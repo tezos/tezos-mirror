@@ -175,6 +175,7 @@ trigger:
   - gcp
   dependencies: []
   timeout: 10 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -196,6 +197,7 @@ sanity_ci:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -217,6 +219,7 @@ docker:hadolint:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -241,6 +244,7 @@ oc.ocaml_fmt:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -269,6 +273,7 @@ oc.semgrep:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -289,6 +294,7 @@ oc.misc_checks:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -316,6 +322,7 @@ check_jsonnet:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -338,6 +345,7 @@ check_rust_fmt:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -361,6 +369,7 @@ nix:
     paths:
     - /nix/store
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -386,6 +395,7 @@ commit_titles:
   dependencies: []
   allow_failure: false
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -417,6 +427,7 @@ oc.build_arm64-released:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -469,6 +480,7 @@ oc.build_arm64-extra-dev:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -528,6 +540,7 @@ oc.build_arm64-extra-exp:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -590,6 +603,7 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -641,6 +655,7 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -692,6 +707,7 @@ oc.build_x86_64-released:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -752,6 +768,7 @@ oc.build_amd64-extra-dev:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -824,6 +841,7 @@ oc.build_amd64-extra-exp:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -888,6 +906,7 @@ wasm-runtime-check:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -924,6 +943,7 @@ oc.build_kernels:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -971,6 +991,7 @@ oc.build_dsn_node:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1004,6 +1025,7 @@ oc.tezt:fetch-records:
   - oc.docker:ci:amd64
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1043,6 +1065,7 @@ build_octez_source:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1091,6 +1114,7 @@ etherlink.build:static-x86_64:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1140,6 +1164,7 @@ etherlink.build:static-arm64:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1185,6 +1210,7 @@ build-layer1-profiling:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1226,6 +1252,7 @@ select_tezts:
   allow_failure:
     exit_codes: 17
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1296,6 +1323,7 @@ kaitai_checks:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1333,6 +1361,7 @@ kaitai_e2e_checks:
   - oc.docker:client-libs-dependencies
   - kaitai_checks
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1366,6 +1395,7 @@ oc.check_lift_limits_patch:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1398,6 +1428,7 @@ oc.python_check:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1433,6 +1464,7 @@ oc.integration:compiler-rejections:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1462,6 +1494,7 @@ oc.script:test-gen-genesis:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1503,6 +1536,7 @@ oc.script:snapshot_alpha_and_link:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1540,6 +1574,7 @@ oc.script:test_octez_release_versions:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1564,6 +1599,7 @@ oc.script:b58_prefix:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1594,6 +1630,7 @@ oc.test-liquidity-baking-scripts:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1617,6 +1654,7 @@ oc:scripts:release_script_values:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1643,6 +1681,7 @@ mir_unit:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1671,6 +1710,7 @@ mir_tzt:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1703,6 +1743,7 @@ test_sdk_rust:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1740,6 +1781,7 @@ test_sdk_bindings:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1778,6 +1820,7 @@ test_kernels:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1817,6 +1860,7 @@ test_etherlink_kernel:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1856,6 +1900,7 @@ test_etherlink_firehose:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1891,6 +1936,7 @@ audit_riscv_deps:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1928,6 +1974,7 @@ check_riscv_kernels:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -1967,6 +2014,7 @@ test_evm_compatibility:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2005,6 +2053,7 @@ ocaml-check:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2050,6 +2099,7 @@ oc.unit:non-proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2115,6 +2165,7 @@ oc.unit:etherlink-x86_64:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2180,6 +2231,7 @@ oc.unit:other-x86_64:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2245,6 +2297,7 @@ oc.unit:proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2306,6 +2359,7 @@ oc.unit:non-proto-arm64:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2351,6 +2405,7 @@ oc.unit:webassembly-x86_64:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 20 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2385,6 +2440,7 @@ oc.unit:protocol_compiles:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2416,6 +2472,7 @@ de.unit:x86_64:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2440,6 +2497,7 @@ de.unit:arm64:
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2464,6 +2522,7 @@ resto.unit:x86_64:
   dependencies:
   - oc.docker:ci:amd64
   timeout: 10 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2488,6 +2547,7 @@ resto.unit:arm64:
   dependencies:
   - oc.docker:ci:arm64
   timeout: 10 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2509,6 +2569,7 @@ oc.install_opam_noble:
   dependencies: []
   allow_failure: true
   timeout: 2 hours
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2530,6 +2591,7 @@ oc.compile_sources_doc_master:
   - trigger
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2572,6 +2634,7 @@ tezt:
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 40 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2645,6 +2708,7 @@ tezt-time-sensitive:
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2717,6 +2781,7 @@ tezt-slow:
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2786,6 +2851,7 @@ tezt-extra:
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2856,6 +2922,7 @@ tezt-flaky:
   - oc.tezt:fetch-records
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2924,6 +2991,7 @@ tezt:static-binaries:
   - oc.build:static-x86_64-linux-binaries
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -2990,6 +3058,7 @@ tezt-riscv-slow-sequential:
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3050,6 +3119,7 @@ oc.unified_coverage:
   allow_failure:
     exit_codes: 64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3088,6 +3158,7 @@ oc.docker:amd64:
   - oc.docker:rust-toolchain:amd64
   - oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3117,6 +3188,7 @@ oc.docker:arm64:
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3145,6 +3217,7 @@ oc.script.docker_verify_image_arm64:
   - oc.docker:arm64
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3170,6 +3243,7 @@ oc.script.docker_verify_image_amd64:
   - oc.docker:amd64
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3194,7 +3268,7 @@ documentation.rst-check:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3225,7 +3299,7 @@ documentation.docgen:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3271,7 +3345,7 @@ documentation.manuals:
   - oc.build_kernels
   - oc.build_dsn_node
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3310,7 +3384,7 @@ documentation.odoc:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3356,7 +3430,7 @@ documentation.build_all:
   - documentation.manuals
   - documentation.docgen
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3393,7 +3467,7 @@ documentation.linkcheck:
   - documentation.build_all
   allow_failure: true
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3417,7 +3491,7 @@ documentation.install_python_bookworm:
   - trigger
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3449,7 +3523,7 @@ teztale.build-arm64:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3498,7 +3572,7 @@ teztale.build-x86_64:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3538,7 +3612,7 @@ grafazos.build:
   dependencies:
   - oc.docker:jsonnet:amd64
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh

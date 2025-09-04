@@ -368,7 +368,8 @@ let () =
     ~jobs:
       (Code_verification.jobs Merge_train @ !Hooks.before_merging
       |> List.map (Tezos_ci.set_tezos_job_cache_policy Gitlab_ci.Types.Push)
-      |> List.map Tezos_ci.no_rules)
+      |> List.map Tezos_ci.no_rules
+      |> List.map (with_interruptible false))
     ~description:
       "Scheduled pipelines that mimics a full version of 'merge_train'.\n\n\
        It starts automatically, and unlike real merge_train pipelines, is not \
