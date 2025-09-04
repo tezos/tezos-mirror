@@ -38,6 +38,10 @@ val when_always : tezos_job -> tezos_job
 (** temp *)
 val has_cache_or_start_stage : tezos_job -> bool
 
+(** Set [retry:max] to [0]. Overload the default [retry] policy. Used in
+    [schedule_merge_train_cache_refresh] pipeline. *)
+val no_retry : tezos_job -> tezos_job
+
 (** A string that should be prepended to all generated files.
 
     Warns not to modify the generated files, and refers to the generator. *)

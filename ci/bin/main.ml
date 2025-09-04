@@ -371,6 +371,7 @@ let () =
       |> List.map (Tezos_ci.set_tezos_job_cache_policy Gitlab_ci.Types.Push)
       |> List.map Tezos_ci.no_rules
       |> List.map Tezos_ci.when_always
+      |> List.map Tezos_ci.no_retry
       |> List.map (with_interruptible false))
     ~description:
       "Scheduled pipelines that mimics a full version of 'merge_train'.\n\n\
