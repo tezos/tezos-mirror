@@ -161,6 +161,17 @@ let no_rules job =
   in
   {job with job = new_generic_job}
 
+let when_always job =
+  let generic_job = job.job in
+  let new_generic_job =
+    let open Gitlab_ci.Types in
+    match generic_job with
+    | Trigger_job trigger_job ->
+        Trigger_job {trigger_job with when_ = Some Always}
+    | Job job -> Job {job with when_ = Some Always}
+  in
+  {job with job = new_generic_job}
+
 type tezos_image =
   | Internal of {
       image : Gitlab_ci.Types.image;
