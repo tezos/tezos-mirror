@@ -22,6 +22,7 @@ for file in /usr/bin/octez-baker-P*; do
     if [ "$AGNOSTIC_BAKER" = "true" ]; then
       systemctl start "octez-agnostic-baker"
       systemctl start "octez-agnostic-accuser"
+      break
     else
       systemctl start "octez-baker@$proto"
       systemctl start "octez-accuser@$proto"
