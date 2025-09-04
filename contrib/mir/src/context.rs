@@ -9,9 +9,9 @@
 
 #![allow(clippy::type_complexity)]
 use crate::ast::big_map::{InMemoryLazyStorage, LazyStorage};
-use crate::ast::michelson_address::AddressHash;
 #[cfg(feature = "runtime_entrypoint_verification")]
 use crate::ast::michelson_address::entrypoint::Entrypoints;
+use crate::ast::michelson_address::AddressHash;
 use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;

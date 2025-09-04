@@ -164,6 +164,7 @@ mod tests {
     use crate::typechecker::typecheck_instruction;
     use std::collections::HashMap;
     use std::rc::Rc;
+    use tezos_crypto_rs::hash::ContractKt1Hash;
 
     fn report_gas<'a, R, F: FnOnce(&mut Ctx<'a>) -> R>(ctx: &mut Ctx<'a>, f: F) -> R {
         let initial_milligas = ctx.gas.milligas();
@@ -1056,6 +1057,7 @@ mod tests {
             parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
                 .unwrap();
         let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(CreateContract {
                 delegate: None,
@@ -1063,11 +1065,10 @@ mod tests {
                 storage: TypedValue::Unit,
                 code: Rc::new(cs),
                 micheline_code: &cs_mich,
+                address: ContractKt1Hash::try_from(expected_addr).unwrap(),
             }),
             101,
         );
-        let expected_addr =
-            TypedValue::Address(Address::try_from("KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K").unwrap());
         run_e2e_test(
             &Arena::new(),
             r#"CREATE_CONTRACT {
@@ -1082,7 +1083,10 @@ mod tests {
                 TypedValue::Mutez(100),
                 TypedValue::new_option(None)
             ],
-            stk![expected_addr, expected_op],
+            stk![
+                TypedValue::Address(Address::try_from(expected_addr).unwrap()),
+                expected_op
+            ],
             {
                 let mut ctx = Ctx::default();
                 ctx.set_operation_counter(100);

@@ -16,7 +16,10 @@ use num_traits::{Signed, ToPrimitive, Zero};
 use std::cmp::min;
 use std::ops::{Shl, Shr};
 use std::rc::Rc;
-use tezos_crypto_rs::blake2b::digest as blake2bdigest;
+use tezos_crypto_rs::{
+    blake2b::digest as blake2bdigest,
+    hash::{ContractKt1Hash, HashTrait},
+};
 use typed_arena::Arena;
 
 use crate::ast::big_map::{BigMap, LazyStorageError};
@@ -1765,10 +1768,11 @@ fn interpret_one<'a>(
             let amount = pop!(V::Mutez);
             let storage = pop!();
             let origination_counter = ctx.origination_counter();
-            stack.push(TypedValue::Address(compute_contract_address(
-                &ctx.operation_group_hash,
-                origination_counter,
-            )));
+            let address = compute_contract_address(&ctx.operation_group_hash, origination_counter);
+            stack.push(TypedValue::Address(Address {
+                hash: AddressHash::Kt1(address.clone()),
+                entrypoint: Entrypoint::default(),
+            }));
             stack.push(TypedValue::new_operation(
                 Operation::CreateContract(CreateContract {
                     delegate: opt_keyhash,
@@ -1776,6 +1780,7 @@ fn interpret_one<'a>(
                     storage,
                     code: cs.clone(), // This clone is cheap since it is an Rc.
                     micheline_code: micheline,
+                    address,
                 }),
                 counter,
             ))
@@ -1794,19 +1799,14 @@ fn interpret_one<'a>(
 ///
 /// # Returns
 ///
-/// Returns an `Address` struct containing the computed contract address.
-pub fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -> Address {
-    use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
+/// Returns a `ContractKt1Hash` struct containing the computed contract address.
+pub fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -> ContractKt1Hash {
     let mut input: [u8; 36] = [0; 36];
     input[..32].copy_from_slice(operation_group_hash);
     // append bytes representing o_index
     input[32..36].copy_from_slice(&o_index.to_be_bytes());
     let digest = blake2bdigest(&input, ContractKt1Hash::hash_size()).unwrap();
-
-    Address {
-        hash: AddressHash::Kt1(HashTrait::try_from_bytes(digest.as_slice()).unwrap()),
-        entrypoint: Entrypoint::default(),
-    }
+    HashTrait::try_from_bytes(digest.as_slice()).unwrap()
 }
 
 fn get_nth_field_ref<'a, 'b>(
@@ -6555,6 +6555,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.set_operation_counter(100);
         let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(super::CreateContract {
                 delegate: None,
@@ -6562,11 +6563,9 @@ mod interpreter_tests {
                 storage: TypedValue::Unit,
                 code: Rc::new(cs.clone()),
                 micheline_code: &cs_mich,
+                address: ContractKt1Hash::try_from(expected_addr).unwrap(),
             }),
             101,
-        );
-        let expected_addr = TypedValue::Address(
-            addr::Address::try_from("KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K").unwrap(),
         );
         let mut stack = stk![
             TypedValue::Unit,
@@ -6582,7 +6581,13 @@ mod interpreter_tests {
             ),
             Ok(())
         );
-        assert_eq!(stack, stk![expected_addr, expected_op]);
+        assert_eq!(
+            stack,
+            stk![
+                TypedValue::Address(addr::Address::try_from(expected_addr).unwrap()),
+                expected_op
+            ]
+        );
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::CREATE_CONTRACT + interpret_cost::INTERPRET_RET
@@ -7097,7 +7102,7 @@ mod interpreter_tests {
                 .unwrap(),
                 0
             ),
-            addr::Address::try_from("KT1UvfyLytrt71jh63YV4Yex5SmbNXpWHxtg").unwrap(),
+            ContractKt1Hash::try_from("KT1UvfyLytrt71jh63YV4Yex5SmbNXpWHxtg").unwrap(),
         );
     }
 }
