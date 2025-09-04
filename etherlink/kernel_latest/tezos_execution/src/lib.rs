@@ -1016,11 +1016,12 @@ mod tests {
             TransferContent,
         },
         operation_result::{
-            ApplyOperationError, ApplyOperationErrors, Balance, BalanceTooLow,
-            BalanceUpdate, ContentResult, CounterError, InternalContentWithMetadata,
-            InternalOperationSum, OperationResult, OperationResultSum, Originated,
-            OriginationError, OriginationSuccess, RevealError, RevealSuccess,
-            TransferError, TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
+            ApplyOperationError, ApplyOperationErrors, BacktrackedResult, Balance,
+            BalanceTooLow, BalanceUpdate, ContentResult, CounterError,
+            InternalContentWithMetadata, InternalOperationSum, OperationKind,
+            OperationResult, OperationResultSum, Originated, OriginationError,
+            OriginationSuccess, RevealError, RevealSuccess, TransferError,
+            TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
         },
     };
 
@@ -3061,10 +3062,13 @@ mod tests {
             if let InternalOperationSum::Transfer(InternalContentWithMetadata {
                 content: TransferContent { destination, .. },
                 result:
-                    ContentResult::BackTracked(TransferTarget::ToContrat(TransferSuccess {
-                        balance_updates,
-                        ..
-                    })),
+                    ContentResult::BackTracked(BacktrackedResult {
+                        errors: None,
+                        result:
+                            TransferTarget::ToContrat(TransferSuccess {
+                                balance_updates, ..
+                            }),
+                    }),
                 ..
             }) = &internal_operation_results[0]
             {
@@ -3661,6 +3665,13 @@ mod tests {
         );
     }
 
+    fn backtrack_result<M: OperationKind>(result: M::Success) -> BacktrackedResult<M> {
+        BacktrackedResult {
+            errors: None,
+            result,
+        }
+    }
+
     #[test]
     fn test_try_apply_three_origination_batch() {
         let mut host = MockKernelHost::default();
@@ -3749,9 +3760,9 @@ mod tests {
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                 ],
-                result: ContentResult::BackTracked(RevealSuccess {
+                result: ContentResult::BackTracked(backtrack_result(RevealSuccess {
                     consumed_gas: 0_u64.into(),
-                }),
+                })),
                 internal_operation_results: vec![],
             }),
             OperationResultSum::Origination(OperationResult {
@@ -3767,55 +3778,57 @@ mod tests {
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                 ],
-                result: ContentResult::BackTracked(OriginationSuccess {
-                    balance_updates: vec![
-                        BalanceUpdate {
-                            balance: Balance::Account(Contract::Implicit(
-                                src.pkh.clone(),
-                            )),
-                            changes: -15,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                        BalanceUpdate {
-                            balance: Balance::Account(Contract::Originated(
-                                expected_kt1_1.clone(),
-                            )),
-                            changes: 15,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                        BalanceUpdate {
-                            balance: Balance::Account(Contract::Implicit(
-                                src.pkh.clone(),
-                            )),
-                            changes: -7500,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                        BalanceUpdate {
-                            balance: Balance::StorageFees,
-                            changes: 7500,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                        BalanceUpdate {
-                            balance: Balance::Account(Contract::Implicit(
-                                src.pkh.clone(),
-                            )),
-                            changes: -64250,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                        BalanceUpdate {
-                            balance: Balance::StorageFees,
-                            changes: 64250,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                    ],
-                    originated_contracts: vec![Originated {
-                        contract: expected_kt1_1.clone(),
-                    }],
-                    consumed_gas: 0_u64.into(),
-                    storage_size: 30.into(),
-                    paid_storage_size_diff: 30.into(),
-                    lazy_storage_diff: None,
-                }),
+                result: ContentResult::BackTracked(backtrack_result(
+                    OriginationSuccess {
+                        balance_updates: vec![
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -15,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Originated(
+                                    expected_kt1_1.clone(),
+                                )),
+                                changes: 15,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -7500,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::StorageFees,
+                                changes: 7500,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -64250,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::StorageFees,
+                                changes: 64250,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                        ],
+                        originated_contracts: vec![Originated {
+                            contract: expected_kt1_1.clone(),
+                        }],
+                        consumed_gas: 0_u64.into(),
+                        storage_size: 30.into(),
+                        paid_storage_size_diff: 30.into(),
+                        lazy_storage_diff: None,
+                    },
+                )),
                 internal_operation_results: vec![],
             }),
             OperationResultSum::Origination(OperationResult {
@@ -3831,55 +3844,57 @@ mod tests {
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                 ],
-                result: ContentResult::BackTracked(OriginationSuccess {
-                    balance_updates: vec![
-                        BalanceUpdate {
-                            balance: Balance::Account(Contract::Implicit(
-                                src.pkh.clone(),
-                            )),
-                            changes: -20,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                        BalanceUpdate {
-                            balance: Balance::Account(Contract::Originated(
-                                expected_kt1_2.clone(),
-                            )),
-                            changes: 20,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                        BalanceUpdate {
-                            balance: Balance::Account(Contract::Implicit(
-                                src.pkh.clone(),
-                            )),
-                            changes: -7500,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                        BalanceUpdate {
-                            balance: Balance::StorageFees,
-                            changes: 7500,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                        BalanceUpdate {
-                            balance: Balance::Account(Contract::Implicit(
-                                src.pkh.clone(),
-                            )),
-                            changes: -64250,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                        BalanceUpdate {
-                            balance: Balance::StorageFees,
-                            changes: 64250,
-                            update_origin: UpdateOrigin::BlockApplication,
-                        },
-                    ],
-                    originated_contracts: vec![Originated {
-                        contract: expected_kt1_2.clone(),
-                    }],
-                    consumed_gas: 0_u64.into(),
-                    storage_size: 30.into(),
-                    paid_storage_size_diff: 30.into(),
-                    lazy_storage_diff: None,
-                }),
+                result: ContentResult::BackTracked(backtrack_result(
+                    OriginationSuccess {
+                        balance_updates: vec![
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -20,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Originated(
+                                    expected_kt1_2.clone(),
+                                )),
+                                changes: 20,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -7500,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::StorageFees,
+                                changes: 7500,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -64250,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::StorageFees,
+                                changes: 64250,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                        ],
+                        originated_contracts: vec![Originated {
+                            contract: expected_kt1_2.clone(),
+                        }],
+                        consumed_gas: 0_u64.into(),
+                        storage_size: 30.into(),
+                        paid_storage_size_diff: 30.into(),
+                        lazy_storage_diff: None,
+                    },
+                )),
                 internal_operation_results: vec![],
             }),
             OperationResultSum::Origination(OperationResult {

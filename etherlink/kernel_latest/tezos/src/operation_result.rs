@@ -438,7 +438,13 @@ pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
     Failed(ApplyOperationErrors),
     Skipped,
-    BackTracked(M::Success),
+    BackTracked(BacktrackedResult<M>),
+}
+
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
+pub struct BacktrackedResult<M: OperationKind> {
+    pub errors: Option<()>,
+    pub result: M::Success,
 }
 
 impl<M: OperationKind> ContentResult<M> {
@@ -448,7 +454,10 @@ impl<M: OperationKind> ContentResult<M> {
             // the result with Skipped as a place holder
             let current_content_result = std::mem::replace(self, ContentResult::Skipped);
             if let ContentResult::Applied(success) = current_content_result {
-                *self = ContentResult::BackTracked(success);
+                *self = ContentResult::BackTracked(BacktrackedResult {
+                    errors: None,
+                    result: success,
+                });
             }
         }
     }
@@ -588,9 +597,10 @@ pub fn produce_operation_result<M: OperationKind>(
                 result: if all_internal_succeded {
                     ContentResult::Applied(success)
                 } else {
-                    ContentResult::BackTracked(
-                        success, // If internal operations failed, we backtrack the main operation result
-                    )
+                    ContentResult::BackTracked(BacktrackedResult {
+                        errors: None,
+                        result: success, // If internal operations failed, we backtrack the main operation result
+                    })
                 },
                 internal_operation_results,
             }
