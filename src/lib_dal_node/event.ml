@@ -357,18 +357,24 @@ open struct
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
 
-  let stored_slot_shard =
+  let cached_or_stored_slot_shard ~kind =
     declare_3
       ~section
       ~prefix_name_with_section:true
-      ~name:"stored_slot_shard"
+      ~name:(Format.sprintf "%s_slot_shard" kind)
       ~msg:
-        "stored shard {shard_index} for level {published_level} and index \
-         {slot_index}"
+        (Format.sprintf
+           "%s shard {shard_index} for level {published_level} and index \
+            {slot_index}"
+           kind)
       ~level:Debug
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("shard_index", Data_encoding.int31)
+
+  let stored_slot_shard = cached_or_stored_slot_shard ~kind:"stored"
+
+  let cached_slot_shard = cached_or_stored_slot_shard ~kind:"cached"
 
   let stored_slot_status =
     declare_3
@@ -1272,6 +1278,9 @@ let emit_stored_slot_content ~published_level ~slot_index =
 
 let emit_stored_slot_shard ~published_level ~slot_index ~shard_index =
   emit stored_slot_shard (published_level, slot_index, shard_index)
+
+let emit_cached_slot_shard ~published_level ~slot_index ~shard_index =
+  emit cached_slot_shard (published_level, slot_index, shard_index)
 
 let emit_stored_slot_status ~published_level ~slot_index ~status =
   emit stored_slot_status (published_level, slot_index, status)

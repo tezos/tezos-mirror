@@ -285,10 +285,7 @@ module Shards_cache = struct
           0
           shard_indexes
 
-  (** [write_all ~silent cache slot_id shards]:
-      - If [silent = true], do not emit events/metrics for shard storage.
-      - If [silent = false], emit events for each newly stored shard. *)
-  let write_all ~silent cache slot_id shards =
+  let write_all cache slot_id shards =
     let open Lwt_result_syntax in
     let cached_shards =
       match
@@ -312,12 +309,10 @@ module Shards_cache = struct
                 [@profiler.aggregate_f {verbosity = Notice} "add shard"])
              in
              let*! () =
-               if silent then Lwt.return_unit
-               else
-                 Event.emit_stored_slot_shard
-                   ~published_level:slot_id.slot_level
-                   ~slot_index:slot_id.slot_index
-                   ~shard_index:index
+               Event.emit_cached_slot_shard
+                 ~published_level:slot_id.slot_level
+                 ~slot_index:slot_id.slot_index
+                 ~shard_index:index
              in
              return shards_map)
          cached_shards
@@ -401,16 +396,12 @@ module Shards = struct
   let write_all {disk; cache} slot_id shards =
     let open Lwt_result_syntax in
     match disk with
-    | None ->
-        (* Cache-only: allow events/metrics from the cache. *)
-        Cache.write_all ~silent:false cache slot_id shards
+    | None -> Cache.write_all cache slot_id shards
     | Some d ->
         (* Disk must succeed for persistence. *)
         let* () = Disk.write_all d slot_id shards in
-        (* Then write-through to cache silently; ignore its failure. *)
-        let*! (_ : (unit, _) result) =
-          Cache.write_all ~silent:true cache slot_id shards
-        in
+        (* Then write-through to cache; ignore its failure. *)
+        let*! (_ : (unit, _) result) = Cache.write_all cache slot_id shards in
         return_unit
 
   let read st slot_id shard_id =
