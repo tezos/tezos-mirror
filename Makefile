@@ -148,8 +148,8 @@ $(ALL_EXECUTABLES): check-slim-mode check-custom-flags
 	echo "Make var $(DUNE_BUILD_JOBS)"
 	echo "Env var $$DUNE_BUILD_JOBS"
 	env | grep "DUNE_BUILD_JOBS" || echo "DUNE_BUILD_JOBS not found in environment"
-	#dune build $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
-	#cp -f _build/install/default/bin/$@ ./
+	dune build $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
+	cp -f _build/install/default/bin/$@ ./
 
 # If slim mode is active, kaitai updates should fail, as some protocol encoding
 # will be missing.
@@ -256,12 +256,12 @@ endif
 	echo "Make var $(DUNE_BUILD_JOBS)"
 	echo "Env var $$DUNE_BUILD_JOBS"
 	env | grep "DUNE_BUILD_JOBS" || echo "DUNE_BUILD_JOBS not found in environment"
-	# dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) $(DUNE_BUILD_JOBS) \
-	# 	$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
-	# 	$(BUILD_EXTRA) \
-	# 	@copy-parameters
-	# @mkdir -p $(OCTEZ_BIN_DIR)/
-	# @cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) $(OCTEZ_BIN_DIR)/
+	dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) $(DUNE_BUILD_JOBS) \
+		$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
+	 	$(BUILD_EXTRA) \
+	 	@copy-parameters
+	@mkdir -p $(OCTEZ_BIN_DIR)/
+	@cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) $(OCTEZ_BIN_DIR)/
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
