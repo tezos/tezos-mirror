@@ -857,7 +857,8 @@ let jobs pipeline_type =
        ]
       @ Option.to_list job_select_tezts
       @ bin_packages_jobs) ;
-    [job_static_x86_64_experimental; job_static_arm64_experimental]
+    ignore [job_static_x86_64_experimental; job_static_arm64_experimental] ;
+    [job_static_x86_64_experimental]
   in
 
   (* Packaging jobs *)
