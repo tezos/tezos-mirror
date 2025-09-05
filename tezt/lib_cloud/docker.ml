@@ -46,11 +46,11 @@ let push ?image_name ?alias ?(tag = "latest") ~registry_uri () =
   let args = ["push"; Format.asprintf "%s/%s:%s" registry_uri image_name tag] in
   Process.spawn ~name ~color "docker" args
 
-let pull ?image_name ?alias ?(tag = "latest") ~registry_uri () =
+let pull ?runner ?image_name ?alias ?(tag = "latest") ~registry_uri () =
   let alias = Option.value ~default:Env.dockerfile_alias alias in
   let image_name = Option.value ~default:alias image_name in
   let args = ["pull"; Format.asprintf "%s/%s:%s" registry_uri image_name tag] in
-  Process.spawn ~name ~color "docker" args
+  Process.spawn ?runner ~name ~color "docker" args
 
 let network ~command ~network_name =
   Process.spawn ~color "docker" (["network"] @ [command] @ [network_name])

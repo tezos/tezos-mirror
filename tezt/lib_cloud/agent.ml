@@ -30,6 +30,26 @@ module Configuration = struct
         Lwt.return (Format.asprintf "%s/octez" registry_uri)
     | Octez_release _, `Local_orchestrator_local_agents -> Lwt.return "octez"
 
+  let registry_uri_of_docker_image docker_image =
+    match (docker_image, Env.mode) with
+    | ( Types.Agent_configuration.Gcp {alias = _},
+        ( `Local_orchestrator_remote_agents | `Remote_orchestrator_remote_agents
+        | `Remote_orchestrator_local_agents | `Ssh_host _ ) ) ->
+        let* registry_uri = Env.registry_uri () in
+        return (Some registry_uri)
+    | Gcp {alias = _}, `Local_orchestrator_local_agents -> Lwt.return None
+    | ( Octez_release _,
+        ( `Local_orchestrator_remote_agents | `Remote_orchestrator_remote_agents
+        | `Remote_orchestrator_local_agents | `Ssh_host _ ) ) ->
+        let* registry_uri = Env.registry_uri () in
+        Lwt.return (Some registry_uri)
+    | Octez_release _, `Local_orchestrator_local_agents -> return None
+
+  let docker_image_name docker_image =
+    match (docker_image, Env.mode) with
+    | Types.Agent_configuration.Gcp {alias}, _ -> alias
+    | Octez_release _, _ -> "octez"
+
   let gen_name =
     let cpt = ref (-1) in
     fun () ->
@@ -130,7 +150,7 @@ let encoding =
                 I don't have a good proposition that keeps a nice UX and is secure at the moment.
             *)
             Runner.create
-              ~options:Ssh.ssh_options
+              ~options:(Ssh.ssh_options @ ["-o"; "IdentitiesOnly=yes"])
               ~ssh_user:"root"
               ~ssh_id
               ~ssh_port
@@ -185,8 +205,12 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
     | Some _, None | None, Some _ ->
         Test.fail "Agent.make was not initialized correctly"
     | Some (address, ssh_port), Some ssh_id ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/8052
+
+           once changes in tezt are merged, ie the IdentitiesOnly option is
+           automatically inserted by tezt ssh wrapper, we can remove it here. *)
         Runner.create
-          ~options:Ssh.ssh_options
+          ~options:(Ssh.ssh_options @ ["-o"; "IdentitiesOnly=yes"])
           ~ssh_user
           ~ssh_id
           ~ssh_port
