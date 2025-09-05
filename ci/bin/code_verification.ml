@@ -704,7 +704,7 @@ let jobs pipeline_type =
            of those that do are limiting factors in the total duration
            of pipelines. So we start this job as early as possible,
            without waiting for sanity_ci. *)
-      ~dependencies:dependencies_needs_start
+        (* ~dependencies:dependencies_needs_start *)
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
   in
@@ -713,7 +713,7 @@ let jobs pipeline_type =
       ~__POS__
       ~arch:Arm64
       ~storage:Ramfs
-      ~dependencies:dependencies_needs_start (* See rationale above *)
+        (* ~dependencies:dependencies_needs_start (\* See rationale above *\) *)
       ~rules:(make_rules ~manual:(On_changes changeset_octez) ())
       ()
   in
@@ -2089,4 +2089,4 @@ let jobs pipeline_type =
     | Schedule_extended_test -> []
   in
   ignore (start_stage @ sanity @ build @ packaging @ test @ coverage @ manual) ;
-  start_stage @ build
+  build

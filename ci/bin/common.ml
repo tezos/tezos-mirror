@@ -620,7 +620,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(cpu = Runner.CPU.Normal) ?storage
     ?storage
     ~name
     ?retry
-    ~image:Images.CI.build
+    ~image:Images.CI.build_master
     ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
     ~variables:
       ([
