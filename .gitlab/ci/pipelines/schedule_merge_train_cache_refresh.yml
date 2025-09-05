@@ -737,6 +737,9 @@ oc.build_kernels:
   stage: build
   tags:
   - gcp
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - trigger
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes

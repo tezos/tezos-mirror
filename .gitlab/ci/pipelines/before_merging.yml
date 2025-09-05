@@ -1223,6 +1223,9 @@ oc.build_kernels:
     - tzt_reference_test_suite/**/*
     - vendors/**/*.ml*
     when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - trigger
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes

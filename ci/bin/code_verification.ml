@@ -661,6 +661,7 @@ let jobs pipeline_type =
 
   let job_build_kernels =
     job_build_kernels
+      ~dependencies:dependencies_needs_start
       ~rules:
         (make_rules
            ~changes:changeset_octez_or_kernels_or_doc
