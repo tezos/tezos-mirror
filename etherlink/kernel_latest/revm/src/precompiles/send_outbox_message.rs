@@ -35,7 +35,8 @@ use crate::{
             FA_WITHDRAWAL_SOL_ADDR, SEND_OUTBOX_MESSAGE_BASE_COST,
             SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
         },
-        provider::revert,
+        error::CustomPrecompileError,
+        guard::{guard, OOG},
     },
 };
 
@@ -79,7 +80,7 @@ sol! {
 }
 
 /// Withdrawal interface of the ticketer contract
-pub type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
+type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
 
 /// Interface of the default entrypoint of the fast withdrawal contract.
 ///
@@ -90,7 +91,7 @@ pub type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
 /// * withdrawer's address
 /// * generic payload
 /// * l2 caller's address
-pub type FastWithdrawalInterface = MichelsonPair<
+type FastWithdrawalInterface = MichelsonPair<
     MichelsonNat,
     MichelsonPair<
         FA2_1Ticket,
@@ -113,7 +114,7 @@ pub enum Withdrawal {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum SendOutboxRevertReason {
+enum SendOutboxRevertReason {
     #[error("Custom decode error: {0}")]
     CustomDecode(String),
 
@@ -135,8 +136,20 @@ pub enum SendOutboxRevertReason {
     #[error("Fixed byte array conversion error: {0}")]
     IntoFixedInvalidSize(usize),
 
-    #[error("Database access error: {0}")]
-    DatabaseAccess(#[from] crate::Error),
+    #[error("Database access error")]
+    DatabaseAccess(CustomPrecompileError),
+}
+
+impl From<CustomPrecompileError> for SendOutboxRevertReason {
+    fn from(e: CustomPrecompileError) -> Self {
+        SendOutboxRevertReason::DatabaseAccess(e)
+    }
+}
+
+impl From<SendOutboxRevertReason> for CustomPrecompileError {
+    fn from(e: SendOutboxRevertReason) -> Self {
+        CustomPrecompileError::Revert(e.to_string())
+    }
 }
 
 impl<'a> From<nom::Err<DecodeError<&'a [u8]>>> for SendOutboxRevertReason {
@@ -446,39 +459,29 @@ pub(crate) fn send_outbox_message_precompile<CTX, DB>(
     is_static: bool,
     transfer: &InputsImpl,
     gas_limit: u64,
-) -> InterpreterResult
+) -> Result<InterpreterResult, CustomPrecompileError>
 where
     CTX: ContextTr,
     CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
     DB: DatabasePrecompileStateChanges,
 {
-    if transfer.target_address != SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS {
-        return revert("invalid transfer target address");
-    }
-
-    if is_static {
-        return revert("static calls are not allowed");
-    }
-
-    if !matches!(
-        transfer.caller_address,
-        WITHDRAWAL_SOL_ADDR | FA_WITHDRAWAL_SOL_ADDR
-    ) {
-        return revert("unauthorized caller");
-    }
+    guard(
+        SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
+        &[WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_ADDR],
+        transfer,
+        is_static,
+    )?;
 
     let mut gas = Gas::new(gas_limit);
-
     if !gas.record_cost(SEND_OUTBOX_MESSAGE_BASE_COST) {
-        return revert("OutOfGas");
+        return Ok(OOG);
     }
 
-    match send_outbox_methods(input, context) {
-        Ok(output) => InterpreterResult {
-            result: InstructionResult::Return,
-            gas,
-            output,
-        },
-        Err(reason) => revert(reason),
-    }
+    let output = send_outbox_methods(input, context)?;
+
+    Ok(InterpreterResult {
+        result: InstructionResult::Return,
+        gas,
+        output,
+    })
 }

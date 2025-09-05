@@ -4,9 +4,10 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
+    custom,
     helpers::legacy::FaDepositWithProxy,
     journal::PrecompileStateChanges,
-    precompiles::send_outbox_message::Withdrawal,
+    precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
     storage::{
         block::{get_block_hash, BLOCKS_STORED},
         code::CodeStorage,
@@ -45,6 +46,8 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
     /// This is used in order to avoid the problem of EIP-3607 for address
     /// zero which contains the forwarder code.
     caller: Address,
+    /// Storage access to address zero aka the system address
+    system: StorageAccount,
 }
 
 enum AccountState {
@@ -59,26 +62,36 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
         block: &'a BlockConstants,
         world_state_handler: &'a mut WorldStateHandler,
         caller: Address,
-    ) -> Self {
-        EtherlinkVMDB {
+    ) -> Result<Self, Error> {
+        let system = StorageAccount::get_or_create_account(
+            host,
+            world_state_handler,
+            Address::ZERO,
+        )?;
+        Ok(EtherlinkVMDB {
             host,
             block,
             world_state_handler,
             commit_status: true,
             withdrawals: vec![],
             caller,
-        }
+            system,
+        })
     }
 }
 
 pub trait DatabasePrecompileStateChanges {
-    fn global_counter(&self) -> Result<U256, Error>;
-    fn ticketer(&self) -> Result<ContractKt1Hash, Error>;
-    fn ticket_balance(&self, ticket_hash: &U256, owner: &Address) -> Result<U256, Error>;
+    fn global_counter(&self) -> Result<U256, CustomPrecompileError>;
+    fn ticket_balance(
+        &self,
+        ticket_hash: &U256,
+        owner: &Address,
+    ) -> Result<U256, CustomPrecompileError>;
     fn deposit_in_queue(
         &self,
         deposit_id: &U256,
-    ) -> Result<Option<FaDepositWithProxy>, Error>;
+    ) -> Result<FaDepositWithProxy, CustomPrecompileError>;
+    fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError>;
 }
 
 pub(crate) trait DatabaseCommitPrecompileStateChanges {
@@ -105,21 +118,21 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     pub fn initialize_storage(&mut self) -> Result<(), Error> {
         self.world_state_handler
             .begin_transaction(self.host)
-            .map_err(|err| Error::Custom(err.to_string()))
+            .map_err(custom)
     }
 
     #[instrument(skip_all)]
     pub fn commit_storage(&mut self) -> Result<(), Error> {
         self.world_state_handler
             .commit_transaction(self.host)
-            .map_err(|err| Error::Custom(err.to_string()))
+            .map_err(custom)
     }
 
     #[instrument(skip_all)]
     pub fn drop_storage(&mut self) -> Result<(), Error> {
         self.world_state_handler
             .rollback_transaction(self.host)
-            .map_err(|err| Error::Custom(err.to_string()))
+            .map_err(custom)
     }
 
     pub fn take_withdrawals(&mut self) -> Vec<Withdrawal> {
@@ -186,43 +199,34 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     }
 }
 
+// Precompile read functions care about the difference between a path not found and a runtime error
+// as path not found is the only one that will produce a revert result
 impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
-    fn global_counter(&self) -> Result<U256, Error> {
-        let account_zero = StorageAccount::get_or_create_account(
-            self.host,
-            self.world_state_handler,
-            Address::ZERO,
-        )?;
-        account_zero.read_global_counter(self.host)
+    fn global_counter(&self) -> Result<U256, CustomPrecompileError> {
+        Ok(self.system.read_global_counter(self.host)?)
     }
 
-    fn ticket_balance(&self, ticket_hash: &U256, owner: &Address) -> Result<U256, Error> {
-        let account_zero = StorageAccount::get_or_create_account(
-            self.host,
-            self.world_state_handler,
-            Address::ZERO,
-        )?;
-        account_zero
-            .read_ticket_balance(self.host, ticket_hash, owner)
-            .map(|ticket| ticket.balance)
+    fn ticket_balance(
+        &self,
+        ticket_hash: &U256,
+        owner: &Address,
+    ) -> Result<U256, CustomPrecompileError> {
+        Ok(self
+            .system
+            .read_ticket_balance(self.host, ticket_hash, owner)?)
     }
 
     fn deposit_in_queue(
         &self,
         deposit_id: &U256,
-    ) -> Result<Option<FaDepositWithProxy>, Error> {
-        let account_zero = StorageAccount::get_or_create_account(
-            self.host,
-            self.world_state_handler,
-            Address::ZERO,
-        )?;
-        account_zero.read_deposit_from_queue(self.host, deposit_id)
+    ) -> Result<FaDepositWithProxy, CustomPrecompileError> {
+        Ok(self.system.read_deposit_from_queue(self.host, deposit_id)?)
     }
 
-    fn ticketer(&self) -> Result<ContractKt1Hash, Error> {
+    fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError> {
         let ticketer = self.host.store_read_all(&WITHDRAWALS_TICKETER_PATH)?;
-        let kt1_b58 = String::from_utf8(ticketer.to_vec()).unwrap();
-        Ok(ContractKt1Hash::from_b58check(&kt1_b58).unwrap())
+        let kt1_b58 = String::from_utf8(ticketer.to_vec()).map_err(custom)?;
+        Ok(ContractKt1Hash::from_b58check(&kt1_b58).map_err(custom)?)
     }
 }
 
@@ -292,38 +296,26 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
 impl<Host: Runtime> DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, Host> {
     fn commit(&mut self, etherlink_data: PrecompileStateChanges) {
         self.withdrawals = etherlink_data.withdrawals.into_iter().collect();
-        let Ok(mut address_zero) = StorageAccount::get_or_create_account(
-            self.host,
-            self.world_state_handler,
-            Address::ZERO,
-        ) else {
-            log!(self.host, LogError, "DatabaseCommitPrecompileStateChanges `get_or_create_account` error for address zero");
-            self.abort();
-            return;
-        };
         if let Some(global_counter) = etherlink_data.global_counter {
             abort_on_error!(
                 self,
-                address_zero.write_global_counter(self.host, global_counter),
+                self.system.write_global_counter(self.host, global_counter),
                 "DatabaseCommitPrecompileStateChanges `write_global_counter`"
             );
         }
         for ((owner, ticket_hash), amount) in etherlink_data.ticket_balances {
             abort_on_error!(
                 self,
-                address_zero.write_ticket_balance(
-                    self.host,
-                    &ticket_hash,
-                    &owner,
-                    amount
-                ),
+                self.system
+                    .write_ticket_balance(self.host, &ticket_hash, &owner, amount),
                 "DatabaseCommitPrecompileStateChanges `write_ticket_balance`"
             );
         }
         for deposit_id in etherlink_data.removed_deposits {
             abort_on_error!(
                 self,
-                address_zero.remove_deposit_from_queue(self.host, &deposit_id),
+                self.system
+                    .remove_deposit_from_queue(self.host, &deposit_id),
                 "DatabaseCommitPrecompileStateChanges `remove_deposit_from_queue`"
             );
         }

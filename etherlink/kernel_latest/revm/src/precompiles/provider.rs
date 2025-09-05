@@ -3,13 +3,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::fmt::Display;
-
 use revm::{
     context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
-    interpreter::{CallInput, Gas, InputsImpl, InstructionResult, InterpreterResult},
-    primitives::{Address, Bytes},
+    interpreter::{CallInput, InputsImpl, InterpreterResult},
+    primitives::Address,
 };
 
 use crate::{
@@ -20,7 +18,9 @@ use crate::{
             CUSTOMS, GLOBAL_COUNTER_PRECOMPILE_ADDRESS,
             SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
         },
-        global_counter::global_counte_precompile,
+        error::CustomPrecompileError,
+        global_counter::global_counter_precompile,
+        guard::revert,
         send_outbox_message::send_outbox_message_precompile,
         table::table_precompile,
     },
@@ -74,44 +74,36 @@ impl EtherlinkPrecompiles {
             CallInput::Bytes(bytes) => bytes.to_vec(),
         };
 
-        match *address {
-            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS => {
-                // Can't return kernel errors
-                // Every unexpected behavior will lead to a revert of the precompile execution
-                let result = send_outbox_message_precompile(
-                    &input_bytes,
-                    context,
-                    is_static,
-                    inputs,
-                    gas_limit,
-                );
-                Ok(Some(result))
-            }
+        let result = match *address {
+            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS => send_outbox_message_precompile(
+                &input_bytes,
+                context,
+                is_static,
+                inputs,
+                gas_limit,
+            ),
             TABLE_PRECOMPILE_ADDRESS => {
-                // Has one kernel internal failure point from host functions
-                let result = table_precompile(
-                    &input_bytes,
-                    context,
-                    is_static,
-                    inputs,
-                    gas_limit,
-                )?;
-                Ok(Some(result))
+                table_precompile(&input_bytes, context, is_static, inputs, gas_limit)
             }
-            GLOBAL_COUNTER_PRECOMPILE_ADDRESS => {
-                // Can't return kernel errors
-                // Every unexpected behavior will lead to a revert of the precompile execution
-                let result = global_counte_precompile(
-                    &input_bytes,
-                    context,
-                    is_static,
-                    inputs,
-                    gas_limit,
-                );
-                Ok(Some(result))
+            GLOBAL_COUNTER_PRECOMPILE_ADDRESS => global_counter_precompile(
+                &input_bytes,
+                context,
+                is_static,
+                inputs,
+                gas_limit,
+            ),
+            _ => return Ok(None),
+        };
+
+        let interpreter_result = match result {
+            Ok(interpreter_result) => interpreter_result,
+            Err(CustomPrecompileError::Revert(reason)) => revert(reason),
+            Err(CustomPrecompileError::Abort(runtime)) => {
+                return Err(Error::Runtime(runtime))
             }
-            _ => Ok(None),
-        }
+        };
+
+        Ok(Some(interpreter_result))
     }
 }
 
@@ -153,20 +145,3 @@ where
         self.contains(address)
     }
 }
-
-pub(crate) fn revert<R>(reason: R) -> InterpreterResult
-where
-    R: Display,
-{
-    InterpreterResult {
-        result: InstructionResult::Revert,
-        gas: Gas::new(0),
-        output: Bytes::copy_from_slice(reason.to_string().as_bytes()),
-    }
-}
-
-pub(crate) const OOG: InterpreterResult = InterpreterResult {
-    result: InstructionResult::OutOfGas,
-    gas: Gas::new(0),
-    output: Bytes::new(),
-};

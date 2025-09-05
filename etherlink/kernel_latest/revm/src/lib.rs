@@ -117,7 +117,7 @@ fn tx_env<'a, Host: Runtime>(
 
     let storage_account = world_state_handler
         .get_or_create(host, &account_path(&caller)?)
-        .map_err(|err| Error::Custom(err.to_string()))?;
+        .map_err(custom)?;
     let nonce = storage_account.nonce(host)?;
 
     // Using the transaction environment builder helps to
@@ -271,7 +271,7 @@ pub fn run_transaction<'a, Host: Runtime>(
         block_constants.chain_id.as_u64(),
     )?;
 
-    let db = EtherlinkVMDB::new(host, block_constants, world_state_handler, caller);
+    let db = EtherlinkVMDB::new(host, block_constants, world_state_handler, caller)?;
 
     if let Some(tracer_input) = tracer_input {
         let inspector = get_inspector_from(tracer_input, precompiles.clone(), spec_id);
@@ -971,8 +971,7 @@ mod test {
         assert_eq!(
             storage_account
                 .read_ticket_balance(&host, &U256::from_be_bytes(ticket_hash.0), &caller)
-                .unwrap()
-                .balance,
+                .unwrap(),
             default_ticket_balance
         );
     }

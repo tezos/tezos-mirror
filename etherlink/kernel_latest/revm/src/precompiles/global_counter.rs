@@ -17,7 +17,8 @@ use crate::{
             FA_WITHDRAWAL_SOL_ADDR, GLOBAL_COUNTER_BASE_COST,
             GLOBAL_COUNTER_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
         },
-        provider::{revert, OOG},
+        error::CustomPrecompileError,
+        guard::{guard, revert, OOG},
     },
 };
 
@@ -27,55 +28,43 @@ sol! {
     }
 }
 
-pub(crate) fn global_counte_precompile<CTX, DB>(
+pub(crate) fn global_counter_precompile<CTX, DB>(
     input: &[u8],
     context: &mut CTX,
     is_static: bool,
     transfer: &InputsImpl,
     gas_limit: u64,
-) -> InterpreterResult
+) -> Result<InterpreterResult, CustomPrecompileError>
 where
     DB: DatabasePrecompileStateChanges,
     CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
 {
-    if transfer.target_address != GLOBAL_COUNTER_PRECOMPILE_ADDRESS {
-        return revert("invalid transfer target address");
-    }
-
-    if is_static {
-        return revert("static calls are not allowed");
-    }
-
-    if !matches!(
-        transfer.caller_address,
-        WITHDRAWAL_SOL_ADDR | FA_WITHDRAWAL_SOL_ADDR
-    ) {
-        return revert("unauthorized caller");
-    }
+    guard(
+        GLOBAL_COUNTER_PRECOMPILE_ADDRESS,
+        &[WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_ADDR],
+        transfer,
+        is_static,
+    )?;
 
     let mut gas = Gas::new(gas_limit);
-
     if !gas.record_cost(GLOBAL_COUNTER_BASE_COST) {
-        return OOG;
+        return Ok(OOG);
     }
 
     let interface = match GlobalCounter::GlobalCounterCalls::abi_decode(input) {
         Ok(data) => data,
-        Err(e) => return revert(e),
+        Err(e) => return Ok(revert(e)),
     };
 
     let counter = match interface {
         GlobalCounter::GlobalCounterCalls::get_and_increment(
             GlobalCounter::get_and_incrementCall,
-        ) => match context.journal_mut().get_and_increment_global_counter() {
-            Ok(value) => value,
-            Err(e) => return revert(e),
-        },
+        ) => context.journal_mut().get_and_increment_global_counter()?,
     };
 
-    InterpreterResult {
+    Ok(InterpreterResult {
         result: InstructionResult::Return,
         gas,
         output: Bytes::from(counter.abi_encode()),
-    }
+    })
 }

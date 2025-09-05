@@ -25,8 +25,7 @@ use crate::{
     database::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges},
     helpers::legacy::FaDepositWithProxy,
     layered_state::LayeredState,
-    precompiles::send_outbox_message::Withdrawal,
-    Error,
+    precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
 };
 
 type TicketBalanceKey = (Address, U256);
@@ -308,7 +307,9 @@ impl<DB> JournalExt for Journal<DB> {
 }
 
 impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
-    pub fn get_and_increment_global_counter(&mut self) -> Result<U256, Error> {
+    pub fn get_and_increment_global_counter(
+        &mut self,
+    ) -> Result<U256, CustomPrecompileError> {
         self.layered_state
             .get_and_increment_global_counter(&self.database)
     }
@@ -318,7 +319,7 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
         ticket_hash: U256,
         owner: Address,
         amount: U256,
-    ) -> Result<(), Error> {
+    ) -> Result<(), CustomPrecompileError> {
         self.layered_state.ticket_balance_add(
             &ticket_hash,
             &owner,
@@ -332,7 +333,7 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
         ticket_hash: U256,
         owner: Address,
         amount: U256,
-    ) -> Result<(), Error> {
+    ) -> Result<(), CustomPrecompileError> {
         self.layered_state.ticket_balance_remove(
             &ticket_hash,
             &owner,
@@ -341,7 +342,10 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
         )
     }
 
-    pub fn remove_deposit_from_queue(&mut self, deposit_id: U256) -> Result<(), Error> {
+    pub fn remove_deposit_from_queue(
+        &mut self,
+        deposit_id: U256,
+    ) -> Result<(), CustomPrecompileError> {
         self.layered_state
             .remove_deposit(&deposit_id, &self.database)
     }
@@ -353,9 +357,11 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
     pub fn find_deposit_in_queue(
         &self,
         deposit_id: &U256,
-    ) -> Result<Option<FaDepositWithProxy>, Error> {
+    ) -> Result<FaDepositWithProxy, CustomPrecompileError> {
         if self.layered_state.is_deposit_removed(deposit_id) {
-            return Ok(None);
+            return Err(CustomPrecompileError::Revert(
+                "Deposit removed in layered state".to_string(),
+            ));
         }
         self.database.deposit_in_queue(deposit_id)
     }

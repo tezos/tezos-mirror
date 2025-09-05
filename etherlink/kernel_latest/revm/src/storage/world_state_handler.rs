@@ -91,12 +91,12 @@ const NONCE_DEFAULT_VALUE: u64 = 0;
 
 pub fn account_path(address: &Address) -> Result<OwnedPath, Error> {
     let path_string = format!("/{address:x}");
-    OwnedPath::try_from(path_string).map_err(|err| Error::Custom(err.to_string()))
+    OwnedPath::try_from(path_string).map_err(custom)
 }
 
 pub fn path_from_u256(index: &U256) -> Result<OwnedPath, Error> {
     let path_string = format!("/{}", hex::encode::<[u8; 32]>(index.to_be_bytes()));
-    OwnedPath::try_from(path_string).map_err(|err| Error::Custom(err.to_string()))
+    OwnedPath::try_from(path_string).map_err(custom)
 }
 
 #[inline]
@@ -111,11 +111,6 @@ struct CodeInfo {
     code_hash: FixedBytes<32>,
 }
 
-pub(crate) struct Ticket {
-    pub(crate) path: OwnedPath,
-    pub(crate) balance: U256,
-}
-
 pub struct StorageAccount {
     path: OwnedPath,
 }
@@ -128,7 +123,7 @@ impl StorageAccount {
     ) -> Result<Option<StorageAccount>, Error> {
         world_state_handler
             .get(host, &account_path(&address)?)
-            .map_err(|err| Error::Custom(err.to_string()))
+            .map_err(custom)
     }
 
     pub fn get_or_create_account(
@@ -138,7 +133,7 @@ impl StorageAccount {
     ) -> Result<StorageAccount, Error> {
         world_state_handler
             .get_or_create(host, &account_path(&address)?)
-            .map_err(|err| Error::Custom(err.to_string()))
+            .map_err(custom)
     }
 
     pub fn from_address(address: &Address) -> Result<Self, Error> {
@@ -412,21 +407,28 @@ impl StorageAccount {
         Ok(write_u256_le(host, &path, value)?)
     }
 
-    pub(crate) fn read_ticket_balance(
+    fn ticket_path(
         &self,
-        host: &impl Runtime,
         ticket_hash: &U256,
         owner: &Address,
-    ) -> Result<Ticket, Error> {
-        let path = concat(
+    ) -> Result<OwnedPath, Error> {
+        concat(
             &self.path,
             &concat(
                 &TICKET_STORAGE_PATH,
                 &concat(&path_from_u256(ticket_hash)?, &account_path(owner)?)?,
             )?,
-        )?;
-        let balance = read_u256_le_default(host, &path, U256::ZERO)?;
-        Ok(Ticket { path, balance })
+        )
+    }
+
+    pub(crate) fn read_ticket_balance(
+        &self,
+        host: &impl Runtime,
+        ticket_hash: &U256,
+        owner: &Address,
+    ) -> Result<U256, Error> {
+        let path = self.ticket_path(ticket_hash, owner)?;
+        Ok(read_u256_le_default(host, &path, U256::ZERO)?)
     }
 
     pub fn write_ticket_balance(
@@ -436,8 +438,7 @@ impl StorageAccount {
         owner: &Address,
         amount: U256,
     ) -> Result<(), Error> {
-        let Ticket { path, balance: _ } =
-            self.read_ticket_balance(host, ticket_hash, owner)?;
+        let path = self.ticket_path(ticket_hash, owner)?;
         write_u256_le(host, &path, amount)?;
         Ok(())
     }
@@ -464,15 +465,10 @@ impl StorageAccount {
         &self,
         host: &impl Runtime,
         deposit_id: &U256,
-    ) -> Result<Option<FaDepositWithProxy>, Error> {
+    ) -> Result<FaDepositWithProxy, Error> {
         let deposit_path = self.deposit_path(deposit_id)?;
-        let raw_deposit = host.store_read_all(&deposit_path);
-
-        match raw_deposit {
-            Ok(bytes) => FaDepositWithProxy::from_raw(bytes).map(Some),
-            Err(RuntimeError::PathNotFound) => Ok(None),
-            Err(err) => Err(Error::Custom(err.to_string())),
-        }
+        let bytes = host.store_read_all(&deposit_path)?;
+        FaDepositWithProxy::from_raw(bytes)
     }
 
     pub(crate) fn remove_deposit_from_queue(
@@ -495,8 +491,7 @@ pub type WorldStateHandler = Storage<StorageAccount>;
 
 #[instrument]
 pub fn new_world_state_handler() -> Result<WorldStateHandler, Error> {
-    Storage::<StorageAccount>::init(&EVM_ACCOUNTS_PATH)
-        .map_err(|err| Error::Custom(err.to_string()))
+    Storage::<StorageAccount>::init(&EVM_ACCOUNTS_PATH).map_err(custom)
 }
 
 #[cfg(test)]
