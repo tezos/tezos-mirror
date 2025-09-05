@@ -204,7 +204,7 @@ teztale.gitlab_release:
   retry: 0
 
 teztale.release_page:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -212,9 +212,11 @@ teztale.release_page:
   - when: manual
     allow_failure: true
   needs:
+  - oc.docker:ci:amd64
   - teztale.build-x86_64
   - teztale.build-arm64
   dependencies:
+  - oc.docker:ci:amd64
   - teztale.build-x86_64
   - teztale.build-arm64
   timeout: 60 minutes

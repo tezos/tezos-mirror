@@ -65,7 +65,7 @@ let job_release_page =
   CI.job
     "release_page"
     ~__POS__
-    ~image:Tezos_ci.Images.ci_release
+    ~image:Tezos_ci.Images.CI.build
     ~stage:Publish
     ~description:
       "Update the Teztale release page. If running in a test pipeline, the \
