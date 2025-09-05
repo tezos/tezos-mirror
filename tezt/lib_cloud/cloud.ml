@@ -528,45 +528,38 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
   in
   if Env.destroy then Deployement.terminate deployement else Lwt.return_unit
 
-(* Set the [FAKETIME] environment variable so that all the ssh sessions have it
-   defined if [Env.faketime] is defined. *)
-let set_faketime agent =
-  match Env.faketime with
-  | None -> Lwt.return_unit
-  | Some faketime -> (
-      match Agent.runner agent with
-      | None -> Lwt.return_unit (* ? *)
-      | Some runner ->
-          let open Runner.Shell in
-          let* home =
-            (* Get the directory where you can (hopefully) find .ssh *)
-            let cmd = cmd [] "pwd" [] in
-            let cmd, args = Runner.wrap_with_ssh runner cmd in
-            Process.run_and_read_stdout cmd args
-          in
-          let env_file =
-            Filename.concat (String.trim home) ".ssh/environment"
-          in
-          let* () =
-            (* Avoid error if the environment file does not exist *)
-            let cmd = cmd [] "touch" [env_file] in
-            let cmd, args = Runner.wrap_with_ssh runner cmd in
-            Process.run cmd args
-          in
-          let* contents =
-            (* Read the environment file content
+let set_faketime agent faketime =
+  match Agent.runner agent with
+  | None -> Lwt.return_unit (* ? *)
+  | Some runner ->
+      let open Runner.Shell in
+      let* home =
+        (* Get the directory where you can (hopefully) find .ssh *)
+        let cmd = cmd [] "pwd" [] in
+        let cmd, args = Runner.wrap_with_ssh runner cmd in
+        Process.run_and_read_stdout cmd args
+      in
+      let env_file = Filename.concat (String.trim home) ".ssh/environment" in
+      let* () =
+        (* Avoid error if the environment file does not exist *)
+        let cmd = cmd [] "touch" [env_file] in
+        let cmd, args = Runner.wrap_with_ssh runner cmd in
+        Process.run cmd args
+      in
+      let* contents =
+        (* Read the environment file content
                and append FAKETIME definition to the result *)
-            let process, stdin =
-              Process.spawn_with_stdin ~runner "cat" [env_file; "-"]
-            in
-            let* () = Lwt_io.write_line stdin (sf "FAKETIME=%s" faketime) in
-            let* () = Lwt_io.close stdin in
-            Process.check_and_read_stdout process
-          in
-          (* Write the final environment content *)
-          let cmd = redirect_stdout (cmd [] "echo" [contents]) env_file in
-          let cmd, args = Runner.wrap_with_ssh runner cmd in
-          Process.run cmd args)
+        let process, stdin =
+          Process.spawn_with_stdin ~runner "cat" [env_file; "-"]
+        in
+        let* () = Lwt_io.write_line stdin (sf "FAKETIME=%s" faketime) in
+        let* () = Lwt_io.close stdin in
+        Process.check_and_read_stdout process
+      in
+      (* Write the final environment content *)
+      let cmd = redirect_stdout (cmd [] "echo" [contents]) env_file in
+      let cmd, args = Runner.wrap_with_ssh runner cmd in
+      Process.run cmd args
 
 (** Optionally add some latency and jitter to network connection *)
 let adjust_traffic_control agent =
@@ -708,7 +701,11 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
           let ensure_ready agent =
             let* () = wait_ssh_server_running agent in
             let* () = adjust_traffic_control agent in
-            let* () = set_faketime agent in
+            let* () =
+              match Env.faketime with
+              | None -> Lwt.return_unit
+              | Some faketime -> set_faketime agent faketime
+            in
             Lwt.return_unit
           in
           fun deployement ->

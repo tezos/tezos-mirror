@@ -710,6 +710,8 @@ module type Layer1 = sig
   val ppx_profiling_verbosity : string option
 
   val ppx_profiling_backends : string list
+
+  val auto_faketime : bool
 end
 
 module Layer1 () = struct
@@ -831,6 +833,20 @@ module Layer1 () = struct
         config
     in
     Option.fold ~none:from_config ~some:Option.some from_cli
+
+  let auto_faketime =
+    Clap.flag
+      ~section
+      ~set_long:"auto-faketime"
+      ~unset_long:"no-auto-faketime"
+      ~description:
+        "If set (it is by default), automatically set the FAKETIME based on \
+         the snapshot timestamp"
+      (Option.value
+         ~default:Scenarios_configuration.LAYER1.Default.auto_faketime
+      @@ Option.map
+           (fun (c : Scenarios_configuration.LAYER1.t) -> c.auto_faketime)
+           config)
 
   let maintenance_delay =
     let default_maintenance_delay =

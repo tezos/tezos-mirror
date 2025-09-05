@@ -31,6 +31,9 @@ val to_string : t -> string
 (** JSON encoding for snapshot representation. *)
 val encoding : t Data_encoding.t
 
+(** Extract the timestamp of a snapshot file using the node's [snapshot info] command. *)
+val get_snapshot_info_timestamp : Node.t -> string -> string Lwt.t
+
 (** Extract the level of a snapshot file using the node's [snapshot info] command. *)
 val get_snapshot_info_level : Node.t -> string -> int Lwt.t
 

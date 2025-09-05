@@ -74,6 +74,11 @@ let encoding =
         (fun s -> Url s);
     ]
 
+let get_snapshot_info_timestamp node snapshot_path =
+  let* info = Node.snapshot_info node ~json:true snapshot_path in
+  let json = JSON.parse ~origin:"snapshot_info" info in
+  Lwt.return JSON.(json |-> "snapshot_header" |-> "timestamp" |> as_string)
+
 let get_snapshot_info_level node snapshot_path =
   let* info = Node.snapshot_info node ~json:true snapshot_path in
   let json = JSON.parse ~origin:"snapshot_info" info in

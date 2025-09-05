@@ -284,6 +284,8 @@ module LAYER1 = struct
     let ppx_profiling_backends = ["txt"]
 
     let without_dal = false
+
+    let auto_faketime = true
   end
 
   type t = {
@@ -300,6 +302,7 @@ module LAYER1 = struct
     signing_delay : (float * float) option;
     fixed_random_seed : int option;
     octez_release : string option;
+    auto_faketime : bool;
   }
 
   let encoding =
@@ -319,6 +322,7 @@ module LAYER1 = struct
              signing_delay;
              fixed_random_seed;
              octez_release;
+             auto_faketime;
            }
          ->
         ( ( stake,
@@ -331,7 +335,7 @@ module LAYER1 = struct
             migration_offset,
             ppx_profiling_verbosity,
             ppx_profiling_backends ),
-          (signing_delay, fixed_random_seed, octez_release) ))
+          (signing_delay, fixed_random_seed, octez_release, auto_faketime) ))
       (fun ( ( stake,
                network,
                snapshot,
@@ -342,7 +346,7 @@ module LAYER1 = struct
                migration_offset,
                ppx_profiling_verbosity,
                ppx_profiling_backends ),
-             (signing_delay, fixed_random_seed, octez_release) )
+             (signing_delay, fixed_random_seed, octez_release, auto_faketime) )
          ->
         {
           stake;
@@ -358,6 +362,7 @@ module LAYER1 = struct
           signing_delay;
           fixed_random_seed;
           octez_release;
+          auto_faketime;
         })
       (merge_objs
          (obj10
@@ -374,8 +379,9 @@ module LAYER1 = struct
                "ppx_profiling_backends"
                (list string)
                Default.ppx_profiling_backends))
-         (obj3
+         (obj4
             (opt "signing_delay" (tup2 float float))
             (opt "fixed_random_seed" int31)
-            (opt "octez_release" string)))
+            (opt "octez_release" string)
+            (dft "auto_faketime" bool Default.auto_faketime)))
 end

@@ -138,6 +138,10 @@ end
 module Cloud : sig
   type t
 
+  (* Set the [FAKETIME] environment variable so that all the ssh sessions have it
+   defined. *)
+  val set_faketime : Agent.t -> string -> unit Lwt.t
+
   (** A wrapper around [Test.register] that can be used to register new tests
       using VMs provided as a map indexed by name. Each VM is abstracted via
       the [Agent] module.
@@ -273,6 +277,8 @@ module Tezt_cloud_cli : sig
   val artifacts_dir : string option
 
   val teztale_artifacts : bool
+
+  val faketime : string option
 
   val to_json_config :
     ?scenario_config:string * Data_encoding.Json.t ->
