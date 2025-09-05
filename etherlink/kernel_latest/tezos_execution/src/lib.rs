@@ -129,7 +129,7 @@ pub fn transfer_tez<Host: Runtime>(
 fn burn_tez(
     host: &mut impl Runtime,
     src_contract: &Contract,
-    src_account: &mut impl TezlinkAccount,
+    src_account: &impl TezlinkAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<Narith, TransferError> {
     let src_balance = src_account
@@ -765,7 +765,7 @@ fn execute_validation<Host: Runtime>(
         .into_iter()
         .map(|op| op.into())
         .collect::<Vec<ManagerOperation<OperationContent>>>();
-    let (source, pk, mut source_account) =
+    let (source, pk, source_account) =
         validate::validate_source(host, context, &content)?;
     let mut balance_updates = vec![];
 
@@ -1304,7 +1304,7 @@ mod tests {
         TezlinkImplicitAccount::allocate(host, &context, &contract)
             .expect("Account initialization should have succeed");
 
-        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeed");
 
         // Setting the balance to pass the validity check
@@ -1317,7 +1317,7 @@ mod tests {
 
     fn reveal_account(host: &mut impl Runtime, source: &Bootstrap) {
         let context = context::Context::init_context();
-        let mut account =
+        let account =
             TezlinkImplicitAccount::from_public_key_hash(&context, &source.pkh)
                 .expect("Account creation should have succeed");
         account.set_manager_public_key(host, &source.pk).unwrap()
@@ -1336,7 +1336,7 @@ mod tests {
 
         let context = context::Context::init_context();
 
-        let mut account = TezlinkOriginatedAccount::from_contract(&context, &contract)
+        let account = TezlinkOriginatedAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeeded");
 
         let parser = mir::parser::Parser::new();
@@ -1465,7 +1465,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let mut account = init_account(&mut host, &source.pkh, 50);
+        let account = init_account(&mut host, &source.pkh, 50);
 
         // Setting the manager key of this account to its public_key, this account
         // will be considered as revealed and the reveal operation should fail
@@ -1527,7 +1527,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let mut account = init_account(&mut host, &source.pkh, 50);
+        let account = init_account(&mut host, &source.pkh, 50);
 
         // Set the an inconsistent manager with the source
         let inconsistent_pkh =

@@ -64,7 +64,7 @@ pub trait TezlinkAccount {
 
     /// Set the **balance** of an account in Mutez held by the account.
     fn set_balance(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
@@ -129,7 +129,7 @@ impl TezlinkImplicitAccount {
 
     /// Set the **counter** for the Tezlink account.
     pub fn set_counter(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         counter: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
@@ -139,7 +139,7 @@ impl TezlinkImplicitAccount {
 
     /// Set the **counter** for the Tezlink account to the successor of the current value.
     pub fn increment_counter(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
     ) -> Result<(), tezos_storage::error::Error> {
         self.set_counter(host, &Narith(self.counter(host)?.0 + 1u64))
@@ -158,7 +158,7 @@ impl TezlinkImplicitAccount {
     /// Most of the time, we're dealing with references so this function is here to avoid cloning
     /// the public key hash to build a [Manager] object
     pub fn set_manager_public_key_hash(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         public_key_hash: &PublicKeyHash,
     ) -> Result<(), tezos_storage::error::Error> {
@@ -176,7 +176,7 @@ impl TezlinkImplicitAccount {
     /// Most of the time, we're dealing with references so this function is here to avoid cloning
     /// the public key hash to build a [Manager] object
     pub fn set_manager_public_key(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         public_key: &PublicKey,
     ) -> Result<(), tezos_storage::error::Error> {
@@ -197,7 +197,7 @@ impl TezlinkImplicitAccount {
         context: &context::Context,
         contract: &Contract,
     ) -> Result<bool, tezos_storage::error::Error> {
-        let mut account = Self::from_contract(context, contract)?;
+        let account = Self::from_contract(context, contract)?;
         if account.allocated(host)? {
             return Ok(true);
         }
@@ -290,7 +290,7 @@ impl TezlinkOriginatedAccount {
     }
 
     fn set_code_size(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         len: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
@@ -299,7 +299,7 @@ impl TezlinkOriginatedAccount {
     }
 
     pub fn set_code(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         data: &[u8],
     ) -> Result<u64, tezos_storage::error::Error> {
@@ -319,7 +319,7 @@ impl TezlinkOriginatedAccount {
     }
 
     fn set_storage_size(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         len: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
@@ -328,7 +328,7 @@ impl TezlinkOriginatedAccount {
     }
 
     pub fn set_storage(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         data: &[u8],
     ) -> Result<u64, tezos_storage::error::Error> {
@@ -340,7 +340,7 @@ impl TezlinkOriginatedAccount {
     }
 
     fn set_paid_bytes(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         paid: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
@@ -349,7 +349,7 @@ impl TezlinkOriginatedAccount {
     }
 
     fn set_used_bytes(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         used: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
@@ -358,7 +358,7 @@ impl TezlinkOriginatedAccount {
     }
 
     pub fn init(
-        &mut self,
+        &self,
         host: &mut impl Runtime,
         code: &[u8],
         storage: &[u8],
@@ -490,7 +490,7 @@ mod test {
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeeded");
 
         let () = account
@@ -516,7 +516,7 @@ mod test {
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeeded");
 
         let () = account
@@ -574,7 +574,7 @@ mod test {
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
             .expect("Contract base58 conversion should succeeded");
 
-        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeeded");
 
         let public_key = PublicKey::from_b58check(BOOTSTRAP1_PK).unwrap();
@@ -604,7 +604,7 @@ mod test {
             .expect("PublicKeyHash base58 conversion should succeeded");
 
         let contract = Contract::Implicit(pkh);
-        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeeded");
 
         let pkh = PublicKeyHash::from_b58check(BOOTSTRAP1_PKH)
@@ -635,7 +635,7 @@ mod test {
             .expect("PublicKeyHash base58 conversion should succeeded");
 
         let contract = Contract::Implicit(pkh);
-        let mut account = TezlinkImplicitAccount::from_contract(&context, &contract)
+        let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeeded");
 
         let exist = account
