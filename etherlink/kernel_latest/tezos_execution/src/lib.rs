@@ -3343,7 +3343,9 @@ mod tests {
         let mut host = MockKernelHost::default();
         let parser = mir::parser::Parser::new();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 50);
+        let init_src_balance = 100000;
+        let expected_init_contract_balance = 1000000;
+        init_account(&mut host, &src.pkh, 100000);
         reveal_account(&mut host, &src);
         let context = context::Context::init_context();
 
@@ -3375,7 +3377,7 @@ mod tests {
             0,
             src.clone(),
             vec![OperationContent::Transfer(TransferContent {
-                amount: 0.into(),
+                amount: 1000.into(),
                 destination: Contract::Originated(contract_chapo_hash.clone()),
                 parameters: Some(Parameter {
                     entrypoint: mir::ast::entrypoint::Entrypoint::default(),
@@ -3422,7 +3424,7 @@ mod tests {
             internal_receipts[0],
             InternalOperationSum::Origination(InternalContentWithMetadata {
                 content: OriginationContent {
-                    balance: 0.into(),
+                    balance: 1000.into(),
                     delegate: None,
                     script: Script {
                         code: parsed_script.encode(),
@@ -3435,6 +3437,20 @@ mod tests {
                             balance: Balance::Account(Contract::Originated(
                                 contract_chapo_hash.clone()
                             )),
+                            changes: -1000,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                expected_address.clone()
+                            )),
+                            changes: 1000,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone()
+                            )),
                             changes: -7500,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
@@ -3444,8 +3460,8 @@ mod tests {
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         BalanceUpdate {
-                            balance: Balance::Account(Contract::Originated(
-                                contract_chapo_hash.clone()
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone()
                             )),
                             changes: -64250,
                             update_origin: UpdateOrigin::BlockApplication,
@@ -3457,17 +3473,52 @@ mod tests {
                         },
                     ],
                     originated_contracts: vec![Originated {
-                        contract: expected_address,
+                        contract: expected_address.clone(),
                     }],
                     consumed_gas: 0_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
                 }),
-                sender: Contract::Originated(contract_chapo_hash),
+                sender: Contract::Originated(contract_chapo_hash.clone()),
                 nonce: 1
             }),
             "Internal origination should match the expected structure"
+        );
+
+        // Check Balances of everything is correct
+        let src_account =
+            TezlinkImplicitAccount::from_public_key_hash(&context, &src.pkh)
+                .expect("Should have succeeded to create an account");
+        let init_contract_account = TezlinkOriginatedAccount::from_contract(
+            &context,
+            &Contract::Originated(contract_chapo_hash),
+        )
+        .expect("Should have succeeded to create an account");
+        let originated_account = TezlinkOriginatedAccount::from_contract(
+            &context,
+            &Contract::Originated(expected_address),
+        )
+        .expect("Should have succeeded to create an account");
+        let expected_src_balance = init_src_balance
+            - 10 // fee for the operation
+            - 7500 // origination cost paid by the contract
+            - 64250 // storage cost paid by the source
+            - 1000; // amount sent to the originated contract
+        assert_eq!(
+            src_account.balance(&host).unwrap(),
+            expected_src_balance.into(),
+            "Source balance should be correct"
+        );
+        assert_eq!(
+            init_contract_account.balance(&host).unwrap(),
+            expected_init_contract_balance.into(),
+            "Init contract balance should be correct"
+        );
+        assert_eq!(
+            originated_account.balance(&host).unwrap(),
+            1000u64.into(),
+            "Originated contract balance should be correct"
         );
     }
 
@@ -3481,7 +3532,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let parser = mir::parser::Parser::new();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 50);
+        init_account(&mut host, &src.pkh, 1000000);
         reveal_account(&mut host, &src);
         let context = context::Context::init_context();
 
@@ -3514,7 +3565,7 @@ mod tests {
             &contract_chapo_hash,
             &init_script,
             &Micheline::prim0(mir::lexer::Prim::None),
-            &1000000_u64.into(),
+            &0.into(),
         );
 
         let operation = make_operation(
@@ -3586,8 +3637,8 @@ mod tests {
                 result: ContentResult::Applied(OriginationSuccess {
                     balance_updates: vec![
                         BalanceUpdate {
-                            balance: Balance::Account(Contract::Originated(
-                                contract_chapo_hash.clone()
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone()
                             )),
                             changes: -8250,
                             update_origin: UpdateOrigin::BlockApplication,
@@ -3598,8 +3649,8 @@ mod tests {
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         BalanceUpdate {
-                            balance: Balance::Account(Contract::Originated(
-                                contract_chapo_hash.clone()
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone()
                             )),
                             changes: -64250,
                             update_origin: UpdateOrigin::BlockApplication,
@@ -3639,8 +3690,8 @@ mod tests {
                 result: ContentResult::Applied(OriginationSuccess {
                     balance_updates: vec![
                         BalanceUpdate {
-                            balance: Balance::Account(Contract::Originated(
-                                contract_chapo_hash.clone()
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone()
                             )),
                             changes: -7500,
                             update_origin: UpdateOrigin::BlockApplication,
@@ -3651,8 +3702,8 @@ mod tests {
                             update_origin: UpdateOrigin::BlockApplication,
                         },
                         BalanceUpdate {
-                            balance: Balance::Account(Contract::Originated(
-                                contract_chapo_hash.clone()
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone()
                             )),
                             changes: -64250,
                             update_origin: UpdateOrigin::BlockApplication,
