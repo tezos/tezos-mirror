@@ -137,6 +137,7 @@ _evm_unstripped_installer_preimages/
 /etherlink/kernels-*
 etherlink-governance-observer
 floodgate
+courier
 etherlink-outbox-monitor
 /fa-bridge-watchtower
 /etherlink/docs/book/*

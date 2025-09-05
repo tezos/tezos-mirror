@@ -57,4 +57,6 @@ let transfer_exn ?nonce ?to_ ?data ~value ~gas_limit ~infos ~from () =
   let* res = transfer ?nonce ?to_ ?data ~value ~gas_limit ~infos ~from () in
   match res with
   | Ok res -> return res
-  | Error _err -> Stdlib.failwith "Could not craft the transfer"
+  | Error err ->
+      Stdlib.failwith
+        (Format.asprintf "Could not craft the transfer: %a" pp_print_trace err)

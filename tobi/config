@@ -40,6 +40,7 @@ dal_node_migrations: src/lib_dal_node/migrations
 efunc_core: efunc-core/src
 etherlink-benchmark: etherlink/tezt/benchmarks
 etherlink-benchmark-producer: etherlink/bin_benchmark_producer
+etherlink-courier: etherlink/bin_courier
 etherlink-governance-observer: etherlink/governance-metrics/src
 etherlink-outbox-monitor: etherlink/bin_outbox_monitor
 fa-bridge-watchtower: etherlink/fa-bridge-watchtower

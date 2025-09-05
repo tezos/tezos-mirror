@@ -509,6 +509,11 @@ build-floodgate:
 	@dune build ./etherlink/bin_floodgate
 	@cp -f ./_build/default/etherlink/bin_floodgate/main.exe floodgate
 
+.PHONY: build-courier
+build-courier:
+	@dune build ./etherlink/bin_courier
+	@cp -f ./_build/default/etherlink/bin_courier/main.exe courier
+
 .PHONY: etherlink-outbox-monitor
 etherlink-outbox-monitor:
 	@dune build ./etherlink/bin_outbox_monitor

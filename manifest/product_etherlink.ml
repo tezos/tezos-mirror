@@ -445,10 +445,32 @@ let _tezt_etherlink =
     ~dep_globs_rec:["../../kernel_latest/*"]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
+let _courier =
+  public_exe
+    "courier"
+    ~internal_name:"main"
+    ~path:"etherlink/bin_courier"
+    ~opam:"etherlink-courier"
+    ~synopsis:
+      "An ad-hoc client to allow the sequencer to withdraw inclusion fees to \
+       the Layer 1 using a key hosted on GCP KMS"
+    ~release_status:Unreleased
+    ~with_macos_security_framework:true
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_stdlib_unix |> open_;
+        octez_clic;
+        evm_node_config |> open_;
+        floodgate_lib;
+      ]
+
 let _evm_node =
   public_exe
-    (sf "octez-evm-node")
-    ~internal_name:(sf "main")
+    "octez-evm-node"
+    ~internal_name:"main"
     ~path:"etherlink/bin_node"
     ~opam:"octez-evm-node"
     ~synopsis:

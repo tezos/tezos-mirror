@@ -9,6 +9,7 @@
 (package (name efunc_core))
 (package (name etherlink-benchmark))
 (package (name etherlink-benchmark-producer))
+(package (name etherlink-courier))
 (package (name etherlink-governance-observer))
 (package (name etherlink-outbox-monitor))
 (package (name fa-bridge-watchtower))
