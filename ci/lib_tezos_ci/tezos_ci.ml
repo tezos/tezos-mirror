@@ -172,6 +172,22 @@ let when_always job =
   in
   {job with job = new_generic_job}
 
+let has_cache job =
+  match job.job with
+  | Trigger_job _ -> false
+  | Job job -> (
+      match job.cache with None | Some [] -> false | Some (_ :: _) -> true)
+
+let has_stage target_stage job =
+  let stage_opt =
+    match job.job with Trigger_job job -> job.stage | Job job -> job.stage
+  in
+  match stage_opt with
+  | None -> false
+  | Some stage -> String.equal stage target_stage
+
+let has_cache_or_start_stage job = has_cache job || has_stage "start" job
+
 type tezos_image =
   | Internal of {
       image : Gitlab_ci.Types.image;

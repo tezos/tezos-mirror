@@ -35,6 +35,9 @@ val no_rules : tezos_job -> tezos_job
  *)
 val when_always : tezos_job -> tezos_job
 
+(** temp *)
+val has_cache_or_start_stage : tezos_job -> bool
+
 (** A string that should be prepended to all generated files.
 
     Warns not to modify the generated files, and refers to the generator. *)
