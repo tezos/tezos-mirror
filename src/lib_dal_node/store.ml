@@ -181,42 +181,77 @@ module Shards_disk = struct
       0
       shard_indexes
 
-  let write_all shards_store slot_id shards =
+  (* Persist all shards, or at most [keep_partial_shards] per slot if provided.
+   If [keep_partial_shards = Some N]:
+   - Count how many shards are already stored for [slot_id].
+   - If that count >= N, return immediately.
+   - Otherwise, store new shards from the incoming [shards] seq until we reach N. *)
+  let write_all ?keep_partial_shards shards_store slot_id shards =
     let open Lwt_result_syntax in
-    let* () =
-      with_metrics shards_store @@ fun () ->
-      Seq.ES.iter
-        (fun {Cryptobox.index; share} ->
-          let* exists =
-            (KVS.value_exists
-               shards_store
-               file_layout
-               slot_id
-               index [@profiler.aggregate_s {verbosity = Notice} "value_exists"])
+    let* remaining =
+      (match keep_partial_shards with
+      | None ->
+          (* Full mode: store all shards. *)
+          return max_int
+      | Some n when n <= 0 ->
+          (* Non-positive value: do nothing. *)
+          return 0
+      | Some target_to_store ->
+          (* Partial mode: compute how many shards are already persisted. *)
+          let* already_stored =
+            KVS.count_values shards_store file_layout slot_id
           in
-          if exists then return_unit
-          else
-            let* () =
-              (KVS.write_value
+          return (target_to_store - already_stored))
+      |> Errors.other_lwt_result
+    in
+    let rec loop remaining s =
+      if remaining <= 0 then
+        (* Target reached. *)
+        return_unit
+      else
+        match s () with
+        | Seq.Nil -> return_unit
+        | Seq.Cons ({Cryptobox.index; share}, tl) ->
+            let* exists =
+              (KVS.value_exists
                  shards_store
                  file_layout
                  slot_id
                  index
-                 share
-               [@profiler.aggregate_s {verbosity = Notice} "write_value"])
+               [@profiler.aggregate_s {verbosity = Notice} "value_exists"])
             in
-            let () = Dal_metrics.shard_stored () in
-            let*! () =
-              Event.emit_stored_slot_shard
-                ~published_level:slot_id.slot_level
-                ~slot_index:slot_id.slot_index
-                ~shard_index:index
-            in
-            return_unit)
-        shards
-      |> Errors.other_lwt_result
+            if exists then
+              (* Do not decrement remaining on duplicates; continue scanning. *)
+              loop remaining tl
+            else
+              let* () =
+                (KVS.write_value
+                   shards_store
+                   file_layout
+                   slot_id
+                   index
+                   share
+                 [@profiler.aggregate_s {verbosity = Notice} "write_value"])
+              in
+              (* Metrics/events only for actually persisted shards. *)
+              let () = Dal_metrics.shard_stored () in
+              let*! () =
+                Event.emit_stored_slot_shard
+                  ~published_level:slot_id.slot_level
+                  ~slot_index:slot_id.slot_index
+                  ~shard_index:index
+              in
+              loop (remaining - 1) tl
     in
-    return_unit
+    if remaining <= 0 then
+      (* To avoid triggering metrics in this case. *)
+      return_unit
+    else
+      let* () =
+        with_metrics shards_store @@ fun () ->
+        loop remaining shards |> Errors.other_lwt_result
+      in
+      return_unit
 
   let read_all shards_store slot_id ~number_of_shards =
     Seq.ints 0
