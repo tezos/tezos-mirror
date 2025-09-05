@@ -465,6 +465,10 @@ fn transfer<'a, Host: Runtime>(
             if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Err(TransferError::NonSmartContractExecutionCall);
             }
+            // Transfers of 0 tez to an implicit contract are rejected.
+            if amount.eq(&0_u64.into()) {
+                return Err(TransferError::EmptyImplicitTransfer);
+            };
 
             let dest_account = TezlinkImplicitAccount::from_public_key_hash(context, pkh)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
