@@ -809,6 +809,7 @@ let jobs pipeline_type =
         ~cpu:Very_high
         ~storage:Ramfs
         ~rules:(make_rules ~manual:Yes ())
+        ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
         ~before_script:
           (before_script
              ~take_ownership:true
