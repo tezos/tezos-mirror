@@ -626,7 +626,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(cpu = Runner.CPU.Normal) ?storage
       ([
          ("ARCH", arch_string);
          ("EXECUTABLE_FILES", executable_files);
-         ("DUNE_BUILD_ARGS", "-j 12");
+         ("DUNE_BUILD_JOBS", "-j 12");
        ]
       @ version_executable)
     ~artifacts

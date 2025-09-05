@@ -33,8 +33,6 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
-  - echo $DUNE_BUILD_JOBS
-  - env | grep "DUNE_BUILD_JOBS"
   - ./scripts/ci/build_static_binaries.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
