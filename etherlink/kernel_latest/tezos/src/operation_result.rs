@@ -391,6 +391,7 @@ pub struct OriginationSuccess {
 
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct TransferSuccess {
+    #[encoding(option, bytes)]
     pub storage: Option<Vec<u8>>,
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
