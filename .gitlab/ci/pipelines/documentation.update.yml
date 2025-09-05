@@ -7,7 +7,7 @@ stages:
 - build
 - publish
 
-fresh-cache.oc.docker:ci:amd64:
+oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -33,7 +33,7 @@ fresh-cache.oc.docker:ci:amd64:
     reports:
       dotenv: ci_image_tag.env
 
-fresh-cache.datadog_pipeline_trace:
+datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -53,7 +53,7 @@ fresh-cache.datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-fresh-cache.oc.build:static-x86_64-linux-binaries:
+oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -61,7 +61,7 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
   rules:
   - when: always
   dependencies:
-  - fresh-cache.oc.docker:ci:amd64
+  - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -103,15 +103,15 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-fresh-cache.documentation.docgen:
+documentation.docgen:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
   - gcp
   needs:
-  - fresh-cache.oc.docker:ci:amd64
+  - oc.docker:ci:amd64
   dependencies:
-  - fresh-cache.oc.docker:ci:amd64
+  - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -148,17 +148,17 @@ fresh-cache.documentation.docgen:
     - docs/api/errors.rst
     - docs/shell/p2p_api.rst
 
-fresh-cache.documentation.manuals:
+documentation.manuals:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
   - gcp
   needs:
-  - fresh-cache.oc.docker:ci:amd64
-  - fresh-cache.oc.build:static-x86_64-linux-binaries
+  - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-binaries
   dependencies:
-  - fresh-cache.oc.docker:ci:amd64
-  - fresh-cache.oc.build:static-x86_64-linux-binaries
+  - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-binaries
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -180,15 +180,15 @@ fresh-cache.documentation.manuals:
     - docs/developer/rollup_metrics.csv
     - docs/user/node-config.json
 
-fresh-cache.documentation.odoc:
+documentation.odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
   - gcp
   needs:
-  - fresh-cache.oc.docker:ci:amd64
+  - oc.docker:ci:amd64
   dependencies:
-  - fresh-cache.oc.docker:ci:amd64
+  - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -228,21 +228,21 @@ fresh-cache.documentation.odoc:
     - docs/odoc.log
     when: always
 
-fresh-cache.documentation.build_all:
+documentation.build_all:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
   tags:
   - gcp
   needs:
-  - fresh-cache.oc.docker:ci:amd64
-  - fresh-cache.documentation.odoc
-  - fresh-cache.documentation.manuals
-  - fresh-cache.documentation.docgen
+  - oc.docker:ci:amd64
+  - documentation.odoc
+  - documentation.manuals
+  - documentation.docgen
   dependencies:
-  - fresh-cache.oc.docker:ci:amd64
-  - fresh-cache.documentation.odoc
-  - fresh-cache.documentation.manuals
-  - fresh-cache.documentation.docgen
+  - oc.docker:ci:amd64
+  - documentation.odoc
+  - documentation.manuals
+  - documentation.docgen
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -263,17 +263,17 @@ fresh-cache.documentation.build_all:
     - docs/_build/
     expose_as: Documentation - excluding old protocols
 
-fresh-cache.documentation.publish:
+documentation.publish:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - fresh-cache.oc.docker:ci:amd64
-  - fresh-cache.documentation.build_all
+  - oc.docker:ci:amd64
+  - documentation.build_all
   dependencies:
-  - fresh-cache.oc.docker:ci:amd64
-  - fresh-cache.documentation.build_all
+  - oc.docker:ci:amd64
+  - documentation.build_all
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG

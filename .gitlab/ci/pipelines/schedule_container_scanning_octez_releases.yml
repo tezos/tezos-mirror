@@ -9,7 +9,7 @@ stages:
 - images
 - test
 
-fresh-cache.oc.docker:ci:amd64:
+oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -35,7 +35,7 @@ fresh-cache.oc.docker:ci:amd64:
     reports:
       dotenv: ci_image_tag.env
 
-fresh-cache.datadog_pipeline_trace:
+datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -55,7 +55,7 @@ fresh-cache.datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-fresh-cache.container_scanning:
+container_scanning:
   stage: test
   tags:
   - gcp
@@ -81,17 +81,17 @@ fresh-cache.container_scanning:
     - gl-dependency-scanning-report.json
     - '"**/gl-sbom-*.cdx.json"'
 
-fresh-cache.container_scanning_slack_notification:
+container_scanning_slack_notification:
   image: ${ci_image_name}/monitoring:${ci_image_tag}
   stage: test
   tags:
   - gcp
   needs:
-  - fresh-cache.oc.docker:ci:amd64
-  - fresh-cache.container_scanning
+  - oc.docker:ci:amd64
+  - container_scanning
   dependencies:
-  - fresh-cache.oc.docker:ci:amd64
-  - fresh-cache.container_scanning
+  - oc.docker:ci:amd64
+  - container_scanning
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)

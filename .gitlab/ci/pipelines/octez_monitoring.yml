@@ -11,7 +11,33 @@ stages:
 - images
 - build
 
-fresh-cache.oc.docker:ci:arm64:
+oc.docker:ci:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 90 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    ARCH: amd64
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
+
+oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -41,33 +67,7 @@ fresh-cache.oc.docker:ci:arm64:
     when:
     - runner_system_failure
 
-fresh-cache.oc.docker:ci:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
-    ARCH: amd64
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-
-fresh-cache.datadog_pipeline_trace:
+datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -87,13 +87,13 @@ fresh-cache.datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-fresh-cache.build-layer1-profiling:
+build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_very_high_cpu
   dependencies:
-  - fresh-cache.oc.docker:ci:amd64
+  - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -135,13 +135,13 @@ fresh-cache.build-layer1-profiling:
     - ./octez-binaries/x86_64/octez-node
     - ./octez-binaries/x86_64/octez-client
 
-fresh-cache.teztale.build:static-arm64:
+teztale.build:static-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_arm64
   dependencies:
-  - fresh-cache.oc.docker:ci:arm64
+  - oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -180,13 +180,13 @@ fresh-cache.teztale.build:static-arm64:
     - teztale-binaries/arm64/octez-teztale-*
     when: on_success
 
-fresh-cache.teztale.build:static-x86_64:
+teztale.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_very_high_cpu
   dependencies:
-  - fresh-cache.oc.docker:ci:amd64
+  - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG

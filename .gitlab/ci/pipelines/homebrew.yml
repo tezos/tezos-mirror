@@ -10,7 +10,7 @@ stages:
 - start
 - build
 
-fresh-cache.datadog_pipeline_trace:
+datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -30,13 +30,13 @@ fresh-cache.datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-fresh-cache.oc.install-homebrew:
+oc.install-homebrew:
   image: debian:bookworm
   stage: build
   tags:
   - gcp_very_high_cpu
   needs:
-  - fresh-cache.oc.build-homebrew
+  - oc.build-homebrew
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
@@ -57,7 +57,7 @@ fresh-cache.oc.install-homebrew:
   variables:
     CARGO_NET_OFFLINE: "false"
 
-fresh-cache.oc.build-homebrew:
+oc.build-homebrew:
   image: debian:bookworm
   stage: build
   tags:
@@ -78,13 +78,13 @@ fresh-cache.oc.build-homebrew:
   variables:
     CARGO_NET_OFFLINE: "false"
 
-fresh-cache.oc.install-homebrew-macosx:
+oc.install-homebrew-macosx:
   image: macos-14-xcode-15
   stage: build
   tags:
   - $TAGS
   needs:
-  - fresh-cache.oc.build-homebrew
+  - oc.build-homebrew
   dependencies: []
   allow_failure: true
   timeout: 60 minutes

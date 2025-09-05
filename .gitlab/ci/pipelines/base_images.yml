@@ -10,7 +10,7 @@ stages:
 - start
 - images
 
-fresh-cache.datadog_pipeline_trace:
+datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -30,7 +30,7 @@ fresh-cache.datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-fresh-cache.oc.base-images.debian:
+oc.base-images.debian:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -65,7 +65,7 @@ fresh-cache.oc.base-images.debian:
       - unstable
       - bookworm
 
-fresh-cache.oc.base-images.ubuntu:
+oc.base-images.ubuntu:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -100,7 +100,7 @@ fresh-cache.oc.base-images.ubuntu:
       - noble
       - jammy
 
-fresh-cache.oc.base-images.fedora:
+oc.base-images.fedora:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -135,7 +135,7 @@ fresh-cache.oc.base-images.fedora:
       - "39"
       - "42"
 
-fresh-cache.oc.base-images.rockylinux:
+oc.base-images.rockylinux:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:

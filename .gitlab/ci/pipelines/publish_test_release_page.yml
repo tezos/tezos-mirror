@@ -6,7 +6,7 @@ stages:
 - images
 - publish
 
-fresh-cache.oc.docker:ci:amd64:
+oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -32,7 +32,7 @@ fresh-cache.oc.docker:ci:amd64:
     reports:
       dotenv: ci_image_tag.env
 
-fresh-cache.datadog_pipeline_trace:
+datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -52,7 +52,7 @@ fresh-cache.datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-fresh-cache.publish:update-release-page:
+publish:update-release-page:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
   tags:
@@ -61,7 +61,7 @@ fresh-cache.publish:update-release-page:
   - when: manual
     allow_failure: true
   dependencies:
-  - fresh-cache.oc.docker:ci:amd64
+  - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -91,7 +91,7 @@ fresh-cache.publish:update-release-page:
     - index.md
     - index.html
 
-fresh-cache.teztale.release_page:
+teztale.release_page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
@@ -124,7 +124,7 @@ fresh-cache.teztale.release_page:
     - index.html
   retry: 0
 
-fresh-cache.grafazos.release_page:
+grafazos.release_page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:

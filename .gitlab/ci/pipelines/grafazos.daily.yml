@@ -6,7 +6,7 @@ stages:
 - images
 - test
 
-fresh-cache.oc.docker:jsonnet:amd64:
+oc.docker:jsonnet:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -32,7 +32,7 @@ fresh-cache.oc.docker:jsonnet:amd64:
     reports:
       dotenv: jsonnet_image_tag.env
 
-fresh-cache.datadog_pipeline_trace:
+datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -52,15 +52,15 @@ fresh-cache.datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-fresh-cache.grafazos.build:
+grafazos.build:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: test
   tags:
   - gcp
   needs:
-  - fresh-cache.oc.docker:jsonnet:amd64
+  - oc.docker:jsonnet:amd64
   dependencies:
-  - fresh-cache.oc.docker:jsonnet:amd64
+  - oc.docker:jsonnet:amd64
   timeout: 60 minutes
   interruptible: false
   before_script:

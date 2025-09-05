@@ -7,7 +7,33 @@ stages:
 - build
 - publish
 
-fresh-cache.oc.docker:ci:arm64:
+oc.docker:ci:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 90 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    ARCH: amd64
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
+
+oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -37,33 +63,7 @@ fresh-cache.oc.docker:ci:arm64:
     when:
     - runner_system_failure
 
-fresh-cache.oc.docker:ci:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
-    ARCH: amd64
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-
-fresh-cache.datadog_pipeline_trace:
+datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -83,13 +83,13 @@ fresh-cache.datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-fresh-cache.oc.build:static-arm64-linux-binaries:
+oc.build:static-arm64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_arm64
   dependencies:
-  - fresh-cache.oc.docker:ci:arm64
+  - oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -133,13 +133,13 @@ fresh-cache.oc.build:static-arm64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-fresh-cache.oc.build:static-x86_64-linux-binaries:
+oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_very_high_cpu_ramfs
   dependencies:
-  - fresh-cache.oc.docker:ci:amd64
+  - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -183,13 +183,13 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-fresh-cache.oc.docker:amd64:
+oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
   - gcp
   dependencies:
-  - fresh-cache.oc.docker:ci:amd64
+  - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -210,13 +210,13 @@ fresh-cache.oc.docker:amd64:
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
 
-fresh-cache.oc.docker:arm64:
+oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
   - gcp_arm64
   dependencies:
-  - fresh-cache.oc.docker:ci:arm64
+  - oc.docker:ci:arm64
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -237,14 +237,14 @@ fresh-cache.oc.docker:arm64:
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
 
-fresh-cache.docker:merge_manifests:
+docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - fresh-cache.oc.docker:amd64
-  - fresh-cache.oc.docker:arm64
+  - oc.docker:amd64
+  - oc.docker:arm64
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -264,17 +264,17 @@ fresh-cache.docker:merge_manifests:
     CI_DOCKER_HUB: "true"
   retry: 0
 
-fresh-cache.gitlab:octez-evm-node-release:
+gitlab:octez-evm-node-release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - fresh-cache.oc.build:static-x86_64-linux-binaries
-  - fresh-cache.oc.build:static-arm64-linux-binaries
+  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-arm64-linux-binaries
   dependencies:
-  - fresh-cache.oc.build:static-x86_64-linux-binaries
-  - fresh-cache.oc.build:static-arm64-linux-binaries
+  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-arm64-linux-binaries
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -288,13 +288,13 @@ fresh-cache.gitlab:octez-evm-node-release:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   retry: 0
 
-fresh-cache.docker:promote_to_latest:
+docker:promote_to_latest:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - fresh-cache.docker:merge_manifests
+  - docker:merge_manifests
   dependencies: []
   timeout: 60 minutes
   before_script:

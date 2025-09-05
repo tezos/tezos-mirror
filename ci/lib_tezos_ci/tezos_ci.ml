@@ -1041,7 +1041,7 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
   | _ -> ()) ;
   let job : Gitlab_ci.Types.job =
     {
-      name = "fresh-cache." ^ name;
+      name;
       after_script =
         Some
           (". ./scripts/ci/datadog_send_job_cache_info.sh 'after'"

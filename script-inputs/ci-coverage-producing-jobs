@@ -1,7 +1,7 @@
-fresh-cache.tezt-flaky
-fresh-cache.tezt-time-sensitive
-fresh-cache.tezt
-fresh-cache.oc.unit:proto-x86_64
-fresh-cache.oc.unit:other-x86_64
-fresh-cache.oc.unit:etherlink-x86_64
-fresh-cache.oc.unit:non-proto-x86_64
+tezt-flaky
+tezt-time-sensitive
+tezt
+oc.unit:proto-x86_64
+oc.unit:other-x86_64
+oc.unit:etherlink-x86_64
+oc.unit:non-proto-x86_64
