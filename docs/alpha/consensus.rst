@@ -304,14 +304,18 @@ The evidence for double signing at a given level can be collected by
 any :ref:`accuser<def_accuser_alpha>` and included as a *denunciation*
 operation in a block in the same cycle as the double signing or in the
 ``DENUNCIATION_PERIOD`` next cycles.
-
-As soon as a delegate is denounced for any double signing, it is
-immediately :ref:`forbidden<new_forbidden_period_alpha>` from both baking
-and attesting for at least 2 cycles.
-
 The actual slashing and denunciation rewarding happen at the end of
 cycle ``n + SLASHING_DELAY`` for a misbehavior that happened in cycle
 ``n``.
+
+As soon as a delegate is denounced for any double signing, it is immediately :ref:`forbidden<new_forbidden_period_alpha>` from both baking and attesting for at least 2 cycles.
+
+The baker stays forbidden from the denunciation time to the slashing itself, which is the remainder of the current cycle and least one full cycle.
+Then, the baker remains forbidden until its current stake matches the computed rights of the cycle.
+Because it has been slashed, its frozen stake is lower during the first cycle after slashing, so it remains forbidden for at least one more cycle.
+In this way, staking more tez can reduce the number of cycles in which it can't participate in consensus.
+
+Also note that while forbidden, a baker might become deactivated from inactivity, and might need to reactivate manually.
 
 Note that selfish baking is not an issue in Tenderbake: say we are at round
 ``r`` and the validator which is proposer at round ``r+1`` does not (pre)attest
