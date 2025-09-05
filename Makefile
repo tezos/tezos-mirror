@@ -145,7 +145,9 @@ build-parameters:
 
 .PHONY: $(ALL_EXECUTABLES)
 $(ALL_EXECUTABLES): check-slim-mode check-custom-flags
-	echo $(DUNE_BUILD_JOBS)
+	echo "Make var $(DUNE_BUILD_JOBS)"
+	echo "Env var $$DUNE_BUILD_JOBS"
+	env | grep "DUNE_BUILD_JOBS" || echo "DUNE_BUILD_JOBS not found in environment"
 	#dune build $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	#cp -f _build/install/default/bin/$@ ./
 
@@ -251,7 +253,9 @@ endif
 ifeq (${OCTEZ_EXECUTABLES},)
 	$(error The build target requires OCTEZ_EXECUTABLES to be specified. Please use another target (e.g. 'make' or 'make release') and make sure that environment variable OCTEZ_EXECUTABLES is unset)
 endif
-	echo $(DUNE_BUILD_JOBS)
+	echo "Make var $(DUNE_BUILD_JOBS)"
+	echo "Env var $$DUNE_BUILD_JOBS"
+	env | grep "DUNE_BUILD_JOBS" || echo "DUNE_BUILD_JOBS not found in environment"
 	# dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) $(DUNE_BUILD_JOBS) \
 	# 	$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
 	# 	$(BUILD_EXTRA) \
