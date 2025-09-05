@@ -48,3 +48,12 @@ val init_echo_rollup :
   Dal_node_helpers.producer list ->
   Account.key option ->
   operator option Lwt.t
+
+(** [fetch_echo_rollup_data ~echo_rollup ~data_node_producers ~level]
+    fetches payload size in bytes for each DAL slot given by [~data_node_producers]
+    written by the [~echo_rollup] at a given L1 [~level]. *)
+val fetch_echo_rollup_data :
+  echo_rollup:operator option ->
+  dal_node_producers:int list ->
+  level:int ->
+  (int, int) Hashtbl.t Lwt.t

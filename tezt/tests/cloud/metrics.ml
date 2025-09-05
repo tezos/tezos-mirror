@@ -338,7 +338,7 @@ let push ~versions ~cloud
     ~help:"Sum of the balances of the etherlink operator"
     ~typ:`Gauge
     ~name:"tezt_etherlink_operator_balance_total"
-    (Tez.to_float etherlink_operator_balance_sum);
+    (Tez.to_float etherlink_operator_balance_sum) ;
   Cloud.push_metric
     cloud
     ~help:"Number of slots unattested from the echo rollup perspective"

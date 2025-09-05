@@ -20,6 +20,43 @@ type operator = {
   origination_level : int;
 }
 
+let fetch_echo_rollup_data ~echo_rollup ~dal_node_producers ~level =
+  let slots = Hashtbl.create 32 in
+  let read_slot echo_operator slot =
+    let key = "/output/slot-" ^ string_of_int slot in
+    let* value_written =
+      Sc_rollup_node.RPC.call echo_operator.sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key
+           ~block:(string_of_int level)
+           ()
+    in
+    let size =
+      match value_written with
+      | None -> 0
+      | Some bytes -> `Hex bytes |> Hex.to_string |> Z.of_bits |> Z.to_int
+    in
+    Hashtbl.add slots slot size ;
+    unit
+  in
+  let* () =
+    match echo_rollup with
+    | None -> unit
+    | Some echo_rollup ->
+        if level < echo_rollup.origination_level then unit
+        else
+          let* _level =
+            Sc_rollup_node.wait_for_level
+              ~timeout:30.
+              echo_rollup.sc_rollup_node
+              level
+          in
+          Lwt_list.iter_s (read_slot echo_rollup) dal_node_producers
+  in
+  return slots
+
 let init_echo_rollup_account ~client ~echo_rollup ~alias_prefix =
   if echo_rollup then
     let () = toplog "Initializing the echo rollup key" in

@@ -89,45 +89,6 @@ type t = {
   otel : string option;
 }
 
-let get_echo_rollup t ~level =
-  let slots = Hashtbl.create 32 in
-  let read_slot echo_operator slot =
-    let key = "/output/slot-" ^ string_of_int slot in
-    let* value_written =
-      Sc_rollup_node.RPC.call echo_operator.Echo_rollup.sc_rollup_node
-      @@ Sc_rollup_rpc.get_global_block_durable_state_value
-           ~pvm_kind:"wasm_2_0_0"
-           ~operation:Sc_rollup_rpc.Value
-           ~key
-           ~block:(string_of_int level)
-           ()
-    in
-    let size =
-      match value_written with
-      | None -> 0
-      | Some bytes -> `Hex bytes |> Hex.to_string |> Z.of_bits |> Z.to_int
-    in
-    Hashtbl.add slots slot size ;
-    unit
-  in
-  let* () =
-    match t.echo_rollup with
-    | None -> unit
-    | Some echo_rollup ->
-        if level < echo_rollup.Echo_rollup.origination_level then unit
-        else
-          let* _level =
-            Sc_rollup_node.wait_for_level
-              ~timeout:30.
-              echo_rollup.sc_rollup_node
-              level
-          in
-          Lwt_list.iter_s
-            (read_slot echo_rollup)
-            t.configuration.dal_node_producers
-  in
-  return slots
-
 let get_infos_per_level t ~level ~metadata =
   let open Metrics in
   let client = t.bootstrap.client in
@@ -261,7 +222,12 @@ let get_infos_per_level t ~level ~metadata =
       unit
     else Lwt.return_unit
   in
-  let* echo_rollup_fetched_data = get_echo_rollup t ~level in
+  let* echo_rollup_fetched_data =
+    Echo_rollup.fetch_echo_rollup_data
+      ~echo_rollup:t.echo_rollup
+      ~dal_node_producers:t.configuration.dal_node_producers
+      ~level
+  in
   Lwt.return
     {
       level;
