@@ -48,6 +48,11 @@ EVM_EXECUTABLES := $(shell cat script-inputs/etherlink-experimental-executables)
 # 'build_x86_64-dev-exp-misc' job.
 BUILD_EXTRA ?=
 
+# set a default parallelism of dune
+# to be instantiated in the CI to avoid OOMs (e.g. "-j 12")
+DUNE_BUILD_JOBS ?=
+
+
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
 ifeq ($(filter ${opam_version_major}.%,${current_opam_version}),)
@@ -140,7 +145,8 @@ build-parameters:
 
 .PHONY: $(ALL_EXECUTABLES)
 $(ALL_EXECUTABLES): check-slim-mode check-custom-flags
-	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
+	echo $(DUNE_BUILD_JOBS)
+	#dune build $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
 # If slim mode is active, kaitai updates should fail, as some protocol encoding
@@ -245,7 +251,8 @@ endif
 ifeq (${OCTEZ_EXECUTABLES},)
 	$(error The build target requires OCTEZ_EXECUTABLES to be specified. Please use another target (e.g. 'make' or 'make release') and make sure that environment variable OCTEZ_EXECUTABLES is unset)
 endif
-	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
+	@echo $(DUNE_BUILD_JOBS)
+	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) $(DUNE_BUILD_JOBS) \
 		$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
 		$(BUILD_EXTRA) \
 		@copy-parameters
