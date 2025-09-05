@@ -177,6 +177,7 @@ Data directory
 
 The node stores data in a data directory, which by default is ``$HOME/.tezos-node/``.
 The ``--data-dir`` argument, available on many node commands, sets the location of this directory.
+This data includes the current context (in the ``context`` directory) and daily logs (in the ``daily_logs`` directory).
 One exception is the configuration file, which is stored in the data directory by default but can be stored in a different location with the ``--config-file`` argument.
 
 If for some reason your node is misbehaving or there has been an
