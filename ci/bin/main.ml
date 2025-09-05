@@ -122,7 +122,7 @@ let () =
   register
     "before_merging"
     If.(on_tezos_namespace && merge_request && not merge_train)
-    ~jobs:(Code_verification.jobs Before_merging (* @ !Hooks.before_merging*))
+    ~jobs:(Code_verification.jobs Before_merging @ !Hooks.before_merging)
     ~description:
       "Lints code in merge requests, checks that it compiles and runs tests.\n\n\
        This pipeline is created on each push to a branch with an associated \
@@ -133,7 +133,7 @@ let () =
     "merge_train"
     ~auto_cancel:{on_job_failure = true; on_new_commit = false}
     If.(on_tezos_namespace && merge_request && merge_train)
-    ~jobs:(Code_verification.jobs Merge_train (* @ !Hooks.before_merging*))
+    ~jobs:(Code_verification.jobs Merge_train @ !Hooks.before_merging)
     ~description:
       "A merge-train-specific version of 'before_merging'.\n\n\
        This pipeline contains the same set of jobs as 'before_merging' but \
@@ -366,7 +366,7 @@ let () =
     "schedule_merge_train_cache_refresh"
     schedule_merge_train_cache_refresh
     ~jobs:
-      (Code_verification.jobs Merge_train (* @ !Hooks.before_merging *)
+      (Code_verification.jobs Merge_train @ !Hooks.before_merging
       |> List.filter Tezos_ci.has_cache_or_start_stage
       |> List.map (Tezos_ci.set_tezos_job_cache_policy Gitlab_ci.Types.Push)
       |> List.map Tezos_ci.no_rules

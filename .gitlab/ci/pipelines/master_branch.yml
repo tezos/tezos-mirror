@@ -91,13 +91,14 @@ fresh-cache.oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 fresh-cache.oc.build:static-x86_64-linux-binaries:
-  image: ${ci_image_name_protected}/build:amd64--master
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_very_high_cpu_ramfs
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -140,13 +141,14 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
     - octez-binaries/$ARCH/*
 
 fresh-cache.oc.build:static-arm64-linux-binaries:
-  image: ${ci_image_name_protected}/build:amd64--master
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_arm64
   rules:
   - when: always
-  dependencies: []
+  dependencies:
+  - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
