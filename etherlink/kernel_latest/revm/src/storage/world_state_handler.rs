@@ -5,18 +5,18 @@
 // SPDX-License-Identifier: MIT
 
 use revm::{
-    primitives::{hex::FromHex, Address, Bytes, FixedBytes, B256, KECCAK_EMPTY, U256},
+    primitives::{Address, Bytes, B256, KECCAK_EMPTY, U256},
     state::{AccountInfo, Bytecode},
 };
+use rlp::{Decodable, Encodable, Rlp};
 use tezos_evm_logging::tracing::instrument;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::{
     path::{OwnedPath, RefPath},
-    runtime::{RuntimeError, ValueType},
+    runtime::RuntimeError,
 };
 use tezos_smart_rollup_storage::storage::Storage;
 
-use super::code::CodeStorage;
 use crate::{
     custom,
     helpers::{
@@ -26,15 +26,9 @@ use crate::{
             read_u64_le_default, write_u256_le,
         },
     },
-    precompiles::constants::{
-        FA_WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_CODE_HASH, FA_WITHDRAWAL_SOL_CONTRACT,
-        INTERNAL_FORWARDER_SOL_CODE_HASH, INTERNAL_FORWARDER_SOL_CONTRACT,
-        WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CODE_HASH, WITHDRAWAL_SOL_CONTRACT,
-    },
+    storage::code::CodeStorage,
     Error,
 };
-#[cfg(test)]
-use rlp::Encodable;
 
 /// Path where EVM accounts are stored.
 pub const EVM_ACCOUNTS_PATH: RefPath =
@@ -75,6 +69,11 @@ const CODE_HASH_PATH: RefPath = RefPath::assert_from(b"/code.hash");
 /// world state or for the current transaction.
 const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
 
+/// Path where all the infos of a contract are stored in the same key.
+/// This path must contains balance, nonce and code hash. This is the new
+/// format for saving the accounts infos that overrides the previous one.
+const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
+
 /// The contracts of "internal" accounts have their own storage area. The account
 /// location prefixed to this path gives the root path (prefix) to where such storage
 /// values are kept. Each index in durable storage gives one complete path to one
@@ -111,20 +110,80 @@ pub fn path_from_u256(index: &U256) -> Result<OwnedPath, Error> {
     OwnedPath::try_from(path_string).map_err(custom)
 }
 
-#[inline]
-fn bytecode_from_hex_str(hex_str: &str) -> Result<Bytecode, Error> {
-    Ok(Bytecode::new_legacy(
-        Bytes::from_hex(hex_str).map_err(custom)?,
-    ))
-}
-
-struct CodeInfo {
-    code: Option<Bytecode>,
-    code_hash: FixedBytes<32>,
-}
-
 pub struct StorageAccount {
     path: OwnedPath,
+}
+
+// Used as a value for the durable storage, can't use REVM `AccountInfo`
+// because we need to implement `RlpEncodable` `RlpDecodable`
+// TODO: Remove pub when `evm_execution` doesn't use it anymore.
+#[derive(Copy, Clone, Default, Debug)]
+pub struct AccountInfoInternal {
+    pub balance: U256,
+    pub nonce: u64,
+    pub code_hash: B256,
+}
+
+impl Encodable for AccountInfoInternal {
+    fn rlp_append(&self, s: &mut rlp::RlpStream) {
+        s.begin_list(3);
+        s.append(&self.balance.to_le_bytes::<32>().as_slice());
+        s.append(&self.nonce);
+        s.append(&self.code_hash.0.as_slice());
+    }
+}
+
+impl Decodable for AccountInfoInternal {
+    fn decode(rlp: &Rlp) -> Result<Self, rlp::DecoderError> {
+        if !rlp.is_list() {
+            Err(rlp::DecoderError::RlpExpectedToBeList)
+        } else {
+            let mut it = rlp.iter();
+            let balance: Vec<u8> = it
+                .next()
+                .ok_or(rlp::DecoderError::RlpExpectedToBeList)?
+                .as_val()?;
+            let nonce: u64 = it
+                .next()
+                .ok_or(rlp::DecoderError::RlpExpectedToBeList)?
+                .as_val()?;
+            let code_hash: Vec<u8> = it
+                .next()
+                .ok_or(rlp::DecoderError::RlpExpectedToBeList)?
+                .as_val()?;
+
+            Ok(Self {
+                balance: U256::from_le_bytes::<32>(
+                    balance.try_into().map_err(|_| {
+                        rlp::DecoderError::Custom("Invalid balance length")
+                    })?,
+                ),
+                nonce,
+                code_hash: B256::from_slice(&code_hash),
+            })
+        }
+    }
+}
+
+impl From<AccountInfoInternal> for AccountInfo {
+    fn from(info: AccountInfoInternal) -> Self {
+        AccountInfo {
+            balance: info.balance,
+            nonce: info.nonce,
+            code_hash: info.code_hash,
+            code: None,
+        }
+    }
+}
+
+impl From<AccountInfo> for AccountInfoInternal {
+    fn from(info: AccountInfo) -> Self {
+        AccountInfoInternal {
+            balance: info.balance,
+            nonce: info.nonce,
+            code_hash: info.code_hash,
+        }
+    }
 }
 
 impl StorageAccount {
@@ -153,224 +212,124 @@ impl StorageAccount {
         Ok(path.into())
     }
 
-    pub fn balance(&self, host: &impl Runtime) -> Result<U256, Error> {
-        let path = concat(&self.path, &BALANCE_PATH)?;
-        Ok(read_u256_le_default(host, &path, BALANCE_DEFAULT_VALUE)?)
+    pub fn from_path(path: OwnedPath) -> Self {
+        Self { path }
     }
 
-    pub fn set_balance(
-        &mut self,
-        host: &mut impl Runtime,
-        new_balance: U256,
-    ) -> Result<(), Error> {
-        let path = concat(&self.path, &BALANCE_PATH)?;
-        Ok(host.store_write_all(&path, &new_balance.to_le_bytes::<{ U256::BYTES }>())?)
-    }
-
-    pub fn nonce(&self, host: &impl Runtime) -> Result<u64, Error> {
-        let path = concat(&self.path, &NONCE_PATH)?;
-        read_u64_le_default(host, &path, NONCE_DEFAULT_VALUE)
-    }
-
-    pub fn set_nonce(
-        &mut self,
-        host: &mut impl Runtime,
-        nonce: u64,
-    ) -> Result<(), Error> {
-        let path = concat(&self.path, &NONCE_PATH)?;
-
-        let value_bytes: [u8; 8] = nonce.to_le_bytes();
-
-        Ok(host.store_write_all(&path, &value_bytes)?)
-    }
-
-    pub fn code_hash(&self, host: &impl Runtime) -> Result<B256, Error> {
-        let path = concat(&self.path, &CODE_HASH_PATH)?;
-        Ok(read_b256_be_default(host, &path, KECCAK_EMPTY)?)
-    }
-
-    pub fn code_exists(&self, host: &impl Runtime) -> Result<bool, Error> {
-        let path = concat(&self.path, &CODE_HASH_PATH)?;
-
-        match host.store_has(&path) {
-            Ok(Some(ValueType::Value | ValueType::ValueWithSubtree)) => Ok(true),
-            Ok(Some(ValueType::Subtree) | None) => Ok(false),
-            Err(err) => Err(Error::Runtime(err)),
-        }
-    }
-
-    pub fn code(&self, host: &impl Runtime) -> Result<Option<Bytecode>, Error> {
-        let path = concat(&self.path, &CODE_PATH)?;
-
+    pub fn info(&self, host: &mut impl Runtime) -> Result<AccountInfo, Error> {
+        let path = concat(&self.path, &INFO_PATH)?;
         match host.store_read_all(&path) {
             Ok(bytes) => {
-                // NB: [new_raw_checked] here is great as it's backward-compatible
-                // but also future proof. It will check if the decoded bytes is
-                // a legacy code, an EIP-7702 EOA's code or an EOF code.
-                Ok(Some(
-                    Bytecode::new_raw_checked(Bytes::from(bytes))
-                        .map_err(|_| RuntimeError::DecodingError)?,
-                ))
+                let account_info = AccountInfoInternal::decode(&Rlp::new(&bytes))
+                    .map_err(|_| RuntimeError::DecodingError)?;
+                Ok(account_info.into())
             }
             Err(RuntimeError::PathNotFound) => {
-                let code_hash = self.code_hash(host)?;
-                if B256::from(code_hash) == KECCAK_EMPTY {
-                    return Ok(Some(Bytecode::new()));
+                // If we don't have the informations inside of `INFO_PATH` it's either :
+                // - We don't have the account created yet
+                // - The account is stored in the old format (each field in a different key)
+                // In the last case we need to migrate the account to the new format
+                // We are not verifying if the keys where existing before for code readibility,
+                // this code will run only once for an old address so the overhead is minimal.
+
+                let balance_path = concat(&self.path, &BALANCE_PATH)?;
+                let nonce_path = concat(&self.path, &NONCE_PATH)?;
+                let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
+                let code_path = concat(&self.path, &CODE_PATH)?;
+
+                let info = AccountInfoInternal {
+                    balance: read_u256_le_default(
+                        host,
+                        &balance_path,
+                        BALANCE_DEFAULT_VALUE,
+                    )?,
+                    nonce: read_u64_le_default(host, &nonce_path, NONCE_DEFAULT_VALUE)?,
+                    code_hash: read_b256_be_default(host, &code_hash_path, KECCAK_EMPTY)?,
                 };
-                let code_storage = CodeStorage::new(&code_hash)?;
-                Ok(Some(code_storage.get_code(host)?))
+
+                // Write migration
+                match host.store_read_all(&code_path) {
+                    Ok(bytes) => {
+                        CodeStorage::add(
+                            host,
+                            Bytecode::new_raw_checked(Bytes::from(bytes))
+                                .map_err(|_| RuntimeError::DecodingError)?
+                                .original_byte_slice(),
+                            Some(info.code_hash),
+                        )?;
+                    }
+                    Err(RuntimeError::PathNotFound) => (),
+                    Err(err) => return Err(Error::Runtime(err)),
+                };
+                host.store_write_all(&path, &info.rlp_bytes())?;
+
+                // Delete legacy account entries
+                for path in &[balance_path, nonce_path, code_hash_path, code_path] {
+                    match host.store_delete(path) {
+                        Ok(()) | Err(RuntimeError::PathNotFound) => (),
+                        Err(err) => return Err(Error::Runtime(err)),
+                    };
+                }
+
+                Ok(info.into())
             }
             Err(err) => Err(Error::Runtime(err)),
         }
     }
 
-    pub fn set_code(
-        &mut self,
-        host: &mut impl Runtime,
-        code: Option<Bytecode>,
-    ) -> Result<(), Error> {
-        let code_hash = match code {
-            // There is nothing to store if there's no code or if the legacy analyzed
-            // bytecode is just the STOP instruction (0x00).
-            None => return Ok(()),
-            Some(Bytecode::LegacyAnalyzed(bytecode))
-                if bytecode.bytecode() == &Bytes::from_static(&[0]) =>
-            {
-                return Ok(())
+    pub fn info_without_migration(
+        &self,
+        host: &impl Runtime,
+    ) -> Result<Option<AccountInfo>, Error> {
+        let path = concat(&self.path, &INFO_PATH)?;
+        match host.store_read_all(&path) {
+            Ok(bytes) => {
+                let account_info = AccountInfoInternal::decode(&Rlp::new(&bytes))
+                    .map_err(|_| RuntimeError::DecodingError)?;
+                Ok(Some(account_info.into()))
             }
-            Some(code) => {
-                if !self.code_exists(host)? {
-                    CodeStorage::add(host, code.original_byte_slice())?
-                } else {
-                    match self.code(host)? {
-                        None => CodeStorage::add(host, code.original_byte_slice())?,
-                        Some(current_code) => {
-                            if code == current_code {
-                                // Nothing to do.
-                                return Ok(());
-                            }
-                            if !code.is_eip7702() {
-                                // Replacement code isn't EIP-7702 and there's actively some
-                                // code under `self` we can't set code.
-                                return Err(Error::Custom(
-                                    "Can't reset code for a non-[EIP-7702] transaction."
-                                        .to_string(),
-                                ));
-                            }
-                            if !current_code.is_eip7702() {
-                                // Current code isn't EIP-7702, it's regular smart contract
-                                // bytecode, we can't reset its code.
-                                return Err(Error::Custom(
-                                    "Can't reset code from a regular smart contract bytecode."
-                                        .to_string(),
-                                ));
-                            }
-                            // If current code is EIP-7702 and the replacement code
-                            // is a re-delegation (also EIP-7702) then we delete the
-                            // current code before adding the new one.
-                            CodeStorage::delete(host, &self.code_hash(host)?)?;
-                            CodeStorage::add(host, code.original_byte_slice())?
-                        }
-                    }
-                }
-            }
-        };
-        let code_hash_bytes: [u8; 32] = code_hash.into();
-        let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
-        Ok(host.store_write_all(&code_hash_path, &code_hash_bytes)?)
-    }
-
-    fn fetch_optimised_code_info(&self, host: &impl Runtime) -> Result<CodeInfo, Error> {
-        let raw_path = self.path.to_string();
-
-        let code_info = if raw_path.contains(&WITHDRAWAL_SOL_ADDR.to_string()[2..]) {
-            CodeInfo {
-                code: Some(bytecode_from_hex_str(WITHDRAWAL_SOL_CONTRACT)?),
-                code_hash: WITHDRAWAL_SOL_CODE_HASH,
-            }
-        } else if raw_path.contains(&FA_WITHDRAWAL_SOL_ADDR.to_string()[2..]) {
-            CodeInfo {
-                code: Some(bytecode_from_hex_str(FA_WITHDRAWAL_SOL_CONTRACT)?),
-                code_hash: FA_WITHDRAWAL_SOL_CODE_HASH,
-            }
-        } else if raw_path.contains(&Address::ZERO.to_string()[2..]) {
-            CodeInfo {
-                code: Some(bytecode_from_hex_str(INTERNAL_FORWARDER_SOL_CONTRACT)?),
-                code_hash: INTERNAL_FORWARDER_SOL_CODE_HASH,
-            }
-        } else {
-            let code_hash = self.code_hash(host)?;
-            let code = if B256::from(code_hash) == KECCAK_EMPTY {
-                Some(Bytecode::new())
-            } else {
-                self.code(host)?
-            };
-            CodeInfo { code, code_hash }
-        };
-
-        Ok(code_info)
-    }
-
-    pub fn info(&self, host: &impl Runtime) -> Result<AccountInfo, Error> {
-        // Optimisation: we can infer some fields of the account info based on the
-        // targeted address.
-        let CodeInfo { code, code_hash } = self.fetch_optimised_code_info(host)?;
-
-        Ok(AccountInfo {
-            balance: self.balance(host)?,
-            nonce: self.nonce(host)?,
-            code_hash,
-            code,
-        })
+            Err(RuntimeError::PathNotFound) => Ok(None),
+            Err(err) => Err(Error::Runtime(err)),
+        }
     }
 
     pub fn set_info(
         &mut self,
         host: &mut impl Runtime,
+        mut new_infos: AccountInfo,
+    ) -> Result<(), Error> {
+        let path = concat(&self.path, &INFO_PATH)?;
+        if let Some(code) = new_infos.code.take() {
+            CodeStorage::add(
+                host,
+                code.original_byte_slice(),
+                Some(new_infos.code_hash),
+            )?;
+        }
+        let value = AccountInfoInternal::from(new_infos).rlp_bytes();
+
+        host.store_write_all(&path, &value)?;
+        Ok(())
+    }
+
+    pub fn set_info_without_code(
+        &mut self,
+        host: &mut impl Runtime,
         new_infos: AccountInfo,
     ) -> Result<(), Error> {
-        let AccountInfo {
-            balance,
-            nonce,
-            code,
-            ..
-        } = new_infos;
+        let path = concat(&self.path, &INFO_PATH)?;
+        let value = AccountInfoInternal::from(new_infos).rlp_bytes();
 
-        self.set_balance(host, balance)?;
-        self.set_nonce(host, nonce)?;
-        self.set_code(host, code)?;
-
+        host.store_write_all(&path, &value)?;
         Ok(())
     }
 
-    fn delete_code(
-        &mut self,
-        host: &mut impl Runtime,
-        code_hash: &B256,
-    ) -> Result<(), Error> {
-        if code_hash != &KECCAK_EMPTY {
-            CodeStorage::delete(host, code_hash)?;
-            let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
-            if host.store_has(&code_hash_path)?.is_some() {
-                host.store_delete(&code_hash_path)?
-            }
-        }
-        Ok(())
-    }
-
-    pub fn clear_info(
-        &mut self,
-        host: &mut impl Runtime,
-        code_hash: &B256,
-    ) -> Result<(), Error> {
-        // If nothing was ever stored state-wise, we have nothing
-        // to clear, it means the storage account was created and
-        // destructed within the same transaction.
-        if host.store_has(&self.path)?.is_some() {
-            self.set_balance(host, U256::ZERO)?;
-            self.set_nonce(host, 0)?;
-            self.delete_code(host, code_hash)?;
-        }
+    pub fn delete_info(&mut self, host: &mut impl Runtime) -> Result<(), Error> {
+        let path = concat(&self.path, &INFO_PATH)?;
+        match host.store_delete(&path) {
+            Ok(()) | Err(RuntimeError::PathNotFound) => (),
+            Err(err) => return Err(Error::Runtime(err)),
+        };
         Ok(())
     }
 
@@ -508,41 +467,50 @@ pub fn new_world_state_handler() -> Result<WorldStateHandler, Error> {
 
 #[cfg(test)]
 mod test {
-    use crate::precompiles::constants::{
-        FA_WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_CODE_HASH, FA_WITHDRAWAL_SOL_CONTRACT,
-        INTERNAL_FORWARDER_SOL_CODE_HASH, INTERNAL_FORWARDER_SOL_CONTRACT,
-        WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CODE_HASH, WITHDRAWAL_SOL_CONTRACT,
+    use crate::{
+        custom,
+        precompiles::constants::{
+            FA_WITHDRAWAL_SOL_CODE_HASH, FA_WITHDRAWAL_SOL_CONTRACT,
+            INTERNAL_FORWARDER_SOL_CODE_HASH, INTERNAL_FORWARDER_SOL_CONTRACT,
+            WITHDRAWAL_SOL_CODE_HASH, WITHDRAWAL_SOL_CONTRACT,
+        },
+        storage::code::CodeStorage,
+        Error,
     };
 
-    use super::{bytecode_from_hex_str, CodeInfo, StorageAccount};
     use revm::{
-        primitives::{Address, FixedBytes, KECCAK_EMPTY},
+        primitives::{hex::FromHex, Bytes, FixedBytes, KECCAK_EMPTY},
         state::Bytecode,
     };
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
 
+    fn bytecode_from_hex_str(hex_str: &str) -> Result<Bytecode, Error> {
+        Ok(Bytecode::new_legacy(
+            Bytes::from_hex(hex_str).map_err(custom)?,
+        ))
+    }
+
     fn check_account_code_info_fetching(
-        host: &impl Runtime,
-        storage_account: StorageAccount,
+        host: &mut impl Runtime,
         code_voucher: Bytecode,
         code_hash_voucher: FixedBytes<32>,
     ) {
-        let CodeInfo { code, code_hash } =
-            storage_account.fetch_optimised_code_info(host).unwrap();
+        let bytecode = CodeStorage::new(&code_hash_voucher)
+            .unwrap()
+            .get_code(host)
+            .unwrap()
+            .unwrap_or_default();
 
-        assert_eq!(Some(code_voucher), code);
-        assert_eq!(code_hash_voucher, code_hash);
+        assert_eq!(code_voucher, bytecode);
     }
 
     #[test]
     fn check_withdrawal_code_info_fetching() {
-        let host = MockKernelHost::default();
-        let storage_account = StorageAccount::from_address(&WITHDRAWAL_SOL_ADDR).unwrap();
+        let mut host = MockKernelHost::default();
         let code_voucher = bytecode_from_hex_str(WITHDRAWAL_SOL_CONTRACT).unwrap();
 
         check_account_code_info_fetching(
-            &host,
-            storage_account,
+            &mut host,
             code_voucher,
             WITHDRAWAL_SOL_CODE_HASH,
         );
@@ -550,14 +518,11 @@ mod test {
 
     #[test]
     fn check_fa_withdrawal_code_info_fetching() {
-        let host = MockKernelHost::default();
-        let storage_account =
-            StorageAccount::from_address(&FA_WITHDRAWAL_SOL_ADDR).unwrap();
+        let mut host = MockKernelHost::default();
         let code_voucher = bytecode_from_hex_str(FA_WITHDRAWAL_SOL_CONTRACT).unwrap();
 
         check_account_code_info_fetching(
-            &host,
-            storage_account,
+            &mut host,
             code_voucher,
             FA_WITHDRAWAL_SOL_CODE_HASH,
         );
@@ -565,14 +530,12 @@ mod test {
 
     #[test]
     fn check_internal_forwarder_code_info_fetching() {
-        let host = MockKernelHost::default();
-        let storage_account = StorageAccount::from_address(&Address::ZERO).unwrap();
+        let mut host = MockKernelHost::default();
         let code_voucher =
             bytecode_from_hex_str(INTERNAL_FORWARDER_SOL_CONTRACT).unwrap();
 
         check_account_code_info_fetching(
-            &host,
-            storage_account,
+            &mut host,
             code_voucher,
             INTERNAL_FORWARDER_SOL_CODE_HASH,
         );
@@ -580,16 +543,9 @@ mod test {
 
     #[test]
     fn check_empty_account_code_info_fetching() {
-        let host = MockKernelHost::default();
-        let storage_account =
-            StorageAccount::from_address(&Address(FixedBytes::new([1; 20]))).unwrap();
+        let mut host = MockKernelHost::default();
         let code_voucher = Bytecode::new();
 
-        check_account_code_info_fetching(
-            &host,
-            storage_account,
-            code_voucher,
-            KECCAK_EMPTY,
-        );
+        check_account_code_info_fetching(&mut host, code_voucher, KECCAK_EMPTY);
     }
 }

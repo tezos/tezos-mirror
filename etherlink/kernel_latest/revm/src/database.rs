@@ -54,6 +54,9 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
     caller: Address,
     /// Storage access to address zero aka the system address
     system: StorageAccount,
+    /// Account info snapshot when read to avoid re-write them if they haven't change and only
+    /// the storage has been touched
+    original_account_infos: HashMap<Address, AccountInfo>,
 }
 
 enum AccountState {
@@ -82,6 +85,7 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
             withdrawals: vec![],
             caller,
             system,
+            original_account_infos: HashMap::with_capacity(2),
         })
     }
 }
@@ -158,12 +162,26 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
             address,
         ) {
             Ok(mut storage_account) => match account_state {
-                AccountState::Touched((info, storage)) => {
-                    abort_on_error!(
-                        self,
-                        storage_account.set_info(self.host, info),
-                        "DatabaseCommit `set_info`"
-                    );
+                AccountState::Touched((mut info, storage)) => {
+                    if let Some(code) = info.code.take() {
+                        abort_on_error!(
+                            self,
+                            CodeStorage::add(
+                                self.host,
+                                code.original_byte_slice(),
+                                Some(info.code_hash)
+                            ),
+                            "DatabaseCommit `CodeStorage::add`"
+                        );
+                    }
+                    // Avoid rewriting the account info if it hasn't changed
+                    if self.original_account_infos.get(&address) != Some(&info) {
+                        abort_on_error!(
+                            self,
+                            storage_account.set_info_without_code(self.host, info),
+                            "DatabaseCommit `set_info_without_code`"
+                        );
+                    }
 
                     for (
                         key,
@@ -190,13 +208,18 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
                 AccountState::SelfDestructed(code_hash) => {
                     abort_on_error!(
                         self,
-                        storage_account.clear_info(self.host, &code_hash),
+                        storage_account.delete_info(self.host),
                         "DatabaseCommit `clear_info`"
                     );
                     abort_on_error!(
                         self,
                         storage_account.clear_storage(self.host),
                         "DatabaseCommit `clear_storage`"
+                    );
+                    abort_on_error!(
+                        self,
+                        CodeStorage::delete(self.host, &code_hash),
+                        "DatabaseCommit `CodeStorage::delete`"
                     );
                 }
             },
@@ -274,6 +297,9 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
             None => AccountInfo::default(),
         };
 
+        self.original_account_infos
+            .insert(address, account_info.copy_without_code());
+
         if self.caller == Address::ZERO && address == Address::ZERO {
             // HACK: [PRECOMPILE_ZERO_ADDRESS_AND_SIMULATION]
             // This can only happen in a simulation case only.
@@ -293,8 +319,7 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
     fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
         let code_storage = CodeStorage::new(&code_hash)?;
         let bytecode = code_storage.get_code(self.host)?;
-
-        Ok(bytecode)
+        Ok(bytecode.unwrap_or_default())
     }
 
     fn storage(
@@ -387,5 +412,6 @@ impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
                 AccountState::Touched((account.info, account.storage)),
             );
         }
+        self.original_account_infos.clear();
     }
 }

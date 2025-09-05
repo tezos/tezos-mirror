@@ -4,18 +4,22 @@
 // SPDX-License-Identifier: MIT
 
 use revm::{
-    primitives::{hex::FromHex, Address, Bytes},
+    primitives::{hex::FromHex, Address, Bytes, KECCAK_EMPTY},
     state::Bytecode,
 };
 use tezos_evm_runtime::runtime::Runtime;
 
 use crate::{
     custom,
+    helpers::storage::bytes_hash,
     precompiles::constants::{
         FA_WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_CONTRACT,
         INTERNAL_FORWARDER_SOL_CONTRACT, WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CONTRACT,
     },
-    storage::world_state_handler::{account_path, WorldStateHandler},
+    storage::{
+        code::CodeStorage,
+        world_state_handler::{account_path, WorldStateHandler},
+    },
     Error,
 };
 
@@ -52,12 +56,16 @@ fn init_precompile_bytecode<'a, Host: Runtime>(
     let mut created_account = world_state_handler
         .get_or_create(host, &account_path(addr).map_err(custom)?)
         .map_err(custom)?;
-    if created_account.code_exists(host).map_err(custom)? {
+    let mut account_info = created_account.info(host).map_err(custom)?;
+    if account_info.code_hash != KECCAK_EMPTY {
         return Ok(());
     }
-    let code = Some(Bytecode::new_legacy(
-        Bytes::from_hex(hex_bytes).map_err(custom)?,
-    ));
-    created_account.set_code(host, code).map_err(custom)?;
+    let code = Bytecode::new_legacy(Bytes::from_hex(hex_bytes).map_err(custom)?);
+    let code_hash = bytes_hash(code.original_byte_slice());
+    account_info.code_hash = code_hash;
+    created_account
+        .set_info(host, account_info)
+        .map_err(custom)?;
+    CodeStorage::add(host, code.original_byte_slice(), Some(code_hash))?;
     Ok(())
 }

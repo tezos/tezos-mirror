@@ -121,6 +121,12 @@ pub enum Error {
     RevmPrecompileInitError,
 }
 
+impl From<revm_etherlink::Error> for Error {
+    fn from(err: revm_etherlink::Error) -> Self {
+        Error::Simulation(EthereumError::WrappedError(err.to_string().into()))
+    }
+}
+
 impl From<PathError> for StorageError {
     fn from(e: PathError) -> Self {
         Self::Path(e)

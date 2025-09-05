@@ -1757,7 +1757,7 @@ mod tests {
         let caller_account = evm_account_storage
             .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
-        let default_nonce = caller_account.nonce(&host).unwrap();
+        let default_nonce = caller_account.nonce(&mut host).unwrap();
         assert_eq!(default_nonce, 0, "default nonce should be 0");
 
         let tx = dummy_eth_transaction_zero();
@@ -1794,7 +1794,7 @@ mod tests {
         );
 
         // Nonce should not have been bumped
-        let nonce = caller_account.nonce(&host).unwrap();
+        let nonce = caller_account.nonce(&mut host).unwrap();
         assert_eq!(nonce, default_nonce, "nonce should not have been bumped");
     }
 

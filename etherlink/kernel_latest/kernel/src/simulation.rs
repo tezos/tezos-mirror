@@ -31,6 +31,7 @@ use evm_execution::handler::{
 use evm_execution::trace::TracerInput;
 use evm_execution::EthereumError;
 use primitive_types::{H160, U256};
+use revm_etherlink::u256_to_alloy;
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use tezos_ethereum::access_list::empty_access_list;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
@@ -458,12 +459,7 @@ impl Evaluation {
         let mut simulation_caller =
             revm_etherlink::storage::world_state_handler::StorageAccount::from_address(
                 &revm::primitives::Address::from_slice(&from.0),
-            )
-            .map_err(|err| {
-                Error::Simulation(EthereumError::WrappedError(Cow::Owned(
-                    err.to_string(),
-                )))
-            })?;
+            )?;
         let max_gas_limit =
             read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
         let gas = self
@@ -480,39 +476,15 @@ impl Evaluation {
         // zero address if necessary.
         if from.is_zero() {
             if let Some(value) = self.value {
-                simulation_caller
-                    .set_balance(
-                        host,
-                        revm::primitives::U256::from_le_slice(
-                            &(evm_execution::utilities::u256_to_le_bytes(
-                                value + max_gas_to_pay,
-                            )),
-                        ),
-                    )
-                    .map_err(|err| {
-                        Error::Simulation(EthereumError::WrappedError(Cow::Owned(
-                            err.to_string(),
-                        )))
-                    })?;
+                let mut info = simulation_caller.info(host)?;
+                info.balance = u256_to_alloy(&value.saturating_add(max_gas_to_pay));
+                simulation_caller.set_info_without_code(host, info)?;
             }
         }
 
-        let balance = simulation_caller.balance(host).map_err(|err| {
-            Error::Simulation(EthereumError::WrappedError(Cow::Owned(err.to_string())))
-        })?;
-        simulation_caller
-            .set_balance(
-                host,
-                balance
-                    + revm::primitives::U256::from_le_slice(
-                        &(evm_execution::utilities::u256_to_le_bytes(max_gas_to_pay)),
-                    ),
-            )
-            .map_err(|err| {
-                Error::Simulation(EthereumError::WrappedError(Cow::Owned(
-                    err.to_string(),
-                )))
-            })?;
+        let mut info = simulation_caller.info(host)?;
+        info.balance = info.balance.saturating_add(u256_to_alloy(&max_gas_to_pay));
+        simulation_caller.set_info_without_code(host, info)?;
 
         match revm_run_transaction(
             host,

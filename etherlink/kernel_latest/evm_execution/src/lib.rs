@@ -2269,11 +2269,14 @@ mod test {
             .unwrap();
 
         assert_eq!(
-            account.balance(&mock_runtime).unwrap(),
+            account.balance(&mut mock_runtime).unwrap(),
             U256::from(1_000_000)
         );
-        assert_eq!(account.code(&mock_runtime).unwrap(), selfdestructing_code);
-        assert_eq!(account.nonce(&mock_runtime).unwrap(), 1);
+        assert_eq!(
+            account.code(&mut mock_runtime).unwrap(),
+            selfdestructing_code
+        );
+        assert_eq!(account.nonce(&mut mock_runtime).unwrap(), 1);
 
         assert_eq!(
             get_balance(&mut mock_runtime, &mut evm_account_storage, &caller),
@@ -2978,14 +2981,15 @@ mod test {
 
         // Test contract nonce before creation
         let contract = EthereumAccount::from_address(&contract_address).unwrap();
-        let original_contract_nonce = contract.nonce(&mock_runtime).unwrap_or_default();
+        let original_contract_nonce =
+            contract.nonce(&mut mock_runtime).unwrap_or_default();
 
         assert_eq!(0, original_contract_nonce);
 
         // Test the nonce of the sub contract that will be created within contract creation
         let sub_contract_account = EthereumAccount::from_address(&sub_contract).unwrap();
         let original_sub_nonce = sub_contract_account
-            .nonce(&mock_runtime)
+            .nonce(&mut mock_runtime)
             .unwrap_or_default();
 
         assert_eq!(0, original_sub_nonce);
@@ -3012,7 +3016,7 @@ mod test {
         match &result_init.result {
             ExecutionResult::ContractDeployed(_, _) => {
                 let contract = EthereumAccount::from_address(&contract_address).unwrap();
-                let caller_nonce = contract.nonce(&mock_runtime).unwrap_or_default();
+                let caller_nonce = contract.nonce(&mut mock_runtime).unwrap_or_default();
                 // Check that even if the contract fails to create another contract (due to a collision),
                 // the nonce of contract_address is still bumped
                 assert_eq!(caller_nonce, 2);
@@ -3022,7 +3026,7 @@ mod test {
                 let sub_contract_created =
                     EthereumAccount::from_address(&sub_contract).unwrap();
                 let sub_contract_nonce = sub_contract_created
-                    .nonce(&mock_runtime)
+                    .nonce(&mut mock_runtime)
                     .unwrap_or_default();
                 assert_eq!(sub_contract_nonce, 1);
             }
@@ -3085,14 +3089,15 @@ mod test {
 
         // Test contract nonce before creation
         let contract = EthereumAccount::from_address(&contract_address).unwrap();
-        let original_contract_nonce = contract.nonce(&mock_runtime).unwrap_or_default();
+        let original_contract_nonce =
+            contract.nonce(&mut mock_runtime).unwrap_or_default();
 
         assert_eq!(0, original_contract_nonce);
 
         // Test the nonce of the sub contract that will be created within contract creation
         let sub_contract_account = EthereumAccount::from_address(&sub_contract).unwrap();
         let original_sub_nonce = sub_contract_account
-            .nonce(&mock_runtime)
+            .nonce(&mut mock_runtime)
             .unwrap_or_default();
 
         assert_eq!(0, original_sub_nonce);
@@ -3121,14 +3126,14 @@ mod test {
                 // Check that even if the contract fails to create another contract (due to a collision),
                 // the nonce of contract_address is still bumped
                 let contract = EthereumAccount::from_address(&contract_address).unwrap();
-                let caller_nonce = contract.nonce(&mock_runtime).unwrap_or_default();
+                let caller_nonce = contract.nonce(&mut mock_runtime).unwrap_or_default();
                 assert_eq!(caller_nonce, 2);
 
                 // The sub contract has a collision, so its nonce should not change
                 let sub_contract_created =
                     EthereumAccount::from_address(&sub_contract).unwrap();
                 let sub_contract_nonce = sub_contract_created
-                    .nonce(&mock_runtime)
+                    .nonce(&mut mock_runtime)
                     .unwrap_or_default();
                 assert_eq!(sub_contract_nonce, original_sub_nonce);
             }
@@ -3241,7 +3246,7 @@ mod test {
         let address = result.new_address().unwrap();
         let smart_contract = EthereumAccount::from_address(&address).unwrap();
 
-        assert_eq!(smart_contract.nonce(&host).unwrap(), 1)
+        assert_eq!(smart_contract.nonce(&mut host).unwrap(), 1)
     }
 
     #[test]
@@ -3293,11 +3298,11 @@ mod test {
 
         let path = account_path(&caller).unwrap();
         let account = evm_account_storage.get_or_create(&host, &path).unwrap();
-        let caller_nonce = account.nonce(&host).unwrap();
+        let caller_nonce = account.nonce(&mut host).unwrap();
 
         let path = account_path(&callee).unwrap();
         let account = evm_account_storage.get_or_create(&host, &path).unwrap();
-        let callee_nonce = account.nonce(&host).unwrap();
+        let callee_nonce = account.nonce(&mut host).unwrap();
 
         assert_eq!(
             ExecutionResult::CallSucceeded(ExitSucceed::Stopped, vec![]),
@@ -3382,7 +3387,7 @@ mod test {
         // Get info on contract that should not be created
         let path = account_path(&should_not_create).unwrap();
         let account = evm_account_storage.get_or_create(&host, &path).unwrap();
-        let nonce_of_should_not_create = account.nonce(&host).unwrap();
+        let nonce_of_should_not_create = account.nonce(&mut host).unwrap();
         let storage_of_should_not_create = account
             .get_storage(&host, &H256::zero())
             .unwrap_or_default();
@@ -3390,7 +3395,7 @@ mod test {
         // Get info on contract that should be created
         let path = account_path(&should_create).unwrap();
         let account = evm_account_storage.get_or_create(&host, &path).unwrap();
-        let nonce_of_should_create = account.nonce(&host).unwrap();
+        let nonce_of_should_create = account.nonce(&mut host).unwrap();
         let storage_of_should_create = account
             .get_storage(&host, &H256::zero())
             .unwrap_or_default();
