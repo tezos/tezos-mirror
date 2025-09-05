@@ -33,8 +33,8 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
-  - echo $DUNE_BUILD_ARGS
-  - env | grep "DUNE_BUILD_ARGS"
+  - echo $DUNE_BUILD_JOBS
+  - env | grep "DUNE_BUILD_JOBS"
   - ./scripts/ci/build_static_binaries.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -43,7 +43,7 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/octez-released-executables script-inputs/octez-experimental-executables
-    DUNE_BUILD_ARGS: -j 12
+    DUNE_BUILD_JOBS: -j 12
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
