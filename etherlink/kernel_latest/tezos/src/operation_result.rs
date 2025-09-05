@@ -145,6 +145,8 @@ pub enum TransferError {
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader)]
 pub enum OriginationError {
+    #[error("Failed to fetch source account")]
+    FailedToFetchSourceAccount,
     #[error("Failed to fetch originated smart contract")]
     FailedToFetchOriginated,
     #[error("Failed to compute balance update")]
