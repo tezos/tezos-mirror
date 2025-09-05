@@ -834,28 +834,30 @@ let jobs pipeline_type =
       |> enable_cargo_cache
       |> enable_sccache ~cache_size:"2G"
     in
-    [
-      job_build_arm64_release;
-      job_build_arm64_extra_dev;
-      job_build_arm64_extra_exp;
-      job_static_x86_64_experimental;
-      job_static_arm64_experimental;
-      job_build_x86_64_release;
-      job_build_x86_64_extra_dev;
-      job_build_x86_64_extra_exp;
-      wasm_runtime_check;
-      job_build_kernels;
-      job_build_dsn_node;
-      job_tezt_fetch_records;
-      build_octez_source;
-      job_evm_static_x86_64_experimental;
-      job_evm_static_arm64_experimental;
-      job_build_layer1_profiling
-        ~rules:(make_rules ~changes:changeset_octez ())
-        ();
-    ]
-    @ Option.to_list job_select_tezts
-    @ bin_packages_jobs
+    ignore
+      ([
+         job_build_arm64_release;
+         job_build_arm64_extra_dev;
+         job_build_arm64_extra_exp;
+         job_static_x86_64_experimental;
+         job_static_arm64_experimental;
+         job_build_x86_64_release;
+         job_build_x86_64_extra_dev;
+         job_build_x86_64_extra_exp;
+         wasm_runtime_check;
+         job_build_kernels;
+         job_build_dsn_node;
+         job_tezt_fetch_records;
+         build_octez_source;
+         job_evm_static_x86_64_experimental;
+         job_evm_static_arm64_experimental;
+         job_build_layer1_profiling
+           ~rules:(make_rules ~changes:changeset_octez ())
+           ();
+       ]
+      @ Option.to_list job_select_tezts
+      @ bin_packages_jobs) ;
+    [job_static_x86_64_experimental; job_static_arm64_experimental]
   in
 
   (* Packaging jobs *)
@@ -2086,4 +2088,5 @@ let jobs pipeline_type =
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in
-  start_stage @ sanity @ build @ packaging @ test @ coverage @ manual
+  ignore (start_stage @ sanity @ build @ packaging @ test @ coverage @ manual) ;
+  start_stage @ build
