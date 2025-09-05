@@ -147,7 +147,7 @@ build-parameters:
 $(ALL_EXECUTABLES): check-slim-mode check-custom-flags
 	echo $(DUNE_BUILD_JOBS)
 	#dune build $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
-	cp -f _build/install/default/bin/$@ ./
+	#cp -f _build/install/default/bin/$@ ./
 
 # If slim mode is active, kaitai updates should fail, as some protocol encoding
 # will be missing.
@@ -251,12 +251,13 @@ endif
 ifeq (${OCTEZ_EXECUTABLES},)
 	$(error The build target requires OCTEZ_EXECUTABLES to be specified. Please use another target (e.g. 'make' or 'make release') and make sure that environment variable OCTEZ_EXECUTABLES is unset)
 endif
-	dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) $(DUNE_BUILD_JOBS) \
-		$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
-		$(BUILD_EXTRA) \
-		@copy-parameters
-	@mkdir -p $(OCTEZ_BIN_DIR)/
-	@cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) $(OCTEZ_BIN_DIR)/
+	echo $(DUNE_BUILD_JOBS)
+	# dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) $(DUNE_BUILD_JOBS) \
+	# 	$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
+	# 	$(BUILD_EXTRA) \
+	# 	@copy-parameters
+	# @mkdir -p $(OCTEZ_BIN_DIR)/
+	# @cp -f $(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) $(OCTEZ_BIN_DIR)/
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
