@@ -553,6 +553,15 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
        immediately in tests *)
     @ make_int_parameter ["blocks_per_cycle"] blocks_per_cycle
     @ make_int_parameter ["blocks_per_commitment"] blocks_per_commitment
+    @ (if
+         (* TODO ABAAB: reactivate test with threshold active *)
+         Protocol.(number protocol >= 024)
+       then
+         [
+           ( ["all_bakers_attest_activation_threshold"],
+             `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+         ]
+       else [])
     @ parameters
   in
 

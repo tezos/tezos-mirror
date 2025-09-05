@@ -74,6 +74,10 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
   --> set S.minimal_block_delay Protocol.Alpha_context.Period.one_minute
   --> set S.cost_per_byte Tez.zero
   --> set S.consensus_threshold_size 0
+  (* Make abaab never activate by default *)
+  --> set
+        S.all_bakers_attest_activation_threshold
+        {numerator = 2; denominator = 1}
   -->
   if deactivate_dynamic then
     set
