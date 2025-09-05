@@ -251,7 +251,6 @@ endif
 ifeq (${OCTEZ_EXECUTABLES},)
 	$(error The build target requires OCTEZ_EXECUTABLES to be specified. Please use another target (e.g. 'make' or 'make release') and make sure that environment variable OCTEZ_EXECUTABLES is unset)
 endif
-	@echo $(DUNE_BUILD_JOBS)
 	dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) $(DUNE_BUILD_JOBS) \
 		$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
 		$(BUILD_EXTRA) \
