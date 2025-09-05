@@ -367,7 +367,7 @@ let () =
     schedule_merge_train_cache_refresh
     ~jobs:
       (Code_verification.jobs Merge_train @ !Hooks.before_merging
-      |> List.filter Tezos_ci.has_cache_or_start_stage
+      |> List.filter Tezos_ci.has_cache_or_start_stage_or_is_trigger
       |> List.map (Tezos_ci.set_tezos_job_cache_policy Gitlab_ci.Types.Push)
       |> List.map Tezos_ci.no_rules
       |> List.map Tezos_ci.when_always
