@@ -16,11 +16,13 @@ fresh-cache.oc.docker:rust-sdk-bindings:amd64:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_sdk_bindings_build.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -40,10 +42,12 @@ fresh-cache.oc.docker:rust-toolchain:amd64:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -63,10 +67,12 @@ fresh-cache.oc.docker:ci:arm64:
   dependencies: []
   timeout: 90 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -91,10 +97,12 @@ fresh-cache.oc.docker:ci:amd64:
   dependencies: []
   timeout: 90 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -116,6 +124,7 @@ fresh-cache.trigger:
   timeout: 10 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
@@ -123,6 +132,7 @@ fresh-cache.trigger:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
@@ -142,6 +152,7 @@ fresh-cache.oc.ocaml_fmt:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -150,6 +161,7 @@ fresh-cache.oc.ocaml_fmt:
   script:
   - scripts/lint.sh --check-ocamlformat
   - dune build --profile=dev @fmt
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
@@ -175,12 +187,14 @@ fresh-cache.nix:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - mkdir -p ~/.config/nix
   - echo 'extra-experimental-features = flakes nix-command' > ~/.config/nix/nix.conf
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - nix run .#ci-check-version-sh-lock
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
@@ -212,6 +226,7 @@ fresh-cache.oc.build_arm64-released:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -220,6 +235,7 @@ fresh-cache.oc.build_arm64-released:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -264,6 +280,7 @@ fresh-cache.oc.build_arm64-extra-dev:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -272,6 +289,7 @@ fresh-cache.oc.build_arm64-extra-dev:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -323,6 +341,7 @@ fresh-cache.oc.build_arm64-extra-exp:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -331,6 +350,7 @@ fresh-cache.oc.build_arm64-extra-exp:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -385,6 +405,7 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -392,6 +413,7 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -435,6 +457,7 @@ fresh-cache.oc.build:static-arm64-linux-binaries:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -442,6 +465,7 @@ fresh-cache.oc.build:static-arm64-linux-binaries:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -485,6 +509,7 @@ fresh-cache.oc.build_x86_64-released:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -493,6 +518,7 @@ fresh-cache.oc.build_x86_64-released:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -545,6 +571,7 @@ fresh-cache.oc.build_amd64-extra-dev:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -553,6 +580,7 @@ fresh-cache.oc.build_amd64-extra-dev:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -617,6 +645,7 @@ fresh-cache.oc.build_amd64-extra-exp:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -625,6 +654,7 @@ fresh-cache.oc.build_amd64-extra-exp:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -681,6 +711,7 @@ fresh-cache.wasm-runtime-check:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -689,6 +720,7 @@ fresh-cache.wasm-runtime-check:
   - . ./scripts/ci/sccache-start.sh
   script:
   - etherlink/lib_wasm_runtime/lint.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -720,12 +752,14 @@ fresh-cache.oc.build_kernels:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk build
   - make -f etherlink.mk evm_kernel.wasm
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -767,11 +801,13 @@ fresh-cache.oc.build_dsn_node:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f etherlink.mk octez-dsn-node
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -808,6 +844,7 @@ fresh-cache.build_octez_source:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -823,6 +860,7 @@ fresh-cache.build_octez_source:
   - cd octez/
   - eval $(opam env)
   - make octez
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -855,6 +893,7 @@ fresh-cache.etherlink.build:static-x86_64:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -863,6 +902,7 @@ fresh-cache.etherlink.build:static-x86_64:
   - . ./scripts/ci/sccache-start.sh
   script:
   - make evm-node-static
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -904,6 +944,7 @@ fresh-cache.etherlink.build:static-arm64:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -912,6 +953,7 @@ fresh-cache.etherlink.build:static-arm64:
   - . ./scripts/ci/sccache-start.sh
   script:
   - make evm-node-static
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -949,6 +991,7 @@ fresh-cache.build-layer1-profiling:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -963,6 +1006,7 @@ fresh-cache.build-layer1-profiling:
   - mkdir -p octez-binaries/x86_64/
   - mv octez-node octez-binaries/x86_64/
   - mv octez-client octez-binaries/x86_64/
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1000,6 +1044,7 @@ fresh-cache.kaitai_checks:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1009,6 +1054,7 @@ fresh-cache.kaitai_checks:
   - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings
     and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files`
     and commit the resulting diff.' ; false)
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1045,6 +1091,7 @@ fresh-cache.oc.check_lift_limits_patch:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1055,6 +1102,7 @@ fresh-cache.oc.check_lift_limits_patch:
     "src/proto_alpha/lib_protocol/main.ml" ]'
   - git apply src/bin_tps_evaluation/lift_limits.patch
   - dune build @src/proto_alpha/lib_protocol/check
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1088,6 +1136,7 @@ fresh-cache.oc.integration:compiler-rejections:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1095,6 +1144,7 @@ fresh-cache.oc.integration:compiler-rejections:
   - . ./scripts/ci/sccache-start.sh
   script:
   - dune build @runtest_rejections
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1136,6 +1186,7 @@ fresh-cache.oc.script:snapshot_alpha_and_link:
     policy: pull
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1144,6 +1195,7 @@ fresh-cache.oc.script:snapshot_alpha_and_link:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/script:snapshot_alpha_and_link.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1176,10 +1228,12 @@ fresh-cache.mir_unit:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - cargo test --manifest-path contrib/mir/Cargo.toml
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -1204,10 +1258,12 @@ fresh-cache.mir_tzt:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - cargo run --manifest-path contrib/mir/Cargo.toml --bin tzt_runner tzt_reference_test_suite/*.tzt
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -1236,12 +1292,14 @@ fresh-cache.test_sdk_rust:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C sdk/rust check
   - make -C sdk/rust test
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1273,6 +1331,7 @@ fresh-cache.test_sdk_bindings:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . $HOME/.venv/bin/activate
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1280,6 +1339,7 @@ fresh-cache.test_sdk_bindings:
   script:
   - make -C contrib/sdk-bindings check
   - make -C contrib/sdk-bindings test
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1311,12 +1371,14 @@ fresh-cache.test_kernels:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk check
   - make -f kernels.mk test
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1350,12 +1412,14 @@ fresh-cache.test_etherlink_kernel:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f etherlink.mk check
   - make -f etherlink.mk test
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1389,11 +1453,13 @@ fresh-cache.test_etherlink_firehose:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C etherlink/firehose check
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1424,11 +1490,13 @@ fresh-cache.audit_riscv_deps:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C src/riscv audit
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1461,12 +1529,14 @@ fresh-cache.check_riscv_kernels:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features --features ci'
     check
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1500,6 +1570,7 @@ fresh-cache.test_evm_compatibility:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
@@ -1509,6 +1580,7 @@ fresh-cache.test_evm_compatibility:
     ethereum_tests
   - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_latest/evm_evaluation/resources/
     -c
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1538,6 +1610,7 @@ fresh-cache.ocaml-check:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -1545,6 +1618,7 @@ fresh-cache.ocaml-check:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - dune build @check --stop-on-first-error
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
@@ -1583,6 +1657,7 @@ fresh-cache.oc.unit:non-proto-x86_64:
     policy: pull
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1590,6 +1665,7 @@ fresh-cache.oc.unit:non-proto-x86_64:
   - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -1648,6 +1724,7 @@ fresh-cache.oc.unit:etherlink-x86_64:
     policy: pull
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1655,6 +1732,7 @@ fresh-cache.oc.unit:etherlink-x86_64:
   - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -1713,6 +1791,7 @@ fresh-cache.oc.unit:other-x86_64:
     policy: pull
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1720,6 +1799,7 @@ fresh-cache.oc.unit:other-x86_64:
   - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -1778,6 +1858,7 @@ fresh-cache.oc.unit:proto-x86_64:
     policy: pull
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1785,6 +1866,7 @@ fresh-cache.oc.unit:proto-x86_64:
   - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -1839,6 +1921,7 @@ fresh-cache.oc.unit:non-proto-arm64:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1846,6 +1929,7 @@ fresh-cache.oc.unit:non-proto-arm64:
   - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1893,6 +1977,7 @@ fresh-cache.oc.unit:protocol_compiles:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1900,6 +1985,7 @@ fresh-cache.oc.unit:protocol_compiles:
   - . ./scripts/ci/sccache-start.sh
   script:
   - dune build @runtest_compile_protocol
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1930,12 +2016,14 @@ fresh-cache.documentation.docgen:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - eval $(opam env)
   - make -C docs -j docexes-gen
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1974,6 +2062,7 @@ fresh-cache.documentation.odoc:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
@@ -1985,6 +2074,7 @@ fresh-cache.documentation.odoc:
   - opam update
   - opam install --yes odoc.2.4.4
   - make -C docs odoc-lite
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -2022,6 +2112,7 @@ fresh-cache.teztale.build-arm64:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
@@ -2032,6 +2123,7 @@ fresh-cache.teztale.build-arm64:
   - make teztale
   - mkdir -p ./teztale-binaries/arm64
   - mv octez-teztale-* ./teztale-binaries/arm64/
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -2070,6 +2162,7 @@ fresh-cache.teztale.build-x86_64:
     policy: push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
@@ -2080,6 +2173,7 @@ fresh-cache.teztale.build-x86_64:
   - make teztale
   - mkdir -p ./teztale-binaries/x86_64
   - mv octez-teztale-* ./teztale-binaries/x86_64/
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
