@@ -203,55 +203,60 @@ pub enum OperationError {
     RuntimeError(#[from] RuntimeError),
 }
 
+fn elements_to_bson(elts: &[(&[u8], &[u8])]) -> Vec<u8> {
+    // As per the BSON specification (https://bsonspec.org/spec.html), the BSON
+    // document is made of the concatenation of the following values:
+    //   * its full size encoded on 4 little-endian bytes, including
+    //     the size itself;
+    //   * its concatenated fields (the contents of the document);
+    //   * the byte 0.
+
+    let mut document = vec![];
+    let mut contents = vec![];
+    for (key, value) in elts {
+        // Tag 2 for a field of type string.
+        contents.push(0x02);
+        // The key does not require a size prefix.
+        contents.extend_from_slice(key);
+        // The 0 byte terminates the key.
+        contents.push(0x00);
+        // The value is also suffixed by the 0 byte and contrary to the key it is
+        // prefixed by its size (including the 0 byte, hence the + 1).
+        contents.extend_from_slice(&(value.len() as u32 + 1).to_le_bytes());
+        contents.extend_from_slice(value);
+        contents.push(0x00);
+    }
+
+    // The size here is the size of the whole document, including the trailing 0
+    // byte and the 4 bytes used to represent the size itself (hence the + 5).
+    document.extend_from_slice(&(contents.len() as u32 + 5).to_le_bytes());
+    document.extend_from_slice(&contents);
+    document.push(0x00);
+    document
+}
+
 // In Tezos data encoding, errors are encoded as bson (binary json). Unfortunately,
 // we cannot use the rust binary json crate to produce compatible bson data because
 // this crate uses Float pointer instructions (which is incompatible with the PVM).
-// To avoid reimplementing full bson support, we convert errors to strings and
-// manually encode them in bson. This gives us error which can be decoded using
-// Tezos data encoding but with less structure than what Tezos L1 produces.
+// To avoid reimplementing full bson support, we restrict the encoding of errors
+// to a single bson structure. This gives us error which can be decoded using
+// Tezos data encoding but with less possibilities than what Tezos L1 produces.
+// For compatibility with the TzKT indexer, we need to produce a BSON object with
+// an "id" field (see https://github.com/baking-bad/tzkt/blob/master/Tzkt.Sync/Protocols/Helpers/OperationErrors.cs).
+// We use the following structure:
+// { "kind": "permanent", "id": "tezlink_error", "error_message": "<error>" }
+// This is a temporary solution while waiting for better error support.
+// TODO https://linear.app/tezos/issue/L2-363/l1tzkt-compatible-errors
 impl BinWriter for ApplyOperationError {
     fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
         tezos_enc::dynamic(|error, out: &mut Vec<u8>| {
-            // Convert the error to a String
-            let error = format!("{error:?}");
-            let encoded_error = error.as_bytes();
-            let size_of_string: u32 = encoded_error
-                .len()
-                .try_into()
-                .map_err(|err| tezos_enc::BinError::custom(format!("{err}")))?;
-            // Tag for a BSON string is 0x82 (1 byte)
-            let bson_tag_size = 1;
-            // Size of a BSON object is encoded on 4 bytes
-            let bson_size = 4;
-            // Size of a BSON string is encoded on 4 bytes
-            let bson_string_size = 4;
-            // Tag for BSON string termination is on 1 byte
-            let bson_string_end_tag_size = 1;
-            // Tag for BSON termination is on 1 byte
-            let bson_end_tag_size = 1;
-            // A BSON object starts with its size
-            let mut bson = (bson_tag_size
-                + bson_size
-                + bson_string_size
-                + size_of_string
-                + bson_string_end_tag_size
-                + bson_end_tag_size)
-                .to_le_bytes()
-                .to_vec();
-            // In BSON, 0x82 is the tag for a String
-            bson.push(0x82_u8);
-            // In BSON, a String is encoded with its size on 4 bytes.
-            // But also an end bytes (byte 0), this is why we encode
-            // size + 1
-            bson.extend_from_slice(
-                &(size_of_string + bson_string_end_tag_size).to_le_bytes(),
-            );
-            bson.extend_from_slice(encoded_error);
-            bson.push(0x00);
-            // This is a little hack, but an OperationError will always be encoded in a list of OperationError.
-            // This zero byte represent the end of an item. Doing this prevent to rewrite multiple BinWriter
-            // implementation.
-            bson.push(0x00);
+            let str_error = format!("{error:?}");
+            let encoded_str_error = str_error.as_bytes();
+            let bson = elements_to_bson(&[
+                (b"kind", b"permanent"),
+                (b"id", b"tezlink_error"),
+                (b"error_message", encoded_str_error),
+            ]);
             tezos_enc::bytes(bson, out)?;
             Ok(())
         })(self, output)
@@ -907,7 +912,7 @@ mod tests {
         let output = operation
             .to_bytes()
             .expect("Operation with metadata should be encodable");
-        let operation_and_receipt_bytes = "00000001b76c0002298c03ed7d454a101eb7022bc95f7e5f41ac78ff010100008080a8ec85afd1310000e7670f32038107a59a2b9cfefae36ea21f5aa63c00000000000100000170000000b3b300000082a90000005472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a314b715470455a37596f62375162504534487934576f38664847384c684b785a5378222929292c2062616c616e63653a204e6172697468283130292c20616d6f756e743a204e617269746828323129207d29290000000000b5b500000082ab0000005472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a31676a614638315a525276647a6a6f627966564e7341655343365053636a6651774e222929292c2062616c616e63653a204e6172697468283535292c20616d6f756e743a204e6172697468283131313129207d2929000000000000f868f45f51a0c7a5733ab2c7f29781303904d9ef5b8fbf7b96429f00fe487c1d0f174c205b49c7393e5436b9522b88d3951113c32115e518465e029439874306";
+        let operation_and_receipt_bytes = "00000002276c0002298c03ed7d454a101eb7022bc95f7e5f41ac78ff010100008080a8ec85afd1310000e7670f32038107a59a2b9cfefae36ea21f5aa63c000000000001000001e0000000ebeb000000026b696e64000a0000007065726d616e656e7400026964000e00000074657a6c696e6b5f6572726f7200026572726f725f6d65737361676500a90000005472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a314b715470455a37596f62375162504534487934576f38664847384c684b785a5378222929292c2062616c616e63653a204e6172697468283130292c20616d6f756e743a204e617269746828323129207d29290000000000eded000000026b696e64000a0000007065726d616e656e7400026964000e00000074657a6c696e6b5f6572726f7200026572726f725f6d65737361676500ab0000005472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a31676a614638315a525276647a6a6f627966564e7341655343365053636a6651774e222929292c2062616c616e63653a204e6172697468283535292c20616d6f756e743a204e6172697468283131313129207d2929000000000000f868f45f51a0c7a5733ab2c7f29781303904d9ef5b8fbf7b96429f00fe487c1d0f174c205b49c7393e5436b9522b88d3951113c32115e518465e029439874306";
 
         assert_eq!(hex::encode(output), operation_and_receipt_bytes);
     }
