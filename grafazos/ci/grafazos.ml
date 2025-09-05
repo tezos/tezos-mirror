@@ -49,7 +49,7 @@ let job_release_page =
   CI.job
     "release_page"
     ~__POS__
-    ~image:Tezos_ci.Images.ci_release
+    ~image:Tezos_ci.Images.CI.build
     ~stage:Publish
     ~description:
       "Update the Grafazos release page. If running in a test pipeline, the \
@@ -79,7 +79,11 @@ let job_release_page =
             ("URL", "octez.tezos.com");
             ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
           ])
-    ["./grafazos/scripts/releases/publish_release_page.sh"]
+    [
+      "eval $(opam env)";
+      "sudo apk add aws-cli pandoc";
+      "./grafazos/scripts/releases/publish_release_page.sh";
+    ]
 
 let register () =
   CI.register_before_merging_jobs [(Auto, job_build Test)] ;

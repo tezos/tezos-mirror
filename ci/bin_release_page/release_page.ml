@@ -51,6 +51,23 @@ module Storage = struct
     !result
 end
 
+type asset_type = Binaries | Dashboards | Packages | Changelog
+
+let string_of_asset_type asset_type =
+  match asset_type with
+  | Binaries -> "Binaries"
+  | Dashboards -> "Dashboards"
+  | Packages -> "Packages"
+  | Changelog -> "Changelog"
+
+let asset_type_of_string_opt asset_type =
+  match String.lowercase_ascii asset_type with
+  | "binaries" -> Some Binaries
+  | "dashboards" -> Some Dashboards
+  | "packages" -> Some Packages
+  | "changelog" -> Some Changelog
+  | _ -> None
+
 type version = {
   major : int;
   minor : int;
@@ -62,7 +79,7 @@ type version = {
 type component = {
   name : string;
   path : string;
-  binaries_path : version -> string;
+  asset_path : version -> asset_type -> string;
   url : string;
 }
 
@@ -118,29 +135,22 @@ let markdown_of_page (page : page) =
     ""
     page
 
-type asset_type = Binaries | Packages | Changelog
+(* [get_checksum_file ?arch ~component ~version ~asset ()]
+   Download the checksum file for [asset] of [component] at [version],
+   optionally scoped to [arch].
 
-let string_of_asset_type asset_type =
-  match asset_type with
-  | Binaries -> "Binaries"
-  | Packages -> "Packages"
-  | Changelog -> "Changelog"
-
-let asset_type_of_string_opt asset_type =
-  match String.lowercase_ascii asset_type with
-  | "binaries" -> Some Binaries
-  | "packages" -> Some Packages
-  | "changelog" -> Some Changelog
-  | _ -> None
-
-(* [get_checksum_file ~component  ~version arch] downloads the checksum
-   file for [component] with [version] and [arch].
-
-   The checksum file is stored in [temp_dir]/ as [arch_sha256sums.txt]. *)
-let get_checksum_file ~component ~version arch =
-  let arch = string_of_arch arch in
-  let path = Filename.concat (component.binaries_path version) arch in
-  let target = Format.sprintf "%s_sha256sums.txt" arch in
+   The file is stored in [temp_dir]/ as:
+   - [<arch>_sha256sums.txt], if [arch] is provided
+   - [sha256sums.txt], otherwise. *)
+let get_checksum_file ?arch ~component ~version ~asset () =
+  let path, target =
+    match arch with
+    | Some arch ->
+        let arch = string_of_arch arch in
+        ( Filename.concat (component.asset_path version asset) arch,
+          Format.sprintf "%s_sha256sums.txt" arch )
+    | None -> (component.asset_path version asset, "sha256sums.txt")
+  in
   let file = "sha256sums.txt" in
   Storage.get_file ~path ~target file
 
@@ -167,34 +177,55 @@ let get_versions ~component =
       ("Failed to read versions.json in " ^ component.path ^ ": "
      ^ show_error error)
 
-(* [get_binaries ~component ~version arch] gets from the s3 [bucket]
-   the [arch] binaries of [version] of [component].
-   They are returned as a list of string. *)
-let get_binaries ~component ~version arch =
-  let arch = string_of_arch arch in
-  Format.printf
-    "Getting binaries list from %s for version %i.%i and architecture %s@."
-    component.path
-    version.major
-    version.minor
-    arch ;
-  let path = Filename.concat (component.binaries_path version) arch in
+(* [get_assets ?arch ~component ~version ~asset ()]
+   Retrieve from S3 the list of files for [asset] of [component] at [version],
+   optionally filtered by [arch].
+
+   The list is returned as a list of strings. *)
+let get_assets ?arch ~component ~version ~asset () =
+  let path =
+    match arch with
+    | None ->
+        Format.printf
+          "Getting %s list from %s for version %i.%i@."
+          (string_of_asset_type asset)
+          component.path
+          version.major
+          version.minor ;
+        Format.printf "%s@." (component.asset_path version asset) ;
+        component.asset_path version asset
+    | Some arch ->
+        let arch = string_of_arch arch in
+        Format.printf
+          "Getting %s list from %s for version %i.%i and architecture %s@."
+          (string_of_asset_type asset)
+          component.path
+          version.major
+          version.minor
+          arch ;
+        Filename.concat (component.asset_path version asset) arch
+  in
   Storage.get_folder_content ~path
 
-let binaries_links ~component ~arch binaries =
-  let binaries_links =
+let make_links ?arch ~component assets =
+  let assets_links =
     List.map
-      (fun binary ->
-        if Filename.basename binary = "sha256sums.txt" then
+      (fun asset ->
+        if Filename.basename asset = "sha256sums.txt" then
           link
-            (Filename.basename binary)
-            ("https://" ^ component.url ^ "/" ^ binary)
+            (Filename.basename asset)
+            ("https://" ^ component.url ^ "/" ^ asset)
         else
+          let checksum_path =
+            match arch with
+            | Some arch -> Filename.concat temp_dir arch ^ "_sha256sums.txt"
+            | None -> Filename.concat temp_dir "sha256sums.txt"
+          in
           let command =
             Format.asprintf
               "grep '%s' %s | awk '{print $1}'"
-              (Filename.basename binary)
-              (Filename.concat temp_dir arch ^ "_sha256sums.txt")
+              (Filename.basename asset)
+              checksum_path
           in
           let ic = Unix.open_process_in command in
           let checksum = input_line ic in
@@ -202,34 +233,42 @@ let binaries_links ~component ~arch binaries =
           Concat
             [
               link
-                (Filename.basename binary)
-                ("https://" ^ component.url ^ "/" ^ binary);
+                (Filename.basename asset)
+                ("https://" ^ component.url ^ "/" ^ asset);
               Text " ";
               Text
                 (Format.sprintf
                    "<span class=\"sha256\">(**sha256:** `%s`)</span>"
                    checksum);
             ])
-      binaries
+      assets
   in
-  Items binaries_links
+  Items assets_links
 
 (* [asset_content ~component ~version asset] returns the content for [asset]
    associated to its [version] of [component]. *)
 let asset_content ~component ~version = function
   | Binaries ->
-      get_checksum_file ~component ~version X86_64 ;
-      get_checksum_file ~component ~version Arm64 ;
-      let binaries_x86 = get_binaries ~component ~version X86_64 in
-      let binaries_arm = get_binaries ~component ~version Arm64 in
+      get_checksum_file ~arch:X86_64 ~component ~version ~asset:Binaries () ;
+      get_checksum_file ~arch:Arm64 ~component ~version ~asset:Binaries () ;
+      let binaries_x86 =
+        get_assets ~component ~version ~asset:Binaries ~arch:X86_64 ()
+      in
+      let binaries_arm =
+        get_assets ~component ~version ~asset:Binaries ~arch:Arm64 ()
+      in
       let section_x86 =
-        section "x86_64"
-        @@ binaries_links ~component ~arch:"x86_64" binaries_x86
+        section "x86_64" @@ make_links ~component ~arch:"x86_64" binaries_x86
       in
       let section_arm64 =
-        section "arm64" @@ binaries_links ~component ~arch:"arm64" binaries_arm
+        section "arm64" @@ make_links ~component ~arch:"arm64" binaries_arm
       in
       section "Static Binaries" @@ Concat [section_x86; section_arm64]
+  | Dashboards ->
+      get_checksum_file ~component ~version ~asset:Dashboards () ;
+      let dashboards = get_assets ~component ~version ~asset:Dashboards () in
+      let dashboards_links = make_links ~component dashboards in
+      section "Dashboards" dashboards_links
   | Packages ->
       Concat
         [
@@ -396,7 +435,7 @@ let () =
            ~show:string_of_asset_type)
         ~description:
           "List of assets types to display in the page. Possible values are \
-           \"changelog\", \"binaries\" and \"packages\"."
+           \"changelog\", \"binaries\", \"dashboards\" and \"packages\"."
         ~placeholder:"ASSET_TYPE"
         ())
   in
@@ -408,11 +447,11 @@ let () =
         (* For octez, the path is root of the bucket. *)
         (if component = "octez" then Format.sprintf "%s%s" bucket path
          else Format.sprintf "%s%s/%s" bucket path component);
-      binaries_path =
-        (fun version ->
+      asset_path =
+        (fun version asset_type ->
           if component = "octez" then
             Format.sprintf
-              "%s%s/%s-v%i.%i%s/binaries"
+              "%s%s/%s-v%i.%i%s/%s"
               bucket
               path
               component
@@ -421,9 +460,10 @@ let () =
               (match version.rc with
               | Some n -> Format.sprintf "-rc%s" @@ string_of_int n
               | None -> "")
+              (string_of_asset_type asset_type |> String.lowercase_ascii)
           else
             Format.sprintf
-              "%s%s/%s/%s-v%i.%i%s/binaries"
+              "%s%s/%s/%s-v%i.%i%s/%s"
               bucket
               path
               component
@@ -432,7 +472,8 @@ let () =
               version.minor
               (match version.rc with
               | Some n -> Format.sprintf "-rc%s" @@ string_of_int n
-              | None -> ""));
+              | None -> "")
+              (string_of_asset_type asset_type |> String.lowercase_ascii));
       url;
     }
   in

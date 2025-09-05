@@ -497,7 +497,7 @@ let () =
     ~jobs:
       ([
          Tezos_ci.job_datadog_pipeline_trace;
-         Release_tag.job_update_release_page ~test:true ();
+         Release_tag.job_release_page ~test:true ();
        ]
       @ !Hooks.global_test_publish_release_page)
     ~description:"Pipeline that updates and publishes the test release page." ;
@@ -507,7 +507,7 @@ let () =
     ~jobs:
       ([
          Tezos_ci.job_datadog_pipeline_trace;
-         Release_tag.job_update_release_page ~test:false ();
+         Release_tag.job_release_page ~test:false ();
        ]
       @ !Hooks.global_publish_release_page)
     ~description:"Pipeline that updates and publishes the release page."
