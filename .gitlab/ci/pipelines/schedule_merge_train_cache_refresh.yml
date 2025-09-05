@@ -52,4 +52,3 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
   when: always
-  retry: 0
