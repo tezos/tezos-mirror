@@ -6,10 +6,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Evm_node_lib_dev_encoding
+open Evm_node_lib_dev
 open Setup
 open Benchmark_utils
 open Floodgate_lib
-open Evm_node_lib_dev_encoding
 
 type env = {
   sequencer : Evm_node.t;
@@ -18,6 +19,8 @@ type env = {
   gas_limit : Z.t;
   accounts : Floodgate_lib.Account.t Array.t;
   contract : string;
+  width : int;
+  height : int;
   spp : int;
 }
 
@@ -90,6 +93,92 @@ let get_gas_limit endpoint infos sender contract spp =
   | Ok gas_limit -> return gas_limit
   | Error err -> return (hardcoded_gas_limit err spp)
 
+let ray_trace_scanline {infos; contract; spp; rpc_node; height; _} sender
+    callback y =
+  let data =
+    Efunc_core.Evm.encode
+      ~name:"TraceScanline"
+      [`int 256; `int 256]
+      [`int (Z.of_int (height - 1 - y)); `int (Z.of_int spp)]
+  in
+  let data = Ethereum_types.hash_of_string (data :> string) in
+  let*? (Hash (Hex res)) =
+    Batch.call
+      (module Rpc_encodings.Eth_call)
+      ~evm_node_endpoint:(Evm_node.endpoint rpc_node |> Uri.of_string)
+      ~keep_alive:true
+      ( {
+          from = Some (Account.address_et sender);
+          to_ = Some (Ethereum_types.Address.of_string contract);
+          gas = None;
+          gasPrice = Some (Qty (Z.mul infos.base_fee_per_gas (Z.of_int 1000)));
+          value = Some (Qty Z.zero);
+          data = Some data;
+        },
+        Block_parameter Latest,
+        Ethereum_types.AddressMap.empty )
+  in
+  let line = String.sub res 128 (String.length res - 128) in
+  let bytes = Hex.to_bytes (`Hex line) in
+  let* () = callback bytes in
+  return bytes
+
+let ray_trace_scanlines ({width; height; _} as env) sender =
+  Log.report "Raytracing with eth_call" ;
+  let lines = List.init height Fun.id in
+  let f = Temp.file "image.ppm" in
+  let* chan = Lwt_io.open_file ~mode:Output f in
+  let* () =
+    (* Write header for PPM image *)
+    Lwt_io.write chan (Format.sprintf "P6\n%d %d\n255\n" width height)
+  in
+  let start = Ptime_clock.now () in
+  let min_time = ref (Ptime.Span.of_d_ps (max_int, 0L) |> Option.get) in
+  let received_lines = ref 0 in
+  let* lines =
+    Lwt_list.map_p
+      (fun y ->
+        let start = Ptime_clock.now () in
+        let* line =
+          ray_trace_scanline
+            env
+            sender
+            (fun _ ->
+              incr received_lines ;
+              Log.info
+                "Received line %d. Completed at %.1f%%"
+                y
+                (float_of_int !received_lines *. 100. /. float_of_int height) ;
+              unit)
+            y
+        in
+        let end_ = Ptime_clock.now () in
+        let time = Ptime.diff end_ start in
+        min_time := min time !min_time ;
+        return line)
+      lines
+  in
+  let end_ = Ptime_clock.now () in
+  let* () =
+    Lwt_list.iter_s
+      (fun b -> Lwt_io.write chan (Bytes.unsafe_to_string b))
+      lines
+  in
+  let* () = Lwt_io.close chan in
+  let wall_time = Ptime.diff end_ start in
+  let speedup =
+    float_of_int height
+    *. Ptime.Span.to_float_s !min_time
+    /. Ptime.Span.to_float_s wall_time
+  in
+  Log.report
+    ~color:Log.Color.bold
+    "Ray traced in %a. Speed up = %.1f"
+    Ptime.Span.pp
+    wall_time
+    speedup ;
+  unit
+
 let call_one {infos; gas_limit; contract; spp; _} sender =
   let* _ =
     call
@@ -121,8 +210,8 @@ let test_snailtracer =
   | Some n when n <> 1 ->
       Log.warn "Deploying only one contract, ignoring argument"
   | _ -> ()) ;
-  let width = 64 in
-  let height = 48 in
+  let width = parameters.width in
+  let height = parameters.height in
   let accounts = Eth_account.accounts nb_accounts in
   let eth_bootstrap_accounts =
     Array.to_list accounts |> List.map (fun a -> a.Eth_account.address)
@@ -170,7 +259,19 @@ let test_snailtracer =
   let* gas_limit = get_gas_limit endpoint infos accounts.(0) contract spp in
   Log.info "SnailTracer contract deployed at %s" contract ;
   Log.info "Will use gas limit %a" Z.pp_print gas_limit ;
-  let env = {sequencer; rpc_node; infos; gas_limit; accounts; contract; spp} in
+  let env =
+    {
+      sequencer;
+      rpc_node;
+      infos;
+      gas_limit;
+      accounts;
+      contract;
+      width;
+      height;
+      spp;
+    }
+  in
   monitor_gasometer sequencer @@ fun () ->
   let* stop_profile =
     if parameters.profiling then profile sequencer else return (fun () -> unit)
@@ -181,4 +282,87 @@ let test_snailtracer =
   let* () = Evm_node.terminate sequencer in
   stop_profile ()
 
-let register () = test_snailtracer [Protocol.Alpha]
+let test_full_image_raytracing =
+  (match parameters.contracts with
+  | Some n when n <> 1 ->
+      Log.warn "Deploying only one contract, ignoring argument"
+  | _ -> ()) ;
+  let width = parameters.width in
+  let height = parameters.height in
+  let accounts = Eth_account.accounts 1 in
+  let sender = accounts.(0) in
+  let spp = parameters.spp in
+  register_all
+    ~__FILE__
+    ~tags:
+      [
+        "benchmark";
+        "evm";
+        "pure_execution";
+        "snailtracer";
+        "eth_call";
+        "image";
+        "ci_disabled";
+      ]
+    ~title:"Benchmarking pure EVM execution in eth_call RPCs"
+    ~time_between_blocks:Nothing
+    ~eth_bootstrap_accounts:[sender.address]
+    ~websockets:true
+    ~use_multichain:Register_without_feature
+    ~use_dal:Register_without_feature
+    ~da_fee:Wei.zero
+    ~minimum_base_fee_per_gas:Wei.one
+    ~maximum_gas_per_transaction:(1 lsl 50 |> Int64.of_int)
+    ~tx_queue:{max_lifespan = 4; max_size = 4_000; tx_per_addr_limit = 1024}
+  @@ fun {sequencer; _} _protocol ->
+  let* sender = floodgate_account sequencer sender in
+  let rpc_node = sequencer in
+  let endpoint = Evm_node.endpoint rpc_node |> Uri.of_string in
+  let*? infos =
+    Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:1000.
+  in
+  let*? () =
+    Tx_queue.start
+      ~relay_endpoint:endpoint
+      ~max_transaction_batch_length:(Some 300)
+      ~inclusion_timeout:parameters.timeout
+      ()
+  in
+  let follower =
+    Floodgate.start_blueprint_follower
+      ~relay_endpoint:endpoint
+      ~rpc_endpoint:endpoint
+  in
+  let tx_queue = Tx_queue.beacon ~tick_interval:0.5 in
+  Log.report "Deploying SnailTracer contract" ;
+  let bin = Base.read_file Solidity_contracts.snailtracer.bin in
+  let bin = bin ^ encode_parameters width height in
+  let* contract =
+    deploy_contract ~rpc_node infos ~sequencer sender (`Custom bin)
+  in
+  Lwt.cancel follower ;
+  Lwt.cancel tx_queue ;
+  let env =
+    {
+      sequencer;
+      rpc_node;
+      infos;
+      gas_limit = Z.zero;
+      accounts = [|sender|];
+      contract;
+      spp;
+      width;
+      height;
+    }
+  in
+  let* stop_profile =
+    if parameters.profiling then profile sequencer else return (fun () -> unit)
+  in
+  let* () = ray_trace_scanlines env sender in
+  let* () = Evm_node.terminate sequencer in
+  stop_profile ()
+
+let register () =
+  test_snailtracer [Protocol.Alpha] ;
+  test_full_image_raytracing [Protocol.Alpha] ;
+  ()

@@ -17,6 +17,8 @@ type parameters = {
   contracts : int option;
   timeout : float;
   spp : int;
+  width : int;
+  height : int;
 }
 
 let parameters =
@@ -90,6 +92,24 @@ let parameters =
          more gas."
       2
   in
+  let width =
+    Clap.default_int
+      ~section
+      ~long:"width"
+      ~placeholder:"pixels"
+      ~description:
+        "Width of image for SnailTracer. Higher values will use more gas."
+      64
+  in
+  let height =
+    Clap.default_int
+      ~section
+      ~long:"height"
+      ~placeholder:"pixels"
+      ~description:
+        "Height of image for SnailTracer. Higher values will use more gas."
+      48
+  in
   {
     profiling;
     time_between_blocks;
@@ -98,6 +118,8 @@ let parameters =
     contracts;
     timeout;
     spp;
+    width;
+    height;
   }
 
 let ( let+? ) x f =
