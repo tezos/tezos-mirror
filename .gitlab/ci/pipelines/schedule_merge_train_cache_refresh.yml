@@ -703,6 +703,9 @@ fresh-cache.oc.build_kernels:
   stage: build
   tags:
   - gcp
+  needs:
+  - fresh-cache.oc.docker:rust-toolchain:amd64
+  - fresh-cache.trigger
   dependencies:
   - fresh-cache.oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
