@@ -152,3 +152,6 @@ Internal
   accounts for the first few cycles are now computed with Adaptive
   Issuance enabled, meaning that delegated tez are already weighted
   less than staked tez. (MR :gl:`!16945`)
+
+- Remove obsolete internal field related to Adaptive Issuance
+  activation. (MR :gl:`!15789`)
