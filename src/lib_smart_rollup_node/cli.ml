@@ -156,12 +156,22 @@ let string_parameter =
   Tezos_clic.parameter (fun (_cctxt : Client_context.full) x ->
       Lwt_result.return x)
 
-let hex_parameter =
+let hex_or_file_parameter =
   Tezos_clic.parameter (fun (cctxt : Client_context.full) h ->
       let open Lwt_result_syntax in
-      match Hex.to_string (`Hex h) with
-      | None -> cctxt#error "Parameter is not a valid hex-encoded string"
-      | Some b -> return b)
+      match String.remove_prefix ~prefix:"file:" h with
+      | Some path ->
+          Lwt.catch
+            (fun () -> Lwt_result.ok @@ Lwt_utils_unix.read_file path)
+            (fun exn ->
+              cctxt#error
+                "%s is not a valid file (%s)"
+                path
+                (Printexc.to_string exn))
+      | None -> (
+          match Hex.to_string (`Hex h) with
+          | None -> cctxt#error "Parameter is not a valid hex-encoded string"
+          | Some b -> return b))
 
 let int_parameter =
   Tezos_clic.parameter (fun (cctxt : Client_context.full) p ->

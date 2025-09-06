@@ -492,7 +492,12 @@ let patch_durable_storage =
     (prefixes ["patch"; "durable"; "storage"; "at"]
     @@ param ~name:"path" ~desc:"Durable storage path" Cli.string_parameter
     @@ prefixes ["with"]
-    @@ param ~name:"value" ~desc:"Patched value" Cli.hex_parameter
+    @@ param
+         ~name:"value"
+         ~desc:
+           "Patched value. If prefixed by `file:`, it is interpreted a path. \
+            Otherwise, it is expected to be an hexadecimal encoded value."
+         Cli.hex_or_file_parameter
     @@ stop)
     (fun (data_dir, force) key value cctxt ->
       if force then
