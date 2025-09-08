@@ -610,6 +610,8 @@ mod tests {
     use evm_execution::configuration::EVMVersion;
     use primitive_types::{H160, U256};
     use std::str::FromStr;
+    use tezos_crypto_rs::hash::ChainId;
+    use tezos_crypto_rs::hash::HashTrait;
     use tezos_crypto_rs::hash::SecretKeyEd25519;
     use tezos_data_encoding::types::Narith;
     use tezos_ethereum::block::BlockFees;
@@ -825,7 +827,9 @@ mod tests {
     }
 
     fn dummy_tez_config() -> MichelsonChainConfig {
-        MichelsonChainConfig::create_config(DUMMY_CHAIN_ID)
+        MichelsonChainConfig::create_config(
+            ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
+        )
     }
 
     fn dummy_configuration() -> Configuration {

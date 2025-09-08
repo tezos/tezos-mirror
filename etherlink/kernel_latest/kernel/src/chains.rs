@@ -26,6 +26,7 @@ use std::{
     collections::VecDeque,
     fmt::{Debug, Display},
 };
+use tezos_crypto_rs::hash::ChainId;
 use tezos_data_encoding::nom::NomReader;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
@@ -77,7 +78,7 @@ pub struct EvmChainConfig {
 
 #[derive(Debug)]
 pub struct MichelsonChainConfig {
-    chain_id: U256,
+    chain_id: ChainId,
 }
 
 pub trait BlockInProgressTrait {
@@ -389,7 +390,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
     type ChainHeader = TezBlockHeader;
 
     fn get_chain_id(&self) -> U256 {
-        self.chain_id
+        self.chain_id.as_ref().into()
     }
 
     fn get_chain_family(&self) -> ChainFamily {
@@ -545,7 +546,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 }
 
 impl MichelsonChainConfig {
-    pub fn create_config(chain_id: U256) -> Self {
+    pub fn create_config(chain_id: ChainId) -> Self {
         Self { chain_id }
     }
 }
@@ -561,7 +562,7 @@ impl ChainConfig {
         )))
     }
 
-    pub fn new_michelson_config(chain_id: U256) -> Self {
+    pub fn new_michelson_config(chain_id: ChainId) -> Self {
         ChainConfig::Michelson(MichelsonChainConfig::create_config(chain_id))
     }
 

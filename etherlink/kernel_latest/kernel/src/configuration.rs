@@ -200,7 +200,7 @@ fn fetch_evm_chain_configuration<Host: Runtime>(
 
 fn fetch_michelson_chain_configuration<Host: Runtime>(
     _host: &mut Host,
-    chain_id: U256,
+    chain_id: ChainId,
 ) -> ChainConfig {
     ChainConfig::new_michelson_config(chain_id)
 }
@@ -228,7 +228,7 @@ pub fn fetch_chain_configuration<Host: Runtime>(
                     log!(host, Error, "Configured chain family is Michelson and the chain id fits on 4 bytes but converting to ChainId failed; falling back to EVM chain family.");
                     fetch_evm_chain_configuration(host, chain_id)
                 }
-                Ok(_chain_id) => fetch_michelson_chain_configuration(host, chain_id),
+                Ok(chain_id) => fetch_michelson_chain_configuration(host, chain_id),
             }
         }
     }
