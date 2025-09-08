@@ -68,3 +68,7 @@ val to_transaction_object :
   hash:Ethereum_types.hash ->
   transaction ->
   (Ethereum_types.legacy_transaction_object, string) result
+
+(** [auth_signer authorization] returns the signer of the [authorization]. *)
+val auth_signer :
+  authorization_list_item -> (Ethereum_types.address, string) result
