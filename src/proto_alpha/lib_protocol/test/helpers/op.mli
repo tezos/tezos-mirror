@@ -181,12 +181,15 @@ val attestation :
     one delegate with a BLS consensus key, otherwise this function
     will return an error.
 
-    [committee] defaults to {!default_committee} with [dal_content =
-    None] for each member.
+    The committee consists of the concatenation of [committee] with
+    [dal_content = None] for each member, and of
+    [committee_with_dal]. If neither is provided, it defaults to
+    {!default_committee} with no DAL contents.
 
     Other parameters are the same as in {!raw_attestation}. *)
 val raw_attestations_aggregate :
-  ?committee:(attesting_slot * dal_content option) list ->
+  ?committee:attesting_slot list ->
+  ?committee_with_dal:(attesting_slot * dal_content option) list ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -197,7 +200,8 @@ val raw_attestations_aggregate :
 (** Same as {!raw_preattestations_aggregate} but returns the packed
     operation. *)
 val attestations_aggregate :
-  ?committee:(attesting_slot * dal_content option) list ->
+  ?committee:attesting_slot list ->
+  ?committee_with_dal:(attesting_slot * dal_content option) list ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -388,7 +392,7 @@ val increase_paid_storage :
     {li [?forge_proof]: use a provided [proof] instead of creating a
     correct proof for [pkh]. Useful for forging non-honest reveal
     operations}
-    
+
     {li [?storage_limit:Z.t]: forces a storage limit, otherwise
     set to [Z.zero]}}
 *)

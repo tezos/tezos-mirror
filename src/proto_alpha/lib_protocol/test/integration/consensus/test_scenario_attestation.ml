@@ -349,6 +349,120 @@ let test_attestations_keep_activation_status =
           let* b = Context.Delegate.deactivated (B block) src.pkh in
           Assert.is_true ~loc:__LOC__ (not b))
 
+(* === Consensus threshold tests === *)
+
+let test_consensus_threshold =
+  let req_attestations = 999 in
+  init_constants ()
+  (* All slots need to be attested : not a single attester must be missing *)
+  --> set S.consensus_committee_size 1000
+  --> set S.consensus_threshold_size req_attestations
+  --> begin_test
+        ~delegates_with_algo:[("delegate_1", Bls); ("delegate_2", Bls)]
+        ["delegate_3"]
+  (* Genesis cannot be attested *)
+  --> next_block
+  (* If everyone attests, the next block is valid *)
+  --> attest_aggreg_with ["delegate_1"; "delegate_2"]
+  --> attest_with "delegate_3" --> next_block
+  (* If the non_tz4 address is missing, the block is invalid *)
+  --> attest_aggreg_with ["delegate_1"; "delegate_2"]
+  --> assert_failure
+        ~loc:__LOC__
+        ~expected_error:(fun _ errs ->
+          Assert.expect_error ~loc:__LOC__ errs (function
+            | [
+                Protocol.Validate_errors.Block.Not_enough_attestations
+                  {required; provided = _};
+              ] ->
+                required = Int64.of_int req_attestations
+            | _ -> false))
+        next_block
+  --> attest_with "delegate_3" --> next_block
+  (* If a tz4 address is missing, the block is also invalid *)
+  --> attest_aggreg_with ["delegate_1"]
+  --> attest_with "delegate_3"
+  --> assert_failure
+        ~loc:__LOC__
+        ~expected_error:(fun _ errs ->
+          Assert.expect_error ~loc:__LOC__ errs (function
+            | [
+                Protocol.Validate_errors.Block.Not_enough_attestations
+                  {required; provided = _};
+              ] ->
+                required = Int64.of_int req_attestations
+            | _ -> false))
+        next_block
+
+(* === DAL content in attestations tests === *)
+
+let test_include_valid_dal_content =
+  (* 32 slots *)
+  let number_of_slots =
+    Default_parameters.constants_mainnet.dal.number_of_slots
+  in
+  let consensus_rights_delay =
+    Default_parameters.constants_mainnet.consensus_rights_delay
+  in
+  let valid_dal_contents =
+    Z.(pred (pow (of_int 2) number_of_slots))
+    :: List.map Z.of_int [0; 1; 2; 3; 12]
+  in
+  init_constants ()
+  --> set S.Dal.number_of_slots number_of_slots
+  --> set S.consensus_rights_delay consensus_rights_delay
+  --> begin_test
+        ~delegates_with_algo:[("delegate_1", Bls); ("delegate_2", Bls)]
+        ["delegate_3"]
+  --> next_block
+  (* setup companion keys *)
+  --> add_account ~algo:Bls "companion_1"
+  --> update_companion_key ~ck_name:"companion_1" "delegate_1"
+  --> add_account ~algo:Bls "companion_2"
+  --> update_companion_key ~ck_name:"companion_2" "delegate_2"
+  (* Wait for companion key activation *)
+  --> wait_n_cycles (consensus_rights_delay + 1)
+  --> (Tag "tz4"
+       --> (Tag "three dal attesters"
+            --> fold_tag_f
+                  (fun x ->
+                    attest_aggreg_with
+                      ~delegates_with_dal:
+                        [("delegate_1", x); ("delegate_2", Z.of_int 7)]
+                      []
+                    --> attest_with ~dal_content:(Z.of_int 11) "delegate_3")
+                  Z.to_string
+                  valid_dal_contents
+           |+ Tag "two dal attesters"
+              --> fold_tag_f
+                    (fun x ->
+                      attest_aggreg_with
+                        ~delegates_with_dal:
+                          [("delegate_1", x); ("delegate_2", Z.of_int 7)]
+                        []
+                      --> attest_with "delegate_3")
+                    Z.to_string
+                    valid_dal_contents
+           |+ Tag "one dal attesters"
+              --> fold_tag_f
+                    (fun x ->
+                      attest_aggreg_with
+                        ~delegates_with_dal:[("delegate_1", x)]
+                        ["delegate_2"]
+                      --> attest_with "delegate_3")
+                    Z.to_string
+                    valid_dal_contents)
+      |+ Tag "non tz4"
+         --> fold_tag_f
+               (fun x ->
+                 attest_aggreg_with ["delegate_1"; "delegate_2"]
+                 --> attest_with ~dal_content:x "delegate_3")
+               Z.to_string
+               valid_dal_contents)
+  --> next_block
+  --> check_aggregated_committee ~kind:Attestation ["delegate_1"; "delegate_2"]
+  --> check_delegate_attested "delegate_3"
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -370,6 +484,9 @@ let tests =
        );
        ( "Test (pre)attestations keep delegate active",
          test_attestations_keep_activation_status );
+       ("Test consensus threshold", test_consensus_threshold);
+       (* TODO: invalid cases *)
+       ("Test include valid dal content", test_include_valid_dal_content);
      ]
 
 let () =

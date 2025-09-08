@@ -112,6 +112,10 @@ let generate_accounts ?algo ?rng_state n : t list tzresult =
   List.init ~when_negative_length:[] n (fun _i ->
       new_account ?algo ?rng_state ())
 
+let generate_accounts_with_algo_list ?rng_state algo_list : t list =
+  Signature.Public_key_hash.Table.clear known_accounts ;
+  List.map (fun algo -> new_account ?algo ?rng_state ()) algo_list
+
 let commitment_secret =
   Blinded_public_key_hash.activation_code_of_hex
     "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb"

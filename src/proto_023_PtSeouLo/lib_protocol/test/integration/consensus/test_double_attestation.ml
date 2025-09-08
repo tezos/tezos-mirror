@@ -626,7 +626,7 @@ let test_invalid_double_attestation_duplicate_in_committee () =
   let* op1 = Op.raw_attestation ~attesting_slot blk_a in
   let* op2 =
     Op.raw_attestations_aggregate
-      ~committee:[(attesting_slot, None); (attesting_slot, None)]
+      ~committee:[attesting_slot; attesting_slot]
       blk_b
   in
   let slot = attesting_slot.slot in
@@ -661,7 +661,8 @@ let test_invalid_double_attestation_duplicate_in_committee () =
       {attestation = Dal.Attestation.(commit empty slot_index)}
     in
     Op.raw_attestations_aggregate
-      ~committee:[(attesting_slot, None); (attesting_slot, Some dal_content)]
+      ~committee_with_dal:
+        [(attesting_slot, None); (attesting_slot, Some dal_content)]
       blk_b
   in
   let op =

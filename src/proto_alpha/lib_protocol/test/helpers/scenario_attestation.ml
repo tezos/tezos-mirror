@@ -84,13 +84,22 @@ let check_attestation_metadata ?(check_not_found = false) ~kind delegate_pkh
   then return_unit
   else
     failwith
-      "%s: %s for %a (consensus key : %a)"
+      "%s: %s for %a (consensus key : %a)@.Full metadata:@.%s"
       error_prefix
       (string_of_kind kind)
       Signature.Public_key_hash.pp
       delegate_pkh
       Signature.Public_key_hash.pp
       consensus_key_pkh
+      (List.fold_left
+         (fun acc op_metadata ->
+           let s =
+             Data_encoding.Json.(
+               construct operation_receipt_encoding op_metadata |> to_string)
+           in
+           acc ^ "\n" ^ s)
+         ""
+         op_metadata)
 
 let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
     ?(expect_same_order = true) committee_expect :
@@ -247,7 +256,7 @@ let check_missed_attestation_rewards delegate_name ?(check_not_found = false) :
 
 let attest_with ?dal_content (delegate_name : string) : (t, t) scenarios =
   exec (fun (block, state) ->
-      let open Lwt_result_wrap_syntax in
+      let open Lwt_result_syntax in
       let kind = Attestation in
       Log.info ~color:action_color "[Attesting with \"%s\"]" delegate_name ;
       if state.force_attest_all then
@@ -259,13 +268,8 @@ let attest_with ?dal_content (delegate_name : string) : (t, t) scenarios =
         in
         let consensus_key = consensus_key_info.active in
         let* consensus_key = Account.find consensus_key.consensus_key_pkh in
-        let*?@ dal_content =
-          Option.map_e
-            Alpha_context.Dal.Attestation.Internal_for_tests.of_z
-            dal_content
-        in
-        let dal_content =
-          Option.map (fun i -> Alpha_context.{attestation = i}) dal_content
+        let* dal_content =
+          Option.map_es Dal_helpers.dal_content_of_z dal_content
         in
         (* Fails to produce an attestation if the delegate has no slot for the block *)
         let* op = Op.attestation ?dal_content ~manager_pkh:delegate.pkh block in
@@ -283,23 +287,31 @@ let attest_with ?dal_content (delegate_name : string) : (t, t) scenarios =
 (** (tz4 only) Creates an aggregated attestation from the attestations of the given delegates.
     Fails if one of the delegates has no slot for the given block, or if one of the
     delegates' consensus key is not a tz4 *)
-let attest_aggreg_with (delegates : string list) : (t, t) scenarios =
+let attest_aggreg_with ?(delegates_with_dal = ([] : (string * Z.t) list))
+    (delegates : string list) : (t, t) scenarios =
   exec (fun (block, state) ->
       let open Lwt_result_wrap_syntax in
       let kind = Attestation in
+      let* delegates =
+        List.map (fun (x, dal) -> (x, Some dal)) delegates_with_dal
+        @ List.map (fun x -> (x, None)) delegates
+        |> List.map_es (fun (x, dal) ->
+               let* dal = Option.map_es Dal_helpers.dal_content_of_z dal in
+               return (x, dal))
+      in
       Log.info
         ~color:action_color
         "[Aggregated attesting with \"%a\"]"
         Format.(
           pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "; ") pp_print_string)
-        delegates ;
+        (List.map fst delegates) ;
       if state.force_attest_all then
         failwith "Cannot manually attest if force_attest_all is true"
       else
-        let* state, committee, expected_metadata_committee =
+        let* state, committee_with_dal, expected_metadata_committee =
           List.fold_left_es
             (fun (state, committee, expected_metadata_committee)
-                 delegate_name
+                 (delegate_name, dal_content)
                ->
               let delegate = State.find_account delegate_name state in
               let* consensus_key_info =
@@ -328,13 +340,13 @@ let attest_aggreg_with (delegates : string list) : (t, t) scenarios =
               in
               return
                 ( state,
-                  (attesting_slot, None) :: committee,
+                  (attesting_slot, dal_content) :: committee,
                   key_in_metadata :: expected_metadata_committee ))
             (state, [], [])
             delegates
         in
         (* Fails to produce an attestation if one of the delegates has no slot for the block *)
-        let* op = Op.attestations_aggregate ~committee block in
+        let* op = Op.attestations_aggregate ~committee_with_dal block in
         (* Check metadata *)
         let state =
           State.add_current_block_check
@@ -425,10 +437,7 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
       else
         (* Add aggregated attestation and metadata check. *)
         let committee =
-          List.map
-            (fun delegate_rights ->
-              (Op.attesting_slot_of_delegate_rights delegate_rights, None))
-            bls_committee
+          List.map Op.attesting_slot_of_delegate_rights bls_committee
         in
         let* op = Op.attestations_aggregate ~committee block in
         let state = State.add_pending_operations [op] state in

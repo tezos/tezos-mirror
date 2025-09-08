@@ -280,7 +280,14 @@ let finalize_payload_ ?payload_round ?baker : t -> t_incr tzresult Lwt.t =
       Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
     else Per_block_vote_pass
   in
-  let* block' = Block.bake ?policy ~adaptive_issuance_vote block in
+  let* block' =
+    Block.bake
+      ~baking_mode:Baking
+      ?policy
+      ~operations:state.pending_operations
+      ~adaptive_issuance_vote
+      block
+  in
   let* i =
     Incremental.begin_construction
       ?payload_round

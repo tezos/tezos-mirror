@@ -35,6 +35,7 @@ let pack_operation ctxt signature contents =
     ({shell = {branch}; protocol_data = {contents; signature}} : _ Operation.t)
 
 let raw_sign (type kind) ctxt ?(watermark = Signature.Generic_operation)
+    ?(companion_key : Delegate_services.companion_key option)
     (sk : Signature.secret_key) branch (contents : kind contents_list) =
   let open Lwt_result_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
@@ -51,11 +52,43 @@ let raw_sign (type kind) ctxt ?(watermark = Signature.Generic_operation)
   let bytes =
     Data_encoding.Binary.to_bytes_exn encoding ({branch}, Contents_list contents)
   in
-  return (Signature.sign ~watermark sk bytes)
+  match (contents, sk, companion_key) with
+  | ( Single (Attestation {dal_content = Some {attestation = dal_content}; _}),
+      (Bls _ : Signature.secret_key),
+      Some companion_key ) -> (
+      let* companion_signer =
+        Account.find (Bls companion_key.companion_key_pkh)
+      in
+      let consensus_sig = Signature.sign ~watermark sk bytes in
+      let companion_sig = Signature.sign ~watermark companion_signer.sk bytes in
+      match
+        ( Signature.Secret_key.to_public_key sk,
+          companion_signer.pk,
+          consensus_sig,
+          companion_sig )
+      with
+      | Bls consensus_pk, Bls companion_pk, Bls consensus_sig, Bls companion_sig
+        -> (
+          let dal_dependent_bls_sig_opt =
+            Alpha_context.Dal.Attestation.Dal_dependent_signing.aggregate_sig
+              ~subgroup_check:false
+              ~consensus_pk
+              ~companion_pk
+              ~consensus_sig
+              ~companion_sig
+              ~op:bytes
+              dal_content
+          in
+          match dal_dependent_bls_sig_opt with
+          | Some sign -> return (Bls sign : Signature.signature)
+          | _ -> assert false)
+      | _ -> assert false)
+  | _ -> return (Signature.sign ~watermark sk bytes)
 
-let sign ctxt ?(watermark = Signature.Generic_operation) sk branch contents =
+let sign ctxt ?(companion_key : Delegate_services.companion_key option)
+    ?(watermark = Signature.Generic_operation) sk branch contents =
   let open Lwt_result_syntax in
-  let* signature = raw_sign ctxt ~watermark sk branch contents in
+  let* signature = raw_sign ctxt ~watermark ?companion_key sk branch contents in
   return
     ({shell = {branch}; protocol_data = {contents; signature = Some signature}}
       : _ Operation.t)
@@ -95,6 +128,23 @@ let get_attesting_slot_of_delegate ~manager_pkh ~attested_block =
   let open Lwt_result_syntax in
   let* attester = Context.get_attester ~manager_pkh (B attested_block) in
   return (attesting_slot_of_attester attester)
+
+let get_delegate_of_attesting_slot ~attesting_slot ~attested_block =
+  let open Lwt_result_syntax in
+  let* attesters = Context.get_attesters (B attested_block) in
+  let attester =
+    List.find
+      (fun (att : Context.attester) ->
+        Signature.Public_key_hash.equal
+          att.consensus_key
+          attesting_slot.consensus_pkh)
+      attesters
+  in
+  match attester with
+  | None ->
+      (* Should not happen, unless the attesting slot is malformed *)
+      return attesting_slot.consensus_pkh
+  | Some attester -> return attester.delegate
 
 let get_different_attesting_slot ~consensus_pkh_to_avoid ~attested_block =
   let open Lwt_result_syntax in
@@ -157,7 +207,7 @@ let mk_consensus_content_signer_and_branch ?attesting_slot ?manager_pkh ?level
     | None -> attested_block.Block.header.shell.predecessor
     | Some branch -> branch
   in
-  let* {slot; consensus_pkh} =
+  let* ({slot; consensus_pkh} as attesting_slot) =
     match (attesting_slot, manager_pkh) with
     | Some attesting_slot, None -> return attesting_slot
     | None, None -> get_attesting_slot ~attested_block
@@ -167,6 +217,11 @@ let mk_consensus_content_signer_and_branch ?attesting_slot ?manager_pkh ?level
         Test.fail
           ~__LOC__
           "Cannot provide both ~attesting_slot and ~manager_pkh"
+  in
+  let* manager_pkh =
+    match manager_pkh with
+    | None -> get_delegate_of_attesting_slot ~attesting_slot ~attested_block
+    | Some manager_pkh -> return manager_pkh
   in
   let* level =
     match level with
@@ -189,12 +244,15 @@ let mk_consensus_content_signer_and_branch ?attesting_slot ?manager_pkh ?level
   in
   let consensus_content = {slot; level; round; block_payload_hash} in
   let* signer = Account.find consensus_pkh in
-  return (consensus_content, signer.sk, branch)
+  let* companion =
+    Context.Delegate.companion_key (B attested_block) manager_pkh
+  in
+  return (consensus_content, signer.sk, companion.active_companion_key, branch)
 
 let raw_attestation ?attesting_slot ?manager_pkh ?level ?round
     ?block_payload_hash ?dal_content ?branch attested_block =
   let open Lwt_result_syntax in
-  let* consensus_content, signer, branch =
+  let* consensus_content, signer, companion_key, branch =
     mk_consensus_content_signer_and_branch
       ?attesting_slot
       ?manager_pkh
@@ -204,9 +262,13 @@ let raw_attestation ?attesting_slot ?manager_pkh ?level ?round
       ?branch
       attested_block
   in
+  (* Note: if the Dal content is not None, the signer is a tz4, and the
+     active companion key is None, then this operation will fail, because
+     the protocol cannot check the signature. It is intended here. *)
   let contents = Single (Attestation {consensus_content; dal_content}) in
   sign
     ~watermark:Operation.(to_watermark (Attestation Chain_id.zero))
+    ?companion_key
     Context.(B attested_block)
     signer
     branch
@@ -301,13 +363,16 @@ let attestation ?attesting_slot ?manager_pkh ?level ?round ?block_payload_hash
   in
   return (Operation.pack op)
 
-let raw_attestations_aggregate ?committee ?level ?round ?block_payload_hash
-    ?branch attested_block =
+let raw_attestations_aggregate ?committee ?committee_with_dal ?level ?round
+    ?block_payload_hash ?branch attested_block =
   let open Lwt_result_syntax in
   let* committee =
-    match committee with
-    | Some committee -> return committee
-    | None ->
+    match (committee, committee_with_dal) with
+    | None, Some committee_with_dal -> return committee_with_dal
+    | Some committee, None -> return @@ List.map (fun x -> (x, None)) committee
+    | Some committee, Some committee_with_dal ->
+        return @@ committee_with_dal @ List.map (fun x -> (x, None)) committee
+    | None, None ->
         let* attesting_slots = default_committee ~attested_block in
         return
           (List.map
@@ -331,12 +396,13 @@ let raw_attestations_aggregate ?committee ?level ?round ?block_payload_hash
   | Some aggregate_attestation -> return aggregate_attestation
   | None -> failwith "no Bls delegate found"
 
-let attestations_aggregate ?committee ?level ?round ?block_payload_hash ?branch
-    attested_block =
+let attestations_aggregate ?committee ?committee_with_dal ?level ?round
+    ?block_payload_hash ?branch attested_block =
   let open Lwt_result_syntax in
   let* op =
     raw_attestations_aggregate
       ?committee
+      ?committee_with_dal
       ?level
       ?round
       ?block_payload_hash
@@ -348,7 +414,7 @@ let attestations_aggregate ?committee ?level ?round ?block_payload_hash ?branch
 let raw_preattestation ?attesting_slot ?manager_pkh ?level ?round
     ?block_payload_hash ?branch attested_block =
   let open Lwt_result_syntax in
-  let* consensus_content, signer, branch =
+  let* consensus_content, signer, _companion_key_opt, branch =
     mk_consensus_content_signer_and_branch
       ?attesting_slot
       ?manager_pkh

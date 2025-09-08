@@ -463,6 +463,11 @@ val init_with_constants_n :
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
 
+val init_with_constants_algo_list :
+  Constants.Parametric.t ->
+  Signature.algo option list ->
+  (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+
 val init_with_constants1 :
   Constants.Parametric.t -> (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
 
