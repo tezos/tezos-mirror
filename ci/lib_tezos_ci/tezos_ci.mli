@@ -803,3 +803,6 @@ module Coverage : sig
       in [Tezos_ci] but in [ci/bin]. *)
   val close : Changeset.t -> tezos_job
 end
+
+(** Add common variables used by jobs compiling kernels *)
+val enable_kernels : tezos_job -> tezos_job

@@ -85,11 +85,6 @@ let before_script ?(take_ownership = false) ?(source_version = false)
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []
 
-(** Add common variables used by jobs compiling kernels *)
-let enable_kernels =
-  Tezos_ci.append_variables
-    [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
-
 (** {2 Child repositories pipelines} *)
 
 (** Return a tuple (ARCHITECTURES, <archs>) based on the type
