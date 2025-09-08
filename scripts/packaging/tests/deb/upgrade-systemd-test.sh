@@ -54,6 +54,17 @@ systemctl start octez-node
 #shellcheck disable=SC2009
 ps aux | grep octez
 
+# --- record baker process count BEFORE upgrade ---
+count_bakers() {
+  # count only real baker binaries under tezos user
+  pgrep -u tezos -f '(^|/)(octez-agnostic-baker|octez-baker-P[[:alnum:]]+)( |$)' | wc -l | tr -d " "
+}
+echo "Listing baker units before upgrade:"
+systemctl list-units --type=service --no-legend | awk '{print $1" "$4}' | grep -E '^octez-(agnostic-)?baker(@|\.service)'
+sleep 3 # give systemd a moment to settle
+BAKER_COUNT_BEFORE="$(count_bakers)"
+echo "BAKER_COUNT_BEFORE=$BAKER_COUNT_BEFORE"
+
 # [setup baker]
 PROTOCOL=$(octez-client --protocol PtParisBxoLz list understood protocols | tee | head -1)
 sudo su tezos -c "octez-client -p $PROTOCOL gen keys baker"
@@ -91,7 +102,55 @@ systemctl status octez-baker.service
 
 systemctl status octez-baker.service
 
+echo "Listing baker units after upgrade:"
+systemctl list-units --type=service --no-legend | awk '{print $1" "$4}' | grep -E '^octez-(agnostic-)?baker(@|\.service)'
+sleep 3
+BAKER_COUNT_AFTER="$(count_bakers)"
+echo "BAKER_COUNT_AFTER=$BAKER_COUNT_AFTER"
+
+if [ "$BAKER_COUNT_BEFORE" -ne "$BAKER_COUNT_AFTER" ]; then
+  echo "ERROR: baker process count changed across upgrade ($BAKER_COUNT_BEFORE -> $BAKER_COUNT_AFTER)"
+  + ERR=1
+else
+  echo "OK: baker process count unchanged ($BAKER_COUNT_AFTER)"
+fi
+
 ERR=0
+
+# --- verify octez-baker binary version matches the installed package (and target, if given) ---
+# Extract "23.1" from: "9aadd15c (...) (Octez 23.1)"
+BAKER_BIN_VER_AFTER="$(
+  /usr/bin/octez-baker --version 2> /dev/null |
+    sed -n 's/.*(Octez \([0-9][0-9.]*\)).*/\1/p' | head -n1
+)"
+# Get dpkg version, trim Debian revision, keep major.minor (e.g., 23.1 from 23.1-1~foo)
+BAKER_PKG_VER_AFTER="$(
+  dpkg-query -W -f='${Version}\n' octez-baker 2> /dev/null |
+    cut -d- -f1 | awk -F. '{print $1"."$2}'
+)"
+echo "octez-baker --version -> ${BAKER_BIN_VER_AFTER}"
+echo "octez-baker (dpkg)   -> ${BAKER_PKG_VER_AFTER}"
+
+if [ -z "${BAKER_BIN_VER_AFTER}" ] || [ -z "${BAKER_PKG_VER_AFTER}" ]; then
+  echo "ERROR: could not determine baker binary/package version after upgrade"
+  ERR=1
+elif [ "${BAKER_BIN_VER_AFTER}" != "${BAKER_PKG_VER_AFTER}" ]; then
+  echo "ERROR: baker binary version (${BAKER_BIN_VER_AFTER}) != package version (${BAKER_PKG_VER_AFTER})"
+  ERR=1
+else
+  echo "OK: baker binary version matches package version (${BAKER_BIN_VER_AFTER})"
+fi
+
+# Optional: enforce a target prefix (e.g., 23.1) if provided by CI
+if [ -n "${TARGET_VER_PREFIX:-}" ]; then
+  case "${BAKER_BIN_VER_AFTER}" in
+  ${TARGET_VER_PREFIX}*) echo "OK: baker binary matches TARGET_VER_PREFIX=${TARGET_VER_PREFIX}" ;;
+  *)
+    echo "ERROR: baker binary version (${BAKER_BIN_VER_AFTER}) does not match TARGET_VER_PREFIX (${TARGET_VER_PREFIX})"
+    ERR=1
+    ;;
+  esac
+fi
 
 # [ check configuration after the upgrade ]
 # we check the debconf parameters

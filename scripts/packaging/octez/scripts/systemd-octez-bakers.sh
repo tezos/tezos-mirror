@@ -20,25 +20,23 @@ for file in /usr/bin/octez-baker-P*; do
       systemctl start octez-dal-node
     fi
     if [ "$AGNOSTIC_BAKER" = "true" ]; then
-      systemctl enable "octez-agnostic-baker"
       systemctl start "octez-agnostic-baker"
-      systemctl enable "octez-agnostic-accuser"
       systemctl start "octez-agnostic-accuser"
+      break
     else
-      systemctl enable "octez-baker@$proto"
       systemctl start "octez-baker@$proto"
-      systemctl enable "octez-accuser@$proto"
       systemctl start "octez-accuser@$proto"
     fi
 
   elif [ "$1" = "stop" ]; then
-    if [ "$AGNOSTIC_BAKER" = "true" ]; then
-      systemctl stop "octez-agnostic-baker"
-      systemctl stop "octez-agnostic-accuser"
-    else
-      systemctl stop "octez-baker@$proto"
-      systemctl stop "octez-accuser@$proto"
-    fi
+    systemctl stop "octez-baker@$proto" || true
+    systemctl disable "octez-baker@$proto" || true
+    systemctl stop "octez-accuser@$proto" || true
+    systemctl disable "octez-accuser@$proto" || true
+    systemctl stop "octez-agnostic-baker" || true
+    systemctl disable "octez-agnostic-baker" || true
+    systemctl stop "octez-agnostic-accuser" || true
+    systemctl disable "octez-agnostic-accuser" || true
     if grep -q "\-\-dal-node" /etc/default/octez-baker; then
       systemctl stop octez-dal-node
     fi
