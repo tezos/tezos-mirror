@@ -175,7 +175,8 @@ pub trait IntoMicheline<'a> {
 
 /// Pattern synonym matching all types which are not yet
 /// supported. Useful for total match in the typechecker.
-macro_rules! micheline_unsupported_types {
+#[macro_export]
+macro_rules! micheline_unsupported_types_common {
     () => {
         Prim::chest
             | Prim::chest_key
@@ -183,6 +184,23 @@ macro_rules! micheline_unsupported_types {
             | Prim::sapling_state
             | Prim::sapling_transaction
             | Prim::sapling_transaction_deprecated
+    };
+}
+
+#[cfg(feature = "bls")]
+macro_rules! micheline_unsupported_types {
+    () => {
+        $crate::micheline_unsupported_types_common!()
+    };
+}
+
+#[cfg(not(feature = "bls"))]
+macro_rules! micheline_unsupported_types {
+    () => {
+        $crate::micheline_unsupported_types_common!()
+            | Prim::bls12_381_fr
+            | Prim::bls12_381_g1
+            | Prim::bls12_381_g2
     };
 }
 
@@ -222,23 +240,12 @@ macro_rules! micheline_types_common {
             | Prim::tx_rollup_l2_address
             | Prim::set
             | Prim::big_map
+            | Prim::bls12_381_fr
+            | Prim::bls12_381_g1
+            | Prim::bls12_381_g2
     };
 }
 
-#[cfg(feature = "bls")]
-macro_rules! micheline_types {
-    () => {
-        Micheline::App(
-            $crate::micheline_types_common!()
-                | Prim::bls12_381_g1
-                | Prim::bls12_381_g2
-                | Prim::bls12_381_fr,
-            ..,
-        )
-    };
-}
-
-#[cfg(not(feature = "bls"))]
 macro_rules! micheline_types {
     () => {
         Micheline::App($crate::micheline_types_common!(), ..)
@@ -266,7 +273,8 @@ macro_rules! micheline_fields {
 
 /// Pattern synonym matching all instruction which are not yet
 /// supported. Useful for total match in the typechecker.
-macro_rules! micheline_unsupported_instructions {
+#[macro_export]
+macro_rules! micheline_unsupported_instructions_common {
     () => {
         Prim::SAPLING_EMPTY_STATE
             | Prim::SAPLING_VERIFY_UPDATE
@@ -280,135 +288,136 @@ macro_rules! micheline_unsupported_instructions {
     };
 }
 
-/// Pattern synonym matching all instruction primitive applications. Useful for total
-/// matches.
-#[macro_export]
-macro_rules! micheline_instructions_common {
-    () => {
-        Prim::PUSH
-            | Prim::INT
-            | Prim::GT
-            | Prim::GE
-            | Prim::LE
-            | Prim::LT
-            | Prim::EQ
-            | Prim::NEQ
-            | Prim::LOOP
-            | Prim::LOOP_LEFT
-            | Prim::DIP
-            | Prim::ADD
-            | Prim::DROP
-            | Prim::IF
-            | Prim::IF_CONS
-            | Prim::IF_LEFT
-            | Prim::IF_NONE
-            | Prim::FAILWITH
-            | Prim::NEVER
-            | Prim::DUP
-            | Prim::UNIT
-            | Prim::CAST
-            | Prim::RENAME
-            | Prim::ISNAT
-            | Prim::NAT
-            | Prim::BYTES
-            | Prim::CAR
-            | Prim::CDR
-            | Prim::PAIR
-            | Prim::SOME
-            | Prim::COMPARE
-            | Prim::ADDRESS
-            | Prim::CONTRACT
-            | Prim::AMOUNT
-            | Prim::NIL
-            | Prim::MEM
-            | Prim::GET
-            | Prim::UPDATE
-            | Prim::GET_AND_UPDATE
-            | Prim::SIZE
-            | Prim::UNPAIR
-            | Prim::NONE
-            | Prim::CONS
-            | Prim::ITER
-            | Prim::CHAIN_ID
-            | Prim::SWAP
-            | Prim::SELF
-            | Prim::PACK
-            | Prim::UNPACK
-            | Prim::BLAKE2B
-            | Prim::KECCAK
-            | Prim::SHA256
-            | Prim::SHA512
-            | Prim::SHA3
-            | Prim::OPEN_CHEST
-            | Prim::VIEW
-            | Prim::BALANCE
-            | Prim::NOW
-            | Prim::SOURCE
-            | Prim::SENDER
-            | Prim::SLICE
-            | Prim::TICKET_DEPRECATED
-            | Prim::TICKET
-            | Prim::READ_TICKET
-            | Prim::SPLIT_TICKET
-            | Prim::JOIN_TICKETS
-            | Prim::DIG
-            | Prim::DUG
-            | Prim::LEVEL
-            | Prim::SELF_ADDRESS
-            | Prim::STEPS_TO_QUOTA
-            | Prim::CHECK_SIGNATURE
-            | Prim::CONCAT
-            | Prim::CREATE_ACCOUNT
-            | Prim::CREATE_CONTRACT
-            | Prim::IMPLICIT_ACCOUNT
-            | Prim::TRANSFER_TOKENS
-            | Prim::SET_DELEGATE
-            | Prim::EMIT
-            | Prim::HASH_KEY
-            | Prim::EMPTY_SET
-            | Prim::EMPTY_MAP
-            | Prim::EMPTY_BIG_MAP
-            | Prim::MIN_BLOCK_TIME
-            | Prim::VOTING_POWER
-            | Prim::TOTAL_VOTING_POWER
-            | Prim::SAPLING_EMPTY_STATE
-            | Prim::SAPLING_VERIFY_UPDATE
-            | Prim::ABS
-            | Prim::NEG
-            | Prim::SUB
-            | Prim::SUB_MUTEZ
-            | Prim::MUL
-            | Prim::EDIV
-            | Prim::LSL
-            | Prim::LSR
-            | Prim::EXEC
-            | Prim::APPLY
-            | Prim::LAMBDA
-            | Prim::LAMBDA_REC
-            | Prim::LEFT
-            | Prim::RIGHT
-            | Prim::MAP
-            | Prim::NOT
-            | Prim::AND
-            | Prim::XOR
-            | Prim::OR
-    };
-}
-
 #[cfg(feature = "bls")]
-macro_rules! micheline_instructions {
+macro_rules! micheline_unsupported_instructions {
     () => {
-        Micheline::App(
-            $crate::micheline_instructions_common!() | Prim::PAIRING_CHECK,
-            ..,
-        )
+        $crate::micheline_unsupported_instructions_common!()
     };
 }
 
 #[cfg(not(feature = "bls"))]
+macro_rules! micheline_unsupported_instructions {
+    () => {
+        $crate::micheline_unsupported_instructions_common!() | Prim::PAIRING_CHECK
+    };
+}
+
+/// Pattern synonym matching all instruction primitive applications. Useful for total
+/// matches.
+#[macro_export]
 macro_rules! micheline_instructions {
     () => {
-        Micheline::App($crate::micheline_instructions_common!(), ..)
+        Micheline::App(
+            Prim::PUSH
+                | Prim::INT
+                | Prim::GT
+                | Prim::GE
+                | Prim::LE
+                | Prim::LT
+                | Prim::EQ
+                | Prim::NEQ
+                | Prim::LOOP
+                | Prim::LOOP_LEFT
+                | Prim::DIP
+                | Prim::ADD
+                | Prim::DROP
+                | Prim::IF
+                | Prim::IF_CONS
+                | Prim::IF_LEFT
+                | Prim::IF_NONE
+                | Prim::FAILWITH
+                | Prim::NEVER
+                | Prim::DUP
+                | Prim::UNIT
+                | Prim::CAST
+                | Prim::RENAME
+                | Prim::ISNAT
+                | Prim::NAT
+                | Prim::BYTES
+                | Prim::CAR
+                | Prim::CDR
+                | Prim::PAIR
+                | Prim::SOME
+                | Prim::COMPARE
+                | Prim::ADDRESS
+                | Prim::CONTRACT
+                | Prim::AMOUNT
+                | Prim::NIL
+                | Prim::MEM
+                | Prim::GET
+                | Prim::UPDATE
+                | Prim::GET_AND_UPDATE
+                | Prim::SIZE
+                | Prim::UNPAIR
+                | Prim::NONE
+                | Prim::CONS
+                | Prim::ITER
+                | Prim::CHAIN_ID
+                | Prim::SWAP
+                | Prim::SELF
+                | Prim::PACK
+                | Prim::UNPACK
+                | Prim::BLAKE2B
+                | Prim::KECCAK
+                | Prim::SHA256
+                | Prim::SHA512
+                | Prim::SHA3
+                | Prim::OPEN_CHEST
+                | Prim::VIEW
+                | Prim::BALANCE
+                | Prim::NOW
+                | Prim::SOURCE
+                | Prim::SENDER
+                | Prim::SLICE
+                | Prim::TICKET_DEPRECATED
+                | Prim::TICKET
+                | Prim::READ_TICKET
+                | Prim::SPLIT_TICKET
+                | Prim::JOIN_TICKETS
+                | Prim::DIG
+                | Prim::DUG
+                | Prim::LEVEL
+                | Prim::SELF_ADDRESS
+                | Prim::STEPS_TO_QUOTA
+                | Prim::CHECK_SIGNATURE
+                | Prim::CONCAT
+                | Prim::CREATE_ACCOUNT
+                | Prim::CREATE_CONTRACT
+                | Prim::IMPLICIT_ACCOUNT
+                | Prim::TRANSFER_TOKENS
+                | Prim::SET_DELEGATE
+                | Prim::EMIT
+                | Prim::HASH_KEY
+                | Prim::EMPTY_SET
+                | Prim::EMPTY_MAP
+                | Prim::EMPTY_BIG_MAP
+                | Prim::MIN_BLOCK_TIME
+                | Prim::VOTING_POWER
+                | Prim::TOTAL_VOTING_POWER
+                | Prim::SAPLING_EMPTY_STATE
+                | Prim::SAPLING_VERIFY_UPDATE
+                | Prim::ABS
+                | Prim::NEG
+                | Prim::SUB
+                | Prim::SUB_MUTEZ
+                | Prim::MUL
+                | Prim::EDIV
+                | Prim::LSL
+                | Prim::LSR
+                | Prim::EXEC
+                | Prim::APPLY
+                | Prim::LAMBDA
+                | Prim::LAMBDA_REC
+                | Prim::LEFT
+                | Prim::RIGHT
+                | Prim::MAP
+                | Prim::NOT
+                | Prim::AND
+                | Prim::XOR
+                | Prim::OR
+                | Prim::PAIRING_CHECK,
+            ..,
+        )
     };
 }
 
