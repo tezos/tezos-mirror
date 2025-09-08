@@ -517,7 +517,7 @@ fn originate_contract<Host: Runtime>(
     source_contract: &Contract,
     sender_contract: &Contract,
     sender_account: &mut impl TezlinkAccount,
-    balance: &Narith,
+    initial_balance: &Narith,
     script: &Script,
     typecheck: bool,
 ) -> Result<OriginationSuccess, OriginationError> {
@@ -559,9 +559,9 @@ fn originate_contract<Host: Runtime>(
         return Err(OriginationError::CantOriginateEmptyContract);
     }
 
-    // Compute the balance setup of the smart contract as a balance update for the origination.
+    // Compute the initial_balance setup of the smart contract as a balance update for the origination.
     let mut balance_updates =
-        compute_balance_updates(sender_contract, &dest_contract, balance)
+        compute_balance_updates(sender_contract, &dest_contract, initial_balance)
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
 
     // Balance updates for the impacts of origination on storage space.
@@ -586,7 +586,7 @@ fn originate_contract<Host: Runtime>(
         sender_contract,
         sender_account,
         &mut smart_contract,
-        &balance.0,
+        &initial_balance.0,
     )
     .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
