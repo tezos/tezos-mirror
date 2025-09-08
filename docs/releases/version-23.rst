@@ -1,4 +1,4 @@
-Version 23.1
+Version 23.2
 ============
 
 Changes
@@ -94,7 +94,7 @@ Ubuntu and Debian packages
 
       curl -s "https://packages.nomadic-labs.com/ubuntu/octez.asc" |
           sudo gpg --yes --dearmor -o /etc/apt/keyrings/octez.gpg
- 
+
   Then, they should be able to continue upgrading as usual, e.g. by::
 
       sudo apt-get update
@@ -121,18 +121,19 @@ From sources
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v23.1
+  git checkout octez-v23.2
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v23.1`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v23.2`` Docker images of Octez.
 
 Changelog
 ---------
 
+- `Version 23.2 <../CHANGES.html#version-23-2>`_
 - `Version 23.1 <../CHANGES.html#version-23-1>`_
 - `Version 23.0 <../CHANGES.html#version-23-0>`_
 - `Version 23.0~rc2 <../CHANGES.html#version-23-0-rc2>`_
