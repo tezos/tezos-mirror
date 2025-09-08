@@ -15,6 +15,12 @@ Version 23 introduces the following changes or new features:
 
 Octez v23.1 addresses an issue with Ubuntu and Debian packages distribution, where an expired PGP key prevented users from updating to v23.0 using apt.
 
+Octez v23.2 fixes an issue affecting ``systemd`` services of Debian and Ubuntu packages that could lead to having two baking binaries running at the same time.
+
+In some cases, this issue could cause bakers to lose consensus rewards or, in certain conditions, could result in double-signing. Consequently, v23.0 and v23.1 Ubuntu and Debian packages were made unavailable via ``apt`` and ``dnf``. The release of v23.2 restores the availability of these distribution packages.
+
+**For all other distributions, this version is the same as Octez v23.1**
+
 .. _protocol_support_v23:
 
 Protocol Support
@@ -90,12 +96,12 @@ Ubuntu and Debian packages
 .. note::
 
   Because the PGP keys have been rotated, users updating packages need to overwrite the previously installed octez.gpg key.
-  For example, in order to update to v23.1 from a pre-existing Ubuntu Noble deployment, a user should first update the keys with::
+  For example, in order to update to v23.2 from a pre-existing Ubuntu Noble deployment, a user should first update the keys with::
 
       curl -s "https://packages.nomadic-labs.com/ubuntu/octez.asc" |
           sudo gpg --yes --dearmor -o /etc/apt/keyrings/octez.gpg
 
-  Then, they should be able to continue upgrading as usual, e.g. by::
+  Then, Octez packages users are advised to stop ``systemd`` services before updating to v23.2::
 
       sudo apt-get update
       sudo apt-get upgrade octez-baker
