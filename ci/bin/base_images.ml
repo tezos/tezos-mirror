@@ -9,6 +9,9 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
+(* these tags are used to build multi-arch docker images on native runners *)
+let tags_matrix = [("TAGS", ["gcp_very_high_cpu"; "gcp_arm64"])]
+
 let debian_releases = ["unstable"; "bookworm"; "trixie"]
 
 let debian_matrix = [("RELEASE", debian_releases)]
@@ -100,11 +103,38 @@ let jobs =
       ~changes
       "images/base-images/Dockerfile.rpm"
   in
+  let job_rust_based_images, job_rust_based_images_merge =
+    let images =
+      make_job_base_images
+        ~__POS__
+        ~name:"oc.base-images.rust"
+        ~distribution:"debian-rust"
+        ~matrix:[("RELEASE", ["unstable"])]
+        ~tags:tags_matrix
+        "images/base-images/Dockerfile.rust"
+    in
+    let merge =
+      job_docker_authenticated
+        ~__POS__
+        ~name:"oc.base-images.rust.merge"
+        ~stage:Stages.images
+        ~dependencies:(Dependent [Job images])
+        ~variables:
+          [
+            ("RELEASE", "unstable");
+            ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
+          ]
+        ["scripts/ci/docker-merge-base-images.sh"]
+    in
+    (images, merge)
+  in
   [
     job_debian_based_images;
     job_ubuntu_based_images;
     job_fedora_based_images;
     job_rockylinux_based_images;
+    job_rust_based_images;
+    job_rust_based_images_merge;
   ]
 
 let child_pipeline =

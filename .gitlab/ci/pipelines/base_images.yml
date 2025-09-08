@@ -177,3 +177,66 @@ oc.base-images.rockylinux:
       - "9.3"
       - "9.6"
       - "10.0"
+
+oc.base-images.rust:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - $TAGS
+  rules:
+  - changes: []
+    when: on_success
+  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
+    when: on_success
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.rust
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: debian-rust
+    IMAGE_PATH: debian-rust
+    PLATFORM: ""
+  parallel:
+    matrix:
+    - RELEASE:
+      - unstable
+      TAGS:
+      - gcp_very_high_cpu
+      - gcp_arm64
+
+oc.base-images.rust.merge:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  needs:
+  - oc.base-images.rust
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/docker-merge-base-images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    RELEASE: unstable
+    IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
