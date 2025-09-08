@@ -223,15 +223,13 @@ let get_peer_score dal_node peer_id =
   in
   return peer_score.score
 
-let wait_for_stored_slot ?shard_index dal_node ~published_level ~slot_index =
+let wait_for_stored_slot ~shard_index dal_node ~published_level ~slot_index =
   let check_slot_id e =
     JSON.(e |-> "published_level" |> as_int) = published_level
     && JSON.(e |-> "slot_index" |> as_int) = slot_index
   in
   let check_shard_index e =
-    match shard_index with
-    | None -> true
-    | Some shard_index -> JSON.(e |-> "shard_index" |> as_int) = shard_index
+    JSON.(e |-> "shard_index" |> as_int) = shard_index
   in
   Dal_node.wait_for dal_node "dal_stored_slot_shard.v0" (fun e ->
       if check_slot_id e && check_shard_index e then Some () else None)
