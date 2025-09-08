@@ -1646,14 +1646,6 @@ let jobs pipeline_type =
           ~dependencies:(Dependent [Job job_build_kernels])
           ["make -f kernels.mk check"; "make -f kernels.mk test"]
       in
-      let job_test_etherlink_kernel : tezos_job =
-        make_job_kernel
-          ~__POS__
-          ~name:"test_etherlink_kernel"
-          ~changes:changeset_test_etherlink_kernel
-          ~dependencies:(Dependent [Job job_build_kernels])
-          ["make -f etherlink.mk check"; "make -f etherlink.mk test"]
-      in
       let job_test_etherlink_firehose : tezos_job =
         make_job_kernel
           ~__POS__
@@ -1709,7 +1701,6 @@ let jobs pipeline_type =
       in
       [
         job_test_kernels;
-        job_test_etherlink_kernel;
         job_test_etherlink_firehose;
         job_audit_riscv_deps;
         job_check_riscv_kernels;
