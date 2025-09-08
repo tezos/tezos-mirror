@@ -271,6 +271,8 @@ module Shards_cache = struct
 
   let init = Slot_map.create
 
+  let has_slot cache slot_id = Option.is_some (Slot_map.find_opt cache slot_id)
+
   let number_of_shards_available cache slot_id shard_indexes =
     Lwt_result_syntax.return
     @@
@@ -283,7 +285,10 @@ module Shards_cache = struct
           0
           shard_indexes
 
-  let write_all cache slot_id shards =
+  (** [write_all ~silent cache slot_id shards]:
+      - If [silent = true], do not emit events/metrics for shard storage.
+      - If [silent = false], emit events for each newly stored shard. *)
+  let write_all ~silent cache slot_id shards =
     let open Lwt_result_syntax in
     let cached_shards =
       match
@@ -307,10 +312,12 @@ module Shards_cache = struct
                 [@profiler.aggregate_f {verbosity = Notice} "add shard"])
              in
              let*! () =
-               Event.emit_stored_slot_shard
-                 ~published_level:slot_id.slot_level
-                 ~slot_index:slot_id.slot_index
-                 ~shard_index:index
+               if silent then Lwt.return_unit
+               else
+                 Event.emit_stored_slot_shard
+                   ~published_level:slot_id.slot_level
+                   ~slot_index:slot_id.slot_index
+                   ~shard_index:index
              in
              return shards_map)
          cached_shards
@@ -348,52 +355,83 @@ module Shards_cache = struct
     Lwt_result_syntax.return @@ Slot_map.remove cache slot_id
 end
 
+(*
+  Shards -- cache-first selector via [source_target]
+
+  Policy:
+  - Reads/counts: If the slot is present in cache, use the cache, otherwise use the disk (if available, otherwise the data is missing).
+  - Writes:
+      * cache-only (disk=None): write to cache with events (silent=false).
+      * disk-backed: write to disk (must succeed) then write to cache silently (silent=true).
+  - Removal always clears cache first, then disk if present.
+*)
 module Shards = struct
   module Disk = Shards_disk
   module Cache = Shards_cache
 
-  type t = Disk of Disk.t | Cache of Cache.t
+  type t = {disk : Disk.t option; cache : Cache.t}
 
   let init ~profile_ctxt ~proto_parameters node_store_dir shard_store_dir =
     let open Lwt_result_syntax in
-    if Profile_manager.is_attester_only_profile profile_ctxt then
-      let storage_period =
-        Profile_manager.get_attested_data_default_store_period
-          profile_ctxt
-          proto_parameters
-      in
-      let cache_size = storage_period * proto_parameters.number_of_slots in
-      let cache = Cache.init cache_size in
-      return (Cache cache)
-    else
-      let* store = Disk.init node_store_dir shard_store_dir in
-      return (Disk store)
+    let* disk =
+      if Profile_manager.is_attester_only_profile profile_ctxt then return_none
+      else
+        let* store = Disk.init node_store_dir shard_store_dir in
+        return_some store
+    in
+    let storage_period =
+      Profile_manager.get_attested_data_default_store_period
+        profile_ctxt
+        proto_parameters
+    in
+    let cache_size = storage_period * proto_parameters.number_of_slots in
+    let cache = Cache.init cache_size in
+    return {disk; cache}
 
-  let number_of_shards_available = function
-    | Disk store -> Disk.number_of_shards_available store
-    | Cache cache -> Cache.number_of_shards_available cache
+  (* Select the backend to use for reads / counts. *)
+  let source_target {disk; cache} slot_id =
+    if Cache.has_slot cache slot_id then `Cache cache
+    else match disk with Some d -> `Disk d | None -> `Cache cache
 
-  let write_all t slot_id shards =
-    match t with
-    | Disk store -> Disk.write_all store slot_id shards
-    | Cache cache -> Cache.write_all cache slot_id shards
+  let number_of_shards_available st slot_id shard_indexes =
+    match source_target st slot_id with
+    | `Cache c -> Cache.number_of_shards_available c slot_id shard_indexes
+    | `Disk d -> Disk.number_of_shards_available d slot_id shard_indexes
 
-  let read_all t slot_id ~number_of_shards =
-    match t with
-    | Disk store -> Disk.read_all store slot_id ~number_of_shards
-    | Cache cache -> Cache.read_all cache slot_id
+  let write_all {disk; cache} slot_id shards =
+    let open Lwt_result_syntax in
+    match disk with
+    | None ->
+        (* Cache-only: allow events/metrics from the cache. *)
+        Cache.write_all ~silent:false cache slot_id shards
+    | Some d ->
+        (* Disk must succeed for persistence. *)
+        let* () = Disk.write_all d slot_id shards in
+        (* Then write-through to cache silently; ignore its failure. *)
+        let*! (_ : (unit, _) result) =
+          Cache.write_all ~silent:true cache slot_id shards
+        in
+        return_unit
 
-  let read = function
-    | Disk store -> Disk.read store
-    | Cache cache -> Cache.read cache
+  let read st slot_id shard_id =
+    match source_target st slot_id with
+    | `Cache c -> Cache.read c slot_id shard_id
+    | `Disk d -> Disk.read d slot_id shard_id
 
-  let count_values = function
-    | Disk store -> Disk.count_values store
-    | Cache cache -> Cache.count_values cache
+  let read_all st slot_id ~number_of_shards =
+    match source_target st slot_id with
+    | `Cache c -> Cache.read_all c slot_id
+    | `Disk d -> Disk.read_all d slot_id ~number_of_shards
 
-  let remove = function
-    | Disk store -> Disk.remove store
-    | Cache cache -> Cache.remove cache
+  let count_values st slot_id =
+    match source_target st slot_id with
+    | `Cache c -> Cache.count_values c slot_id
+    | `Disk d -> Disk.count_values d slot_id
+
+  let remove {disk; cache} slot_id =
+    let open Lwt_result_syntax in
+    let* () = Cache.remove cache slot_id in
+    match disk with Some d -> Disk.remove d slot_id | None -> return_unit
 end
 
 module Slots = struct
