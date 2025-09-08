@@ -17,7 +17,45 @@ type operator = {
   sc_rollup_node : Sc_rollup_node.t;
   sc_rollup_address : string;
   operator : Account.key;
+  origination_level : int;
 }
+
+let fetch_echo_rollup_data ~echo_rollup ~dal_node_producers ~level =
+  let slots = Hashtbl.create 32 in
+  let read_slot echo_operator slot =
+    let key = "/output/slot-" ^ string_of_int slot in
+    let* value_written =
+      Sc_rollup_node.RPC.call echo_operator.sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key
+           ~block:(string_of_int level)
+           ()
+    in
+    let size =
+      match value_written with
+      | None -> 0
+      | Some bytes -> `Hex bytes |> Hex.to_string |> Z.of_bits |> Z.to_int
+    in
+    Hashtbl.add slots slot size ;
+    unit
+  in
+  let* () =
+    match echo_rollup with
+    | None -> unit
+    | Some echo_rollup ->
+        if level < echo_rollup.origination_level then unit
+        else
+          let* _level =
+            Sc_rollup_node.wait_for_level
+              ~timeout:30.
+              echo_rollup.sc_rollup_node
+              level
+          in
+          Lwt_list.iter_s (read_slot echo_rollup) dal_node_producers
+  in
+  return slots
 
 let init_echo_rollup_account ~client ~echo_rollup ~alias_prefix =
   if echo_rollup then
@@ -165,6 +203,8 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
       client
   in
   let () = toplog "Init Echo rollup: waiting again, for level %d" (l + 2) in
+  (* The origination level is an overapproximation, it prevents metrics to fail
+     if they attempt to read the rollup storage before its origination level. *)
   let* _ = Node.wait_for_level node (l + 2) in
   let () =
     toplog "Init Echo rollup: waiting again, for level %d: done" (l + 2)
@@ -173,8 +213,23 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
+  let* genesis_info =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+         sc_rollup_address
+  in
+  let origination_level = JSON.(genesis_info |-> "level" |> as_int) in
   let () = toplog "Init Echo rollup: launching the rollup node: done" in
-  let operator = {node; client; sc_rollup_node; operator; sc_rollup_address} in
+  let operator =
+    {
+      node;
+      client;
+      sc_rollup_node;
+      operator;
+      sc_rollup_address;
+      origination_level;
+    }
+  in
   let* () =
     add_prometheus_source
       ?dal_node

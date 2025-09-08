@@ -808,10 +808,14 @@ let import_snapshot ?(apply_unsafe_patches = false) ?(force = false)
   in
   Runnable.{value = process; run = Process.check}
 
-let as_rpc_endpoint (t : t) =
+let as_rpc_endpoint ?(local = false) (t : t) =
   let state = t.persistent_state in
   let scheme = "http" in
-  Endpoint.make ~scheme ~host:state.rpc_host ~port:state.rpc_port ()
+  let host =
+    if local || Option.is_none t.persistent_state.runner then state.rpc_host
+    else Runner.address t.persistent_state.runner
+  in
+  Endpoint.make ~scheme ~host ~port:state.rpc_port ()
 
 let operators t =
   (t.persistent_state.default_operator, t.persistent_state.operators)

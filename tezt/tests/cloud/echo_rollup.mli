@@ -13,7 +13,14 @@
     messages published via DAL slots.
 *)
 
-type operator
+type operator = {
+  node : Node.t;
+  client : Client.t;
+  sc_rollup_node : Sc_rollup_node.t;
+  sc_rollup_address : string;
+  operator : Account.key;
+  origination_level : int;
+}
 
 (** [init_echo_rollup_account ~client ~echo_rollup ~alias_prefix] generates
     a new rollup operator key if [~echo_rollup] is [true]. The key alias will
@@ -41,3 +48,12 @@ val init_echo_rollup :
   Dal_node_helpers.producer list ->
   Account.key option ->
   operator option Lwt.t
+
+(** [fetch_echo_rollup_data ~echo_rollup ~data_node_producers ~level]
+    fetches payload size in bytes for each DAL slot given by [~data_node_producers]
+    written by the [~echo_rollup] at a given L1 [~level]. *)
+val fetch_echo_rollup_data :
+  echo_rollup:operator option ->
+  dal_node_producers:int list ->
+  level:int ->
+  (int, int) Hashtbl.t Lwt.t

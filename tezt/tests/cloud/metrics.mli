@@ -38,6 +38,7 @@ type per_level_info = {
   attestations : (public_key_hash, dal_status) Hashtbl.t;
   attested_commitments : Z.t;
   etherlink_operator_balance_sum : Tez.t;
+  echo_rollup_fetched_data : (int, int) Hashtbl.t;
 }
 
 type t

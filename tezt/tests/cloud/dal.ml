@@ -222,6 +222,12 @@ let get_infos_per_level t ~level ~metadata =
       unit
     else Lwt.return_unit
   in
+  let* echo_rollup_fetched_data =
+    Echo_rollup.fetch_echo_rollup_data
+      ~echo_rollup:t.echo_rollup
+      ~dal_node_producers:t.configuration.dal_node_producers
+      ~level
+  in
   Lwt.return
     {
       level;
@@ -229,6 +235,7 @@ let get_infos_per_level t ~level ~metadata =
       attestations;
       attested_commitments;
       etherlink_operator_balance_sum;
+      echo_rollup_fetched_data;
     }
 
 let init_teztale (configuration : configuration) cloud agent =

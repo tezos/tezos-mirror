@@ -22,6 +22,7 @@ type per_level_info = {
   attestations : (public_key_hash, dal_status) Hashtbl.t;
   attested_commitments : Z.t;
   etherlink_operator_balance_sum : Tez.t;
+  echo_rollup_fetched_data : (int, int) Hashtbl.t;
 }
 
 type t = {
@@ -42,6 +43,9 @@ type t = {
   ratio_attested_commitments_per_baker :
     (public_key_hash, Baker_helpers.per_baker_dal_summary) Hashtbl.t;
   etherlink_operator_balance_sum : Tez.t;
+  total_echo_rollup_unattested_slots : int;
+  total_echo_rollup_fetched_data_size : int;
+  last_echo_rollup_fetched_data_size : int;
 }
 
 let default =
@@ -58,6 +62,9 @@ let default =
     ratio_published_commitments_last_level = 0.;
     ratio_attested_commitments_per_baker = Hashtbl.create 0;
     etherlink_operator_balance_sum = Tez.zero;
+    total_echo_rollup_unattested_slots = 0;
+    total_echo_rollup_fetched_data_size = 0;
+    last_echo_rollup_fetched_data_size = 0;
   }
 
 let aliases =
@@ -97,6 +104,9 @@ let pp ~bakers
       ratio_published_commitments_last_level;
       ratio_attested_commitments_per_baker;
       etherlink_operator_balance_sum;
+      total_echo_rollup_unattested_slots;
+      total_echo_rollup_fetched_data_size;
+      last_echo_rollup_fetched_data_size;
     } =
   let pp_ratio fmt (num, div) =
     if div = 0 then Format.fprintf fmt "Not a number: %d/0" num
@@ -158,7 +168,16 @@ let pp ~bakers
     "DAL slots: total attested commitments per slot (<slot index> -> <attested \
      commit.>).@.%a"
     pp_slot_metrics
-    (Hashtbl.to_seq total_attested_commitments_per_slot)
+    (Hashtbl.to_seq total_attested_commitments_per_slot) ;
+  Log.info
+    "Echo rollup slots: total unattested slots: %d"
+    total_echo_rollup_unattested_slots ;
+  Log.info
+    "Echo rollup slots: total fetched data: %d"
+    total_echo_rollup_fetched_data_size ;
+  Log.info
+    "Echo rollup slots: last fetched data: %d"
+    last_echo_rollup_fetched_data_size
 
 let push ~versions ~cloud
     {
@@ -174,6 +193,9 @@ let push ~versions ~cloud
       ratio_published_commitments_last_level;
       ratio_attested_commitments_per_baker;
       etherlink_operator_balance_sum;
+      total_echo_rollup_unattested_slots;
+      total_echo_rollup_fetched_data_size;
+      last_echo_rollup_fetched_data_size;
     } =
   let get_labels public_key_hash =
     let alias =
@@ -316,7 +338,28 @@ let push ~versions ~cloud
     ~help:"Sum of the balances of the etherlink operator"
     ~typ:`Gauge
     ~name:"tezt_etherlink_operator_balance_total"
-    (Tez.to_float etherlink_operator_balance_sum)
+    (Tez.to_float etherlink_operator_balance_sum) ;
+  Cloud.push_metric
+    cloud
+    ~help:"Number of slots unattested from the echo rollup perspective"
+    ~typ:`Gauge
+    ~labels:[("kind", "unattested")]
+    ~name:"tezt_total_echo_rollup_unattested_slots"
+    (float_of_int total_echo_rollup_unattested_slots) ;
+  Cloud.push_metric
+    cloud
+    ~help:"Total size of data fetched by the echo rollup"
+    ~typ:`Gauge
+    ~labels:[("kind", "data")]
+    ~name:"tezt_total_echo_rollup_fetched_data"
+    (float_of_int total_echo_rollup_fetched_data_size) ;
+  Cloud.push_metric
+    cloud
+    ~help:"Last size of data fetched by the echo rollup"
+    ~typ:`Gauge
+    ~labels:[("kind", "data")]
+    ~name:"tezt_last_echo_rollup_fetched_data"
+    (float_of_int last_echo_rollup_fetched_data_size)
 
 let published_level_of_attested_level ~attestation_lag level =
   level - attestation_lag
@@ -524,6 +567,18 @@ let update_ratio_attested_commitments_per_baker ~first_level ~infos
         |> Hashtbl.add_seq table ;
         table
 
+let update_echo_rollup_metrics infos_per_level metrics =
+  let data_size, unattested_slots =
+    Hashtbl.fold
+      (fun _ v (total_size, unattested) ->
+        (total_size + v, if v = 0 then unattested + 1 else unattested))
+      infos_per_level.echo_rollup_fetched_data
+      (0, 0)
+  in
+  ( metrics.total_echo_rollup_unattested_slots + unattested_slots,
+    metrics.total_echo_rollup_fetched_data_size + data_size,
+    data_size )
+
 let get ~first_level ~attestation_lag ~dal_node_producers ~number_of_slots
     ~infos infos_per_level metrics =
   let level_first_commitment_published =
@@ -604,6 +659,11 @@ let get ~first_level ~attestation_lag ~dal_node_producers ~number_of_slots
       metrics.total_published_commitments_per_slot
       metrics.total_attested_commitments_per_slot
   in
+  let ( total_echo_rollup_unattested_slots,
+        total_echo_rollup_fetched_data_size,
+        last_echo_rollup_fetched_data_size ) =
+    update_echo_rollup_metrics infos_per_level metrics
+  in
   {
     level_first_commitment_published;
     level_first_commitment_attested;
@@ -618,4 +678,7 @@ let get ~first_level ~attestation_lag ~dal_node_producers ~number_of_slots
     ratio_attested_commitments_per_baker;
     etherlink_operator_balance_sum =
       infos_per_level.etherlink_operator_balance_sum;
+    total_echo_rollup_unattested_slots;
+    total_echo_rollup_fetched_data_size;
+    last_echo_rollup_fetched_data_size;
   }

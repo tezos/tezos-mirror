@@ -403,7 +403,7 @@ val list_metrics :
   unit Lwt.t
 
 (** Expose the RPC server address of this node as a foreign endpoint. *)
-val as_rpc_endpoint : t -> Endpoint.t
+val as_rpc_endpoint : ?local:bool -> t -> Endpoint.t
 
 (** [operators node] returns a pair with the default operator and all other
     operators with their purpose. *)
