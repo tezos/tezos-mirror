@@ -346,7 +346,17 @@ let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =
 
 let clear_outdated_reward_data ctxt ~new_cycle =
   let open Lwt_syntax in
-  match Cycle_repr.sub new_cycle 2 with
+  match
+    Cycle_repr.sub
+      new_cycle
+      (* We should not clear [new_cycle - 1] even if
+         [issuance_modification_delay < 2]. Indeed, calling e.g. the
+         "issuance_per_minute" RPC on the last block of a given cycle
+         [c] will request the issuance coeff for cycle [c] from a
+         context that has already been set up for cycle [c + 1], so it
+         still needs to be available. *)
+      (Compare.Int.max 2 (Constants_storage.issuance_modification_delay ctxt))
+  with
   | None -> Lwt.return ctxt
   | Some cycle ->
       let* ctxt = Storage.Issuance_coeff.remove ctxt cycle in
