@@ -10,18 +10,69 @@ open Ethereum_types
 
 let root = Durable_storage_path.etherlink_root
 
-let balance read address =
-  inspect_durable_and_decode_default
-    ~default:(Ethereum_types.Qty Z.zero)
-    read
-    (Durable_storage_path.Accounts.balance address)
-    decode_number_le
+module AccountInfo = struct
+  type t = {
+    balance : Ethereum_types.quantity;
+    nonce : Ethereum_types.quantity;
+    code_hash : Ethereum_types.hash;
+  }
 
-let nonce read address =
+  let encode {balance; nonce; code_hash} =
+    let open Rlp in
+    Rlp.encode
+      (List
+         [
+           Value (encode_u256_le balance);
+           Value (encode_z (Ethereum_types.Qty.to_z nonce));
+           Value (encode_hash code_hash);
+         ])
+
+  let decode_opt b =
+    match Rlp.decode b with
+    | Ok (List [Value balance; Value nonce; Value code_hash]) ->
+        let balance = decode_number_le balance in
+        let nonce = decode_number_le nonce in
+        let code_hash = decode_hash code_hash in
+        Some {balance; nonce; code_hash}
+    | _ -> None
+
+  let decode_exn b =
+    match decode_opt b with
+    | Some x -> x
+    | None ->
+        Stdlib.failwith
+        @@ Format.asprintf "Invalid account info format: %s"
+        @@ Bytes.to_string b
+end
+
+let inspect_and_decode_opt_account read address =
   inspect_durable_and_decode_opt
     read
-    (Durable_storage_path.Accounts.nonce address)
-    decode_number_le
+    (Durable_storage_path.Accounts.info address)
+    AccountInfo.decode_exn
+
+let balance read address =
+  let open Lwt_result_syntax in
+  let* answer = inspect_and_decode_opt_account read address in
+  match answer with
+  | Some info -> return info.balance
+  | None ->
+      inspect_durable_and_decode_default
+        ~default:(Ethereum_types.Qty Z.zero)
+        read
+        (Durable_storage_path.Accounts.balance address)
+        decode_number_le
+
+let nonce read address =
+  let open Lwt_result_syntax in
+  let* answer = inspect_and_decode_opt_account read address in
+  match answer with
+  | Some info -> return @@ Some info.nonce
+  | None ->
+      inspect_durable_and_decode_opt
+        read
+        (Durable_storage_path.Accounts.nonce address)
+        decode_number_le
 
 let code read address =
   let open Lwt_result_syntax in
@@ -29,30 +80,36 @@ let code read address =
   let decode bytes =
     bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hex_of_string
   in
-  let* answer =
-    inspect_durable_and_decode_opt
-      read
-      (Durable_storage_path.Accounts.code address)
-      decode
-  in
-  match answer with
-  | Some code -> return code
-  | None -> (
-      let* hash_opt =
+  let* hash_opt =
+    let* account_opt = inspect_and_decode_opt_account read address in
+    match account_opt with
+    | Some info -> return (Some info.code_hash)
+    | None ->
         inspect_durable_and_decode_opt
           read
           (Durable_storage_path.Accounts.code_hash address)
           (fun bytes ->
             Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hash_of_string)
+  in
+  match hash_opt with
+  | Some hash ->
+      let* code =
+        inspect_durable_and_decode_default
+          ~default
+          read
+          (Durable_storage_path.Code.code hash)
+          decode
       in
-      match hash_opt with
-      | None -> return default
-      | Some hash ->
-          inspect_durable_and_decode_default
-            ~default
-            read
-            (Durable_storage_path.Code.code hash)
-            decode)
+      return code
+  | None ->
+      let* code =
+        inspect_durable_and_decode_default
+          ~default
+          read
+          (Durable_storage_path.Accounts.code address)
+          decode
+      in
+      return code
 
 let current_block_number read =
   Durable_storage.block_number ~root read Durable_storage_path.Block.Current

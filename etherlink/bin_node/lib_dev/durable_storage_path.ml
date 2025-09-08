@@ -72,6 +72,8 @@ let maximum_gas_per_transaction = EVM.make "/maximum_gas_per_transaction"
 module Accounts = struct
   let accounts_path = World_state.make "/eth_accounts"
 
+  let info_path = "/info"
+
   let balance_path = "/balance"
 
   let nonce_path = "/nonce"
@@ -83,6 +85,8 @@ module Accounts = struct
   let storage_path = "/storage"
 
   let account (Address (Hex s)) = accounts_path ^ "/" ^ s
+
+  let info address = account address ^ info_path
 
   let balance address = account address ^ balance_path
 
@@ -127,12 +131,6 @@ module Accounts = struct
     let open Result_syntax in
     let* address_path = account_e address in
     return (address_path ^ path)
-
-  let balance_e address = concat_e address balance_path
-
-  let nonce_e address = concat_e address nonce_path
-
-  let code_e address = concat_e address code_path
 
   let storage_e address index =
     if String.length index = 64 then
