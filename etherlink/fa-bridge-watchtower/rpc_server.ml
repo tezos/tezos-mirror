@@ -465,6 +465,14 @@ let () =
 let () =
   register
     `GET
+    "/last_seen_block"
+    Encodings.quantity_hum_encoding
+    ~description:"Retrieve last Etherlink block number seen by the watchtower"
+  @@ fun _req _ ctx -> Db.Pointers.L2_head.get ctx.db
+
+let () =
+  register
+    `GET
     "/openapi"
     Data_encoding.json
     ~description:"OpenAPI specification for watchtower API"
