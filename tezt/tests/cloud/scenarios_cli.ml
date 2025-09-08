@@ -124,6 +124,8 @@ module type Dal = sig
   val number_of_slots : int option
 
   val config : Scenarios_configuration.DAL.t
+
+  val traps_fraction : Q.t option
 end
 
 module Dal () : Dal = struct
@@ -680,6 +682,26 @@ module Dal () : Dal = struct
         ()
     in
     Option.fold ~none:config.number_of_slots ~some:Option.some from_cli
+
+  let traps_fraction =
+    let typ =
+      Clap.typ
+        ~name:"Q"
+        ~dummy:Q.zero
+        ~parse:(fun s -> try Some (Q.of_string s) with _ -> None)
+        ~show:Q.to_string
+    in
+    let from_cli =
+      Clap.optional
+        ~section
+        ~long:"traps-fraction"
+        ~description:
+          "Set the fraction of shards received by the DAL node considered as \
+           traps."
+        typ
+        ()
+    in
+    Option.fold ~none:config.traps_fraction ~some:Option.some from_cli
 end
 
 module type Layer1 = sig

@@ -50,6 +50,7 @@ type configuration = {
   daily_logs_destination : string option;
   slot_size : int option;
   number_of_slots : int option;
+  traps_fraction : Q.t option;
 }
 
 type bootstrap = {
@@ -698,7 +699,16 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
             | Some number_of_slots ->
                 [(["dal_parametric"; "number_of_slots"], `Int number_of_slots)]
             | None -> [])
-          @ []
+          @
+          match configuration.traps_fraction with
+          | Some {num; den} ->
+              [
+                ( ["dal_parametric"; "traps_fraction"; "numerator"],
+                  `String (Z.to_string num) );
+                ( ["dal_parametric"; "traps_fraction"; "denominator"],
+                  `String (Z.to_string den) );
+              ]
+          | None -> []
         in
         Protocol.write_parameter_file
           ~bootstrap_accounts
@@ -1252,6 +1262,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     in
     let slot_size = Cli.slot_size in
     let number_of_slots = Cli.number_of_slots in
+    let traps_fraction = Cli.traps_fraction in
     let t =
       {
         with_dal;
@@ -1287,6 +1298,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         daily_logs_destination;
         slot_size;
         number_of_slots;
+        traps_fraction;
       }
     in
     (t, etherlink)
