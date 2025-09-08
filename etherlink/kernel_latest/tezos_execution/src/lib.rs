@@ -135,28 +135,28 @@ pub fn transfer_tez<Host: Runtime>(
 
 fn burn_tez(
     host: &mut impl Runtime,
-    sender_contract: &Contract,
-    sender_account: &impl TezlinkAccount,
+    contract: &Contract,
+    account: &impl TezlinkAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<Narith, TransferError> {
-    let sender_balance = sender_account
+    let balance = account
         .balance(host)
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
-    let new_sender_balance = match sender_balance.0.checked_sub(amount) {
+    let new_balance = match balance.0.checked_sub(amount) {
         None => {
             log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: sender_contract.clone(),
-                balance: sender_balance.clone(),
+                contract: contract.clone(),
+                balance: balance.clone(),
                 amount: amount.into(),
             }));
         }
-        Some(new_source_balance) => new_source_balance.into(),
+        Some(new_balance) => new_balance.into(),
     };
-    sender_account
-        .set_balance(host, &new_sender_balance)
+    account
+        .set_balance(host, &new_balance)
         .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
-    Ok(new_sender_balance)
+    Ok(new_balance)
 }
 
 #[allow(clippy::too_many_arguments)]
