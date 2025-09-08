@@ -492,6 +492,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 &context,
                 hash.clone(),
                 operation.clone(),
+                &number,
+                &timestamp,
+                &self.chain_id,
             ) {
                 Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {
