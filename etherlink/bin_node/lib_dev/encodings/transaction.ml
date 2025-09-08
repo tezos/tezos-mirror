@@ -646,7 +646,7 @@ let authorization_hash authorization =
   let rlp_authorization = auth_message authorization in
   Buffer.add_bytes buffer rlp_authorization ;
   let raw_bytes = Buffer.to_bytes buffer in
-  Tezos_crypto.Signature.Secp256k1.keccak256_digest raw_bytes
+  Tezos_crypto.Hacl.Hash.Keccak_256.digest raw_bytes
 
 let auth_signer ({r; s; y_parity; _} as authorization : authorization_list_item)
     =
