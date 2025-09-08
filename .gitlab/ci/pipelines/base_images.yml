@@ -59,6 +59,7 @@ oc.base-images.debian:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: debian
     IMAGE_PATH: debian
+    PLATFORM: linux/amd64,linux/arm64
   parallel:
     matrix:
     - RELEASE:
@@ -94,6 +95,7 @@ oc.base-images.ubuntu:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: ubuntu
     IMAGE_PATH: ubuntu
+    PLATFORM: linux/amd64,linux/arm64
   parallel:
     matrix:
     - RELEASE:
@@ -129,6 +131,7 @@ oc.base-images.fedora:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: fedora
     IMAGE_PATH: fedora
+    PLATFORM: linux/amd64,linux/arm64
   parallel:
     matrix:
     - RELEASE:
@@ -164,6 +167,7 @@ oc.base-images.rockylinux:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: rockylinux
     IMAGE_PATH: rockylinux/rockylinux
+    PLATFORM: linux/amd64,linux/arm64
   parallel:
     matrix:
     - RELEASE:

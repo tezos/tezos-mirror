@@ -11,31 +11,39 @@ open Tezos_ci
 
 let debian_releases = ["unstable"; "bookworm"]
 
-let debian_matrix = [[("RELEASE", debian_releases)]]
+let debian_matrix = [("RELEASE", debian_releases)]
 
 let ubuntu_releases = ["noble"; "jammy"]
 
-let ubuntu_matrix = [[("RELEASE", ubuntu_releases)]]
+let ubuntu_matrix = [("RELEASE", ubuntu_releases)]
 
 let rockylinux_releases = ["9.6"]
 
-let rockylinux_matrix = [[("RELEASE", rockylinux_releases)]]
+let rockylinux_matrix = [("RELEASE", rockylinux_releases)]
 
 let fedora_releases = ["39"; "42"]
 
-let fedora_matrix = [[("RELEASE", fedora_releases)]]
+let fedora_matrix = [("RELEASE", fedora_releases)]
 
 let jobs =
   let make_job_base_images ~__POS__ ~name ~matrix ~distribution ?image_path
-      ?(changes = Changeset.make []) dockerfile =
+      ?(changes = Changeset.make []) ?tags dockerfile =
+    (* if [tags] is omitted then we build for two different architectures
+     using emulation. If [tags] is not empty ( we assume a matrix ), then
+     we build using a native runner setting the tag accordingly. In the former
+     case, we must also run a merge manifest job *)
     let script =
       Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile
     in
+    let emulated = Option.is_none tags in
     let variables =
-      if Option.is_none image_path then
-        [("DISTRIBUTION", distribution); ("IMAGE_PATH", distribution)]
-      else
-        [("DISTRIBUTION", distribution); ("IMAGE_PATH", Option.get image_path)]
+      [
+        ("DISTRIBUTION", distribution);
+        ( "IMAGE_PATH",
+          if Option.is_none image_path then distribution
+          else Option.get image_path );
+        ("PLATFORM", if emulated then "linux/amd64,linux/arm64" else "");
+      ]
     in
     job_docker_authenticated
       ~__POS__
@@ -47,8 +55,8 @@ let jobs =
           job_rule ~changes:(Changeset.encode changes) ~when_:On_success ();
           job_rule ~if_:Rules.force_rebuild ~when_:On_success ();
         ]
-      ~parallel:(Matrix matrix)
-      ~tag:Gcp_very_high_cpu
+      ~parallel:(Matrix [matrix @ Option.value ~default:[] tags])
+      ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
       [script]
   in
   let job_debian_based_images =
