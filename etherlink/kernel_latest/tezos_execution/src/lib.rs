@@ -103,20 +103,21 @@ fn address_from_contract(contract: Contract) -> AddressHash {
 
 pub fn transfer_tez<Host: Runtime>(
     host: &mut Host,
-    sender_contract: &Contract,
-    sender_account: &mut impl TezlinkAccount,
+    giver_contract: &Contract,
+    giver_account: &mut impl TezlinkAccount,
     amount: &Narith,
-    dest_contract: &Contract,
-    dest_account: &mut impl TezlinkAccount,
+    receiver_contract: &Contract,
+    receiver_account: &mut impl TezlinkAccount,
 ) -> Result<TransferSuccess, TransferError> {
-    let balance_updates = compute_balance_updates(sender_contract, dest_contract, amount)
-        .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
+    let balance_updates =
+        compute_balance_updates(giver_contract, receiver_contract, amount)
+            .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
 
     apply_balance_changes(
         host,
-        sender_contract,
-        sender_account,
-        dest_account,
+        giver_contract,
+        giver_account,
+        receiver_account,
         &amount.0,
     )?;
     Ok(TransferSuccess {
