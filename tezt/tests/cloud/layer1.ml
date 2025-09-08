@@ -1022,26 +1022,41 @@ let parse_conf encoding file =
 
 let yes_wallet_exe = Uses.path Constant.yes_wallet
 
-let number_of_bakers ~snapshot ~(network : Network.t) =
-  let* snapshot =
-    let open Snapshot_helpers in
-    match snapshot with
-    | Local_file path -> Lwt.return path
-    | Docker_embedded path ->
-        toplog "Using locally stored snapshot file: %s" path ;
+let local_snapshot =
+  let cache = Hashtbl.create 0 in
+  fun ~snapshot ~network ->
+    match Hashtbl.find_opt cache (snapshot, network) with
+    | Some path -> Lwt.return path
+    | None ->
+        let* path =
+          let open Snapshot_helpers in
+          match snapshot with
+          | Local_file path -> Lwt.return path
+          | Docker_embedded path ->
+              toplog "Using locally stored snapshot file: %s" path ;
+              Lwt.return path
+          | Url url ->
+              let path = Temp.file "snapshot_file" in
+              download_snapshot ~path ~url ~name:"host" ()
+          | No_snapshot ->
+              toplog
+                "No snapshot provided. Downloading one for network %s"
+                (Network.to_string network) ;
+              download_snapshot
+                ~url:(Network.snapshot_service @@ Network.to_public network)
+                ~name:"host"
+                ()
+        in
+        Hashtbl.add cache (snapshot, network) path ;
         Lwt.return path
-    | Url url ->
-        let path = Temp.file "snapshot_file" in
-        download_snapshot ~path ~url ~name:"host" ()
-    | No_snapshot ->
-        toplog
-          "No snapshot provided. Downloading one for network %s"
-          (Network.to_string network) ;
-        download_snapshot
-          ~url:(Network.snapshot_service @@ Network.to_public network)
-          ~name:"host"
-          ()
-  in
+
+let snapshot_timestamp ~snapshot ~(network : Network.t) =
+  let node = Node.create [] in
+  let* snapshot = local_snapshot ~snapshot ~network in
+  Snapshot_helpers.get_snapshot_info_timestamp node snapshot
+
+let number_of_bakers ~snapshot ~(network : Network.t) =
+  let* snapshot = local_snapshot ~snapshot ~network in
   let node =
     let name = "tmp-node" in
     let data_dir = Temp.dir name in
@@ -1079,6 +1094,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
       signing_delay = Cli.signing_delay;
       fixed_random_seed = Cli.fixed_random_seed;
       octez_release = Cli.octez_release;
+      auto_faketime = Cli.auto_faketime;
     }
   in
   let with_dal_producers =
@@ -1194,6 +1210,26 @@ let register (module Cli : Scenarios_cli.Layer1) =
   toplog "Creating the agents" ;
   let agents = Cloud.agents cloud in
   toplog "Created %d agents" (List.length agents) ;
+  let* () =
+    if configuration.auto_faketime && Tezt_cloud_cli.faketime = None then
+      let* snapshot_timestamp =
+        snapshot_timestamp
+          ~network:configuration.network
+          ~snapshot:configuration.snapshot
+      in
+      let timestamp, _, _ =
+        Result.get_ok (Ptime.of_rfc3339 snapshot_timestamp)
+      in
+      let now = Ptime_clock.now () in
+      let offset =
+        Ptime.(to_float_s timestamp -. to_float_s now)
+        |> truncate |> string_of_int
+      in
+      Lwt_list.iter_s
+        (fun agent -> Tezt_cloud.Cloud.set_faketime agent offset)
+        agents
+    else Lwt.return_unit
+  in
   let* t = init ~configuration cloud in
   toplog "Starting main loop" ;
   let produce_slot (t : 'network t) level =

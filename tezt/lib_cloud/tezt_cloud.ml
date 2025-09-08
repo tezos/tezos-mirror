@@ -315,6 +315,8 @@ module Tezt_cloud_cli = struct
 
   let teztale_artifacts = Cli.teztale_artifacts
 
+  let faketime = Cli.faketime
+
   let to_json_config = Cli.to_json_config
 end
 

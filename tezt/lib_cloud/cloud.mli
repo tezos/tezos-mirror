@@ -23,6 +23,10 @@ val register :
   (t -> unit Lwt.t) ->
   unit
 
+(* Set the [FAKETIME] environment variable so that all the ssh sessions have it
+   defined. *)
+val set_faketime : Agent.t -> string -> unit Lwt.t
+
 (** Dynamically add an alert *)
 val add_alert : t -> alert:Alert_manager.alert -> unit Lwt.t
 

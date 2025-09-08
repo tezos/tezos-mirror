@@ -61,6 +61,8 @@ module LAYER1 : sig
     val ppx_profiling_backends : string list
 
     val without_dal : bool
+
+    val auto_faketime : bool
   end
 
   (** Scenario configuration
@@ -94,6 +96,9 @@ module LAYER1 : sig
       upgrade will be performed via a UAU.
 
     - [stresstest]: See the description of [stresstest_conf]
+
+    - [auto_faketime]: is set to [true], use the snapshot info in order to
+      calculate the right FAKETIME offset to use.
   *)
   type t = {
     stake : Stake_repartition.Layer1.t;
@@ -109,6 +114,7 @@ module LAYER1 : sig
     signing_delay : (float * float) option;
     fixed_random_seed : int option;
     octez_release : string option;
+    auto_faketime : bool;
   }
 
   val encoding : t Data_encoding.t
