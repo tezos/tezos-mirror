@@ -345,10 +345,10 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
 pub fn transfer<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
-    sender_contract: &Contract,
-    sender_account: &mut impl TezlinkAccount,
+    giver_contract: &Contract, // The contract from which the funds are sent currently can be either the source(implicit_account) or and intermediary sender(originated_account)
+    giver_account: &mut impl TezlinkAccount,
     amount: &Narith,
-    dest_contract: &Contract,
+    receiver_contract: &Contract,
     entrypoint: &Entrypoint,
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
@@ -356,25 +356,25 @@ pub fn transfer<'a, Host: Runtime>(
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     origination_nonce: &mut OriginationNonce,
 ) -> Result<TransferSuccess, TransferError> {
-    match dest_contract {
+    match receiver_contract {
         Contract::Implicit(pkh) => {
             if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Err(TransferError::NonSmartContractExecutionCall);
             }
             // Allocated is not being used on purpose (see below the comment on the allocated_destination_contract field)
             let _allocated =
-                TezlinkImplicitAccount::allocate(host, context, dest_contract)
+                TezlinkImplicitAccount::allocate(host, context, receiver_contract)
                     .map_err(|_| TransferError::FailedToAllocateDestination)?;
-            let mut dest_account =
+            let mut receiver_account =
                 TezlinkImplicitAccount::from_public_key_hash(context, pkh)
                     .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             transfer_tez(
                 host,
-                sender_contract,
-                sender_account,
+                giver_contract,
+                giver_account,
                 amount,
-                dest_contract,
-                &mut dest_account,
+                receiver_contract,
+                &mut receiver_account,
             )
             .map(|success| {
                 TransferSuccess {
@@ -388,49 +388,49 @@ pub fn transfer<'a, Host: Runtime>(
             })
         }
         Contract::Originated(_) => {
-            let mut dest_account =
-                TezlinkOriginatedAccount::from_contract(context, dest_contract)
+            let mut receiver_account =
+                TezlinkOriginatedAccount::from_contract(context, receiver_contract)
                     .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             let receipt = transfer_tez(
                 host,
-                sender_contract,
-                sender_account,
+                giver_contract,
+                giver_account,
                 amount,
-                dest_contract,
-                &mut dest_account,
+                receiver_contract,
+                &mut receiver_account,
             )?;
-            ctx.sender = address_from_contract(sender_contract.clone());
+            ctx.sender = address_from_contract(giver_contract.clone());
             ctx.amount = amount.0.clone().try_into().map_err(
                 |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
                     TransferError::MirAmountToNarithError(err.to_string())
                 },
             )?;
-            ctx.self_address = address_from_contract(dest_contract.clone());
-            let balance = dest_account
+            ctx.self_address = address_from_contract(receiver_contract.clone());
+            let receiver_balance = receiver_account
                 .balance(host)
                 .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
-            ctx.balance = balance.0.try_into().map_err(
+            ctx.balance = receiver_balance.0.try_into().map_err(
                 |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
                     TransferError::MirAmountToNarithError(err.to_string())
                 },
             )?;
-            let code = dest_account
+            let code = receiver_account
                 .code(host)
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
-            let storage = dest_account
+            let storage = receiver_account
                 .storage(host)
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
             let (internal_operations, new_storage) =
                 execute_smart_contract(code, storage, entrypoint, param, parser, ctx)?;
-            dest_account
+            receiver_account
                 .set_storage(host, &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
             execute_internal_operations(
                 host,
                 context,
                 internal_operations,
-                dest_contract,
-                &mut dest_account,
+                receiver_contract,
+                &mut receiver_account,
                 parser,
                 ctx,
                 all_internal_receipts,
