@@ -1140,7 +1140,7 @@ mod tests {
 
         let bootstrap1_contract = Contract::Implicit(src.clone());
 
-        let mut bootstrap1 =
+        let bootstrap1 =
             TezlinkImplicitAccount::from_contract(&context, &bootstrap1_contract)
                 .expect("Account interface should be correct");
 
@@ -1151,9 +1151,6 @@ mod tests {
         bootstrap1
             .set_balance(&mut host, &50_u64.into())
             .expect("Set balance should have succeed");
-
-        // Drop the mutable access to bootstrap1
-        let bootstrap1 = bootstrap1;
 
         let manager = bootstrap1
             .manager(&host)
