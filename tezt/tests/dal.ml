@@ -6003,11 +6003,15 @@ module Amplification = struct
         0
         assigned_shard_indices_non_banned
     in
-
+    (* Minimum number of shards required to reconstruct a slot.
+       This is also the (minimum) count that relevant profiles (non-attester,
+       non-bootstrap) must store on disk. *)
+    let num_minimal_shards_to_reconstruct =
+      number_of_shards / redundancy_factor
+    in
     (* Check that the non-banned attesters have collectively enough
        assigned shards to reconstruct the slot. *)
-    Check.(
-      number_of_shards / redundancy_factor < total_number_of_assigned_shards)
+    Check.(num_minimal_shards_to_reconstruct < total_number_of_assigned_shards)
       ~__LOC__
       Check.int
       ~error_msg:
@@ -6033,8 +6037,7 @@ module Amplification = struct
     List.iter2
       (fun assigned_shard_indices attester ->
         Check.(
-          number_of_shards / redundancy_factor
-          > List.length assigned_shard_indices)
+          num_minimal_shards_to_reconstruct > List.length assigned_shard_indices)
           ~__LOC__
           Check.int
           ~error_msg:
