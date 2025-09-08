@@ -18,9 +18,9 @@ use crate::{
         constants::{
             FA_WITHDRAWAL_SOL_ADDR, TABLE_PRECOMPILE_ADDRESS, TICKET_TABLE_BASE_COST,
         },
-        provider::revert,
+        error::CustomPrecompileError,
+        guard::{guard, revert, OOG},
     },
-    Error,
 };
 
 sol! {
@@ -58,27 +58,21 @@ pub(crate) fn table_precompile<CTX, DB>(
     is_static: bool,
     transfer: &InputsImpl,
     gas_limit: u64,
-) -> Result<InterpreterResult, Error>
+) -> Result<InterpreterResult, CustomPrecompileError>
 where
     DB: DatabasePrecompileStateChanges,
     CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
 {
-    if transfer.target_address != TABLE_PRECOMPILE_ADDRESS {
-        return Ok(revert("invalid transfer target address"));
-    }
-
-    if is_static {
-        return Ok(revert("static calls are not allowed"));
-    }
-
-    if transfer.caller_address != FA_WITHDRAWAL_SOL_ADDR {
-        return Ok(revert("unauthorized caller"));
-    }
+    guard(
+        TABLE_PRECOMPILE_ADDRESS,
+        &[FA_WITHDRAWAL_SOL_ADDR],
+        transfer,
+        is_static,
+    )?;
 
     let mut gas = Gas::new(gas_limit);
-
     if !gas.record_cost(TICKET_TABLE_BASE_COST) {
-        return Ok(revert("OutOfGas"));
+        return Ok(OOG);
     }
 
     let interface = match Table::TableCalls::abi_decode(input) {
@@ -92,13 +86,9 @@ where
             owner,
             amount,
         }) => {
-            if let Err(err) =
-                context
-                    .journal_mut()
-                    .ticket_balance_add(ticket_hash, owner, amount)
-            {
-                return Ok(revert(format!("adding {amount} balance to {owner} failed, ref. ticket hash: {ticket_hash}, err: {err}")));
-            };
+            context
+                .journal_mut()
+                .ticket_balance_add(ticket_hash, owner, amount)?;
             None
         }
         Table::TableCalls::ticket_balance_remove(Table::ticket_balance_removeCall {
@@ -106,23 +96,13 @@ where
             owner,
             amount,
         }) => {
-            if let Err(err) =
-                context
-                    .journal_mut()
-                    .ticket_balance_remove(ticket_hash, owner, amount)
-            {
-                return Ok(revert(format!("removing {amount} balance from {owner} failed, ref. ticket hash: {ticket_hash}, err: {err}")));
-            };
+            context
+                .journal_mut()
+                .ticket_balance_remove(ticket_hash, owner, amount)?;
             None
         }
         Table::TableCalls::find_deposit(Table::find_depositCall { deposit_id }) => {
-            // Only internal error is emitted here
-            let Some(deposit) = context.journal().find_deposit_in_queue(&deposit_id)?
-            else {
-                return Ok(revert(format!(
-                    "fetching deposit with id {deposit_id} failed"
-                )));
-            };
+            let deposit = context.journal().find_deposit_in_queue(&deposit_id)?;
             let sol_deposit = Table::SolFaDepositWithProxy {
                 amount: u256_to_alloy(&deposit.amount).unwrap_or_default(),
                 receiver: h160_to_alloy(&deposit.receiver),
@@ -139,15 +119,9 @@ where
             Some(Bytes::copy_from_slice(&sol_deposit.abi_encode_params()))
         }
         Table::TableCalls::remove_deposit(Table::remove_depositCall { deposit_id }) => {
-            if context
+            context
                 .journal_mut()
-                .remove_deposit_from_queue(deposit_id)
-                .is_err()
-            {
-                return Ok(revert(format!(
-                    "removing deposit with id {deposit_id} failed"
-                )));
-            }
+                .remove_deposit_from_queue(deposit_id)?;
             None
         }
     };

@@ -8,8 +8,10 @@ use std::mem;
 use revm::primitives::{Address, U256};
 
 use crate::{
-    database::DatabasePrecompileStateChanges, journal::PrecompileStateChanges,
-    precompiles::send_outbox_message::Withdrawal, Error,
+    database::DatabasePrecompileStateChanges,
+    journal::PrecompileStateChanges,
+    precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
+    Error,
 };
 
 /// This state is created to manage one object because
@@ -60,7 +62,7 @@ impl LayeredState {
     pub fn get_and_increment_global_counter<DB: DatabasePrecompileStateChanges>(
         &mut self,
         db: &DB,
-    ) -> Result<U256, Error> {
+    ) -> Result<U256, CustomPrecompileError> {
         let returned = self
             .etherlink_data
             .global_counter
@@ -80,15 +82,18 @@ impl LayeredState {
         owner: &Address,
         amount: U256,
         db: &DB,
-    ) -> Result<(), Error> {
+    ) -> Result<(), CustomPrecompileError> {
         let key = (*owner, *ticket_hash);
         let ticket_balance = match self.etherlink_data.ticket_balances.get(&key) {
             Some(balance) => *balance,
             None => db.ticket_balance(ticket_hash, owner)?,
         };
-        let new_balance = ticket_balance.checked_add(amount).ok_or(Error::Custom(
-            "Overflow in ticket balance addition".to_string(),
-        ))?;
+        let new_balance =
+            ticket_balance
+                .checked_add(amount)
+                .ok_or(CustomPrecompileError::Revert(format!(
+                "Adding {amount} to {owner} balance failed, ticket hash is {ticket_hash}"
+            )))?;
         self.etherlink_data.ticket_balances.insert(key, new_balance);
         self.entries.push(EtherlinkEntry::TicketBalanceAdd {
             ticket_hash: *ticket_hash,
@@ -104,15 +109,18 @@ impl LayeredState {
         owner: &Address,
         amount: U256,
         db: &DB,
-    ) -> Result<(), Error> {
+    ) -> Result<(), CustomPrecompileError> {
         let key = (*owner, *ticket_hash);
         let ticket_balance = match self.etherlink_data.ticket_balances.get(&key) {
             Some(balance) => *balance,
             None => db.ticket_balance(ticket_hash, owner)?,
         };
-        let new_balance = ticket_balance.checked_sub(amount).ok_or(Error::Custom(
-            "Underflow in ticket balance removal".to_string(),
-        ))?;
+        let new_balance =
+            ticket_balance
+                .checked_sub(amount)
+                .ok_or(CustomPrecompileError::Revert(format!(
+            "Removing {amount} from {owner} balance failed, ticket hash is {ticket_hash}"
+        )))?;
         self.etherlink_data.ticket_balances.insert(key, new_balance);
         self.entries.push(EtherlinkEntry::TicketBalanceRemove {
             ticket_hash: *ticket_hash,
@@ -126,13 +134,13 @@ impl LayeredState {
         &mut self,
         deposit_id: &U256,
         db: &impl DatabasePrecompileStateChanges,
-    ) -> Result<(), Error> {
+    ) -> Result<(), CustomPrecompileError> {
         if self.etherlink_data.removed_deposits.contains(deposit_id) {
-            return Err(Error::Custom("Deposit already removed".to_string()));
+            return Err(CustomPrecompileError::Revert(
+                "Deposit already removed".to_string(),
+            ));
         }
-        if db.deposit_in_queue(deposit_id)?.is_none() {
-            return Err(Error::Custom("Deposit not found in queue".to_string()));
-        }
+        db.deposit_in_queue(deposit_id)?;
         self.etherlink_data.removed_deposits.insert(*deposit_id);
         self.entries.push(EtherlinkEntry::RemoveDeposit {
             deposit_id: *deposit_id,
@@ -226,14 +234,15 @@ mod tests {
     use tezos_crypto_rs::hash::ContractKt1Hash;
 
     use crate::{
-        database::DatabasePrecompileStateChanges, helpers::legacy::FaDepositWithProxy,
-        layered_state::LayeredState, Error,
+        custom, database::DatabasePrecompileStateChanges,
+        helpers::legacy::FaDepositWithProxy, layered_state::LayeredState,
+        precompiles::error::CustomPrecompileError,
     };
 
     struct DummyDB;
 
     impl DatabasePrecompileStateChanges for DummyDB {
-        fn global_counter(&self) -> Result<U256, Error> {
+        fn global_counter(&self) -> Result<U256, CustomPrecompileError> {
             Ok(U256::ZERO)
         }
 
@@ -241,20 +250,24 @@ mod tests {
             &self,
             _ticket_hash: &U256,
             _owner: &Address,
-        ) -> Result<U256, Error> {
+        ) -> Result<U256, CustomPrecompileError> {
             Ok(U256::ZERO)
         }
 
         fn deposit_in_queue(
             &self,
             _deposit_id: &U256,
-        ) -> Result<Option<FaDepositWithProxy>, Error> {
-            Ok(Some(FaDepositWithProxy::default()))
+        ) -> Result<FaDepositWithProxy, CustomPrecompileError> {
+            Ok(FaDepositWithProxy::default())
         }
 
-        fn ticketer(&self) -> Result<ContractKt1Hash, Error> {
-            ContractKt1Hash::from_base58_check("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")
-                .map_err(|e| Error::Custom(format!("Invalid ticketer address: {e}")))
+        fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError> {
+            Ok(
+                ContractKt1Hash::from_base58_check(
+                    "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX",
+                )
+                .map_err(custom)?,
+            )
         }
     }
 

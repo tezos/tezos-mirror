@@ -3,8 +3,11 @@
 // SPDX-License-Identifier: MIT
 
 pub mod constants;
-pub mod global_counter;
+pub mod error;
 pub mod initializer;
 pub mod provider;
 pub mod send_outbox_message;
-pub mod table;
+
+mod global_counter;
+mod guard;
+mod table;
