@@ -110,7 +110,7 @@ defprim! {
     OPEN_CHEST, VIEW, view, constant, SUB_MUTEZ,
     tx_rollup_l2_address, MIN_BLOCK_TIME, sapling_transaction,
     EMIT, Lambda_rec, LAMBDA_REC, TICKET, BYTES,
-    NAT,
+    NAT, Ticket, IS_IMPLICIT_ACCOUNT,
     // Unstable primitives (they are not part of a released protocol)
     Transfer_tokens, Set_delegate, Create_contract, Emit,
     // BLS primitivies

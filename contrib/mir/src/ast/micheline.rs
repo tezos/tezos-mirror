@@ -285,6 +285,7 @@ macro_rules! micheline_unsupported_instructions_common {
             | Prim::TICKET_DEPRECATED
             | Prim::CAST
             | Prim::RENAME
+            | Prim::IS_IMPLICIT_ACCOUNT
     };
 }
 
@@ -415,7 +416,8 @@ macro_rules! micheline_instructions {
                 | Prim::AND
                 | Prim::XOR
                 | Prim::OR
-                | Prim::PAIRING_CHECK,
+                | Prim::PAIRING_CHECK
+                | Prim::IS_IMPLICIT_ACCOUNT,
             ..,
         )
     };
@@ -436,6 +438,7 @@ macro_rules! micheline_values {
                 | Prim::Left
                 | Prim::Right
                 | Prim::Lambda_rec
+                | Prim::Ticket
                 | Prim::Transfer_tokens
                 | Prim::Emit
                 | Prim::Create_contract
