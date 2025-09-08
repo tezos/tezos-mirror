@@ -133,6 +133,7 @@ If you are using Docker instead, use the ``octez-v23.2`` Docker images of Octez.
 Changelog
 ---------
 
+- `Version 23.2 <../CHANGES.html#version-23-2>`_
 - `Version 23.1 <../CHANGES.html#version-23-1>`_
 - `Version 23.0 <../CHANGES.html#version-23-0>`_
 - `Version 23.0~rc2 <../CHANGES.html#version-23-0-rc2>`_
