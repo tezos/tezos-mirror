@@ -48,7 +48,7 @@ let agent_name_stresstest : rex = rex "stresstest-(\\d+)"
 
 let agent_name_baker : rex = rex "baker-(\\d+)"
 
-let agent_name_dal_producer : rex = rex "dal-node-producer-(\\d+)"
+let agent_name_dal_producer : rex = rex "dal-producer-(\\d+)"
 
 let extract_agent_index (r : rex) agent =
   match Agent.name agent =~* r with
@@ -180,9 +180,13 @@ module Node = struct
        your bakers start to bake. *)
     synchronisation_waiter
 
-  let client ~node agent =
+  let client ~local ~node agent =
     let name = Tezt_cloud.Agent.name agent ^ "-client" in
-    Client.Agent.create ~name ~endpoint:(Client.Node node) agent
+    let endpoint =
+      if local then Client.Foreign_endpoint (Node.as_rpc_endpoint ~local node)
+      else Client.Node node
+    in
+    Client.Agent.create ~name ~endpoint agent
 
   (** Initialize the node,
       create the associated client,
@@ -202,7 +206,7 @@ module Node = struct
         network
         migration_offset
     in
-    let* client = client ~node agent in
+    let* client = client ~local:true ~node agent in
     let* yes_wallet = Node_helpers.yes_wallet agent in
     let* _filename =
       Yes_wallet.create_from_context
@@ -264,9 +268,9 @@ module Node = struct
       create the associated client,
       create the yes-wallet.
     *)
-  let init_baker_node ?(delay = 0) ~accounts ~peers ~ppx_profiling_verbosity
-      ~ppx_profiling_backends ~snapshot ~network ~migration_offset
-      (agent, node, name) =
+  let init_node_with_wallet ?(delay = 0) ~accounts ~peers
+      ~ppx_profiling_verbosity ~ppx_profiling_backends ~snapshot ~network
+      ~migration_offset (agent, node, name) =
     toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
       init_node_from_snapshot
@@ -279,7 +283,10 @@ module Node = struct
         ~migration_offset
         (agent, node, name)
     in
-    let* client = client ~node agent in
+    let* client =
+      (* [~local] is set to false since the client might be called from the localhost/orchestrator *)
+      client ~local:false ~node agent
+    in
     let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () =
       Lwt_list.iter_s
@@ -308,7 +315,7 @@ module Node = struct
         ~migration_offset
         (agent, node, name)
     in
-    let* client = client ~node agent in
+    let* client = client ~local:true ~node agent in
     let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () = Client.forget_all_keys client in
     let* () = Client.import_public_key ~alias:pkh ~public_key:pk client in
@@ -362,7 +369,7 @@ let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
   let* client =
     toplog "init_baker: Initialize node" ;
     let name = name ^ "-node" in
-    Node.init_baker_node
+    Node.init_node_with_wallet
       ~accounts
       ~delay
       ~peers
@@ -450,7 +457,7 @@ let init_producer_i i (configuration : Scenarios_configuration.LAYER1.t)
   let () = toplog "Initializing the DAL producer %s" name in
   let* client =
     let name = name ^ "-node" in
-    Node.init_baker_node
+    Node.init_node_with_wallet
       ~accounts:[]
       ~delay
       ~peers
@@ -880,39 +887,6 @@ let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
   in
   Lwt.return {cloud; configuration; bootstrap; bakers; producers; stresstesters}
 
-let on_new_level =
-  let push_level t level =
-    Cloud.push_metric
-      t.cloud
-      ~help:"Level of (HEAD - 1)"
-      ~typ:`Counter
-      ~name:"level"
-      (float_of_int level)
-  in
-  let push_nb_ops t nb =
-    Cloud.push_metric
-      t.cloud
-      ~help:"Level of (HEAD - 1)"
-      ~typ:`Counter
-      ~name:"nb_ops"
-      (float_of_int nb)
-  in
-  fun t level ->
-    let* _ = Node.wait_for_level t.bootstrap.node level in
-    let level = level - 2 in
-    toplog "Processing metrics for level %d" level ;
-    let* json =
-      Client.(rpc GET)
-        ["chains"; "main"; "blocks"; string_of_int level]
-        t.bootstrap.client
-    in
-    let level = JSON.(json |-> "header" |-> "level" |> as_int) in
-    let nops = JSON.(json |-> "operations" |> as_list |> List.length) in
-    push_level t level ;
-    push_nb_ops t nops ;
-    toplog "Done processing metrics for level %d" level ;
-    Lwt.return_unit
-
 type docker_image = Agent.Configuration.docker_image =
   | Gcp of {alias : string}
   | Octez_release of {tag : string}
@@ -1177,7 +1151,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
                     | {bakers = Some bakers; _} -> List.nth_opt bakers i
                     | {bakers = None; _} -> None)
            | Producer i ->
-               make_vm_conf ~name:(name_of_daemon (Producer_dal_node i))
+               make_vm_conf ~name:(name_of (Producer i))
                @@ Option.bind vms_conf (function
                     | {producers = Some producers; _} ->
                         List.nth_opt producers i
@@ -1268,7 +1242,6 @@ let register (module Cli : Scenarios_cli.Layer1) =
     (let rec loop level =
        let level = succ level in
        let* () = produce_slot t level in
-       let* () = on_new_level t level in
        loop level
      in
      loop)
