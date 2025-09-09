@@ -41,7 +41,7 @@ class TestForging: XCTestCase {
     func revealForging() {
         let publicKey = try! PublicKey.fromB58check(data: "sppk7aDfaJGufpeUHY36yeuRu3YLrZqeroqF755SV33mxsZ14psWg9D")
         let source = try! PublicKeyHash.fromB58check(data: "tz28peirZbqKQR1udNdaL4fWtRGggHygyF9D")
-        let reveal = Reveal(
+        let reveal = Operation.reveal(
           source: source,
           fee: 47,
           counter: 5,
@@ -82,7 +82,7 @@ class TestForging: XCTestCase {
         let source = try! PublicKeyHash.fromB58check(data: "tz2GNQB7rXjNXBX6msePzQ2nBWYUUGutYy5p")
         let destination = try! Contract.fromB58check(data: "tz2GNQB7rXjNXBX6msePzQ2nBWYUUGutYy5p")
         let entrypoint = try! Entrypoint(name: "finalize_unstake")
-        let transaction = Transaction(
+        let transaction = Operation.transaction(
           source: source,
           fee: 0,
           counter: 14,
@@ -125,7 +125,7 @@ class TestForging: XCTestCase {
     func originationForging() {
         let delegate = try! PublicKeyHash.fromB58check(data: "tz1XFq85mnnXhyhzpNEpxFvrkcuNtFBsSsVu")
         let source = try! PublicKeyHash.fromB58check(data: "tz2RcdU4n2PvJHUNYkS8FPuvcnFmBqEccxb4")
-        let origination = Origination(
+        let origination = Operation.origination(
           source: source,
           fee: 1,
           counter: 30,
@@ -161,7 +161,7 @@ class TestForging: XCTestCase {
     func delegationForging() {
         let delegate = try! PublicKeyHash.fromB58check(data: "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
         let source = try! PublicKeyHash.fromB58check(data: "tz1QFD9WqLWZmmAuqnnTPPUjfauitYEWdshv")
-        let delegation = Delegation(
+        let delegation = Operation.delegation(
           source: source,
           fee: 1,
           counter: 2,
