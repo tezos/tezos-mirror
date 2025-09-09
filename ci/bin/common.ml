@@ -623,7 +623,11 @@ let job_build_static_binaries ~__POS__ ~arch ?(cpu = Runner.CPU.Normal) ?storage
     ~image:Images.CI.build
     ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
     ~variables:
-      ([("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
+      ([
+         ("ARCH", arch_string);
+         ("EXECUTABLE_FILES", executable_files);
+         ("DUNE_BUILD_JOBS", "-j 12");
+       ]
       @ version_executable)
     ~artifacts
     ["./scripts/ci/build_static_binaries.sh"]

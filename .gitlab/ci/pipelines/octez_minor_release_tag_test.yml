@@ -122,6 +122,7 @@ oc.build:static-x86_64-linux-binaries:
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/octez-released-executables
+    DUNE_BUILD_JOBS: -j 12
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
@@ -172,6 +173,7 @@ oc.build:static-arm64-linux-binaries:
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/octez-released-executables
+    DUNE_BUILD_JOBS: -j 12
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
