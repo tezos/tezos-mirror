@@ -37,6 +37,13 @@ Signer
 Baker
 -----
 
+- **Deprecation** The ``adaptive-issuance-vote`` argument (placeholder
+  ``vote``) is now deprecated, and will be removed in the next major
+  version of Octez. It was meant to decide the activation of the
+  Adaptive Issuance feature, and has had no effects since the Paris
+  protocol has been voted in. (MR :gl:`!19215`)
+
+
 Accuser
 -------
 
