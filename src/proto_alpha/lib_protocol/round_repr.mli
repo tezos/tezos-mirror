@@ -72,6 +72,9 @@ val to_int : t -> int tzresult
    mod committee_size]. *)
 val to_slot : t -> committee_size:int -> Slot_repr.t tzresult
 
+(** Returns the round corresponding to the given slot *)
+val of_slot : Slot_repr.t -> t tzresult
+
 (** Round encoding.
     Be aware that decoding a negative 32 bit integer would lead to an
     exception. *)

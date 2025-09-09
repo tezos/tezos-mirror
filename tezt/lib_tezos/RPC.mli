@@ -799,6 +799,7 @@ val get_chain_block_helper_validators :
   ?chain:string ->
   ?block:string ->
   ?delegate:string ->
+  ?consensus_key:string ->
   ?level:int ->
   unit ->
   JSON.t t

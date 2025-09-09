@@ -29,44 +29,40 @@ open Baking_state_types
 
 (** A delegate slot consists of the delegate's consensus key, its public key
     hash, its first slot, and its attesting power at some level. *)
-type delegate_slot = {
+type delegate_info = {
   delegate : Delegate.t;
-  first_slot : Slot.t;
+  attestation_slot : Slot.t;
   attesting_power : int64;
 }
 
-val pp_delegate_slot : Format.formatter -> delegate_slot -> unit
+val pp_delegate_info : Format.formatter -> delegate_info -> unit
 
-module Delegate_slots : sig
+module Delegate_infos : sig
   (** Information regarding the slot distribution at some level. *)
   type t
 
   (** Returns the list of our own delegates that have at least a slot. There are
       no duplicates, the associated slot is the first one. *)
-  val own_delegates : t -> delegate_slot list
-
-  (** Returns, among our *own* delegates, the delegate (together with its
-      first attesting slot) that owns the given slot, if any (even if the
-      given slot is not the delegate's first slot). *)
-  val own_slot_owner : t -> slot:Slot.t -> delegate_slot option
+  val own_delegates : t -> delegate_info list
 
   (** Returns, among our *own* delegates, the delegate (together with its
       first attesting slot) that owns the given round, if any. *)
   val own_round_owner :
-    t -> committee_size:int -> round:Round.t -> delegate_slot option tzresult
+    t -> committee_size:int -> round:Round.t -> delegate_info option tzresult
 
   (** Returns the voting power of the delegate whose first slot is the given
       slot. Returns [None] if the slot is not the first slot of any delegate. *)
   val voting_power : t -> slot:Slot.t -> int64 option
 
-  (** Finds the first slot greater than or equal to [slot]. Returns the
-     corresponding (slot, delegate) pair if found, or [None] if no such slot
+  (** Finds the first round greater than or equal to [round]. Returns the
+     corresponding (round, delegate) pair if found, or [None] if no such round
      exist. *)
-  val find_first_slot_from : t -> slot:Slot.t -> (Slot.t * delegate_slot) option
+  val find_first_round_from :
+    t -> round:Round.t -> (Round.t * delegate_info) option
 
-  (** Returns the slot with the smallest index, along with its associated
+  (** Returns the round with the smallest index, along with its associated
       delegate. Returns [None] if the map is empty. *)
-  val min_slot : t -> (Slot.t * delegate_slot) option
+  val min_round : t -> (Round.t * delegate_info) option
 
   (** Returns the consensus threshold at the level the slots were computed *)
   val consensus_threshold : t -> int64
@@ -75,20 +71,20 @@ module Delegate_slots : sig
   val consensus_committee : t -> int64
 end
 
-type delegate_slots = Delegate_slots.t
+type delegate_infos = Delegate_infos.t
 
-val pp_delegate_slots : Format.formatter -> delegate_slots -> unit
+val pp_delegate_infos : Format.formatter -> delegate_infos -> unit
 
-(** [compute_delegate_slots cctxt ?block ~level ~chain delegates] computes the
+(** [compute_delegate_infos cctxt ?block ~level ~chain delegates] computes the
     delegate slots of the given [delegates] for the [level]
     @param block default to [`Head 0]*)
-val compute_delegate_slots :
+val compute_delegate_infos :
   Protocol_client_context.full ->
   ?block:Block_services.block ->
   level:int32 ->
   chain:Shell_services.chain ->
   Key.t list ->
-  delegate_slots tzresult Lwt.t
+  delegate_infos tzresult Lwt.t
 
 (** {2 Consensus operations types functions} *)
 
@@ -319,10 +315,10 @@ type level_state = {
           round. *)
   elected_block : elected_block option;
       (** A quorum has been reached on an applied proposal. *)
-  delegate_slots : delegate_slots;
-      (** Delegate slots for the baker delegates at the current level *)
-  next_level_delegate_slots : delegate_slots;
-      (** Delegate slots for the baker delegates at the next level *)
+  delegate_infos : delegate_infos;
+      (** Delegate infos for the baker delegates at the current level *)
+  next_level_delegate_infos : delegate_infos;
+      (** Delegate infos for the baker delegates at the next level *)
   next_level_latest_forge_request : Round.t option;
       (** Some if a forge request has been sent for the next level on the given
           round *)
@@ -504,7 +500,7 @@ val update_current_phase : t -> phase -> t
     that has a proposer slot at the given round and the current or next level,
     if any. *)
 val round_proposer :
-  state -> level:[`Current | `Next] -> Round.t -> delegate_slot option
+  state -> level:[`Current | `Next] -> Round.t -> delegate_info option
 
 (** Memoization wrapper for {!Round.timestamp_of_round}. *)
 val timestamp_of_round :

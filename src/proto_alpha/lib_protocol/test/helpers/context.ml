@@ -139,8 +139,9 @@ type attester = Plugin.RPC.Validators.delegate = {
   delegate : Signature.public_key_hash;
   consensus_key : Signature.public_key_hash;
   companion_key : Signature.Bls.Public_key_hash.t option;
-  slots : Slot.t list;
+  rounds : Round.t list;
   attesting_power : int64;
+  attestation_slot : Slot.t;
 }
 
 let get_attesters ctxt =
@@ -174,7 +175,8 @@ let get_attester_n ctxt n =
   let attester =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth attesters n
   in
-  (attester.consensus_key, attester.slots)
+  (* TODO ABAAB: check the rounds are used as rounds, not as attestation slots *)
+  (attester.consensus_key, attester.rounds)
 
 let attester_has_bls_key {consensus_key; _} =
   Signature.Public_key_hash.is_bls consensus_key
@@ -198,10 +200,10 @@ let get_attesting_power_for_delegate ctxt ?level pkh =
   match attesters with
   | [{delegates = attesters; _}] ->
       let rec find_slots_for_delegate = function
-        | [] -> return 0
-        | {Plugin.RPC.Validators.delegate; slots; _} :: t ->
+        | [] -> return 0L
+        | {Plugin.RPC.Validators.delegate; attesting_power; _} :: t ->
             if Signature.Public_key_hash.equal delegate pkh then
-              return (List.length slots)
+              return attesting_power
             else find_slots_for_delegate t
       in
       find_slots_for_delegate attesters
@@ -212,8 +214,8 @@ let get_cumulated_attesting_power_for_delegate ctxt ~levels pkh =
   List.fold_left_es
     (fun accu level ->
       let+ power = get_attesting_power_for_delegate ctxt ~level pkh in
-      accu + power)
-    0
+      Int64.add accu power)
+    0L
     levels
 
 let get_current_voting_power = Delegate_services.current_voting_power rpc_ctxt

@@ -50,11 +50,11 @@ Breaking Changes
   and contains four fields: the ``level`` itself, the ``consensus_threshold`` required for the current
   level, the ``consensus_committee`` of the current level, and ``delegates`` which is the list
   of validators for that level. Each element of this last
-  list contains the fields present in the previous version of this RPC: ``delegate``, ``slots``,
-  ``consensus_key``, and ``companion_key`` (optional).
-  Also include a new field for delegates, ``attesting_power``, with their attesting power
-  for the level.
-  (MR :gl:`!18931`, :gl:`!18959`)
+  list contains the fields present in the previous version of this RPC: ``delegate``, "slots"
+  which have been renamed to ``rounds``, ``consensus_key``, and ``companion_key`` (optional).
+  Also include new fields for delegates, ``attesting_power``, with their attesting power
+  for the level, and ``attestation_slot``, their slot for the given level.
+  (MR :gl:`!18931`, :gl:`!18959`, :gl:`!18984`)
 
 - Updated ``GET /chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance``,
   changing ``baking_reward_bonus_per_slot`` with ``baking_reward_bonus_per_block``, and

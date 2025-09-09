@@ -876,10 +876,11 @@ let get_chain_block_helper_attestation_rights ?(chain = "main")
     Fun.id
 
 let get_chain_block_helper_validators ?(chain = "main") ?(block = "head")
-    ?delegate ?level () =
+    ?delegate ?consensus_key ?level () =
   let query_string =
     Query_arg.opt "delegate" Fun.id delegate
     @ Query_arg.opt "level" Int.to_string level
+    @ Query_arg.opt "consensus_key" Fun.id consensus_key
   in
   make
     ~query_string

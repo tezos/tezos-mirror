@@ -373,8 +373,8 @@ let delegates_of_block block =
   let open Lwt_result_syntax in
   let+ validators = Context.get_attesters (B block) in
   List.map
-    (fun Plugin.RPC.Validators.{consensus_key; slots; _} ->
-      (consensus_key, slots))
+    (fun Plugin.RPC.Validators.{consensus_key; attestation_slot; _} ->
+      (consensus_key, attestation_slot))
     validators
 
 (** Sequential validation of an operation list. *)

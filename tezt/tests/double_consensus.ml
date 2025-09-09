@@ -107,7 +107,7 @@ let double_consensus_init
       (if Protocol.number protocol >= 024 then
          JSON.(
            slots |> as_list |> List.hd |-> "delegates" |> as_list |> List.hd
-           |-> "slots" |> as_list)
+           |-> "rounds" |> as_list)
        else JSON.(slots |> as_list |> List.hd |-> "slots" |> as_list))
   in
   Log.info "Inject valid %s." consensus_name ;
@@ -395,7 +395,7 @@ let operation_too_far_in_future =
       (if Protocol.number protocol >= 024 then
          JSON.(
            slots |> as_list |> List.hd |-> "delegates" |> as_list |> List.hd
-           |-> "slots" |> as_list)
+           |-> "rounds" |> as_list)
        else JSON.(slots |> as_list |> List.hd |-> "slots" |> as_list))
   in
   Log.info
@@ -571,8 +571,9 @@ let attestation_and_aggregation_wrong_payload_hash =
   (* Attest for bootstrap1 with a dummy block_payload_hash *)
   let* _ =
     let open Operation.Consensus in
-    let* slots = get_slots_by_consensus_key ~level ~protocol client in
-    let slot = first_slot ~slots ck1 in
+    let* slot =
+      get_attestation_slot ~level ~protocol ~consensus_key:ck1 client
+    in
     let* branch = get_branch ~attested_level:level client in
     let* bph_level_4 = get_block_payload_hash ~block:"4" client in
     attest_for
@@ -599,12 +600,13 @@ let attestation_and_aggregation_wrong_payload_hash =
       [(bootstrap1, (Attestation, Attestations_aggregate))]
   in
   let open Operation.Consensus in
-  let* slots = get_slots_by_consensus_key ~level ~protocol client in
   let* branch = get_branch ~attested_level:level client in
   let* block_payload_hash = get_block_payload_hash client in
   (* Attest for bootstrap1 and check that he is forbidden *)
   let* (`OpHash _) =
-    let slot = first_slot ~slots ck1 in
+    let* slot =
+      get_attestation_slot ~level ~protocol ~consensus_key:ck1 client
+    in
     attest_for
       ~error:delegate_forbidden_error
       ~protocol
@@ -618,7 +620,9 @@ let attestation_and_aggregation_wrong_payload_hash =
   in
   (* Attest for bootstrap2 and expect a success *)
   let* (`OpHash _) =
-    let slot = first_slot ~slots ck2 in
+    let* slot =
+      get_attestation_slot ~level ~protocol ~consensus_key:ck2 client
+    in
     attest_for
       ~protocol
       ~branch
@@ -737,12 +741,13 @@ let double_aggregation_wrong_payload_hash =
   let open Operation.Consensus in
   let* branch = get_branch ~attested_level:level client1 in
   let* block_payload_hash = get_block_payload_hash client1 in
-  let* slots = get_slots_by_consensus_key ~level ~protocol client1 in
   (* Attest with the double attesting keys and check that they are forbidden *)
   let* () =
     Lwt_list.iter_s
       (fun ck ->
-        let slot = first_slot ~slots ck in
+        let* slot =
+          get_attestation_slot ~level ~protocol ~consensus_key:ck client1
+        in
         let* (`OpHash _) =
           attest_for
             ~error:delegate_forbidden_error
@@ -762,7 +767,9 @@ let double_aggregation_wrong_payload_hash =
   let* () =
     Lwt_list.iter_s
       (fun ck ->
-        let slot = first_slot ~slots ck in
+        let* slot =
+          get_attestation_slot ~level ~protocol ~consensus_key:ck client1
+        in
         let* (`OpHash _) =
           attest_for
             ~protocol
@@ -912,14 +919,15 @@ let preattestation_and_aggregation_wrong_payload_hash =
   let open Operation.Consensus in
   let* branch = get_branch ~attested_level:level client in
   let* block_payload_hash = get_block_payload_hash ~block:"2" client in
-  let* slots = get_slots_by_consensus_key ~level ~protocol client in
   Log.info
     "preattesting level %d round 1 for bootstrap1, bootstrap2 and bootstrap4"
     level ;
   let* () =
     Lwt_list.iter_s
       (fun ck ->
-        let slot = first_slot ~slots ck in
+        let* slot =
+          get_attestation_slot ~level ~protocol ~consensus_key:ck client
+        in
         let* (`OpHash _) =
           preattest_for
             ~protocol
@@ -965,11 +973,12 @@ let preattestation_and_aggregation_wrong_payload_hash =
   (* Attest with the misbehaving keys and check that they are forbidden *)
   let* branch = get_branch ~attested_level:level client in
   let* block_payload_hash = get_block_payload_hash client in
-  let* slots = get_slots_by_consensus_key ~level ~protocol client in
   let* () =
     Lwt_list.iter_s
       (fun ck ->
-        let slot = first_slot ~slots ck in
+        let* slot =
+          get_attestation_slot ~level ~protocol ~consensus_key:ck client
+        in
         let* (`OpHash _) =
           attest_for
             ~error:delegate_forbidden_error
@@ -987,7 +996,9 @@ let preattestation_and_aggregation_wrong_payload_hash =
   in
   (* Attest with a non-misbehaving key and expect a success *)
   let* (`OpHash _) =
-    let slot = first_slot ~slots ck3 in
+    let* slot =
+      get_attestation_slot ~level ~protocol ~consensus_key:ck3 client
+    in
     attest_for
       ~protocol
       ~branch
@@ -1128,12 +1139,13 @@ let double_preattestation_aggregation_wrong_payload_hash =
   let open Operation.Consensus in
   let* branch = get_branch ~attested_level:level client1 in
   let* block_payload_hash = get_block_payload_hash client1 in
-  let* slots = get_slots_by_consensus_key ~level ~protocol client1 in
   (* Attest with the double preattesting keys and check that they are forbidden *)
   let* () =
     Lwt_list.iter_s
       (fun ck ->
-        let slot = first_slot ~slots ck in
+        let* slot =
+          get_attestation_slot ~level ~protocol ~consensus_key:ck client1
+        in
         let* (`OpHash _) =
           attest_for
             ~error:delegate_forbidden_error
@@ -1151,7 +1163,9 @@ let double_preattestation_aggregation_wrong_payload_hash =
   in
   (* Attest with a non-misbehaving key and expect a success *)
   let* (`OpHash _) =
-    let slot = first_slot ~slots ck3 in
+    let* slot =
+      get_attestation_slot ~level ~protocol ~consensus_key:ck3 client1
+    in
     attest_for
       ~protocol
       ~branch

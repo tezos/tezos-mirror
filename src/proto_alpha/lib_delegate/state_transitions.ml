@@ -93,9 +93,9 @@ let make_consensus_vote_batch state proposal kind =
   let batch_content = {level; round; block_payload_hash} in
   let delegates_and_slots =
     List.map
-      (fun (delegate_slot : delegate_slot) ->
-        (delegate_slot.delegate, delegate_slot.first_slot))
-      (Delegate_slots.own_delegates state.level_state.delegate_slots)
+      (fun (delegate_info : delegate_info) ->
+        (delegate_info.delegate, delegate_info.attestation_slot))
+      (Delegate_infos.own_delegates state.level_state.delegate_infos)
   in
   (* The branch is the latest finalized block. *)
   let batch_branch =
@@ -201,7 +201,7 @@ let extract_pqc state (new_proposal : proposal) =
       let voting_power =
         let voting_power_of_slot slot =
           match
-            Delegate_slots.voting_power state.level_state.delegate_slots ~slot
+            Delegate_infos.voting_power state.level_state.delegate_infos ~slot
           with
           | Some attesting_power -> attesting_power
           | None -> 0L
@@ -225,7 +225,7 @@ let extract_pqc state (new_proposal : proposal) =
           prequorum.preattestations
       in
       let consensus_threshold =
-        Delegate_slots.consensus_threshold state.level_state.delegate_slots
+        Delegate_infos.consensus_threshold state.level_state.delegate_infos
       in
       if Compare.Int64.(voting_power >= consensus_threshold) then
         Some (prequorum.preattestations, prequorum.round)
@@ -425,8 +425,8 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
          This is where we update our [level_state] (and our [round_state]) *)
     let* () = Events.(emit new_head_with_increasing_level ()) in
     let new_level = new_proposal.block.shell.level in
-    let compute_new_state ~current_round ~delegate_slots
-        ~next_level_delegate_slots ~dal_attestable_slots
+    let compute_new_state ~current_round ~delegate_infos
+        ~next_level_delegate_infos ~dal_attestable_slots
         ~next_level_dal_attestable_slots =
       let round_state =
         {
@@ -446,8 +446,8 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           locked_round = None;
           attestable_payload = None;
           elected_block = None;
-          delegate_slots;
-          next_level_delegate_slots;
+          delegate_infos;
+          next_level_delegate_infos;
           next_level_latest_forge_request = None;
           dal_attestable_slots;
           next_level_dal_attestable_slots;

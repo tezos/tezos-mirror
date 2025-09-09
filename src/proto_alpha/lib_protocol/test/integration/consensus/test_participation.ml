@@ -98,8 +98,9 @@ let test_participation ~sufficient_participation () =
         let attester, new_attesting_power =
           if
             sufficient_participation
-            && attesting_power < minimal_nb_active_slots
-          then (del2, attesting_power + attesting_power_for_level)
+            && Compare.Int64.(
+                 attesting_power < Int64.of_int minimal_nb_active_slots)
+          then (del2, Int64.add attesting_power attesting_power_for_level)
           else (del1, attesting_power)
         in
         let* b, (metadata, _) =
@@ -107,7 +108,7 @@ let test_participation ~sufficient_participation () =
         in
         let autostaked = Block.autostaked_opt del2 metadata in
         return (b_crt, b, new_attesting_power, autostaked))
-      (b0, b1, 0, None)
+      (b0, b1, 0L, None)
       (2 -- (blocks_per_cycle - 1))
   in
   let* bal2_at_pred_b =
@@ -243,7 +244,8 @@ let test_participation_rpc () =
         let* () =
           Assert.equal_int ~loc:__LOC__ info.missed_levels (level_int - 1)
         in
-        let missed_slots = total_attesting_power in
+        (* TODO ABAAB: cannot be cast to an int *)
+        let missed_slots = Int64.to_int total_attesting_power in
         let* () =
           Assert.equal_int ~loc:__LOC__ info.missed_slots missed_slots
         in
@@ -272,8 +274,8 @@ let test_participation_rpc () =
         let* attesting_power =
           Context.get_attesting_power_for_delegate (B b_crt) ~level del2
         in
-        return (b_crt, b, total_attesting_power + attesting_power))
-      (b0, b1, 0)
+        return (b_crt, b, Int64.add total_attesting_power attesting_power))
+      (b0, b1, 0L)
       (1 -- (blocks_per_cycle - 2))
   in
   return_unit

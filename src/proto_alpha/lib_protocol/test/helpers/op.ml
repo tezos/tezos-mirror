@@ -115,9 +115,9 @@ let mk_block_payload_hash (b : Block.t) =
 
 type attesting_slot = {slot : Slot.t; consensus_pkh : public_key_hash}
 
-let attesting_slot_of_attester {Plugin.RPC.Validators.consensus_key; slots; _} =
-  let slot = List.hd slots |> WithExceptions.Option.get ~loc:__LOC__ in
-  {slot; consensus_pkh = consensus_key}
+let attesting_slot_of_attester
+    {Plugin.RPC.Validators.consensus_key; attestation_slot; _} =
+  {slot = attestation_slot; consensus_pkh = consensus_key}
 
 let get_attesting_slot ~attested_block =
   let open Lwt_result_syntax in
@@ -159,18 +159,23 @@ let get_different_attesting_slot ~consensus_pkh_to_avoid ~attested_block =
   in
   return (attesting_slot_of_attester attester)
 
-let non_canonical_attesting_slot_of_attester {Context.consensus_key; slots; _} =
-  let slot =
-    match slots with
-    | _ :: non_canonical_slot :: _ -> non_canonical_slot
+let non_canonical_attesting_slot_of_attester {Context.consensus_key; rounds; _}
+    =
+  let open Lwt_result_wrap_syntax in
+  let* slot =
+    match rounds with
+    | _ :: non_canonical_slot :: _ ->
+        let*?@ round_int = Round.to_int non_canonical_slot in
+        let*?@ slot = Slot.of_int round_int in
+        return slot
     | _ -> Test.fail ~__LOC__ "Expected attester to have at least two slots"
   in
-  {slot; consensus_pkh = consensus_key}
+  return {slot; consensus_pkh = consensus_key}
 
 let get_non_canonical_attesting_slot ~attested_block =
   let open Lwt_result_syntax in
   let* attester = Context.get_attester (B attested_block) in
-  return (non_canonical_attesting_slot_of_attester attester)
+  non_canonical_attesting_slot_of_attester attester
 
 let default_committee ~attested_block =
   let open Lwt_result_syntax in

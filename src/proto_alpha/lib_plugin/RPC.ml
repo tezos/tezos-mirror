@@ -3987,8 +3987,9 @@ module Validators = struct
     delegate : Signature.Public_key_hash.t;
     consensus_key : Signature.public_key_hash;
     companion_key : Bls.Public_key_hash.t option;
-    slots : Slot.t list;
+    rounds : Round.t list;
     attesting_power : int64;
+    attestation_slot : Slot.t;
   }
 
   type t = {
@@ -4001,16 +4002,43 @@ module Validators = struct
   let delegate_encoding =
     let open Data_encoding in
     conv
-      (fun {delegate; consensus_key; companion_key; slots; attesting_power} ->
-        (delegate, slots, consensus_key, companion_key, attesting_power))
-      (fun (delegate, slots, consensus_key, companion_key, attesting_power) ->
-        {delegate; consensus_key; companion_key; slots; attesting_power})
-      (obj5
+      (fun {
+             delegate;
+             consensus_key;
+             companion_key;
+             rounds;
+             attesting_power;
+             attestation_slot;
+           }
+         ->
+        ( delegate,
+          rounds,
+          consensus_key,
+          companion_key,
+          attesting_power,
+          attestation_slot ))
+      (fun ( delegate,
+             rounds,
+             consensus_key,
+             companion_key,
+             attesting_power,
+             attestation_slot )
+         ->
+        {
+          delegate;
+          consensus_key;
+          companion_key;
+          rounds;
+          attesting_power;
+          attestation_slot;
+        })
+      (obj6
          (req "delegate" Signature.Public_key_hash.encoding)
-         (req "slots" (list Slot.encoding))
+         (req "rounds" (list Round.encoding))
          (req "consensus_key" Signature.Public_key_hash.encoding)
          (opt "companion_key" Bls.Public_key_hash.encoding)
-         (req "attesting_power" int64))
+         (req "attesting_power" int64)
+         (req "attestation_slot" Slot.encoding))
 
   let encoding =
     let open Data_encoding in
@@ -4077,8 +4105,9 @@ module Validators = struct
                  Baking.delegate;
                  consensus_key;
                  companion_key;
-                 slots;
+                 rounds;
                  attesting_power;
+                 attestation_slot;
                }
                acc
              ->
@@ -4087,7 +4116,14 @@ module Validators = struct
               | Bls _ when aggregate_attestation -> companion_key
               | _ -> None
             in
-            {delegate; consensus_key; companion_key; slots; attesting_power}
+            {
+              delegate;
+              consensus_key;
+              companion_key;
+              rounds;
+              attesting_power;
+              attestation_slot;
+            }
             :: acc)
           rights
           [] )

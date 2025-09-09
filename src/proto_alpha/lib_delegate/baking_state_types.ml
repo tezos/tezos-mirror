@@ -182,8 +182,9 @@ module Delegate = struct
         Plugin.RPC.Validators.consensus_key = consensus_pkh;
         companion_key = companion_bls_pkh_opt;
         delegate = manager_pkh;
-        slots = _;
+        rounds = _;
         attesting_power = _;
+        attestation_slot = _;
       } =
     let open Lwt_syntax in
     match Key.Set.find_pkh consensus_pkh known_keys with
