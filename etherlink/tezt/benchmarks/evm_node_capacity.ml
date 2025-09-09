@@ -155,6 +155,7 @@ let test_erc20_capacity =
   in
   Lwt.cancel follower ;
   Lwt.cancel tx_queue ;
+  let* () = Tx_queue.shutdown () in
   let* () = Evm_node.terminate sequencer in
   stop_profile ()
 

@@ -279,6 +279,7 @@ let test_snailtracer =
   let* () = Lwt_list.iter_s (step env) (List.init parameters.iterations succ) in
   Lwt.cancel follower ;
   Lwt.cancel tx_queue ;
+  let* () = Tx_queue.shutdown () in
   let* () = Evm_node.terminate sequencer in
   stop_profile ()
 
@@ -342,6 +343,7 @@ let test_full_image_raytracing =
   in
   Lwt.cancel follower ;
   Lwt.cancel tx_queue ;
+  let* () = Tx_queue.shutdown () in
   let env =
     {
       sequencer;

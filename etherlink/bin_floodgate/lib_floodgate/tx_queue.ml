@@ -307,20 +307,26 @@ end
 
 let table = Worker.create_table Queue
 
-let worker_promise, worker_waker = Lwt.task ()
+type worker_promise = {
+  mutable promise : worker Lwt.t;
+  mutable resolver : worker Lwt.u;
+}
+
+let worker_promise =
+  let promise, resolver = Lwt.task () in
+  {promise; resolver}
 
 type error += No_worker
 
-let worker =
-  lazy
-    (match Lwt.state worker_promise with
-    | Lwt.Return worker -> Ok worker
-    | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
-    | Lwt.Sleep -> Result_syntax.tzfail No_worker)
+let worker () =
+  match Lwt.state worker_promise.promise with
+  | Lwt.Return worker -> Ok worker
+  | Lwt.Fail e -> Result_syntax.tzfail (error_of_exn e)
+  | Lwt.Sleep -> Result_syntax.tzfail No_worker
 
 let tick () =
   let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
+  let*? worker = worker () in
   let*! (_was_pushed : bool) = Worker.Queue.push_request worker Tick in
   return_unit
 
@@ -332,7 +338,7 @@ let rec beacon ~tick_interval =
 
 let inject ?(callback = fun _ -> Lwt_syntax.return_unit) txn =
   let open Lwt_syntax in
-  let* worker = worker_promise in
+  let* worker = worker_promise.promise in
   let* (_was_pushed : bool) =
     Worker.Queue.push_request worker (Inject {payload = txn; callback})
   in
@@ -340,7 +346,7 @@ let inject ?(callback = fun _ -> Lwt_syntax.return_unit) txn =
 
 let confirm txn_hash =
   let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
+  let*? worker = worker () in
   let*! (was_pushed : bool) =
     Worker.Queue.push_request worker (Confirm {txn_hash})
   in
@@ -357,7 +363,7 @@ let start ~relay_endpoint ~max_transaction_batch_length
       {relay_endpoint; max_transaction_batch_length; inclusion_timeout}
       (module Handlers)
   in
-  Lwt.wakeup worker_waker worker ;
+  Lwt.wakeup worker_promise.resolver worker ;
   let*! () = Floodgate_events.tx_queue_is_ready () in
   return_unit
 
@@ -377,6 +383,16 @@ let transfer ?(callback = fun _ -> Lwt.return_unit) ?to_ ?(value = Z.zero)
     Craft.transfer_exn ?nonce ~infos ~from ?to_ ~gas_limit ~value ?data ()
   in
   inject ~callback txn
+
+let shutdown () =
+  let open Lwt_syntax in
+  let worker = worker () |> Result.to_option in
+  (* Prepare promise for next restart *)
+  let promise, resolver = Lwt.task () in
+  worker_promise.promise <- promise ;
+  worker_promise.resolver <- resolver ;
+  let* () = Option.iter_s Worker.shutdown worker in
+  return_unit
 
 module Misc = struct
   let send_raw_transaction ~relay_endpoint txn =
