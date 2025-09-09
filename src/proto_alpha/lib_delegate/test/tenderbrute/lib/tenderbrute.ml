@@ -64,7 +64,6 @@ let init_context ?constants_overrides_json ?bootstrap_accounts_json parameters =
       ~level:1l
       ~predecessor_timestamp:timestamp
       ~timestamp
-      ~adaptive_issuance_enable:false
   in
   Lwt.return @@ Environment.wrap_tzresult result
 

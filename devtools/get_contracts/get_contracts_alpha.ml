@@ -38,12 +38,7 @@ module Proto = struct
       let open Lwt_result_syntax in
       let+ ctxt =
         Lwt.map wrap_tzresult
-        @@ Raw_context.prepare
-             ~level
-             ~predecessor_timestamp
-             ~timestamp
-             ~adaptive_issuance_enable:false
-             ctxt
+        @@ Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
       in
       Raw_context.set_gas_limit
         ctxt

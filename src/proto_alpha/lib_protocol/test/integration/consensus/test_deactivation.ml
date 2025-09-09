@@ -54,7 +54,6 @@ let check_stake ~loc (b : Block.t) (account : Account.t) =
       ~level:b.header.shell.level
       ~predecessor_timestamp:b.header.shell.timestamp
       ~timestamp:b.header.shell.timestamp
-      ~adaptive_issuance_enable:false
   in
   let*@ stake = Stake_storage.Internal_for_tests.get ctxt account.pkh in
   Assert.equal_int64
@@ -77,7 +76,6 @@ let check_no_stake ~loc (b : Block.t) (account : Account.t) =
       ~level:b.header.shell.level
       ~predecessor_timestamp:b.header.shell.timestamp
       ~timestamp:b.header.shell.timestamp
-      ~adaptive_issuance_enable:false
   in
   let*@ stake = Stake_storage.Internal_for_tests.get ctxt account.pkh in
   Assert.equal_int64 ~loc (Tez_repr.to_mutez stake) 0L

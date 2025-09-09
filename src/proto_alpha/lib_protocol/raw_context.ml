@@ -307,7 +307,6 @@ type back = {
   reward_coeff_for_current_cycle : Q.t;
   sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
   dal : Raw_dal.t;
-  adaptive_issuance_enable : bool;
   address_registry_diff_rev : Raw_address_registry.diff list;
 }
 
@@ -382,8 +381,6 @@ let[@inline] reward_coeff_for_current_cycle ctxt =
 
 let[@inline] dal ctxt = ctxt.back.dal
 
-let[@inline] adaptive_issuance_enable ctxt = ctxt.back.adaptive_issuance_enable
-
 let[@inline] update_back ctxt back = {ctxt with back}
 
 let[@inline] update_remaining_block_gas ctxt remaining_block_gas =
@@ -433,9 +430,6 @@ let[@inline] update_reward_coeff_for_current_cycle ctxt
   update_back ctxt {ctxt.back with reward_coeff_for_current_cycle}
 
 let[@inline] update_dal ctxt dal = update_back ctxt {ctxt.back with dal}
-
-let[@inline] set_adaptive_issuance_enable ctxt =
-  update_back ctxt {ctxt.back with adaptive_issuance_enable = true}
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -898,8 +892,7 @@ let check_cycle_eras (cycle_eras : Level_repr.cycle_eras)
     Compare.Int32.(
       current_era.blocks_per_commitment = constants.blocks_per_commitment))
 
-let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
-    ctxt =
+let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
   let open Lwt_result_syntax in
   let*? level = Raw_level_repr.of_int32 level in
   let* () = check_inited ctxt in
@@ -947,7 +940,6 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
           Raw_dal.init
             ~number_of_slots:
               constants.Constants_parametric_repr.dal.number_of_slots;
-        adaptive_issuance_enable;
         address_registry_diff_rev = [];
       };
   }
@@ -1771,14 +1763,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         return (ctxt, Some c)
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in
-  let+ ctxt =
-    prepare
-      ctxt
-      ~level
-      ~predecessor_timestamp:timestamp
-      ~timestamp
-      ~adaptive_issuance_enable:false
-  in
+  let+ ctxt = prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp in
   (previous_proto, previous_proto_constants, ctxt)
 
 let activate ctxt h =

@@ -1106,8 +1106,6 @@ module Constants : sig
 
   val zk_rollup_min_pending_to_process : context -> int
 
-  val adaptive_issuance_enable : context -> bool
-
   val zk_rollup_max_ticket_payload_size : context -> int
 
   val direct_ticket_spending_enable : context -> bool

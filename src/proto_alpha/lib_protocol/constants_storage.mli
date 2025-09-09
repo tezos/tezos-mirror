@@ -140,8 +140,6 @@ val zk_rollup_origination_size : Raw_context.t -> int
 
 val zk_rollup_max_ticket_payload_size : Raw_context.t -> int
 
-val adaptive_issuance_enable : Raw_context.t -> bool
-
 val adaptive_issuance_global_limit_of_staking_over_baking : Raw_context.t -> int
 
 val adaptive_issuance_edge_of_staking_over_delegation : Raw_context.t -> int
