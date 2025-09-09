@@ -103,20 +103,21 @@ fn address_from_contract(contract: Contract) -> AddressHash {
 
 pub fn transfer_tez<Host: Runtime>(
     host: &mut Host,
-    sender_contract: &Contract,
-    sender_account: &mut impl TezlinkAccount,
+    giver_contract: &Contract,
+    giver_account: &mut impl TezlinkAccount,
     amount: &Narith,
-    dest_contract: &Contract,
-    dest_account: &mut impl TezlinkAccount,
+    receiver_contract: &Contract,
+    receiver_account: &mut impl TezlinkAccount,
 ) -> Result<TransferSuccess, TransferError> {
-    let balance_updates = compute_balance_updates(sender_contract, dest_contract, amount)
-        .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
+    let balance_updates =
+        compute_balance_updates(giver_contract, receiver_contract, amount)
+            .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
 
     apply_balance_changes(
         host,
-        sender_contract,
-        sender_account,
-        dest_account,
+        giver_contract,
+        giver_account,
+        receiver_account,
         &amount.0,
     )?;
     Ok(TransferSuccess {
@@ -134,28 +135,28 @@ pub fn transfer_tez<Host: Runtime>(
 
 fn burn_tez(
     host: &mut impl Runtime,
-    sender_contract: &Contract,
-    sender_account: &impl TezlinkAccount,
+    contract: &Contract,
+    account: &impl TezlinkAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<Narith, TransferError> {
-    let sender_balance = sender_account
+    let balance = account
         .balance(host)
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
-    let new_sender_balance = match sender_balance.0.checked_sub(amount) {
+    let new_balance = match balance.0.checked_sub(amount) {
         None => {
             log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: sender_contract.clone(),
-                balance: sender_balance.clone(),
+                contract: contract.clone(),
+                balance: balance.clone(),
                 amount: amount.into(),
             }));
         }
-        Some(new_source_balance) => new_source_balance.into(),
+        Some(new_balance) => new_balance.into(),
     };
-    sender_account
-        .set_balance(host, &new_sender_balance)
+    account
+        .set_balance(host, &new_balance)
         .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
-    Ok(new_sender_balance)
+    Ok(new_balance)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -345,10 +346,10 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
 pub fn transfer<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
-    giver_contract: &Contract, // The contract from which the funds are sent currently can be either the source(implicit_account) or and intermediary sender(originated_account)
-    giver_account: &mut impl TezlinkAccount,
+    sender_contract: &Contract,
+    sender_account: &mut impl TezlinkAccount,
     amount: &Narith,
-    receiver_contract: &Contract,
+    dest_contract: &Contract,
     entrypoint: &Entrypoint,
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
@@ -356,25 +357,25 @@ pub fn transfer<'a, Host: Runtime>(
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     origination_nonce: &mut OriginationNonce,
 ) -> Result<TransferSuccess, TransferError> {
-    match receiver_contract {
+    match dest_contract {
         Contract::Implicit(pkh) => {
             if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Err(TransferError::NonSmartContractExecutionCall);
             }
             // Allocated is not being used on purpose (see below the comment on the allocated_destination_contract field)
             let _allocated =
-                TezlinkImplicitAccount::allocate(host, context, receiver_contract)
+                TezlinkImplicitAccount::allocate(host, context, dest_contract)
                     .map_err(|_| TransferError::FailedToAllocateDestination)?;
-            let mut receiver_account =
+            let mut dest_account =
                 TezlinkImplicitAccount::from_public_key_hash(context, pkh)
                     .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             transfer_tez(
                 host,
-                giver_contract,
-                giver_account,
+                sender_contract,
+                sender_account,
                 amount,
-                receiver_contract,
-                &mut receiver_account,
+                dest_contract,
+                &mut dest_account,
             )
             .map(|success| {
                 TransferSuccess {
@@ -388,49 +389,49 @@ pub fn transfer<'a, Host: Runtime>(
             })
         }
         Contract::Originated(_) => {
-            let mut receiver_account =
-                TezlinkOriginatedAccount::from_contract(context, receiver_contract)
+            let mut dest_account =
+                TezlinkOriginatedAccount::from_contract(context, dest_contract)
                     .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             let receipt = transfer_tez(
                 host,
-                giver_contract,
-                giver_account,
+                sender_contract,
+                sender_account,
                 amount,
-                receiver_contract,
-                &mut receiver_account,
+                dest_contract,
+                &mut dest_account,
             )?;
-            ctx.sender = address_from_contract(giver_contract.clone());
+            ctx.sender = address_from_contract(sender_contract.clone());
             ctx.amount = amount.0.clone().try_into().map_err(
                 |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
                     TransferError::MirAmountToNarithError(err.to_string())
                 },
             )?;
-            ctx.self_address = address_from_contract(receiver_contract.clone());
-            let receiver_balance = receiver_account
+            ctx.self_address = address_from_contract(dest_contract.clone());
+            let balance = dest_account
                 .balance(host)
                 .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
-            ctx.balance = receiver_balance.0.try_into().map_err(
+            ctx.balance = balance.0.try_into().map_err(
                 |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
                     TransferError::MirAmountToNarithError(err.to_string())
                 },
             )?;
-            let code = receiver_account
+            let code = dest_account
                 .code(host)
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
-            let storage = receiver_account
+            let storage = dest_account
                 .storage(host)
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
             let (internal_operations, new_storage) =
                 execute_smart_contract(code, storage, entrypoint, param, parser, ctx)?;
-            receiver_account
+            dest_account
                 .set_storage(host, &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
             execute_internal_operations(
                 host,
                 context,
                 internal_operations,
-                receiver_contract,
-                &mut receiver_account,
+                dest_contract,
+                &mut dest_account,
                 parser,
                 ctx,
                 all_internal_receipts,
@@ -644,30 +645,30 @@ fn compute_fees_balance_updates(
 
 /// Prepares balance updates in the format expected by the Tezos operation.
 fn compute_balance_updates(
-    sender: &Contract,
-    dest: &Contract,
+    giver: &Contract,
+    receiver: &Contract,
     amount: &Narith,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
     if amount.eq(&0_u64.into()) {
         return Ok(vec![]);
     };
 
-    let sender_delta = BigInt::from_biguint(num_bigint::Sign::Minus, amount.into());
-    let dest_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
+    let giver_delta = BigInt::from_biguint(num_bigint::Sign::Minus, amount.into());
+    let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
 
-    let sender_update = BalanceUpdate {
-        balance: Balance::Account(sender.clone()),
-        changes: sender_delta.try_into()?,
+    let giver_update = BalanceUpdate {
+        balance: Balance::Account(giver.clone()),
+        changes: giver_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
 
-    let dest_update = BalanceUpdate {
-        balance: Balance::Account(dest.clone()),
-        changes: dest_delta.try_into()?,
+    let receiver_update = BalanceUpdate {
+        balance: Balance::Account(receiver.clone()),
+        changes: receiver_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
 
-    Ok(vec![sender_update, dest_update])
+    Ok(vec![giver_update, receiver_update])
 }
 
 /// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
@@ -696,42 +697,42 @@ pub fn compute_storage_balance_updates(
 /// Applies balance changes by updating both source and destination accounts.
 fn apply_balance_changes(
     host: &mut impl Runtime,
-    sender_contract: &Contract,
-    sender_account: &mut impl TezlinkAccount,
-    dest_account: &mut impl TezlinkAccount,
+    giver_contract: &Contract,
+    giver_account: &mut impl TezlinkAccount,
+    receiver_account: &mut impl TezlinkAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<(), TransferError> {
-    let sender_balance = sender_account
+    let giver_balance = giver_account
         .balance(host)
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
-    let new_sender_balance = match sender_balance.0.checked_sub(amount) {
+    let new_giver_balance = match giver_balance.0.checked_sub(amount) {
         None => {
             log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: sender_contract.clone(),
-                balance: sender_balance.clone(),
+                contract: giver_contract.clone(),
+                balance: giver_balance.clone(),
                 amount: amount.into(),
             }));
         }
         Some(new_source_balance) => new_source_balance.into(),
     };
-    sender_account
-        .set_balance(host, &new_sender_balance)
+    giver_account
+        .set_balance(host, &new_giver_balance)
         .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
-    let dest_balance = dest_account
+    let receiver_balance = receiver_account
         .balance(host)
         .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
         .0;
-    let new_dest_balance = (&dest_balance + amount).into();
-    dest_account
-        .set_balance(host, &new_dest_balance)
+    let new_receiver_balance = (&receiver_balance + amount).into();
+    receiver_account
+        .set_balance(host, &new_receiver_balance)
         .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
 
     log!(
         host,
         Debug,
-        "Transfer: OK - the new balance of the source is {:?} and the new balance of the destination is {:?}",
-    new_sender_balance, new_dest_balance);
+        "Transfer: OK - the new balance of the giver is {:?} and the new balance of the receiver is {:?}",
+    new_giver_balance, new_receiver_balance);
 
     Ok(())
 }
