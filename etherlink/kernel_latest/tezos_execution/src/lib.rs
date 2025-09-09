@@ -628,7 +628,6 @@ fn get_contract_entrypoint(
 pub fn transfer_external<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
-    source: &PublicKeyHash,
     source_account: &TezlinkImplicitAccount,
     amount: &Narith,
     dest: &Contract,
@@ -643,13 +642,12 @@ pub fn transfer_external<Host: Runtime>(
         host,
         Debug,
         "Applying an external transfer operation from {} to {:?} of {:?} mutez with parameters {:?}",
-        source,
+        source_account.pkh(),
         dest,
         amount,
         parameter
     );
 
-    let source_contract = Contract::Implicit(source.clone());
     let parser = Parser::new();
     let (entrypoint, value) = match parameter {
         Some(param) => (
@@ -662,14 +660,14 @@ pub fn transfer_external<Host: Runtime>(
     transfer(
         host,
         context,
-        &source_contract,
+        &source_account.address(),
         source_account,
         amount,
         dest,
         entrypoint,
         value,
         &parser,
-        source,
+        source_account.pkh(),
         &mut mir::gas::Gas::default(),
         &mut 0,
         all_internal_receipts,
@@ -1157,7 +1155,6 @@ fn apply_operation<Host: Runtime>(
             let transfer_result = transfer_external(
                 host,
                 context,
-                source,
                 source_account,
                 amount,
                 destination,
