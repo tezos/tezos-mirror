@@ -31,6 +31,7 @@ use storage::{
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
+use tezos_evm_runtime::internal_runtime::InternalRuntime;
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
@@ -346,20 +347,22 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+// `kernel_loop` shouldn't be called in tests, as it won't use `MockInternal` for the
+// internal runtime. Use `kernel` instead.
 #[entrypoint::main]
 pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut Host) {
-    // In order to setup the temporary directory, we need to move something
-    // from /evm to /tmp, so /evm must be non empty, this only happen
-    // at the first run.
+    kernel(
+        host,
+        tezos_evm_runtime::internal_runtime::WasmInternalHost(),
+    )
+}
 
-    // The kernel host is initialized as soon as possible. `kernel_loop`
-    // shouldn't be called in tests as it won't use `MockInternal` for the
-    // internal runtime.
-    let mut host: KernelHost<
-        Host,
-        &mut Host,
-        tezos_evm_runtime::internal_runtime::InternalHost,
-    > = KernelHost::init(host);
+pub fn kernel<Host, I>(host: &mut Host, internal: I)
+where
+    Host: tezos_smart_rollup_host::runtime::Runtime,
+    I: InternalRuntime,
+{
+    let mut host: KernelHost<Host, &mut Host, I> = KernelHost::init(host, internal);
 
     let reboot_counter = host
         .host
@@ -377,6 +380,9 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
         .store_count_subkeys(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)
         .expect("The kernel failed to read the number of /evm/world_state subkeys");
 
+    // In order to setup the temporary directory, we need to move something
+    // from /evm to /tmp, so /evm must be non empty, this only happen
+    // at the first run.
     if world_state_subkeys == 0 {
         host.host
             .store_write(
@@ -417,7 +423,7 @@ pub fn kernel_loop<Host: tezos_smart_rollup_host::runtime::Runtime>(host: &mut H
     match run(&mut host) {
         Ok(()) => (),
         Err(err) => {
-            log!(&mut host, Fatal, "The kernel produced an error: {:?}", err);
+            log!(&host, Fatal, "The kernel produced an error: {:?}", err);
         }
     }
 }
