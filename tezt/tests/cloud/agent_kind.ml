@@ -20,24 +20,59 @@ type t =
   | Echo_rollup_dal_observer of {slot_index : int}
   | Stresstest of int
 
+let rex_bootstrap = rex "bootstrap"
+
+let rex_baker_index = rex "baker-(\\d+)"
+
+let rex_producer_index = rex "dal-producer-(\\d+)"
+
+let rex_observer_index = rex "dal-observer-(\\d+)"
+
+let rex_observer_pkh = rex "dal-observer-([a-zA-Z0-9]+)"
+
+let rex_reverse_proxy = rex "dal-reverse-proxy"
+
+let rex_etherlink_operator = rex "etherlink-operator"
+
+let rex_etherlink_dal_operator = rex "etherlink-dal-operator"
+
+let rex_etherlink_dal_observer_index = rex "etherlink-dal-operator-(\\d+)"
+
+let rex_etherlink_producer_index = rex "etherlink-producer-(\\d+)"
+
+let rex_echo_rollup_operator = rex "echo-rollup-operator"
+
+let rex_echo_rollup_dal_observer_index = rex "echo-rollup-dal-node-(\\d+)"
+
+let rex_stresstest_index = rex "stresstest-(\\d+)"
+
+let rex_constant = show_rex
+
+let rex_replace_string =
+  let string = rex "\\(\\[a-zA-Z0-9\\]\\+\\)" in
+  fun r by -> replace_string string ~by (show_rex r)
+
+let rex_replace_index =
+  let index = rex "\\(\\\\d\\+\\)" in
+  fun r i -> replace_string index ~by:(string_of_int i) (show_rex r)
+
 let name_of = function
-  | Bootstrap -> "bootstrap"
-  | Baker i -> Format.asprintf "baker-%d" i
-  | Producer i -> Format.asprintf "dal-producer-%d" i
-  | Observer (`Index i) -> Format.asprintf "dal-observer-%d" i
+  | Bootstrap -> rex_constant rex_bootstrap
+  | Baker i -> rex_replace_index rex_baker_index i
+  | Producer i -> rex_replace_index rex_producer_index i
+  | Observer (`Index i) -> rex_replace_index rex_observer_index i
   | Observer (`Pkh pkh) ->
-      (* Shorting the pkh enables to get better logs. *)
-      Format.asprintf "dal-observer-%s" (String.sub pkh 0 8)
-  | Reverse_proxy -> "dal-reverse-proxy"
-  | Etherlink_operator -> "etherlink-operator"
-  | Etherlink_dal_operator -> "etherlink-dal-operator"
+      rex_replace_string rex_observer_pkh (String.sub pkh 0 8)
+  | Reverse_proxy -> rex_constant rex_reverse_proxy
+  | Etherlink_operator -> rex_constant rex_etherlink_operator
+  | Etherlink_dal_operator -> rex_constant rex_etherlink_dal_operator
   | Etherlink_dal_observer {slot_index} ->
-      Format.asprintf "etherlink-dal-operator-%d" slot_index
-  | Etherlink_producer i -> Format.asprintf "etherlink-producer-%d" i
-  | Echo_rollup_operator -> "echo-rollup-operator"
+      rex_replace_index rex_etherlink_dal_operator slot_index
+  | Etherlink_producer i -> rex_replace_index rex_etherlink_producer_index i
+  | Echo_rollup_operator -> rex_constant rex_echo_rollup_operator
   | Echo_rollup_dal_observer {slot_index} ->
-      Format.sprintf "echo-rollup-dal-node-%d" slot_index
-  | Stresstest i -> Format.sprintf "stresstest-%d" i
+      rex_replace_index rex_echo_rollup_dal_observer_index slot_index
+  | Stresstest i -> rex_replace_index rex_stresstest_index i
 
 type daemon =
   | Baker_l1_node of int
