@@ -36,7 +36,7 @@ OCTEZ_ONLY_EXPERIMENTAL_EXECUTABLES := $(shell cat script-inputs/octez-experimen
 OCTEZ_ONLY_EXECUTABLES := $(OCTEZ_ONLY_RELEASED_EXECUTABLES) $(OCTEZ_ONLY_EXPERIMENTAL_EXECUTABLES)
 
 #Define octez layer1 only executables by excluding the EVM-node and teztale tools.
-OCTEZ_ONLY_LAYER1_EXECUTABLES := $(filter-out etherlink-governance-observer octez-evm-node octez-teztale-archiver octez-teztale-server octez-teztale-snitch octez-smart-rollup-wasm-debugger octez-smart-rollup-node octez-dal-node,$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES))
+OCTEZ_ONLY_LAYER1_EXECUTABLES := $(filter-out etherlink-governance-observer octez-evm-node octez-teztale-archiver octez-teztale-server octez-teztale-snitch octez-smart-rollup-wasm-debugger octez-smart-rollup-node,$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES))
 
 TEZTALE_EXECUTABLES := $(shell cat script-inputs/teztale-experimental-executables)
 
