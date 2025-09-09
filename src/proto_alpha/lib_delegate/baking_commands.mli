@@ -40,7 +40,6 @@ val run_baker :
   * int option
   * bool
   * Protocol.Per_block_votes_repr.per_block_vote option
-  * Protocol.Per_block_votes_repr.per_block_vote option
   * string option
   * Baking_configuration.Operations_source.t option
   * Uri.t option

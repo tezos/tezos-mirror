@@ -29,26 +29,11 @@
     - {v {"liquidity_baking_toggle_vote": "on"} v}
     - {v {"liquidity_baking_toggle_vote": "off"} v}
     - {v {"liquidity_baking_toggle_vote": "pass"} v}
-    - {v {"adaptive_issuance_vote": "on"} v}
-    - {v {"adaptive_issuance_vote": "off"} v}
-    - {v {"adaptive_issuance_vote": "pass"} v}
-    - {v {"liquidity_baking_toggle_vote": "on","adaptive_issuance_vote": "on"} v}
-    - {v {"liquidity_baking_toggle_vote": "on","adaptive_issuance_vote": "off"} v}
-    - {v {"liquidity_baking_toggle_vote": "on","adaptive_issuance_vote": "pass"} v}
-    - {v {"liquidity_baking_toggle_vote": "off","adaptive_issuance_vote": "on"} v}
-    - {v {"liquidity_baking_toggle_vote": "off","adaptive_issuance_vote": "off"} v}
-    - {v {"liquidity_baking_toggle_vote": "off","adaptive_issuance_vote": "pass"} v}
-    - {v {"liquidity_baking_toggle_vote": "pass","adaptive_issuance_vote": "on"} v}
-    - {v {"liquidity_baking_toggle_vote": "pass","adaptive_issuance_vote": "off"} v}
-    - {v {"liquidity_baking_toggle_vote": "pass","adaptive_issuance_vote": "pass"} v}
 
     Moreover, in order to handle dynamic voting (i.e. change the
     baker's vote without having to restart it), each time a block is
     being built, the baker will try and read the vote file present in
     the config in order to check for updated votes.
-
-    [adaptive_issuance_vote] is ignored and deprecated, and will be
-    removed soon: https://gitlab.com/tezos/tezos/-/issues/8055
 *)
 
 (** Default vote file name that should be looked up when the baker
