@@ -3,6 +3,8 @@
 
 (executable
  (name main)
+ (public_name etherlink-benchmark)
+ (package etherlink-benchmark)
  (libraries
   octez-evm-node-libs.evm_node_rust_deps
   bls12-381.archive

@@ -496,11 +496,11 @@ let _tezt_testnet_scenarios =
       ]
 
 let _tezt_node_benchmark =
-  private_exe
-    "main"
+  public_exe
+    "etherlink-benchmark"
+    ~internal_name:"main"
     ~path:"etherlink/tezt/benchmarks"
     ~synopsis:"Run EVM node benchmark"
-    ~opam:""
     ~bisect_ppx:No
     ~static:false
     ~deps:
