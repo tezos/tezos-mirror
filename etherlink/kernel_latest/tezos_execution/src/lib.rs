@@ -645,30 +645,30 @@ fn compute_fees_balance_updates(
 
 /// Prepares balance updates in the format expected by the Tezos operation.
 fn compute_balance_updates(
-    sender: &Contract,
-    dest: &Contract,
+    giver: &Contract,
+    receiver: &Contract,
     amount: &Narith,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
     if amount.eq(&0_u64.into()) {
         return Ok(vec![]);
     };
 
-    let sender_delta = BigInt::from_biguint(num_bigint::Sign::Minus, amount.into());
-    let dest_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
+    let giver_delta = BigInt::from_biguint(num_bigint::Sign::Minus, amount.into());
+    let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
 
-    let sender_update = BalanceUpdate {
-        balance: Balance::Account(sender.clone()),
-        changes: sender_delta.try_into()?,
+    let giver_update = BalanceUpdate {
+        balance: Balance::Account(giver.clone()),
+        changes: giver_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
 
-    let dest_update = BalanceUpdate {
-        balance: Balance::Account(dest.clone()),
-        changes: dest_delta.try_into()?,
+    let receiver_update = BalanceUpdate {
+        balance: Balance::Account(receiver.clone()),
+        changes: receiver_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
 
-    Ok(vec![sender_update, dest_update])
+    Ok(vec![giver_update, receiver_update])
 }
 
 /// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
