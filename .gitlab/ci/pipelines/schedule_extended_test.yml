@@ -359,10 +359,6 @@ oc.build_arm64-released:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
@@ -376,18 +372,23 @@ oc.build_arm64-released:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - ./scripts/ci/build_full_unreleased.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
     OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
@@ -416,10 +417,6 @@ oc.build_arm64-extra-dev:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
@@ -433,11 +430,13 @@ oc.build_arm64-extra-dev:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - ./scripts/ci/build_full_unreleased.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
@@ -445,8 +444,11 @@ oc.build_arm64-extra-dev:
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
     OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
@@ -480,10 +482,6 @@ oc.build_arm64-extra-exp:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
@@ -497,11 +495,13 @@ oc.build_arm64-extra-exp:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - ./scripts/ci/build_full_unreleased.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
@@ -509,8 +509,11 @@ oc.build_arm64-extra-exp:
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
     OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
@@ -544,10 +547,6 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
@@ -560,19 +559,24 @@ oc.build:static-x86_64-linux-binaries:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - ./scripts/ci/build_static_binaries.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/octez-released-executables script-inputs/octez-experimental-executables
     DUNE_BUILD_JOBS: -j 12
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
     OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
@@ -597,10 +601,6 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
@@ -613,19 +613,24 @@ oc.build:static-arm64-linux-binaries:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - ./scripts/ci/build_static_binaries.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/octez-released-executables script-inputs/octez-experimental-executables
     DUNE_BUILD_JOBS: -j 12
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
     OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
@@ -650,10 +655,6 @@ oc.build_x86_64-released:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
@@ -667,18 +668,23 @@ oc.build_x86_64-released:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - ./scripts/ci/build_full_unreleased.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
     OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
@@ -708,10 +714,6 @@ oc.build_amd64-extra-dev:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
@@ -729,11 +731,13 @@ oc.build_amd64-extra-dev:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - ./scripts/ci/build_full_unreleased.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   - eval $(opam env)
   - dune cache trim --size=5GB
@@ -743,8 +747,11 @@ oc.build_amd64-extra-dev:
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
     OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
@@ -782,10 +789,6 @@ oc.build_amd64-extra-exp:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
@@ -803,11 +806,13 @@ oc.build_amd64-extra-exp:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - ./scripts/ci/build_full_unreleased.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   - eval $(opam env)
   - dune cache trim --size=5GB
@@ -817,8 +822,11 @@ oc.build_amd64-extra-exp:
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
     OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
@@ -852,11 +860,7 @@ oc.build_kernels:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
-  - key: kernels-sccache
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -866,18 +870,23 @@ oc.build_kernels:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make -f kernels.mk build
   - make -f etherlink.mk evm_kernel.wasm
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     CARGO_NET_OFFLINE: "false"
   artifacts:
     name: build-kernels-$CI_COMMIT_REF_SLUG
@@ -904,13 +913,9 @@ build_octez_source:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -921,6 +926,7 @@ build_octez_source:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - ./scripts/ci/restrict_export_to_octez_source.sh
   - ./scripts/ci/create_octez_tarball.sh octez
@@ -933,12 +939,16 @@ build_octez_source:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     DUNE_BUILD_JOBS: -j 12
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -953,13 +963,9 @@ build-layer1-profiling:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -970,6 +976,7 @@ build-layer1-profiling:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - scripts/slim-mode.sh on
   - scripts/custom-flags.sh set -opaque
@@ -981,12 +988,16 @@ build-layer1-profiling:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     PROFILE: static
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     expire_in: 1 day
     paths:
@@ -1040,11 +1051,7 @@ opam:all_6:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -1056,6 +1063,7 @@ opam:all_6:
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - opam remote add dev-repo ./_opam-repo-for-release
   - opam install --yes ${package}.dev
@@ -1065,11 +1073,15 @@ opam:all_6:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1114,11 +1126,7 @@ opam:exec_6:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -1130,6 +1138,7 @@ opam:exec_6:
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - opam remote add dev-repo ./_opam-repo-for-release
   - opam install --yes ${package}.dev
@@ -1139,11 +1148,15 @@ opam:exec_6:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1175,11 +1188,7 @@ opam:all_2:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -1191,6 +1200,7 @@ opam:all_2:
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - opam remote add dev-repo ./_opam-repo-for-release
   - opam install --yes ${package}.dev
@@ -1200,11 +1210,15 @@ opam:all_2:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1251,11 +1265,7 @@ opam:all_1:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -1267,6 +1277,7 @@ opam:all_1:
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - opam remote add dev-repo ./_opam-repo-for-release
   - opam install --yes ${package}.dev
@@ -1276,11 +1287,15 @@ opam:all_1:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1318,11 +1333,7 @@ opam:all_3:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -1334,6 +1345,7 @@ opam:all_3:
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - opam remote add dev-repo ./_opam-repo-for-release
   - opam install --yes ${package}.dev
@@ -1343,11 +1355,15 @@ opam:all_3:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1394,11 +1410,7 @@ opam:exec_4:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -1410,6 +1422,7 @@ opam:exec_4:
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - opam remote add dev-repo ./_opam-repo-for-release
   - opam install --yes ${package}.dev
@@ -1419,11 +1432,15 @@ opam:exec_4:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1454,11 +1471,7 @@ opam:all_4:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -1470,6 +1483,7 @@ opam:all_4:
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - opam remote add dev-repo ./_opam-repo-for-release
   - opam install --yes ${package}.dev
@@ -1479,11 +1493,15 @@ opam:all_4:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1529,11 +1547,7 @@ opam:exec_1:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -1545,6 +1559,7 @@ opam:exec_1:
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - opam remote add dev-repo ./_opam-repo-for-release
   - opam install --yes ${package}.dev
@@ -1554,11 +1569,15 @@ opam:exec_1:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1597,11 +1616,7 @@ opam:all_5:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -1613,6 +1628,7 @@ opam:all_5:
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - opam remote add dev-repo ./_opam-repo-for-release
   - opam install --yes ${package}.dev
@@ -1622,11 +1638,15 @@ opam:all_5:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1673,11 +1693,7 @@ opam:all_7:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -1689,6 +1705,7 @@ opam:all_7:
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - opam remote add dev-repo ./_opam-repo-for-release
   - opam install --yes ${package}.dev
@@ -1698,11 +1715,15 @@ opam:all_7:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
   - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
@@ -1785,13 +1806,9 @@ kaitai_checks:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -1801,6 +1818,7 @@ kaitai_checks:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings
     and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files`
@@ -1808,11 +1826,15 @@ kaitai_checks:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     expire_in: 1 hour
     paths:
@@ -1860,13 +1882,9 @@ oc.check_lift_limits_patch:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -1876,6 +1894,7 @@ oc.check_lift_limits_patch:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - '[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | cut -f3) =
     "src/proto_alpha/lib_protocol/main.ml" ]'
@@ -1884,11 +1903,15 @@ oc.check_lift_limits_patch:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.python_check:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -1932,13 +1955,9 @@ oc.integration:compiler-rejections:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -1948,16 +1967,21 @@ oc.integration:compiler-rejections:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - dune build @runtest_rejections
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 oc.script:test-gen-genesis:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1998,10 +2022,6 @@ oc.script:snapshot_alpha_and_link:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -2015,18 +2035,23 @@ oc.script:snapshot_alpha_and_link:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - ./scripts/ci/script:snapshot_alpha_and_link.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   - eval $(opam env)
   - dune cache trim --size=5GB
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -2212,13 +2237,9 @@ test_sdk_rust:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -2226,17 +2247,22 @@ test_sdk_rust:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make -C sdk/rust check
   - make -C sdk/rust test
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 test_sdk_bindings:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
@@ -2251,13 +2277,9 @@ test_sdk_bindings:
   - oc.docker:rust-sdk-bindings:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -2266,17 +2288,22 @@ test_sdk_bindings:
   - . $HOME/.venv/bin/activate
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make -C contrib/sdk-bindings check
   - make -C contrib/sdk-bindings test
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 test_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -2292,13 +2319,9 @@ test_kernels:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -2306,19 +2329,24 @@ test_kernels:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make -f kernels.mk check
   - make -f kernels.mk test
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 audit_riscv_deps:
   image: ${rust_toolchain_image_name_protected}:master
@@ -2331,13 +2359,9 @@ audit_riscv_deps:
   dependencies: []
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -2345,18 +2369,23 @@ audit_riscv_deps:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make -C src/riscv audit
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 check_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -2371,13 +2400,9 @@ check_riscv_kernels:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -2385,19 +2410,24 @@ check_riscv_kernels:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features --features ci'
     check
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 ocaml-check:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -2456,10 +2486,6 @@ oc.unit:non-proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -2472,12 +2498,14 @@ oc.unit:non-proto-x86_64:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make $MAKE_TARGETS
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   - eval $(opam env)
   - dune cache trim --size=5GB
@@ -2486,8 +2514,11 @@ oc.unit:non-proto-x86_64:
     MAKE_TARGETS: test-nonproto-unit
     DUNE_ARGS: -j 12
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -2524,10 +2555,6 @@ oc.unit:other-x86_64:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -2540,12 +2567,14 @@ oc.unit:other-x86_64:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make $MAKE_TARGETS
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   - eval $(opam env)
   - dune cache trim --size=5GB
@@ -2554,8 +2583,11 @@ oc.unit:other-x86_64:
     MAKE_TARGETS: test-other-unit
     DUNE_ARGS: -j 12
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -2592,10 +2624,6 @@ oc.unit:proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -2608,12 +2636,14 @@ oc.unit:proto-x86_64:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make $MAKE_TARGETS
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   - eval $(opam env)
   - dune cache trim --size=5GB
@@ -2622,8 +2652,11 @@ oc.unit:proto-x86_64:
     MAKE_TARGETS: test-proto-unit
     DUNE_ARGS: -j 12
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -2656,13 +2689,9 @@ oc.unit:non-proto-arm64:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -2672,11 +2701,13 @@ oc.unit:non-proto-arm64:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make $MAKE_TARGETS
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
@@ -2684,8 +2715,11 @@ oc.unit:non-proto-arm64:
     DUNE_ARGS: -j 12
     DISTRIBUTE_TESTS_TO_PARALLELS: "true"
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     name: $CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}
     expire_in: 1 day
@@ -2741,13 +2775,9 @@ oc.unit:protocol_compiles:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -2757,16 +2787,21 @@ oc.unit:protocol_compiles:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - dune build @runtest_compile_protocol
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
 
 de.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}

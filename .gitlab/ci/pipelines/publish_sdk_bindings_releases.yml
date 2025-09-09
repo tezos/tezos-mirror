@@ -66,13 +66,9 @@ build_python_sdk_linux:
   - oc.docker:rust-sdk-bindings:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -81,16 +77,21 @@ build_python_sdk_linux:
   - . $HOME/.venv/bin/activate
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make -C contrib/sdk-bindings/rust -f python.mk build
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - contrib/sdk-bindings/rust/target/wheels/*
@@ -105,13 +106,9 @@ build_python_sdk_macos:
   dependencies: []
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -126,17 +123,22 @@ build_python_sdk_macos:
   - brew install sccache
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
+  - 'sccache --show-stats | grep "Cache location" '
   script:
   - make -C contrib/sdk-bindings/rust -f python.mk build
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - sccache --show-stats
   - ./scripts/ci/sccache-stop.sh
   variables:
     TAGS: saas-macos-medium-m1
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
   artifacts:
     paths:
     - contrib/sdk-bindings/rust/target/wheels/*
