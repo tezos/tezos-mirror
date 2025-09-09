@@ -14,9 +14,11 @@ use crate::{
     database::DatabasePrecompileStateChanges,
     journal::Journal,
     precompiles::{
+        change_sequencer_key::change_sequencer_key_precompile,
         constants::{
-            CUSTOMS, GLOBAL_COUNTER_PRECOMPILE_ADDRESS,
-            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
+            CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, CUSTOMS,
+            GLOBAL_COUNTER_PRECOMPILE_ADDRESS, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
+            TABLE_PRECOMPILE_ADDRESS,
         },
         error::CustomPrecompileError,
         global_counter::global_counter_precompile,
@@ -86,6 +88,13 @@ impl EtherlinkPrecompiles {
                 table_precompile(&input_bytes, context, is_static, inputs, gas_limit)
             }
             GLOBAL_COUNTER_PRECOMPILE_ADDRESS => global_counter_precompile(
+                &input_bytes,
+                context,
+                is_static,
+                inputs,
+                gas_limit,
+            ),
+            CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS => change_sequencer_key_precompile(
                 &input_bytes,
                 context,
                 is_static,

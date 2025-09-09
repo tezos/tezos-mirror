@@ -11,6 +11,7 @@ use crate::{
     database::DatabasePrecompileStateChanges,
     journal::PrecompileStateChanges,
     precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
+    storage::sequencer_key_change::SequencerKeyChange,
     Error,
 };
 
@@ -42,6 +43,9 @@ pub enum EtherlinkEntry {
     },
     PushWithdrawal,
     IncrementGlobalCounter,
+    StoreSequencerKeyChange {
+        old_sequencer_key_change: Option<SequencerKeyChange>,
+    },
 }
 
 impl Default for LayeredState {
@@ -153,6 +157,14 @@ impl LayeredState {
         self.entries.push(EtherlinkEntry::PushWithdrawal);
     }
 
+    pub fn store_sequencer_key_change(&mut self, upgrade: SequencerKeyChange) {
+        let old_sequencer_key_change = self.etherlink_data.sequencer_key_change.take();
+        self.etherlink_data.sequencer_key_change = Some(upgrade);
+        self.entries.push(EtherlinkEntry::StoreSequencerKeyChange {
+            old_sequencer_key_change,
+        });
+    }
+
     pub fn is_deposit_removed(&self, deposit_id: &U256) -> bool {
         self.etherlink_data.removed_deposits.contains(deposit_id)
     }
@@ -216,6 +228,11 @@ impl LayeredState {
                         *counter -= U256::ONE;
                     }
                 }
+                EtherlinkEntry::StoreSequencerKeyChange {
+                    old_sequencer_key_change,
+                } => {
+                    self.etherlink_data.sequencer_key_change = old_sequencer_key_change;
+                }
             }
         }
     }
@@ -231,7 +248,7 @@ impl LayeredState {
 #[cfg(test)]
 mod tests {
     use revm::primitives::{Address, U256};
-    use tezos_crypto_rs::hash::ContractKt1Hash;
+    use tezos_crypto_rs::{hash::ContractKt1Hash, public_key::PublicKey};
 
     use crate::{
         custom, database::DatabasePrecompileStateChanges,
@@ -268,6 +285,21 @@ mod tests {
                 )
                 .map_err(custom)?,
             )
+        }
+
+        fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError> {
+            PublicKey::from_b58check(
+                "edpkv4NmL2YPe8eiVGXUDXmPQybD725ofKirTzGRxs1X9UmaG3voKw",
+            )
+            .map_err(|e| {
+                CustomPrecompileError::Revert(format!("Invalid sequencer address: {e}"))
+            })
+        }
+
+        fn governance_sequencer_upgrade_exists(
+            &self,
+        ) -> Result<bool, CustomPrecompileError> {
+            Ok(false)
         }
     }
 

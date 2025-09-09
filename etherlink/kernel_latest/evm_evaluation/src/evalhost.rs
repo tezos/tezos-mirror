@@ -218,6 +218,13 @@ impl ExtendedRuntime for EvalHost {
     ) -> Result<Vec<u8>, tezos_smart_rollup_host::runtime::RuntimeError> {
         self.host.store_get_hash(path)
     }
+
+    fn internal_store_read_all<T: Path>(
+        &self,
+        path: &T,
+    ) -> Result<Vec<u8>, RuntimeError> {
+        self.host.store_read_all(path)
+    }
 }
 
 impl Verbosity for EvalHost {

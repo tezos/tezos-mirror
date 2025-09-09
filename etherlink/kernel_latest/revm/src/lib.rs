@@ -335,7 +335,7 @@ pub fn run_transaction<'a, Host: Runtime>(
 
 #[cfg(test)]
 mod test {
-    use alloy_sol_types::{ContractError, Revert, RevertReason, SolInterface};
+    use alloy_sol_types::{ContractError, Revert, RevertReason, SolEvent, SolInterface};
     use alloy_sol_types::{SolCall, SolError};
     use nom::AsBytes;
     use primitive_types::H256;
@@ -347,6 +347,12 @@ mod test {
         primitives::{hex::FromHex, Address, Bytes, U256},
         state::{AccountInfo, Bytecode},
     };
+    use rlp::Decodable;
+    use tezos_crypto_rs::{
+        hash::{HashTrait, SecretKeyEd25519},
+        public_key::PublicKey,
+    };
+    use tezos_data_encoding::enc::BinWriter;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::runtime::Runtime;
     use utilities::{
@@ -361,13 +367,22 @@ mod test {
     use crate::{
         helpers::legacy::FaDepositWithProxy,
         precompiles::{
+            change_sequencer_key::{
+                ChangeSequencerKey::{change_sequencer_keyCall, ChangeSequencerKeyCalls},
+                ChangeSequencerKeyEvent,
+            },
             constants::{
-                FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BURN_ADDRESS, WITHDRAWAL_SOL_ADDR,
+                CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, FA_WITHDRAWAL_SOL_ADDR,
+                PRECOMPILE_BURN_ADDRESS, WITHDRAWAL_SOL_ADDR,
             },
             initializer::init_precompile_bytecodes,
         },
-        storage::world_state_handler::{
-            new_world_state_handler, StorageAccount, WITHDRAWALS_TICKETER_PATH,
+        storage::{
+            sequencer_key_change::SequencerKeyChange,
+            world_state_handler::{
+                new_world_state_handler, StorageAccount, SEQUENCER_KEY_CHANGE_PATH,
+                SEQUENCER_KEY_PATH, WITHDRAWALS_TICKETER_PATH,
+            },
         },
         test::utilities::{
             CallAndRevert::{self, callAndRevertCall},
@@ -746,6 +761,92 @@ mod test {
         assert_eq!(zero_account.balance(&host).unwrap(), withdrawn_amount);
         let raw_expected_withdrawals = r#"[Standard(AtomicTransactionBatch(OutboxMessageTransactionBatch { batch: [OutboxMessageTransaction { parameters: MichelsonPair(MichelsonContract(Implicit(Ed25519(ContractTz1Hash("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")))), Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4"))), MichelsonPair(MichelsonPair(MichelsonNat(Zarith(0)), MichelsonOption(None)), MichelsonInt(Zarith(1)))))), destination: Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4")), entrypoint: Entrypoint { name: "burn" } }] }))]"#;
         assert_eq!(format!("{withdrawals:?}"), raw_expected_withdrawals);
+    }
+
+    #[test]
+    fn test_call_update_sequencer_key() {
+        let mut host = MockKernelHost::default();
+        let mut world_state_handler = new_world_state_handler().unwrap();
+        let block_constants = block_constants_with_no_fees();
+
+        init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+        // Insert account information
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+        let mut storage_account = world_state_handler
+            .get_or_create(&host, &account_path(&caller).unwrap())
+            .unwrap();
+        storage_account.set_info(&mut host, caller_info).unwrap();
+
+        let private_key = SecretKeyEd25519::from_b58check(
+            "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6",
+        )
+        .unwrap();
+        let public_key = PublicKey::from_b58check(
+            "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
+        )
+        .unwrap();
+        let mut public_key_bytes = Vec::new();
+        public_key.bin_write(&mut public_key_bytes).unwrap();
+
+        let pk_b58 = PublicKey::to_b58check(&public_key);
+        let storage_bytes = String::as_bytes(&pk_b58);
+        host.store_write_all(&SEQUENCER_KEY_PATH, storage_bytes)
+            .unwrap();
+        let signature = private_key.sign(public_key_bytes.clone()).unwrap();
+        let signature_bytes = signature.to_bytes().unwrap();
+        let calldata =
+            ChangeSequencerKeyCalls::change_sequencer_key(change_sequencer_keyCall {
+                publicKey: Bytes::copy_from_slice(&public_key_bytes),
+                signature: Bytes::copy_from_slice(&signature_bytes),
+            })
+            .abi_encode();
+
+        let ExecutionOutcome { result, .. } = run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            &mut world_state_handler,
+            EtherlinkPrecompiles::new(),
+            caller,
+            Some(CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS),
+            Bytes::copy_from_slice(&calldata),
+            10_000_000,
+            0,
+            U256::MAX,
+            AccessList(vec![]),
+            vec![],
+            None,
+        )
+        .unwrap();
+
+        assert!(result.logs().len() == 1);
+        assert!(
+            result
+                .logs()
+                .first()
+                .unwrap()
+                .data
+                .topics()
+                .first()
+                .unwrap()
+                == &ChangeSequencerKeyEvent::SIGNATURE_HASH
+        );
+        let value = host.store_read_all(&SEQUENCER_KEY_CHANGE_PATH).unwrap();
+        let stored_change = SequencerKeyChange::decode(&rlp::Rlp::new(&value)).unwrap();
+        match stored_change {
+            change => {
+                assert_eq!(change.sequencer_key(), &public_key);
+            }
+            #[allow(unreachable_patterns)]
+            _ => panic!("Expected a Key change"),
+        }
     }
 
     #[test]

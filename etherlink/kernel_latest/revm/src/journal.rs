@@ -26,6 +26,7 @@ use crate::{
     helpers::legacy::FaDepositWithProxy,
     layered_state::LayeredState,
     precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
+    storage::sequencer_key_change::SequencerKeyChange,
 };
 
 type TicketBalanceKey = (Address, U256);
@@ -36,6 +37,7 @@ pub struct PrecompileStateChanges {
     pub removed_deposits: HashSet<U256>,
     pub withdrawals: Vec<Withdrawal>,
     pub global_counter: Option<U256>,
+    pub sequencer_key_change: Option<SequencerKeyChange>,
 }
 
 /// A journal of state changes internal to the EVM
@@ -364,5 +366,13 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
             ));
         }
         self.database.deposit_in_queue(deposit_id)
+    }
+
+    pub fn store_sequencer_key_change(&mut self, upgrade: SequencerKeyChange) {
+        self.layered_state.store_sequencer_key_change(upgrade)
+    }
+
+    pub fn log(&mut self, log: Log) {
+        self.inner.log(log)
     }
 }
