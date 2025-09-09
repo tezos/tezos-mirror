@@ -60,39 +60,11 @@ bind_hash!(Ed25519Signature, hash::Ed25519Signature);
 bind_hash!(Secp256k1Signature, hash::Secp256k1Signature);
 bind_hash!(P256Signature, hash::P256Signature);
 bind_hash!(BlsSignature, hash::BlsSignature);
+bind_hash!(Signature, signature::Signature);
 
 bind_hash!(ContractKt1Hash, hash::ContractKt1Hash);
 
 bind_hash!(Contract, contract::Contract);
-
-// TODO: https://linear.app/tezos/issue/SDK-73.
-// Unable use the `bind_hash!` macro because the `signature::Signature` struct does not implement `from_b58check` and `to_b58check` but `from_base58_check` and `to_base58_check`
-/// Generic signature structure gathering the four types of signature hash and the unknown signature hash.
-#[derive(uniffi::Object, Debug, Clone, PartialEq, Eq)]
-#[uniffi::export(Debug, Display, Eq)]
-pub struct Signature(pub(crate) signature::Signature);
-
-#[uniffi::export]
-impl Signature {
-    /// Decodes any Base58Check-encoded signature string into a `Signature`.
-    #[uniffi::constructor]
-    pub fn from_b58check(data: &str) -> Result<Self, Error> {
-        signature::Signature::from_base58_check(data)
-            .map(Self)
-            .map_err(Error::Base58)
-    }
-
-    /// Encodes the `Signature` into a Base58Check-encoded string.
-    pub fn to_b58check(&self) -> String {
-        signature::Signature::to_base58_check(&self.0)
-    }
-}
-
-impl ::std::fmt::Display for Signature {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
 
 macro_rules! bind_pk_to_pkh {
     ($pk:ident, $pkh:ident) => {
