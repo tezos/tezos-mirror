@@ -38,6 +38,7 @@ type request = {payload : Ethereum_types.hex; callback : callback}
 val start :
   relay_endpoint:Uri.t ->
   max_transaction_batch_length:int option ->
+  ?inclusion_timeout:float ->
   unit ->
   unit tzresult Lwt.t
 

@@ -154,3 +154,21 @@ let lots_of_address =
     "e99ed5b90020575a9bda90e48f56c824a9bb079b";
     "c8c2d559b31e5022d1fe63cbc35361b6ed9acc52";
   ]
+
+let accounts_seq =
+  let cpt = ref 0 in
+  Seq.memoize @@ Seq.of_dispenser
+  @@ fun () ->
+  incr cpt ;
+  let open Tezos_crypto.Signature.Secp256k1 in
+  let seed = Bytes.init 32 (fun _ -> '\000') in
+  let si = string_of_int !cpt in
+  Bytes.blit_string si 0 seed 0 (String.length si) ;
+  let _pkh, pk, sk = generate_key ~seed () in
+  let address = eth_address_of_public_key pk in
+  let address = "0x" ^ Hex.(show @@ of_bytes address) in
+  let private_key = Data_encoding.Binary.to_bytes_exn Secret_key.encoding sk in
+  let private_key = "0x" ^ Hex.(show @@ of_bytes private_key) in
+  Some {address; private_key}
+
+let accounts nb = Seq.take nb accounts_seq |> Array.of_seq

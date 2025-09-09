@@ -8,11 +8,10 @@
 
 open Tezos_workers
 
-let two_seconds = Ptime.Span.of_int_s 2
-
 type parameters = {
   relay_endpoint : Uri.t;
   max_transaction_batch_length : int option;
+  inclusion_timeout : float;
 }
 
 type callback =
@@ -41,13 +40,13 @@ module Pending_transactions = struct
         Some pending
     | None -> None
 
-  let drop htbl =
+  let drop timeout htbl =
     let now = Time.System.now () in
     let dropped = ref [] in
     S.filter_map_inplace
       (fun _hash pending ->
         let lifespan = Ptime.diff now pending.since in
-        if Ptime.Span.compare lifespan two_seconds > 0 then (
+        if Ptime.Span.compare lifespan timeout > 0 then (
           dropped := pending :: !dropped ;
           None)
         else Some pending)
@@ -60,6 +59,7 @@ type state = {
   mutable queue : request Queue.t;
   pending : Pending_transactions.t;
   max_transaction_batch_length : int option;
+  inclusion_timeout : Ptime.Span.t;
 }
 
 module Types = struct
@@ -270,7 +270,9 @@ module Handlers = struct
             transactions_to_inject
         in
 
-        let txns = Pending_transactions.drop state.pending in
+        let txns =
+          Pending_transactions.drop state.inclusion_timeout state.pending
+        in
         List.iter
           (fun {callback; _} -> Lwt.async (fun () -> callback `Dropped))
           txns
@@ -278,7 +280,8 @@ module Handlers = struct
   type launch_error = tztrace
 
   let on_launch _self ()
-      ({relay_endpoint; max_transaction_batch_length} : parameters) =
+      ({relay_endpoint; max_transaction_batch_length; inclusion_timeout} :
+        parameters) =
     let open Lwt_result_syntax in
     return
       {
@@ -286,6 +289,9 @@ module Handlers = struct
         queue = Queue.create ();
         pending = Pending_transactions.empty ();
         max_transaction_batch_length;
+        inclusion_timeout =
+          Ptime.Span.of_float_s inclusion_timeout
+          |> WithExceptions.Option.get ~loc:__LOC__;
       }
 
   let on_error (type a b) _self _status_request (_r : (a, b) Request.t)
@@ -341,13 +347,14 @@ let confirm txn_hash =
   assert was_pushed ;
   return_unit
 
-let start ~relay_endpoint ~max_transaction_batch_length () =
+let start ~relay_endpoint ~max_transaction_batch_length
+    ?(inclusion_timeout = 2.) () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
       table
       ()
-      {relay_endpoint; max_transaction_batch_length}
+      {relay_endpoint; max_transaction_batch_length; inclusion_timeout}
       (module Handlers)
   in
   Lwt.wakeup worker_waker worker ;

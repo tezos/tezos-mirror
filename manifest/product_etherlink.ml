@@ -495,6 +495,28 @@ let _tezt_testnet_scenarios =
         tezt_etherlink |> open_;
       ]
 
+let _tezt_node_benchmark =
+  public_exe
+    "etherlink-benchmark"
+    ~internal_name:"main"
+    ~path:"etherlink/tezt/benchmarks"
+    ~synopsis:"Run EVM node benchmark"
+    ~bisect_ppx:No
+    ~static:false
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_test_helpers |> open_;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_etherlink |> open_;
+        floodgate_lib;
+      ]
+    ~with_macos_security_framework:true
+    ~dep_globs:
+      ["evm_kernel_inputs/*"; "../../tezos_contracts/*"; "../../config/*"]
+    ~dep_globs_rec:["../../kernel_latest/*"]
+
 let _tezt_etherlink_benchmark_producer =
   public_exe
     "etherlink-benchmark-producer"
