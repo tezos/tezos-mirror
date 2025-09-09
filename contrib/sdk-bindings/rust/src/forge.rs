@@ -57,7 +57,7 @@ pub fn forge_message(msg: &str) -> Result<Vec<u8>, Error> {
 pub mod operation {
     use super::*;
     use crate::entrypoint::Entrypoint;
-    use crate::keys::{BlsSignature, Contract, PublicKey, PublicKeyHash};
+    use crate::hash::{BlsSignature, Contract, PublicKey, PublicKeyHash};
     use crate::Error;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_protocol::operation::{
@@ -203,7 +203,7 @@ pub mod operation {
 mod tests {
     use super::*;
     use crate::entrypoint::Entrypoint;
-    use crate::keys::{BlsSignature, Contract, PublicKey, PublicKeyHash};
+    use crate::hash::{BlsSignature, Contract, PublicKey, PublicKeyHash};
     use operation::*;
 
     // All messages bytes were generated using `octez-codec encode "alpha.script.expr" from '{ "string": "$MSG" }'`

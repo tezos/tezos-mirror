@@ -8,6 +8,7 @@ uniffi::setup_scaffolding!();
 
 pub mod entrypoint;
 pub mod forge;
+pub mod hash;
 pub mod keys;
 
 #[derive(Debug, uniffi::Error, thiserror::Error)]
