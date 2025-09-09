@@ -151,12 +151,6 @@ let launch_ema_threshold client =
   Lwt.return
   @@ JSON.(json |-> "adaptive_issuance_launch_ema_threshold" |> as_int)
 
-let edge_of_staking_over_delegation client =
-  let* json =
-    Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
-  in
-  Lwt.return @@ JSON.(json |-> "edge_of_staking_over_delegation" |> as_int)
-
 let init ?(overrides = default_overrides) protocol =
   let* sandbox_node = Node.init [Synchronisation_threshold 0; Private_mode] in
   let sandbox_endpoint = Client.Node sandbox_node in
@@ -328,8 +322,6 @@ let test_staking =
   let consensus_rights_delay =
     JSON.(constants |-> "consensus_rights_delay" |> as_int)
   in
-
-  let* eosod = edge_of_staking_over_delegation client_1 in
 
   log_step 1 "Prepare second node for double baking" ;
   Log.info "Starting second node" ;
@@ -709,12 +701,7 @@ let test_staking =
         let* bu = Operation_receipt.get_block_metadata client_1 in
         let* bu = Operation_receipt.Balance_updates.from_result [bu] in
         let amount_baker_share, amount_delegation, amount_edge, amount_stakers =
-          match eosod with
-          | 2 -> (834, 7877, 4, 4)
-          | 3 -> (1194, 7514, 6, 5)
-          | _ ->
-              Log.error "Unexpected edge_of_staking_over_baking value: %d" eosod ;
-              (0, 0, 0, 0)
+          (1194, 7514, 6, 5)
         in
         (* check rewards *)
         check_balance_updates
@@ -967,9 +954,7 @@ let test_staking =
   let* bu = Operation_receipt.Balance_updates.from_result [bu] in
 
   (* check slashed and rewarded amounts *)
-  let global_limit_of_staking_over_baking =
-    if Protocol.(number protocol <= 020) then 5 else 9
-  in
+  let global_limit_of_staking_over_baking = 9 in
   (* It's critical that the rewarded amount cannot exceed the amount
      slashed from the baker's own deposits; otherwise, the baker may
      actually gain tez by purposefully double signing and denuncing
@@ -980,10 +965,14 @@ let test_staking =
 
   (* slashed stakers (including baker) unstake deposit *)
   let amount_slashed_from_unstake_stakers_deposits =
-    match eosod with
-    | 2 -> 50_000_002
-    | 3 -> 50_000_003
-    | _ -> Test.fail "Unexpected edge_of_staking_over_baking value: %d" eosod
+    if Protocol.(number protocol > number S023) then
+      (* From T on, when activating the protocol from Genesis, the
+         initialization of consensus rights for the first cycles is
+         done with AI already in effect, so delegation already counts
+         less than staking. This slightly skews the balances in the
+         whole test. *)
+      50_000_004
+    else 50_000_003
   in
   let amount_rewarded_from_unstake_stakers_deposits =
     amount_slashed_from_unstake_stakers_deposits / reward_denominator
@@ -995,10 +984,7 @@ let test_staking =
 
   (* slashed stake *)
   let amount_slashed_from_stakers_deposits =
-    match eosod with
-    | 2 -> 50_248_756
-    | 3 -> 50_248_756
-    | _ -> Test.fail "Unexpected edge_of_staking_over_baking value: %d" eosod
+    if Protocol.(number protocol > number S023) then 50_248_757 else 50_248_756
   in
   let amount_rewarded_from_stakers_deposits =
     amount_slashed_from_stakers_deposits / reward_denominator
@@ -1009,10 +995,8 @@ let test_staking =
 
   (* slashing baker (bootstrap2) stake*)
   let amount_slashed_from_baker_deposits =
-    match eosod with
-    | 2 -> 10_049_764_326
-    | 3 -> if consensus_rights_delay = 1 then 10_049_761_010 else 10_049_764_732
-    | _ -> Test.fail "Unexpected edge_of_staking_over_baking value: %d" eosod
+    if Protocol.(number protocol > number S023) then 10_049_775_146
+    else 10_049_764_732
   in
 
   let amount_rewarded_from_baker_deposits =

@@ -85,24 +85,43 @@ let dummy_account =
   in
   new_account ~seed ()
 
-let default_initial_full_balance =
-  Default_parameters.Internal_for_tests.bootstrap_balance
-
-let default_initial_staked_balance =
-  (* Cf [init_account] in {!Protocol.Bootstrap_storage}. *)
-  let constants = Default_parameters.constants_test in
+let bootstrap_initial_staked_balance ~(constants : Constants.Parametric.t)
+    ~initial_full_balance =
+  (* Bootstrap accounts are initialized with just enough staked balance
+     to meet the [minimal_stake] and [minimal_frozen_stake]
+     requirements, and to not be over-delegated. See the [init_account]
+     function in {!Protocol.Bootstrap_storage}. *)
   let minimal_staked =
-    Tez.min constants.minimal_stake constants.minimal_frozen_stake
+    Tez.max constants.minimal_stake constants.minimal_frozen_stake
   in
   let minimal_to_not_be_overdelegated =
     Tez.div_exn
-      default_initial_full_balance
+      initial_full_balance
       (constants.limit_of_delegation_over_baking + 1)
   in
   Tez.(
     min
-      default_initial_full_balance
+      initial_full_balance
       (max minimal_staked minimal_to_not_be_overdelegated))
+
+let bootstrap_initial_baking_power ~constants ~initial_full_balance =
+  let initial_staked_balance =
+    bootstrap_initial_staked_balance ~constants ~initial_full_balance
+  in
+  let open Tez in
+  Tez_helpers.(
+    initial_staked_balance
+    +! div_exn
+         (initial_full_balance -! initial_staked_balance)
+         constants.adaptive_issuance.edge_of_staking_over_delegation)
+
+let default_initial_full_balance =
+  Default_parameters.Internal_for_tests.bootstrap_balance
+
+let default_initial_staked_balance =
+  bootstrap_initial_staked_balance
+    ~constants:Default_parameters.constants_test
+    ~initial_full_balance:default_initial_full_balance
 
 let default_initial_spendable_balance =
   Tez_helpers.(default_initial_full_balance -! default_initial_staked_balance)

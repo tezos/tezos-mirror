@@ -146,4 +146,4 @@
 { "first": 1, "last": 8 }
 
 ./octez-client --mode light rpc get /chains/main/blocks/head/helpers/total_baking_power
-"20000000000000"
+"7333333333330"
