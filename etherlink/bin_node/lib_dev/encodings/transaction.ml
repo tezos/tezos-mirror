@@ -541,19 +541,21 @@ let legacy_recovery_id ~chain_id ~v =
       let chain_id = Z.to_int chain_id in
       v - ((chain_id * 2) + 35)
 
-let recovery_id : transaction -> (bytes, string) result =
- fun transaction ->
+let recovery_id ri =
+  if ri == 0 || ri == 1 then (
+    let buffer = Bytes.create 1 in
+    Bytes.set_uint8 buffer 0 ri ;
+    Ok buffer)
+  else Error "Invalid recovery id"
+
+let recovery_id_from_tx transaction =
   let ri =
     match transaction.transaction_type with
     | Legacy ->
         legacy_recovery_id ~chain_id:transaction.chain_id ~v:transaction.v
     | Eip2930 | Eip1559 | Eip7702 -> Z.to_int transaction.v
   in
-  if ri == 0 || ri == 1 then (
-    let buffer = Bytes.create 1 in
-    Bytes.set_uint8 buffer 0 ri ;
-    Ok buffer)
-  else Error "Invalid recovery id"
+  recovery_id ri
 
 let secp256k1n_2 =
   Z.of_string
@@ -581,7 +583,7 @@ let uncompressed_signature ~r ~s recovery_id =
 let caller ({r; s; _} as transaction) =
   let open Result_syntax in
   let message = message transaction in
-  let* recovery_id = recovery_id transaction in
+  let* recovery_id = recovery_id_from_tx transaction in
   let* sig_ = uncompressed_signature ~r ~s recovery_id in
   let+ caller = Tezos_crypto.Signature.Secp256k1.recover sig_ message in
   Address (Hex (Hex.of_bytes caller |> Hex.show))
@@ -628,3 +630,29 @@ let to_transaction_object :
       r = Qty r;
       s = Qty s;
     }
+
+let auth_message {chain_id; address; nonce; _} =
+  let open Rlp in
+  let chain_id = encode_z chain_id in
+  let nonce = encode_z nonce in
+  let rlp = List [Value chain_id; Value address; Value nonce] in
+  encode rlp
+
+let authorization_hash authorization =
+  (* Magic number used to calculate an EIP7702 authority. *)
+  let authority_magic_byte = 5 in
+  let buffer = Buffer.create 128 in
+  Buffer.add_char buffer (Char.chr authority_magic_byte) ;
+  let rlp_authorization = auth_message authorization in
+  Buffer.add_bytes buffer rlp_authorization ;
+  let raw_bytes = Buffer.to_bytes buffer in
+  Tezos_crypto.Hacl.Hash.Keccak_256.digest raw_bytes
+
+let auth_signer ({r; s; y_parity; _} as authorization : authorization_list_item)
+    =
+  let open Result_syntax in
+  let hash = authorization_hash authorization in
+  let* recovery_id = recovery_id (Z.to_int y_parity) in
+  let* sig_ = uncompressed_signature ~r ~s recovery_id in
+  let+ auth_signer = Tezos_crypto.Signature.Secp256k1.recover sig_ hash in
+  Address (Hex (Hex.of_bytes auth_signer |> Hex.show))
