@@ -195,8 +195,7 @@ You may also access this whole documentation as a single `text file <https://oct
    :caption: Protocol Reference Manuals
    :hidden:
 
-   Rio Protocol Reference <active/index>
-   Seoul Protocol Reference <seoul/index>
+   Seoul Protocol Reference <active/index>
    Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
@@ -223,7 +222,6 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    protocols/naming
-   protocols/022_rio
    protocols/023_seoul
    protocols/alpha
    protocols/history

@@ -3,7 +3,7 @@ Protocol Alpha
 
 This page lists the changes brought by protocol Alpha with respect
 to Seoul (see :ref:`naming_convention`).
-For the list of changes brought by Seoul with respect to Rio, see :doc:`../protocols/023_seoul`.
+For the list of changes brought by Seoul with respect to Rio, see :doc:`./023_seoul`.
 
 For a higher-level overview of the most salient new features see the
 `announcement blog <https://research-development.nomadic-labs.com/blog.html>`__.

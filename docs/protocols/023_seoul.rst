@@ -3,13 +3,13 @@ Protocol Seoul
 
 This page lists the changes brought by protocol Seoul with respect
 to Rio (see :ref:`naming_convention`).
-For the list of changes brought by Rio with respect to Quebec, see :doc:`../protocols/022_rio`.
+For the list of changes brought by Rio with respect to Quebec, see :doc:`./022_rio`.
 
 For a higher-level overview of the most salient new features see the
 `announcement blog <https://research-development.nomadic-labs.com/seoul-announcement.html>`__.
 
 The code can be found in directory :src:`src/proto_023_PtSeouLo` of the ``master``
-branch of Octez and the full documentation in :doc:`this page <../seoul/index>`.
+branch of Octez and the full documentation in :doc:`this page <../active/index>`.
 
 Environment Version
 -------------------

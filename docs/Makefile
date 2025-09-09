@@ -16,16 +16,14 @@ P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = rio seoul
+NAMED_PROTOS  = seoul
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-rio_long      = PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7
 seoul_long     = PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-rio_short    = PsRiotum
 seoul_short    = PtSeouLo
 alpha_short   = alpha
 
@@ -61,10 +59,6 @@ $(BUILDDIR)/octezdoc.txt: $(BUILDDIR)/index.html
 # Build the manuals for a given protocol
 %/octez-client.html:
 	@../octez-client -protocol $($(@D)_long) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/octez-baker.html:
-	@../octez-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/octez-accuser.html:
-	@../octez-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 # Binary non-protocol specific manuals for clic binaries.
 api/%.html:
@@ -89,8 +83,6 @@ api/octez-dal-node-config-init.txt:
 .PHONY: manuals
 manuals: \
 	 $(PROTOCOLS:%=%/octez-client.html) \
-	 $(PROTOCOLS:%=%/octez-baker.html) \
-	 $(PROTOCOLS:%=%/octez-accuser.html) \
 	 api/octez-admin-client.html \
 	 api/octez-signer.html \
 	 api/octez-codec.html \
@@ -150,7 +142,6 @@ redirectcheck:
 .PHONY: xrefscheck
 xrefscheck:
 	$(CHECKXREFS) seoul
-	$(CHECKXREFS) rio
 	$(CHECKXREFS) -l alpha
 
 .PHONY: installcheck
@@ -233,7 +224,7 @@ docexes-gen: api/errors.rst shell/p2p_api.rst rpc
 sphinx: install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	$(SPHINXBUILD) --builder html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/rio" || true
+	@ln -s active "$(BUILDDIR)/seoul" || true
 
 # Syntax check RST files.
 # Run Sphinx, but first create dummy version of all generated files,
@@ -323,5 +314,5 @@ clean:
 	@-rm -Rf "$(BUILDDIR)" "$(BUILDDIRTXT)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv octezdoc.txt
-	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html seoul/octez-*.html rio/octez-*.html
+	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html seoul/octez-*.html
 	@-rm -Rf ../openapi-tmp

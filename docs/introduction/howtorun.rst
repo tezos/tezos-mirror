@@ -1,5 +1,3 @@
-.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
-
 Running Octez
 =============
 
@@ -245,7 +243,7 @@ Putting together all the above instructions, you may want to quickly start a bak
     octez-client register key mybaker as delegate
     octez-client stake 6000 for mybaker
     octez-dal-node run --endpoint http://127.0.0.1:8732 --attester-profiles=$BAKER_ADDRESS
-    octez-baker-PsRiotum run with local node $HOME/.tezos-node mybaker --liquidity-baking-toggle-vote pass --dal-node http://127.0.0.1:10732
+    octez-baker run with local node $HOME/.tezos-node mybaker --liquidity-baking-toggle-vote pass --dal-node http://127.0.0.1:10732
 
 
 .. warning::
