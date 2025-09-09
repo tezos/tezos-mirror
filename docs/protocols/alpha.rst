@@ -78,6 +78,19 @@ RPC Changes
   The ``cycle`` argument, if omitted, defaults to the current
   cycle. (MR :gl:`!19093`)
 
+
+Blocks and block receipts
+-------------------------
+
+- Removed obsolete field ``adaptive_issuance_vote`` from the block
+  header, and fields ``adaptive_issuance_vote_ema`` and
+  ``adaptive_issuance_activation_cycle`` from the block metadata. The
+  adaptive issuance activation cycle (which is 748 on mainnet) can
+  still be queried via the RPC ``GET
+  /chains/<chain>/blocks/<block>/context/adaptive_issuance_launch_cycle``. (MR
+  :gl:`!19215`)
+
+
 Operation receipts
 ------------------
 
