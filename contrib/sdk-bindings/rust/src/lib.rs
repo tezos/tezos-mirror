@@ -10,6 +10,7 @@ pub mod entrypoint;
 pub mod forge;
 pub mod hash;
 pub mod keys;
+pub mod micheline;
 mod types;
 
 #[derive(Debug, uniffi::Error, thiserror::Error)]
