@@ -36,6 +36,12 @@ macro_rules! generate_tests {
 }
 
 generate_tests!(
+    BlockHash,
+    "BLzGG2VsshDHBxmgWpMbUQKX8LWEMLLG3fEEE8NaGpEmh4NSjsZ",
+    "BL4d8vHu4UQQ9D7ZSF4adpA9HcFm1oG8QfrnDpg1UmXXHiTUHkH"
+);
+
+generate_tests!(
     ContractKt1Hash,
     "KT1G4D3W9cf86dzAmZBN9nwUn7sYh4DYMRb4",
     "KT1WPztCUj2wXnsXvgG6C3RnFe9pv2MY9Pv2"
