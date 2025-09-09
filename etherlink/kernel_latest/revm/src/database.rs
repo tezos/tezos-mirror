@@ -205,22 +205,9 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
                         }
                     }
                 }
-                AccountState::SelfDestructed(code_hash) => {
-                    abort_on_error!(
-                        self,
-                        storage_account.delete_info(self.host),
-                        "DatabaseCommit `clear_info`"
-                    );
-                    abort_on_error!(
-                        self,
-                        storage_account.clear_storage(self.host),
-                        "DatabaseCommit `clear_storage`"
-                    );
-                    abort_on_error!(
-                        self,
-                        CodeStorage::delete(self.host, &code_hash),
-                        "DatabaseCommit `CodeStorage::delete`"
-                    );
+                AccountState::SelfDestructed(_code_hash) => {
+                    // Starting from the Cancun hard fork, the underlying opcode is no longer supposed
+                    // to delete the code and data associated with an account
                 }
             },
             error => {
