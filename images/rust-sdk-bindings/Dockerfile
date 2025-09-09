@@ -23,6 +23,7 @@ RUN apt-get update && \
     ca-certificates curl \
     build-essential \
     jq \
+    gpg \
     # Python requirements
     python3 python3-venv \
     pipx \
@@ -49,12 +50,14 @@ ENV PATH=/usr/local/bin:$PATH
 
 # install datadog static binary
 COPY scripts/install_datadog_static.sh \
+     scripts/install-gsutil-apt.sh \
      scripts/install_sccache_static.sh /tmp/
 
 #hadolint ignore=DL3008,DL3015
 RUN /tmp/install_datadog_static.sh && \
     /tmp/install_sccache_static.sh && \
-    rm /tmp/install_datadog_static.sh /tmp/install_sccache_static.sh
+    /tmp/install-gsutil-apt.sh && \
+    rm /tmp/install_datadog_static.sh /tmp/install_sccache_static.sh /tmp/install-gsutil-apt.sh
 
 # install toolchain
 ARG RUST_VERSION=1.83.0
