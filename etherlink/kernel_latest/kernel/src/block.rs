@@ -798,10 +798,13 @@ mod tests {
         }
     }
 
-    fn tezlink_blueprint(operations: Vec<Operation>) -> Blueprint<TezTransactions> {
+    fn tezlink_blueprint(
+        operations: Vec<Operation>,
+        timestamp: Timestamp,
+    ) -> Blueprint<TezTransactions> {
         Blueprint {
             transactions: TezTransactions(operations),
-            timestamp: Timestamp::from(0i64),
+            timestamp,
         }
     }
 
@@ -1084,9 +1087,9 @@ mod tests {
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
             vec![
-                tezlink_blueprint(vec![]),
-                tezlink_blueprint(vec![]),
-                tezlink_blueprint(vec![]),
+                tezlink_blueprint(vec![], Timestamp::from(0i64)),
+                tezlink_blueprint(vec![], Timestamp::from(1i64)),
+                tezlink_blueprint(vec![], Timestamp::from(10i64)),
             ],
         );
 
@@ -1141,7 +1144,7 @@ mod tests {
 
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
-            vec![tezlink_blueprint(vec![reveal])],
+            vec![tezlink_blueprint(vec![reveal], Timestamp::from(0i64))],
         );
 
         produce(&mut host, &chain_config, &mut config, None, None)
@@ -1232,7 +1235,10 @@ mod tests {
         // Bootstrap 1 reveals its manager and then
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
-            vec![tezlink_blueprint(vec![reveal, transfer])],
+            vec![tezlink_blueprint(
+                vec![reveal, transfer],
+                Timestamp::from(0i64),
+            )],
         );
 
         produce(&mut host, &chain_config, &mut config, None, None)
@@ -1337,11 +1343,12 @@ mod tests {
             None,
         );
 
+        let timestamp_of_call = 10i64;
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
             vec![
-                tezlink_blueprint(vec![origination]),
-                tezlink_blueprint(vec![call]),
+                tezlink_blueprint(vec![origination], Timestamp::from(0i64)),
+                tezlink_blueprint(vec![call], Timestamp::from(timestamp_of_call)),
             ],
         );
 
@@ -1358,7 +1365,7 @@ mod tests {
             U256::from(expected_level),
             read_current_number(&host).unwrap()
         );
-        let expected_timestamp = 0;
+        let expected_timestamp = timestamp_of_call;
         let expected_chain_id = "0x01000000";
         let expected_storage = format!(
             "Pair {expected_level} (Pair {expected_timestamp} {expected_chain_id})"
