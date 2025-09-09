@@ -62,7 +62,11 @@ FROM base AS full
 ARG BINARIES_DESTINATION_PATH
 COPY ./octez-node $BINARIES_DESTINATION_PATH/octez-node
 COPY ./octez-client $BINARIES_DESTINATION_PATH/octez-client
+COPY ./octez-admin-client $BINARIES_DESTINATION_PATH/octez-admin-client
 COPY ./octez-baker $BINARIES_DESTINATION_PATH/octez-baker
+COPY ./octez-dal-node $BINARIES_DESTINATION_PATH/octez-dal-node
+COPY ./octez-teztale-archiver $BINARIES_DESTINATION_PATH/octez-teztale-archiver
+COPY ./octez-teztale-server $BINARIES_DESTINATION_PATH/octez-teztale-server
 # Feel free to complete with the binaries you need
 
 #################################################################################
