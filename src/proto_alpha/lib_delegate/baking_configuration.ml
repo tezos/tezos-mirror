@@ -79,7 +79,6 @@ type state_recorder_config = Filesystem | Memory
 type per_block_votes_config = {
   vote_file : string option;
   liquidity_baking_vote : Protocol.Alpha_context.Per_block_votes.per_block_vote;
-  adaptive_issuance_vote : Protocol.Alpha_context.Per_block_votes.per_block_vote;
 }
 
 type t = {
@@ -119,8 +118,6 @@ let default_votes_config =
   {
     vote_file = None;
     liquidity_baking_vote =
-      Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass;
-    adaptive_issuance_vote =
       Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass;
   }
 
@@ -256,25 +253,19 @@ let user_activate_upgrades_config_encoding =
 let liquidity_baking_toggle_vote_config_encoding =
   Protocol.Alpha_context.Per_block_votes.liquidity_baking_vote_encoding
 
-let adaptive_issuance_vote_config_encoding =
-  (* TMP: use liquidity baking encoding because it has the right type,
-     but this encoding will be removed in the next MR anyway *)
-  Protocol.Alpha_context.Per_block_votes.liquidity_baking_vote_encoding
-
 let per_block_votes_config_encoding =
   let open Data_encoding in
   def (String.concat "." [Protocol.name; "per_block_votes_config"])
   @@ conv
-       (fun {vote_file; liquidity_baking_vote; adaptive_issuance_vote} ->
-         (vote_file, liquidity_baking_vote, adaptive_issuance_vote))
-       (fun (vote_file, liquidity_baking_vote, adaptive_issuance_vote) ->
-         {vote_file; liquidity_baking_vote; adaptive_issuance_vote})
-       (obj3
+       (fun {vote_file; liquidity_baking_vote} ->
+         (vote_file, liquidity_baking_vote))
+       (fun (vote_file, liquidity_baking_vote) ->
+         {vote_file; liquidity_baking_vote})
+       (obj2
           (opt "per_block_vote_file" string)
           (req
              "liquidity_baking_vote"
-             liquidity_baking_toggle_vote_config_encoding)
-          (req "adaptive_issuance_vote" adaptive_issuance_vote_config_encoding))
+             liquidity_baking_toggle_vote_config_encoding))
 
 let force_config_encoding = Data_encoding.bool
 

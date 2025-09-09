@@ -1020,9 +1020,7 @@ let genesis_protocol_data (baker_sk : Signature.secret_key)
       Protocol.Per_block_votes_repr.liquidity_baking_vote =
         Baking_configuration.default_votes_config
           .Baking_configuration.liquidity_baking_vote;
-      adaptive_issuance_vote =
-        Baking_configuration.default_votes_config
-          .Baking_configuration.adaptive_issuance_vote;
+      adaptive_issuance_vote = Per_block_vote_pass;
     }
   in
   let contents =

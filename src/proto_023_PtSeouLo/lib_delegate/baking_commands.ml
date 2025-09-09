@@ -474,14 +474,6 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ?extra_operations
           ?data_dir
           ~count:block_count
-          ?votes:
-            (Option.map
-               (fun adaptive_issuance_vote ->
-                 {
-                   Baking_configuration.default_votes_config with
-                   adaptive_issuance_vote;
-                 })
-               adaptive_issuance_vote)
           ~state_recorder
           delegates);
     command
@@ -729,8 +721,7 @@ let run_baker ?(recommend_agnostic_baker = true)
       | Octez_agnostic_baker.Per_block_votes.Per_block_vote_pass ->
           Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass
     in
-    let* Octez_agnostic_baker.Configuration.
-           {vote_file; liquidity_baking_vote; adaptive_issuance_vote} =
+    let* Octez_agnostic_baker.Configuration.{vote_file; liquidity_baking_vote} =
       Octez_agnostic_baker.Per_block_vote_file.load_per_block_votes_config
         ~default_liquidity_baking_vote:
           (Option.map of_protocol liquidity_baking_vote)
@@ -738,11 +729,7 @@ let run_baker ?(recommend_agnostic_baker = true)
     in
     return
       Baking_configuration.
-        {
-          vote_file;
-          liquidity_baking_vote = to_protocol liquidity_baking_vote;
-          adaptive_issuance_vote = to_protocol adaptive_issuance_vote;
-        }
+        {vote_file; liquidity_baking_vote = to_protocol liquidity_baking_vote}
   in
   let dal_node_rpc_ctxt =
     Option.map create_dal_node_rpc_ctxt dal_node_endpoint

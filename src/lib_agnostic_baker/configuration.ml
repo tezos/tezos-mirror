@@ -447,5 +447,4 @@ let create_config
 type per_block_votes_config = {
   vote_file : string option;
   liquidity_baking_vote : Per_block_votes.per_block_vote;
-  adaptive_issuance_vote : Per_block_votes.per_block_vote;
 }
