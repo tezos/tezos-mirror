@@ -1054,10 +1054,27 @@ module Teztale = struct
       Agent.copy ~source:aliases_filename ~destination:aliases_filename agent
     in
     let* _ =
-      Agent.copy
-        ~source:"tezt/lib_cloud/teztale-visualisation/index.html"
-        ~destination:(Format.asprintf "%s/index.html" public_directory)
-        agent
+      (* Teztale dataviz is a single page app written with React.
+         Copying the same main page (index.html) allow you to be able to share
+         links directly to the right tab. Without this hack, going to e.g.
+         http://your.teztale.server/Available directly would produce a 404 error. *)
+      Lwt_list.map_s
+        (fun dst ->
+          Agent.copy
+            ~source:"tezt/lib_cloud/teztale-visualisation/index.html"
+            ~destination:(Format.asprintf "%s/%s" public_directory dst)
+            agent)
+        [
+          "index.html";
+          "Available";
+          "CommitteeSizePerDelay";
+          "CommitteeSizePerLevel";
+          "DelayToConsensus";
+          "DelegateStats";
+          "LevelDiff";
+          "Level";
+          "Report";
+        ]
     in
     let* _ =
       Agent.copy
