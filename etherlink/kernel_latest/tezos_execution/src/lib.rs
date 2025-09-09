@@ -697,42 +697,42 @@ pub fn compute_storage_balance_updates(
 /// Applies balance changes by updating both source and destination accounts.
 fn apply_balance_changes(
     host: &mut impl Runtime,
-    sender_contract: &Contract,
-    sender_account: &mut impl TezlinkAccount,
-    dest_account: &mut impl TezlinkAccount,
+    giver_contract: &Contract,
+    giver_account: &mut impl TezlinkAccount,
+    receiver_account: &mut impl TezlinkAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<(), TransferError> {
-    let sender_balance = sender_account
+    let giver_balance = giver_account
         .balance(host)
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
-    let new_sender_balance = match sender_balance.0.checked_sub(amount) {
+    let new_giver_balance = match giver_balance.0.checked_sub(amount) {
         None => {
             log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: sender_contract.clone(),
-                balance: sender_balance.clone(),
+                contract: giver_contract.clone(),
+                balance: giver_balance.clone(),
                 amount: amount.into(),
             }));
         }
         Some(new_source_balance) => new_source_balance.into(),
     };
-    sender_account
-        .set_balance(host, &new_sender_balance)
+    giver_account
+        .set_balance(host, &new_giver_balance)
         .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
-    let dest_balance = dest_account
+    let receiver_balance = receiver_account
         .balance(host)
         .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
         .0;
-    let new_dest_balance = (&dest_balance + amount).into();
-    dest_account
-        .set_balance(host, &new_dest_balance)
+    let new_receiver_balance = (&receiver_balance + amount).into();
+    receiver_account
+        .set_balance(host, &new_receiver_balance)
         .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
 
     log!(
         host,
         Debug,
-        "Transfer: OK - the new balance of the source is {:?} and the new balance of the destination is {:?}",
-    new_sender_balance, new_dest_balance);
+        "Transfer: OK - the new balance of the giver is {:?} and the new balance of the receiver is {:?}",
+    new_giver_balance, new_receiver_balance);
 
     Ok(())
 }
