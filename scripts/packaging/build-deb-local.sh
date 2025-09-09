@@ -25,7 +25,8 @@ packages() {
 
   # Build the debian packages
   cd scripts/packaging/octez/
-  DEB_BUILD_OPTIONS=noautodbgsym dpkg-buildpackage -tc -b --no-sign -sa
+  DEB_BUILD_OPTIONS=parallel=6 DEB_BUILD_OPTIONS=noautodbgsym \
+    dpkg-buildpackage -tc -b --no-sign -sa
   cd -
 }
 
