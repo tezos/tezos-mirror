@@ -1670,7 +1670,13 @@ module Images = struct
     (* The job that builds the CI images.
        This job is automatically included in any pipeline that uses any of these images. *)
     let job_docker_ci arch ?storage () =
-      let variables = Some [("ARCH", Runner.Arch.show_uniform arch)] in
+      let variables =
+        Some
+          [
+            ("ARCH", Runner.Arch.show_uniform arch);
+            ("GCLOUD_VERSION", "543.0.0");
+          ]
+      in
       let retry =
         match arch with
         | Amd64 -> None

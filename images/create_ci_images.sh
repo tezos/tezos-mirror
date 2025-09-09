@@ -210,6 +210,7 @@ build() {
       --build-arg TARGETARCH="${targetarch}" \
       --build-arg NPM_REGISTRY_DOMAIN="${NPM_REGISTRY_DOMAIN:-}" \
       --build-arg NPM_REGISTRY="${NPM_REGISTRY:-}" \
+      --build-arg GCLOUD_VERSION="${GCLOUD_VERSION}" \
       -t "$f_image_name" \
       $(if [ -n "$tag_extra" ]; then echo "-t $f_image_name_extra"; fi) \
       "$@" \

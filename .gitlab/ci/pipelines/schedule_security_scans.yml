@@ -28,6 +28,7 @@ oc.docker:ci:amd64:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
     ARCH: amd64
+    GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
       dotenv: ci_image_tag.env
