@@ -133,7 +133,7 @@ module Worker = struct
     let payloads = Sequencer_blueprint.create_dal_payloads chunks in
     let nb_chunks = Sequencer_blueprint.nb_chunks chunks in
     let*! () = Blueprint_events.blueprint_injected_on_DAL ~level ~nb_chunks in
-    Metrics.record_blueprint_chunks_sent_on_dal nb_chunks ;
+    Metrics.record_blueprint_chunks_sent_on_dal chunks ;
     Rollup_services.publish_on_dal
       ~rollup_node_endpoint:state.rollup_node_endpoint
       ~messages:payloads
