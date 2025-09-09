@@ -92,10 +92,15 @@ let test_michelson_primitives_encoding =
 let check_sample ~name ~file =
   let* json_string = Tezos_stdlib_unix.Lwt_utils_unix.read_file file in
   let original_json = JSON.parse ~origin:json_string json_string in
-  let* binary =
-    Codec.encode ~hooks:Regression.hooks ~name (JSON.unannotate original_json)
+  let* binary = Codec.encode ~name (JSON.unannotate original_json) in
+  let () =
+    Regression.capture
+      (sf
+         "%s: %s"
+         Filename.(file |> basename |> remove_extension |> remove_extension)
+         binary)
   in
-  let* decoded_json = Codec.decode ~hooks:Regression.hooks ~name binary in
+  let* decoded_json = Codec.decode ~name binary in
   Check.(
     (original_json = decoded_json)
       json

@@ -1,6 +1,1 @@
-
-./octez-codec encode 023-PtSeouLo.timestamp from '"2020-04-20T16:19:59Z"'
-000000005e9dcbaf
-
-./octez-codec decode 023-PtSeouLo.timestamp from 000000005e9dcbaf
-"2020-04-20T16:19:59Z"
+timestamp: 000000005e9dcbaf
