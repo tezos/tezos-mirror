@@ -339,16 +339,34 @@ let () =
     ~description:"Health endpoint to check watchtower is running"
   @@ fun _ _ _ -> Lwt_result_syntax.return_unit
 
+let json_remove_path p json = Ezjsonm.update json p None
+
 let () =
   register
     `GET
     "/config"
     ~include_default_fields:`Always
-    Config.encoding
+    (Data_encoding.conv_with_guard
+       ~schema:(Data_encoding.Json.schema Config.encoding)
+       (fun config ->
+         Data_encoding.Json.construct
+           ~include_default_fields:`Always
+           Config.encoding
+           config
+         |> json_remove_path ["secret_key"]
+         |> json_remove_path ["evm_node_endpoint"])
+       (fun _ -> Error "Config read only encoding")
+       Data_encoding.json)
     ~description:"Retrieve configuration of watchtower"
   @@ fun _ _ ctx ->
   Lwt_result_syntax.return
-    {ctx.config with secret_key = None (* erase secret key from output *)}
+    {
+      ctx.config with
+      secret_key =
+        None
+        (* erase secret key from output, although it's removed from the encoding
+           above, this is a safety measure in case it changes. *);
+    }
 
 let () =
   register
