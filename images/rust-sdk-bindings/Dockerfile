@@ -49,12 +49,14 @@ ENV PATH=/usr/local/bin:$PATH
 
 # install datadog static binary
 COPY scripts/install_datadog_static.sh \
+     scripts/install-gsutil.sh \
      scripts/install_sccache_static.sh /tmp/
 
 #hadolint ignore=DL3008,DL3015
 RUN /tmp/install_datadog_static.sh && \
     /tmp/install_sccache_static.sh && \
-    rm /tmp/install_datadog_static.sh /tmp/install_sccache_static.sh
+    /tmp/install-gsutil.sh && \
+    rm /tmp/install_datadog_static.sh /tmp/install_sccache_static.sh /tmp/install-gsutil.sh
 
 # install toolchain
 ARG RUST_VERSION=1.83.0
