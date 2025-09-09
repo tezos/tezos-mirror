@@ -65,6 +65,7 @@ oc.base-images.debian:
     - RELEASE:
       - unstable
       - bookworm
+      - trixie
 
 oc.base-images.ubuntu:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -101,6 +102,7 @@ oc.base-images.ubuntu:
     - RELEASE:
       - noble
       - jammy
+      - plucky
 
 oc.base-images.fedora:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -136,6 +138,7 @@ oc.base-images.fedora:
     matrix:
     - RELEASE:
       - "39"
+      - "41"
       - "42"
 
 oc.base-images.rockylinux:
@@ -171,4 +174,6 @@ oc.base-images.rockylinux:
   parallel:
     matrix:
     - RELEASE:
+      - "9.3"
       - "9.6"
+      - "10.0"

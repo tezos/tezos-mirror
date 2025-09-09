@@ -207,6 +207,37 @@ container_scanning_tezos-debian-bookworm-master:
     paths:
     - gl-container-scanning-report-tezos-debian-bookworm-master.json
 
+container_scanning_tezos-debian-trixie-master:
+  image: aquasec/trivy:latest
+  stage: test
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: trivy
+    paths:
+    - .trivycache/
+    policy: pull-push
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/ci/container_scanning_generate_reports.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: .trivycache/
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie
+    REPORT: gl-container-scanning-report-tezos-debian-trixie-master.json
+  artifacts:
+    paths:
+    - gl-container-scanning-report-tezos-debian-trixie-master.json
+
 container_scanning_tezos-ubuntu-noble-master:
   image: aquasec/trivy:latest
   stage: test
@@ -269,6 +300,37 @@ container_scanning_tezos-ubuntu-jammy-master:
     paths:
     - gl-container-scanning-report-tezos-ubuntu-jammy-master.json
 
+container_scanning_tezos-ubuntu-plucky-master:
+  image: aquasec/trivy:latest
+  stage: test
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: trivy
+    paths:
+    - .trivycache/
+    policy: pull-push
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/ci/container_scanning_generate_reports.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: .trivycache/
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:plucky
+    REPORT: gl-container-scanning-report-tezos-ubuntu-plucky-master.json
+  artifacts:
+    paths:
+    - gl-container-scanning-report-tezos-ubuntu-plucky-master.json
+
 container_scanning_tezos-fedora-39-master:
   image: aquasec/trivy:latest
   stage: test
@@ -299,6 +361,37 @@ container_scanning_tezos-fedora-39-master:
   artifacts:
     paths:
     - gl-container-scanning-report-tezos-fedora-39-master.json
+
+container_scanning_tezos-fedora-41-master:
+  image: aquasec/trivy:latest
+  stage: test
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: trivy
+    paths:
+    - .trivycache/
+    policy: pull-push
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/ci/container_scanning_generate_reports.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: .trivycache/
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:41
+    REPORT: gl-container-scanning-report-tezos-fedora-41-master.json
+  artifacts:
+    paths:
+    - gl-container-scanning-report-tezos-fedora-41-master.json
 
 container_scanning_tezos-fedora-42-master:
   image: aquasec/trivy:latest
@@ -331,6 +424,37 @@ container_scanning_tezos-fedora-42-master:
     paths:
     - gl-container-scanning-report-tezos-fedora-42-master.json
 
+container_scanning_tezos-rockylinux-9.3-master:
+  image: aquasec/trivy:latest
+  stage: test
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: trivy
+    paths:
+    - .trivycache/
+    policy: pull-push
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/ci/container_scanning_generate_reports.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: .trivycache/
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3
+    REPORT: gl-container-scanning-report-tezos-rockylinux-9.3-master.json
+  artifacts:
+    paths:
+    - gl-container-scanning-report-tezos-rockylinux-9.3-master.json
+
 container_scanning_tezos-rockylinux-9.6-master:
   image: aquasec/trivy:latest
   stage: test
@@ -362,6 +486,37 @@ container_scanning_tezos-rockylinux-9.6-master:
     paths:
     - gl-container-scanning-report-tezos-rockylinux-9.6-master.json
 
+container_scanning_tezos-rockylinux-10.0-master:
+  image: aquasec/trivy:latest
+  stage: test
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  cache:
+    key: trivy
+    paths:
+    - .trivycache/
+    policy: pull-push
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/ci/container_scanning_generate_reports.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    TRIVY_NO_PROGRESS: "true"
+    TRIVY_CACHE_DIR: .trivycache/
+    FULL_IMAGE_NAME: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:10.0
+    REPORT: gl-container-scanning-report-tezos-rockylinux-10.0-master.json
+  artifacts:
+    paths:
+    - gl-container-scanning-report-tezos-rockylinux-10.0-master.json
+
 container_scanning_merge_reports:
   image: ${ci_image_name}/monitoring:${ci_image_tag}
   stage: test
@@ -374,11 +529,16 @@ container_scanning_merge_reports:
   - container_scanning_tezos-tezos-master
   - container_scanning_tezos-debian-unstable-master
   - container_scanning_tezos-debian-bookworm-master
+  - container_scanning_tezos-debian-trixie-master
   - container_scanning_tezos-ubuntu-noble-master
   - container_scanning_tezos-ubuntu-jammy-master
+  - container_scanning_tezos-ubuntu-plucky-master
   - container_scanning_tezos-fedora-39-master
+  - container_scanning_tezos-fedora-41-master
   - container_scanning_tezos-fedora-42-master
+  - container_scanning_tezos-rockylinux-9.3-master
   - container_scanning_tezos-rockylinux-9.6-master
+  - container_scanning_tezos-rockylinux-10.0-master
   dependencies:
   - oc.docker:ci:amd64
   - container_scanning_tezos-tezos-latest
@@ -386,11 +546,16 @@ container_scanning_merge_reports:
   - container_scanning_tezos-tezos-master
   - container_scanning_tezos-debian-unstable-master
   - container_scanning_tezos-debian-bookworm-master
+  - container_scanning_tezos-debian-trixie-master
   - container_scanning_tezos-ubuntu-noble-master
   - container_scanning_tezos-ubuntu-jammy-master
+  - container_scanning_tezos-ubuntu-plucky-master
   - container_scanning_tezos-fedora-39-master
+  - container_scanning_tezos-fedora-41-master
   - container_scanning_tezos-fedora-42-master
+  - container_scanning_tezos-rockylinux-9.3-master
   - container_scanning_tezos-rockylinux-9.6-master
+  - container_scanning_tezos-rockylinux-10.0-master
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)

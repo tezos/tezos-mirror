@@ -9,19 +9,19 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
-let debian_releases = ["unstable"; "bookworm"]
+let debian_releases = ["unstable"; "bookworm"; "trixie"]
 
 let debian_matrix = [("RELEASE", debian_releases)]
 
-let ubuntu_releases = ["noble"; "jammy"]
+let ubuntu_releases = ["noble"; "jammy"; "plucky"]
 
 let ubuntu_matrix = [("RELEASE", ubuntu_releases)]
 
-let rockylinux_releases = ["9.6"]
+let rockylinux_releases = ["9.3"; "9.6"; "10.0"]
 
 let rockylinux_matrix = [("RELEASE", rockylinux_releases)]
 
-let fedora_releases = ["39"; "42"]
+let fedora_releases = ["39"; "41"; "42"]
 
 let fedora_matrix = [("RELEASE", fedora_releases)]
 
