@@ -81,8 +81,7 @@ Baker manual
 This is the manual page of the baker command line tool. See :ref:`baker_run` for a general description of this tool.
 
 .. note::
-	This unique baker executable is meant to replace the protocol-specific bakers for all the protocols it supports, such as :ref:`octez-baker-PsRiotum <baker_manual_rio>` and :ref:`octez-baker-alpha <baker_manual_alpha>`.
-
+	This unique baker executable is meant to replace the protocol-specific bakers for all the protocols it supports, such as ``octez-baker-PsRiotum`` and ``octez-baker-alpha``.
 
 .. raw:: html
          :file: ../api/octez-baker.html
@@ -95,7 +94,7 @@ Accuser manual
 This is the manual page of the accuser command line tool. See :ref:`accuser_run` for a general description of this tool.
 
 .. note::
-	This unique accuser executable is meant to replace the protocol-specific accusers for all the protocols it supports, such as :ref:`octez-accuser-PsRiotum <accuser_manual_rio>` and :ref:`octez-accuser-alpha <accuser_manual_alpha>`.
+	This unique accuser executable is meant to replace the protocol-specific accusers for all the protocols it supports, such as ``octez-accuser-PsRiotum`` and ``octez-accuser-alpha``.
 
 .. raw:: html
          :file: ../api/octez-accuser.html
