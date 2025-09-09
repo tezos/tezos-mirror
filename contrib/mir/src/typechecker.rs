@@ -8163,6 +8163,48 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn is_implicit_account() {
+        let stk = &mut tc_stk![Type::Address];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("IS_IMPLICIT_ACCOUNT").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Ok(IsImplicitAccount)
+        );
+        assert_eq!(stk, &tc_stk![Type::new_option(Type::KeyHash)]);
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("IS_IMPLICIT_ACCOUNT").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IS_IMPLICIT_ACCOUNT,
+                stack: stk![],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 1 })
+            })
+        );
+
+        let stk = &mut tc_stk![Type::Unit];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("IS_IMPLICIT_ACCOUNT").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IS_IMPLICIT_ACCOUNT,
+                stack: stk![Type::Unit],
+                reason: None
+            })
+        );
+    }
+
+    #[test]
     fn now() {
         let stk = &mut tc_stk![];
         assert_eq!(
