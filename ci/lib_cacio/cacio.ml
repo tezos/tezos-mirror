@@ -45,6 +45,17 @@ type sccache_config = {
 let sccache ?key ?error_log ?idle_timeout ?log ?path ?cache_size () =
   {key; error_log; idle_timeout; log; path; cache_size}
 
+type dune_cache_config = {
+  key : string option;
+  path : string option;
+  cache_size : string option;
+  copy_mode : bool option;
+  policy : Gitlab_ci.Types.cache_policy option;
+}
+
+let dune_cache ?key ?path ?cache_size ?copy_mode ?policy () =
+  {key; path; cache_size; copy_mode; policy}
+
 (* Conditions are disjunctions: the job is included in the pipeline if
    ANY file in [changed] changed, or if the merge request has ANY of the [label]s. *)
 type condition = {changed : Tezos_ci.Changeset.t; label : String_set.t}
@@ -74,7 +85,9 @@ type job = {
   script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
   cargo_cache : bool;
+  cargo_target_caches : bool;
   sccache : sccache_config option;
+  dune_cache : dune_cache_config option;
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
 }
 
@@ -351,12 +364,14 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     script;
                     artifacts;
                     cargo_cache;
+                    cargo_target_caches;
                     sccache;
+                    dune_cache;
                     allow_failure;
                   };
                 trigger;
                 only_if;
-              } -> (
+              } ->
               (* Convert dependencies recursively. *)
               let dependencies =
                 let needs =
@@ -424,6 +439,40 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 | None | Some GCP | Some AWS -> false
                 | Some GCP_dev -> true
               in
+              let maybe_enable_cargo_cache job =
+                if cargo_cache then Tezos_ci.Cache.enable_cargo_cache job
+                else job
+              in
+              let maybe_enable_cargo_target_caches job =
+                if cargo_target_caches then
+                  Tezos_ci.Cache.enable_cargo_target_caches job
+                else job
+              in
+              let maybe_enable_sccache job =
+                match sccache with
+                | None -> job
+                | Some {key; error_log; idle_timeout; log; path; cache_size} ->
+                    Tezos_ci.Cache.enable_sccache
+                      ?key
+                      ?error_log
+                      ?idle_timeout
+                      ?log
+                      ?path
+                      ?cache_size
+                      job
+              in
+              let maybe_enable_dune_cache job =
+                match dune_cache with
+                | None -> job
+                | Some {key; path; cache_size; copy_mode; policy} ->
+                    Tezos_ci.Cache.enable_dune_cache
+                      ?key
+                      ?path
+                      ?cache_size
+                      ?copy_mode
+                      ?policy
+                      job
+              in
               Tezos_ci.job
                 ~__POS__:source_location
                 ~name
@@ -448,19 +497,8 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 ?artifacts
                 ?allow_failure
                 script
-              |> (if cargo_cache then Tezos_ci.Cache.enable_cargo_cache
-                  else Fun.id)
-              |>
-              match sccache with
-              | None -> Fun.id
-              | Some {key; error_log; idle_timeout; log; path; cache_size} ->
-                  Tezos_ci.Cache.enable_sccache
-                    ?key
-                    ?error_log
-                    ?idle_timeout
-                    ?log
-                    ?path
-                    ?cache_size)
+              |> maybe_enable_cargo_cache |> maybe_enable_cargo_target_caches
+              |> maybe_enable_sccache |> maybe_enable_dune_cache
         in
         result := UID_map.add uid result_node !result ;
         result_node
@@ -514,7 +552,9 @@ module type COMPONENT_API = sig
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cargo_cache:bool ->
+    ?cargo_target_caches:bool ->
     ?sccache:sccache_config ->
+    ?dune_cache:dune_cache_config ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     string ->
     string list ->
@@ -556,8 +596,9 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
-      ?(needs_legacy = []) ?variables ?artifacts ?(cargo_cache = false) ?sccache
-      ?allow_failure name script =
+      ?(needs_legacy = []) ?variables ?artifacts ?(cargo_cache = false)
+      ?(cargo_target_caches = false) ?sccache ?dune_cache ?allow_failure name
+      script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -595,7 +636,9 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       script;
       artifacts;
       cargo_cache;
+      cargo_target_caches;
       sccache;
+      dune_cache;
       allow_failure;
     }
 

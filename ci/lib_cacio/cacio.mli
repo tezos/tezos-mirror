@@ -51,7 +51,7 @@ type sccache_config
 
 (** Make an sccache configuration.
 
-    See {!Tezos_ci.enable_sccache}. *)
+    See {!Tezos_ci.Cache.enable_sccache}. *)
 val sccache :
   ?key:string ->
   ?error_log:string ->
@@ -61,6 +61,21 @@ val sccache :
   ?cache_size:string ->
   unit ->
   sccache_config
+
+(** Configuration of Dune's cache. *)
+type dune_cache_config
+
+(** Make a configuration for Dune's cache.
+
+    See {!Tezos_ci.Cache.enable_dune_cache}. *)
+val dune_cache :
+  ?key:string ->
+  ?path:string ->
+  ?cache_size:string ->
+  ?copy_mode:bool ->
+  ?policy:Gitlab_ci.Types.cache_policy ->
+  unit ->
+  dune_cache_config
 
 (** Pipeline jobs.
 
@@ -183,10 +198,16 @@ module type COMPONENT_API = sig
       contrary to [needs] jobs.
 
       If [cargo_cache] is [true], the resulting job is modified with
-      {!Tezos_ci.enable_cargo_cache}. Default is [false].
+      {!Tezos_ci.Cache.enable_cargo_cache}. Default is [false].
+
+      If [cargo_target_caches] is [true], the resulting job is modified with
+      {!Tezos_ci.Cache.enable_cargo_target_caches}. Default is [false].
 
       If [sccache] is specified, the resulting job is modified with
-      {!Tezos_ci.enable_sccache}.
+      {!Tezos_ci.Cache.enable_sccache}.
+
+      If [dune_cache] is specified, the resulting job is modified with
+      {!Tezos_ci.Cache.enable_dune_cache}.
 
       See {!Tezos_ci.job} for information about other arguments. *)
   val job :
@@ -205,7 +226,9 @@ module type COMPONENT_API = sig
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cargo_cache:bool ->
+    ?cargo_target_caches:bool ->
     ?sccache:sccache_config ->
+    ?dune_cache:dune_cache_config ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     string ->
     string list ->
