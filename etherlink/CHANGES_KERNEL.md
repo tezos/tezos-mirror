@@ -19,6 +19,7 @@ Its storage version is 37.
     - [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702): Set Code for EOAs.
     - [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537): Precompile for
       BLS12-381 curve operations.
+    - [EIP-7623](https://eips.ethereum.org/EIPS/eip-7623): Increase calldata cost.
 
 ### Bug fixes
 
