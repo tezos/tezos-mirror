@@ -10,10 +10,10 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-evm-node-libs" { = version }
-  "bls12-381"
   "octez-libs"
   "efunc_core"
+  "octez-evm-node-libs" { = version }
+  "bls12-381"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
