@@ -52,31 +52,25 @@ val maximum_gas_per_transaction : path
 
 (** Paths related to accounts. *)
 module Accounts : sig
-  (** Path to the account's balance. *)
+  (** Path to the account's info. Should be used in place of `balance`, `nonce` and `code` *)
+  val info : address -> path
+
+  (** Path to the account's balance. DEPRECATED use `info` *)
   val balance : address -> path
 
-  (** Path to the account's nonce. *)
+  (** Path to the account's nonce. DEPRECATED use `info` *)
   val nonce : address -> path
 
   (** Path to the account's code. *)
   val code : address -> path
 
-  (** Path to the account's code hash. *)
+  (** Path to the account's code hash. DEPRECATED use `info` *)
   val code_hash : address -> path
 
   (** Path to the account's storage at a given index. *)
   val storage : address -> path -> path
 
   type error += Invalid_address of string | Invalid_key of string
-
-  (** Path to the account's balance. Error if address is invalid. *)
-  val balance_e : address -> path tzresult
-
-  (** Path to the account's nonce. Error if address is invalid. *)
-  val nonce_e : address -> path tzresult
-
-  (** Path to the account's code. Error if address is invalid. *)
-  val code_e : address -> path tzresult
 
   (** Path to the account's storage at a given index. Error if address or
       storage key is invalid. *)

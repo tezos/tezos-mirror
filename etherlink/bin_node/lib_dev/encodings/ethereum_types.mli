@@ -134,6 +134,8 @@ val transaction_hash_size : int
 
 val decode_hash : bytes -> hash
 
+val encode_hash : hash -> bytes
+
 (** [hash_of_string s] takes a string [s] representing a hash in
     hexadecimal format, e.g. [0xFFFFFFF]. Strips the prefix and keeps
     the hash value, e.g. [FFFFFFF]. *)

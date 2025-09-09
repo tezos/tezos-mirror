@@ -35,6 +35,8 @@ sha2.workspace = true
 sha3.workspace = true
 ripemd.workspace = true
 libsecp256k1.workspace = true
+revm.workspace = true
+revm-etherlink.workspace = true
 
 evm.workspace = true
 aurora-engine-modexp.workspace = true

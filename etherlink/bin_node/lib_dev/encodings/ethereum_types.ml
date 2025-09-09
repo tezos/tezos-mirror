@@ -273,6 +273,8 @@ let decode_number_be bytes = Helpers.decode_z_be bytes |> quantity_of_z
 
 let decode_hash bytes = Hash (decode_hex bytes)
 
+let encode_hash (Hash hash) = encode_hex hash
+
 let pad_to_n_bytes_le bytes length =
   let current_length = Bytes.length bytes in
   if current_length >= length then bytes

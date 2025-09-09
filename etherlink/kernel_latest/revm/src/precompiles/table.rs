@@ -104,17 +104,14 @@ where
         Table::TableCalls::find_deposit(Table::find_depositCall { deposit_id }) => {
             let deposit = context.journal().find_deposit_in_queue(&deposit_id)?;
             let sol_deposit = Table::SolFaDepositWithProxy {
-                amount: u256_to_alloy(&deposit.amount).unwrap_or_default(),
+                amount: u256_to_alloy(&deposit.amount),
                 receiver: h160_to_alloy(&deposit.receiver),
                 proxy: h160_to_alloy(&deposit.proxy),
-                inbox_level: u256_to_alloy(&U256::from(deposit.inbox_level))
-                    .unwrap_or_default(),
-                inbox_msg_id: u256_to_alloy(&U256::from(deposit.inbox_msg_id))
-                    .unwrap_or_default(),
+                inbox_level: u256_to_alloy(&U256::from(deposit.inbox_level)),
+                inbox_msg_id: u256_to_alloy(&U256::from(deposit.inbox_msg_id)),
                 ticket_hash: u256_to_alloy(&U256::from_big_endian(
                     deposit.ticket_hash.as_bytes(),
-                ))
-                .unwrap_or_default(),
+                )),
             };
             Some(Bytes::copy_from_slice(&sol_deposit.abi_encode_params()))
         }

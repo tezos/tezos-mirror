@@ -1094,6 +1094,8 @@ dependencies = [
  "primitive-types",
  "proptest",
  "rand 0.8.5",
+ "revm",
+ "revm-etherlink",
  "ripemd",
  "rlp",
  "sha2 0.10.9",

@@ -29,16 +29,10 @@ impl FaDepositWithProxy {
     }
 }
 
-pub fn u256_to_le_bytes(value: PU256) -> Vec<u8> {
-    let mut bytes = vec![0u8; 32];
+pub fn u256_to_alloy(value: &PU256) -> U256 {
+    let mut bytes = [0u8; 32];
     value.to_little_endian(&mut bytes);
-    bytes
-}
-
-pub fn u256_to_alloy(value: &PU256) -> Option<U256> {
-    Some(U256::from_le_bytes::<32>(
-        u256_to_le_bytes(*value).try_into().ok()?,
-    ))
+    U256::from_le_bytes::<32>(bytes)
 }
 
 pub fn h160_to_alloy(value: &H160) -> Address {

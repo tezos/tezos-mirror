@@ -42,7 +42,9 @@ pub mod storage;
 mod database;
 mod helpers;
 
-#[derive(Error, Debug)]
+pub use helpers::legacy::u256_to_alloy;
+
+#[derive(Error, Debug, PartialEq, Eq, Clone)]
 pub enum Error {
     #[error("Runtime error: {0}")]
     Runtime(#[from] RuntimeError),
@@ -118,7 +120,7 @@ fn tx_env<'a, Host: Runtime>(
     let storage_account = world_state_handler
         .get_or_create(host, &account_path(&caller)?)
         .map_err(custom)?;
-    let nonce = storage_account.nonce(host)?;
+    let info = storage_account.info(host)?;
 
     // Using the transaction environment builder helps to
     // derive the transaction type directly from the different
@@ -130,7 +132,7 @@ fn tx_env<'a, Host: Runtime>(
         .kind(kind)
         .value(value)
         .data(data)
-        .nonce(nonce)
+        .nonce(info.nonce)
         .chain_id(Some(chain_id))
         .access_list(access_list)
         .authorization_list_signed(authorization_list)
@@ -359,7 +361,8 @@ mod test {
         block_constants_with_fees, block_constants_with_no_fees, DEFAULT_SPEC_ID,
     };
 
-    use crate::storage::code::EVM_CODES_PATH;
+    use crate::helpers::storage::bytes_hash;
+    use crate::storage::code::{CodeStorage, EVM_CODES_PATH};
     use crate::test::utilities::CreateAndRevert::{
         createAndRevertCall, CreateAndRevertCalls,
     };
@@ -487,11 +490,15 @@ mod test {
             .get_or_create(&host, &account_path(&destination).unwrap())
             .unwrap();
 
-        caller_account.set_info(&mut host, caller_info).unwrap();
+        caller_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
 
+        let caller_info = caller_account.info(&mut host).unwrap();
+        let destination_info = destination_account.info(&mut host).unwrap();
         // Check balances before executing the transfer
-        assert_eq!(caller_account.balance(&host).unwrap(), U256::MAX);
-        assert_eq!(destination_account.balance(&host).unwrap(), U256::ZERO);
+        assert_eq!(caller_info.balance, U256::MAX);
+        assert_eq!(destination_info.balance, U256::ZERO);
 
         let execution_result = run_transaction(
             &mut host,
@@ -519,11 +526,13 @@ mod test {
             }
         }
 
+        let caller_info = caller_account.info(&mut host).unwrap();
         assert_eq!(
-            caller_account.balance(&host).unwrap(),
+            caller_info.balance,
             U256::MAX.checked_sub(value_sent).unwrap()
         );
-        assert_eq!(destination_account.balance(&host).unwrap(), value_sent);
+        let destination_info = destination_account.info(&mut host).unwrap();
+        assert_eq!(destination_info.balance, value_sent);
     }
 
     #[test]
@@ -551,18 +560,21 @@ mod test {
             .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
 
-        caller_account.set_info(&mut host, caller_info).unwrap();
+        caller_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
 
         let mut contract_account = world_state_handler
             .get_or_create(&host, &account_path(&contract).unwrap())
             .unwrap();
 
+        let bytecode = Bytecode::new_raw(Bytes::from_hex("6042600155600154").unwrap());
         let contract_info = AccountInfo {
             balance: U256::ZERO,
             nonce: 0,
             // Code hash will be automatically computed and inserted when
             // inserting the account info into the db.
-            code_hash: Default::default(),
+            code_hash: bytes_hash(bytecode.original_byte_slice()),
             // PUSH1 0x42      # Value to store
             // PUSH1 0x01      # Storage slot index
             // SSTORE          # Store the value in storage
@@ -630,7 +642,9 @@ mod test {
             .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
 
-        storage_account.set_info(&mut host, caller_info).unwrap();
+        storage_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
 
         let result = run_transaction(
             &mut host,
@@ -672,10 +686,13 @@ mod test {
                 let contract_account = world_state_handler
                     .get_or_create(&host, &account_path(&address).unwrap())
                     .unwrap();
+                let info = contract_account.info(&mut host).unwrap();
+
                 assert_eq!(
                     bytecode,
-                    contract_account
-                        .code(&host)
+                    CodeStorage::new(&info.code_hash)
+                        .unwrap()
+                        .get_code(&host)
                         .unwrap()
                         .unwrap()
                         .original_bytes()
@@ -705,7 +722,9 @@ mod test {
         let mut storage_account = world_state_handler
             .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
-        storage_account.set_info(&mut host, caller_info).unwrap();
+        storage_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
 
         // Store the ticketer address required to build the outbox message
         host.store_write_all(
@@ -747,18 +766,18 @@ mod test {
         //  - zero address received the burned amound
         //  - outbox message has been built and sent
         assert!(result.is_success());
-        assert_eq!(
-            storage_account.balance(&host).unwrap(),
-            U256::MAX.saturating_sub(withdrawn_amount)
-        );
+        let info = storage_account.info(&mut host).unwrap();
+        assert_eq!(info.balance, U256::MAX.saturating_sub(withdrawn_amount));
         let created_account = world_state_handler
             .get_or_create(&host, &account_path(&WITHDRAWAL_SOL_ADDR).unwrap())
             .unwrap();
-        assert_eq!(created_account.balance(&host).unwrap(), U256::ZERO);
+        let created_account_info = created_account.info(&mut host).unwrap();
+        assert_eq!(created_account_info.balance, U256::ZERO);
         let zero_account = world_state_handler
             .get_or_create(&host, &account_path(&PRECOMPILE_BURN_ADDRESS).unwrap())
             .unwrap();
-        assert_eq!(zero_account.balance(&host).unwrap(), withdrawn_amount);
+        let zero_account_info = zero_account.info(&mut host).unwrap();
+        assert_eq!(zero_account_info.balance, withdrawn_amount);
         let raw_expected_withdrawals = r#"[Standard(AtomicTransactionBatch(OutboxMessageTransactionBatch { batch: [OutboxMessageTransaction { parameters: MichelsonPair(MichelsonContract(Implicit(Ed25519(ContractTz1Hash("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")))), Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4"))), MichelsonPair(MichelsonPair(MichelsonNat(Zarith(0)), MichelsonOption(None)), MichelsonInt(Zarith(1)))))), destination: Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4")), entrypoint: Entrypoint { name: "burn" } }] }))]"#;
         assert_eq!(format!("{withdrawals:?}"), raw_expected_withdrawals);
     }
@@ -868,7 +887,9 @@ mod test {
             .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
 
-        storage_account.set_info(&mut host, caller_info).unwrap();
+        storage_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
 
         let result_create = run_transaction(
             &mut host,
@@ -1021,7 +1042,9 @@ mod test {
         let mut storage_account = world_state_handler
             .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
-        storage_account.set_info(&mut host, caller_info).unwrap();
+        storage_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
 
         // Call the CallAndRevert contract with the calldata for FAWithdrawal
         let ExecutionOutcome {
@@ -1209,7 +1232,9 @@ mod test {
             .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
 
-        caller_account.set_info(&mut host, caller_info).unwrap();
+        caller_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
 
         // Claim deposit with id 2 (wrong id), revert is expected
 
@@ -1235,6 +1260,7 @@ mod test {
         )
         .unwrap();
 
-        assert_eq!(initial_balance, caller_account.balance(&host).unwrap());
+        let caller_account_info = caller_account.info(&mut host).unwrap();
+        assert_eq!(initial_balance, caller_account_info.balance);
     }
 }

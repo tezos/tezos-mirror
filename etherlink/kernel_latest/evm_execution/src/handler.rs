@@ -1202,7 +1202,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             Ok(true)
         } else if let Some(from_account) = self.get_account(from)? {
             let balance = from_account
-                .balance(self.host)
+                .read_only_balance(self.host)
                 .map_err(EthereumError::from)?;
             let enough_balance = &balance >= value;
             if !enough_balance {
@@ -1672,7 +1672,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             .map_err(EthereumError::from)
     }
 
-    fn get_nonce(&self, address: H160) -> Result<u64, AccountStorageError> {
+    fn get_nonce(&mut self, address: H160) -> Result<u64, AccountStorageError> {
         self.get_account(address)?
             .map(|account| account.nonce(self.host))
             .unwrap_or(Ok(0))
@@ -2623,7 +2623,7 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
         self.get_account(address)
             .ok()
             .flatten()
-            .and_then(|a| a.balance(self.host).ok())
+            .and_then(|a| a.read_only_balance(self.host).ok())
             .unwrap_or_default()
     }
 
