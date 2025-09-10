@@ -54,6 +54,24 @@ pub fn forge_message(msg: &str) -> Result<Vec<u8>, Error> {
     Ok(out)
 }
 
+#[uniffi::export]
+pub fn forge_operation(
+    branch: &crate::hash::BlockHash,
+    operations: Vec<Arc<operation::Operation>>,
+) -> Result<Vec<u8>, Error> {
+    use enc::BinWriter;
+    use tezos_protocol::operation::{OperationContentList, UnsignedOperation};
+    let unsigned_operation = UnsignedOperation {
+        branch: branch.0.clone(),
+        content_list: OperationContentList {
+            contents: operations.into_iter().map(|op| op.0.clone()).collect(),
+        },
+    };
+    unsigned_operation
+        .to_bytes()
+        .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
+}
+
 pub mod operation {
     use super::*;
     use crate::entrypoint::Entrypoint;
@@ -66,7 +84,7 @@ pub mod operation {
     };
 
     #[derive(uniffi::Object, Debug)]
-    pub struct Operation(OperationContent);
+    pub struct Operation(pub(crate) OperationContent);
 
     #[uniffi::export]
     impl Operation {
@@ -203,7 +221,7 @@ pub mod operation {
 mod tests {
     use super::*;
     use crate::entrypoint::Entrypoint;
-    use crate::hash::{BlsSignature, Contract, PublicKey, PublicKeyHash};
+    use crate::hash::{BlockHash, BlsSignature, Contract, PublicKey, PublicKeyHash};
     use operation::*;
 
     // All messages bytes were generated using `octez-codec encode "alpha.script.expr" from '{ "string": "$MSG" }'`
@@ -610,6 +628,71 @@ mod tests {
         assert_eq!(
             bytes, raw_delegation,
             "Delegation must be forged into the expected bytes"
+        );
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.unsigned" from '{
+      "branch": "BL2fRnPdMqU3z6iEvEYNofAwYoTTLhaMLsvMES2Wf4Zj7Lf69qy",
+      "contents": [
+        {
+          "kind": "reveal",
+          "source": "tz1dPdVboerXfFsZ5L4ga2y9ZJKuKT5x391x",
+          "fee": "114",
+          "counter": "43209",
+          "gas_limit": "785",
+          "storage_limit": "231",
+          "public_key": "edpkvXZ4cwEip8QxeoNZPjxPUKCpVJNQXio1k6Dp16PsSh6ugNjhw9"
+        },
+        {
+          "kind": "transaction",
+          "source": "tz1dPdVboerXfFsZ5L4ga2y9ZJKuKT5x391x",
+          "fee": "437",
+          "counter": "43210",
+          "gas_limit": "835",
+          "storage_limit": "0",
+          "amount": "753",
+          "destination": "KT1EHorBhV6bEJH7wsyxSuDXsQ5dw4VWVwL4",
+          "parameters": {
+            "entrypoint": "unstake",
+            "value": { "prim": "Unit" }
+          }
+        }
+      ]
+    }'
+    */
+    #[test]
+    fn operation_forging() {
+        let pkh = PublicKeyHash::from_b58check("tz1dPdVboerXfFsZ5L4ga2y9ZJKuKT5x391x").unwrap();
+        let pk = PublicKey::from_b58check("edpkvXZ4cwEip8QxeoNZPjxPUKCpVJNQXio1k6Dp16PsSh6ugNjhw9")
+            .unwrap();
+
+        let reveal = Operation::reveal(&pkh, 114, 43209, 785, 231, &pk, None);
+        let transaction = Operation::transaction(
+            &pkh,
+            437,
+            43210,
+            835,
+            0,
+            753,
+            &Contract::from_b58check("KT1EHorBhV6bEJH7wsyxSuDXsQ5dw4VWVwL4").unwrap(),
+            Some(Arc::new(Entrypoint::new("unstake").unwrap())),
+            // octez-client convert data 'Unit' from Michelson to binary
+            Some(hex::decode("030b").unwrap()),
+        );
+
+        let branch =
+            BlockHash::from_b58check("BL2fRnPdMqU3z6iEvEYNofAwYoTTLhaMLsvMES2Wf4Zj7Lf69qy")
+                .unwrap();
+        let operations = vec![Arc::new(reveal), Arc::new(transaction)];
+
+        let forged_operation =
+            forge_operation(&branch, operations).expect("Forging operations should succeed");
+
+        let bytes = hex::decode("29bc70a0d87890e8c45b9653b65385638d1d829e053591a21812999c69d305286b00c2b9134fa5b947b44f9a9c9a75f83d7f2e8524f672c9d1029106e70100f83f217c459a46b88b0fb2b099a4b25d6ffa97b55201132b28091287842a6739006c00c2b9134fa5b947b44f9a9c9a75f83d7f2e8524f6b503cad102c30600f105013e9b96d5173312baacd650285dfe748d2337b39d00ff0700000002030b").unwrap();
+        assert_eq!(
+            bytes, forged_operation,
+            "Operations must be forged into the expected bytes"
         );
     }
 }

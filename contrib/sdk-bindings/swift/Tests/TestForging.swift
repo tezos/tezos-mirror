@@ -13,6 +13,7 @@ class TestForging: XCTestCase {
       ("transactionForging", transactionForging),
       ("originationForging", originationForging),
       ("delegationForging", delegationForging),
+      ("operationForging", operationForging),
     ]
 
     func messageForging() {
@@ -178,5 +179,55 @@ class TestForging: XCTestCase {
           0x2b, 0xc9, 0x5f, 0x7e, 0x5f, 0x41, 0xac, 0x78
         ]
         XCTAssertEqual(Array(rawDelegation), expectedBytes)
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.unsigned" from '{
+      "branch": "BLABQbLzzNcrgTgcumYBgCkFzgT9LSx7WK2SsjjZdcJGtTRtCzz",
+      "contents": [
+        {
+          "kind": "transaction",
+          "source": "tz2BctFU4ggoq31YSKu5L3MgSmFhvU7zDhY8",
+          "fee": "537",
+          "counter": "623698",
+          "gas_limit": "248",
+          "storage_limit": "735",
+          "amount": "700000",
+          "destination": "tz3i3aDaYUtfSnza4VC1XQKGFJgf99pFtoHk"
+        }
+      ]
+    }'
+    */
+    func operationForging() {
+        let source = try! PublicKeyHash.fromB58check(data: "tz2BctFU4ggoq31YSKu5L3MgSmFhvU7zDhY8")
+        let destination = try! Contract.fromB58check(data: "tz3i3aDaYUtfSnza4VC1XQKGFJgf99pFtoHk")
+
+        let transaction = Operation.transaction(
+          source: source,
+          fee: 537,
+          counter: 623698,
+          gasLimit: 248,
+          storageLimit: 735,
+          amount: 700000,
+          destination: destination
+        )
+
+        let branch = try! BlockHash.fromB58check(data: "BLABQbLzzNcrgTgcumYBgCkFzgT9LSx7WK2SsjjZdcJGtTRtCzz")
+        let operations = [transaction]
+
+        let forgedOperation = try! forgeOperation(branch: branch, operations: operations)
+
+        let expectedBytes: [UInt8] = [
+          0x3a, 0xcd, 0xd9, 0xe7, 0xa0, 0xcd, 0x11, 0x20, 0x77, 0x3c,
+          0x0f, 0xe0, 0x56, 0x7a, 0x31, 0x9e, 0xac, 0x66, 0x37, 0x11,
+          0xb0, 0xbd, 0x4b, 0xd4, 0x55, 0x26, 0x2a, 0xde, 0x9d, 0x52,
+          0x34, 0x70, 0x6c, 0x01, 0x24, 0x3e, 0xd3, 0x72, 0xff, 0xcb,
+          0x2d, 0xc1, 0x5a, 0xed, 0x65, 0x9c, 0x84, 0xe7, 0x36, 0xf7,
+          0xfa, 0xa7, 0xcb, 0x78, 0x99, 0x04, 0xd2, 0x88, 0x26, 0xf8,
+          0x01, 0xdf, 0x05, 0xe0, 0xdc, 0x2a, 0x00, 0x02, 0xee, 0x35,
+          0x3d, 0xbd, 0x57, 0x8e, 0xb2, 0x08, 0x9d, 0x7f, 0xcb, 0xa3,
+          0x02, 0x07, 0x4d, 0x99, 0xec, 0x26, 0xef, 0xd2, 0x00
+        ]
+        XCTAssertEqual(Array(forgedOperation), expectedBytes)
     }
 }
