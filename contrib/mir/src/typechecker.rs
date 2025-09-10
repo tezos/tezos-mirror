@@ -164,6 +164,9 @@ pub enum TcError {
     /// All branches of a `MAP` instruction's code block are failing.
     #[error("all branches of a MAP block use FAILWITH, its type cannot be inferred")]
     MapBlockFail,
+    /// Two views with the same name where declared in a script
+    #[error("two views were declared with the same name {0}")]
+    DuplicatedView(String),
 }
 
 impl From<TryFromBigIntError<()>> for TcError {
@@ -304,6 +307,8 @@ impl<'a> Micheline<'a> {
     /// Typecheck the contract script. Validates the script's types, then
     /// typechecks the code and checks the result stack is as expected. Returns
     /// typechecked script.
+    /// If the script contains some views, they are not typechecked.
+    /// TODO https://linear.app/tezos/issue/L2-376/type-check-views
     pub fn typecheck_script(&self, ctx: &mut Ctx) -> Result<ContractScript<'a>, TcError> {
         let seq = match self {
             // top-level allows one level of nesting
@@ -314,6 +319,7 @@ impl<'a> Micheline<'a> {
         let mut parameter_ty = None;
         let mut storage_ty = None;
         let mut code = None;
+        let mut views = HashMap::new();
         fn set_if_none<T>(elt: Prim, var: &mut Option<T>, value: T) -> Result<(), TcError> {
             if var.is_none() {
                 *var = Some(value);
@@ -332,6 +338,27 @@ impl<'a> Micheline<'a> {
                 }
                 Micheline::App(Prim::storage, [content], anns) if anns.is_empty() => {
                     set_if_none(Prim::storage, &mut storage_ty, content)?
+                }
+                Micheline::App(
+                    Prim::view,
+                    [Micheline::String(name), input_type, output_type, code],
+                    anns,
+                ) if anns.is_empty() => {
+                    // TODO: consume some gas
+                    let name: String = name.into();
+                    let input_type = input_type.parse_ty(ctx)?;
+                    let output_type = output_type.parse_ty(ctx)?;
+                    let previous_view = views.insert(
+                        name.clone(),
+                        View {
+                            input_type,
+                            output_type,
+                            code: code.clone(),
+                        },
+                    );
+                    if previous_view.is_some() {
+                        return Err(TcError::DuplicatedView(name));
+                    }
                 }
                 Micheline::Seq(..)
                 | micheline_instructions!()
@@ -372,6 +399,7 @@ impl<'a> Micheline<'a> {
             parameter,
             storage,
             annotations: anns,
+            views,
         })
     }
 }
@@ -6188,6 +6216,122 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn test_script_typechecking() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage unit;",
+                "code { CAR; NIL operation; PAIR };",
+            ))
+            .unwrap()
+            .typecheck_script(&mut ctx),
+            Ok(ContractScript {
+                parameter: Type::Unit,
+                storage: Type::Unit,
+                code: Seq(vec![Car, Nil, Pair]),
+                annotations: HashMap::from([(
+                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    (Vec::new(), Type::Unit)
+                )]),
+                views: HashMap::new(),
+            })
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_views() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage unit;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "a" unit unit { CAR };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut ctx),
+            Ok(ContractScript {
+                parameter: Type::Unit,
+                storage: Type::Unit,
+                code: Seq(vec![Car, Nil, Pair]),
+                annotations: HashMap::from([(
+                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    (Vec::new(), Type::Unit)
+                )]),
+                views: HashMap::from_iter([(
+                    "a".into(),
+                    View {
+                        input_type: Type::Unit,
+                        output_type: Type::Unit,
+                        code: parse("{ CAR }").unwrap()
+                    }
+                )]),
+            })
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_two_views() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage unit;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "a" unit unit { CAR };"#,
+                r#"view "b" unit unit { CDR };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut ctx),
+            Ok(ContractScript {
+                parameter: Type::Unit,
+                storage: Type::Unit,
+                code: Seq(vec![Car, Nil, Pair]),
+                annotations: HashMap::from([(
+                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    (Vec::new(), Type::Unit)
+                )]),
+                views: HashMap::from_iter([
+                    (
+                        "a".into(),
+                        View {
+                            input_type: Type::Unit,
+                            output_type: Type::Unit,
+                            code: parse("{ CAR }").unwrap()
+                        }
+                    ),
+                    (
+                        "b".into(),
+                        View {
+                            input_type: Type::Unit,
+                            output_type: Type::Unit,
+                            code: parse("{ CDR }").unwrap()
+                        }
+                    )
+                ]),
+            })
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_duplicated_views() {
+        let mut ctx = Ctx::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage unit;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "a" unit unit { CAR };"#,
+                r#"view "a" unit unit { CDR };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut ctx),
+            Err(TcError::DuplicatedView("a".into()))
+        );
+    }
+
+    #[test]
     fn test_contract_is_passable() {
         let mut ctx = Ctx::default();
         assert_eq!(
@@ -6206,6 +6350,7 @@ mod typecheck_tests {
                     FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
                     (Vec::new(), Type::new_contract(Type::Unit))
                 )]),
+                views: HashMap::new(),
             })
         );
     }
@@ -6657,6 +6802,7 @@ mod typecheck_tests {
                         (vec![Direction::Left], Type::Int)
                     )
                 ]),
+                views: HashMap::new(),
             })
         );
     }
@@ -6711,6 +6857,7 @@ mod typecheck_tests {
                         (vec![Direction::Right], Type::Unit)
                     ),
                 ]),
+                views: HashMap::new(),
             })
         );
     }
