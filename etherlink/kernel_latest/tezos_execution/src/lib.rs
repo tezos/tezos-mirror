@@ -4372,5 +4372,56 @@ mod tests {
             "Expected Successful Transfer operation result, got {:?}",
             receipts2[0]
         );
+
+        // An empty internal transfer to an implicit account fails.
+        let operation = make_transfer_operation(
+            15,
+            3,
+            4,
+            5,
+            src.clone(),
+            0.into(),
+            Contract::Originated(kt1_addr.clone()),
+            Some(Parameter {
+                entrypoint: Entrypoint::try_from("call")
+                    .expect("Entrypoint should be valid"),
+                value: Micheline::from(src.clone().pkh.to_b58check()).encode(),
+            }),
+        );
+        let receipts3 = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+            &0u32.into(),
+            &0i64.into(),
+            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(receipts3.len(), 1, "There should be one receipt");
+        assert!(
+            matches!(
+                &receipts3[0],
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::BackTracked(BacktrackedResult { result: TransferTarget::ToContrat(TransferSuccess { .. }), .. }),
+                    internal_operation_results,
+                    ..
+                }) if internal_operation_results.len() == 1 && matches!(
+                    &internal_operation_results[0],
+                    InternalOperationSum::Transfer(InternalContentWithMetadata {result: ContentResult::Failed(ApplyOperationErrors { errors }), ..})
+                        if errors.len() == 1 && matches!(
+                            &errors[0],
+                            ApplyOperationError::Transfer(
+                                TransferError::EmptyImplicitTransfer
+                            )
+                        )
+                )
+            ),
+            "Expected Failed Transfer operation result with EmptyImplicitTransfer, got {:?}",
+            receipts3[0]
+        );
     }
 }
