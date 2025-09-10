@@ -89,6 +89,7 @@ type job = {
   sccache : sccache_config option;
   dune_cache : dune_cache_config option;
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
+  retry : Gitlab_ci.Types.retry option;
 }
 
 type trigger = Auto | Immediate | Manual
@@ -368,6 +369,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     sccache;
                     dune_cache;
                     allow_failure;
+                    retry;
                   };
                 trigger;
                 only_if;
@@ -430,9 +432,12 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 match stage with Build | Test -> true | Publish -> false
               in
               let retry : Gitlab_ci.Types.retry option =
-                match stage with
-                | Build | Test -> None
-                | Publish -> Some {max = 0; when_ = []}
+                match retry with
+                | Some _ -> retry
+                | None -> (
+                    match stage with
+                    | Build | Test -> None
+                    | Publish -> Some {max = 0; when_ = []})
               in
               let dev_infra =
                 match provider with
@@ -556,6 +561,7 @@ module type COMPONENT_API = sig
     ?sccache:sccache_config ->
     ?dune_cache:dune_cache_config ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
+    ?retry:Gitlab_ci.Types.retry ->
     string ->
     string list ->
     job
@@ -597,8 +603,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
       ?(needs_legacy = []) ?variables ?artifacts ?(cargo_cache = false)
-      ?(cargo_target_caches = false) ?sccache ?dune_cache ?allow_failure name
-      script =
+      ?(cargo_target_caches = false) ?sccache ?dune_cache ?allow_failure ?retry
+      name script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -640,6 +646,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       sccache;
       dune_cache;
       allow_failure;
+      retry;
     }
 
   let register_before_merging_jobs jobs =
