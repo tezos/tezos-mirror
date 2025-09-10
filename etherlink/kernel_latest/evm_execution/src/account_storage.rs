@@ -151,7 +151,7 @@ pub struct StorageEffect {
 /// an account. We don't currently require it, and so it's omitted.
 #[derive(Debug, PartialEq)]
 pub struct EthereumAccount {
-    path: OwnedPath,
+    pub path: OwnedPath,
 }
 
 impl From<OwnedPath> for EthereumAccount {

@@ -61,7 +61,7 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
 
 enum AccountState {
     Touched((AccountInfo, EvmStorage)),
-    SelfDestructed(B256),
+    SelfDestructed,
 }
 
 impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
@@ -205,9 +205,13 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
                         }
                     }
                 }
-                AccountState::SelfDestructed(_code_hash) => {
-                    // Starting from the Cancun hard fork, the underlying opcode is no longer supposed
-                    // to delete the code and data associated with an account
+                AccountState::SelfDestructed => {
+                    abort_on_error!(
+                        self,
+                        storage_account
+                            .set_info_without_code(self.host, AccountInfo::default()),
+                        "DatabaseCommit `set_info_without_code`"
+                    );
                 }
             },
             error => {
@@ -386,10 +390,7 @@ impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
             // The account is touched and marked as selfdestructed, we clear the
             // account.
             if account.is_selfdestructed() {
-                self.update_account(
-                    address,
-                    AccountState::SelfDestructed(account.info.code_hash),
-                );
+                self.update_account(address, AccountState::SelfDestructed);
                 continue;
             }
 
