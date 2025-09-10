@@ -8,6 +8,7 @@
 
 open Evm_node_lib_dev_encoding
 open Evm_node_lib_dev
+open Tezt_etherlink
 open Setup
 open Etherlink_benchmark_lib
 open Benchmark_utils
@@ -307,6 +308,7 @@ let test_snailtracer () =
       else return (fun () -> unit)
     in
     let* () =
+      with_collect_host_function_metrics env.rpc_node @@ fun () ->
       Lwt_list.iter_s (step env) (List.init parameters.iterations succ)
     in
     Lwt.cancel follower ;
@@ -416,7 +418,10 @@ let test_full_image_raytracing () =
   let* stop_profile =
     if parameters.profiling then profile sequencer else return (fun () -> unit)
   in
-  let* () = ray_trace_scanlines env sender in
+  let* () =
+    with_collect_host_function_metrics env.rpc_node @@ fun () ->
+    ray_trace_scanlines env sender
+  in
   let* () = Evm_node.terminate sequencer in
   stop_profile ()
 

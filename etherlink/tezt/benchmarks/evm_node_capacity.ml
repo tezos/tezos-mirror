@@ -278,6 +278,7 @@ let test_erc20_capacity () =
       else return (fun () -> unit)
     in
     let* () =
+      with_collect_host_function_metrics env.rpc_node @@ fun () ->
       Lwt_list.iter_s (step env erc20s) (List.init parameters.iterations succ)
     in
     Lwt.cancel follower ;

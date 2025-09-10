@@ -747,3 +747,45 @@ let profile evm_node =
   match String.trim os with
   | "Darwin" -> return (MacOS.profile evm_node)
   | _ -> return (Linux.profile evm_node)
+
+let host_fun_metrics_re =
+  rex "octez_evm_node_host_function_calls\\{host_function=\"([^\"]*)\"} (\\d+)"
+
+module StringTable = Hashtbl.Make (String)
+
+let collect_host_function_metrics evm_node =
+  let* metrics = Rpc.metrics evm_node in
+  let metrics = String.split_on_char '\n' metrics in
+  List.fold_left
+    (fun acc line ->
+      match line =~** host_fun_metrics_re with
+      | None -> acc
+      | Some (f_name, count_s) ->
+          let count = try int_of_string count_s with _ -> 0 in
+          (f_name, count) :: acc)
+    []
+    metrics
+  |> List.rev |> return
+
+let log_host_function_calls metrics =
+  let total = List.fold_left (fun acc (_, c) -> c + acc) 0 metrics in
+  Log.report
+    ~color:Log.Color.bold
+    "Total number of host function calls: %#d"
+    total ;
+  List.iter (fun (n, c) -> Log.info " - %-18s %#8d" n c) metrics
+
+let with_collect_host_function_metrics evm_node f =
+  let* metrics_before = collect_host_function_metrics evm_node in
+  let* res = f () in
+  let* metrics_after = collect_host_function_metrics evm_node in
+  let metrics =
+    List.map
+      (fun (name, count_aft) ->
+        match List.assoc_opt name metrics_before with
+        | None -> (name, count_aft)
+        | Some count_bef -> (name, count_aft - count_bef))
+      metrics_after
+  in
+  log_host_function_calls metrics ;
+  return res
