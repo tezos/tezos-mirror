@@ -374,6 +374,7 @@ let register ~auto ~description pipeline_type =
   Pipeline.register_child
     pipeline_name
     ~description
+    ~default:retry_default_config
     ~jobs:(job_datadog_pipeline_trace :: jobs)
 
 let child_pipeline_partial =
