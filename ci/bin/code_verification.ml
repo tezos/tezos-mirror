@@ -253,60 +253,58 @@ type manual =
   | Yes  (** Add rule for manual start. *)
   | On_changes of Changeset.t  (** Add manual start on certain [changes:] *)
 
+(* [make_rules] makes rules for jobs that are:
+   - automatic in scheduled pipelines;
+   - conditional in [before_merging] pipelines.
+
+   If a job has non-optional dependencies, then [dependent] must be
+   set to [true] to ensure that we only run the job in case previous
+   jobs succeeded (setting [when: on_success]).
+
+   If [label] is set, add rule that selects the job in
+   [Before_merging] pipelines for merge requests with the given
+   label. Rules for manual start can be configured using [manual].
+
+   If [label], [changes] and [manual] are omitted, then rules will
+   enable the job [On_success] in the [before_merging] pipeline. This
+   is safe, but prefer specifying a [changes] clause if possible.
+
+   If [final_pipeline_disable] is set to true (default false), this job is
+   disabled in final [Before_merging] pipelines. *)
+let make_rules ~pipeline_type ?label ?changes ?(manual = No)
+    ?(dependent = false) ?(final_pipeline_disable = false) () =
+  match pipeline_type with
+  | Schedule_extended_test ->
+      (* The scheduled pipeline always runs all jobs unconditionally
+           -- unless they are dependent on a previous job (which is
+           not [job_start] defined below), in the pipeline. *)
+      [job_rule ~when_:(if dependent then On_success else Always) ()]
+  | Before_merging | Merge_train -> (
+      (* MR labels can be used to force tests to run. *)
+      (if final_pipeline_disable then
+         [job_rule ~if_:Rules.is_final_pipeline ~when_:Never ()]
+       else [])
+      @ (match label with
+        | Some label ->
+            [job_rule ~if_:Rules.(has_mr_label label) ~when_:On_success ()]
+        | None -> [])
+      (* Modifying some files can force tests to run. *)
+      @ (match changes with
+        | None -> []
+        | Some changes ->
+            [job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()])
+      (* It can be relevant to start some jobs manually. *)
+      @
+      match manual with
+      | No -> []
+      | Yes -> [job_rule ~when_:Manual ()]
+      | On_changes changes ->
+          [job_rule ~when_:Manual ~changes:(Changeset.encode changes) ()])
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
-  (* [make_rules] makes rules for jobs that are:
-     - automatic in scheduled pipelines;
-     - conditional in [before_merging] pipelines.
-
-     If a job has non-optional dependencies, then [dependent] must be
-     set to [true] to ensure that we only run the job in case previous
-     jobs succeeded (setting [when: on_success]).
-
-     If [label] is set, add rule that selects the job in
-     [Before_merging] pipelines for merge requests with the given
-     label. Rules for manual start can be configured using [manual].
-
-     If [label], [changes] and [manual] are omitted, then rules will
-     enable the job [On_success] in the [before_merging] pipeline. This
-     is safe, but prefer specifying a [changes] clause if possible.
-
-     If [final_pipeline_disable] is set to true (default false), this job is
-     disabled in final [Before_merging] pipelines. *)
-  let make_rules ?label ?changes ?(manual = No) ?(dependent = false)
-      ?(final_pipeline_disable = false) () =
-    match pipeline_type with
-    | Schedule_extended_test ->
-        (* The scheduled pipeline always runs all jobs unconditionally
-           -- unless they are dependent on a previous job (which is
-           not [job_start] defined below), in the pipeline. *)
-        [job_rule ~when_:(if dependent then On_success else Always) ()]
-    | Before_merging | Merge_train -> (
-        (* MR labels can be used to force tests to run. *)
-        (if final_pipeline_disable then
-           [job_rule ~if_:Rules.is_final_pipeline ~when_:Never ()]
-         else [])
-        @ (match label with
-          | Some label ->
-              [job_rule ~if_:Rules.(has_mr_label label) ~when_:On_success ()]
-          | None -> [])
-        (* Modifying some files can force tests to run. *)
-        @ (match changes with
-          | None -> []
-          | Some changes ->
-              [
-                job_rule ~changes:(Changeset.encode changes) ~when_:On_success ();
-              ])
-        (* It can be relevant to start some jobs manually. *)
-        @
-        match manual with
-        | No -> []
-        | Yes -> [job_rule ~when_:Manual ()]
-        | On_changes changes ->
-            [job_rule ~when_:Manual ~changes:(Changeset.encode changes) ()])
-  in
-
+  let make_rules = make_rules ~pipeline_type in
   (* Stages *)
   let start_stage, make_dependencies =
     match pipeline_type with
