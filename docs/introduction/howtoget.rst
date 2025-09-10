@@ -529,7 +529,7 @@ Install Octez OPAM packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The latest Octez release is available (as soon as possible after the
-release) directly as OPAM packages.
+release) directly as OPAM packages in a specific repository (defined below).
 
 .. note::
 
@@ -540,13 +540,13 @@ release) directly as OPAM packages.
    ``$HOME/.zshrc``, ``$HOME/.emacs``, ...) if you asked/allowed OPAM
    to add some lines in them).
 
-The binaries need a specific version of the OCaml compiler (see the value
-of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an environment with it do:
+The binaries need a specific version of the OCaml and Rust compilers (see the values
+of variables ``$ocaml_version`` and ``$recommended_rust_version`` in file ``scripts/version.sh``). To get an environment with them do:
 
 .. literalinclude:: install-opam.sh
   :language: shell
   :start-after: [install ocaml compiler]
-  :end-before: [install tezos]
+  :end-before: [add octez repository]
 
 .. note::
 
@@ -569,6 +569,13 @@ of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an enviro
    computation by setting the OPAMSOLVERTIMEOUT environment variable (to a
    number of seconds), e.g. by adding ``OPAMSOLVERTIMEOUT=1200`` before the
    command. If no timeout occurs, you may omit this part.
+
+The Octez packages are distributed in their own Opam repository, which you have to add:
+
+.. literalinclude:: install-opam.sh
+  :language: shell
+  :start-after: [add octez repository]
+  :end-before: [install tezos]
 
 Now, install all the binaries by:
 

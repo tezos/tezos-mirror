@@ -26,6 +26,16 @@ wget -O latest-release:version.sh https://gitlab.com/tezos/tezos/raw/latest-rele
 source latest-release:version.sh
 opam switch create for_tezos $ocaml_version
 eval $(opam env)
+# [install rust]
+wget https://sh.rustup.rs/rustup-init.sh
+chmod +x rustup-init.sh
+./rustup-init.sh --profile minimal --default-toolchain $recommended_rust_version -y
+. "$HOME/.cargo/env"
+rustc --version
+# [add octez repository]
+opam remote remove -a octez
+opam remote add octez https://github.com/tezos/opam-repository.git\#octez-latest
+opam update
 # [install tezos]
 opam install octez
 # [test executables]
