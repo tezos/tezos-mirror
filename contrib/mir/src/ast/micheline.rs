@@ -286,6 +286,8 @@ macro_rules! micheline_unsupported_instructions_common {
             | Prim::CAST
             | Prim::RENAME
             | Prim::IS_IMPLICIT_ACCOUNT
+            | Prim::INDEX_ADDRESS
+            | Prim::GET_ADDRESS_INDEX
     };
 }
 
@@ -417,7 +419,9 @@ macro_rules! micheline_instructions {
                 | Prim::XOR
                 | Prim::OR
                 | Prim::PAIRING_CHECK
-                | Prim::IS_IMPLICIT_ACCOUNT,
+                | Prim::IS_IMPLICIT_ACCOUNT
+                | Prim::INDEX_ADDRESS
+                | Prim::GET_ADDRESS_INDEX,
             ..,
         )
     };

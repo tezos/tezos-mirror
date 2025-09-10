@@ -38,6 +38,7 @@ runtime_entrypoint_verification = []
 
 [dev-dependencies]
 proptest = "1.3.1"
+regex = "1.11.2"
 
 # Ignore the lint warning on `#![cfg(not(tarpaulin_include))]` which
 # is the only non-nightly way to locally disable the tarpaulin

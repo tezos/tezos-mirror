@@ -74,7 +74,6 @@ macro_rules! defprim {
 // For the correct order, see
 // `src/proto_alpha/lib_protocol/michelson_v1_primitives.ml` file in this
 // repository, `prim_encoding` function.
-// TODO: https://gitlab.com/tezos/tezos/-/issues/6632
 // Add a test on ordering
 defprim! {
     /// Micheline primitives.
@@ -103,6 +102,8 @@ defprim! {
     CHAIN_ID, LEVEL, SELF_ADDRESS, never, NEVER,
     UNPAIR, VOTING_POWER, TOTAL_VOTING_POWER, KECCAK,
     SHA3,
+    // BLS primitivies
+    PAIRING_CHECK, bls12_381_g1, bls12_381_g2, bls12_381_fr,
     sapling_state, sapling_transaction_deprecated,
     SAPLING_EMPTY_STATE, SAPLING_VERIFY_UPDATE, ticket,
     TICKET_DEPRECATED, READ_TICKET, SPLIT_TICKET,
@@ -110,11 +111,10 @@ defprim! {
     OPEN_CHEST, VIEW, view, constant, SUB_MUTEZ,
     tx_rollup_l2_address, MIN_BLOCK_TIME, sapling_transaction,
     EMIT, Lambda_rec, LAMBDA_REC, TICKET, BYTES,
-    NAT, Ticket, IS_IMPLICIT_ACCOUNT,
+    NAT, Ticket, IS_IMPLICIT_ACCOUNT, INDEX_ADDRESS,
+    GET_ADDRESS_INDEX,
     // Unstable primitives (they are not part of a released protocol)
     Transfer_tokens, Set_delegate, Create_contract, Emit,
-    // BLS primitivies
-    PAIRING_CHECK, bls12_381_g1, bls12_381_g2, bls12_381_fr,
     // If you add anything here, see the note about the order above.
 }
 
