@@ -74,7 +74,6 @@ macro_rules! defprim {
 // For the correct order, see
 // `src/proto_alpha/lib_protocol/michelson_v1_primitives.ml` file in this
 // repository, `prim_encoding` function.
-// TODO: https://gitlab.com/tezos/tezos/-/issues/6632
 // Add a test on ordering
 defprim! {
     /// Micheline primitives.
