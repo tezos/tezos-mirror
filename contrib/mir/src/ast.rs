@@ -768,11 +768,16 @@ pub mod test_strategies {
                         .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
                         .is_ok())
                     .prop_map(Type::new_ticket),
-                (inner.clone(), inner)
+                (inner.clone(), inner.clone())
                     .prop_filter("Key must be comparable", |(k, _)| k
                         .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
                         .is_ok())
                     .prop_map(|(k, v)| Type::new_map(k, v)),
+                (inner.clone(), inner)
+                    .prop_filter("Key must be comparable", |(k, _)| k
+                        .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
+                        .is_ok())
+                    .prop_map(|(k, v)| Type::new_big_map(k, v)),
             ]
         })
     }
@@ -856,6 +861,25 @@ pub mod test_strategies {
                 .prop_map(V::Map)
                 .boxed()
             }
+            // We don't generate all the allowed syntaxes for big maps
+            // but only id-free ones because these are the only ones
+            // which can be typechecked in any context.
+            T::BigMap(m) => {
+                let (key_ty, val_ty) = m.as_ref();
+                (Just(key_ty.clone()), Just(val_ty.clone()), prop::collection::btree_map(
+                    typed_value_by_type(key_ty),
+                    typed_value_by_type(val_ty),
+                    0..=3,
+                ))
+                    .prop_map(|(key_type, value_type, map)|
+                              {
+                                  let content = big_map::BigMapContent::InMemory(map);
+                                  V::BigMap(BigMap {
+                                      content,
+                                      key_type,
+                                      value_type,
+                                  })}).boxed()
+            }
             T::Address => prop_oneof![
                 Just(V::Address(
                     Address::from_base58_check("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap()
@@ -930,7 +954,6 @@ pub mod test_strategies {
                 Just(V::Bls12381G2(Box::new(bls::g2::G2::zero()))).boxed(),
             T::Contract(_) => panic!("Cannot generate typed value for contract"),
             T::Operation => panic!("Cannot generate typed value for operation"),
-            T::BigMap(_) => panic!("Cannot generate typed value for big_map"),
             T::Lambda(_) => panic!("Cannot generate typed value for lambda"),
             T::Never =>  panic!("Cannot generate typed value for never"),
             // NOTE: if you append clauses here, you likely need to update other generators too
