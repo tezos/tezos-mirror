@@ -35,13 +35,13 @@ chmod 700 "$HOME/.ssh"
 log "Done setting up credentials."
 
 # call opam-release.sh with the correct arguments
-echo "$script_dir/opam-release.sh" \
+echo "$script_dir/releases/opam-release.sh" \
   "$opam_release_tag" \
   "https://gitlab.com/tezos/tezos/-/archive/$CI_COMMIT_TAG/$gitlab_octez_source_package_name.tar.gz" \
   "$opam_dir" \
   "$dry_run"
 
-"$script_dir/opam-release.sh" \
+"$script_dir/releases/opam-release.sh" \
   "$opam_release_tag" \
   "https://gitlab.com/tezos/tezos/-/archive/$CI_COMMIT_TAG/$gitlab_octez_source_package_name.tar.gz" \
   "$opam_dir" \
