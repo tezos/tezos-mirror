@@ -59,6 +59,36 @@ let check_dump_encodings () =
   let* (_ : JSON.t) = Codec.dump_encodings () in
   unit
 
+let test_michelson_primitives_encoding =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"Michelson primitives regression"
+    ~tags:["michelson"; "primitives"; "encoding"]
+    ~uses:(fun _ -> [Constant.octez_codec])
+    ~uses_node:false
+    ~uses_client:false
+    ~uses_admin_client:false
+  @@ fun protocol ->
+  let encoding_id = sf "%s.script.prim" (Protocol.encoding_prefix protocol) in
+  let* encoding_dump = Codec.dump_encoding ~id:encoding_id () in
+  let prim_list =
+    JSON.(
+      encoding_dump |-> "binary" |-> "fields" |=> 0 |-> "encoding" |-> "cases"
+      |> as_list)
+  in
+  let () =
+    List.iter
+      (fun json ->
+        match JSON.as_list json with
+        | [tag; prim] ->
+            let tag = JSON.as_int tag in
+            let prim = JSON.as_string prim in
+            Regression.capture (sf "%d: %s" tag prim)
+        | _ -> Test.fail "expected a list of length 2")
+      prim_list
+  in
+  unit
+
 let check_sample ~name ~file =
   let* json_string = Tezos_stdlib_unix.Lwt_utils_unix.read_file file in
   let original_json = JSON.parse ~origin:json_string json_string in
@@ -155,4 +185,5 @@ let check_samples protocols =
 
 let register ~protocols =
   check_dump_encodings () ;
-  check_samples protocols
+  check_samples protocols ;
+  test_michelson_primitives_encoding protocols
