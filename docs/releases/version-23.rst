@@ -88,11 +88,6 @@ Update Instructions
 Ubuntu and Debian packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: shell
-
-  sudo apt update
-  sudo apt upgrade octez-node octez-client octez-baker octez-dal-node octez-smart-rollup-node
-
 .. note::
 
   Because the PGP keys have been rotated, users updating packages need to overwrite the previously installed octez.gpg key.
