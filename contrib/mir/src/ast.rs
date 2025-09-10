@@ -664,6 +664,17 @@ pub enum Instruction<'a> {
     Map(overloads::Map, Vec<Self>),
 }
 
+/// An untyped view, as it appears in a script
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct View<'a> {
+    /// Input type of the view
+    pub input_type: Type,
+    /// Output type of the view
+    pub output_type: Type,
+    /// Code of the view
+    pub code: Micheline<'a>,
+}
+
 /// A full typechecked contract script.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContractScript<'a> {
@@ -675,6 +686,8 @@ pub struct ContractScript<'a> {
     pub code: Instruction<'a>,
     /// Script entrypoints.
     pub annotations: HashMap<FieldAnnotation<'a>, (Vec<Direction>, Type)>,
+    /// Views. Corresponds to the script's `view` fields.
+    pub views: HashMap<String, View<'a>>,
 }
 
 #[cfg(test)]
