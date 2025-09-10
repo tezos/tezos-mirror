@@ -4329,5 +4329,48 @@ mod tests {
                 )
             )
         ), "Expected Failed Transfer operation result with EmptyImplicitTransfer, got {:?}", receipts1[0]);
+
+        // An empty external transfer to a smart contract succeeds.
+        let operation = make_transfer_operation(
+            15,
+            2,
+            4,
+            5,
+            src.clone(),
+            0.into(),
+            Contract::Originated(kt1_addr.clone()),
+            Some(Parameter {
+                entrypoint: Entrypoint::try_from("default")
+                    .expect("Entrypoint should be valid"),
+                value: Micheline::from(()).encode(),
+            }),
+        );
+        let receipts2 = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+            &0u32.into(),
+            &0i64.into(),
+            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(receipts2.len(), 1, "There should be one receipt");
+        assert!(
+            matches!(
+                &receipts2[0],
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                        TransferSuccess { .. }
+                    )),
+                    ..
+                })
+            ),
+            "Expected Successful Transfer operation result, got {:?}",
+            receipts2[0]
+        );
     }
 }
