@@ -53,6 +53,10 @@ module type T = sig
 
   type tb_slot
 
+  (** [tb_slot_to_int tb_slot] returns the integer representation of a
+      [tb_slot]. *)
+  val tb_slot_to_int : tb_slot -> int
+
   (** [block_info ?chain ?block ~operations_metadata ctxt] returns the
       information of the [block] in [ctxt] for the given [chain]. Operations'
       metadata are included or skipped depending on the value of

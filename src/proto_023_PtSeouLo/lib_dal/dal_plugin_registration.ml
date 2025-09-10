@@ -40,6 +40,8 @@ module Plugin = struct
 
   type tb_slot = Slot.t
 
+  let tb_slot_to_int tb_slot = Slot.to_int tb_slot
+
   type error += Aggregation_result_size_error
 
   let () =

@@ -39,6 +39,8 @@ module Plugin = struct
 
   type tb_slot = int
 
+  let tb_slot_to_int tb_slot = tb_slot
+
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol.Constants_services.parametric cpctxt (chain, block)

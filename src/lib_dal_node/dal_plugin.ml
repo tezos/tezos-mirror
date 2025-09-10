@@ -44,6 +44,8 @@ module type T = sig
 
   type tb_slot
 
+  val tb_slot_to_int : tb_slot -> int
+
   val block_info :
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
