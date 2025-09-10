@@ -251,7 +251,7 @@ Using Homebrew
 
 On macOS and Linux, you can compile and install Octez using Homebrew. If
 Homebrew is not yet installed on your system, please refer to the official
-[Homebrew installation guide](https://brew.sh/) for detailed instructions.
+`Homebrew installation guide <https://brew.sh/>`__ for detailed instructions.
 
 Once Homebrew is set up, follow these steps to install Octez.
 
