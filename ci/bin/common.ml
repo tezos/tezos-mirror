@@ -246,6 +246,14 @@ let changeset_octez_docs =
 (** Only if reStructured Text files have changed *)
 let changeset_octez_docs_rst = Changeset.(changeset_base @ make ["**/*.rst"])
 
+(* Job [documentation:manuals] requires the build jobs, because it needs
+   to run Octez executables to generate the man pages.
+   So the build jobs need to be included if the documentation changes. *)
+let changeset_octez_or_doc = Changeset.(changeset_octez @ changeset_octez_docs)
+
+let changeset_octez_or_kernels_or_doc =
+  Changeset.(changeset_octez_or_kernels @ changeset_octez_docs)
+
 let changeset_octez_docker_changes_or_master =
   Changeset.(
     changeset_base
