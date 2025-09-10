@@ -128,7 +128,7 @@ impl Encodable for AccountInfoInternal {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(3);
         s.append(&self.balance.to_le_bytes::<32>().as_slice());
-        s.append(&self.nonce);
+        s.append(&self.nonce.to_le_bytes().as_slice());
         s.append(&self.code_hash.0.as_slice());
     }
 }
@@ -143,7 +143,7 @@ impl Decodable for AccountInfoInternal {
                 .next()
                 .ok_or(rlp::DecoderError::RlpExpectedToBeList)?
                 .as_val()?;
-            let nonce: u64 = it
+            let nonce: Vec<u8> = it
                 .next()
                 .ok_or(rlp::DecoderError::RlpExpectedToBeList)?
                 .as_val()?;
@@ -158,7 +158,11 @@ impl Decodable for AccountInfoInternal {
                         rlp::DecoderError::Custom("Invalid balance length")
                     })?,
                 ),
-                nonce,
+                nonce: u64::from_le_bytes(
+                    nonce
+                        .try_into()
+                        .map_err(|_| rlp::DecoderError::Custom("Invalid nonce length"))?,
+                ),
                 code_hash: B256::from_slice(&code_hash),
             })
         }

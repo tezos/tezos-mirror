@@ -13838,6 +13838,62 @@ let test_eip2537 =
     ~error_msg:(Format.sprintf "BLS12_G1ADD mismatch for test bls_g1add_g1+p1") ;
   unit
 
+let pad_to_n_bytes_le bytes length =
+  let current_length = Bytes.length bytes in
+  if current_length >= length then bytes
+  else
+    let padding_length = length - current_length in
+    let padding = Bytes.make padding_length '\x00' in
+    Bytes.cat bytes padding
+
+let test_validate_encoding_compatibility_accounts =
+  register_all
+    ~__FILE__
+    ~title:"Validate encoding compatibility of accounts"
+    ~tags:["encoding"; "accounts"; "foo"]
+  @@ fun {sequencer; observer; _} _protocol ->
+  let nonce = Z.of_int 1234 in
+  let source = Eth_account.bootstrap_accounts.(0) in
+  let bits = Z.to_bits nonce |> Bytes.of_string in
+  let encoded_nonce = pad_to_n_bytes_le bits 4 in
+  let* () = Evm_node.terminate sequencer in
+  let* () = Evm_node.terminate observer in
+  let* () =
+    Evm_node.patch_state
+      sequencer
+      ~key:(Durable_storage_path.nonce source.address)
+      ~value:(Hex.of_bytes encoded_nonce |> Hex.show)
+  in
+  let* () =
+    Evm_node.patch_state
+      observer
+      ~key:(Durable_storage_path.nonce source.address)
+      ~value:(Hex.of_bytes encoded_nonce |> Hex.show)
+  in
+  let* () = Evm_node.run sequencer in
+  let* () = Evm_node.run observer in
+  let desination = Eth_account.bootstrap_accounts.(1) in
+  let*@ balance = Rpc.get_balance ~address:desination.address sequencer in
+  (* First execution of the transaction should lazy migrate the storage values
+  to the new `info` format and the others transactions should execute correctly*)
+  let* _ =
+    repeat 5 (fun () ->
+        let* _ =
+          send_transaction_to_sequencer
+            (Eth_cli.transaction_send
+               ~source_private_key:source.private_key
+               ~to_public_key:desination.address
+               ~value:Wei.zero
+               ~endpoint:(Evm_node.endpoint sequencer))
+            sequencer
+        in
+        unit)
+  in
+  let*@ balance_after = Rpc.get_balance ~address:desination.address sequencer in
+  Check.((balance_after = balance) Wei.typ)
+    ~error_msg:"Expected balance of %R wei, got %L wei after %R transactions" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -14010,4 +14066,5 @@ let () =
   test_evm_based_sequencer_upgrade_fails_if_governance_upgrade_exists [Alpha] ;
   test_eip2930_storage_access [Alpha] ;
   test_eip7702 [Alpha] ;
+  test_validate_encoding_compatibility_accounts [Alpha] ;
   test_eip2537 [Alpha]
