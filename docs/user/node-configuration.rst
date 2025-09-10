@@ -367,6 +367,7 @@ Note that UPnP is generally not supported by professional networks, and might
 not be enabled by default in home networks.
 
 The general workflow of using UPnP with Octez v23 is the following:
+
 1. Ask for a redirection of the P2P port on any port:
 
 ::

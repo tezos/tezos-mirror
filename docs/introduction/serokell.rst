@@ -32,7 +32,7 @@ If you were using RPM packages, use ``dnf`` instead of ``apt``.
 
 3. Add NL Repository
 --------------------
-**If using Debian**, add the NL package repository and install the ``octez-node`` package:
+**If using Debian** (see other :ref:`supported platforms <installing_deb>`), add the NL package repository and install the ``octez-node`` package:
 
 .. code:: shell
 

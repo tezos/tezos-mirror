@@ -138,7 +138,9 @@ concurrently and selects the best one based on its fitness (see
    <https://en.wikipedia.org/wiki/Network_Time_Protocol>`__ to avoid clock
    drift. Clock drift may result in not being able to get recent blocks in case
    of negative lag time, and in not being able to inject new blocks in case of
-   positive lag time.
+   positive lag time. Refer to your operating system's documentation for
+   instructions on setting a "time server" or "time service" to sync your
+   computer's time with an NTP server.
 
 Node Synchronization
 ~~~~~~~~~~~~~~~~~~~~
@@ -175,6 +177,7 @@ Data directory
 
 The node stores data in a data directory, which by default is ``$HOME/.tezos-node/``.
 The ``--data-dir`` argument, available on many node commands, sets the location of this directory.
+This data includes the current context (in the ``context`` directory) and daily logs (in the ``daily_logs`` directory).
 One exception is the configuration file, which is stored in the data directory by default but can be stored in a different location with the ``--config-file`` argument.
 
 If for some reason your node is misbehaving or there has been an

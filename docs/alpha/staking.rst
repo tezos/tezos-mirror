@@ -1,8 +1,6 @@
 .. note::
 
-  For information about how to stake, see `Staking <https://docs.tezos.com/using/staking>`__ on docs.tezos.com.
-
-  For operational details about the staking mechanism and its configuration, see `a staking mechanism tutorial <https://docs.google.com/document/d/1-1WTG2Vuez9D8fROTJrs42twbIErR16xyknRRBrjr-A/edit?usp=sharing>`__.
+  To stake easily, directly from a user wallet, see `Staking <https://docs.tezos.com/using/staking>`__ on docs.tezos.com.
 
 =================
 Staking mechanism
@@ -227,3 +225,7 @@ to be delegated to the old delegate, however the spending
 balance of the account is accounted in the new delegate's stake.
 It will not be possible to stake with the new delegate as long as there are
 unfinalizable unstake request for token staked with the old delegate.
+
+.. note::
+
+  For further details about the staking mechanism and its configuration, see `a staking mechanism tutorial <https://docs.google.com/document/d/1-1WTG2Vuez9D8fROTJrs42twbIErR16xyknRRBrjr-A/edit?usp=sharing>`__.
