@@ -444,9 +444,17 @@ let validate_minimum_gas_requirement ~session
   let initial_gas, floor_gas =
     initial_tx_gas_computation ~transaction ~is_prague_enabled
   in
+  let da_inclusion_fees =
+    Fees.da_fees_gas_limit_overhead
+      ~da_fee_per_byte:(Qty session.da_fee_per_bytes)
+      ~minimum_base_fee_per_gas:session.minimum_base_fee_per_gas
+      transaction.Transaction.data
+  in
   let gas_limit = transaction.gas_limit in
   let* () =
-    let minimum_gas_limit_required = Z.of_int initial_gas in
+    let minimum_gas_limit_required =
+      Z.(of_int initial_gas + da_inclusion_fees)
+    in
     (* Early exit for a transaction with a gas limit that can't cover the minimum
        required. *)
     when_ (gas_limit < minimum_gas_limit_required) @@ fun () ->
@@ -454,7 +462,7 @@ let validate_minimum_gas_requirement ~session
   in
   let* () =
     (* Check induced by EIP-7623, see https://eips.ethereum.org/EIPS/eip-7623. *)
-    let minimum_gas_limit_required = Z.of_int floor_gas in
+    let minimum_gas_limit_required = Z.(of_int floor_gas + da_inclusion_fees) in
     when_ (is_prague_enabled && gas_limit < minimum_gas_limit_required)
     @@ fun () ->
     tzfail (Gas_limit_too_low {gas_limit; minimum_gas_limit_required})
