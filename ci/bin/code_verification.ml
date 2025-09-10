@@ -334,18 +334,10 @@ let job_start =
 let jobs pipeline_type =
   let make_rules = make_rules ~pipeline_type in
   (* Stages *)
-  let start_stage, make_dependencies =
+  let start_stage =
     match pipeline_type with
-    | Schedule_extended_test ->
-        let make_dependencies ~before_merging:_ ~schedule_extended_test =
-          schedule_extended_test ()
-        in
-        ([job_datadog_pipeline_trace], make_dependencies)
-    | Before_merging | Merge_train ->
-        let make_dependencies ~before_merging ~schedule_extended_test:_ =
-          before_merging job_start
-        in
-        ([job_start], make_dependencies)
+    | Schedule_extended_test -> [job_datadog_pipeline_trace]
+    | Before_merging | Merge_train -> [job_start]
   in
 
   (* Used in trigger job definitions. For code verification pipelines,
@@ -365,11 +357,7 @@ let jobs pipeline_type =
   (* Sanity jobs *)
   let sanity =
     let stage = Stages.sanity in
-    let dependencies =
-      make_dependencies
-        ~before_merging:(fun _ -> Dependent [])
-        ~schedule_extended_test:(fun () -> Dependent [])
-    in
+    let dependencies = Dependent [] in
     let job_sanity_ci : tezos_job =
       (* Quick, CI-related sanity checks.
 
@@ -567,9 +555,9 @@ let jobs pipeline_type =
      stage does not succeed. Since some sanity jobs are conditional,
      we make these dependencies optional. *)
   let dependencies_needs_start =
-    make_dependencies
-      ~before_merging:(fun job_start -> Dependent [Job job_start])
-      ~schedule_extended_test:(fun () -> Staged [])
+    match pipeline_type with
+    | Before_merging | Merge_train -> Dependent [Job job_start]
+    | Schedule_extended_test -> Staged []
   in
   (* The build_x86_64 jobs are split in two to keep the artifact size
      under the 1GB hard limit set by GitLab. *)
@@ -829,16 +817,16 @@ let jobs pipeline_type =
      [Scheduled_extended_test] we are not in a hurry and we let them
      be [Staged []]. *)
   let order_after_build =
-    make_dependencies
-      ~before_merging:(fun job_start ->
+    match pipeline_type with
+    | Before_merging | Merge_train ->
         Dependent
           (Job job_start
           :: [
                Optional job_build_x86_64_release;
                Optional job_build_x86_64_extra_dev;
                Optional job_build_x86_64_extra_exp;
-             ]))
-      ~schedule_extended_test:(fun () -> Staged [])
+             ])
+    | Schedule_extended_test -> Staged []
   in
 
   (* Test jobs*)
