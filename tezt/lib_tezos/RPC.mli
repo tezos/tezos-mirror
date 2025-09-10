@@ -1471,6 +1471,14 @@ val get_stake_distribution :
 
 val get_stake_info : ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/tz4_staker_number_ratio?cycle=<cycle>]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+    [cycle] doesn't have to be specified (defaults to current cycle). *)
+val get_tz4_staker_number_ratio :
+  ?chain:string -> ?block:string -> ?cycle:int -> unit -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/destination/<destination>/index]
 
     [chain] defaults to ["main"].

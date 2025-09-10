@@ -276,6 +276,10 @@ end
 module Cycle = struct
   include Cycle_repr
   include Cycle_storage
+
+  module For_RPC = struct
+    let of_repr c = c
+  end
 end
 
 module Fees = Fees_storage

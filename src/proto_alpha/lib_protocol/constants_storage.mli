@@ -166,8 +166,9 @@ val tolerated_inactivity_period_threshold : Raw_context.t -> int
 (* attestation aggregation feature flag *)
 val aggregate_attestation : Raw_context.t -> bool
 
-val all_bakers_attest_activation_level :
-  Raw_context.t -> Raw_level_repr.t option
+val all_bakers_attest_activation_threshold : Raw_context.t -> Ratio_repr.t
+
+val all_bakers_attest_first_level : Raw_context.t -> Level_repr.t option
 
 (** See {!Raw_context.round_durations}. *)
 val round_durations : Raw_context.t -> Round_repr.Durations.t

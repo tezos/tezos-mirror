@@ -1,6 +1,6 @@
-From 9fb4fb9d53fb048ac23bdb54abb939bfb55755cb Mon Sep 17 00:00:00 2001
+From 5bc2eac92c108fe4fe76c115ba1edfbee9cdd3b1 Mon Sep 17 00:00:00 2001
 From: Lucas Randazzo <lucas@nomadic-labs.com>
-Date: Thu, 21 Aug 2025 16:23:33 +0200
+Date: Tue, 9 Sep 2025 15:38:22 +0200
 Subject: [PATCH 1/1] Patch alpha
 
 ---
@@ -11,11 +11,11 @@ Subject: [PATCH 1/1] Patch alpha
  .../lib_protocol/delegate_cycles.ml           | 78 ++++++++++++++----
  src/proto_alpha/lib_protocol/dune             |  2 +
  src/proto_alpha/lib_protocol/init_storage.ml  | 36 +++++++--
- src/proto_alpha/lib_protocol/raw_context.ml   | 13 +--
+ src/proto_alpha/lib_protocol/raw_context.ml   |  4 +-
  src/proto_alpha/lib_protocol/script_cache.ml  | 19 ++---
  .../lib_protocol/script_interpreter.ml        | 11 +--
  .../lib_protocol/script_ir_translator.ml      | 40 +++++-----
- 11 files changed, 217 insertions(+), 85 deletions(-)
+ 11 files changed, 212 insertions(+), 81 deletions(-)
 
 diff --git a/src/lib_protocol_environment/sigs/v15.in.ml b/src/lib_protocol_environment/sigs/v15.in.ml
 index e86731c9cbd..05291026e6b 100644
@@ -255,10 +255,10 @@ index f412c985e9c..313466717b9 100644
 
    module Riscv : sig
 diff --git a/src/proto_alpha/lib_protocol/apply.ml b/src/proto_alpha/lib_protocol/apply.ml
-index 97965b0f7af..ad18f8ccf98 100644
+index 3d938c303fd..eb55b9ce17e 100644
 --- a/src/proto_alpha/lib_protocol/apply.ml
 +++ b/src/proto_alpha/lib_protocol/apply.ml
-@@ -2538,7 +2538,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
+@@ -2499,7 +2499,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
      ~source ~operation contents_list =
    let open Lwt_result_syntax in
    let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
@@ -271,7 +271,7 @@ index 97965b0f7af..ad18f8ccf98 100644
    let gas_cost_for_sig_check =
      let algo =
        Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key_hash source
-@@ -2814,11 +2818,12 @@ let may_start_new_cycle ctxt =
+@@ -2774,11 +2778,12 @@ let may_start_new_cycle ctxt =
    match Level.dawn_of_a_new_cycle ctxt with
    | None -> return (ctxt, [], [])
    | Some last_cycle ->
@@ -290,10 +290,10 @@ index 97965b0f7af..ad18f8ccf98 100644
  let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
    let open Lwt_result_syntax in
 diff --git a/src/proto_alpha/lib_protocol/baking.ml b/src/proto_alpha/lib_protocol/baking.ml
-index 3c3bd980bc3..2c48b44392c 100644
+index 8964820680f..ef1a8909abc 100644
 --- a/src/proto_alpha/lib_protocol/baking.ml
 +++ b/src/proto_alpha/lib_protocol/baking.ml
-@@ -109,7 +109,7 @@ type ordered_slots = {
+@@ -110,7 +110,7 @@ type ordered_slots = {
  (* Slots returned by this function are assumed by consumers to be in increasing
     order, hence the use of [Slot.Range.rev_fold_es]. *)
  let attesting_rights (ctxt : t) level =
@@ -302,9 +302,9 @@ index 3c3bd980bc3..2c48b44392c 100644
    let all_bakers_attest_enabled =
      Attesting_power.check_all_bakers_attest_at_level ctxt level
    in
-@@ -165,7 +165,7 @@ let attesting_rights (ctxt : t) level =
-         else {t with attesting_power = List.length slots |> Int64.of_int})
-       map
+@@ -210,7 +210,7 @@ let attesting_rights (ctxt : t) level =
+         map
+     else map
    in
 -  return (ctxt, map)
 +  return (ctxt, map)) [@profiler.record_s {verbosity = Notice} "attesting_rights"]
@@ -312,7 +312,7 @@ index 3c3bd980bc3..2c48b44392c 100644
  let incr_slot att_rights =
    let one = Attesting_power.make ~slots:1 ~stake:0L in
 diff --git a/src/proto_alpha/lib_protocol/delegate_cycles.ml b/src/proto_alpha/lib_protocol/delegate_cycles.ml
-index 9f3949710a9..5f1a6242a80 100644
+index 9ac7a3a0536..e224da6d487 100644
 --- a/src/proto_alpha/lib_protocol/delegate_cycles.ml
 +++ b/src/proto_alpha/lib_protocol/delegate_cycles.ml
 @@ -227,42 +227,92 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
@@ -376,7 +376,7 @@ index 9f3949710a9..5f1a6242a80 100644
 +       ~new_cycle
 +     [@profiler.record_s {verbosity = Notice} "activate consensus key"])
 +  in
-   (* trying to unforbid delegates for the cycle to come.  *)
+   (* trying to unforbid delegates for the cycle to come. *)
    let* ctxt =
 -    Forbidden_delegates_storage.update_at_cycle_end_after_slashing
 -      ctxt
@@ -423,7 +423,7 @@ index 9f3949710a9..5f1a6242a80 100644
    let balance_updates = slashing_balance_updates @ attesting_balance_updates in
    return (ctxt, balance_updates, deactivated_delegates)
 diff --git a/src/proto_alpha/lib_protocol/dune b/src/proto_alpha/lib_protocol/dune
-index fa81fbafe08..4b46d91a7e5 100644
+index 7fea31a9fe2..75d43668c34 100644
 --- a/src/proto_alpha/lib_protocol/dune
 +++ b/src/proto_alpha/lib_protocol/dune
 @@ -23,6 +23,8 @@
@@ -436,10 +436,10 @@ index fa81fbafe08..4b46d91a7e5 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index 209f77c75fb..209c8d6006f 100644
+index 176be47f1fa..1467d67c38d 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
-@@ -247,22 +247,38 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+@@ -249,22 +249,38 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
          (* Start of Alpha stitching. Comment used for automatic snapshot *)
      | Alpha ->
          let* ctxt =
@@ -482,7 +482,7 @@ index 209f77c75fb..209c8d6006f 100644
          in
          let* ctxt =
            match previous_proto_constants with
-@@ -277,10 +293,18 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+@@ -279,10 +295,18 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
    in
    let* ctxt =
@@ -504,20 +504,22 @@ index 209f77c75fb..209c8d6006f 100644
    in
    return ctxt
 diff --git a/src/proto_alpha/lib_protocol/raw_context.ml b/src/proto_alpha/lib_protocol/raw_context.ml
-index 910c9d5dad7..ea684a8f115 100644
+index de837e10580..54db676001f 100644
 --- a/src/proto_alpha/lib_protocol/raw_context.ml
 +++ b/src/proto_alpha/lib_protocol/raw_context.ml
-@@ -1764,5 +1764,11 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
+@@ -1774,12 +1774,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
    in
--  let+ ctxt = prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp in
-+  let+ ctxt =
+   let+ ctxt =
+-    prepare
 +    (prepare
-+       ctxt
-+       ~level
-+       ~predecessor_timestamp:timestamp
-+       ~timestamp [@profiler.record_s {verbosity = Notice} "Prepare"])
-+  in
+       ctxt
+       ~level
+       ~predecessor_timestamp:timestamp
+       ~timestamp
+-      ~all_bakers_attest_first_level:None
++      ~all_bakers_attest_first_level:None [@profiler.record_s {verbosity = Notice} "Prepare"])
+   in
    (previous_proto, previous_proto_constants, ctxt)
 
 diff --git a/src/proto_alpha/lib_protocol/script_cache.ml b/src/proto_alpha/lib_protocol/script_cache.ml
@@ -551,10 +553,10 @@ index 70a79eb8f44..9724bc4246b 100644
  let update ctxt identifier updated_script approx_size =
    Cache.update ctxt identifier (Some (updated_script, approx_size))
 diff --git a/src/proto_alpha/lib_protocol/script_interpreter.ml b/src/proto_alpha/lib_protocol/script_interpreter.ml
-index 3527a81698c..efd4ffebbe8 100644
+index e098905296a..54b1e80d856 100644
 --- a/src/proto_alpha/lib_protocol/script_interpreter.ml
 +++ b/src/proto_alpha/lib_protocol/script_interpreter.ml
-@@ -1826,7 +1826,7 @@ type execution_result = {
+@@ -1820,7 +1820,7 @@ type execution_result = {
  let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
      unparsed_script cached_script arg =
    let open Lwt_result_syntax in
@@ -563,7 +565,7 @@ index 3527a81698c..efd4ffebbe8 100644
      Script_ir_translator_config.make
        ~legacy:true
        ~keep_extra_types_for_interpreter_logging:(Option.is_some logger)
-@@ -1879,9 +1879,10 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
+@@ -1873,9 +1873,10 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
      Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
    in
    let* (ops, new_storage), ctxt =
@@ -577,7 +579,7 @@ index 3527a81698c..efd4ffebbe8 100644
    in
    let* storage, lazy_storage_diff, ctxt =
      Script_ir_translator.extract_lazy_storage_diff
-@@ -1949,7 +1950,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
+@@ -1943,7 +1944,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
          ticket_receipt;
          address_registry_diff;
        },
@@ -587,12 +589,12 @@ index 3527a81698c..efd4ffebbe8 100644
  let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
      ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
 diff --git a/src/proto_alpha/lib_protocol/script_ir_translator.ml b/src/proto_alpha/lib_protocol/script_ir_translator.ml
-index 8356e1e2ba1..9d6b1929f55 100644
+index b91d2d87114..60727fae94e 100644
 --- a/src/proto_alpha/lib_protocol/script_ir_translator.ml
 +++ b/src/proto_alpha/lib_protocol/script_ir_translator.ml
-@@ -5244,17 +5244,21 @@ let parse_script :
-              (Code
-                {code; arg_type; storage_type; views; entrypoints; code_size}),
+@@ -5217,17 +5217,21 @@ let parse_script :
+     let* ( Ex_code
+              (Code {code; arg_type; storage_type; views; entrypoints; code_size}),
             ctxt ) =
 -      parse_code ~unparse_code_rec ~elab_conf ctxt ~code
 +      (parse_code
@@ -621,7 +623,7 @@ index 8356e1e2ba1..9d6b1929f55 100644
      in
      ( Ex_script
          (Script
-@@ -5954,15 +5958,15 @@ let list_of_big_map_ids ids =
+@@ -5926,15 +5930,15 @@ let list_of_big_map_ids ids =
 
  let parse_data ~elab_conf ctxt ~allow_forged_tickets
      ~allow_forged_lazy_storage_id ty t =

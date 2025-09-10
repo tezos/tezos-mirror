@@ -312,6 +312,10 @@ module Cycle : sig
 
   (** See {!Cycle_storage.greatest_unstake_finalizable_cycle}. *)
   val greatest_unstake_finalizable_cycle : context -> cycle option
+
+  module For_RPC : sig
+    val of_repr : Cycle_repr.t -> cycle
+  end
 end
 
 (** This module re-exports definitions from {!Round_repr}. *)
@@ -969,7 +973,7 @@ module Constants : sig
       direct_ticket_spending_enable : bool;
       aggregate_attestation : bool;
       allow_tz4_delegate_enable : bool;
-      all_bakers_attest_activation_level : Raw_level_repr.t option;
+      all_bakers_attest_activation_threshold : Ratio.t;
     }
 
     val encoding : t Data_encoding.t
@@ -1113,8 +1117,6 @@ module Constants : sig
   val aggregate_attestation : context -> bool
 
   val allow_tz4_delegate_enable : context -> bool
-
-  val all_bakers_attest_activation_level : context -> Raw_level_repr.t option
 
   (** All constants: fixed and parametric and derived. *)
   type t = private {

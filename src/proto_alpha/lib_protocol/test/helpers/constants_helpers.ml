@@ -128,6 +128,10 @@ module Set = struct
   let allow_tz4_delegate_enable allow_tz4_delegate_enable (c : t) =
     {c with allow_tz4_delegate_enable}
 
+  let all_bakers_attest_activation_threshold
+      all_bakers_attest_activation_threshold (c : t) =
+    {c with all_bakers_attest_activation_threshold}
+
   let issuance_weights issuance_weights (c : t) = {c with issuance_weights}
 
   module Issuance_weights = struct

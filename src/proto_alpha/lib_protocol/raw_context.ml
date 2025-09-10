@@ -308,6 +308,7 @@ type back = {
   sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
   dal : Raw_dal.t;
   address_registry_diff_rev : Raw_address_registry.diff list;
+  all_bakers_attest_first_level : Level_repr.t option;
 }
 
 (*
@@ -381,6 +382,9 @@ let[@inline] reward_coeff_for_current_cycle ctxt =
 
 let[@inline] dal ctxt = ctxt.back.dal
 
+let[@inline] all_bakers_attest_first_level ctxt =
+  ctxt.back.all_bakers_attest_first_level
+
 let[@inline] update_back ctxt back = {ctxt with back}
 
 let[@inline] update_remaining_block_gas ctxt remaining_block_gas =
@@ -430,6 +434,9 @@ let[@inline] update_reward_coeff_for_current_cycle ctxt
   update_back ctxt {ctxt.back with reward_coeff_for_current_cycle}
 
 let[@inline] update_dal ctxt dal = update_back ctxt {ctxt.back with dal}
+
+let[@inline] set_all_bakers_attest_first_level ctxt level =
+  update_back ctxt {ctxt.back with all_bakers_attest_first_level = Some level}
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -892,7 +899,8 @@ let check_cycle_eras (cycle_eras : Level_repr.cycle_eras)
     Compare.Int32.(
       current_era.blocks_per_commitment = constants.blocks_per_commitment))
 
-let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
+let prepare ~level ~predecessor_timestamp ~timestamp
+    ~all_bakers_attest_first_level ctxt =
   let open Lwt_result_syntax in
   let*? level = Raw_level_repr.of_int32 level in
   let* () = check_inited ctxt in
@@ -940,6 +948,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
           Raw_dal.init
             ~number_of_slots:
               constants.Constants_parametric_repr.dal.number_of_slots;
+        all_bakers_attest_first_level;
         address_registry_diff_rev = [];
       };
   }
@@ -1346,7 +1355,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  direct_ticket_spending_enable;
                  aggregate_attestation = _;
                  allow_tz4_delegate_enable = _;
-                 all_bakers_attest_activation_level;
+                 all_bakers_attest_activation_threshold;
                }
                 : Previous.t) =
             c
@@ -1400,7 +1409,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             direct_ticket_spending_enable;
             aggregate_attestation = true;
             allow_tz4_delegate_enable = true;
-            all_bakers_attest_activation_level;
+            all_bakers_attest_activation_threshold;
           }
         in
         let*! ctxt = add_constants ctxt constants in
@@ -1642,7 +1651,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                direct_ticket_spending_enable;
                aggregate_attestation = _;
                allow_tz4_delegate_enable = _;
-               all_bakers_attest_activation_level;
+               all_bakers_attest_activation_level = _;
              }
               : Previous.t) =
           c
@@ -1756,14 +1765,22 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             direct_ticket_spending_enable;
             aggregate_attestation = true;
             allow_tz4_delegate_enable = true;
-            all_bakers_attest_activation_level;
+            all_bakers_attest_activation_threshold =
+              Ratio_repr.{numerator = 1; denominator = 2};
           }
         in
         let*! ctxt = add_constants ctxt constants in
         return (ctxt, Some c)
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in
-  let+ ctxt = prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp in
+  let+ ctxt =
+    prepare
+      ctxt
+      ~level
+      ~predecessor_timestamp:timestamp
+      ~timestamp
+      ~all_bakers_attest_first_level:None
+  in
   (previous_proto, previous_proto_constants, ctxt)
 
 let activate ctxt h =
@@ -2093,13 +2110,12 @@ let sort_stakes_pk_for_stake_info stakes_pk =
         consensus_pk2.delegate)
     stakes_pk
 
-let init_stake_info_for_cycle ctxt cycle total_stake stakes_pk =
+let init_stake_info_for_cycle ctxt cycle ~total_stake stakes_pk =
   let open Result_syntax in
   let map = stake_info ctxt in
   if Cycle_repr.Map.mem cycle map then tzfail (Stake_info_already_set cycle)
   else
     let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
-    let total_stake = Stake_repr.staking_weight total_stake in
     let map = Cycle_repr.Map.add cycle (total_stake, stakes_pk) map in
     let ctxt = update_stake_info ctxt map in
     return ctxt

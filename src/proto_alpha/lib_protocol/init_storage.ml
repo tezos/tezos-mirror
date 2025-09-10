@@ -112,7 +112,15 @@ let patch_script ctxt (address, hash, patched_code) =
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   let open Lwt_result_syntax in
   let* ctxt =
-    Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
+    Raw_context.prepare
+      ~level
+      ~predecessor_timestamp
+      ~timestamp
+      ~all_bakers_attest_first_level:None
+      ctxt
+  in
+  let* ctxt =
+    All_bakers_attest_activation_storage.set_all_bakers_attest_first_level ctxt
   in
   Storage.Pending_migration.remove ctxt
 

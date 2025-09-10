@@ -822,6 +822,11 @@ module Adaptive_issuance : sig
        and type value = Cycle_repr.t option
 end
 
+(** Level from which all bakers attest is set to be active.
+    Not set if the feature is not yet planned to activate. **)
+module All_bakers_attest_activation :
+  Single_data_storage with type t := Raw_context.t and type value = Level_repr.t
+
 (** A map of [Script_repr.expr] values, indexed by their hash ([Script_expr_hash.t]).
     Values from this map can be incorporated by any contract via the primitive
     [Michelson_v1_primitives.H_constant]. *)

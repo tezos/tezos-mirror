@@ -746,6 +746,15 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
       unit
     else unit
   in
+  let* () =
+    if Protocol.(number protocol >= 024) then
+      let* _ =
+        Client.RPC.call ?endpoint ~hooks client
+        @@ RPC.get_tz4_staker_number_ratio ()
+      in
+      unit
+    else unit
+  in
   unit
 
 let mempool_hooks =

@@ -305,7 +305,7 @@ type t = {
   direct_ticket_spending_enable : bool;
   aggregate_attestation : bool;
   allow_tz4_delegate_enable : bool;
-  all_bakers_attest_activation_level : Raw_level_repr.t option;
+  all_bakers_attest_activation_threshold : Ratio_repr.t;
 }
 
 let sc_rollup_encoding =
@@ -612,7 +612,8 @@ let encoding =
                       ( c.direct_ticket_spending_enable,
                         c.aggregate_attestation,
                         c.allow_tz4_delegate_enable,
-                        c.all_bakers_attest_activation_level ) ) ) ) ) ) ) ) ))
+                        c.all_bakers_attest_activation_threshold ) ) ) ) ) ) )
+        ) ))
     (fun ( ( ( consensus_rights_delay,
                blocks_preservation_cycles,
                delegate_parameters_activation_delay,
@@ -659,7 +660,8 @@ let encoding =
                          ( direct_ticket_spending_enable,
                            aggregate_attestation,
                            allow_tz4_delegate_enable,
-                           all_bakers_attest_activation_level ) ) ) ) ) ) ) ) )
+                           all_bakers_attest_activation_threshold ) ) ) ) ) ) )
+           ) )
        ->
       {
         consensus_rights_delay;
@@ -709,7 +711,7 @@ let encoding =
         direct_ticket_spending_enable;
         aggregate_attestation;
         allow_tz4_delegate_enable;
-        all_bakers_attest_activation_level;
+        all_bakers_attest_activation_threshold;
       })
     (merge_objs
        (merge_objs
@@ -780,8 +782,8 @@ let encoding =
                                (req "aggregate_attestation" bool)
                                (req "allow_tz4_delegate_enable" bool)
                                (req
-                                  "all_bakers_attest_activation_level"
-                                  (option Raw_level_repr.encoding)))))))))))
+                                  "all_bakers_attest_activation_threshold"
+                                  Ratio_repr.encoding))))))))))
 
 let update_sc_rollup_parameter ratio_i32 c =
   (* Constants remain small enough to fit in [int32] after update (as a

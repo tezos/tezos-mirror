@@ -38,7 +38,12 @@ module Proto = struct
       let open Lwt_result_syntax in
       let+ ctxt =
         Lwt.map wrap_tzresult
-        @@ Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
+        @@ Raw_context.prepare
+             ~level
+             ~predecessor_timestamp
+             ~timestamp
+             ~all_bakers_attest_first_level:None
+             ctxt
       in
       Raw_context.set_gas_limit
         ctxt

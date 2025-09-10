@@ -1845,6 +1845,17 @@ module Adaptive_issuance = struct
       end)
 end
 
+module All_bakers_attest_activation =
+  Make_single_data_storage (Registered) (Raw_context)
+    (struct
+      let name = ["all_bakers_attest_first_level"]
+    end)
+    (struct
+      type t = Level_repr.t
+
+      let encoding = Level_repr.encoding
+    end)
+
 module Ticket_balance = struct
   module Name = struct
     let name = ["ticket_balance"]

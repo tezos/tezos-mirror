@@ -248,7 +248,7 @@ let cycle_end ctxt last_cycle =
   in
   (* Activating consensus key for the cycle to come *)
   let*! ctxt = Delegate_consensus_key.activate ctxt ~new_cycle in
-  (* trying to unforbid delegates for the cycle to come.  *)
+  (* trying to unforbid delegates for the cycle to come. *)
   let* ctxt =
     Forbidden_delegates_storage.update_at_cycle_end_after_slashing
       ctxt

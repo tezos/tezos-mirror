@@ -41,6 +41,7 @@ let to_raw_context (b : Block.t) =
       ~level:b.header.shell.level
       ~predecessor_timestamp:b.header.shell.timestamp
       ~timestamp:b.header.shell.timestamp
+      ~all_bakers_attest_first_level:None
   in
   ctxt
 

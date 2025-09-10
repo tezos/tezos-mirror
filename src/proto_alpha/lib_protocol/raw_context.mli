@@ -89,6 +89,7 @@ val prepare :
   level:Int32.t ->
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
+  all_bakers_attest_first_level:Level_repr.t option ->
   Context.t ->
   t tzresult Lwt.t
 
@@ -295,7 +296,7 @@ val sampler_for_cycle :
   Cycle_repr.t ->
   (t * Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t
 
-(** [init_stake_info_for_cycle ctxt cycle total_stake stakes_pk] caches the stakes
+(** [init_stake_info_for_cycle ctxt cycle ~total_stake stakes_pk] caches the stakes
     of the active delegates for [cycle] in memory for quick access.
 
     @return [Error Stake_info_already_set] if the info was already
@@ -303,7 +304,7 @@ val sampler_for_cycle :
 val init_stake_info_for_cycle :
   t ->
   Cycle_repr.t ->
-  Stake_repr.t ->
+  total_stake:Int64.t ->
   (consensus_pk * Int64.t) list ->
   t tzresult
 
@@ -341,6 +342,13 @@ val reward_coeff_for_current_cycle : t -> Q.t
     This update should only be called once per cycle. It is done in
     [Adaptive_issuance_storage] *)
 val update_reward_coeff_for_current_cycle : t -> Q.t -> t
+
+(** Returns the first level at which all bakers attest is active.
+    Returns [None] if it is not set to activate yet. *)
+val all_bakers_attest_first_level : t -> Level_repr.t option
+
+(** Set the feature flag of all bakers attest. *)
+val set_all_bakers_attest_first_level : t -> Level_repr.t -> t
 
 module Internal_for_tests : sig
   val add_level : t -> int -> t

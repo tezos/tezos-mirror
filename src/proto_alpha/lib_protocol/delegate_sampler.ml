@@ -257,23 +257,40 @@ let select_distribution_for_cycle ctxt cycle =
       stakes
       total_stake
   in
-  let* stakes_pk =
+  let* stakes_pk, tz4_number_stakers =
     List.fold_left_es
-      (fun acc (pkh, stake) ->
-        let+ pk =
+      (fun (list_acc, tz4_count_acc) (pkh, stake) ->
+        let* pk =
           Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
         in
-        (pk, Stake_repr.staking_weight stake) :: acc)
-      []
+        let stake_weight = Stake_repr.staking_weight stake in
+        let tz4_count =
+          match pk.consensus_pk with
+          | Bls _ -> tz4_count_acc + 1
+          | _ -> tz4_count_acc
+        in
+        return ((pk, stake_weight) :: list_acc, tz4_count))
+      ([], 0)
       stakes
   in
+  let total_stake = Stake_repr.staking_weight total_stake in
   let state = Sampler.create stakes_pk in
   let* ctxt = Delegate_sampler_state.init ctxt cycle state in
   (* pre-allocate the sampler *)
   let*? ctxt = Raw_context.init_sampler_for_cycle ctxt cycle seed state in
   (* pre-allocate the raw stake distribution info *)
   let*? ctxt =
-    Raw_context.init_stake_info_for_cycle ctxt cycle total_stake stakes_pk
+    Raw_context.init_stake_info_for_cycle ctxt cycle ~total_stake stakes_pk
+  in
+  (* Update all bakers attest activation level if tz4 stake
+     is above activation threshold *)
+  let*! ctxt =
+    All_bakers_attest_activation_storage
+    .may_update_all_bakers_attest_first_level
+      ctxt
+      cycle
+      ~total_number_stakers:(List.length stakes)
+      ~tz4_number_stakers
   in
   return ctxt
 
