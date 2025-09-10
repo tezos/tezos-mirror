@@ -3,6 +3,33 @@
 Changelog Smart Rollup Node
 '''''''''''''''''''''''''''
 
+Version 20250911 (2025-09-11)
+=============================
+
+- Improved Opentelemetry traces for Etherlink block evaluation (MR :gl:`!18592`)
+
+- The rollup node now exports its logs to Opentelemetry when enabled in the
+  configuration file or with `--profiling true`. (MR :gl:`!18910`)
+
+- The rollup node now ensures pending telemetry data is exported on exit (MR
+  :gl:`!19157`)
+
+- Allow patching durable storage from a file using the CLI command ``patch
+  durable storage`` (for development purposes only). (MR :gl:`!19195`)
+
+Version 23.0 (2025-08-21)
+=========================
+
+- The RPCs ``/global/block/{block_id}/dal/slot_headers`` and
+  ``/global/block/{block_id}/dal/processed_slots`` have been deleted, since they
+  are now obsolete, the DAL-related indexing logic having been moved out of the
+  rollup-node (MR :gl:`!17466`).
+
+- **Breaking change** Enforced stricter validation for the JSON configuration
+  file. Previously, the parser would silently ignore any content that appeared
+  after the first valid JSON object. Now, any extraneous data will cause the
+  function to return an error. (MR :gl:`!18745`)
+
 Version 20250627 (2025-06-27)
 =============================
 
