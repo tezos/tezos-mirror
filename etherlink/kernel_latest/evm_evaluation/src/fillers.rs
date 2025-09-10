@@ -17,6 +17,8 @@ use evm_execution::account_storage::EthereumAccount;
 
 use bytes::Bytes;
 use primitive_types::{H160, H256, U256};
+use revm::state::AccountInfo;
+use revm_etherlink::storage::world_state_handler::StorageAccount;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
@@ -93,23 +95,17 @@ fn check_should_not_exist(
     hex_address: &str,
 ) {
     if let Some(_shouldnotexist) = shouldnotexist {
-        let balance_is_zero = if let Ok(balance) = account.balance(host) {
-            balance == U256::zero()
-        } else {
-            false
-        };
+        let account = StorageAccount::from_path(account.path.clone());
+        let AccountInfo {
+            balance,
+            code,
+            nonce,
+            ..
+        } = account.info(host).unwrap();
 
-        let no_code = if let Ok(code_size) = account.code_size(host) {
-            code_size == U256::zero()
-        } else {
-            false
-        };
-
-        let nonce_is_zero = if let Ok(nonce) = account.nonce(host) {
-            nonce == 0
-        } else {
-            false
-        };
+        let balance_is_zero = balance == revm::primitives::U256::ZERO;
+        let no_code = code.is_none() || code.unwrap().is_empty();
+        let nonce_is_zero = nonce == 0;
 
         if balance_is_zero && no_code && nonce_is_zero {
             write_host!(host, "Account {} rightfully does not exist.", hex_address);

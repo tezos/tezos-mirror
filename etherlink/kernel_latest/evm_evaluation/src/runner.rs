@@ -5,15 +5,18 @@
 // SPDX-License-Identifier: MIT
 
 use bytes::Bytes;
-use evm_execution::account_storage::{
-    init_account_storage, EthereumAccount, EthereumAccountStorage,
-};
-use evm_execution::handler::ExecutionOutcome;
-use evm_execution::precompiles::{precompile_set, PrecompileBTreeMap};
-use evm_execution::{run_transaction, Config, EthereumError};
+use evm_execution::account_storage::EthereumAccount;
 
+use revm::context::result::EVMError;
+use revm::primitives::hardfork::SpecId;
+use revm_etherlink::precompiles::provider::EtherlinkPrecompiles;
+use revm_etherlink::storage::world_state_handler::new_world_state_handler;
+use revm_etherlink::Error;
+use revm_etherlink::{run_transaction, ExecutionOutcome};
 use tezos_ethereum::access_list::AccessList;
+use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
+use thiserror::Error;
 
 use hex_literal::hex;
 use primitive_types::{H160, H256, U256};
@@ -23,7 +26,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use thiserror::Error;
 
 use crate::evalhost::EvalHost;
 use crate::fillers::{output_result, process, TestResult};
@@ -188,18 +190,24 @@ fn initialize_env(unit: &TestUnit) -> Result<Env, TestError> {
     Ok(env)
 }
 
+fn u256_to_u128(value: U256) -> u128 {
+    if value <= U256::from(u128::MAX) {
+        value.low_u128()
+    } else {
+        u128::MAX
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn execute_transaction(
     host: &mut EvalHost,
-    evm_account_storage: &mut EthereumAccountStorage,
-    precompiles: &PrecompileBTreeMap<EvalHost>,
-    config: &Config,
     unit: &TestUnit,
     env: &mut Env,
+    spec_id: SpecId,
     test: &Test,
     data: Bytes,
     access_list: AccessList,
-) -> Result<Option<ExecutionOutcome>, EthereumError> {
+) -> Result<ExecutionOutcome, EVMError<Error>> {
     let gas_limit = *unit.transaction.gas_limit.get(test.indexes.gas).unwrap();
     let gas_limit = u64::try_from(gas_limit).unwrap_or(u64::MAX);
     env.tx.gas_limit = gas_limit;
@@ -223,7 +231,25 @@ fn execute_transaction(
     let call_data = env.tx.data.to_vec();
     let gas_limit = env.tx.gas_limit;
     let transaction_value = env.tx.value;
-    let pay_for_gas = true; // always, for now
+    let access_list = revm::context::transaction::AccessList::from(
+        access_list
+            .into_iter()
+            .map(
+                |AccessListItem {
+                     address,
+                     storage_keys,
+                 }| {
+                    revm::context::transaction::AccessListItem {
+                        address: revm::primitives::Address::from_slice(&address.0),
+                        storage_keys: storage_keys
+                            .into_iter()
+                            .map(|key| revm::primitives::B256::from_slice(&key.0))
+                            .collect(),
+                    }
+                },
+            )
+            .collect::<Vec<revm::context::transaction::AccessListItem>>(),
+    );
 
     write_host!(
         host,
@@ -239,19 +265,22 @@ fn execute_transaction(
     );
     run_transaction(
         host,
+        spec_id,
         &block_constants,
-        evm_account_storage,
-        precompiles,
-        config,
-        address,
+        &mut new_world_state_handler().unwrap(),
+        EtherlinkPrecompiles::new(),
         caller,
-        call_data,
-        Some(gas_limit),
-        env.tx.gas_price,
-        transaction_value,
-        pay_for_gas,
-        None,
+        address,
+        revm::primitives::Bytes::from(call_data),
+        gas_limit,
+        u256_to_u128(env.tx.gas_price),
+        revm::primitives::U256::from_le_slice(
+            &(evm_execution::utilities::u256_to_le_bytes(transaction_value)),
+        ),
         access_list,
+        // TODO: add authorization list when Prague tests are enabled.
+        vec![],
+        None,
     )
 }
 
@@ -270,19 +299,14 @@ fn check_results(
     host: &EvalHost,
     name: &str,
     test: &Test,
-    exec_result: &Result<Option<ExecutionOutcome>, EthereumError>,
+    exec_result: &Result<ExecutionOutcome, EVMError<Error>>,
 ) {
     match exec_result {
-        Ok(execution_outcome_opt) => {
-            let outcome_status = match execution_outcome_opt {
-                Some(execution_outcome) => {
-                    if execution_outcome.is_success() {
-                        "[SUCCESS]"
-                    } else {
-                        "[FAILURE]"
-                    }
-                }
-                None => "[INVALID]",
+        Ok(execution_outcome) => {
+            let outcome_status = if execution_outcome.result.is_success() {
+                "[SUCCESS]"
+            } else {
+                "[FAILURE]"
             };
             write_host!(host, "\nOutcome status: {}", outcome_status);
         }
@@ -331,9 +355,6 @@ pub fn run_test(
         if output.log {
             write_out!(output_file, "Running unit test: {}", name);
         }
-        let precompiles = precompile_set::<EvalHost>(false);
-        let mut evm_account_storage = init_account_storage().unwrap();
-
         let filler_source = prepare_filler_source(&host, &unit, opt)?;
 
         let mut env = initialize_env(&unit)?;
@@ -341,9 +362,10 @@ pub fn run_test(
 
         // post and execution
         for (spec_name, tests) in &unit.post {
-            let config = match spec_name {
-                SpecName::Shanghai => Config::shanghai(),
-                SpecName::Cancun => Config::cancun(),
+            let spec_id = match spec_name {
+                SpecName::Shanghai => SpecId::SHANGHAI,
+                SpecName::Cancun => SpecId::CANCUN,
+                SpecName::Prague => SpecId::PRAGUE,
                 // TODO: enable future configs when parallelization is enabled.
                 // Other tests are ignored
                 _ => continue,
@@ -396,11 +418,9 @@ pub fn run_test(
 
                 let exec_result = execute_transaction(
                     &mut host,
-                    &mut evm_account_storage,
-                    &precompiles,
-                    &config,
                     &unit,
                     &mut env,
+                    spec_id,
                     test_execution,
                     data,
                     access_list,

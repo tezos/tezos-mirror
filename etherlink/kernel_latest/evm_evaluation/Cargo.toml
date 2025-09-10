@@ -12,6 +12,8 @@ license = "MIT"
 thiserror.workspace = true
 
 evm-execution = { workspace = true, features = ["debug"] }
+revm-etherlink.workspace = true
+revm.workspace = true
 tezos_ethereum = { workspace = true, features = ["evaluation"] }
 tezos-evm-logging.workspace = true
 tezos-evm-runtime.workspace = true
