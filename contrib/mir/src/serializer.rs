@@ -55,13 +55,17 @@ mod tests {
             // primitive so we use the simplest possible Micheline
             // case involving primitives: application of a primitive
             // to no argument and no annotation
-            let micheline = Micheline::decode_raw(&arena, &[APP_NO_ARGS_NO_ANNOTS_TAG, tag])
+            let serialized = [APP_NO_ARGS_NO_ANNOTS_TAG, tag];
+            let micheline = Micheline::decode_raw(&arena, &serialized)
                 .unwrap_or_else(|err| panic!("tag {tag} should be decodable as primitive: {err}"));
             assert_eq!(
                 micheline,
                 Micheline::prim0(prim),
                 "tag {tag} is associated to primitive {prim} but we deserialized it as {micheline:?}"
-            )
+            );
+            // While we are at it, we also check that serializing the
+            // primitives gives back the expected tag.
+            assert_eq!(micheline.encode(), serialized,)
         }
     }
 }
