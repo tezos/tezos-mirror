@@ -197,27 +197,31 @@ let store_skip_list_cells ctxt cctxt dal_constants ~attested_level
   Store.Skip_list_cells.insert store ~attested_level cells_of_level
 
 (* This functions counts, for each slot, the number of shards attested by the bakers. *)
-let attested_shards_per_slot attestations committee ~number_of_slots is_attested
-    =
+let attested_shards_per_slot attestations slot_to_committee ~number_of_slots
+    is_attested tb_slot_to_int =
   let count_per_slot = Array.make number_of_slots 0 in
   List.iter
-    (fun (_tb_slot, delegate_opt, _attestation_op, dal_attestation_opt) ->
-      match (delegate_opt, dal_attestation_opt) with
-      | Some delegate, Some dal_attestation -> (
-          match Signature.Public_key_hash.Map.find delegate committee with
-          | None -> ()
-          | Some shard_indexes ->
+    (fun (tb_slot, _, _, dal_attestation_opt) ->
+      match dal_attestation_opt with
+      | Some dal_attestation -> (
+          match
+            List.find
+              (fun (s, _) -> s = tb_slot_to_int tb_slot)
+              slot_to_committee
+          with
+          | Some (_, (_, shard_indexes)) ->
               let num_shards = List.length shard_indexes in
               for i = 0 to number_of_slots - 1 do
                 if is_attested dal_attestation i then
                   count_per_slot.(i) <- count_per_slot.(i) + num_shards
-              done)
-      | _ -> ())
+              done
+          | None -> ())
+      | None -> ())
     attestations ;
   count_per_slot
 
-let check_attesters_attested node_ctxt parameters ~block_level attestations
-    is_attested tb_slot_to_int =
+let check_attesters_attested node_ctxt committee slot_to_committee parameters
+    ~block_level attestations is_attested tb_slot_to_int =
   let open Lwt_result_syntax in
   let tracked_attesters =
     match
@@ -228,16 +232,13 @@ let check_attesters_attested node_ctxt parameters ~block_level attestations
   in
   if Signature.Public_key_hash.Set.is_empty tracked_attesters then return_unit
   else
-    let attestation_level = Int32.pred block_level in
-    let* committee =
-      Node_context.fetch_committee node_ctxt ~level:attestation_level
-    in
     let attested_shards_per_slot =
       attested_shards_per_slot
         attestations
-        committee
+        slot_to_committee
         ~number_of_slots:parameters.Types.number_of_slots
         is_attested
+        tb_slot_to_int
     in
     let threshold =
       parameters.cryptobox_parameters.number_of_shards
@@ -455,9 +456,30 @@ let process_block_data ctxt cctxt store proto_parameters block_level
        ~block_level
        cctxt [@profiler.record_s {verbosity = Notice} "get_attestations"])
   in
+  let* committee =
+    let attestation_level = Int32.pred block_level in
+    Node_context.fetch_committee ctxt ~level:attestation_level
+  in
+  (* [slot_to_committee] associates a Tenderbake attestation slot index to an
+     attester public key hash an its associated list of DAL slots indexs. This
+     can be done by matching the TB attestation slot index and the first DAL
+     slot index of a given attester as there is a DAL invariant that enforces
+     the fact that the first DAL slot index corresponds to the TB attestation
+     slot index of a give attester. *)
+  let slot_to_committee =
+    Signature.Public_key_hash.Map.fold
+      (fun pkh slots l ->
+        match List.nth_opt slots 0 with
+        | Some slot -> (slot, (pkh, slots)) :: l
+        | None -> l)
+      committee
+      []
+  in
   let* () =
     (check_attesters_attested
        ctxt
+       committee
+       slot_to_committee
        proto_parameters
        ~block_level
        attestations
