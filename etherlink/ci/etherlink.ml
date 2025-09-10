@@ -22,6 +22,13 @@ module Files = struct
 
   let kernel = ["etherlink.mk"; "etherlink/**/*.rs"]
 
+  let firehose =
+    [
+      "etherlink/firehose/**/*";
+      "etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*";
+    ]
+
+  (* [firehose] is already included in [node] *)
   let all = sdks @ rust_toolchain_image @ lib_wasm_runtime_rust @ node @ kernel
 end
 
@@ -119,6 +126,22 @@ let job_test_kernel =
     ~sccache:(Cacio.sccache ())
     ["make -f etherlink.mk check"; "make -f etherlink.mk test"]
 
+let job_test_firehose =
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "test_firehose"
+    ~__POS__
+    ~stage:Test
+    ~description:"Check and test etherlink firehose."
+    ~image:Tezos_ci.Images.rust_toolchain
+    ~only_if_changed:Files.(rust_toolchain_image @ firehose)
+    ~needs_legacy:
+      [(Job, Tezos_ci_jobs.Code_verification.job_build_kernels pipeline_type)]
+    ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    ["make -C etherlink/firehose check"]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -129,6 +152,7 @@ let register () =
       (* We rely on the fact that [Tezos_ci_pipelines.Code_verification.job_build_kernels]
          returns an equivalent job for [Before_merging] and [Merge_train]. *)
       (Auto, job_test_kernel Before_merging);
+      (Auto, job_test_firehose Before_merging);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
@@ -141,5 +165,6 @@ let register () =
       (Auto, job_lint_wasm_runtime);
       (Auto, job_unit_tests);
       (Auto, job_test_kernel Schedule_extended_test);
+      (Auto, job_test_firehose Schedule_extended_test);
     ] ;
   ()
