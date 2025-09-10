@@ -103,6 +103,8 @@ defprim! {
     CHAIN_ID, LEVEL, SELF_ADDRESS, never, NEVER,
     UNPAIR, VOTING_POWER, TOTAL_VOTING_POWER, KECCAK,
     SHA3,
+    // BLS primitivies
+    PAIRING_CHECK, bls12_381_g1, bls12_381_g2, bls12_381_fr,
     sapling_state, sapling_transaction_deprecated,
     SAPLING_EMPTY_STATE, SAPLING_VERIFY_UPDATE, ticket,
     TICKET_DEPRECATED, READ_TICKET, SPLIT_TICKET,
@@ -113,8 +115,6 @@ defprim! {
     NAT, Ticket, IS_IMPLICIT_ACCOUNT,
     // Unstable primitives (they are not part of a released protocol)
     Transfer_tokens, Set_delegate, Create_contract, Emit,
-    // BLS primitivies
-    PAIRING_CHECK, bls12_381_g1, bls12_381_g2, bls12_381_fr,
     // If you add anything here, see the note about the order above.
 }
 
