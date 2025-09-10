@@ -1062,6 +1062,8 @@ dependencies = [
  "hex-literal",
  "primitive-types",
  "regex",
+ "revm",
+ "revm-etherlink",
  "serde",
  "serde_json",
  "serde_yaml",
