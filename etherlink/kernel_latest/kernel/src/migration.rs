@@ -400,6 +400,10 @@ fn migrate_to<Host: Runtime>(
             store_evm_version(host, &EVMVersion::Prague)?;
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V38 => {
+            // Dummy migration for the new gas price
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 

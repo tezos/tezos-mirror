@@ -2,7 +2,7 @@
 
 ## Version NEXT
 
-Its storage version is 37.
+Its storage version is 38.
 
 ### Features
 
@@ -22,6 +22,8 @@ Its storage version is 37.
     - [EIP-7623](https://eips.ethereum.org/EIPS/eip-7623): Increase calldata cost.
 - Allows the sequencer operator to set a new public key to be used to verify
   the signature of its blueprint, through a call to a new precompile contract. (!19129)
+- Bump the capacity of Etherlink to 14MGas/s (meaning a target per second to
+  7MGas/s). (!18452)
 
 ### Bug fixes
 
