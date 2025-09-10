@@ -308,12 +308,39 @@ module Simulation = struct
     {inconsistent_da_fees; confirm_gas_needed; time_waiting; queue_size}
 end
 
+module Evm = struct
+  type t = {host_funs : Counter.t String.Hashtbl.t}
+
+  let init () = {host_funs = String.Hashtbl.create 13}
+
+  let host_counter =
+    Counter.v_label
+      ~registry
+      ~label_name:"host_function"
+      ~help:"Number of calls made to host functions"
+      ~namespace
+      ~subsystem
+      "host_function_calls"
+
+  let inc_host_function_call {host_funs} function_name =
+    let counter =
+      match String.Hashtbl.find_opt host_funs function_name with
+      | None ->
+          let counter = host_counter function_name in
+          String.Hashtbl.replace host_funs function_name counter ;
+          counter
+      | Some c -> c
+    in
+    Counter.inc_one counter
+end
+
 type t = {
   chain : Chain.t;
   block : Block.t;
   simulation : Simulation.t;
   health : Health.t;
   l1_level : Gauge.t;
+  evm : Evm.t;
 }
 
 module Blueprint_chunk_sent = struct
@@ -350,6 +377,7 @@ let metrics =
   let block = Block.init name in
   let simulation = Simulation.init name in
   let health = Health.init name in
+  let evm = Evm.init () in
   let l1_level =
     Gauge.v_label
       ~registry
@@ -360,7 +388,7 @@ let metrics =
       "l1_level"
       name
   in
-  {chain; block; simulation; health; l1_level}
+  {chain; block; simulation; health; l1_level; evm}
 
 let init ~mode ?tx_pool_size_info ~smart_rollup_address () =
   Info.init ~mode ~smart_rollup_address ;
@@ -429,6 +457,10 @@ let record_blueprint_chunks_sent_on_inbox chunks =
     "record_blueprint_chunks_sent_on_inbox"
 
 let inc_rpc_method ~name = Counter.inc_one (Rpc.method_ name)
+
+let () =
+  Wasm_runtime_callbacks.Metrics.set_inc_host_function_call
+    (Evm.inc_host_function_call metrics.evm)
 
 module Performance_metrics_config = struct
   open Octez_performance_metrics

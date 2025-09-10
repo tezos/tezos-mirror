@@ -20,6 +20,8 @@
 #TYPE octez_evm_node_gas_price gauge
 #HELP octez_evm_node_head Level of the node's head
 #TYPE octez_evm_node_head gauge
+#HELP octez_evm_node_host_function_calls Number of calls made to host functions
+#TYPE octez_evm_node_host_function_calls counter
 #HELP octez_evm_node_inconsistent_da_fees Node DA fees are inconsistent with kernel ones
 #TYPE octez_evm_node_inconsistent_da_fees counter
 #HELP octez_evm_node_l1_level Last processed L1 block level
