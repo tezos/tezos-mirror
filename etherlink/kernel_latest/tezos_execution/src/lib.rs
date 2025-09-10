@@ -4254,4 +4254,80 @@ mod tests {
             )
         ), "Expected Failed Origination operation result with MirTypecheckingError, got {:?}", receipts[0]);
     }
+
+    #[test]
+    // Tests that empty transfers (external or internal) to implicit accounts
+    // fail, and empty transfers (external or internal) to smart contracts
+    // succeed.
+    fn test_empty_transfers() {
+        let mut host = MockKernelHost::default();
+        let context = context::Context::init_context();
+        let src = bootstrap1();
+        let dst = bootstrap2();
+        let kt1_addr =
+            ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
+                .expect("ContractKt1Hash b58 conversion should have succeeded");
+        // Setup accounts with 50 mutez in their balance
+        init_account(&mut host, &src.pkh, 1000);
+        reveal_account(&mut host, &src);
+        let (code, storage) = (
+            r#"
+                        parameter (or (unit %default) (address %call));
+                        storage unit;
+                        code
+                        { UNPAIR;
+                          IF_LEFT
+                            { DROP; NIL operation; PAIR }
+                            { CONTRACT unit;
+                              { IF_NONE { { UNIT ; FAILWITH } } {} } ;
+                              PUSH mutez 0;
+                              UNIT;
+                              TRANSFER_TOKENS;
+                              NIL operation;
+                              SWAP;
+                              CONS;
+                              PAIR } }
+            "#,
+            &Micheline::from(()),
+        );
+        init_contract(&mut host, &kt1_addr, code, storage, &0.into());
+
+        // An empty external transfer to an implicit account fails.
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            0.into(),
+            Contract::Implicit(dst.pkh),
+            None,
+        );
+        let receipts1 = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+            &0u32.into(),
+            &0i64.into(),
+            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(receipts1.len(), 1, "There should be one receipt");
+        assert!(matches!(
+            &receipts1[0],
+            OperationResultSum::Transfer(OperationResult {
+                result: ContentResult::Failed(ApplyOperationErrors { errors }),
+                ..
+            }) if errors.len() == 1 && matches!(
+                &errors[0],
+                ApplyOperationError::Transfer(
+                    TransferError::EmptyImplicitTransfer
+                )
+            )
+        ), "Expected Failed Transfer operation result with EmptyImplicitTransfer, got {:?}", receipts1[0]);
+    }
 }
