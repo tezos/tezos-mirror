@@ -217,16 +217,16 @@ let attested_shards_per_slot attestations committee ~number_of_slots is_attested
   count_per_slot
 
 let check_attesters_attested node_ctxt parameters ~block_level attestations
-    is_attested =
+    is_attested tb_slot_to_int =
   let open Lwt_result_syntax in
-  let attesters =
+  let tracked_attesters =
     match
       Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
     with
     | Controller profile -> Controller_profiles.attesters profile
     | _ -> Signature.Public_key_hash.Set.empty
   in
-  if Signature.Public_key_hash.Set.is_empty attesters then return_unit
+  if Signature.Public_key_hash.Set.is_empty tracked_attesters then return_unit
   else
     let attestation_level = Int32.pred block_level in
     let* committee =
@@ -270,29 +270,28 @@ let check_attesters_attested node_ctxt parameters ~block_level attestations
                  index = slot_index
                  && Signature.Public_key_hash.equal delegate pkh)
     in
-    let check_attester delegate =
+    let check_attester attester proto_tb_slot =
       let attestation_opt =
         List.find
-          (fun (_tb_slot, delegate_opt, _attestation_op, _dal_attestation_opt)
-             ->
-            match delegate_opt with
-            | Some pkh -> Signature.Public_key_hash.equal delegate pkh
-            | None -> false)
+          (fun (tb_slot, _delegate_opt, _attestation_op, _dal_attestation_opt)
+             -> tb_slot_to_int tb_slot = proto_tb_slot)
           attestations
       in
       match attestation_opt with
       | None ->
-          Dal_metrics.attested_slots_for_baker_per_level_ratio ~delegate 0. ;
-          Event.emit_warn_no_attestation
-            ~attester:delegate
-            ~attested_level:block_level
+          Dal_metrics.attested_slots_for_baker_per_level_ratio
+            ~delegate:attester
+            0. ;
+          Event.emit_warn_no_attestation ~attester ~attested_level:block_level
       | Some (_tb_slot, _delegate_opt, _attestation_op, dal_attestation_opt)
         -> (
           match dal_attestation_opt with
           | None ->
-              Dal_metrics.attested_slots_for_baker_per_level_ratio ~delegate 0. ;
+              Dal_metrics.attested_slots_for_baker_per_level_ratio
+                ~delegate:attester
+                0. ;
               Event.emit_warn_attester_not_dal_attesting
-                ~attester:delegate
+                ~attester
                 ~attested_level:block_level
           | Some bitset ->
               let attested, not_attested, not_attested_with_traps =
@@ -307,7 +306,7 @@ let check_attesters_attested node_ctxt parameters ~block_level attestations
                           not_attested_with_traps )
                       else if
                         parameters.incentives_enable
-                        && contains_traps delegate index
+                        && contains_traps attester index
                       then
                         ( attested,
                           not_attested,
@@ -330,12 +329,12 @@ let check_attesters_attested node_ctxt parameters ~block_level attestations
                 with _ -> 1.
               in
               Dal_metrics.attested_slots_for_baker_per_level_ratio
-                ~delegate
+                ~delegate:attester
                 ratio ;
               let*! () =
                 if attested <> [] then
                   Event.emit_attester_attested
-                    ~attester:delegate
+                    ~attester
                     ~attested_level:block_level
                     ~slot_indexes:attested
                 else Lwt.return_unit
@@ -343,25 +342,28 @@ let check_attesters_attested node_ctxt parameters ~block_level attestations
               let*! () =
                 if not_attested <> [] then
                   Event.emit_warn_attester_did_not_attest
-                    ~attester:delegate
+                    ~attester
                     ~attested_level:block_level
                     ~slot_indexes:not_attested
                 else Lwt.return_unit
               in
               if not_attested_with_traps <> [] then
                 Event.emit_attester_did_not_attest_because_of_traps
-                  ~attester:delegate
+                  ~attester
                   ~attested_level:block_level
                   ~slot_indexes:not_attested_with_traps
               else Lwt.return_unit)
     in
     let*! () =
       Signature.Public_key_hash.Set.iter_s
-        (fun delegate ->
-          if Signature.Public_key_hash.Map.mem delegate committee then
-            check_attester delegate
-          else Lwt.return_unit)
-        attesters
+        (fun attester ->
+          match Signature.Public_key_hash.Map.find attester committee with
+          | None -> Lwt.return_unit
+          | Some tb_slots -> (
+              match List.nth_opt tb_slots 0 with
+              | None -> Lwt.return_unit
+              | Some tb_slot -> check_attester attester tb_slot))
+        tracked_attesters
     in
     return_unit
 
@@ -460,6 +462,7 @@ let process_block_data ctxt cctxt store proto_parameters block_level
        ~block_level
        attestations
        Plugin.is_attested
+       Plugin.tb_slot_to_int
      [@profiler.record_s {verbosity = Notice} "check_attesters_attested"])
   in
   (Accuser.inject_entrapment_evidences
