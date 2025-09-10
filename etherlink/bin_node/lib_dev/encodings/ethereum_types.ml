@@ -289,7 +289,7 @@ let encode_u256_le (Qty n) =
 
 let encode_u64_le (Qty n) =
   let bits = Z.to_bits n |> Bytes.of_string in
-  pad_to_n_bytes_le bits 4
+  pad_to_n_bytes_le bits 8
 
 type transaction_log = {
   address : address;

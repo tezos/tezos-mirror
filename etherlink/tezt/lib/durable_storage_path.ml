@@ -51,6 +51,8 @@ let eth_account addr = sf "%s/%s" eth_accounts (normalize addr)
 
 let balance addr = sf "%s/balance" (eth_account addr)
 
+let nonce addr = sf "%s/nonce" (eth_account addr)
+
 let code addr = sf "%s/code" (eth_account addr)
 
 let storage addr ?key () =

@@ -23,7 +23,7 @@ module AccountInfo = struct
       (List
          [
            Value (encode_u256_le balance);
-           Value (encode_z (Ethereum_types.Qty.to_z nonce));
+           Value (encode_u64_le nonce);
            Value (encode_hash code_hash);
          ])
 
