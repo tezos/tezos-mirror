@@ -329,6 +329,26 @@ let job_start =
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
+(* Use this function to define jobs that depend on the pipeline type.
+   Without this function, you risk defining the same job multiple times
+   for the same pipeline type. *)
+let depending_on_pipeline_type :
+    (code_verification_pipeline -> 'a) -> code_verification_pipeline -> 'a =
+  (* Same as [Cacio.parameterize]: this is just a memoization function.
+     We just specialize its type to make it more clear what we are doing. *)
+  Cacio.parameterize
+
+let job_build_kernels =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_kernels
+    ~rules:
+      (make_rules
+         ~pipeline_type
+         ~changes:changeset_octez_or_kernels_or_doc
+         ~dependent:true
+         ())
+    ()
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
@@ -613,15 +633,7 @@ let jobs pipeline_type =
     job_build_arm64_extra_exp ~rules:build_arm_rules ()
   in
 
-  let job_build_kernels =
-    job_build_kernels
-      ~rules:
-        (make_rules
-           ~changes:changeset_octez_or_kernels_or_doc
-           ~dependent:true
-           ())
-      ()
-  in
+  let job_build_kernels = job_build_kernels pipeline_type in
   let job_tezt_fetch_records =
     Tezt.job_tezt_fetch_records
       ~rules:(make_rules ~changes:changeset_octez ())
