@@ -56,6 +56,16 @@ pub struct BigMap<'a> {
 }
 
 impl<'a> BigMap<'a> {
+    /// Michelson's `EMPTY_BIG_MAP`
+    pub fn empty(key_type: Type, value_type: Type) -> Self {
+        Self {
+            id: None,
+            overlay: BTreeMap::new(),
+            key_type,
+            value_type,
+        }
+    }
+
     /// Michelson's `GET`.
     pub fn get(
         &self,

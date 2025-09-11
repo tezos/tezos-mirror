@@ -1264,14 +1264,8 @@ fn interpret_one<'a>(
             stack.push(V::Map(BTreeMap::new()))
         }
         I::EmptyBigMap(kty, vty) => {
-            use std::collections::BTreeMap;
             ctx.gas().consume(interpret_cost::EMPTY_BIG_MAP)?;
-            stack.push(V::BigMap(BigMap {
-                id: None,
-                overlay: BTreeMap::new(),
-                key_type: kty.clone(),
-                value_type: vty.clone(),
-            }))
+            stack.push(V::BigMap(BigMap::empty(kty.clone(), vty.clone())))
         }
         I::Mem(overload) => match overload {
             overloads::Mem::Set => {
@@ -3854,12 +3848,7 @@ mod interpreter_tests {
         );
         assert_eq!(
             stack,
-            stk![TypedValue::BigMap(BigMap {
-                id: None,
-                overlay: BTreeMap::new(),
-                key_type: Type::Int,
-                value_type: Type::Unit,
-            })]
+            stk![TypedValue::BigMap(BigMap::empty(Type::Int, Type::Unit))]
         );
         assert_eq!(
             ctx.gas().milligas(),
