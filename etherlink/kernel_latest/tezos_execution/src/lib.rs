@@ -134,7 +134,6 @@ pub fn transfer_tez<Host: Runtime>(
 
 fn burn_tez(
     host: &mut impl Runtime,
-    contract: &Contract,
     account: &impl TezlinkAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<Narith, TransferError> {
@@ -145,7 +144,7 @@ fn burn_tez(
         None => {
             log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: contract.clone(),
+                contract: account.address(),
                 balance: balance.clone(),
                 amount: amount.into(),
             }));
@@ -739,13 +738,8 @@ fn originate_contract<Host: Runtime>(
     apply_balance_changes(host, sender_account, &smart_contract, &initial_balance.0)
         .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
-    let _ = burn_tez(
-        host,
-        &source_contract,
-        source_account,
-        &(ORIGINATION_COST + storage_fees),
-    )
-    .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
+    let _ = burn_tez(host, source_account, &(ORIGINATION_COST + storage_fees))
+        .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
     let dummy_origination_sucess = OriginationSuccess {
         balance_updates,
