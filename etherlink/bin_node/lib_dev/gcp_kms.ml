@@ -190,7 +190,11 @@ let get_public_key kms_handler =
   let open Lwt_result_syntax in
   let headers = request_header kms_handler in
   let* response, body_str =
-    Octez_connpool.get ~headers kms_handler.pool (Route.public_key kms_handler)
+    Octez_connpool.get
+      ~timeout:2.0
+      ~headers
+      kms_handler.pool
+      (Route.public_key kms_handler)
   in
   if Cohttp.Response.status response = `OK then
     match Ezjsonm.value_from_string_result body_str with
@@ -277,6 +281,7 @@ let rec sign_rpc ~allow_refresh kms_handler digest =
   let headers = request_header kms_handler in
   let* response, body =
     Octez_connpool.post
+      ~timeout:2.0
       ~headers
       ~body:
         (Cohttp_lwt.Body.of_string
