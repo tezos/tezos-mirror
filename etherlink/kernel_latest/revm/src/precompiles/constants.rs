@@ -92,6 +92,10 @@ pub(crate) const GLOBAL_COUNTER_BASE_COST: u64 = 5000;
 // Covers the cost of 2 r/w access on cold keys.
 pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 5000;
 
+// Rationale regarding the cost:
+// Consumed gas is ~47_000 for both queue execute_without_proxy entrypoints
+pub const FA_DEPOSIT_EXECUTION_COST: u64 = 50_000;
+
 pub(crate) const SEQUENCER_UPGRADE_DELAY: u64 = 60 * 60 * 24; // 24 hours
 
 #[cfg(test)]
