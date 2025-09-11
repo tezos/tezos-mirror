@@ -1424,13 +1424,14 @@ let opt_var name f = function Some value -> [(name, f value)] | None -> []
     authenticate with Docker Hub provided the environment variable
     [CI_DOCKER_AUTH] contains the appropriate credentials. *)
 let job_docker_authenticated ?(skip_docker_initialization = false)
-    ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies
-    ?image_dependencies ?arch ?storage ?tag ?allow_failure ?parallel ?timeout
-    ?retry ?description ?dev_infra ~__POS__ ~stage ~name script : tezos_job =
+    ?ci_docker_hub ?artifacts ?(variables = []) ?rules
+    ?(dependencies = Staged []) ?image_dependencies ?arch ?storage ?tag
+    ?allow_failure ?parallel ?timeout ?retry ?description ?dev_infra ~__POS__
+    ~stage ~name script : tezos_job =
   let docker_version = "24.0.7" in
   job
     ?rules
-    ?dependencies
+    ~dependencies
     ?image_dependencies
     ?artifacts
     ?arch
