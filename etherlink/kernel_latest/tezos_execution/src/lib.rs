@@ -291,13 +291,14 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                         result: ContentResult::Skipped,
                     })
                 } else {
-                    let source_contract = Contract::Implicit(source.clone());
+                    let source_account =
+                        TezlinkImplicitAccount::from_public_key_hash(context, source)
+                            .map_err(|_| OriginationError::FailedToFetchSourceAccount)?;
                     let receipt = originate_contract(
                         host,
                         context,
                         address,
-                        &source_contract,
-                        sender_contract,
+                        &source_account,
                         sender_account,
                         &amount,
                         &script,
@@ -690,8 +691,7 @@ fn originate_contract<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     contract: ContractKt1Hash,
-    source_contract: &Contract,
-    sender_contract: &Contract,
+    source_account: &TezlinkImplicitAccount,
     sender_account: &impl TezlinkAccount,
     initial_balance: &Narith,
     script: &Script,
@@ -715,12 +715,10 @@ fn originate_contract<Host: Runtime>(
             })?;
     }
 
-    let dest_contract = Contract::Originated(contract.clone());
-
     // TODO: Handle lazy_storage diff, a lot of the origination is concerned
 
     // Set the storage of the contract
-    let smart_contract = TezlinkOriginatedAccount::from_contract(context, &dest_contract)
+    let smart_contract = TezlinkOriginatedAccount::from_kt1(context, &contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
     let total_size = smart_contract
@@ -734,9 +732,13 @@ fn originate_contract<Host: Runtime>(
         return Err(OriginationError::CantOriginateEmptyContract);
     }
 
+    let sender_contract = sender_account.address();
+    let new_contract = smart_contract.address();
+    let source_contract = source_account.address();
+
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
     let mut balance_updates =
-        compute_balance_updates(sender_contract, &dest_contract, initial_balance)
+        compute_balance_updates(&sender_contract, &new_contract, initial_balance)
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
 
     // Balance updates for the impacts of origination on storage space.
@@ -745,33 +747,30 @@ fn originate_contract<Host: Runtime>(
         .checked_mul(&BigUint::from(COST_PER_BYTES))
         .ok_or(OriginationError::FailedToComputeBalanceUpdate)?;
     let storage_fees_balance_updates =
-        compute_storage_balance_updates(source_contract, storage_fees.clone())
+        compute_storage_balance_updates(&source_contract, storage_fees.clone())
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
     balance_updates.extend(storage_fees_balance_updates);
 
     // Balance updates for the base origination cost.
     let origination_fees_balance_updates =
-        compute_storage_balance_updates(source_contract, ORIGINATION_COST.into())
+        compute_storage_balance_updates(&source_contract, ORIGINATION_COST.into())
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
     balance_updates.extend(origination_fees_balance_updates);
 
     // Apply the balance change, accordingly to the balance updates computed
     apply_balance_changes(
         host,
-        sender_contract,
+        &sender_contract,
         sender_account,
         &smart_contract,
         &initial_balance.0,
     )
     .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
-    // Retrieve the source account to charge the fees.
-    let source_account = TezlinkImplicitAccount::from_contract(context, source_contract)
-        .map_err(|_| OriginationError::FailedToFetchSourceAccount)?;
     let _ = burn_tez(
         host,
-        source_contract,
-        &source_account,
+        &source_contract,
+        source_account,
         &(ORIGINATION_COST + storage_fees),
     )
     .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
@@ -1128,7 +1127,7 @@ fn apply_operation<Host: Runtime>(
     context: &Context,
     origination_nonce: &mut OriginationNonce,
     content: &ManagerOperation<OperationContent>,
-    source: &PublicKeyHash,
+    _source: &PublicKeyHash,
     source_account: &TezlinkImplicitAccount,
     balance_updates: Vec<BalanceUpdate>,
     level: &BlockNumber,
@@ -1177,13 +1176,11 @@ fn apply_operation<Host: Runtime>(
             ref script,
         }) => {
             let address = origination_nonce.generate_kt1();
-            let source_contract = Contract::Implicit(source.clone());
             let origination_result = originate_contract(
                 host,
                 context,
                 address,
-                &source_contract,
-                &source_contract,
+                source_account,
                 source_account,
                 balance,
                 script,
