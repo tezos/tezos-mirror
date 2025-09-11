@@ -107,6 +107,11 @@ impl<'a> BigMap<'a> {
     pub fn update(&mut self, key: TypedValue<'a>, value: Option<TypedValue<'a>>) {
         self.overlay.insert(key, value);
     }
+
+    /// Length of the in-memory part of the big map
+    pub fn len_for_gas(&self) -> usize {
+        self.overlay.len()
+    }
 }
 
 /// Errors that can happen when working with lazy storage.

@@ -1287,9 +1287,9 @@ fn interpret_one<'a>(
             overloads::Mem::BigMap => {
                 let key = pop!();
                 let map = pop!(V::BigMap);
+                let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
-                ctx.gas()
-                    .consume(interpret_cost::map_mem(&key, map.overlay.len())?)?;
+                ctx.gas().consume(interpret_cost::map_mem(&key, len)?)?;
                 let result = map.mem(&key, ctx.big_map_storage())?;
                 stack.push(V::Bool(result));
             }
@@ -1306,9 +1306,9 @@ fn interpret_one<'a>(
             overloads::Get::BigMap => {
                 let key = pop!();
                 let map = pop!(V::BigMap);
-                // the protocol intentionally uses map costs for the overlay
-                ctx.gas()
-                    .consume(interpret_cost::map_get(&key, map.overlay.len())?)?;
+                let len = map.len_for_gas();
+                // the protocol deliberately uses map costs for the overlay
+                ctx.gas().consume(interpret_cost::map_get(&key, len)?)?;
                 let result = map.get(arena, &key, ctx.big_map_storage())?;
                 stack.push(V::new_option(result));
             }
@@ -1347,9 +1347,9 @@ fn interpret_one<'a>(
                 let key = pop!();
                 let opt_new_val = pop!(V::Option);
                 let map = irrefutable_match!(&mut stack[0]; V::BigMap);
-                // the protocol intentionally uses map costs for the overlay
-                ctx.gas()
-                    .consume(interpret_cost::map_update(&key, map.overlay.len())?)?;
+                let len = map.len_for_gas();
+                // the protocol deliberately uses map costs for the overlay
+                ctx.gas().consume(interpret_cost::map_update(&key, len)?)?;
                 map.update(key, opt_new_val.map(|x| *x));
             }
         },
@@ -1370,9 +1370,10 @@ fn interpret_one<'a>(
                 let key = pop!();
                 let opt_new_val = pop!(V::Option);
                 let map = irrefutable_match!(&mut stack[0]; V::BigMap);
-                // the protocol intentionally uses map costs for the overlay
+                let len = map.len_for_gas();
+                // the protocol deliberately uses map costs for the overlay
                 ctx.gas()
-                    .consume(interpret_cost::map_get_and_update(&key, map.overlay.len())?)?;
+                    .consume(interpret_cost::map_get_and_update(&key, len)?)?;
                 let opt_old_val = map.get(arena, &key, ctx.big_map_storage())?;
                 map.update(key, opt_new_val.map(|x| *x));
                 stack.push(V::new_option(opt_old_val));
