@@ -107,15 +107,16 @@ fn address_from_contract(contract: Contract) -> AddressHash {
 
 pub fn transfer_tez<Host: Runtime>(
     host: &mut Host,
-    giver_contract: &Contract,
     giver_account: &impl TezlinkAccount,
     amount: &Narith,
-    receiver_contract: &Contract,
     receiver_account: &impl TezlinkAccount,
 ) -> Result<TransferSuccess, TransferError> {
-    let balance_updates =
-        compute_balance_updates(giver_contract, receiver_contract, amount)
-            .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
+    let balance_updates = compute_balance_updates(
+        &giver_account.address(),
+        &receiver_account.address(),
+        amount,
+    )
+    .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
 
     apply_balance_changes(host, giver_account, receiver_account, &amount.0)?;
     Ok(TransferSuccess {
@@ -482,15 +483,7 @@ pub fn transfer<'a, Host: Runtime>(
                     .map_err(|_| TransferError::FailedToAllocateDestination)?;
             let dest_account = TezlinkImplicitAccount::from_public_key_hash(context, pkh)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            transfer_tez(
-                host,
-                sender_contract,
-                sender_account,
-                amount,
-                dest_contract,
-                &dest_account,
-            )
-            .map(|success| {
+            transfer_tez(host, sender_account, amount, &dest_account).map(|success| {
                 TransferSuccess {
                     // This boolean is kept at false on purpose to maintain compatibility with TZKT.
                     // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
@@ -505,14 +498,7 @@ pub fn transfer<'a, Host: Runtime>(
             let dest_account =
                 TezlinkOriginatedAccount::from_contract(context, dest_contract)
                     .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            let receipt = transfer_tez(
-                host,
-                sender_contract,
-                sender_account,
-                amount,
-                dest_contract,
-                &dest_account,
-            )?;
+            let receipt = transfer_tez(host, sender_account, amount, &dest_account)?;
             let sender = address_from_contract(sender_contract.clone());
             let amount = amount.0.clone().try_into().map_err(
                 |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
