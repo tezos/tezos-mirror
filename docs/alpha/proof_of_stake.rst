@@ -101,20 +101,38 @@ See :ref:`this page<consensus_key_details>` for further important details,
 including client commands that are helpful for handling consensus keys.
 
 
-Active and passive delegates
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Active delegates and deactivation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. _active_delegate_alpha:
 
-A delegate can be marked as either active or passive. A passive
-delegate cannot participate in the consensus algorithm.
+A delegate can be marked as active or not. An inactive delegate stops
+receiving baking and attesting rights for future cycles.
 
-A delegate is marked as active at its registration.
+A delegate is marked as active when it registers. An inactive delegate
+may reactivate itself by :ref:`registering as a
+delegate<DelegateRegistration>` again. Moreover, if an inactive baker
+participates in the consensus (from leftover rights it had received
+back when it was still active), then it gets automatically marked as
+active again.
 
 At the end of a cycle, a delegate gets deactivated if the chain has
-not witnessed any consensus activity (baking, attesting) from it during the
-past ``TOLERATED_INACTIVITY_PERIOD`` cycles, including the currently
-ending cycle.
+not witnessed any consensus activity (baking, attesting) from it
+during the past ``tolerated_inactivity_period`` cycles, including the
+currently ending cycle. The tolerated inactivity period depends on the
+delegate's :doc:`baking power<baking_power>` ratio over the total
+active baking power. If the ratio is greater than the
+:ref:`proof-of-stake protocol parameter<ps_constants_alpha>`
+``TOLERATED_INACTIVITY_PERIOD_THRESHOLD`` (expressed in 'per
+thousand'), the delegate has a low tolerance
+``TOLERATED_INACTIVITY_PERIOD_LOW``, otherwise it has a high tolerance
+``TOLERATED_INACTIVITY_PERIOD_HIGH``. With current parameters,
+delegates with more than 1% of the total active baking power have a
+``tolerated_inactivity_period`` of 1 cycle, and for delegates with 1%
+or less, it is 12 cycles. In cases where the baking power is unknown,
+the low tolerance is also applied (e.g., after a delegate's
+registration, reactivation, or if its baking power is below
+``MINIMAL_STAKE``).
 
 Note that there is an extra grace period of ``CONSENSUS_RIGHTS_DELAY``
 cycles when a delegate has just registered or has just been
@@ -192,8 +210,16 @@ Proof-of-stake parameters
      - 6,000 ꜩ
    * - ``MINIMAL_FROZEN_STAKE``
      - 600 ꜩ
-   * - ``TOLERATED_INACTIVITY_PERIOD``
-     - 2 cycles
+   * - ``TOLERATED_INACTIVITY_PERIOD_LOW``
+     - 1 cycle
+   * - ``TOLERATED_INACTIVITY_PERIOD_HIGH``
+     - 12 cycles
+   * - ``TOLERATED_INACTIVITY_PERIOD_THRESHOLD``
+     - 10 per thousand
+
+.. /!\ When updating the values of these constants, search for
+   "ps_constants_alpha" to check places where explicit use of those
+   values might need to be updated too.
 
 Further External Resources
 --------------------------
