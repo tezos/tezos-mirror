@@ -6,12 +6,9 @@
 use crate::{custom, Error};
 use primitive_types::{H160, H256, U256 as PU256};
 use revm::primitives::{Address, U256};
-#[cfg(test)]
-use rlp::RlpEncodable;
-use rlp::{Decodable, Rlp, RlpDecodable};
+use rlp::{Decodable, Rlp, RlpDecodable, RlpEncodable};
 
-#[derive(Debug, RlpDecodable, Default)]
-#[cfg_attr(test, derive(RlpEncodable))]
+#[derive(Debug, Eq, PartialEq, Clone, RlpEncodable, RlpDecodable, Default)]
 pub struct FaDepositWithProxy {
     pub amount: PU256,
     pub receiver: H160,
@@ -37,4 +34,12 @@ pub fn u256_to_alloy(value: &PU256) -> U256 {
 
 pub fn h160_to_alloy(value: &H160) -> Address {
     Address::from_slice(&value.to_fixed_bytes())
+}
+
+pub fn alloy_to_u256(value: &U256) -> PU256 {
+    PU256(value.into_limbs())
+}
+
+pub fn alloy_to_h160(value: &Address) -> H160 {
+    H160::from_slice(value.as_slice())
 }

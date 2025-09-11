@@ -9,6 +9,7 @@ use revm::primitives::{Address, U256};
 
 use crate::{
     database::DatabasePrecompileStateChanges,
+    helpers::legacy::FaDepositWithProxy,
     journal::PrecompileStateChanges,
     precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
     storage::sequencer_key_change::SequencerKeyChange,
@@ -41,6 +42,7 @@ pub enum EtherlinkEntry {
     RemoveDeposit {
         deposit_id: U256,
     },
+    QueueDeposit,
     PushWithdrawal,
     IncrementGlobalCounter,
     StoreSequencerKeyChange {
@@ -152,6 +154,15 @@ impl LayeredState {
         Ok(())
     }
 
+    // Queue entrypoint is called exclusively and directly by the system address after a transaction is deposited.
+    // Because of this, find and remove operations can never interact with queued deposits within the same transaction.
+    // This justfies the fact that layered state functions do not take `etherlink_data.deposits` into account.
+    // If the first assumption was to change this behavior would need to be updated.
+    pub fn queue_deposit(&mut self, deposit: FaDepositWithProxy, deposit_id: U256) {
+        self.etherlink_data.deposits.push((deposit_id, deposit));
+        self.entries.push(EtherlinkEntry::QueueDeposit);
+    }
+
     pub fn push_withdrawal(&mut self, withdrawal: Withdrawal) {
         self.etherlink_data.withdrawals.push(withdrawal);
         self.entries.push(EtherlinkEntry::PushWithdrawal);
@@ -220,6 +231,9 @@ impl LayeredState {
                 EtherlinkEntry::RemoveDeposit { deposit_id } => {
                     self.etherlink_data.removed_deposits.remove(&deposit_id);
                 }
+                EtherlinkEntry::QueueDeposit => {
+                    self.etherlink_data.deposits.pop();
+                }
                 EtherlinkEntry::PushWithdrawal => {
                     self.etherlink_data.withdrawals.pop();
                 }
@@ -259,6 +273,8 @@ mod tests {
     struct DummyDB;
 
     impl DatabasePrecompileStateChanges for DummyDB {
+        fn log_node_message(&mut self, _: tezos_evm_logging::Level, _: &str) {}
+
         fn global_counter(&self) -> Result<U256, CustomPrecompileError> {
             Ok(U256::ZERO)
         }

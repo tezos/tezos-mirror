@@ -29,7 +29,7 @@ use tezos_crypto_rs::{
     public_key::PublicKey,
 };
 use tezos_ethereum::block::BlockConstants;
-use tezos_evm_logging::{log, tracing::instrument, Level::Error as LogError};
+use tezos_evm_logging::{log, tracing::instrument, Level};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 
@@ -91,6 +91,7 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
 }
 
 pub trait DatabasePrecompileStateChanges {
+    fn log_node_message(&mut self, level: Level, message: &str);
     fn global_counter(&self) -> Result<U256, CustomPrecompileError>;
     fn ticket_balance(
         &self,
@@ -114,7 +115,7 @@ macro_rules! abort_on_error {
     ($obj:expr, $expr:expr, $msg:expr) => {
         if let Err(err) = $expr {
             $obj.abort();
-            log!($obj.host, LogError, "{} error: {err:?}", $msg);
+            log!($obj.host, Level::Error, "{} error: {err:?}", $msg);
             return;
         }
     };
@@ -224,6 +225,10 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
 // Precompile read functions care about the difference between a path not found and a runtime error
 // as path not found is the only one that will produce a revert result
 impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
+    fn log_node_message(&mut self, level: Level, message: &str) {
+        log!(self.host, level, "{message:?}");
+    }
+
     fn global_counter(&self) -> Result<U256, CustomPrecompileError> {
         Ok(self.system.read_global_counter(self.host)?)
     }
@@ -367,6 +372,13 @@ impl<Host: Runtime> DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, H
                 self.system
                     .write_ticket_balance(self.host, &ticket_hash, &owner, amount),
                 "DatabaseCommitPrecompileStateChanges `write_ticket_balance`"
+            );
+        }
+        for (deposit_id, deposit) in etherlink_data.deposits.iter() {
+            abort_on_error!(
+                self,
+                self.system.write_deposit(self.host, deposit_id, deposit),
+                "DatabaseCommitPrecompileStateChanges `write_deposit`"
             );
         }
         for deposit_id in etherlink_data.removed_deposits {

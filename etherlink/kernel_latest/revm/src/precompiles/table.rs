@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolInterface, SolValue};
-use primitive_types::U256;
+use primitive_types::{H256, U256};
 use revm::{
     context::ContextTr,
     interpreter::{Gas, InputsImpl, InstructionResult, InterpreterResult},
@@ -12,7 +12,9 @@ use revm::{
 
 use crate::{
     database::DatabasePrecompileStateChanges,
-    helpers::legacy::{h160_to_alloy, u256_to_alloy},
+    helpers::legacy::{
+        alloy_to_h160, alloy_to_u256, h160_to_alloy, u256_to_alloy, FaDepositWithProxy,
+    },
     journal::Journal,
     precompiles::{
         constants::{
@@ -35,6 +37,11 @@ sol! {
             uint256 ticket_hash,
             address owner,
             uint256 amount,
+        ) external;
+
+        function queue_deposit(
+            SolFaDepositWithProxy memory deposit,
+            uint256 deposit_id
         ) external;
 
         function find_deposit(uint256 deposit_id) external;
@@ -99,6 +106,37 @@ where
             context
                 .journal_mut()
                 .ticket_balance_remove(ticket_hash, owner, amount)?;
+            None
+        }
+        Table::TableCalls::queue_deposit(Table::queue_depositCall {
+            deposit,
+            deposit_id,
+        }) => {
+            context.journal_mut().queue_deposit(
+                FaDepositWithProxy {
+                    amount: alloy_to_u256(&deposit.amount),
+                    receiver: alloy_to_h160(&deposit.receiver),
+                    proxy: alloy_to_h160(&deposit.proxy),
+                    inbox_level: alloy_to_u256(&deposit.inbox_level).try_into().map_err(
+                        |_| {
+                            CustomPrecompileError::Revert(
+                                "invalid inbox level".to_string(),
+                            )
+                        },
+                    )?,
+                    inbox_msg_id: alloy_to_u256(&deposit.inbox_msg_id)
+                        .try_into()
+                        .map_err(|_| {
+                            CustomPrecompileError::Revert(
+                                "invalid message id".to_string(),
+                            )
+                        })?,
+                    ticket_hash: H256::from_slice(
+                        &deposit.ticket_hash.to_be_bytes::<32>(),
+                    ),
+                },
+                deposit_id,
+            );
             None
         }
         Table::TableCalls::find_deposit(Table::find_depositCall { deposit_id }) => {

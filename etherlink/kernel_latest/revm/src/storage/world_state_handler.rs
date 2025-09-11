@@ -434,14 +434,13 @@ impl StorageAccount {
         )
     }
 
-    #[cfg(test)]
     pub(crate) fn write_deposit(
         &mut self,
         host: &mut impl Runtime,
-        deposit: FaDepositWithProxy,
-        id: U256,
+        deposit_id: &U256,
+        deposit: &FaDepositWithProxy,
     ) -> Result<(), Error> {
-        let deposit_path = self.deposit_path(&id)?;
+        let deposit_path = self.deposit_path(deposit_id)?;
         Ok(host.store_write_all(&deposit_path, &deposit.rlp_bytes())?)
     }
 
