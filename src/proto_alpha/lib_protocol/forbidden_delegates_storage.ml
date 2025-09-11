@@ -81,7 +81,7 @@ let update_at_cycle_end_after_slashing ctxt ~new_cycle =
   let forbidden_delegates = Raw_context.Consensus.forbidden_delegates ctxt in
   if Signature.Public_key_hash.Set.is_empty forbidden_delegates then return ctxt
   else
-    let* selection_for_new_cycle =
+    let* ctxt, selection_for_new_cycle =
       Stake_storage.get_selected_distribution_as_map ctxt new_cycle
     in
     let* forbidden_delegates =

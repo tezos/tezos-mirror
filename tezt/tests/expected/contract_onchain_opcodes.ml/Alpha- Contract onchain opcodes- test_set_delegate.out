@@ -45,7 +45,7 @@ Contract memorized as set_delegate.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg '(Some "[PUBLIC_KEY_HASH]")'
 Node is bootstrapped.
-Estimated gas: 1385.229 units (will add 100 for safety)
+Estimated gas: 1385.915 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -71,7 +71,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 51 bytes
-      Consumed gas: 1285.808
+      Consumed gas: 1286.838
       Internal operations:
         Internal Delegation:
           Contract: [CONTRACT_HASH]
@@ -82,7 +82,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg None
 Node is bootstrapped.
-Estimated gas: 1379.351 units (will add 100 for safety)
+Estimated gas: 1380.037 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -93,13 +93,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000403
+    Fee to the baker: ꜩ0.000404
     Expected counter: 3
-    Gas limit: 1480
+    Gas limit: 1481
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000403
-      payload fees(the block proposer) ....... +ꜩ0.000403
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000404
+      payload fees(the block proposer) ....... +ꜩ0.000404
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -108,7 +108,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 51 bytes
-      Consumed gas: 1279.930
+      Consumed gas: 1280.960
       Internal operations:
         Internal Delegation:
           Contract: [CONTRACT_HASH]

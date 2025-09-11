@@ -45,7 +45,7 @@ Contract memorized as store_now.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg Unit
 Node is bootstrapped.
-Estimated gas: 1277.238 units (will add 100 for safety)
+Estimated gas: 1277.924 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -70,7 +70,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 1
       Storage size: 40 bytes
-      Consumed gas: 1277.860
+      Consumed gas: 1278.890
 
 
 ./octez-client --mode mockup rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'

@@ -93,7 +93,7 @@ module Cache = (val Cache.register_exn (module Client))
 let find ctxt addr =
   let open Lwt_result_syntax in
   let identifier = identifier_of_contract addr in
-  let* contract_opt = Cache.find ctxt identifier in
+  let* ctxt, contract_opt = Cache.find ctxt identifier in
   match contract_opt with
   | Some (unparsed_script, ex_script) ->
       return (ctxt, identifier, Some (unparsed_script, ex_script))

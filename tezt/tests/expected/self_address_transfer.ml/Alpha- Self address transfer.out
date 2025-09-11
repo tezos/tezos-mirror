@@ -101,7 +101,7 @@ Contract memorized as self_address_receiver.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2961.427 units (will add 100 for safety)
+Estimated gas: 2962.842 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -114,7 +114,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000601
     Expected counter: 1
-    Gas limit: 3062
+    Gas limit: 3063
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000601
@@ -127,7 +127,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 82 bytes
-      Consumed gas: 1745.840
+      Consumed gas: 1746.870
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -137,5 +137,5 @@ This sequence of operations was run:
           This transaction was successfully applied
           Updated storage: Unit
           Storage size: 83 bytes
-          Consumed gas: 1216.725
+          Consumed gas: 1217.755
 

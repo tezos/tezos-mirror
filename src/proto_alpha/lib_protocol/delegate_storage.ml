@@ -120,10 +120,10 @@ module Contract = struct
     let open Lwt_result_syntax in
     let*! is_registered = registered c delegate in
     if is_registered then
-      let* () =
-        let* is_inactive = Delegate_activation_storage.is_inactive c delegate in
-        fail_unless is_inactive Active_delegate
+      let* c, is_inactive =
+        Delegate_activation_storage.is_inactive c delegate
       in
+      let* () = fail_unless is_inactive Active_delegate in
       Stake_storage.set_active c delegate
     else
       let contract = Contract_repr.Implicit delegate in
@@ -252,22 +252,22 @@ let list = Storage.Delegates.elements
 
 let initial_frozen_deposits ctxt delegate =
   let open Lwt_result_syntax in
-  let* stake_opt =
+  let* ctxt, stake_opt =
     match Raw_context.find_stake_distribution_for_current_cycle ctxt with
     | Some distribution ->
-        return (Signature.Public_key_hash.Map.find delegate distribution)
+        return (ctxt, Signature.Public_key_hash.Map.find delegate distribution)
     | None ->
         (* This branch happens when the stake distribution is not initialized in
            [ctxt], e.g. when RPCs are called or operations are simulated. *)
         let current_cycle = (Raw_context.current_level ctxt).cycle in
-        let+ stakes =
+        let+ ctxt, stakes =
           Stake_storage.get_selected_distribution ctxt current_cycle
         in
-        List.assoc ~equal:Signature.Public_key_hash.equal delegate stakes
+        (ctxt, List.assoc ~equal:Signature.Public_key_hash.equal delegate stakes)
   in
   match stake_opt with
-  | None -> return Tez_repr.zero
-  | Some {frozen; weighted_delegated = _} -> return frozen
+  | None -> return (ctxt, Tez_repr.zero)
+  | Some {frozen; weighted_delegated = _} -> return (ctxt, frozen)
 
 let initial_frozen_deposits_of_previous_cycle ctxt delegate =
   let open Lwt_result_syntax in
@@ -275,14 +275,14 @@ let initial_frozen_deposits_of_previous_cycle ctxt delegate =
   match Cycle_repr.pred current_cycle with
   | None -> tzfail No_previous_cycle
   | Some previous_cycle -> (
-      let+ stakes =
+      let+ ctxt, stakes =
         Stake_storage.get_selected_distribution ctxt previous_cycle
       in
       match
         List.assoc ~equal:Signature.Public_key_hash.equal delegate stakes
       with
-      | None -> Tez_repr.zero
-      | Some {frozen; weighted_delegated = _} -> frozen)
+      | None -> (ctxt, Tez_repr.zero)
+      | Some {frozen; weighted_delegated = _} -> (ctxt, frozen))
 
 let current_frozen_deposits ctxt delegate =
   let open Lwt_result_syntax in

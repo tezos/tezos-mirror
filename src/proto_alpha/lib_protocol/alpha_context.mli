@@ -2413,21 +2413,22 @@ module Delegate : sig
     context -> public_key_hash -> Tez.t tzresult Lwt.t
 
   val initial_frozen_deposits :
-    context -> public_key_hash -> Tez.t tzresult Lwt.t
+    context -> public_key_hash -> (context * Tez.t) tzresult Lwt.t
 
   (** See {!Contract_delegate_storage.delegated_contracts}. *)
   val delegated_contracts : context -> public_key_hash -> Contract.t list Lwt.t
 
   val registered : context -> public_key_hash -> bool Lwt.t
 
-  val deactivated : context -> public_key_hash -> bool tzresult Lwt.t
+  val deactivated :
+    context -> public_key_hash -> (context * bool) tzresult Lwt.t
 
   (** See {!Forbidden_delegates_storage.is_forbidden}. *)
   val is_forbidden_delegate : t -> public_key_hash -> bool
 
   (** See {!Delegate_activation_storage.last_cycle_before_deactivation}. *)
   val last_cycle_before_deactivation :
-    context -> public_key_hash -> Cycle.t tzresult Lwt.t
+    context -> public_key_hash -> (context * Cycle.t) tzresult Lwt.t
 
   module Consensus_key : sig
     val check_not_tz4 :
@@ -4633,7 +4634,8 @@ module Cache : sig
     val update :
       context -> identifier -> (cached_value * size) option -> context tzresult
 
-    val find : context -> identifier -> cached_value option tzresult Lwt.t
+    val find :
+      context -> identifier -> (context * cached_value option) tzresult Lwt.t
 
     val list_identifiers : context -> (string * int) list
 
@@ -5317,7 +5319,7 @@ module Stake_distribution : sig
     val get_selected_distribution :
       context ->
       Cycle.t ->
-      (Signature.public_key_hash * Stake_repr.t) list tzresult Lwt.t
+      (context * (Signature.public_key_hash * Stake_repr.t) list) tzresult Lwt.t
   end
 end
 

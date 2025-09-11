@@ -122,7 +122,11 @@ module Get_delegates = struct
       |> Lwt.map Environment.wrap_tzresult
 
     let deactivated ctxt pkh =
-      deactivated ctxt pkh |> Lwt.map Environment.wrap_tzresult
+      let open Lwt_result_syntax in
+      let* _ctxt, deactivated =
+        deactivated ctxt pkh |> Lwt.map Environment.wrap_tzresult
+      in
+      return deactivated
 
     let consensus_key ctxt pkh : Signature.public_key tzresult Lwt.t =
       let open Lwt_result_syntax in

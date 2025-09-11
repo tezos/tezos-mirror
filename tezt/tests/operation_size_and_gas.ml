@@ -289,7 +289,7 @@ let test_contract_call =
   let* signature = Client.sign_bytes ~signer:account.alias ~data:msg client in
   let data = sf "Pair %S %S %s" account.public_key signature msg in
   test
-    ~gas_limit:1460
+    ~gas_limit:1470
     ~storage_limit:161
     ~script_name
     ~arg:data

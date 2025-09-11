@@ -143,7 +143,7 @@ Contract memorized as transfer_tokens.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2948.415 units (will add 100 for safety)
+Estimated gas: 2949.830 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -156,7 +156,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000599
     Expected counter: 4
-    Gas limit: 3049
+    Gas limit: 3050
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000599
@@ -169,7 +169,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 66 bytes
-      Consumed gas: 1741.268
+      Consumed gas: 1742.298
       Internal operations:
         Internal Transaction:
           Amount: ꜩ100
@@ -178,7 +178,7 @@ This sequence of operations was run:
           This transaction was successfully applied
           Updated storage: Unit
           Storage size: 38 bytes
-          Consumed gas: 1208.328
+          Consumed gas: 1209.358
           Balance updates:
             [CONTRACT_HASH] ... -ꜩ100
             [CONTRACT_HASH] ... +ꜩ100
@@ -186,7 +186,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2948.415 units (will add 100 for safety)
+Estimated gas: 2949.830 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -199,7 +199,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000599
     Expected counter: 5
-    Gas limit: 3049
+    Gas limit: 3050
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000599
@@ -212,7 +212,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 66 bytes
-      Consumed gas: 1741.268
+      Consumed gas: 1742.298
       Internal operations:
         Internal Transaction:
           Amount: ꜩ100
@@ -221,7 +221,7 @@ This sequence of operations was run:
           This transaction was successfully applied
           Updated storage: Unit
           Storage size: 38 bytes
-          Consumed gas: 1208.328
+          Consumed gas: 1209.358
           Balance updates:
             [CONTRACT_HASH] ... -ꜩ100
             [CONTRACT_HASH] ... +ꜩ100

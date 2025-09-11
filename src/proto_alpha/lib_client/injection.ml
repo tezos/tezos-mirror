@@ -861,8 +861,8 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                    let default_safety_guard =
                      match c.operation with
                      | Transaction {destination = Implicit _; _}
-                     | Reveal _ | Set_deposits_limit _ | Increase_paid_storage _
-                       ->
+                     | Reveal _ | Delegation _ | Set_deposits_limit _
+                     | Increase_paid_storage _ ->
                          Gas.Arith.zero
                      | _ -> default_safety_guard
                    in

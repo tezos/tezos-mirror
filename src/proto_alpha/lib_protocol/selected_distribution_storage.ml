@@ -38,18 +38,24 @@ module Selected_distribution_for_cycle = struct
   let get ctxt cycle =
     let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
-    let* value_opt = Cache.find ctxt id in
+    let* ctxt, value_opt = Cache.find ctxt id in
     match value_opt with
-    | None -> Storage.Stake.Selected_distribution_for_cycle.get ctxt cycle
-    | Some v -> return v
+    | None ->
+        let* v = Storage.Stake.Selected_distribution_for_cycle.get ctxt cycle in
+        return (ctxt, v)
+    | Some v -> return (ctxt, v)
 
   let find ctxt cycle =
     let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
-    let* value_opt = Cache.find ctxt id in
+    let* ctxt, value_opt = Cache.find ctxt id in
     match value_opt with
-    | None -> Storage.Stake.Selected_distribution_for_cycle.find ctxt cycle
-    | Some _ as some_v -> return some_v
+    | None ->
+        let* v =
+          Storage.Stake.Selected_distribution_for_cycle.find ctxt cycle
+        in
+        return (ctxt, v)
+    | Some _ as some_v -> return (ctxt, some_v)
 
   let remove_existing ctxt cycle =
     let open Lwt_result_syntax in
@@ -80,16 +86,21 @@ let find_selected_distribution = Selected_distribution_for_cycle.find
 
 let get_selected_distribution_as_map ctxt cycle =
   let open Lwt_result_syntax in
-  let+ stakes = Selected_distribution_for_cycle.get ctxt cycle in
-  List.fold_left
-    (fun map (pkh, stake) -> Signature.Public_key_hash.Map.add pkh stake map)
-    Signature.Public_key_hash.Map.empty
-    stakes
+  let* ctxt, stakes = Selected_distribution_for_cycle.get ctxt cycle in
+  let stakes_map =
+    List.fold_left
+      (fun map (pkh, stake) -> Signature.Public_key_hash.Map.add pkh stake map)
+      Signature.Public_key_hash.Map.empty
+      stakes
+  in
+  return (ctxt, stakes_map)
 
 let prepare_stake_distribution ctxt =
   let open Lwt_result_syntax in
   let level = Level_storage.current ctxt in
-  let+ stake_distribution = get_selected_distribution_as_map ctxt level.cycle in
+  let+ ctxt, stake_distribution =
+    get_selected_distribution_as_map ctxt level.cycle
+  in
   Raw_context.init_stake_distribution_for_current_cycle ctxt stake_distribution
 
 let get_total_active_stake = Storage.Stake.Total_active_stake.get

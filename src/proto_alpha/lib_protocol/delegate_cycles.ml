@@ -39,7 +39,7 @@ let update_activity ctxt last_cycle =
         ~init:(Ok (ctxt, []))
         ~f:(fun delegate acc ->
           let*? ctxt, deactivated = acc in
-          let* cycle =
+          let* ctxt, cycle =
             Delegate_activation_storage.last_cycle_before_deactivation
               ctxt
               delegate
@@ -167,7 +167,9 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
   in
   (* We cannot use the cached stake info: the detailed stake is needed for reward
      distribution, but it is not cached. *)
-  let* delegates = Stake_storage.get_selected_distribution ctxt last_cycle in
+  let* ctxt, delegates =
+    Stake_storage.get_selected_distribution ctxt last_cycle
+  in
   List.fold_left_es
     (fun (ctxt, balance_updates) (delegate, active_stake) ->
       let* ctxt, sufficient_participation =

@@ -45,7 +45,7 @@ Contract memorized as level.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg Unit
 Node is bootstrapped.
-Estimated gas: 1277.146 units (will add 100 for safety)
+Estimated gas: 1277.832 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -70,7 +70,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 1
       Storage size: 40 bytes
-      Consumed gas: 1277.818
+      Consumed gas: 1278.848
 
 
 ./octez-client --mode mockup get contract storage for '[CONTRACT_HASH]'
@@ -81,7 +81,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg Unit
 Node is bootstrapped.
-Estimated gas: 1277.758 units (will add 100 for safety)
+Estimated gas: 1278.788 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -94,7 +94,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000386
     Expected counter: 3
-    Gas limit: 1378
+    Gas limit: 1379
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000386
@@ -106,7 +106,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 4
       Storage size: 40 bytes
-      Consumed gas: 1277.692
+      Consumed gas: 1278.722
 
 
 ./octez-client --mode mockup get contract storage for '[CONTRACT_HASH]'

@@ -68,7 +68,9 @@ let update_stake ~f ctxt delegate =
   match (had_minimal_stake_before, has_minimal_stake_after) with
   | true, false ->
       (* Decrease below the minimal stake. *)
-      let* inactive = Delegate_activation_storage.is_inactive ctxt delegate in
+      let* ctxt, inactive =
+        Delegate_activation_storage.is_inactive ctxt delegate
+      in
       if inactive then
         (* The delegate is inactive so it wasn't in the set and we
            don't need to update it. *)
@@ -80,7 +82,9 @@ let update_stake ~f ctxt delegate =
         return ctxt
   | false, true ->
       (* Increase above the minimal stake. *)
-      let* inactive = Delegate_activation_storage.is_inactive ctxt delegate in
+      let* ctxt, inactive =
+        Delegate_activation_storage.is_inactive ctxt delegate
+      in
       if inactive then
         (* The delegate is inactive so we don't need to add it to the
            set. *)

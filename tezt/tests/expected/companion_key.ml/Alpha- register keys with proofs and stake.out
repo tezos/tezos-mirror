@@ -3,7 +3,7 @@
 Node is bootstrapped.
 Estimated gas: 184.813 units (will add 0 for safety)
 Estimated storage: no bytes added
-Estimated gas: 100 units (will add 100 for safety)
+Estimated gas: 100 units (will add 0 for safety)
 Estimated storage: no bytes added
 Estimated gas: 1671.680 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -31,16 +31,16 @@ This sequence of operations was run:
       Contract: [PUBLIC_KEY_HASH]
       Key: [PUBLIC_KEY]
       This revelation was successfully applied
-      Consumed gas: 184.482
+      Consumed gas: 184.449
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.00017
+    Fee to the baker: ꜩ0.000159
     Expected counter: 3
-    Gas limit: 200
+    Gas limit: 100
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.00017
-      payload fees(the block proposer) ....... +ꜩ0.00017
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000159
+      payload fees(the block proposer) ....... +ꜩ0.000159
     Delegation:
       Contract: [PUBLIC_KEY_HASH]
       To: [PUBLIC_KEY_HASH]

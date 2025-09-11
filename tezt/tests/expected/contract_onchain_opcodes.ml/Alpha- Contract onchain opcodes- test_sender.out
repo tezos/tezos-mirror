@@ -95,7 +95,7 @@ Contract memorized as sender.
 
 ./octez-client --mode mockup --wait none transfer 0 from '[PUBLIC_KEY_HASH]' to '[CONTRACT_HASH]' --burn-cap 10 --arg Unit
 Node is bootstrapped.
-Estimated gas: 1278.793 units (will add 100 for safety)
+Estimated gas: 1279.479 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -108,7 +108,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000386
     Expected counter: 1
-    Gas limit: 1379
+    Gas limit: 1380
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000386
@@ -120,7 +120,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c
       Storage size: 65 bytes
-      Consumed gas: 1279.372
+      Consumed gas: 1280.402
 
 
 ./octez-client --mode mockup get contract storage for '[CONTRACT_HASH]'
@@ -128,7 +128,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from '[PUBLIC_KEY_HASH]' to '[CONTRACT_HASH]' --burn-cap 10 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 2948.882 units (will add 100 for safety)
+Estimated gas: 2950.297 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -139,13 +139,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000599
+    Fee to the baker: ꜩ0.0006
     Expected counter: 2
-    Gas limit: 3049
+    Gas limit: 3051
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000599
-      payload fees(the block proposer) ....... +ꜩ0.000599
+      [PUBLIC_KEY_HASH] ... -ꜩ0.0006
+      payload fees(the block proposer) ....... +ꜩ0.0006
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -154,7 +154,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 55 bytes
-      Consumed gas: 1739.356
+      Consumed gas: 1740.386
       Internal operations:
         Internal Transaction:
           Amount: ꜩ0
@@ -163,7 +163,7 @@ This sequence of operations was run:
           This transaction was successfully applied
           Updated storage: 0x01c144b1848cb3943f64c69648f0b9e477d96c540600
           Storage size: 65 bytes
-          Consumed gas: 1210.707
+          Consumed gas: 1211.737
 
 
 ./octez-client --mode mockup get contract storage for '[CONTRACT_HASH]'

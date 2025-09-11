@@ -107,7 +107,7 @@ Contract memorized as view_check_caller.
 
 ./octez-client --mode mockup --wait none transfer 1 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3582.580 units (will add 100 for safety)
+Estimated gas: 3583.266 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -120,7 +120,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000665
     Expected counter: 3
-    Gas limit: 3683
+    Gas limit: 3684
     Storage limit: 0 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000665
@@ -133,7 +133,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: None
       Storage size: 208 bytes
-      Consumed gas: 3583.116
+      Consumed gas: 3584.146
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ1
         [CONTRACT_HASH] ... +ꜩ1
@@ -141,7 +141,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 1 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 1285.773 units (will add 100 for safety)
+Estimated gas: 1286.459 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -154,7 +154,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000389
     Expected counter: 4
-    Gas limit: 1386
+    Gas limit: 1387
     Storage limit: 47 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000389
@@ -167,7 +167,7 @@ This sequence of operations was run:
       Updated storage: { 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 }
       Storage size: 179 bytes
       Paid storage size diff: 27 bytes
-      Consumed gas: 1286.351
+      Consumed gas: 1287.381
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675
@@ -177,7 +177,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 1 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
-Estimated gas: 3586.212 units (will add 100 for safety)
+Estimated gas: 3586.898 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -204,7 +204,7 @@ This sequence of operations was run:
       Updated storage: (Some 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78)
       Storage size: 235 bytes
       Paid storage size diff: 27 bytes
-      Consumed gas: 3586.748
+      Consumed gas: 3587.778
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675
