@@ -2373,12 +2373,22 @@ pub(crate) fn typecheck_value<'a>(
             let (tk, tv) = m.as_ref();
             TV::Map(typecheck_map(ctx, t, tk, tv, vs)?)
         }
+        // All valid instantiations of big map are mentioned in
+        // https://tezos.gitlab.io/michelson-reference/#type-big_map
+        (T::BigMap(m), V::Seq(vs)) => {
+            // In-memory big maps have the same syntax as regular maps
+            let (tk, tv) = m.as_ref();
+            let overlay = typecheck_big_map(ctx, t, tk, tv, vs, false)?;
+            TV::BigMap(BigMap {
+                id: None,
+                overlay,
+                key_type: tk.clone(),
+                value_type: tv.clone(),
+            })
+        }
         (T::BigMap(m), v) => {
             let (id_opt, vs_opt, diff) = match v {
-                // All valid instantiations of big map are mentioned in
-                // https://tezos.gitlab.io/michelson-reference/#type-big_map
                 V::Int(i) => (Some(i.clone()), None, false),
-                V::Seq(vs) => (None, Some(vs), false),
                 V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (Some(i.clone()), Some(vs), true),
                 _ => return Err(invalid_value_for_type!()),
             };
