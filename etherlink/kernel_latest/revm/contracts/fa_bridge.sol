@@ -43,6 +43,106 @@ contract FABridge is ReentrancySafe {
         uint256 inboxMsgId
     );
 
+    event QueuedDeposit(
+        uint256 indexed ticketHash,
+        address indexed proxy,
+        uint256 nonce,
+        address receiver,
+        uint256 amount,
+        uint256 inboxLevel,
+        uint256 inboxMsgId
+    );
+
+    struct FaDepositWithoutProxy {
+        uint256 amount;
+        address receiver;
+        uint256 ticketHash;
+        uint256 inboxLevel;
+        uint256 inboxMsgId;
+    }
+
+    modifier onlySystem() {
+        require(
+            msg.sender == Constants.system,
+            "InternalForwarder: unauthorized caller"
+        );
+        _;
+    }
+
+    /**
+     * @notice Queue a deposit into the ticket table with proxy information.
+     * @dev
+     *  - Increments the global counter and uses it as a deposit nonce.
+     *  - Registers the deposit.
+     * @param deposit The deposit data, including:
+     *   - `amount`: The deposit amount
+     *   - `receiver`: The target account that will receive funds
+     *   - `ticketHash`: The ticket hash identifying the deposit
+     *   - `proxy`: The proxy address through which the deposit is routed
+     *   - `inboxLevel`: The inbox level at which the deposit was submitted
+     *   - `inboxMsgId`: The inbox message identifier
+     */
+    function queue(
+        ITable.FaDepositWithProxy memory deposit
+    ) external payable nonReentrant onlySystem {
+        // Get and increment global counter
+        uint256 counter = ICounter(Constants.globalCounter).get_and_increment();
+
+        // Push deposit to the queue
+        bytes memory input = abi.encodeCall(
+            ITable.queue_deposit,
+            (deposit, counter)
+        );
+        (bool success, ) = Constants.ticketTable.call(input);
+        require(success, "Could not queue deposit");
+
+        // Emit queued deposit event
+        emit QueuedDeposit(
+            deposit.ticketHash,
+            deposit.proxy,
+            counter,
+            deposit.receiver,
+            deposit.amount,
+            deposit.inboxLevel,
+            deposit.inboxMsgId
+        );
+    }
+
+    /**
+     * @notice Execute a deposit that does not require a proxy.
+     * @dev
+     *  - Used for direct deposits without a proxy address.
+     *  - Consumes deposit information and processes it accordingly.
+     * @param deposit The deposit data, including:
+     *   - `amount`: The deposit amount
+     *   - `receiver`: The target account that will receive funds
+     *   - `ticketHash`: The ticket hash identifying the deposit
+     *   - `inboxLevel`: The inbox level at which the deposit was submitted
+     *   - `inboxMsgId`: The inbox message identifier
+     */
+    function execute_without_proxy(
+        FaDepositWithoutProxy memory deposit
+    ) external payable nonReentrant onlySystem {
+        // Increase ticket balance of receiver as there is no proxy
+        bytes memory ticketData = abi.encodeCall(
+            ITable.ticket_balance_add,
+            (deposit.ticketHash, deposit.receiver, deposit.amount)
+        );
+        (bool ticketSuccess, ) = Constants.ticketTable.call(ticketData);
+        require(ticketSuccess, "Failed to increment ticket balance");
+
+        // Emit claimed deposit event
+        // We have receiver twice as both ticket owner and receiver
+        emit Deposit(
+            deposit.ticketHash,
+            deposit.receiver,
+            deposit.receiver,
+            deposit.amount,
+            deposit.inboxLevel,
+            deposit.inboxMsgId
+        );
+    }
+
     /// @notice Claim a queued FA deposit identified by `depositId`.
     /// @param depositId The identifier of the deposit to claim.
     function claim(uint256 depositId) external payable nonReentrant {
