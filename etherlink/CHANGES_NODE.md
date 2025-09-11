@@ -8,17 +8,11 @@
 
 ### RPCs changes
 
-- Fixes `eth_getTransactionByHash` always returning a transaction object for
-  transactions injected during a sequencer downtime. (!19247)
-
-### Metrics changes
+### Monitoring changes
 
 ### Command-line interface changes
 
 ### Execution changes
-
-- Prevents GCP KMS unresponsiveness to impact the block production of the
-  sequencer by adding a timeout of 2s. (!19246)
 
 ### Storage changes
 
@@ -30,6 +24,28 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.40 (2025-09-11)
+
+### RPCs changes
+
+- Fixes `eth_getTransactionByHash` always returning a transaction object for
+  transactions injected during a sequencer downtime. (!19247)
+
+### Monitoring changes
+
+- Adds two new attributes on every Opentelemetry spans: `service.version`
+  (specific to each release of the node) and `deployment.environment` (defined
+  in the configuration file or using the `DD_ENV` environment variable). See
+  [Datadog configuration][config] for the semantics of these fields.
+  (!19156)
+
+[config]: https://docs.datadoghq.com/getting_started/tagging/unified_service_tagging
+
+### Execution changes
+
+- Prevents GCP KMS unresponsiveness to impact the block production of the
+  sequencer by adding a timeout of 2s. (!19246)
 
 ## Version 0.39 (2025-09-02)
 
