@@ -2378,10 +2378,10 @@ pub(crate) fn typecheck_value<'a>(
         (T::BigMap(m), V::Seq(vs)) => {
             // In-memory big maps have the same syntax as regular maps
             let (tk, tv) = m.as_ref();
-            let overlay = typecheck_big_map(ctx, t, tk, tv, vs, false)?;
+            let map = typecheck_map(ctx, t, tk, tv, vs)?;
+            let content = big_map::BigMapContent::InMemory(map);
             TV::BigMap(BigMap {
-                id: None,
-                overlay,
+                content,
                 key_type: tk.clone(),
                 value_type: tv.clone(),
             })
@@ -2412,9 +2412,12 @@ pub(crate) fn typecheck_value<'a>(
             } else {
                 BTreeMap::default()
             };
-            TV::BigMap(BigMap {
-                id: Some(big_map_id),
+            let content = big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+                id: big_map_id,
                 overlay,
+            });
+            TV::BigMap(BigMap {
+                content,
                 key_type: tk.clone(),
                 value_type: tv.clone(),
             })
@@ -6110,8 +6113,10 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                id: Some(id0.clone()),
-                overlay: BTreeMap::new(),
+                content: big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+                    id: id0.clone(),
+                    overlay: BTreeMap::new()
+                }),
                 key_type: Type::Int,
                 value_type: Type::Int
             }))
@@ -6157,8 +6162,10 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                id: None,
-                overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))]),
+                content: big_map::BigMapContent::InMemory(BTreeMap::from([(
+                    TypedValue::int(7),
+                    TypedValue::int(8)
+                )])),
                 key_type: Type::Int,
                 value_type: Type::Int
             }))
@@ -6198,8 +6205,10 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                id: Some(id0.clone()),
-                overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))]),
+                content: big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+                    id: id0.clone(),
+                    overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))])
+                }),
                 key_type: Type::Int,
                 value_type: Type::Int
             }))
@@ -6213,8 +6222,10 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                id: Some(id0),
-                overlay: BTreeMap::from([(TypedValue::int(7), None)]),
+                content: big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+                    id: id0,
+                    overlay: BTreeMap::from([(TypedValue::int(7), None)])
+                }),
                 key_type: Type::Int,
                 value_type: Type::Int
             }))

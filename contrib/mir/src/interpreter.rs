@@ -3562,12 +3562,15 @@ mod interpreter_tests {
                 Some(TypedValue::String("foo".to_owned())),
             )
             .unwrap();
-        let big_map = BigMap {
-            id: Some(big_map_id),
+        let content = big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+            id: big_map_id,
             overlay: BTreeMap::from([(
                 TypedValue::int(2),
                 Some(TypedValue::String("bar".to_owned())),
             )]),
+        });
+        let big_map = BigMap {
+            content,
             key_type: Type::Int,
             value_type: Type::String,
         };
@@ -3752,9 +3755,12 @@ mod interpreter_tests {
                 ],
             )
             .unwrap();
-        let big_map = BigMap {
-            id: Some(big_map_id),
+        let content = big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+            id: big_map_id,
             overlay: BTreeMap::new(),
+        });
+        let big_map = BigMap {
+            content,
             key_type: Type::Int,
             value_type: Type::String,
         };
@@ -4192,9 +4198,12 @@ mod interpreter_tests {
             ctx.big_map_storage
                 .big_map_bulk_update(&id, content)
                 .unwrap();
-            let big_map = BigMap {
-                id: Some(id.clone()),
+            let content = big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+                id: id.clone(),
                 overlay: overlay.into_iter().collect(),
+            });
+            let big_map = BigMap {
+                content,
                 key_type: Type::Int,
                 value_type: Type::String,
             };
@@ -4210,8 +4219,12 @@ mod interpreter_tests {
             assert_eq!(
                 stack,
                 stk![TypedValue::BigMap(BigMap {
-                    id: Some(id),
-                    overlay: result.into_iter().collect(),
+                    content: big_map::BigMapContent::FromLazyStorage(
+                        big_map::BigMapFromLazyStorage {
+                            id,
+                            overlay: result.into_iter().collect()
+                        }
+                    ),
                     key_type: Type::Int,
                     value_type: Type::String,
                 })]
@@ -4273,9 +4286,12 @@ mod interpreter_tests {
             ctx.big_map_storage
                 .big_map_bulk_update(&id, content)
                 .unwrap();
-            let big_map = BigMap {
-                id: Some(id.clone()),
+            let content = big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+                id: id.clone(),
                 overlay: overlay.into_iter().collect(),
+            });
+            let big_map = BigMap {
+                content,
                 key_type: Type::Int,
                 value_type: Type::String,
             };
@@ -4296,8 +4312,12 @@ mod interpreter_tests {
                 stack,
                 stk![
                     TypedValue::BigMap(BigMap {
-                        id: Some(id),
-                        overlay: result.into_iter().collect(),
+                        content: big_map::BigMapContent::FromLazyStorage(
+                            big_map::BigMapFromLazyStorage {
+                                id,
+                                overlay: result.into_iter().collect()
+                            }
+                        ),
                         key_type: Type::Int,
                         value_type: Type::String,
                     }),

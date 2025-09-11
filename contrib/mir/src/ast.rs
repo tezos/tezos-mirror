@@ -377,21 +377,28 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                 m.into_iter()
                     .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
             )),
-            TV::BigMap(m) => {
-                let id_part = m.id.map(|i| V::Int(i.0));
-                let overlay_empty = m.overlay.is_empty();
-                let map_part = V::Seq(V::alloc_iter(
+            TV::BigMap(m) => match m.content {
+                big_map::BigMapContent::InMemory(m) => V::Seq(V::alloc_iter(
                     arena,
-                    m.overlay.into_iter().map(|(key, val)| {
-                        V::prim2(arena, Prim::Elt, go(key), option_into_micheline(val))
-                    }),
-                ));
-                match id_part {
-                    Some(id_part) if overlay_empty => id_part,
-                    Some(id_part) => V::prim2(arena, Prim::Pair, id_part, map_part),
-                    None => map_part,
+                    m.into_iter()
+                        .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
+                )),
+                big_map::BigMapContent::FromLazyStorage(m) => {
+                    let id_part = V::Int(m.id.0);
+                    let overlay_empty = m.overlay.is_empty();
+                    let map_part = V::Seq(V::alloc_iter(
+                        arena,
+                        m.overlay.into_iter().map(|(key, val)| {
+                            V::prim2(arena, Prim::Elt, go(key), option_into_micheline(val))
+                        }),
+                    ));
+                    if overlay_empty {
+                        id_part
+                    } else {
+                        V::prim2(arena, Prim::Pair, id_part, map_part)
+                    }
                 }
-            }
+            },
             TV::Option(x) => option_into_micheline(x.map(|v| *v)),
             TV::Or(or) => match *or {
                 Or::Left(x) => V::prim1(arena, Prim::Left, go(x)),
