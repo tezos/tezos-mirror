@@ -95,11 +95,18 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
     psql ~db:tzkt_db (sf "GRANT ALL ON SCHEMA public TO %s;" tzkt_db_user)
   in
 
-  (* Clone TZKT sources on `proto23` branch as it supports Seoul. *)
+  (* Clone TZKT sources on head-streaming branch as it supports Seoul and fast
+     indexing. *)
   let* () =
     run
       "git"
-      ["clone"; "-b"; "proto23"; "https://github.com/baking-bad/tzkt"; "tzkt"]
+      [
+        "clone";
+        "-b";
+        "head-streaming";
+        "https://github.com/baking-bad/tzkt";
+        "tzkt";
+      ]
   in
   (* Compile Tzkt indexer and API. The output of the compilation is sent
      to different directory to prevent collision. *)
@@ -154,6 +161,14 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
       ["Kestrel"; "Endpoints"; "Http"; "Url"]
       [sf "http://0.0.0.0:%d" api_port]
   in
+  let polling_args =
+    [
+      (* debounce=false means the indexer doesn't sleep for "min block time" *)
+      tzkt_arg ["Observer"; "Debounce"] ["false"];
+      (* delay between polling requests in milliseconds *)
+      tzkt_arg ["Observer"; "Period"] ["400"];
+    ]
+  in
 
   (* Run the Tzkt indexer and Tzkt API *)
   let runner = Agent.runner agent in
@@ -166,6 +181,7 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
       ~endpoint:endpoint_arg
       ~db:database_arg
       ~port:indexer_port_arg
+      ~args:polling_args
       ()
   in
   let* () =
