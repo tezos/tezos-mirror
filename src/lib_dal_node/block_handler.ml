@@ -201,7 +201,7 @@ let attested_shards_per_slot attestations slot_to_committee ~number_of_slots
     is_attested tb_slot_to_int =
   let count_per_slot = Array.make number_of_slots 0 in
   List.iter
-    (fun (tb_slot, _, _, dal_attestation_opt) ->
+    (fun (tb_slot, _, dal_attestation_opt) ->
       match dal_attestation_opt with
       | Some dal_attestation -> (
           match
@@ -274,8 +274,8 @@ let check_attesters_attested node_ctxt committee slot_to_committee parameters
     let check_attester attester proto_tb_slot =
       let attestation_opt =
         List.find
-          (fun (tb_slot, _delegate_opt, _attestation_op, _dal_attestation_opt)
-             -> tb_slot_to_int tb_slot = proto_tb_slot)
+          (fun (tb_slot, _attestation_op, _dal_attestation_opt) ->
+            tb_slot_to_int tb_slot = proto_tb_slot)
           attestations
       in
       match attestation_opt with
@@ -284,8 +284,7 @@ let check_attesters_attested node_ctxt committee slot_to_committee parameters
             ~delegate:attester
             0. ;
           Event.emit_warn_no_attestation ~attester ~attested_level:block_level
-      | Some (_tb_slot, _delegate_opt, _attestation_op, dal_attestation_opt)
-        -> (
+      | Some (_tb_slot, _attestation_op, dal_attestation_opt) -> (
           match dal_attestation_opt with
           | None ->
               Dal_metrics.attested_slots_for_baker_per_level_ratio

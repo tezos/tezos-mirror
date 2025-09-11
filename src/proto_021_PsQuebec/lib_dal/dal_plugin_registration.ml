@@ -163,7 +163,7 @@ module Plugin = struct
       Protocol_client_context.Alpha_block_services.Operations.operations_in_pass
         cpctxt
         ~block:(`Level block_level)
-        ~metadata:`Always
+        ~metadata:`Never
         0
     in
     return
@@ -171,7 +171,7 @@ module Plugin = struct
          (fun operation ->
            let (Operation_data operation_data) = operation.protocol_data in
            match operation_data.contents with
-           | Single (Attestation attestation) -> (
+           | Single (Attestation attestation) ->
                let packed_operation : Kind.attestation Alpha_context.operation =
                  {
                    Alpha_context.shell = operation.shell;
@@ -184,23 +184,7 @@ module Plugin = struct
                    (fun x -> (x.attestation :> dal_attestation))
                    attestation.dal_content
                in
-               match operation.receipt with
-               | Receipt (Operation_metadata operation_metadata) -> (
-                   match operation_metadata.contents with
-                   | Single_result (Attestation_result result) ->
-                       let delegate =
-                         Tezos_crypto.Signature.Of_V1.public_key_hash
-                           result.delegate
-                       in
-                       Some
-                         ( tb_slot,
-                           Some delegate,
-                           packed_operation,
-                           dal_attestation )
-                   | _ -> Some (tb_slot, None, packed_operation, dal_attestation)
-                   )
-               | Empty | Too_large | Receipt No_operation_metadata ->
-                   Some (tb_slot, None, packed_operation, dal_attestation))
+               Some (tb_slot, packed_operation, dal_attestation)
            | _ -> None)
          consensus_ops
 

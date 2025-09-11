@@ -67,12 +67,7 @@ module type T = sig
   val get_attestations :
     block_level:int32 ->
     Tezos_rpc__RPC_context.generic ->
-    (tb_slot
-    * Signature.public_key_hash option
-    * attestation_operation
-    * dal_attestation option)
-    list
-    tzresult
+    (tb_slot * attestation_operation * dal_attestation option) list tzresult
     Lwt.t
 
   val get_committee :

@@ -10,7 +10,7 @@
    their corresponding attestation operation and DAL attestation. *)
 let get_attestation_map attestations slot_to_committee_pkh tb_slot_to_int =
   List.fold_left
-    (fun map (tb_slot, _delegate_opt, operation, dal_attestation) ->
+    (fun map (tb_slot, operation, dal_attestation) ->
       match
         List.find
           (fun (v, _) -> v = tb_slot_to_int tb_slot)

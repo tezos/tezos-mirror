@@ -205,7 +205,7 @@ module Plugin = struct
       Protocol_client_context.Alpha_block_services.Operations.operations_in_pass
         cpctxt
         ~block:(`Level block_level)
-        ~metadata:`Always
+        ~metadata:`Never
         0
     in
     Lwt.return @@ Result.map List.flatten
@@ -213,7 +213,7 @@ module Plugin = struct
          (fun operation ->
            let (Operation_data operation_data) = operation.protocol_data in
            match operation_data.contents with
-           | Single (Attestation attestation) -> (
+           | Single (Attestation attestation) ->
                let packed_operation =
                  Op
                    {
@@ -228,26 +228,8 @@ module Plugin = struct
                      (dal_content.attestation :> dal_attestation))
                    attestation.dal_content
                in
-               match operation.receipt with
-               | Receipt (Operation_metadata operation_metadata) -> (
-                   match operation_metadata.contents with
-                   | Single_result (Attestation_result result) ->
-                       let delegate =
-                         Tezos_crypto.Signature.Of_V2.public_key_hash
-                           result.delegate
-                       in
-                       Ok
-                         [
-                           ( tb_slot,
-                             Some delegate,
-                             packed_operation,
-                             dal_attestation );
-                         ]
-                   | _ ->
-                       Ok [(tb_slot, None, packed_operation, dal_attestation)])
-               | Empty | Too_large | Receipt No_operation_metadata ->
-                   Ok [(tb_slot, None, packed_operation, dal_attestation)])
-           | Single (Attestations_aggregate {committee; _}) -> (
+               Ok [(tb_slot, packed_operation, dal_attestation)]
+           | Single (Attestations_aggregate {committee; _}) ->
                let packed_operation =
                  Op
                    {
@@ -265,32 +247,11 @@ module Plugin = struct
                          dal_content_opt ))
                    committee
                in
-               match operation.receipt with
-               | Receipt (Operation_metadata operation_metadata) -> (
-                   match operation_metadata.contents with
-                   | Single_result
-                       (Attestations_aggregate_result {committee; _}) ->
-                       List.map2
-                         ~when_different_lengths:[Aggregation_result_size_error]
-                         (fun (tb_slot, dal_attestation) (consensus_key, _) ->
-                           ( tb_slot,
-                             Some consensus_key.Consensus_key.delegate,
-                             packed_operation,
-                             dal_attestation ))
-                         slots_and_dal_attestations
-                         committee
-                   | _ ->
-                       Ok
-                         (List.map
-                            (fun (tb_slot, dal_attestation) ->
-                              (tb_slot, None, packed_operation, dal_attestation))
-                            slots_and_dal_attestations))
-               | Empty | Too_large | Receipt No_operation_metadata ->
-                   Ok
-                     (List.map
-                        (fun (tb_slot, dal_attestation) ->
-                          (tb_slot, None, packed_operation, dal_attestation))
-                        slots_and_dal_attestations))
+               Ok
+                 (List.map
+                    (fun (tb_slot, dal_attestation) ->
+                      (tb_slot, packed_operation, dal_attestation))
+                    slots_and_dal_attestations)
            | _ -> Ok [])
          consensus_ops
 

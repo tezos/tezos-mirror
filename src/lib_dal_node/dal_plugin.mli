@@ -80,20 +80,13 @@ module type T = sig
     Tezos_rpc__RPC_context.generic ->
     slot_header list tzresult Lwt.t
 
-  (** For a given block, returns for each included attestation, as a
-      list, its Tenderbake slot, its attester if available in the
-      operation receipt, its [attestation] operation and, if it
-      exists, its [dal_attestation] to be passed to the [is_attested]
-      function. *)
+  (** For a given block, returns for each included attestation, as a list, its
+      Tenderbake slot, its [attestation] operation and, if it exists, its
+      [dal_attestation] to be passed to the [is_attested] function. *)
   val get_attestations :
     block_level:int32 ->
     Tezos_rpc__RPC_context.generic ->
-    (tb_slot
-    * Signature.public_key_hash option
-    * attestation_operation
-    * dal_attestation option)
-    list
-    tzresult
+    (tb_slot * attestation_operation * dal_attestation option) list tzresult
     Lwt.t
 
   (** [get_committee ctxt ~level] retrieves the DAL committee at [level] from L1 as a
