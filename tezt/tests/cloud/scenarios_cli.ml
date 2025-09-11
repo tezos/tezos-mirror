@@ -1157,5 +1157,13 @@ module Tezlink () : Tezlink = struct
         ()
     in
     if s = "none" then Tezos.Evm_node.Nothing
-    else Time_between_blocks (Float.of_string s)
+    else
+      match Float.of_string_opt s with
+      | None ->
+          failwith
+            (sf
+               "unrecognized value \"%s\": option --time-between-blocks only \
+                accepts \"none\" or a float"
+               s)
+      | Some f -> Time_between_blocks f
 end
