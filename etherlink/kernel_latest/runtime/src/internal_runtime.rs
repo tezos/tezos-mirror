@@ -62,9 +62,9 @@ pub trait ExtendedRuntime {
         -> Result<Vec<u8>, RuntimeError>;
 }
 
-pub struct InternalHost();
+pub struct WasmInternalHost();
 
-impl InternalRuntime for InternalHost {
+impl InternalRuntime for WasmInternalHost {
     fn __internal_store_get_hash<T: Path>(
         &mut self,
         path: &T,

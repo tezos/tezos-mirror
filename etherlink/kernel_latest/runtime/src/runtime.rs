@@ -15,7 +15,7 @@ use std::{
 
 use crate::{
     extensions::WithGas,
-    internal_runtime::{ExtendedRuntime, InternalHost, InternalRuntime},
+    internal_runtime::{ExtendedRuntime, InternalRuntime},
     mock_internal::MockInternal,
 };
 use tezos_evm_logging::{tracing::instrument, Level, Verbosity};
@@ -350,13 +350,14 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> W
     }
 }
 
-impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>> KernelHost<R, Host, InternalHost> {
-    pub fn init(host: Host) -> Self {
-        let internal_storage = InternalHost();
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, I: InternalRuntime>
+    KernelHost<R, Host, I>
+{
+    pub fn init(host: Host, internal: I) -> Self {
         let logs_verbosity = read_logs_verbosity(host.borrow());
         Self {
             host,
-            internal: internal_storage,
+            internal,
             logs_verbosity,
             execution_gas_used: 0,
             _pd: PhantomData,
