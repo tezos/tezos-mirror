@@ -17,6 +17,9 @@
 
 ### Execution changes
 
+- Prevents GCP KMS unresponsiveness to impact the block production of the
+  sequencer by adding a timeout of 2s. (!19246)
+
 ### Storage changes
 
 ### Documentation changes

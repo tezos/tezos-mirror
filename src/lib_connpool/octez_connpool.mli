@@ -37,6 +37,7 @@ val warm : t -> unit Lwt.t
     connection becomes available if the pool has already reached full capacity.
     *)
 val get :
+  ?timeout:float ->
   ?headers:Cohttp.Header.t ->
   ?sensitive_headers:string list ->
   ?query:(string * string list) list ->
@@ -48,6 +49,7 @@ val get :
 (** [post t path] perform a [POST path] request to the endpoint of [t], using
     one of the connections of the pool. See {!get} for caveats. *)
 val post :
+  ?timeout:float ->
   ?headers:Cohttp.Header.t ->
   ?sensitive_headers:string list ->
   ?body:Cohttp_lwt.Body.t ->
@@ -60,6 +62,7 @@ val post :
 (** [put t path] perform a [PUT path] request to the endpoint of [t], using
     one of the connections of the pool. See {!get} for caveats. *)
 val put :
+  ?timeout:float ->
   ?headers:Cohttp.Header.t ->
   ?sensitive_headers:string list ->
   ?body:Cohttp_lwt.Body.t ->
@@ -72,6 +75,7 @@ val put :
 (** [patch t path] perform a [PATCH path] request to the endpoint of [t], using
     one of the connections of the pool. See {!get} for caveats. *)
 val patch :
+  ?timeout:float ->
   ?headers:Cohttp.Header.t ->
   ?sensitive_headers:string list ->
   ?body:Cohttp_lwt.Body.t ->
@@ -84,6 +88,7 @@ val patch :
 (** [delete t path] perform a [DELETE path] request to the endpoint of [t],
     using one of the connections of the pool. See {!get} for caveats. *)
 val delete :
+  ?timeout:float ->
   ?headers:Cohttp.Header.t ->
   ?sensitive_headers:string list ->
   ?body:Cohttp_lwt.Body.t ->
