@@ -236,15 +236,22 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     Services_backend_sig.tx_container_module tx_container
   in
 
-  let* signer =
+  let* signer_opt =
     match signer with
+    | Some signer -> return (Signer.first_signer signer)
+    | None ->
+        let*? keys = Configuration.sequencer_keys configuration in
+        let* signer = Signer.of_sequencer_keys configuration cctxt keys in
+        return (Signer.first_signer signer)
+  in
+  let* pk, signer =
+    match signer_opt with
     | Some signer -> return signer
     | None ->
-        let*? key = Configuration.sequencer_key configuration in
-        let* signer = Signer.of_sequencer_key configuration cctxt key in
-        return signer
+        failwith
+          "No signer found in the provided sequencer keys. Please provide at \
+           least one valid signer."
   in
-
   let* status, smart_rollup_address_typed =
     Evm_context.start
       ~configuration
@@ -261,7 +268,6 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
   let* () =
     match sandbox_config with
     | Some {funded_addresses; disable_da_fees; kernel_verbosity; tezlink; _} ->
-        let* pk = Signer.public_key signer in
         let* () = Evm_context.patch_sequencer_key pk in
         let new_balance =
           Ethereum_types.quantity_of_z Z.(of_int 10_000 * pow (of_int 10) 18)

@@ -6,6 +6,9 @@
 
 ### Configuration changes
 
+- Add support for multiple sequencer keys in the configuration
+  (only first one used for now) (!19251).
+
 ### RPCs changes
 
 ### Monitoring changes
@@ -97,10 +100,10 @@ This release will not apply any migration to the node's store (version
   version 0.30 deprecated.
 - The sequencer now performs full gas limit prevalidation in line with Ethereum
   standards.
-  Transactions are rejected if the specified gas limit is insufficient to cover:  
+  Transactions are rejected if the specified gas limit is insufficient to cover:
     * calldata cost,
     * potential access list cost, and
-    * authorization list cost. 
+    * authorization list cost.
   Previously the prevalidation was only checking if the requirement to cover the
   minimum da fees and base intrisic gas cost were covered which was not enough. (!19149)
 

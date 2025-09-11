@@ -5,9 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module PKMap = Map.Make (Signature.Public_key)
+
 type t =
   | Wallet : #Client_context.wallet * Client_keys.sk_uri -> t
   | Gcp_kms of Gcp_kms.t
+
+type map = t PKMap.t
 
 let wallet cctxt sk_uri = Wallet (cctxt, sk_uri)
 
@@ -20,6 +24,28 @@ let of_sequencer_key config cctxt (k : Configuration.sequencer_key) =
   | Gcp_key k ->
       let* kms = Gcp_kms.from_gcp_key config.Configuration.gcp_kms k in
       return (Gcp_kms kms)
+
+let of_sequencer_keys config cctxt keys =
+  let open Lwt_result_syntax in
+  List.fold_left_es
+    (fun acc k ->
+      let* value = of_sequencer_key config cctxt k in
+      let* pk =
+        match value with
+        | Wallet (_cctxt, sk_uri) ->
+            let* pk_uri = Client_keys.neuterize sk_uri in
+            let* pk = Client_keys.public_key pk_uri in
+            return pk
+        | Gcp_kms kms ->
+            let pk = Gcp_kms.public_key kms in
+            return pk
+      in
+      return (PKMap.add pk value acc))
+    PKMap.empty
+    keys
+
+let first_signer map =
+  match PKMap.bindings map with [] -> None | signer :: _ -> Some signer
 
 let of_string config cctxt key_str =
   let open Lwt_result_syntax in

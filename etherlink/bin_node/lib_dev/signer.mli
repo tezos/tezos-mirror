@@ -5,11 +5,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+type t =
+  | Wallet : #Client_context.wallet * Client_keys.sk_uri -> t
+  | Gcp_kms of Gcp_kms.t
+
+type map
 
 val wallet : #Client_context.wallet -> Client_keys.sk_uri -> t
 
-val gcp_kms : Gcp_kms.t -> t
+val of_sequencer_keys :
+  Configuration.t ->
+  #Client_context.wallet ->
+  Configuration.sequencer_key list ->
+  map tzresult Lwt.t
+
+val first_signer : map -> (Signature.public_key * t) option
 
 val of_sequencer_key :
   Configuration.t ->

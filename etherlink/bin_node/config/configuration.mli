@@ -144,7 +144,7 @@ type sequencer = {
       (** See {!type-time_between_blocks}. *)
   max_number_of_chunks : int;
       (** The maximum number of chunks per blueprints. *)
-  sequencer : sequencer_key option;  (** The key used to sign the blueprints. *)
+  sequencer : sequencer_key list;  (** The keys used to sign the blueprints. *)
   blueprints_publisher_config : blueprints_publisher_config;
   sunset_sec : int64;
 }
@@ -266,9 +266,9 @@ val load_file :
 val load :
   ?network:supported_network -> data_dir:string -> string -> t tzresult Lwt.t
 
-(** [sequencer_key config] returns the key the sequencer should use, or
+(** [sequencer_keys config] returns the keys the sequencer should use, or
     fails. *)
-val sequencer_key : t -> sequencer_key tzresult
+val sequencer_keys : t -> sequencer_key list tzresult
 
 val gcp_key_from_string_opt : string -> gcp_key option
 
@@ -318,7 +318,7 @@ module Cli : sig
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
-    ?sequencer_key:sequencer_key ->
+    ?sequencer_keys:sequencer_key list ->
     ?evm_node_endpoint:Uri.t ->
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
@@ -358,7 +358,7 @@ module Cli : sig
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
-    ?sequencer_key:sequencer_key ->
+    ?sequencer_keys:sequencer_key list ->
     ?evm_node_endpoint:Uri.t ->
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
@@ -398,7 +398,7 @@ module Cli : sig
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
-    ?sequencer_key:sequencer_key ->
+    ?sequencer_keys:sequencer_key list ->
     ?evm_node_endpoint:Uri.t ->
     ?max_blueprints_lag:int ->
     ?max_blueprints_ahead:int ->
