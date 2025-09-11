@@ -162,7 +162,6 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
-    sender_contract: &Contract,
     sender_account: &TezlinkOriginatedAccount,
     parser: &'a Parser<'a>,
     source: &PublicKeyHash,
@@ -215,7 +214,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 if failed.is_some() {
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
-                        sender: sender_contract.clone(),
+                        sender: sender_account.address(),
                         nonce,
                         result: ContentResult::Skipped,
                     })
@@ -243,7 +242,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                     );
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
-                        sender: sender_contract.clone(),
+                        sender: sender_account.address(),
                         nonce,
                         result: match receipt {
                             Ok(success) => ContentResult::Applied(success.into()),
@@ -279,7 +278,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                             delegate,
                             script,
                         },
-                        sender: sender_contract.clone(),
+                        sender: sender_account.address(),
                         nonce,
                         result: ContentResult::Skipped,
                     })
@@ -303,7 +302,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                             delegate,
                             script,
                         },
-                        sender: sender_contract.clone(),
+                        sender: sender_account.address(),
                         nonce,
                         result: match receipt {
                             Ok(success) => ContentResult::Applied(success),
@@ -545,7 +544,6 @@ pub fn transfer<'a, Host: Runtime>(
                 host,
                 context,
                 internal_operations,
-                dest_contract,
                 &dest_account,
                 parser,
                 source,
