@@ -30,7 +30,7 @@ pub trait CtxTrait<'a> {
 
     fn sender(&self) -> AddressHash;
 
-    fn source(&self) -> AddressHash;
+    fn source(&self) -> PublicKeyHash;
 
     fn min_block_time(&self) -> BigUint;
 
@@ -77,7 +77,7 @@ pub struct Ctx<'a> {
     /// transaction. The result of the `SOURCE` instruction. Note that in a
     /// regular blockchain, this is necessarily an implicit account. Defaults to
     /// `tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP`.
-    pub source: AddressHash,
+    pub source: PublicKeyHash,
     /// Minimal block time in seconds. The result of the `MIN_BLOCK_TIME`
     /// instruciton. Defaults to `1`.
     pub min_block_time: BigUint,
@@ -232,7 +232,7 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         self.sender.clone()
     }
 
-    fn source(&self) -> AddressHash {
+    fn source(&self) -> PublicKeyHash {
         self.source.clone()
     }
 

@@ -384,8 +384,8 @@ impl<'a, Host: Runtime> CtxTrait<'a>
         self.sender.clone()
     }
 
-    fn source(&self) -> AddressHash {
-        self.source.clone().into()
+    fn source(&self) -> PublicKeyHash {
+        self.source.clone()
     }
 
     fn amount(&self) -> i64 {

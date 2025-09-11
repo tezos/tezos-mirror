@@ -800,17 +800,20 @@ mod tests {
 
     #[test]
     fn source() {
-        let addr = Address::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
+        let addr = PublicKeyHash::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
         run_e2e_test(
             &Arena::new(),
             "SOURCE",
             stk![],
             stk![Type::Address],
             stk![],
-            stk![TypedValue::Address(addr.clone())],
+            stk![TypedValue::Address(Address {
+                hash: addr.clone().into(),
+                entrypoint: Entrypoint::default()
+            })],
             {
                 let mut c = Ctx::default();
-                c.source = addr.hash;
+                c.source = addr;
                 c
             },
         );

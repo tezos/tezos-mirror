@@ -106,7 +106,7 @@ pub struct TztTest<'a> {
     /// Initial value for "now" in the context.
     pub now: Option<BigInt>,
     /// Address that directly or indirectly initiated the current transaction
-    pub source: Option<AddressHash>,
+    pub source: Option<PublicKeyHash>,
     /// Address that directly initiated the current transaction
     pub sender: Option<AddressHash>,
 }
@@ -246,13 +246,10 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         };
 
         let source = match m_source {
-            Some(s) => Some(
-                irrefutable_match!(
-                typecheck_value(&s, &mut Ctx::default(), &Type::Address)?;
-                TypedValue::Address
-                )
-                .hash,
-            ),
+            Some(s) => Some(irrefutable_match!(
+            typecheck_value(&s, &mut Ctx::default(), &Type::KeyHash)?;
+            TypedValue::KeyHash
+            )),
             None => None,
         };
 

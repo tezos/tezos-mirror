@@ -1716,7 +1716,7 @@ fn interpret_one<'a>(
         I::Source => {
             ctx.gas().consume(interpret_cost::SOURCE)?;
             stack.push(TypedValue::Address(Address {
-                hash: ctx.source(),
+                hash: ctx.source().into(),
                 entrypoint: Entrypoint::default(),
             }));
         }
@@ -5566,13 +5566,19 @@ mod interpreter_tests {
 
     #[test]
     fn source() {
-        let addr = super::Address::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
+        let addr = super::PublicKeyHash::try_from("tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP").unwrap();
         let mut ctx = Ctx::default();
-        ctx.source = addr.hash.clone();
+        ctx.source = addr.clone();
         let mut stack = stk![];
         let start_milligas = ctx.gas().milligas();
         assert_eq!(interpret(&[Source], &mut ctx, &mut stack), Ok(()));
-        assert_eq!(stack, stk![V::Address(addr),]);
+        assert_eq!(
+            stack,
+            stk![V::Address(super::Address {
+                hash: addr.into(),
+                entrypoint: Entrypoint::default()
+            })]
+        );
         assert_eq!(
             start_milligas - ctx.gas().milligas(),
             interpret_cost::SOURCE + interpret_cost::INTERPRET_RET
