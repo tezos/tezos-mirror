@@ -54,7 +54,6 @@ mod validate;
 
 fn reveal<Host: Runtime>(
     host: &mut Host,
-    provided_hash: &PublicKeyHash,
     source_account: &TezlinkImplicitAccount,
     public_key: &PublicKey,
 ) -> Result<RevealSuccess, RevealError> {
@@ -69,7 +68,7 @@ fn reveal<Host: Runtime>(
     };
 
     // Ensure that the source of the operation is equal to the retrieved hash.
-    if &expected_hash != provided_hash {
+    if &expected_hash != source_account.pkh() {
         return Err(RevealError::InconsistentHash(expected_hash));
     }
 
@@ -1139,7 +1138,7 @@ fn apply_operation<Host: Runtime>(
     let mut internal_operations_receipts = Vec::new();
     match &content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
-            let reveal_result = reveal(host, source, source_account, pk);
+            let reveal_result = reveal(host, source_account, pk);
             let manager_result = produce_operation_result(
                 balance_updates,
                 reveal_result.map_err(Into::into),
