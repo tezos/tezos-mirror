@@ -2337,61 +2337,6 @@ check_riscv_kernels:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-test_evm_compatibility:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - etherlink.mk
-    - etherlink/kernel_latest/evm_evaluation/**/*
-    - etherlink/kernel_latest/evm_execution/**/*
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
-    when: on_success
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  - oc.build_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
-  - git clone --depth 1 --branch v14.1@etherlink https://github.com/functori/tests
-    ethereum_tests
-  - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_latest/evm_evaluation/resources/
-    -c
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-
 ocaml-check:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
@@ -4141,6 +4086,60 @@ etherlink.unit_tests:
       junit: test_results/*.xml
     when: always
   retry: 2
+
+etherlink.test_evm_compatibility:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - etherlink.mk
+    - etherlink/kernel_latest/evm_evaluation/**/*
+    - etherlink/kernel_latest/evm_execution/**/*
+    - images/create_image.sh
+    - images/rust-toolchain/**/*
+    - images/scripts/install_datadog_static.sh
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - trigger
+  - oc.build_kernels
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
+  - git clone --depth 1 --branch v14.1@etherlink https://github.com/functori/tests
+    ethereum_tests
+  - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_latest/evm_evaluation/resources/
+    -c
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 etherlink.test_firehose:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
