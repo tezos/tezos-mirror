@@ -5,7 +5,7 @@
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
 use context::Context;
-use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
+use mir::ast::{AddressHash, Entrypoint, OperationInfo, PublicKeyHash, TransferTokens};
 use mir::{
     ast::{IntoMicheline, Micheline},
     context::CtxTrait,
@@ -23,7 +23,7 @@ use tezos_crypto_rs::{
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
-use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash, Timestamp};
+use tezos_smart_rollup::types::{Contract, PublicKey, Timestamp};
 use tezos_tezlink::enc_wrappers::{BlockNumber, OperationHash};
 use tezos_tezlink::operation::{Operation, OriginationContent, Script};
 use tezos_tezlink::operation_result::{
@@ -781,7 +781,7 @@ fn originate_contract<Host: Runtime>(
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
 fn compute_fees_balance_updates(
-    source: &PublicKeyHash,
+    source: &TezlinkImplicitAccount,
     amount: &Narith,
 ) -> Result<
     (BalanceUpdate, BalanceUpdate),
@@ -791,7 +791,7 @@ fn compute_fees_balance_updates(
     let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
 
     let source_update = BalanceUpdate {
-        balance: Balance::Account(Contract::Implicit(source.clone())),
+        balance: Balance::Account(source.address()),
         changes: source_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
@@ -939,13 +939,12 @@ fn execute_validation<Host: Runtime>(
         .into_iter()
         .map(|op| op.into())
         .collect::<Vec<ManagerOperation<OperationContent>>>();
-    let (source, pk, source_account) =
-        validate::validate_source(host, context, &content)?;
+    let (pk, source_account) = validate::validate_source(host, context, &content)?;
     let mut balance_updates = vec![];
 
     for c in &content {
         let (new_source_balance, op_balance_updates) =
-            validate_individual_operation(host, &source, &source_account, c)?;
+            validate_individual_operation(host, &source_account, c)?;
 
         source_account
             .set_balance(host, &new_source_balance)
@@ -960,7 +959,6 @@ fn execute_validation<Host: Runtime>(
 
     match verify_signature(&pk, &operation.branch, content, operation.signature) {
         Ok((true, validated_operations)) => Ok(ValidationInfo {
-            source,
             source_account,
             balance_updates,
             validated_operations,
@@ -1049,7 +1047,6 @@ fn apply_batch<Host: Runtime>(
     chain_id: &ChainId,
 ) -> (Vec<OperationResultSum>, bool) {
     let ValidationInfo {
-        source,
         source_account,
         balance_updates,
         validated_operations,
@@ -1083,7 +1080,6 @@ fn apply_batch<Host: Runtime>(
                 context,
                 origination_nonce,
                 &content,
-                &source,
                 &source_account,
                 balance_uppdate,
                 level,
@@ -1115,7 +1111,6 @@ fn apply_operation<Host: Runtime>(
     context: &Context,
     origination_nonce: &mut OriginationNonce,
     content: &ManagerOperation<OperationContent>,
-    _source: &PublicKeyHash,
     source_account: &TezlinkImplicitAccount,
     balance_updates: Vec<BalanceUpdate>,
     level: &BlockNumber,
