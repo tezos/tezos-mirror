@@ -916,22 +916,6 @@ let job_build_kernels ?rules () : tezos_job =
   |> enable_sccache ~key:"kernels-sccache" ~path:"$CI_PROJECT_DIR/_sccache"
   |> enable_cargo_cache
 
-let job_build_dsn_node ?rules () : tezos_job =
-  job
-    ~__POS__
-    ~name:"oc.build_dsn_node"
-    ~image:Images.rust_toolchain
-    ~stage:Stages.build
-    ?rules
-    ["make -f etherlink.mk octez-dsn-node"]
-    ~artifacts:
-      (artifacts
-         ~name:"build-dsn-node-$CI_COMMIT_REF_SLUG"
-         ~expire_in:(Duration (Days 1))
-         ~when_:On_success
-         ["octez-dsn-node"])
-  |> enable_kernels |> enable_sccache |> enable_cargo_cache
-
 let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
   job
     ~__POS__

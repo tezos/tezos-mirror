@@ -162,7 +162,6 @@ let job_manuals =
             (Artifacts, dummy "oc.build_amd64-extra-dev");
             (Artifacts, dummy "oc.build_amd64-extra-exp");
             (Artifacts, dummy "oc.build_kernels");
-            (Artifacts, dummy "oc.build_dsn_node");
           ]
       | `static -> [(Artifacts, Master_branch.job_static_x86_64)])
     ~only_if_changed:Files.odoc
