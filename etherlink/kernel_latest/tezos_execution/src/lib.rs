@@ -117,13 +117,7 @@ pub fn transfer_tez<Host: Runtime>(
         compute_balance_updates(giver_contract, receiver_contract, amount)
             .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
 
-    apply_balance_changes(
-        host,
-        giver_contract,
-        giver_account,
-        receiver_account,
-        &amount.0,
-    )?;
+    apply_balance_changes(host, giver_account, receiver_account, &amount.0)?;
     Ok(TransferSuccess {
         storage: None,
         lazy_storage_diff: None,
@@ -732,14 +726,15 @@ fn originate_contract<Host: Runtime>(
         return Err(OriginationError::CantOriginateEmptyContract);
     }
 
-    let sender_contract = sender_account.address();
-    let new_contract = smart_contract.address();
     let source_contract = source_account.address();
 
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
-    let mut balance_updates =
-        compute_balance_updates(&sender_contract, &new_contract, initial_balance)
-            .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+    let mut balance_updates = compute_balance_updates(
+        &sender_account.address(),
+        &smart_contract.address(),
+        initial_balance,
+    )
+    .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
 
     // Balance updates for the impacts of origination on storage space.
     // storage_fees = total_size * COST_PER_BYTES
@@ -758,14 +753,8 @@ fn originate_contract<Host: Runtime>(
     balance_updates.extend(origination_fees_balance_updates);
 
     // Apply the balance change, accordingly to the balance updates computed
-    apply_balance_changes(
-        host,
-        &sender_contract,
-        sender_account,
-        &smart_contract,
-        &initial_balance.0,
-    )
-    .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
+    apply_balance_changes(host, sender_account, &smart_contract, &initial_balance.0)
+        .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
     let _ = burn_tez(
         host,
@@ -870,7 +859,6 @@ pub fn compute_storage_balance_updates(
 /// Applies balance changes by updating both source and destination accounts.
 fn apply_balance_changes(
     host: &mut impl Runtime,
-    giver_contract: &Contract,
     giver_account: &impl TezlinkAccount,
     receiver_account: &impl TezlinkAccount,
     amount: &num_bigint::BigUint,
@@ -882,8 +870,8 @@ fn apply_balance_changes(
         None => {
             log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: giver_contract.clone(),
-                balance: giver_balance.clone(),
+                contract: giver_account.address(),
+                balance: giver_balance,
                 amount: amount.into(),
             }));
         }
