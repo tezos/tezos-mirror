@@ -26,16 +26,15 @@ module Tzkt_process = struct
 
   include Daemon.Make (Parameters)
 
-  let run ?runner ~suffix ~path ~dll ~endpoint ~db ~port () =
+  let run ?runner ~suffix ~path ~dll ~endpoint ~db ~port ?(args = []) () =
     let process_name = sf "%s-%s" Parameters.base_default_name suffix in
     let daemon = create ?runner ~name:process_name ~path:"sh" () in
+    let arguments = String.concat " " ([endpoint; db; port] @ args) in
     run
       ?runner
       daemon
       ()
-      [
-        "-c"; sf "cd %s && dotnet Tzkt.%s.dll %s %s %s" path dll endpoint db port;
-      ]
+      ["-c"; sf "cd %s && dotnet Tzkt.%s.dll %s" path dll arguments]
 end
 
 let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
