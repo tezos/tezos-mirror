@@ -95,6 +95,7 @@ let child_pipeline_full =
     ~description:
       "A child pipeline of 'schedule_extended_test' testing the build of  \
        homebrew packages."
+    ~default:Common.retry_default_config
     ~jobs:(jobs Full)
 
 let child_pipeline_full_auto =
@@ -103,4 +104,5 @@ let child_pipeline_full_auto =
     ~description:
       "A child pipeline of 'schedule_extended_test' testing the homebrew \
        packaging. This pipelines starts automatically"
+    ~default:Common.retry_default_config
     ~jobs:(jobs Full)
