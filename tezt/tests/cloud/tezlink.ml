@@ -26,19 +26,25 @@ module Tzkt_process = struct
 
   include Daemon.Make (Parameters)
 
-  let run ?runner ~suffix ~path ~dll ~endpoint ~db ~port () =
+  let run ?runner ~suffix ~path ~dll ~endpoint ~db ~port ?(args = []) () =
     let process_name = sf "%s-%s" Parameters.base_default_name suffix in
     let daemon = create ?runner ~name:process_name ~path:"sh" () in
+    let arguments = String.concat " " ([endpoint; db; port] @ args) in
     run
       ?runner
       daemon
       ()
-      [
-        "-c"; sf "cd %s && dotnet Tzkt.%s.dll %s %s %s" path dll endpoint db port;
-      ]
+      ["-c"; sf "cd %s && dotnet Tzkt.%s.dll %s" path dll arguments]
 end
 
-let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
+let polling_period = function
+  | Evm_node.Nothing -> 500
+  | Time_between_blocks t ->
+      let in_ms = t *. 1000. |> int_of_float in
+      in_ms / 2
+
+let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
+    ~time_between_blocks =
   (* Set of functions helpful for Tzkt setup *)
   let spawn_run ?name cmd args =
     Agent.docker_run_command ?name agent cmd args
@@ -96,11 +102,18 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
     psql ~db:tzkt_db (sf "GRANT ALL ON SCHEMA public TO %s;" tzkt_db_user)
   in
 
-  (* Clone TZKT sources on `proto23` branch as it supports Seoul. *)
+  (* Clone TZKT sources on head-streaming branch as it supports Seoul and fast
+     indexing. *)
   let* () =
     run
       "git"
-      ["clone"; "-b"; "proto23"; "https://github.com/baking-bad/tzkt"; "tzkt"]
+      [
+        "clone";
+        "-b";
+        "head-streaming";
+        "https://github.com/baking-bad/tzkt";
+        "tzkt";
+      ]
   in
   (* Compile Tzkt indexer and API. The output of the compilation is sent
      to different directory to prevent collision. *)
@@ -155,6 +168,16 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
       ["Kestrel"; "Endpoints"; "Http"; "Url"]
       [sf "http://0.0.0.0:%d" api_port]
   in
+  let polling_args =
+    [
+      (* debounce=false means the indexer doesn't sleep for "min block time" *)
+      tzkt_arg ["Observer"; "Debounce"] ["false"];
+      (* delay between polling requests in milliseconds *)
+      tzkt_arg
+        ["Observer"; "Period"]
+        [polling_period time_between_blocks |> string_of_int];
+    ]
+  in
 
   (* Run the Tzkt indexer and Tzkt API *)
   let runner = Agent.runner agent in
@@ -167,6 +190,7 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
       ~endpoint:endpoint_arg
       ~db:database_arg
       ~port:indexer_port_arg
+      ~args:polling_args
       ()
   in
   let* () =
@@ -183,7 +207,8 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
   unit
 
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
-    (rpc_port : int option) (verbose : bool) agent =
+    (rpc_port : int option) (verbose : bool)
+    (time_between_blocks : Evm_node.time_between_blocks) agent =
   let chain_id = 1 in
   let () = toplog "Initializing the tezlink scenario" in
   let tezlink_config = Temp.file "l2-tezlink-config.yaml" in
@@ -212,7 +237,6 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
   in
   let private_rpc_port = Agent.next_available_port agent |> Option.some in
   let spawn_rpc = Agent.next_available_port agent in
-  let time_between_blocks = Some (Evm_node.Time_between_blocks 10.) in
   let mode =
     Evm_node.Tezlink_sandbox
       {
@@ -220,7 +244,7 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
         funded_addresses = [];
         preimage_dir = Some preimages_dir;
         private_rpc_port;
-        time_between_blocks;
+        time_between_blocks = Some time_between_blocks;
         genesis_timestamp = None;
         max_number_of_chunks = None;
         wallet_dir = Some wallet_dir;
@@ -316,6 +340,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           name
           Cli.public_rpc_port
           Cli.verbose
+          Cli.time_between_blocks
           tezlink_sequencer_agent
       in
       let* () =
@@ -324,6 +349,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             ~tzkt_api_port:Cli.tzkt_api_port
             ~agent:tezlink_sequencer_agent
             ~tezlink_sandbox_endpoint
+            ~time_between_blocks:Cli.time_between_blocks
         else return ()
       in
       let () = toplog "Starting main loop" in
