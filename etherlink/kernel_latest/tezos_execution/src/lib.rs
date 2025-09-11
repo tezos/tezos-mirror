@@ -112,8 +112,8 @@ pub fn transfer_tez<Host: Runtime>(
     receiver_account: &impl TezlinkAccount,
 ) -> Result<TransferSuccess, TransferError> {
     let balance_updates = compute_balance_updates(
-        &giver_account.address(),
-        &receiver_account.address(),
+        &giver_account.contract(),
+        &receiver_account.contract(),
         amount,
     )
     .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
@@ -144,7 +144,7 @@ fn burn_tez(
         None => {
             log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: account.address(),
+                contract: account.contract(),
                 balance: balance.clone(),
                 amount: amount.into(),
             }));
@@ -214,7 +214,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 if failed.is_some() {
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
-                        sender: sender_account.address(),
+                        sender: sender_account.contract(),
                         nonce,
                         result: ContentResult::Skipped,
                     })
@@ -242,7 +242,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                     );
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
-                        sender: sender_account.address(),
+                        sender: sender_account.contract(),
                         nonce,
                         result: match receipt {
                             Ok(success) => ContentResult::Applied(success.into()),
@@ -278,7 +278,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                             delegate,
                             script,
                         },
-                        sender: sender_account.address(),
+                        sender: sender_account.contract(),
                         nonce,
                         result: ContentResult::Skipped,
                     })
@@ -302,7 +302,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                             delegate,
                             script,
                         },
-                        sender: sender_account.address(),
+                        sender: sender_account.contract(),
                         nonce,
                         result: match receipt {
                             Ok(success) => ContentResult::Applied(success),
@@ -496,7 +496,7 @@ pub fn transfer<'a, Host: Runtime>(
                 TezlinkOriginatedAccount::from_contract(context, dest_contract)
                     .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             let receipt = transfer_tez(host, sender_account, amount, &dest_account)?;
-            let sender = address_from_contract(sender_account.address());
+            let sender = address_from_contract(sender_account.contract());
             let amount = amount.0.clone().try_into().map_err(
                 |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
                     TransferError::MirAmountToNarithError(err.to_string())
@@ -707,12 +707,12 @@ fn originate_contract<Host: Runtime>(
         return Err(OriginationError::CantOriginateEmptyContract);
     }
 
-    let source_contract = source_account.address();
+    let source_contract = source_account.contract();
 
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
     let mut balance_updates = compute_balance_updates(
-        &sender_account.address(),
-        &smart_contract.address(),
+        &sender_account.contract(),
+        &smart_contract.contract(),
         initial_balance,
     )
     .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
@@ -767,7 +767,7 @@ fn compute_fees_balance_updates(
     let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
 
     let source_update = BalanceUpdate {
-        balance: Balance::Account(source.address()),
+        balance: Balance::Account(source.contract()),
         changes: source_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
@@ -846,7 +846,7 @@ fn apply_balance_changes(
         None => {
             log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: giver_account.address(),
+                contract: giver_account.contract(),
                 balance: giver_balance,
                 amount: amount.into(),
             }));

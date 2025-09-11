@@ -53,7 +53,7 @@ fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::
 
 pub trait TezlinkAccount {
     fn path(&self) -> &OwnedPath;
-    fn address(&self) -> Contract;
+    fn contract(&self) -> Contract;
 
     /// Get the **balance** of an account in Mutez held by the account.
     fn balance(
@@ -86,7 +86,7 @@ impl TezlinkAccount for TezlinkImplicitAccount {
     fn path(&self) -> &OwnedPath {
         &self.path
     }
-    fn address(&self) -> Contract {
+    fn contract(&self) -> Contract {
         Contract::Implicit(self.pkh.clone())
     }
 }
@@ -273,7 +273,7 @@ impl TezlinkAccount for TezlinkOriginatedAccount {
     fn path(&self) -> &OwnedPath {
         &self.path
     }
-    fn address(&self) -> Contract {
+    fn contract(&self) -> Contract {
         Contract::Originated(self.kt1.clone())
     }
 }
