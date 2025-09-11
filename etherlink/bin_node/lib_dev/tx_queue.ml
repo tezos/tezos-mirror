@@ -795,15 +795,8 @@ struct
                 in
                 return (transactions_to_inject, remaining_transactions)
           in
+
           state.queue <- Queue.of_seq remaining_transactions ;
-
-          let* () =
-            send_transactions_batch
-              ~keep_alive:state.keep_alive
-              ~evm_node_endpoint
-              transactions_to_inject
-          in
-
           let txns =
             Pending_transactions.drop
               ~max_lifespan:(Ptime.Span.of_int_s state.config.max_lifespan_s)
@@ -814,6 +807,14 @@ struct
               (fun {pending_callback; _} -> pending_callback `Dropped)
               txns
           in
+
+          let* () =
+            send_transactions_batch
+              ~keep_alive:state.keep_alive
+              ~evm_node_endpoint
+              transactions_to_inject
+          in
+
           return_unit
       | Size_info ->
           protect @@ fun () ->

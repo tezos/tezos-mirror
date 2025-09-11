@@ -8,6 +8,9 @@
 
 ### RPCs changes
 
+- Fixes `eth_getTransactionByHash` always returning a transaction object for
+  transactions injected during a sequencer downtime. (!19247)
+
 ### Metrics changes
 
 ### Command-line interface changes
