@@ -664,15 +664,6 @@ let jobs pipeline_type =
            ())
       ()
   in
-  let job_build_dsn_node =
-    job_build_dsn_node
-      ~rules:
-        (make_rules
-           ~changes:changeset_octez_or_kernels_or_doc
-           ~dependent:true
-           ())
-      ()
-  in
   let job_tezt_fetch_records =
     Tezt.job_tezt_fetch_records
       ~rules:(make_rules ~changes:changeset_octez ())
@@ -841,7 +832,6 @@ let jobs pipeline_type =
       job_build_x86_64_extra_exp;
       wasm_runtime_check;
       job_build_kernels;
-      job_build_dsn_node;
       job_tezt_fetch_records;
       build_octez_source;
       job_evm_static_x86_64_experimental;
@@ -1557,7 +1547,6 @@ let jobs pipeline_type =
             Artifacts job_build_x86_64_extra_exp;
             Artifacts job_build_x86_64_extra_dev;
             Artifacts job_build_kernels;
-            Artifacts job_build_dsn_node;
             Artifacts job_tezt_fetch_records;
           ]
       in

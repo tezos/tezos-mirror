@@ -1262,92 +1262,6 @@ oc.build_kernels:
     - dal_echo_kernel.wasm
     when: on_success
 
-oc.build_dsn_node:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink.mk
-    - etherlink/**/*
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - images/**/*
-    - irmin/**/*
-    - irmin/**/*.ml*
-    - kernels.mk
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - script-inputs/**/*/
-    - scripts/**/*
-    - scripts/**/*/
-    - scripts/ci/**/*
-    - sdk/**/*
-    - src/**/*
-    - src/**/*.ml*
-    - tezt/**/*
-    - tezt/**/*.ml*
-    - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
-    when: on_success
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  timeout: 60 minutes
-  cache:
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -f etherlink.mk octez-dsn-node
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    CARGO_NET_OFFLINE: "false"
-  artifacts:
-    name: build-dsn-node-$CI_COMMIT_REF_SLUG
-    expire_in: 1 day
-    paths:
-    - octez-dsn-node
-    when: on_success
-
 oc.tezt:fetch-records:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
@@ -3566,7 +3480,6 @@ tezt:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
@@ -3575,7 +3488,6 @@ tezt:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 40 minutes
   before_script:
@@ -3667,7 +3579,6 @@ tezt-time-sensitive:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
@@ -3676,7 +3587,6 @@ tezt-time-sensitive:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
   before_script:
@@ -3768,7 +3678,6 @@ tezt-slow:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
@@ -3777,7 +3686,6 @@ tezt-slow:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
   before_script:
@@ -3866,7 +3774,6 @@ tezt-extra:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
@@ -3875,7 +3782,6 @@ tezt-extra:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
   before_script:
@@ -3964,7 +3870,6 @@ tezt-flaky:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
@@ -3973,7 +3878,6 @@ tezt-flaky:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - oc.build_dsn_node
   - oc.tezt:fetch-records
   allow_failure: true
   timeout: 60 minutes
@@ -4157,7 +4061,6 @@ tezt-riscv-slow-sequential:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
@@ -4165,7 +4068,6 @@ tezt-riscv-slow-sequential:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - oc.build_dsn_node
   - oc.tezt:fetch-records
   timeout: 60 minutes
   before_script:
@@ -4537,14 +4439,12 @@ documentation.manuals:
   - oc.build_amd64-extra-dev
   - oc.build_amd64-extra-exp
   - oc.build_kernels
-  - oc.build_dsn_node
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
   - oc.build_amd64-extra-exp
   - oc.build_kernels
-  - oc.build_dsn_node
   timeout: 60 minutes
   interruptible: true
   before_script:
