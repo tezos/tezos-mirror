@@ -224,7 +224,6 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                     let receipt = transfer(
                         host,
                         context,
-                        sender_contract,
                         sender_account,
                         &content.amount,
                         &content.destination,
@@ -456,7 +455,6 @@ impl<'a, Host: Runtime> CtxTrait<'a>
 pub fn transfer<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
-    sender_contract: &Contract,
     sender_account: &impl TezlinkAccount,
     amount: &Narith,
     dest_contract: &Contract,
@@ -499,7 +497,7 @@ pub fn transfer<'a, Host: Runtime>(
                 TezlinkOriginatedAccount::from_contract(context, dest_contract)
                     .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             let receipt = transfer_tez(host, sender_account, amount, &dest_account)?;
-            let sender = address_from_contract(sender_contract.clone());
+            let sender = address_from_contract(sender_account.address());
             let amount = amount.0.clone().try_into().map_err(
                 |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
                     TransferError::MirAmountToNarithError(err.to_string())
@@ -640,7 +638,6 @@ pub fn transfer_external<Host: Runtime>(
     transfer(
         host,
         context,
-        &source_account.address(),
         source_account,
         amount,
         dest,
