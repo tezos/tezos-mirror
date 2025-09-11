@@ -490,9 +490,11 @@ let process_block_data ctxt cctxt store proto_parameters block_level
   (Accuser.inject_entrapment_evidences
      (module Plugin)
      attestations
+     slot_to_committee
      ctxt
      cctxt
      ~attested_level:block_level
+     Plugin.tb_slot_to_int
    [@profiler.record_s {verbosity = Notice} "inject_entrapment_evidences"])
 
 let process_block ctxt cctxt l1_crawler proto_parameters finalized_shell_header

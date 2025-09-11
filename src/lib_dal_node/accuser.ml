@@ -8,12 +8,16 @@
 (* [get_attestation_map] retrieves DAL attestation operations from a
    block and transforms them into a map where delegates are mapped to
    their corresponding attestation operation and DAL attestation. *)
-let get_attestation_map attestations =
+let get_attestation_map attestations slot_to_committee_pkh tb_slot_to_int =
   List.fold_left
-    (fun map (tb_slot, delegate_opt, operation, dal_attestation) ->
-      match delegate_opt with
+    (fun map (tb_slot, _delegate_opt, operation, dal_attestation) ->
+      match
+        List.find
+          (fun (v, _) -> v = tb_slot_to_int tb_slot)
+          slot_to_committee_pkh
+      with
       | None -> map
-      | Some delegate ->
+      | Some (_, (delegate, _)) ->
           Signature.Public_key_hash.Map.add
             delegate
             (operation, dal_attestation, tb_slot)
@@ -62,8 +66,8 @@ let inject_entrapment_evidences
     (module Plugin : Dal_plugin.T
       with type attestation_operation = attestation_operation
        and type dal_attestation = dal_attestation
-       and type tb_slot = tb_slot) attestations node_ctxt rpc_ctxt
-    ~attested_level =
+       and type tb_slot = tb_slot) attestations slot_to_committee_pkh node_ctxt
+    rpc_ctxt ~attested_level tb_slot_to_int =
   let open Lwt_result_syntax in
   let*? proto_parameters =
     Node_context.get_proto_parameters node_ctxt ~level:(`Level attested_level)
@@ -81,7 +85,12 @@ let inject_entrapment_evidences
       match traps with
       | [] -> return_unit
       | traps ->
-          let attestation_map = get_attestation_map attestations in
+          let attestation_map =
+            get_attestation_map
+              attestations
+              slot_to_committee_pkh
+              tb_slot_to_int
+          in
           let traps_to_inject =
             filter_injectable_traps attestation_map traps
             |>

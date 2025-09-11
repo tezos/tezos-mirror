@@ -23,7 +23,9 @@ val inject_entrapment_evidences :
   * 'attestation_operation
   * 'dal_attestation option)
   list ->
+  (int * (Signature.public_key_hash * int trace)) trace ->
   Node_context.t ->
   Rpc_context.t ->
   attested_level:int32 ->
+  ('tb_slot -> int) ->
   unit tzresult Lwt.t
