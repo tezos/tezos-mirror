@@ -198,7 +198,8 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
   unit
 
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
-    (rpc_port : int option) (verbose : bool) agent =
+    (rpc_port : int option) (verbose : bool)
+    (time_between_blocks : Evm_node.time_between_blocks) agent =
   let chain_id = 1 in
   let () = toplog "Initializing the tezlink scenario" in
   let tezlink_config = Temp.file "l2-tezlink-config.yaml" in
@@ -227,7 +228,6 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
   in
   let private_rpc_port = Agent.next_available_port agent |> Option.some in
   let spawn_rpc = Agent.next_available_port agent in
-  let time_between_blocks = Some (Evm_node.Time_between_blocks 10.) in
   let mode =
     Evm_node.Tezlink_sandbox
       {
@@ -235,7 +235,7 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
         funded_addresses = [];
         preimage_dir = Some preimages_dir;
         private_rpc_port;
-        time_between_blocks;
+        time_between_blocks = Some time_between_blocks;
         genesis_timestamp = None;
         max_number_of_chunks = None;
         wallet_dir = Some wallet_dir;
@@ -331,6 +331,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           name
           Cli.public_rpc_port
           Cli.verbose
+          Cli.time_between_blocks
           tezlink_sequencer_agent
       in
       let* () =

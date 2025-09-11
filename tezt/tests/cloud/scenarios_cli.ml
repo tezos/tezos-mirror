@@ -1090,6 +1090,8 @@ module type Tezlink = sig
   val tzkt : bool
 
   val verbose : bool
+
+  val time_between_blocks : Tezos.Evm_node.time_between_blocks
 end
 
 module Tezlink () : Tezlink = struct
@@ -1141,4 +1143,19 @@ module Tezlink () : Tezlink = struct
       ~unset_long:"discreet-node"
       ~description:"Make the EVM node verbose"
       true
+
+  let time_between_blocks =
+    let s =
+      Clap.mandatory_string
+        ~section
+        ~long:"time-between-blocks"
+        ~description:
+          "Interval (in seconds) at which the sequencer creates an empty block \
+           by default. If set to `none`, blocks are produced on demand only \
+           (see octez-evm-node private method produceBlock). (default: 10.)"
+        ~placeholder:"10."
+        ()
+    in
+    if s = "none" then Tezos.Evm_node.Nothing
+    else Time_between_blocks (Float.of_string s)
 end
