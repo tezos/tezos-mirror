@@ -955,4 +955,14 @@ mod test_untypers {
             assert_eq!(typed_, Ok(typed.val))
         }
     }
+
+    // We used to have a bug in which a panic was raised in the
+    // following case, this test is there to avoid a regression.
+    #[test]
+    fn test_big_map_without_id() {
+        let arena = Arena::new();
+        let mut m = BigMap::empty(Type::Nat, Type::Unit);
+        m.update(TypedValue::Nat(0u32.into()), None);
+        TypedValue::BigMap(m).into_micheline_optimized_legacy(&arena);
+    }
 }
