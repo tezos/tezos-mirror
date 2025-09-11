@@ -37,7 +37,14 @@ module Tzkt_process = struct
       ["-c"; sf "cd %s && dotnet Tzkt.%s.dll %s" path dll arguments]
 end
 
-let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
+let polling_period = function
+  | Evm_node.Nothing -> 500
+  | Time_between_blocks t ->
+      let in_ms = t *. 1000. |> int_of_float in
+      in_ms / 2
+
+let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
+    ~time_between_blocks =
   (* Set of functions helpful for Tzkt setup *)
   let spawn_run ?name cmd args =
     Agent.docker_run_command ?name agent cmd args
@@ -166,7 +173,9 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
       (* debounce=false means the indexer doesn't sleep for "min block time" *)
       tzkt_arg ["Observer"; "Debounce"] ["false"];
       (* delay between polling requests in milliseconds *)
-      tzkt_arg ["Observer"; "Period"] ["400"];
+      tzkt_arg
+        ["Observer"; "Period"]
+        [polling_period time_between_blocks |> string_of_int];
     ]
   in
 
@@ -340,6 +349,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             ~tzkt_api_port:Cli.tzkt_api_port
             ~agent:tezlink_sequencer_agent
             ~tezlink_sandbox_endpoint
+            ~time_between_blocks:Cli.time_between_blocks
         else return ()
       in
       let () = toplog "Starting main loop" in
