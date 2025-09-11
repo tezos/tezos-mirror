@@ -473,12 +473,13 @@ pub fn transfer<'a, Host: Runtime>(
             if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Err(TransferError::NonSmartContractExecutionCall);
             }
-            // Allocated is not being used on purpose (see below the comment on the allocated_destination_contract field)
-            let _allocated =
-                TezlinkImplicitAccount::allocate(host, context, dest_contract)
-                    .map_err(|_| TransferError::FailedToAllocateDestination)?;
+
             let dest_account = TezlinkImplicitAccount::from_public_key_hash(context, pkh)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+            // Allocated is not being used on purpose (see below the comment on the allocated_destination_contract field)
+            let _allocated = dest_account
+                .allocate(host)
+                .map_err(|_| TransferError::FailedToAllocateDestination)?;
             transfer_tez(host, sender_account, amount, &dest_account).map(|success| {
                 TransferSuccess {
                     // This boolean is kept at false on purpose to maintain compatibility with TZKT.
@@ -1462,12 +1463,13 @@ mod tests {
 
         let context = context::Context::init_context();
 
-        // Allocate the account
-        TezlinkImplicitAccount::allocate(host, &context, &contract)
-            .expect("Account initialization should have succeed");
-
         let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeed");
+
+        // Allocate the account
+        account
+            .allocate(host)
+            .expect("Account allocation should have succeed");
 
         // Setting the balance to pass the validity check
         account

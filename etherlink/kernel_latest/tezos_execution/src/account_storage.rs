@@ -180,6 +180,8 @@ impl TezlinkImplicitAccount {
         Ok(())
     }
 
+    /// This function is used to test a situation in which we have an
+    /// inconsistent manager pkh for an implicit account.
     #[cfg(test)]
     pub fn force_set_manager_public_key_hash(
         &self,
@@ -210,18 +212,16 @@ impl TezlinkImplicitAccount {
     /// Allocate an account in the durable storage. Does nothing if account was
     /// already allocated.
     pub fn allocate(
+        &self,
         host: &mut impl Runtime,
-        context: &context::Context,
-        contract: &Contract,
     ) -> Result<bool, tezos_storage::error::Error> {
-        let account = Self::from_contract(context, contract)?;
-        if account.allocated(host)? {
+        if self.allocated(host)? {
             return Ok(true);
         }
-        account.set_balance(host, &0_u64.into())?;
+        self.set_balance(host, &0_u64.into())?;
         // TODO: use a global counter instead of initializing counter at 0
-        account.set_counter(host, &0u64.into())?;
-        account.set_manager_public_key_hash(host)?;
+        self.set_counter(host, &0u64.into())?;
+        self.set_manager_public_key_hash(host)?;
         Ok(false)
     }
 
@@ -668,7 +668,8 @@ mod test {
 
         assert!(!exist);
 
-        TezlinkImplicitAccount::allocate(&mut host, &context, &contract)
+        account
+            .allocate(&mut host)
             .expect("Account initialization should have succeeded");
 
         let exist = account
@@ -685,7 +686,8 @@ mod test {
 
         // Calling init on a contract already initialized will do nothing
         // So the balance should not change and still be 1999
-        TezlinkImplicitAccount::allocate(&mut host, &context, &contract)
+        account
+            .allocate(&mut host)
             .expect("Account initialization should have succeeded");
 
         let read_balance = account
