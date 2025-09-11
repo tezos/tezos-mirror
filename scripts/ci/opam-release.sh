@@ -49,6 +49,7 @@ echo "$script_dir/releases/opam-release.sh" \
 
 # Matches the corresponding variable in /scripts/opam-release.sh.
 branch_name="octez-$(echo "$opam_release_tag" | tr '~' -)"
+latest_branch="octez-latest"
 
 if [ -z "$dry_run" ]; then
 
@@ -60,7 +61,7 @@ if [ -z "$dry_run" ]; then
   log "Pushing $branch_name to $opam_repository_fork..."
   git push --force-with-lease github "${branch_name}:${branch_name}"
 
-  log "Create the pull request at:"
-  log "https://github.com/ocaml/opam-repository/compare/master...tezos:opam-repository:${branch_name}"
+  log "Pushing $latest_branch to $opam_repository_fork..."
+  git push github "${latest_branch}:${latest_branch}"
 
 fi
