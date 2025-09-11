@@ -610,6 +610,8 @@ mod tests {
     use evm_execution::configuration::EVMVersion;
     use primitive_types::{H160, U256};
     use std::str::FromStr;
+    use tezos_crypto_rs::hash::ChainId;
+    use tezos_crypto_rs::hash::HashTrait;
     use tezos_crypto_rs::hash::SecretKeyEd25519;
     use tezos_data_encoding::types::Narith;
     use tezos_ethereum::block::BlockFees;
@@ -624,6 +626,7 @@ mod tests {
     use tezos_execution::account_storage::Manager;
     use tezos_execution::account_storage::TezlinkAccount;
     use tezos_execution::account_storage::TezlinkImplicitAccount;
+    use tezos_execution::account_storage::TezlinkOriginatedAccount;
     use tezos_execution::context;
     use tezos_smart_rollup::types::Contract;
     use tezos_smart_rollup::types::PublicKey;
@@ -644,7 +647,9 @@ mod tests {
     use tezos_tezlink::operation::ManagerOperationContent;
     use tezos_tezlink::operation::Operation;
     use tezos_tezlink::operation::OperationContent;
+    use tezos_tezlink::operation::OriginationContent;
     use tezos_tezlink::operation::RevealContent;
+    use tezos_tezlink::operation::Script;
     use tezos_tezlink::operation::TransferContent;
 
     #[derive(Clone)]
@@ -761,6 +766,31 @@ mod tests {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn make_origination_operation(
+        fee: u64,
+        counter: u64,
+        gas_limit: u64,
+        storage_limit: u64,
+        source: Bootstrap,
+        balance: Narith,
+        code: Vec<u8>,
+        storage: Vec<u8>,
+    ) -> Operation {
+        make_operation(
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            source,
+            vec![OperationContent::Origination(OriginationContent {
+                balance,
+                delegate: None,
+                script: Script { code, storage },
+            })],
+        )
+    }
+
     fn blueprint(transactions: Vec<Transaction>) -> Blueprint<Transactions> {
         Blueprint {
             transactions: Transactions::EthTxs(transactions),
@@ -768,10 +798,13 @@ mod tests {
         }
     }
 
-    fn tezlink_blueprint(operations: Vec<Operation>) -> Blueprint<TezTransactions> {
+    fn tezlink_blueprint(
+        operations: Vec<Operation>,
+        timestamp: Timestamp,
+    ) -> Blueprint<TezTransactions> {
         Blueprint {
             transactions: TezTransactions(operations),
-            timestamp: Timestamp::from(0i64),
+            timestamp,
         }
     }
 
@@ -825,7 +858,9 @@ mod tests {
     }
 
     fn dummy_tez_config() -> MichelsonChainConfig {
-        MichelsonChainConfig::create_config(DUMMY_CHAIN_ID)
+        MichelsonChainConfig::create_config(
+            ChainId::try_from_bytes(&1u32.to_le_bytes()).unwrap(),
+        )
     }
 
     fn dummy_configuration() -> Configuration {
@@ -1052,9 +1087,9 @@ mod tests {
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
             vec![
-                tezlink_blueprint(vec![]),
-                tezlink_blueprint(vec![]),
-                tezlink_blueprint(vec![]),
+                tezlink_blueprint(vec![], Timestamp::from(0i64)),
+                tezlink_blueprint(vec![], Timestamp::from(1i64)),
+                tezlink_blueprint(vec![], Timestamp::from(10i64)),
             ],
         );
 
@@ -1109,7 +1144,7 @@ mod tests {
 
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
-            vec![tezlink_blueprint(vec![reveal])],
+            vec![tezlink_blueprint(vec![reveal], Timestamp::from(0i64))],
         );
 
         produce(&mut host, &chain_config, &mut config, None, None)
@@ -1200,7 +1235,10 @@ mod tests {
         // Bootstrap 1 reveals its manager and then
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
-            vec![tezlink_blueprint(vec![reveal, transfer])],
+            vec![tezlink_blueprint(
+                vec![reveal, transfer],
+                Timestamp::from(0i64),
+            )],
         );
 
         produce(&mut host, &chain_config, &mut config, None, None)
@@ -1231,6 +1269,122 @@ mod tests {
         let bootstrap2_balance = bootstrap2.balance(&host).unwrap();
 
         assert_eq!(bootstrap2_balance, 35_u64.into());
+    }
+
+    #[test]
+    fn test_tezlink_level_now_chain_id_instructions() {
+        let mut host = MockKernelHost::default();
+
+        let chain_config = dummy_tez_config();
+        let mut config = dummy_configuration();
+
+        // A contract storing the chain id and the level and timestamp
+        // of the last call
+        let parser = mir::parser::Parser::new();
+        let code = parser
+            .parse_top_level(
+                "
+                   parameter unit;
+                   storage (pair nat timestamp chain_id);
+                   code { DROP; CHAIN_ID; NOW; LEVEL; PAIR 3; NIL operation; PAIR }
+            ",
+            )
+            .expect("Should have succeeded to parse the script")
+            .encode();
+        let storage = parser
+            .parse("Pair 0 0 0x00000000")
+            .expect("Should have succeeded to parse the storage")
+            .encode();
+        // Address generated by the origination
+        let contract_addr = "KT1TzSYizBJmvwKR6MZ5uTrYUPcRNxkhmG1V";
+
+        let boostrap1 = bootstrap1();
+        let src = boostrap1.pkh.clone();
+        let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
+            .expect("Context creation should have succeed");
+
+        let bootstrap1_contract = Contract::Implicit(src.clone());
+        let bootstrap1 =
+            TezlinkImplicitAccount::from_contract(&context, &bootstrap1_contract)
+                .expect("Account interface should be correct");
+        // Allocate bootstrap 1 and give some mutez for a transfer
+        TezlinkImplicitAccount::allocate(&mut host, &context, &bootstrap1_contract)
+            .expect("Contract initialization should have succeed");
+        bootstrap1
+            .set_balance(&mut host, &500_000u64.into())
+            .expect("Set balance should have succeed");
+        let pk = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .expect("Public key creation should have succeed");
+        bootstrap1
+            .set_manager_public_key(&mut host, &pk)
+            .expect("Set manager should have succeed");
+
+        let origination = make_origination_operation(
+            0,
+            1,
+            0,
+            0,
+            boostrap1.clone(),
+            35_u64.into(),
+            code,
+            storage,
+        );
+
+        let call = make_transaction_operation(
+            0,
+            2,
+            0,
+            0,
+            boostrap1,
+            0.into(),
+            Contract::from_b58check(contract_addr).unwrap(),
+            None,
+        );
+
+        let timestamp_of_call = 10i64;
+        store_blueprints::<_, MichelsonChainConfig>(
+            &mut host,
+            vec![
+                tezlink_blueprint(vec![origination], Timestamp::from(0i64)),
+                tezlink_blueprint(vec![call], Timestamp::from(timestamp_of_call)),
+            ],
+        );
+
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        let computation = produce(&mut host, &chain_config, &mut config, None, None)
+            .expect("The block production should have succeeded.");
+        assert_eq!(ComputationResult::Finished, computation);
+
+        let expected_level = 1;
+        assert_eq!(
+            U256::from(expected_level),
+            read_current_number(&host).unwrap()
+        );
+        let expected_timestamp = timestamp_of_call;
+        let expected_chain_id = "0x01000000";
+        let expected_storage = format!(
+            "Pair {expected_level} (Pair {expected_timestamp} {expected_chain_id})"
+        );
+
+        assert_eq!(
+            parser.parse(&expected_storage).unwrap(),
+            mir::ast::Micheline::decode_raw(
+                &parser.arena,
+                &TezlinkOriginatedAccount::from_contract(
+                    &context,
+                    &Contract::from_b58check(contract_addr).unwrap()
+                )
+                .unwrap()
+                .storage(&host)
+                .unwrap()
+            )
+            .unwrap()
+        )
     }
 
     #[test]
