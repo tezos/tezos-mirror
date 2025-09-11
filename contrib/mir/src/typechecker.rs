@@ -1997,8 +1997,9 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(APPLY, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(TICKET, [], _), [.., T::Nat, _]) => {
-            stack[0] = T::new_option(T::new_ticket(pop!()));
-            I::Ticket
+            let content_ty = pop!();
+            stack[0] = T::new_option(T::new_ticket(content_ty.clone()));
+            I::Ticket(content_ty)
         }
         (App(TICKET, [], _), [.., _, _]) => no_overload!(TICKET),
         (App(TICKET, [], _), [] | [_]) => no_overload!(TICKET, len 2),
@@ -2505,17 +2506,40 @@ pub(crate) fn typecheck_value<'a>(
                 matches!(raw, V::App(Prim::Lambda_rec, ..)),
             )?))
         }
-        (T::Ticket(c), m) => {
+        (
+            T::Ticket(content_type),
+            V::App(Prim::Ticket, [ticketer, content_type_bis, content, amount], _),
+        ) => {
+            let content_type_bis = parse_ty(ctx, content_type_bis)?;
+            ensure_ty_eq(&mut ctx.gas, content_type, &content_type_bis)?;
+            let ticketer = typecheck_value(ticketer, ctx, &T::Address)?;
+            let ticketer = irrefutable_match!(ticketer; TV::Address);
+            let content = typecheck_value(content, ctx, content_type)?;
+            let amount = typecheck_value(amount, ctx, &T::Nat)?;
+            let amount = irrefutable_match!(amount; TV::Nat);
+            TV::new_ticket(Ticket {
+                ticketer: ticketer.hash,
+                content_type: content_type.as_ref().clone(),
+                content,
+                amount,
+            })
+        }
+        (T::Ticket(content_type), m) => {
+            let content_type = content_type.as_ref();
             match typecheck_value(
                 m,
                 ctx,
-                &Type::new_pair(Type::Address, Type::new_pair(c.as_ref().clone(), Type::Nat)),
+                &Type::new_pair(
+                    Type::Address,
+                    Type::new_pair(content_type.clone(), Type::Nat),
+                ),
             ) {
                 Ok(TV::Pair(b)) => {
                     let address = irrefutable_match!(b.0; TV::Address);
                     let c = irrefutable_match!(b.1; TV::Pair);
                     TV::new_ticket(Ticket {
                         ticketer: address.hash,
+                        content_type: content_type.clone(),
                         content: c.0,
                         amount: irrefutable_match!(c.1; TV::Nat),
                     })
@@ -7596,6 +7620,7 @@ mod typecheck_tests {
         let mut ctx = Ctx::default();
         let ticket: super::Ticket = super::Ticket {
             ticketer: AddressHash::try_from("tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h").unwrap(),
+            content_type: Type::Unit,
             content: TypedValue::Unit,
             amount: 5u32.into(),
         };
@@ -7659,7 +7684,7 @@ mod typecheck_tests {
         let stk = &mut tc_stk![Type::Nat, Type::Unit];
         assert_eq!(
             typecheck_instruction(&parse("TICKET").unwrap(), &mut Ctx::default(), stk),
-            Ok(Instruction::Ticket)
+            Ok(Instruction::Ticket(Type::Unit))
         );
         assert_eq!(
             stk,
