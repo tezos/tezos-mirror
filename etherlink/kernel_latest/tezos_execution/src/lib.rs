@@ -103,7 +103,7 @@ fn address_from_contract(contract: Contract) -> AddressHash {
     }
 }
 
-pub fn transfer_tez<Host: Runtime>(
+fn transfer_tez<Host: Runtime>(
     host: &mut Host,
     giver_account: &impl TezlinkAccount,
     amount: &Narith,
@@ -153,7 +153,7 @@ fn burn_tez(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn execute_internal_operations<'a, Host: Runtime>(
+fn execute_internal_operations<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
@@ -442,7 +442,7 @@ impl<'a, Host: Runtime> CtxTrait<'a>
 
 /// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
 #[allow(clippy::too_many_arguments)]
-pub fn transfer<'a, Host: Runtime>(
+fn transfer<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     sender_account: &impl TezlinkAccount,
@@ -592,7 +592,7 @@ fn get_contract_entrypoint(
 
 // Handles manager transfer operations.
 #[allow(clippy::too_many_arguments)]
-pub fn transfer_external<Host: Runtime>(
+fn transfer_external<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     source_account: &TezlinkImplicitAccount,
@@ -796,7 +796,7 @@ fn compute_balance_updates(
 }
 
 /// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
-pub fn compute_storage_balance_updates(
+fn compute_storage_balance_updates(
     source: &TezlinkImplicitAccount,
     fee: BigUint,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {

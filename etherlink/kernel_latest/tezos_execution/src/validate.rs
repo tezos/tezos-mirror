@@ -22,7 +22,7 @@ impl TezlinkImplicitAccount {
     /// This function verifies that the counter given in argument is the
     /// successor of the stored counter. If not, it returns the appropriate
     /// error.
-    pub fn check_counter_increment(
+    fn check_counter_increment(
         &self,
         host: &impl Runtime,
         counter: &Narith,
@@ -66,7 +66,7 @@ impl TezlinkImplicitAccount {
         }
     }
 
-    pub fn get_manager_key(
+    fn get_manager_key(
         &self,
         host: &impl Runtime,
     ) -> Result<Result<PublicKey, ValidityError>, tezos_storage::error::Error> {
@@ -125,13 +125,7 @@ fn check_storage_limit(
     }
 }
 
-pub struct ValidationInfo {
-    pub source_account: TezlinkImplicitAccount,
-    pub balance_updates: Vec<Vec<BalanceUpdate>>,
-    pub validated_operations: Vec<ManagerOperation<OperationContent>>,
-}
-
-pub fn validate_source<Host: Runtime>(
+fn validate_source<Host: Runtime>(
     host: &Host,
     context: &Context,
     content: &Vec<ManagerOperation<OperationContent>>,
@@ -164,7 +158,7 @@ pub fn validate_source<Host: Runtime>(
     Ok((pk, account))
 }
 
-pub fn validate_individual_operation<Host: Runtime>(
+fn validate_individual_operation<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
     content: &ManagerOperation<OperationContent>,
@@ -214,6 +208,12 @@ pub fn validate_individual_operation<Host: Runtime>(
             .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
 
     Ok((new_balance, vec![src_delta, block_fees]))
+}
+
+pub struct ValidationInfo {
+    pub source_account: TezlinkImplicitAccount,
+    pub balance_updates: Vec<Vec<BalanceUpdate>>,
+    pub validated_operations: Vec<ManagerOperation<OperationContent>>,
 }
 
 pub fn execute_validation<Host: Runtime>(
