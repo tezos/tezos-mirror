@@ -1,0 +1,28 @@
+# Purpose: verify that big_map contents persist across blocks.
+parameter unit ;
+storage (pair (nat %counter) (big_map %m nat unit)) ;
+# Initial storage: (Pair 0 { Elt 0 Unit })
+# Invariant: the m big_map contains exactly one key equal to the current counter.
+# Execution on each call:
+#   1) Assert that key = counter is present in m.
+#   2) Remove the current (counter) key from m.
+#   3) Increment the counter.
+#   4) Insert the new (counter) key into m with value unit.
+#   5) Return no operations and the updated storage.
+code { CDR ;
+       # Check that the key is in the map
+       DUP ;
+       UNPAIR;
+       MEM;
+       ASSERT;
+       # Remove the n-th key
+       UNPAIR ;
+       DUP ;
+       DIP { NONE unit ; SWAP ; UPDATE } ;
+       # Add (n+1)-th key
+       PUSH nat 1 ; ADD ;
+       DUP ;
+       DIP { UNIT ; SOME ; SWAP ; UPDATE } ;
+       PAIR ;
+       NIL operation ;
+       PAIR }
