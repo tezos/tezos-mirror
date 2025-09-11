@@ -26,3 +26,21 @@ let faucet_contract () =
           find ["mini_scenarios"; "faucet"] tezlink_protocol |> path);
       initial_storage = "Unit";
     }
+
+let big_map_option () =
+  Evm_node.
+    {
+      address = "KT1WxdAwoKy6WKLe32UfDoRpB9uxfxPWjRAo";
+      path =
+        Michelson_script.(find ["big_maps"; "option"] tezlink_protocol |> path);
+      initial_storage = "None";
+    }
+
+let big_map_counter () =
+  Evm_node.
+    {
+      address = "KT1SRkwG4X65KD7sJhFFoc1fPyuFGECMZsYs";
+      path =
+        Michelson_script.(find ["big_maps"; "counter"] tezlink_protocol |> path);
+      initial_storage = "(Pair 0 { Elt 0 Unit })";
+    }
