@@ -2387,31 +2387,25 @@ pub(crate) fn typecheck_value<'a>(
             })
         }
         (T::BigMap(m), v) => {
-            let (id_opt, vs_opt, diff) = match v {
-                V::Int(i) => (Some(i.clone()), None, false),
-                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (Some(i.clone()), Some(vs), true),
+            let (id, vs_opt, diff) = match v {
+                V::Int(i) => (i, None, false),
+                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (i, Some(vs), true),
                 _ => return Err(invalid_value_for_type!()),
             };
 
             let (tk, tv) = m.as_ref();
 
-            let big_map_id = if let Some(id) = id_opt {
-                let big_map_id = BigMapId(id.clone());
-                let (key_type, value_type) = {
-                    let big_map_storage = ctx.big_map_storage();
-                    big_map_storage
-                        .big_map_get_type(&big_map_id)
-                        .map_err(TcError::LazyStorageError)?
-                        .ok_or(TcError::BigMapNotFound(id))?
-                };
-                let key_type = &key_type.clone();
-                let value_type = &value_type.clone();
-                ensure_ty_eq(ctx.gas(), key_type, tk)?;
-                ensure_ty_eq(ctx.gas(), value_type, tv)?;
-                Some(big_map_id)
-            } else {
-                None
-            };
+            let big_map_id = BigMapId(id.clone());
+            let (key_type, value_type) = ctx
+                .big_map_storage()
+                .big_map_get_type(&big_map_id)
+                .map_err(TcError::LazyStorageError)?
+                .ok_or(TcError::BigMapNotFound(id.clone()))?;
+
+            let key_type = &key_type.clone();
+            let value_type = &value_type.clone();
+            ensure_ty_eq(ctx.gas(), key_type, tk)?;
+            ensure_ty_eq(ctx.gas(), value_type, tv)?;
 
             let overlay = if let Some(vs) = vs_opt {
                 typecheck_big_map(ctx, t, tk, tv, vs, diff)?
@@ -2419,7 +2413,7 @@ pub(crate) fn typecheck_value<'a>(
                 BTreeMap::default()
             };
             TV::BigMap(BigMap {
-                id: big_map_id,
+                id: Some(big_map_id),
                 overlay,
                 key_type: tk.clone(),
                 value_type: tv.clone(),
