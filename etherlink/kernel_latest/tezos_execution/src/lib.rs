@@ -172,7 +172,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
     sender_contract: &Contract,
     sender_account: &mut TezlinkOriginatedAccount,
     parser: &'a Parser<'a>,
-    source: &AddressHash,
+    source: &PublicKeyHash,
     gas: &mut Gas,
     operation_counter: &mut u128,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
@@ -292,7 +292,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                         result: ContentResult::Skipped,
                     })
                 } else {
-                    let source_contract = contract_from_address(source.clone())?;
+                    let source_contract = Contract::Implicit(source.clone());
                     let receipt = originate_contract(
                         host,
                         context,
@@ -367,7 +367,7 @@ struct Ctx<'a, Host, Context, Gas, OpCounter, OrigNonce> {
     now: Timestamp,
     chain_id: ChainId,
 
-    source: AddressHash,
+    source: PublicKeyHash,
     gas: Gas,
     operation_counter: OpCounter,
     origination_nonce: OrigNonce,
@@ -385,7 +385,7 @@ impl<'a, Host: Runtime> CtxTrait<'a>
     }
 
     fn source(&self) -> AddressHash {
-        self.source.clone()
+        self.source.clone().into()
     }
 
     fn amount(&self) -> i64 {
@@ -468,7 +468,7 @@ pub fn transfer<'a, Host: Runtime>(
     entrypoint: &Entrypoint,
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
-    source: &AddressHash,
+    source: &PublicKeyHash,
     gas: &mut Gas,
     operation_counter: &mut u128,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
@@ -659,7 +659,6 @@ pub fn transfer_external<Host: Runtime>(
         ),
         None => (&Entrypoint::default(), Micheline::from(())),
     };
-    let source = address_from_contract(source_contract.clone());
 
     transfer(
         host,
@@ -671,7 +670,7 @@ pub fn transfer_external<Host: Runtime>(
         entrypoint,
         value,
         &parser,
-        &source,
+        source,
         &mut mir::gas::Gas::default(),
         &mut 0,
         all_internal_receipts,
