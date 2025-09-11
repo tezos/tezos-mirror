@@ -77,7 +77,7 @@ module Protocol_types = struct
       Tezos_types.convert_using_serialization
         ~name:"counter"
         ~dst:encoding
-        ~src:Data_encoding.z
+        ~src:Data_encoding.n
   end
 end
 
