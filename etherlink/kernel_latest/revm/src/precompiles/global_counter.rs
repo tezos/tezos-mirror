@@ -14,7 +14,7 @@ use crate::{
     journal::Journal,
     precompiles::{
         constants::{
-            FA_WITHDRAWAL_SOL_ADDR, GLOBAL_COUNTER_BASE_COST,
+            FA_BRIDGE_SOL_ADDR, GLOBAL_COUNTER_BASE_COST,
             GLOBAL_COUNTER_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
         },
         error::CustomPrecompileError,
@@ -41,7 +41,7 @@ where
 {
     guard(
         GLOBAL_COUNTER_PRECOMPILE_ADDRESS,
-        &[WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_ADDR],
+        &[WITHDRAWAL_SOL_ADDR, FA_BRIDGE_SOL_ADDR],
         transfer,
         is_static,
     )?;

@@ -18,7 +18,7 @@ use tezos_smart_rollup_host::{
 use crate::{
     helpers::storage::{bytes_hash, concat, read_u64_le_default, write_u64_le},
     precompiles::constants::{
-        FA_WITHDRAWAL_SOL_CODE_HASH, FA_WITHDRAWAL_SOL_CONTRACT,
+        FA_BRIDGE_SOL_CODE_HASH, FA_BRIDGE_SOL_CONTRACT,
         INTERNAL_FORWARDER_SOL_CODE_HASH, INTERNAL_FORWARDER_SOL_CONTRACT,
         WITHDRAWAL_SOL_CODE_HASH, WITHDRAWAL_SOL_CONTRACT,
     },
@@ -141,9 +141,9 @@ pub fn get_precompile_bytecode(code_hash: &B256) -> Result<Option<Bytecode>, Err
             Bytes::from_hex(WITHDRAWAL_SOL_CONTRACT)
                 .map_err(|err| Error::Custom(err.to_string()))?,
         )))
-    } else if code_hash == &FA_WITHDRAWAL_SOL_CODE_HASH {
+    } else if code_hash == &FA_BRIDGE_SOL_CODE_HASH {
         Ok(Some(Bytecode::new_legacy(
-            Bytes::from_hex(FA_WITHDRAWAL_SOL_CONTRACT)
+            Bytes::from_hex(FA_BRIDGE_SOL_CONTRACT)
                 .map_err(|err| Error::Custom(err.to_string()))?,
         )))
     } else if code_hash == &INTERNAL_FORWARDER_SOL_CODE_HASH {

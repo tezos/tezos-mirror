@@ -32,7 +32,7 @@ use crate::{
     journal::Journal,
     precompiles::{
         constants::{
-            FA_WITHDRAWAL_SOL_ADDR, SEND_OUTBOX_MESSAGE_BASE_COST,
+            FA_BRIDGE_SOL_ADDR, SEND_OUTBOX_MESSAGE_BASE_COST,
             SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
         },
         error::CustomPrecompileError,
@@ -467,7 +467,7 @@ where
 {
     guard(
         SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
-        &[WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_ADDR],
+        &[WITHDRAWAL_SOL_ADDR, FA_BRIDGE_SOL_ADDR],
         transfer,
         is_static,
     )?;

@@ -474,7 +474,7 @@ mod test {
     use crate::{
         custom,
         precompiles::constants::{
-            FA_WITHDRAWAL_SOL_CODE_HASH, FA_WITHDRAWAL_SOL_CONTRACT,
+            FA_BRIDGE_SOL_CODE_HASH, FA_BRIDGE_SOL_CONTRACT,
             INTERNAL_FORWARDER_SOL_CODE_HASH, INTERNAL_FORWARDER_SOL_CONTRACT,
             WITHDRAWAL_SOL_CODE_HASH, WITHDRAWAL_SOL_CONTRACT,
         },
@@ -523,12 +523,12 @@ mod test {
     #[test]
     fn check_fa_withdrawal_code_info_fetching() {
         let mut host = MockKernelHost::default();
-        let code_voucher = bytecode_from_hex_str(FA_WITHDRAWAL_SOL_CONTRACT).unwrap();
+        let code_voucher = bytecode_from_hex_str(FA_BRIDGE_SOL_CONTRACT).unwrap();
 
         check_account_code_info_fetching(
             &mut host,
             code_voucher,
-            FA_WITHDRAWAL_SOL_CODE_HASH,
+            FA_BRIDGE_SOL_CODE_HASH,
         );
     }
 

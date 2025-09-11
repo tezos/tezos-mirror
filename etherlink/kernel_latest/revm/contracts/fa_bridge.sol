@@ -9,7 +9,7 @@ import "./interfaces.sol";
 import "./internal_forwarder.sol";
 import "./reentrancy_safe.sol";
 
-contract FAWithdrawal is ReentrancySafe {
+contract FABridge is ReentrancySafe {
     bool private locked;
 
     event Withdrawal(
