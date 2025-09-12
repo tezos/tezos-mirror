@@ -1107,7 +1107,9 @@ let number_of_bakers ~snapshot ~(network : Network.t) =
          ~network
          ~delay:0)
   in
-  let* () = Node.snapshot_import ~no_check:true node snapshot in
+  let* () =
+    Node.snapshot_import ~env:yes_crypto_env ~no_check:true node snapshot
+  in
   let* () = Node.run node (Node_helpers.isolated_args ~private_mode:false []) in
   let* () = Node.wait_for_ready node in
   let* n =
