@@ -186,7 +186,8 @@ let has_stage target_stage job =
   | None -> false
   | Some stage -> String.equal stage target_stage
 
-let has_cache_or_start_stage job = has_cache job || has_stage "start" job
+let has_cache_or_start_images_stages job =
+  has_cache job || has_stage "start" job || has_stage "images" job
 
 type tezos_image =
   | Internal of {
