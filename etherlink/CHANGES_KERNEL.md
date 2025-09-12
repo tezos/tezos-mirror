@@ -2,6 +2,16 @@
 
 ## Version NEXT
 
+### Features
+
+### Bug fixes
+
+- FA deposit events are now emitted by the FA bridge address: `0xff00000000000000000000000000000000000002` (!19239)
+
+### Internal
+
+## Etherlink 5 (Ebisu)
+
 Its storage version is 38.
 
 ### Features
