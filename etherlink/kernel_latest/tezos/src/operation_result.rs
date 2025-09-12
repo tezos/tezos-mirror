@@ -141,6 +141,8 @@ pub enum TransferError {
     MirAmountToNarithError(String),
     #[error("Failed to convert Narith to amount: {0}")]
     MirNarithToAmountError(String),
+    #[error("Transactions of 0 tez towards a contract without code are forbidden")]
+    EmptyImplicitTransfer,
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader)]

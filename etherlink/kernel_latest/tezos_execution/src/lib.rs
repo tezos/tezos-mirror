@@ -465,6 +465,10 @@ fn transfer<'a, Host: Runtime>(
             if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Err(TransferError::NonSmartContractExecutionCall);
             }
+            // Transfers of 0 tez to an implicit contract are rejected.
+            if amount.eq(&0_u64.into()) {
+                return Err(TransferError::EmptyImplicitTransfer);
+            };
 
             let dest_account = TezlinkImplicitAccount::from_public_key_hash(context, pkh)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
@@ -4249,5 +4253,220 @@ mod tests {
             )
             )
         ), "Expected Failed Origination operation result with MirTypecheckingError, got {:?}", receipts[0]);
+    }
+
+    #[test]
+    // Tests that empty transfers (external or internal) to implicit accounts
+    // fail, and empty transfers (external or internal) to smart contracts
+    // succeed.
+    fn test_empty_transfers() {
+        let mut host = MockKernelHost::default();
+        let context = context::Context::init_context();
+        let src = bootstrap1();
+        let dst = bootstrap2();
+        let kt1_addr =
+            ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
+                .expect("ContractKt1Hash b58 conversion should have succeeded");
+        // Setup accounts with 50 mutez in their balance
+        init_account(&mut host, &src.pkh, 1000);
+        reveal_account(&mut host, &src);
+        let (code, storage) = (
+            r#"
+                        parameter (or (unit %default) (address %call));
+                        storage unit;
+                        code
+                        { UNPAIR;
+                          IF_LEFT
+                            { DROP; NIL operation; PAIR }
+                            { CONTRACT unit;
+                              { IF_NONE { { UNIT ; FAILWITH } } {} } ;
+                              PUSH mutez 0;
+                              UNIT;
+                              TRANSFER_TOKENS;
+                              NIL operation;
+                              SWAP;
+                              CONS;
+                              PAIR } }
+            "#,
+            &Micheline::from(()),
+        );
+        init_contract(&mut host, &kt1_addr, code, storage, &0.into());
+
+        // An empty external transfer to an implicit account fails.
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            0.into(),
+            Contract::Implicit(dst.pkh),
+            None,
+        );
+        let receipts1 = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+            &0u32.into(),
+            &0i64.into(),
+            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(receipts1.len(), 1, "There should be one receipt");
+        assert!(matches!(
+            &receipts1[0],
+            OperationResultSum::Transfer(OperationResult {
+                result: ContentResult::Failed(ApplyOperationErrors { errors }),
+                ..
+            }) if errors.len() == 1 && matches!(
+                &errors[0],
+                ApplyOperationError::Transfer(
+                    TransferError::EmptyImplicitTransfer
+                )
+            )
+        ), "Expected Failed Transfer operation result with EmptyImplicitTransfer, got {:?}", receipts1[0]);
+
+        // An empty external transfer to a smart contract succeeds.
+        let operation = make_transfer_operation(
+            15,
+            2,
+            4,
+            5,
+            src.clone(),
+            0.into(),
+            Contract::Originated(kt1_addr.clone()),
+            Some(Parameter {
+                entrypoint: Entrypoint::try_from("default")
+                    .expect("Entrypoint should be valid"),
+                value: Micheline::from(()).encode(),
+            }),
+        );
+        let receipts2 = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+            &0u32.into(),
+            &0i64.into(),
+            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(receipts2.len(), 1, "There should be one receipt");
+        assert!(
+            matches!(
+                &receipts2[0],
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                        TransferSuccess { .. }
+                    )),
+                    ..
+                })
+            ),
+            "Expected Successful Transfer operation result, got {:?}",
+            receipts2[0]
+        );
+
+        // An empty internal transfer to an implicit account fails.
+        let operation = make_transfer_operation(
+            15,
+            3,
+            4,
+            5,
+            src.clone(),
+            0.into(),
+            Contract::Originated(kt1_addr.clone()),
+            Some(Parameter {
+                entrypoint: Entrypoint::try_from("call")
+                    .expect("Entrypoint should be valid"),
+                value: Micheline::from(src.clone().pkh.to_b58check()).encode(),
+            }),
+        );
+        let receipts3 = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+            &0u32.into(),
+            &0i64.into(),
+            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(receipts3.len(), 1, "There should be one receipt");
+        assert!(
+            matches!(
+                &receipts3[0],
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::BackTracked(BacktrackedResult { result: TransferTarget::ToContrat(TransferSuccess { .. }), .. }),
+                    internal_operation_results,
+                    ..
+                }) if internal_operation_results.len() == 1 && matches!(
+                    &internal_operation_results[0],
+                    InternalOperationSum::Transfer(InternalContentWithMetadata {result: ContentResult::Failed(ApplyOperationErrors { errors }), ..})
+                        if errors.len() == 1 && matches!(
+                            &errors[0],
+                            ApplyOperationError::Transfer(
+                                TransferError::EmptyImplicitTransfer
+                            )
+                        )
+                )
+            ),
+            "Expected Failed Transfer operation result with EmptyImplicitTransfer, got {:?}",
+            receipts3[0]
+        );
+
+        // An empty internal transfer to a smart contract succeeds.
+        let operation = make_transfer_operation(
+            15,
+            4,
+            4,
+            5,
+            src,
+            0.into(),
+            Contract::Originated(kt1_addr.clone()),
+            Some(Parameter {
+                entrypoint: Entrypoint::try_from("call")
+                    .expect("Entrypoint should be valid"),
+                value: Micheline::from(kt1_addr.to_b58check()).encode(),
+            }),
+        );
+        let receipts4 = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+            &0u32.into(),
+            &0i64.into(),
+            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(receipts4.len(), 1, "There should be one receipt");
+        assert!(
+            matches!(
+                &receipts4[0],
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess{ .. })),
+                    internal_operation_results,
+                    ..
+                }) if internal_operation_results.len() == 1 && matches!(
+                    &internal_operation_results[0],
+                    InternalOperationSum::Transfer(InternalContentWithMetadata {result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess{ .. })), ..})
+                )
+            ),
+            "Expected Successful Transfer operation result, got {:?}",
+            receipts4[0]
+        );
     }
 }
