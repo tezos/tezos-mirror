@@ -9,13 +9,54 @@
 
 #![allow(clippy::type_complexity)]
 use crate::ast::big_map::{InMemoryLazyStorage, LazyStorage};
-#[cfg(feature = "runtime_entrypoint_verification")]
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
 use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
 use tezos_crypto_rs::{hash::OperationHash, public_key_hash::PublicKeyHash};
+
+#[allow(missing_docs)]
+pub trait CtxTrait<'a> {
+    type BigMapStorage: LazyStorage<'a>;
+
+    fn gas(&mut self) -> &mut Gas;
+
+    fn amount(&self) -> i64;
+
+    fn balance(&self) -> i64;
+
+    fn level(&self) -> BigUint;
+
+    fn sender(&self) -> AddressHash;
+
+    fn source(&self) -> PublicKeyHash;
+
+    fn min_block_time(&self) -> BigUint;
+
+    fn chain_id(&self) -> tezos_crypto_rs::hash::ChainId;
+
+    fn self_address(&self) -> AddressHash;
+
+    fn lookup_contract(
+        &self,
+        address: &AddressHash,
+    ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>>;
+
+    fn voting_power(&self, pkh: &PublicKeyHash) -> BigUint;
+
+    fn now(&self) -> BigInt;
+
+    fn total_voting_power(&self) -> BigUint;
+
+    fn operation_group_hash(&self) -> [u8; 32];
+
+    fn big_map_storage(&mut self) -> &mut Self::BigMapStorage;
+
+    fn origination_counter(&mut self) -> u32;
+
+    fn operation_counter(&mut self) -> u128;
+}
 
 /// [Ctx] includes "outer context" required for typechecking and interpreting
 /// Michelson.
@@ -36,7 +77,7 @@ pub struct Ctx<'a> {
     /// transaction. The result of the `SOURCE` instruction. Note that in a
     /// regular blockchain, this is necessarily an implicit account. Defaults to
     /// `tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP`.
-    pub source: AddressHash,
+    pub source: PublicKeyHash,
     /// Minimal block time in seconds. The result of the `MIN_BLOCK_TIME`
     /// instruciton. Defaults to `1`.
     pub min_block_time: BigUint,
@@ -53,8 +94,7 @@ pub struct Ctx<'a> {
     /// exist, or [`Some(entrypoints)`] with the map of its entrypoints. See
     /// also [Self::set_known_contracts]. Defaults to returning [None] for any
     /// address.
-    #[cfg(feature = "runtime_entrypoint_verification")]
-    pub lookup_contract: Box<dyn FnMut(&AddressHash) -> Option<Entrypoints>>,
+    pub lookup_contract: Box<dyn Fn(&AddressHash) -> Option<Entrypoints>>,
     /// A function that maps public key hashes (i.e. effectively implicit
     /// account addresses) to their corresponding voting powers. Note that if
     /// you provide a custom function here, you also must define
@@ -79,7 +119,7 @@ pub struct Ctx<'a> {
     /// Storage for `big_map`s. By default uses [InMemoryLazyStorage], but can
     /// admit a custom implementation of [LazyStorage] trait. Defaults to a new,
     /// empty, [InMemoryLazyStorage].
-    pub big_map_storage: Box<dyn LazyStorage<'a> + 'a>,
+    pub big_map_storage: InMemoryLazyStorage<'a>,
     origination_counter: u32,
     operation_counter: u128,
 }
@@ -99,7 +139,6 @@ impl<'a> Ctx<'a> {
 
     /// Set a reasonable implementation for [Self::lookup_contract] by providing
     /// something that can convert to [`HashMap<AddressHash, Entrypoints>`].
-    #[cfg(feature = "runtime_entrypoint_verification")]
     pub fn set_known_contracts(&mut self, v: impl Into<HashMap<AddressHash, Entrypoints>>) {
         let map = v.into();
         self.lookup_contract = Box::new(move |ah| map.get(ah).cloned());
@@ -107,8 +146,8 @@ impl<'a> Ctx<'a> {
 
     /// Set a resonable implementation for [Self::big_map_storage] by providing
     /// something that implements the [LazyStorage] trait.
-    pub fn set_big_map_storage(&mut self, v: impl LazyStorage<'a> + 'a) {
-        self.big_map_storage = Box::new(v);
+    pub fn set_big_map_storage(&mut self, v: InMemoryLazyStorage<'a>) {
+        self.big_map_storage = v;
     }
 
     /// Set a reasonable implementation for [Self::voting_powers] and a
@@ -152,11 +191,10 @@ impl Default for Ctx<'_> {
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
-            #[cfg(feature = "runtime_entrypoint_verification")]
             lookup_contract: Box::new(|_| None),
             voting_powers: Box::new(|_| 0u32.into()),
             total_voting_power: 0u32.into(),
-            big_map_storage: Box::new(InMemoryLazyStorage::new()),
+            big_map_storage: InMemoryLazyStorage::new(),
             operation_counter: 0,
             operation_group_hash: OperationHash::from_base58_check(
                 "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
@@ -168,5 +206,82 @@ impl Default for Ctx<'_> {
             .unwrap(),
             origination_counter: 0,
         }
+    }
+}
+
+impl<'a> CtxTrait<'a> for Ctx<'a> {
+    type BigMapStorage = InMemoryLazyStorage<'a>;
+
+    fn gas(&mut self) -> &mut Gas {
+        &mut self.gas
+    }
+
+    fn amount(&self) -> i64 {
+        self.amount
+    }
+
+    fn balance(&self) -> i64 {
+        self.balance
+    }
+
+    fn level(&self) -> BigUint {
+        self.level.clone()
+    }
+
+    fn sender(&self) -> AddressHash {
+        self.sender.clone()
+    }
+
+    fn source(&self) -> PublicKeyHash {
+        self.source.clone()
+    }
+
+    fn min_block_time(&self) -> BigUint {
+        self.min_block_time.clone()
+    }
+
+    fn chain_id(&self) -> tezos_crypto_rs::hash::ChainId {
+        self.chain_id.clone()
+    }
+
+    fn self_address(&self) -> AddressHash {
+        self.self_address.clone()
+    }
+
+    fn lookup_contract(
+        &self,
+        address: &AddressHash,
+    ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
+        (self.lookup_contract)(address)
+    }
+
+    fn voting_power(&self, pkh: &PublicKeyHash) -> BigUint {
+        (self.voting_powers)(pkh)
+    }
+
+    fn now(&self) -> BigInt {
+        self.now.clone()
+    }
+
+    fn total_voting_power(&self) -> BigUint {
+        self.total_voting_power.clone()
+    }
+
+    fn operation_group_hash(&self) -> [u8; 32] {
+        self.operation_group_hash
+    }
+
+    fn big_map_storage(&mut self) -> &mut Self::BigMapStorage {
+        &mut self.big_map_storage
+    }
+
+    fn origination_counter(&mut self) -> u32 {
+        self.origination_counter += 1;
+        self.origination_counter
+    }
+
+    fn operation_counter(&mut self) -> u128 {
+        self.operation_counter += 1;
+        self.operation_counter
     }
 }

@@ -10,7 +10,7 @@ use crate::ast::IntoMicheline;
 use super::*;
 
 fn check_error_expectation<'a>(
-    ctx: &mut Ctx,
+    ctx: &mut Ctx<'a>,
     err_exp: ErrorExpectation<'a>,
     err: TestError<'a>,
 ) -> Result<(), TztTestError<'a>> {
@@ -56,9 +56,9 @@ fn compare_typed_stacks(
         && std::iter::zip(s1, s2).all(|(v1, v2)| compare_typed_values(v1, v2))
 }
 
-fn unify_interpreter_error(
-    ctx: &mut Ctx,
-    exp: &InterpreterErrorExpectation,
+fn unify_interpreter_error<'a>(
+    ctx: &mut Ctx<'a>,
+    exp: &InterpreterErrorExpectation<'a>,
     err: &InterpretError,
 ) -> bool {
     use InterpreterErrorExpectation::*;
@@ -82,7 +82,7 @@ fn unify_interpreter_error(
 }
 
 pub fn check_expectation<'a>(
-    ctx: &mut Ctx,
+    ctx: &mut Ctx<'a>,
     expected: TestExpectation<'a>,
     real: Result<(FailingTypeStack, IStack<'a>), TestError<'a>>,
 ) -> Result<(), TztTestError<'a>> {

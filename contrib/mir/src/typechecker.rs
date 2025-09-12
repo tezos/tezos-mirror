@@ -24,7 +24,7 @@ pub mod type_props;
 use type_props::TypeProperty;
 
 use crate::ast::annotations::{AnnotationError, NO_ANNS};
-use crate::ast::big_map::{BigMap, BigMapId, LazyStorageError};
+use crate::ast::big_map::{BigMap, BigMapId, LazyStorage, LazyStorageError};
 use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types,
     micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
@@ -33,7 +33,7 @@ use crate::ast::michelson_address::AddressHash;
 use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
-use crate::context::Ctx;
+use crate::context::CtxTrait;
 use crate::gas::OutOfGas;
 use crate::gas::{self, tc_cost, Gas};
 use crate::irrefutable_match::irrefutable_match;
@@ -256,8 +256,8 @@ impl<'a> Micheline<'a> {
     /// Validates the type.
     pub fn typecheck_value(
         &self,
-        ctx: &mut Ctx,
-        value_type: &Micheline,
+        ctx: &mut impl CtxTrait<'a>,
+        value_type: &Micheline<'a>,
     ) -> Result<TypedValue<'a>, TcError> {
         let ty = parse_ty(ctx, value_type)?;
         typecheck_value(self, ctx, &ty)
@@ -272,14 +272,14 @@ impl<'a> Micheline<'a> {
     /// in lambdas).
     pub fn typecheck_instruction(
         &self,
-        ctx: &mut Ctx,
-        self_type: Option<&Micheline>,
-        stack: &[Micheline],
+        ctx: &mut impl CtxTrait<'a>,
+        self_type: Option<&Micheline<'a>>,
+        stack: &[Micheline<'a>],
     ) -> Result<Instruction<'a>, TcError> {
         let entrypoints = self_type
             .map(|ty| {
                 let (entrypoints, _, ty) = parse_parameter_ty_with_entrypoints(ctx, ty)?;
-                ty.ensure_prop(&mut ctx.gas, TypeProperty::Passable)?;
+                ty.ensure_prop(ctx.gas(), TypeProperty::Passable)?;
                 Ok::<_, TcError>(entrypoints)
             })
             .transpose()?;
@@ -293,13 +293,13 @@ impl<'a> Micheline<'a> {
     }
 
     /// Parse `Micheline` as a type. Validates the type.
-    pub fn parse_ty(&self, ctx: &mut Ctx) -> Result<Type, TcError> {
+    pub fn parse_ty(&self, ctx: &mut impl CtxTrait<'a>) -> Result<Type, TcError> {
         parse_ty(ctx, self)
     }
 
     /// Interpreting `Micheline` as a contract parameter type, collect its
     /// entrypoints into [Entrypoints].
-    pub fn get_entrypoints(&self, ctx: &mut Ctx) -> Result<Entrypoints, TcError> {
+    pub fn get_entrypoints(&self, ctx: &mut impl CtxTrait<'a>) -> Result<Entrypoints, TcError> {
         let (entrypoints, _, _) = parse_parameter_ty_with_entrypoints(ctx, self)?;
         Ok(entrypoints)
     }
@@ -309,7 +309,10 @@ impl<'a> Micheline<'a> {
     /// typechecked script.
     /// If the script contains some views, they are not typechecked.
     /// TODO https://linear.app/tezos/issue/L2-376/type-check-views
-    pub fn typecheck_script(&self, ctx: &mut Ctx) -> Result<ContractScript<'a>, TcError> {
+    pub fn typecheck_script(
+        &self,
+        ctx: &mut impl CtxTrait<'a>,
+    ) -> Result<ContractScript<'a>, TcError> {
         let seq = match self {
             // top-level allows one level of nesting
             Micheline::Seq([Micheline::Seq(seq)]) => seq,
@@ -377,8 +380,8 @@ impl<'a> Micheline<'a> {
         let storage = storage_ty
             .ok_or(TcError::MissingTopLevelElt(Prim::storage))?
             .parse_ty(ctx)?;
-        parameter.ensure_prop(&mut ctx.gas, TypeProperty::Passable)?;
-        storage.ensure_prop(&mut ctx.gas, TypeProperty::Storable)?;
+        parameter.ensure_prop(ctx.gas(), TypeProperty::Passable)?;
+        storage.ensure_prop(ctx.gas(), TypeProperty::Storable)?;
         let mut stack = tc_stk![Type::new_pair(parameter.clone(), storage.clone())];
         let code = typecheck_instruction(
             code.ok_or(TcError::MissingTopLevelElt(Prim::code))?,
@@ -404,11 +407,14 @@ impl<'a> Micheline<'a> {
     }
 }
 
-pub(crate) fn parse_ty(ctx: &mut Ctx, ty: &Micheline) -> Result<Type, TcError> {
+pub(crate) fn parse_ty<'a>(
+    ctx: &mut impl CtxTrait<'a>,
+    ty: &Micheline<'a>,
+) -> Result<Type, TcError> {
     parse_ty_with_entrypoints(ctx, ty, None, &mut HashMap::new(), Vec::new())
 }
 
-fn parse_ty_with_entrypoints<'a>(
+fn parse_ty_with_entrypoints<'a, Ctx: CtxTrait<'a>>(
     ctx: &mut Ctx,
     ty: &Micheline<'a>,
     mut entrypoints: Option<&mut Entrypoints>,
@@ -417,10 +423,10 @@ fn parse_ty_with_entrypoints<'a>(
 ) -> Result<Type, TcError> {
     use Micheline::*;
     use Prim::*;
-    ctx.gas.consume(gas::tc_cost::PARSE_TYPE_STEP)?;
-    fn make_pair(
+    ctx.gas().consume(gas::tc_cost::PARSE_TYPE_STEP)?;
+    fn make_pair<'a, Ctx: CtxTrait<'a>>(
         ctx: &mut Ctx,
-        args: (&Micheline, &Micheline, &[Micheline]),
+        args: (&Micheline<'a>, &Micheline<'a>, &[Micheline<'a>]),
         // NB: the tuple models a slice of at least 2 elements
     ) -> Result<Type, TcError> {
         Ok(match args {
@@ -466,7 +472,7 @@ fn parse_ty_with_entrypoints<'a>(
             let t = parse_ty(ctx, t)?;
             // NB: The inner type of ticket only needs to be comparable.
             // See https://tezos.gitlab.io/michelson-reference/#type-ticket
-            t.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            t.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             Type::new_ticket(t)
         }
         App(ticket, ..) => unexpected()?,
@@ -507,21 +513,21 @@ fn parse_ty_with_entrypoints<'a>(
             // argument doesn't need to be. The only constraint is that it needs
             // to be passable, as it represents the contract's parameter type.
             // See https://tezos.gitlab.io/michelson-reference/#type-contract
-            t.ensure_prop(&mut ctx.gas, TypeProperty::Passable)?;
+            t.ensure_prop(ctx.gas(), TypeProperty::Passable)?;
             Type::new_contract(t)
         }
         App(contract, ..) => unexpected()?,
 
         App(set, [k], _) => {
             let k = parse_ty(ctx, k)?;
-            k.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            k.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             Type::new_set(k)
         }
         App(set, ..) => unexpected()?,
 
         App(map, [k, v], _) => {
             let k = parse_ty(ctx, k)?;
-            k.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            k.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             let v = parse_ty(ctx, v)?;
             Type::new_map(k, v)
         }
@@ -529,9 +535,9 @@ fn parse_ty_with_entrypoints<'a>(
 
         App(big_map, [k, v], _) => {
             let k = parse_ty(ctx, k)?;
-            k.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            k.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             let v = parse_ty(ctx, v)?;
-            v.ensure_prop(&mut ctx.gas, TypeProperty::BigMapValue)?;
+            v.ensure_prop(ctx.gas(), TypeProperty::BigMapValue)?;
             Type::new_big_map(k, v)
         }
         App(big_map, ..) => unexpected()?,
@@ -598,7 +604,7 @@ fn parse_ty_with_entrypoints<'a>(
 
 #[allow(clippy::type_complexity)]
 fn parse_parameter_ty_with_entrypoints<'a>(
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     parameter_ty: &Micheline<'a>,
 ) -> Result<
     (
@@ -636,7 +642,7 @@ fn parse_parameter_ty_with_entrypoints<'a>(
 /// has to be locally overridden during typechecking.
 fn typecheck<'a>(
     ast: &[Micheline<'a>],
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
 ) -> Result<Vec<Instruction<'a>>, TcError> {
@@ -664,7 +670,7 @@ macro_rules! nothing_to_none {
 /// has to be locally overridden during typechecking.
 pub(crate) fn typecheck_instruction<'a>(
     i: &Micheline<'a>,
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
 ) -> Result<Instruction<'a>, TcError> {
@@ -770,7 +776,7 @@ pub(crate) fn typecheck_instruction<'a>(
         };
     }
 
-    ctx.gas.consume(gas::tc_cost::INSTR_STEP)?;
+    ctx.gas().consume(gas::tc_cost::INSTR_STEP)?;
 
     use Micheline::*;
     use Prim::*;
@@ -1085,7 +1091,7 @@ pub(crate) fn typecheck_instruction<'a>(
             };
             let protected_height = opt_height.unwrap_or(1) as usize;
 
-            ctx.gas.consume(gas::tc_cost::dip_n(&opt_height)?)?;
+            ctx.gas().consume(gas::tc_cost::dip_n(&opt_height)?)?;
 
             ensure_stack_len(Prim::DIP, stack, protected_height)?;
             // Here we split off the protected portion of the stack, typecheck the code with the
@@ -1105,7 +1111,7 @@ pub(crate) fn typecheck_instruction<'a>(
                 _ => unexpected_micheline!(),
             };
             let drop_height: usize = opt_height.unwrap_or(1) as usize;
-            ctx.gas.consume(gas::tc_cost::drop_n(&opt_height)?)?;
+            ctx.gas().consume(gas::tc_cost::drop_n(&opt_height)?)?;
             ensure_stack_len(Prim::DROP, stack, drop_height)?;
             stack.drop_top(drop_height);
             I::Drop(opt_height)
@@ -1122,7 +1128,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
             ensure_stack_len(Prim::DUP, stack, dup_height)?;
             let ty = &stack[dup_height - 1];
-            ty.ensure_prop(&mut ctx.gas, TypeProperty::Duplicable)?;
+            ty.ensure_prop(ctx.gas(), TypeProperty::Duplicable)?;
             stack.push(ty.clone());
             I::Dup(opt_height)
         }
@@ -1130,7 +1136,8 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(DIG, [Int(height)], _), ..) => {
             let dig_height = validate_u10(height)?;
             ensure_stack_len(Prim::DIG, stack, dig_height as usize)?;
-            ctx.gas.consume(gas::tc_cost::dig_n(dig_height as usize)?)?;
+            ctx.gas()
+                .consume(gas::tc_cost::dig_n(dig_height as usize)?)?;
             if dig_height > 0 {
                 let e = stack.remove(dig_height as usize);
                 stack.push(e);
@@ -1142,7 +1149,8 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(DUG, [Int(height)], _), ..) => {
             let dug_height = validate_u10(height)?;
-            ctx.gas.consume(gas::tc_cost::dug_n(dug_height as usize)?)?;
+            ctx.gas()
+                .consume(gas::tc_cost::dug_n(dug_height as usize)?)?;
             if dug_height > 0 {
                 ensure_stack_len(Prim::DUG, stack, dug_height as usize)?;
                 let e = pop!();
@@ -1456,7 +1464,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(PUSH, [t, v], _), ..) => {
             let t = parse_ty(ctx, t)?;
-            t.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            t.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
             let v = typecheck_value(v, ctx, &t)?;
             stack.push(t);
             I::Push(v)
@@ -1477,7 +1485,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // the type needs to be packable, but that's not quite correct, as
             // `contract _` is forbidden. The correct constraint is seemingly
             // "pushable", as "pushable" is just "packable" without `contract _`
-            ty.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            ty.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
             // mark stack as failed
             *opt_stack = FailingTypeStack::Failed;
             I::Failwith(ty)
@@ -1533,7 +1541,7 @@ pub(crate) fn typecheck_instruction<'a>(
             if stack.len() < n as usize {
                 no_overload!(PAIR, len n as usize);
             }
-            ctx.gas.consume(tc_cost::pair_n(n as usize)?)?;
+            ctx.gas().consume(tc_cost::pair_n(n as usize)?)?;
             // unwrap is fine, n is non-zero.
             let res = stack
                 .drain_top(n as usize)
@@ -1558,7 +1566,7 @@ pub(crate) fn typecheck_instruction<'a>(
             if n < 2 {
                 return Err(TcError::PairN01(UNPAIR, n));
             }
-            ctx.gas.consume(tc_cost::unpair_n(n as usize)?)?;
+            ctx.gas().consume(tc_cost::unpair_n(n as usize)?)?;
             fn fill(n: u16, stack: &mut Stack<Type>, p: &Type) -> Result<(), TcError> {
                 if n == 0 {
                     stack.push(p.clone());
@@ -1598,7 +1606,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NONE, expect_args!(1), _), _) => unexpected_micheline!(),
 
         (App(COMPARE, [], _), [.., u, t]) => {
-            ensure_ty_eq(&mut ctx.gas, t, u).map_err(|e| match e {
+            ensure_ty_eq(ctx.gas(), t, u).map_err(|e| match e {
                 TcError::TypesNotEqual(e) => TcError::NoMatchingOverload {
                     instr: Prim::COMPARE,
                     stack: stack.clone(),
@@ -1606,7 +1614,7 @@ pub(crate) fn typecheck_instruction<'a>(
                 },
                 e => e,
             })?;
-            t.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            t.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             pop!();
             stack[0] = T::Int;
             I::Compare
@@ -1628,7 +1636,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NIL, ..), _) => unexpected_micheline!(),
 
         (App(CONS, [], _), [.., T::List(ty1), ty2]) => {
-            ensure_ty_eq(&mut ctx.gas, ty1, ty2)?;
+            ensure_ty_eq(ctx.gas(), ty1, ty2)?;
             pop!();
             I::Cons
         }
@@ -1660,7 +1668,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(EMPTY_SET, [ty], _), _) => {
             let ty = parse_ty(ctx, ty)?;
-            ty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            ty.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             stack.push(T::new_set(ty));
             I::EmptySet
         }
@@ -1668,18 +1676,18 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(EMPTY_MAP, [kty, vty], _), _) => {
             let kty = parse_ty(ctx, kty)?;
-            kty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            kty.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             let vty = parse_ty(ctx, vty)?;
-            stack.push(T::new_map(kty.clone(), vty));
+            stack.push(T::new_map(kty, vty));
             I::EmptyMap
         }
         (App(EMPTY_MAP, expect_args!(2), _), _) => unexpected_micheline!(),
 
         (App(EMPTY_BIG_MAP, [kty, vty], _), _) => {
             let kty = parse_ty(ctx, kty)?;
-            kty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            kty.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             let vty = parse_ty(ctx, vty)?;
-            vty.ensure_prop(&mut ctx.gas, TypeProperty::BigMapValue)?;
+            vty.ensure_prop(ctx.gas(), TypeProperty::BigMapValue)?;
             stack.push(T::new_big_map(kty.clone(), vty.clone()));
             I::EmptyBigMap(kty, vty)
         }
@@ -1688,21 +1696,21 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(MEM, [], _), [.., T::Set(..), _]) => {
             let ty_ = pop!();
             let ty = pop!(T::Set);
-            ensure_ty_eq(&mut ctx.gas, &ty, &ty_)?;
+            ensure_ty_eq(ctx.gas(), &ty, &ty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Set)
         }
         (App(MEM, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::Map);
-            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
+            ensure_ty_eq(ctx.gas(), &map_tys.0, &kty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Map)
         }
         (App(MEM, [], _), [.., T::BigMap(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::BigMap);
-            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
+            ensure_ty_eq(ctx.gas(), &map_tys.0, &kty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::BigMap)
         }
@@ -1713,14 +1721,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GET, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::Map);
-            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
+            ensure_ty_eq(ctx.gas(), &map_tys.0, &kty_)?;
             stack.push(T::new_option(map_tys.1.clone()));
             I::Get(overloads::Get::Map)
         }
         (App(GET, [], _), [.., T::BigMap(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::BigMap);
-            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
+            ensure_ty_eq(ctx.gas(), &map_tys.0, &kty_)?;
             stack.push(T::new_option(map_tys.1.clone()));
             I::Get(overloads::Get::BigMap)
         }
@@ -1732,7 +1740,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // no_overload! below won't report the type on the top of the stack.
             let ty = &mut stack[0];
             let n = validate_u10(n)?;
-            ctx.gas.consume(tc_cost::get_n(n as usize)?)?;
+            ctx.gas().consume(tc_cost::get_n(n as usize)?)?;
             let res = match get_nth_field_ref(n, ty) {
                 Ok(res) => res,
                 Err(ty) => no_overload!(GET, NMOR::ExpectedPair(ty)),
@@ -1746,21 +1754,21 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GET, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(UPDATE, [], _), [.., T::Set(ty), T::Bool, ty_]) => {
-            ensure_ty_eq(&mut ctx.gas, ty, ty_)?;
+            ensure_ty_eq(ctx.gas(), ty, ty_)?;
             stack.drop_top(2);
             I::Update(overloads::Update::Set)
         }
         (App(UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
-            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            ensure_ty_eq(ctx.gas(), kty, kty_)?;
+            ensure_ty_eq(ctx.gas(), vty, vty_new)?;
             stack.drop_top(2);
             I::Update(overloads::Update::Map)
         }
         (App(UPDATE, [], _), [.., T::BigMap(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
-            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            ensure_ty_eq(ctx.gas(), kty, kty_)?;
+            ensure_ty_eq(ctx.gas(), vty, vty_new)?;
             stack.drop_top(2);
             I::Update(overloads::Update::BigMap)
         }
@@ -1787,15 +1795,15 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(GET_AND_UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
-            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            ensure_ty_eq(ctx.gas(), kty, kty_)?;
+            ensure_ty_eq(ctx.gas(), vty, vty_new)?;
             pop!();
             I::GetAndUpdate(overloads::GetAndUpdate::Map)
         }
         (App(GET_AND_UPDATE, [], _), [.., T::BigMap(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
-            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            ensure_ty_eq(ctx.gas(), kty, kty_)?;
+            ensure_ty_eq(ctx.gas(), vty, vty_new)?;
             pop!();
             I::GetAndUpdate(overloads::GetAndUpdate::BigMap)
         }
@@ -1862,7 +1870,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(PACK, [], _), [.., _]) => {
             let t = pop!();
-            t.ensure_prop(&mut ctx.gas, TypeProperty::Packable)?;
+            t.ensure_prop(ctx.gas(), TypeProperty::Packable)?;
             stack.push(T::Bytes);
             I::Pack
         }
@@ -1875,7 +1883,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // not quite correct, as `contract _` is forbidden. The correct
             // constraint is seemingly "pushable", as "pushable" is just
             // "packable" without `contract _`
-            ty.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            ty.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
             stack[0] = T::new_option(ty.clone());
             I::Unpack(ty)
         }
@@ -1886,7 +1894,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(UNPACK, expect_args!(1), _), _) => unexpected_micheline!(),
 
         (App(TRANSFER_TOKENS, [], _), [.., T::Contract(ct), T::Mutez, arg_t]) => {
-            ensure_ty_eq(&mut ctx.gas, ct, arg_t)?;
+            ensure_ty_eq(ctx.gas(), ct, arg_t)?;
             stack.drop_top(3);
             stack.push(T::Operation);
             I::TransferTokens
@@ -1957,7 +1965,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EXEC, [], _), [.., T::Lambda(_), _]) => {
             let ty = pop!();
             let lam_tys = pop!(T::Lambda);
-            ensure_ty_eq(&mut ctx.gas, &lam_tys.0, &ty)?;
+            ensure_ty_eq(ctx.gas(), &lam_tys.0, &ty)?;
             stack.push(lam_tys.1.clone());
             I::Exec
         }
@@ -1988,7 +1996,7 @@ pub(crate) fn typecheck_instruction<'a>(
                     });
                 }
             };
-            ensure_ty_eq(&mut ctx.gas, &pair_ty.0, &ty)?;
+            ensure_ty_eq(ctx.gas(), &pair_ty.0, &ty)?;
             stack.push(T::new_lambda(pair_ty.1.clone(), lam_ty.1.clone()));
             I::Apply { arg_ty: ty }
         }
@@ -2033,7 +2041,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let lt = irrefutable_match!(&tickets.0; Type::Ticket);
             let rt = irrefutable_match!(&tickets.1; Type::Ticket);
 
-            ensure_ty_eq(&mut ctx.gas, lt, rt)?;
+            ensure_ty_eq(ctx.gas(), lt, rt)?;
             stack[0] = Type::new_option(tickets.0.clone());
             I::JoinTickets
         }
@@ -2149,13 +2157,13 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EMIT, [t], anns), [.., _]) => {
             let emit_val_type = pop!();
             let emit_type_arg = parse_ty(ctx, t)?;
-            ensure_ty_eq(&mut ctx.gas, &emit_type_arg, &emit_val_type)?;
+            ensure_ty_eq(ctx.gas(), &emit_type_arg, &emit_val_type)?;
             // NB: the docs for the EMIT instruction
             // https://tezos.gitlab.io/michelson-reference/#instr-EMIT claim
             // the type needs to be packable, but that's not quite correct, as
             // `contract _` is forbidden. The correct constraint is seemingly
             // "pushable", as "pushable" is just "packable" without `contract _`
-            emit_val_type.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            emit_val_type.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
             let opt_tag = anns.get_single_field_ann()?;
             if let Option::Some(t) = &opt_tag {
                 check_ep_name_len(t.as_str().as_bytes()).map_err(TcError::EntrypointError)?;
@@ -2168,7 +2176,7 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(EMIT, [], anns), [.., _]) => {
             let emit_val_type = pop!();
-            emit_val_type.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            emit_val_type.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
             let opt_tag = anns.get_single_field_ann()?;
             if let Option::Some(t) = &opt_tag {
                 check_ep_name_len(t.as_str().as_bytes()).map_err(TcError::EntrypointError)?;
@@ -2210,7 +2218,7 @@ pub(crate) fn typecheck_instruction<'a>(
             if matches!(opt_keyhash.as_ref(), Type::KeyHash) =>
         {
             let contract_script = cs.typecheck_script(ctx)?;
-            ensure_ty_eq(&mut ctx.gas, &contract_script.storage, new_storage)?;
+            ensure_ty_eq(ctx.gas(), &contract_script.storage, new_storage)?;
             stack.drop_top(3);
             stack.push(Type::Address);
             stack.push(Type::Operation);
@@ -2232,8 +2240,8 @@ pub(crate) fn typecheck_instruction<'a>(
     })
 }
 
-pub(crate) fn typecheck_contract_address(
-    _ctx: &mut Ctx,
+pub(crate) fn typecheck_contract_address<'a>(
+    _ctx: &mut impl CtxTrait<'a>,
     address: Address,
     ep: Entrypoint,
     typ: &Type,
@@ -2264,12 +2272,12 @@ pub(crate) fn typecheck_contract_address(
                 Err(TcError::UnexpectedImplicitAccountType(typ.clone()))
             }
         }
-        #[cfg(feature = "runtime_entrypoint_verification")]
         AddressHash::Kt1(_) | AddressHash::Sr1(_) => {
             // Check if we have a contract at the address_hash of the given address.
             // and we have found a valid entrypoint to use.
-            let contract_entrypoints =
-                (_ctx.lookup_contract)(&address.hash).ok_or(TcError::NoSuchContract)?;
+            let contract_entrypoints = _ctx
+                .lookup_contract(&address.hash)
+                .ok_or(TcError::NoSuchContract)?;
 
             // Do we have the entrypoint for the call in the entrypoints parsed
             // from the destination contract parameter?
@@ -2279,18 +2287,13 @@ pub(crate) fn typecheck_contract_address(
 
             // if the entrypoint is present, check that it is of the required
             // type.
-            ensure_ty_eq(&mut _ctx.gas, typ, contract_entrypoint_type)?;
+            ensure_ty_eq(_ctx.gas(), typ, contract_entrypoint_type)?;
 
             Ok(Address {
                 entrypoint,
                 hash: address.hash,
             })
         }
-        #[cfg(not(feature = "runtime_entrypoint_verification"))]
-        AddressHash::Kt1(_) | AddressHash::Sr1(_) => Ok(Address {
-            entrypoint,
-            hash: address.hash,
-        }),
     }
 }
 
@@ -2315,13 +2318,13 @@ fn get_nth_field_ref(mut m: u16, mut ty: &mut Type) -> Result<&mut Type, Type> {
 /// illegal types like `set operation` or `contract operation`.
 pub(crate) fn typecheck_value<'a>(
     v: &Micheline<'a>,
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     t: &Type,
 ) -> Result<TypedValue<'a>, TcError> {
     use Micheline as V;
     use Type as T;
     use TypedValue as TV;
-    ctx.gas.consume(gas::tc_cost::VALUE_STEP)?;
+    ctx.gas().consume(gas::tc_cost::VALUE_STEP)?;
     macro_rules! invalid_value_for_type {
         () => {
             TcError::InvalidValueForType(format!("{v:?}"), t.clone())
@@ -2384,14 +2387,17 @@ pub(crate) fn typecheck_value<'a>(
 
             let big_map_id = if let Some(id) = id_opt {
                 let big_map_id = BigMapId(id.clone());
-                let (key_type, value_type) = ctx
-                    .big_map_storage
-                    .big_map_get_type(&big_map_id)
-                    .map_err(TcError::LazyStorageError)?
-                    .ok_or(TcError::BigMapNotFound(id))?;
-
-                ensure_ty_eq(&mut ctx.gas, key_type, tk)?;
-                ensure_ty_eq(&mut ctx.gas, value_type, tv)?;
+                let (key_type, value_type) = {
+                    let big_map_storage = ctx.big_map_storage();
+                    big_map_storage
+                        .big_map_get_type(&big_map_id)
+                        .map_err(TcError::LazyStorageError)?
+                        .ok_or(TcError::BigMapNotFound(id))?
+                };
+                let key_type = &key_type.clone();
+                let value_type = &value_type.clone();
+                ensure_ty_eq(ctx.gas(), key_type, tk)?;
+                ensure_ty_eq(ctx.gas(), value_type, tv)?;
                 Some(big_map_id)
             } else {
                 None
@@ -2410,14 +2416,14 @@ pub(crate) fn typecheck_value<'a>(
             })
         }
         (T::Address, V::String(str)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_HASH_READABLE)?;
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
             TV::Address(
                 Address::from_base58_check(str)
                     .map_err(|e| TcError::ByteReprError(T::Address, e))?,
             )
         }
         (T::Address, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
             TV::Address(Address::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Address, e))?)
         }
         (T::Contract(ty), addr) => {
@@ -2426,47 +2432,47 @@ pub(crate) fn typecheck_value<'a>(
                 .map(TypedValue::Contract)?
         }
         (T::ChainId, V::String(str)) => {
-            ctx.gas.consume(gas::tc_cost::CHAIN_ID_READABLE)?;
+            ctx.gas().consume(gas::tc_cost::CHAIN_ID_READABLE)?;
             TV::ChainId(
                 ChainId::from_base58_check(str).map_err(|x| TcError::ChainIdError(x.into()))?,
             )
         }
         (T::ChainId, V::Bytes(bs)) => {
             use tezos_crypto_rs::hash::HashTrait;
-            ctx.gas.consume(gas::tc_cost::CHAIN_ID_OPTIMIZED)?;
+            ctx.gas().consume(gas::tc_cost::CHAIN_ID_OPTIMIZED)?;
             TV::ChainId(ChainId::try_from_bytes(bs).map_err(|x| TcError::ChainIdError(x.into()))?)
         }
         (T::Bytes, V::Bytes(bs)) => TV::Bytes(bs.clone()),
         (T::Key, V::String(str)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_READABLE)?;
+            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
             TV::Key(Key::from_base58_check(str).map_err(|e| TcError::ByteReprError(T::Key, e))?)
         }
         (T::Key, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_OPTIMIZED)?;
+            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
             TV::Key(Key::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Key, e))?)
         }
         (T::Signature, V::String(str)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_READABLE)?;
+            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
             TV::Signature(
                 Signature::from_base58_check(str)
                     .map_err(|e| TcError::ByteReprError(T::Signature, e))?,
             )
         }
         (T::Signature, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_OPTIMIZED)?;
+            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
             TV::Signature(
                 Signature::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Signature, e))?,
             )
         }
         (T::KeyHash, V::String(str)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_HASH_READABLE)?;
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
             TV::KeyHash(
                 PublicKeyHash::from_b58check(str)
                     .map_err(|e| TcError::ByteReprError(T::KeyHash, e.into()))?,
             )
         }
         (T::KeyHash, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
             TV::KeyHash(PublicKeyHash::nom_read_exact(bs).map_err(|err| {
                 TcError::ByteReprError(
                     T::KeyHash,
@@ -2479,7 +2485,7 @@ pub(crate) fn typecheck_value<'a>(
         }
         (T::Timestamp, V::Int(n)) => TV::Timestamp(n.clone()),
         (T::Timestamp, V::String(n)) => {
-            ctx.gas
+            ctx.gas()
                 .consume(gas::tc_cost::timestamp_decoding(n.len())?)?;
             // First, try to parse the string as an integer
             if let Ok(int_value) = n.parse::<i64>() {
@@ -2511,7 +2517,7 @@ pub(crate) fn typecheck_value<'a>(
             V::App(Prim::Ticket, [ticketer, content_type_bis, content, amount], _),
         ) => {
             let content_type_bis = parse_ty(ctx, content_type_bis)?;
-            ensure_ty_eq(&mut ctx.gas, content_type, &content_type_bis)?;
+            ensure_ty_eq(ctx.gas(), content_type, &content_type_bis)?;
             let ticketer = typecheck_value(ticketer, ctx, &T::Address)?;
             let ticketer = irrefutable_match!(ticketer; TV::Address);
             let content = typecheck_value(content, ctx, content_type)?;
@@ -2549,22 +2555,22 @@ pub(crate) fn typecheck_value<'a>(
         }
         #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Int(i)) => {
-            ctx.gas.consume(gas::tc_cost::BLS_FR)?;
+            ctx.gas().consume(gas::tc_cost::BLS_FR)?;
             TV::Bls12381Fr(bls::Fr::from_big_int(i))
         }
         #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::BLS_FR)?;
+            ctx.gas().consume(gas::tc_cost::BLS_FR)?;
             TV::Bls12381Fr(bls::Fr::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
         #[cfg(feature = "bls")]
         (T::Bls12381G1, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::BLS_G1)?;
+            ctx.gas().consume(gas::tc_cost::BLS_G1)?;
             TV::new_bls12381_g1(bls::G1::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
         #[cfg(feature = "bls")]
         (T::Bls12381G2, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::BLS_G2)?;
+            ctx.gas().consume(gas::tc_cost::BLS_G2)?;
             TV::new_bls12381_g2(bls::G2::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
         (_, _) => return Err(invalid_value_for_type!()),
@@ -2573,7 +2579,7 @@ pub(crate) fn typecheck_value<'a>(
 
 fn typecheck_lambda<'a>(
     instrs: &'a [Micheline<'a>],
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     in_ty: Type,
     out_ty: Type,
     recursive: bool,
@@ -2611,7 +2617,7 @@ fn typecheck_lambda<'a>(
 fn typecheck_map_block<'a>(
     nested: &[Micheline<'a>],
     ty1: Type,
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     self_entrypoints: Option<&Entrypoints>,
     stack: &TypeStack,
 ) -> Result<(Vec<Instruction<'a>>, Type), TcError> {
@@ -2643,160 +2649,152 @@ fn validate_u10(n: &BigInt) -> Result<u16, TcError> {
     Ok(res)
 }
 
-/// An iterator that ensures the keys to be in strictly ascending order.
-/// (where you specify a getter to obtain the key from an element).
-///
-/// Also charges gas for this check.
-struct OrderValidatingIterator<'a, 'b, T: Iterator<Item = Result<I, TcError>>, I> {
-    it: std::iter::Peekable<T>,
-    to_key: fn(&I) -> &TypedValue,
-    container_ty: &'a Type,
-    ctx: &'a std::cell::RefCell<&'a mut Ctx<'b>>,
-}
-
-impl<T, I> Iterator for OrderValidatingIterator<'_, '_, T, I>
-where
-    T: Iterator<Item = Result<I, TcError>>,
-{
-    type Item = Result<I, TcError>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.it.next().map(|cur| {
-            let cur = cur?;
-            if let Some(Ok(next)) = self.it.peek() {
-                let mut ctx = self.ctx.borrow_mut();
-                let cur_key = (self.to_key)(&cur);
-                let next_key = (self.to_key)(next);
-                ctx.gas
-                    .consume(gas::interpret_cost::compare(cur_key, next_key)?)?;
-                match cur_key.cmp(next_key) {
-                    std::cmp::Ordering::Less => (),
-                    std::cmp::Ordering::Equal => {
-                        Err(TcError::DuplicateElements(self.container_ty.clone()))?
-                    }
-                    std::cmp::Ordering::Greater => {
-                        Err(TcError::ElementsNotSorted(self.container_ty.clone()))?
-                    }
-                }
-            }
-            Ok(cur)
-        })
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.it.size_hint()
-    }
-}
-
 fn typecheck_set<'a>(
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     set_ty: &Type,
     elem_ty: &Type,
     vs: &[Micheline<'a>],
 ) -> Result<BTreeSet<TypedValue<'a>>, TcError> {
-    ctx.gas.consume(gas::tc_cost::construct_set(
+    ctx.gas().consume(gas::tc_cost::construct_set(
         elem_ty.size_for_gas(),
         vs.len(),
     )?)?;
-    let ctx_cell = std::cell::RefCell::new(ctx);
-    // See the same concern about constructing from ordered sequence as in [typecheck_map]
-    OrderValidatingIterator {
-        it: vs
-            .iter()
-            .map(|v| typecheck_value(v, *ctx_cell.borrow_mut(), elem_ty))
-            .peekable(),
-        container_ty: set_ty,
-        to_key: |x| x,
-        ctx: &ctx_cell,
-    }
-    .collect::<Result<_, TcError>>()
-}
 
-// A helper function that handles the common map-typechecking logic.
-fn typecheck_map_common<'a, V, F>(
-    ctx: &mut Ctx,
-    map_ty: &Type,
-    key_type: &Type,
-    vs: &[Micheline<'a>],
-    check_parse_value: F,
-) -> Result<BTreeMap<TypedValue<'a>, V>, TcError>
-where
-    F: Fn(&Micheline<'a>, &mut Ctx) -> Result<V, TcError>,
-{
-    ctx.gas.consume(gas::tc_cost::construct_map(
-        key_type.size_for_gas(),
-        vs.len(),
-    )?)?;
+    let mut prev_elt = None;
+    let mut set = BTreeSet::new();
 
-    let ctx_cell = std::cell::RefCell::new(ctx);
-    let tc_elt =
-        |mich: &Micheline<'a>, local_ctx: &mut Ctx| -> Result<(TypedValue<'a>, V), TcError> {
-            match mich {
-                Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
-                    let k = typecheck_value(k_expr, local_ctx, key_type)?;
-                    let v = check_parse_value(v_expr, local_ctx)?;
-                    Ok((k, v))
+    for elt in vs.iter() {
+        let elt = typecheck_value(elt, ctx, elem_ty)?;
+        if let Some(prev_elt) = prev_elt {
+            ctx.gas()
+                .consume(gas::interpret_cost::compare(&prev_elt, &elt)?)?;
+            match prev_elt.cmp(&elt) {
+                std::cmp::Ordering::Less => (),
+                std::cmp::Ordering::Equal => {
+                    return Err(TcError::DuplicateElements(set_ty.clone()))
                 }
-                _ => Err(TcError::InvalidEltForMap(
-                    format!("{mich:?}"),
-                    map_ty.clone(),
-                )),
-            }
+                std::cmp::Ordering::Greater => {
+                    return Err(TcError::ElementsNotSorted(set_ty.clone()))
+                }
+            };
         };
-
-    // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
-    // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
-    // be very fast in cases where the slice is nearly sorted", so hopefully it doesn't add
-    // too much overhead.
-    OrderValidatingIterator {
-        it: vs
-            .iter()
-            .map(|v| tc_elt(v, *ctx_cell.borrow_mut()))
-            .peekable(),
-        container_ty: map_ty,
-        to_key: |(k, _)| k,
-        ctx: &ctx_cell,
+        prev_elt = Some(elt.clone());
+        set.insert(elt);
     }
-    .collect()
+    Ok(set)
 }
 
 fn typecheck_map<'a>(
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     map_ty: &Type,
     key_type: &Type,
     value_type: &Type,
     vs: &[Micheline<'a>],
 ) -> Result<BTreeMap<TypedValue<'a>, TypedValue<'a>>, TcError> {
-    // Here, parse_value simply calls `typecheck_value` on the value expression.
-    typecheck_map_common(ctx, map_ty, key_type, vs, |val_expr, local_ctx| {
-        typecheck_value(val_expr, local_ctx, value_type)
-    })
+    ctx.gas().consume(gas::tc_cost::construct_map(
+        key_type.size_for_gas(),
+        vs.len(),
+    )?)?;
+
+    let mut prev_key = None;
+    let mut map = BTreeMap::new();
+
+    for mich in vs.iter() {
+        let (key, val) = match mich {
+            Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
+                let k = typecheck_value(k_expr, ctx, key_type)?;
+                let v = typecheck_value(v_expr, ctx, value_type)?;
+                (k, v)
+            }
+            _ => {
+                return Err(TcError::InvalidEltForMap(
+                    format!("{mich:?}"),
+                    map_ty.clone(),
+                ))
+            }
+        };
+        if let Some(prev_key) = prev_key {
+            ctx.gas()
+                .consume(gas::interpret_cost::compare(&prev_key, &key)?)?;
+            match prev_key.cmp(&key) {
+                std::cmp::Ordering::Less => (),
+                std::cmp::Ordering::Equal => {
+                    return Err(TcError::DuplicateElements(map_ty.clone()))
+                }
+                std::cmp::Ordering::Greater => {
+                    return Err(TcError::ElementsNotSorted(map_ty.clone()))
+                }
+            };
+        };
+        prev_key = Some(key.clone());
+        map.insert(key, val);
+    }
+    Ok(map)
 }
 
 fn typecheck_big_map<'a>(
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     map_ty: &Type,
     key_type: &Type,
     value_type: &Type,
     vs: &[Micheline<'a>],
     diff: bool,
 ) -> Result<BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>, TcError> {
-    typecheck_map_common(ctx, map_ty, key_type, vs, |val_expr, local_ctx| {
-        if diff {
-            match val_expr {
-                Micheline::App(Prim::Some, [inner_val], _) => {
-                    let v = typecheck_value(inner_val, local_ctx, value_type)?;
-                    Ok(Some(v))
-                }
-                Micheline::App(Prim::None, [], _) => Ok(None),
-                _ => Err(TcError::InvalidEltForMap(
-                    format!("{val_expr:?}"),
-                    map_ty.clone(),
-                )),
+    ctx.gas().consume(gas::tc_cost::construct_map(
+        key_type.size_for_gas(),
+        vs.len(),
+    )?)?;
+
+    let mut prev_key = None;
+    let mut map = BTreeMap::new();
+
+    for mich in vs.iter() {
+        let (key, val) = match mich {
+            Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
+                let k = typecheck_value(k_expr, ctx, key_type)?;
+                let v = if diff {
+                    match v_expr {
+                        Micheline::App(Prim::Some, [inner_val], _) => {
+                            let v = typecheck_value(inner_val, ctx, value_type)?;
+                            Some(v)
+                        }
+                        Micheline::App(Prim::None, [], _) => None,
+                        _ => {
+                            return Err(TcError::InvalidEltForMap(
+                                format!("{v_expr:?}"),
+                                map_ty.clone(),
+                            ))
+                        }
+                    }
+                } else {
+                    Some(typecheck_value(v_expr, ctx, value_type)?)
+                };
+                (k, v)
             }
-        } else {
-            typecheck_value(val_expr, local_ctx, value_type).map(Some)
-        }
-    })
+            _ => {
+                return Err(TcError::InvalidEltForMap(
+                    format!("{mich:?}"),
+                    map_ty.clone(),
+                ))
+            }
+        };
+        if let Some(prev_key) = prev_key {
+            ctx.gas()
+                .consume(gas::interpret_cost::compare(&prev_key, &key)?)?;
+            match prev_key.cmp(&key) {
+                std::cmp::Ordering::Less => (),
+                std::cmp::Ordering::Equal => {
+                    return Err(TcError::DuplicateElements(map_ty.clone()))
+                }
+                std::cmp::Ordering::Greater => {
+                    return Err(TcError::ElementsNotSorted(map_ty.clone()))
+                }
+            };
+        };
+        prev_key = Some(key.clone());
+        map.insert(key, val);
+    }
+    Ok(map)
 }
 
 /// Ensures type stack is at least of the required length, otherwise returns
@@ -2819,8 +2817,8 @@ fn ensure_stack_len(instr: Prim, stack: &TypeStack, l: usize) -> Result<(), TcEr
 /// instead.
 ///
 /// Failed stacks unify with anything.
-fn unify_stacks(
-    ctx: &mut Ctx,
+fn unify_stacks<'a>(
+    ctx: &mut impl CtxTrait<'a>,
     dest: &mut FailingTypeStack,
     aux: FailingTypeStack,
 ) -> Result<(), TcError> {
@@ -2838,7 +2836,11 @@ fn unify_stacks(
     Ok(())
 }
 
-fn ensure_stacks_eq(ctx: &mut Ctx, stack1: &TypeStack, stack2: &TypeStack) -> Result<(), TcError> {
+fn ensure_stacks_eq<'a>(
+    ctx: &mut impl CtxTrait<'a>,
+    stack1: &TypeStack,
+    stack2: &TypeStack,
+) -> Result<(), TcError> {
     if stack1.len() != stack2.len() {
         return Err(TcError::StacksNotEqual(
             stack1.clone(),
@@ -2847,7 +2849,7 @@ fn ensure_stacks_eq(ctx: &mut Ctx, stack1: &TypeStack, stack2: &TypeStack) -> Re
         ));
     }
     for (ty1, ty2) in stack1.iter().zip(stack2.iter()) {
-        ensure_ty_eq(&mut ctx.gas, ty1, ty2).map_err(|e| match e {
+        ensure_ty_eq(ctx.gas(), ty1, ty2).map_err(|e| match e {
             TcError::TypesNotEqual(e) => {
                 TcError::StacksNotEqual(stack1.clone(), stack2.clone(), e.into())
             }
@@ -2869,10 +2871,11 @@ fn ensure_ty_eq(gas: &mut Gas, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
 #[cfg(test)]
 mod typecheck_tests {
     use super::{Lambda, Or};
-    use crate::ast::micheline::test_helpers::*;
+    use crate::ast::big_map::LazyStorage;
     use crate::ast::michelson_address as addr;
     use crate::ast::michelson_address::entrypoint::DEFAULT_EP_NAME;
     use crate::ast::or::Or::{Left, Right};
+    use crate::context::{Ctx, CtxTrait};
     use crate::gas::Gas;
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
@@ -2883,7 +2886,7 @@ mod typecheck_tests {
     /// hack to simplify syntax in tests
     fn typecheck_instruction<'a>(
         i: &Micheline<'a>,
-        ctx: &mut Ctx,
+        ctx: &mut impl CtxTrait<'a>,
         opt_stack: &mut FailingTypeStack,
     ) -> Result<Instruction<'a>, TcError> {
         super::typecheck_instruction(i, ctx, None, opt_stack)
@@ -2895,7 +2898,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::Nat, Type::Nat];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(DUP[1]), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("DUP 1").unwrap(), &mut ctx, &mut stack),
             Ok(Dup(Some(1)))
         );
         assert_eq!(stack, expected_stack);
@@ -2908,7 +2911,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::Int, Type::Nat, Type::Int];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(DUP[2]), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("DUP 2").unwrap(), &mut ctx, &mut stack),
             Ok(Dup(Some(2)))
         );
         assert_eq!(stack, expected_stack);
@@ -2921,7 +2924,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::Int, Type::Nat];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(SWAP), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("SWAP").unwrap(), &mut ctx, &mut stack),
             Ok(Swap)
         );
         assert_eq!(stack, expected_stack);
@@ -2934,7 +2937,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::Nat];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(ABS), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ABS").unwrap(), &mut ctx, &mut stack),
             Ok(Abs)
         );
         assert_eq!(stack, expected_stack);
@@ -2946,7 +2949,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![Type::Unit];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(ABS), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ABS").unwrap(), &mut ctx, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::ABS,
                 stack: stk![Type::Unit],
@@ -2957,7 +2960,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_abs_too_short() {
-        too_short_test(&app!(ABS), Prim::ABS, 1);
+        too_short_test(&parse("ABS").unwrap(), Prim::ABS, 1);
     }
 
     #[test]
@@ -2966,7 +2969,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::new_option(Type::Nat)];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(ISNAT), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ISNAT").unwrap(), &mut ctx, &mut stack),
             Ok(IsNat)
         );
         assert_eq!(stack, expected_stack);
@@ -2978,7 +2981,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![Type::Unit];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(ISNAT), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ISNAT").unwrap(), &mut ctx, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::ISNAT,
                 stack: stk![Type::Unit],
@@ -2989,7 +2992,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_is_nat_too_short() {
-        too_short_test(&app!(ISNAT), Prim::ISNAT, 1);
+        too_short_test(&parse("ISNAT").unwrap(), Prim::ISNAT, 1);
     }
 
     mod int {
@@ -3000,7 +3003,7 @@ mod typecheck_tests {
             let expected_stack = tc_stk![Type::Int];
             let mut ctx = Ctx::default();
             assert_eq!(
-                typecheck_instruction(&app!(INT), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("INT").unwrap(), &mut ctx, &mut stack),
                 Ok(Instruction::Int(overload)),
             );
             assert_eq!(stack, expected_stack);
@@ -3023,7 +3026,7 @@ mod typecheck_tests {
 
         #[test]
         fn test_int_short() {
-            too_short_test(&app!(INT), Prim::INT, 1);
+            too_short_test(&parse("INT").unwrap(), Prim::INT, 1);
         }
 
         #[test]
@@ -3031,7 +3034,7 @@ mod typecheck_tests {
             let mut stack = tc_stk![Type::String];
             let mut ctx = Ctx::default();
             assert_eq!(
-                typecheck_instruction(&app!(INT), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("INT").unwrap(), &mut ctx, &mut stack),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::INT,
                     stack: stk![Type::String],
@@ -3050,7 +3053,7 @@ mod typecheck_tests {
             let expected_stack = tc_stk![Type::Nat];
             let mut ctx = Ctx::default();
             assert_eq!(
-                typecheck_instruction(&app!(NAT), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("NAT").unwrap(), &mut ctx, &mut stack),
                 Ok(Instruction::Nat),
             );
             assert_eq!(stack, expected_stack);
@@ -3059,7 +3062,7 @@ mod typecheck_tests {
 
         #[test]
         fn test_int_short() {
-            too_short_test(&app!(NAT), Prim::NAT, 1);
+            too_short_test(&parse("NAT").unwrap(), Prim::NAT, 1);
         }
 
         #[test]
@@ -3067,7 +3070,7 @@ mod typecheck_tests {
             let mut stack = tc_stk![Type::String];
             let mut ctx = Ctx::default();
             assert_eq!(
-                typecheck_instruction(&app!(NAT), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("NAT").unwrap(), &mut ctx, &mut stack),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::NAT,
                     stack: stk![Type::String],
@@ -3085,7 +3088,7 @@ mod typecheck_tests {
             let expected_stack = tc_stk![Type::Bytes];
             let mut ctx = Ctx::default();
             assert_eq!(
-                typecheck_instruction(&app!(BYTES), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("BYTES").unwrap(), &mut ctx, &mut stack),
                 Ok(Instruction::Bytes(overload)),
             );
             assert_eq!(stack, expected_stack);
@@ -3107,7 +3110,7 @@ mod typecheck_tests {
 
         #[test]
         fn test_int_short() {
-            too_short_test(&app!(BYTES), Prim::BYTES, 1);
+            too_short_test(&parse("BYTES").unwrap(), Prim::BYTES, 1);
         }
 
         #[test]
@@ -3115,7 +3118,7 @@ mod typecheck_tests {
             let mut stack = tc_stk![Type::String];
             let mut ctx = Ctx::default();
             assert_eq!(
-                typecheck_instruction(&app!(BYTES), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("BYTES").unwrap(), &mut ctx, &mut stack),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::BYTES,
                     stack: stk![Type::String],
@@ -3131,7 +3134,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(DROP), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("DROP").unwrap(), &mut ctx, &mut stack),
             Ok(Drop(None))
         );
         assert_eq!(stack, expected_stack);
@@ -3144,7 +3147,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(DROP[2]), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("DROP 2").unwrap(), &mut ctx, &mut stack),
             Ok(Drop(Some(2)))
         );
         assert_eq!(stack, expected_stack);
@@ -3157,7 +3160,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::Nat, Type::Int];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(PUSH[app!(int), 1]), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("PUSH int 1").unwrap(), &mut ctx, &mut stack),
             Ok(Push(TypedValue::int(1)))
         );
         assert_eq!(stack, expected_stack);
@@ -3186,7 +3189,7 @@ mod typecheck_tests {
             let expected_stack = tc_stk![Type::new_option(Type::Mutez)];
             let mut ctx = Ctx::default();
             assert_eq!(
-                typecheck_instruction(&app!(SUB_MUTEZ), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("SUB_MUTEZ").unwrap(), &mut ctx, &mut stack),
                 Ok(SubMutez)
             );
             assert_eq!(stack, expected_stack);
@@ -3198,7 +3201,7 @@ mod typecheck_tests {
             let mut stack = tc_stk![Type::Unit, Type::Mutez];
             let mut ctx = Ctx::default();
             assert_eq!(
-                typecheck_instruction(&app!(SUB_MUTEZ), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("SUB_MUTEZ").unwrap(), &mut ctx, &mut stack),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::SUB_MUTEZ,
                     stack: stk![Type::Unit, Type::Mutez],
@@ -3209,7 +3212,7 @@ mod typecheck_tests {
 
         #[test]
         fn too_short() {
-            too_short_test(&app!(SUB_MUTEZ), Prim::SUB_MUTEZ, 2);
+            too_short_test(&parse("SUB_MUTEZ").unwrap(), Prim::SUB_MUTEZ, 2);
         }
     }
 
@@ -3219,7 +3222,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::Int];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(ADD), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
             Ok(Add(overloads::Add::IntInt))
         );
         assert_eq!(stack, expected_stack);
@@ -3232,7 +3235,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::Nat];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(ADD), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
             Ok(Add(overloads::Add::NatNat))
         );
         assert_eq!(stack, expected_stack);
@@ -3245,7 +3248,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::Mutez];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(ADD), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
             Ok(Add(overloads::Add::MutezMutez))
         );
         assert_eq!(stack, expected_stack);
@@ -3290,7 +3293,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::Nat];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(AND), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("AND").unwrap(), &mut ctx, &mut stack),
             Ok(And(overloads::And::IntNat))
         );
         assert_eq!(stack, expected_stack);
@@ -3299,17 +3302,17 @@ mod typecheck_tests {
 
     #[test]
     fn test_and_short() {
-        too_short_test(&app!(AND), Prim::AND, 2);
+        too_short_test(&parse("AND").unwrap(), Prim::AND, 2);
     }
 
     #[test]
     fn test_or_short() {
-        too_short_test(&app!(OR), Prim::OR, 2);
+        too_short_test(&parse("OR").unwrap(), Prim::OR, 2);
     }
 
     #[test]
     fn test_xor_short() {
-        too_short_test(&app!(XOR), Prim::XOR, 2);
+        too_short_test(&parse("XOR").unwrap(), Prim::XOR, 2);
     }
 
     #[test]
@@ -3317,7 +3320,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![Type::String, Type::String];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(AND), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("AND").unwrap(), &mut ctx, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::AND,
                 stack: stk![Type::String, Type::String],
@@ -3331,7 +3334,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![Type::String, Type::String];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(OR), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("OR").unwrap(), &mut ctx, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::OR,
                 stack: stk![Type::String, Type::String],
@@ -3345,7 +3348,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![Type::String, Type::String];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(XOR), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("XOR").unwrap(), &mut ctx, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::XOR,
                 stack: stk![Type::String, Type::String],
@@ -3373,7 +3376,7 @@ mod typecheck_tests {
             };
             let mut ctx = Ctx::default();
             assert_eq!(
-                typecheck_instruction(&app!(NOT), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("NOT").unwrap(), &mut ctx, &mut stack),
                 Ok(Not(expected_overload))
             );
             assert_eq!(stack, expected_stack);
@@ -3382,7 +3385,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_not_short() {
-        too_short_test(&app!(NOT), Prim::NOT, 1);
+        too_short_test(&parse("NOT").unwrap(), Prim::NOT, 1);
     }
 
     #[test]
@@ -3390,7 +3393,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![Type::String];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(NOT), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("NOT").unwrap(), &mut ctx, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::NOT,
                 stack: stk![Type::String],
@@ -3405,7 +3408,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::Bls12381Fr];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(ADD), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
             Ok(Add(overloads::Add::Bls12381Fr))
         );
         assert_eq!(stack, expected_stack);
@@ -3418,7 +3421,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::Bls12381G1];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(ADD), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
             Ok(Add(overloads::Add::Bls12381G1))
         );
         assert_eq!(stack, expected_stack);
@@ -3431,7 +3434,7 @@ mod typecheck_tests {
         let expected_stack = tc_stk![Type::Bls12381G2];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(ADD), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
             Ok(Add(overloads::Add::Bls12381G2))
         );
         assert_eq!(stack, expected_stack);
@@ -3553,7 +3556,11 @@ mod typecheck_tests {
 
     #[test]
     fn test_loop_left_too_short() {
-        too_short_test(&app!(LOOP_LEFT[seq! {app!(FAILWITH)}]), Prim::LOOP_LEFT, 1);
+        too_short_test(
+            &parse("LOOP_LEFT { FAILWITH }").unwrap(),
+            Prim::LOOP_LEFT,
+            1,
+        );
     }
 
     #[test]
@@ -3569,7 +3576,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_iter_too_short() {
-        too_short_test(&app!(ITER[Micheline::Seq(&[])]), Prim::ITER, 1)
+        too_short_test(&parse("ITER {}").unwrap(), Prim::ITER, 1)
     }
 
     #[test]
@@ -3802,7 +3809,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_map_too_short() {
-        too_short_test(&app!(MAP[Micheline::Seq(&[])]), Prim::MAP, 1)
+        too_short_test(&parse("MAP {}").unwrap(), Prim::MAP, 1)
     }
 
     #[test]
@@ -3823,7 +3830,7 @@ mod typecheck_tests {
     fn test_failwith() {
         assert_eq!(
             typecheck_instruction(
-                &app!(FAILWITH),
+                &parse("FAILWITH").unwrap(),
                 &mut Ctx::default(),
                 &mut tc_stk![Type::Int]
             ),
@@ -3834,7 +3841,11 @@ mod typecheck_tests {
     #[test]
     fn test_never() {
         assert_eq!(
-            typecheck_instruction(&app!(NEVER), &mut Ctx::default(), &mut tc_stk![Type::Never]),
+            typecheck_instruction(
+                &parse("NEVER").unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![Type::Never]
+            ),
             Ok(Never)
         );
     }
@@ -4476,7 +4487,7 @@ mod typecheck_tests {
             Ok(IfCons(vec![Drop(Some(2))], vec![]))
         );
         assert_eq!(stack, tc_stk![]);
-        too_short_test(&app!(IF_CONS[seq!{}, seq!{}]), Prim::IF_CONS, 1)
+        too_short_test(&parse("IF_CONS {} {}").unwrap(), Prim::IF_CONS, 1)
     }
 
     #[test]
@@ -4529,7 +4540,7 @@ mod typecheck_tests {
 
     #[test]
     fn if_left_too_short() {
-        too_short_test(&app!(IF_LEFT[seq!{}, seq!{}]), Prim::IF_LEFT, 1)
+        too_short_test(&parse("IF_LEFT {} {}").unwrap(), Prim::IF_LEFT, 1)
     }
 
     #[test]
@@ -4704,7 +4715,7 @@ mod typecheck_tests {
 
     #[test]
     fn cons_too_short() {
-        too_short_test(&app!(CONS), Prim::CONS, 2);
+        too_short_test(&parse("CONS").unwrap(), Prim::CONS, 2);
     }
 
     #[test]
@@ -5051,8 +5062,8 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 None,
                 &[
-                    app!(map[app!(list[app!(int)]), app!(string)]),
-                    app!(list[app!(int)]),
+                    parse("map (list int) string").unwrap(),
+                    parse("list int").unwrap(),
                 ]
             ),
             Err(TcError::InvalidTypeProperty(
@@ -5174,7 +5185,7 @@ mod typecheck_tests {
 
         #[test]
         fn too_short() {
-            too_short_test(&app!(GET[0]), Prim::GET, 1);
+            too_short_test(&parse("GET 0").unwrap(), Prim::GET, 1);
         }
 
         #[test]
@@ -5267,7 +5278,7 @@ mod typecheck_tests {
 
         #[test]
         fn too_short() {
-            too_short_test(&app!(UPDATE[0]), Prim::UPDATE, 2);
+            too_short_test(&parse("UPDATE 0").unwrap(), Prim::UPDATE, 2);
         }
 
         #[test]
@@ -5313,8 +5324,8 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 None,
                 &[
-                    app!(map[app!(list[app!(int)]), app!(string)]),
-                    app!(list[app!(int)]),
+                    parse("map (list int) string").unwrap(),
+                    parse("list int").unwrap(),
                 ]
             ),
             Err(TcError::InvalidTypeProperty(
@@ -5378,9 +5389,9 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 None,
                 &[
-                    app!(set[app!(list[app!(int)])]),
-                    app!(bool),
-                    app!(list[app!(int)])
+                    parse("set (list int)").unwrap(),
+                    parse("bool").unwrap(),
+                    parse("list int").unwrap()
                 ]
             ),
             Err(TcError::InvalidTypeProperty(
@@ -5438,9 +5449,9 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 None,
                 &[
-                    app!(map[app!(list[app!(int)]), app!(string)]),
-                    app!(option[app!(string)]),
-                    app!(list[app!(int)]),
+                    parse("map (list int) string").unwrap(),
+                    parse("option string").unwrap(),
+                    parse("list int").unwrap(),
                 ]
             ),
             Err(TcError::InvalidTypeProperty(
@@ -5522,9 +5533,9 @@ mod typecheck_tests {
                 &mut Ctx::default(),
                 None,
                 &[
-                    app!(map[app!(list[app!(int)]), app!(string)]),
-                    app!(option[app!(string)]),
-                    app!(list[app!(int)]),
+                    parse("map (list int) string").unwrap(),
+                    parse("option string").unwrap(),
+                    parse("list int").unwrap(),
                 ]
             ),
             Err(TcError::InvalidTypeProperty(
@@ -5536,7 +5547,7 @@ mod typecheck_tests {
 
     #[test]
     fn get_and_update_map_too_short() {
-        too_short_test(&app!(GET_AND_UPDATE), Prim::GET_AND_UPDATE, 3)
+        too_short_test(&parse("GET_AND_UPDATE").unwrap(), Prim::GET_AND_UPDATE, 3)
     }
 
     #[test]
@@ -5571,7 +5582,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_size_short() {
-        too_short_test(&app!(SIZE), Prim::SIZE, 1);
+        too_short_test(&parse("SIZE").unwrap(), Prim::SIZE, 1);
     }
 
     #[test]
@@ -5631,7 +5642,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_add_short() {
-        too_short_test(&app!(ADD), Prim::ADD, 2);
+        too_short_test(&parse("ADD").unwrap(), Prim::ADD, 2);
     }
 
     #[test]
@@ -5639,7 +5650,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![Type::String, Type::String];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(ADD), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::ADD,
                 stack: stk![Type::String, Type::String],
@@ -5653,7 +5664,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(DUP[0]), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("DUP 0").unwrap(), &mut ctx, &mut stack),
             Err(TcError::Dup0)
         );
     }
@@ -5673,7 +5684,11 @@ mod typecheck_tests {
                         let expected_stack = tc_stk![Type::Bool];
                         let mut ctx = Ctx::default();
                         assert_eq!(
-                            typecheck_instruction(&app!($op), &mut ctx, &mut stack),
+                            typecheck_instruction(
+                                &parse(stringify!($op)).unwrap(),
+                                &mut ctx,
+                                &mut stack
+                            ),
                             Ok($instr)
                         );
                         assert_eq!(stack, expected_stack);
@@ -5685,7 +5700,11 @@ mod typecheck_tests {
                         let mut stack = tc_stk![Type::String];
                         let mut ctx = Ctx::default();
                         assert_eq!(
-                            typecheck_instruction(&app!($op), &mut ctx, &mut stack),
+                            typecheck_instruction(
+                                &parse(stringify!($op)).unwrap(),
+                                &mut ctx,
+                                &mut stack
+                            ),
                             Err(TcError::NoMatchingOverload {
                                 instr: Prim::$op,
                                 stack: stk![Type::String],
@@ -5696,7 +5715,7 @@ mod typecheck_tests {
 
                     #[test]
                     fn short() {
-                        too_short_test(&app!($op), Prim::$op, 1);
+                        too_short_test(&parse(stringify!($op)).unwrap(), Prim::$op, 1);
                     }
                 }
             };
@@ -5715,7 +5734,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![Type::String];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(IF[seq!{}, seq!{}]), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("IF {} {}").unwrap(), &mut ctx, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::IF,
                 stack: stk![Type::String],
@@ -5726,17 +5745,17 @@ mod typecheck_tests {
 
     #[test]
     fn test_if_short() {
-        too_short_test(&app!(IF[seq![], seq![]]), Prim::IF, 1);
+        too_short_test(&parse("IF {} {}").unwrap(), Prim::IF, 1);
     }
 
     #[test]
     fn test_if_none_short() {
-        too_short_test(&app!(IF_NONE[seq![], seq![]]), Prim::IF_NONE, 1);
+        too_short_test(&parse("IF_NONE {} {}").unwrap(), Prim::IF_NONE, 1);
     }
 
     #[test]
     fn test_loop_short() {
-        too_short_test(&app!(LOOP[seq![]]), Prim::LOOP, 1);
+        too_short_test(&parse("LOOP {}").unwrap(), Prim::LOOP, 1);
     }
 
     #[test]
@@ -5744,7 +5763,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![Type::String];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(LOOP[seq![]]), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("LOOP {}").unwrap(), &mut ctx, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::LOOP,
                 stack: stk![Type::String],
@@ -5758,7 +5777,7 @@ mod typecheck_tests {
         let mut stack = tc_stk![Type::String];
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(UNPAIR), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("UNPAIR").unwrap(), &mut ctx, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::UNPAIR,
                 stack: stk![Type::String],
@@ -5769,67 +5788,67 @@ mod typecheck_tests {
 
     #[test]
     fn test_swap_short() {
-        too_short_test(&app!(SWAP), Prim::SWAP, 2);
+        too_short_test(&parse("SWAP").unwrap(), Prim::SWAP, 2);
     }
 
     #[test]
     fn test_pair_short() {
-        too_short_test(&app!(PAIR), Prim::PAIR, 2);
+        too_short_test(&parse("PAIR").unwrap(), Prim::PAIR, 2);
     }
 
     #[test]
     fn test_concat_short() {
-        too_short_test(&app!(CONCAT), Prim::CONCAT, 1);
+        too_short_test(&parse("CONCAT").unwrap(), Prim::CONCAT, 1);
     }
 
     #[test]
     fn test_mem_short() {
-        too_short_test(&app!(MEM), Prim::MEM, 2);
+        too_short_test(&parse("MEM").unwrap(), Prim::MEM, 2);
     }
 
     #[test]
     fn test_get_short() {
-        too_short_test(&app!(GET), Prim::GET, 2);
+        too_short_test(&parse("GET").unwrap(), Prim::GET, 2);
     }
 
     #[test]
     fn test_update_short() {
-        too_short_test(&app!(UPDATE), Prim::UPDATE, 3);
+        too_short_test(&parse("UPDATE").unwrap(), Prim::UPDATE, 3);
     }
 
     #[test]
     fn test_failwith_short() {
-        too_short_test(&app!(FAILWITH), Prim::FAILWITH, 1);
+        too_short_test(&parse("FAILWITH").unwrap(), Prim::FAILWITH, 1);
     }
 
     #[test]
     fn test_never_short() {
-        too_short_test(&app!(NEVER), Prim::NEVER, 1);
+        too_short_test(&parse("NEVER").unwrap(), Prim::NEVER, 1);
     }
 
     #[test]
     fn test_car_short() {
-        too_short_test(&app!(CAR), Prim::CAR, 1);
+        too_short_test(&parse("CAR").unwrap(), Prim::CAR, 1);
     }
 
     #[test]
     fn test_cdr_short() {
-        too_short_test(&app!(CDR), Prim::CDR, 1);
+        too_short_test(&parse("CDR").unwrap(), Prim::CDR, 1);
     }
 
     #[test]
     fn test_some_short() {
-        too_short_test(&app!(SOME), Prim::SOME, 1);
+        too_short_test(&parse("SOME").unwrap(), Prim::SOME, 1);
     }
 
     #[test]
     fn test_compare_short() {
-        too_short_test(&app!(COMPARE), Prim::COMPARE, 2);
+        too_short_test(&parse("COMPARE").unwrap(), Prim::COMPARE, 2);
     }
 
     #[test]
     fn test_unpair_short() {
-        too_short_test(&app!(UNPAIR), Prim::UNPAIR, 1);
+        too_short_test(&parse("UNPAIR").unwrap(), Prim::UNPAIR, 1);
     }
 
     #[test]
@@ -5837,7 +5856,11 @@ mod typecheck_tests {
         let ctx = &mut Ctx::default();
         ctx.gas = Gas::new(gas::tc_cost::INSTR_STEP);
         assert_eq!(
-            typecheck_instruction(&app!(COMPARE), ctx, &mut tc_stk![Type::Unit, Type::Unit]),
+            typecheck_instruction(
+                &parse("COMPARE").unwrap(),
+                ctx,
+                &mut tc_stk![Type::Unit, Type::Unit]
+            ),
             Err(TcError::OutOfGas(OutOfGas))
         );
     }
@@ -5847,7 +5870,7 @@ mod typecheck_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             typecheck_instruction(
-                &app!(COMPARE),
+                &parse("COMPARE").unwrap(),
                 &mut ctx,
                 &mut tc_stk![Type::Operation, Type::Operation]
             ),
@@ -5862,7 +5885,11 @@ mod typecheck_tests {
     fn test_get_mismatch() {
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(GET), &mut ctx, &mut tc_stk![Type::Unit, Type::Unit]),
+            typecheck_instruction(
+                &parse("GET").unwrap(),
+                &mut ctx,
+                &mut tc_stk![Type::Unit, Type::Unit]
+            ),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::GET,
                 stack: stk![Type::Unit, Type::Unit],
@@ -5875,7 +5902,11 @@ mod typecheck_tests {
     fn test_mem_mismatch() {
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(MEM), &mut ctx, &mut tc_stk![Type::Unit, Type::Unit]),
+            typecheck_instruction(
+                &parse("MEM").unwrap(),
+                &mut ctx,
+                &mut tc_stk![Type::Unit, Type::Unit]
+            ),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::MEM,
                 stack: stk![Type::Unit, Type::Unit],
@@ -5889,7 +5920,7 @@ mod typecheck_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             typecheck_instruction(
-                &app!(UPDATE),
+                &parse("UPDATE").unwrap(),
                 &mut ctx,
                 &mut tc_stk![Type::Unit, Type::Unit, Type::Unit]
             ),
@@ -5906,7 +5937,7 @@ mod typecheck_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             typecheck_instruction(
-                &app!(PUSH[app!(operation), app!(Unit)]),
+                &parse("PUSH operation Unit").unwrap(),
                 &mut ctx,
                 &mut tc_stk![]
             ),
@@ -5978,8 +6009,7 @@ mod typecheck_tests {
     fn test_invalid_map_value() {
         let mut ctx = Ctx::default();
         assert_eq!(
-            Micheline::Seq(&[])
-                .typecheck_value(&mut ctx, &app!(map[app!(list[app!(unit)]), app!(unit)])),
+            Micheline::Seq(&[]).typecheck_value(&mut ctx, &parse("map (list unit) unit").unwrap()),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -6051,7 +6081,7 @@ mod typecheck_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             Micheline::Seq(&[])
-                .typecheck_value(&mut ctx, &app!(big_map[app!(list[app!(unit)]), app!(unit)])),
+                .typecheck_value(&mut ctx, &parse("big_map (list unit) unit").unwrap()),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -6118,7 +6148,7 @@ mod typecheck_tests {
         // Only overlay - ok case
         assert_eq!(
             typecheck_value(
-                &seq!(app!(Elt[7, 8])),
+                &parse("{Elt 7 8}").unwrap(),
                 &mut ctx,
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
@@ -6133,7 +6163,7 @@ mod typecheck_tests {
         // Only overlay - key type mismatch case
         assert_eq!(
             typecheck_value(
-                &seq!(app!(Elt["a", 8])),
+                &parse("{Elt \"a\" 8}").unwrap(),
                 &mut ctx,
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
@@ -6146,7 +6176,7 @@ mod typecheck_tests {
         // ID and overlay - forget some
         assert_eq!(
             typecheck_value(
-                &app!(Pair[0, seq!(app!(Elt[7, 8]))]),
+                &parse("Pair 0 {Elt 7 8}").unwrap(),
                 &mut ctx,
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
@@ -6159,7 +6189,7 @@ mod typecheck_tests {
         // ID and overlay - Some case
         assert_eq!(
             typecheck_value(
-                &app!(Pair[0, seq!(app!(Elt[7, app!(Some[8])]))]),
+                &parse("Pair 0 {Elt 7 (Some 8)}").unwrap(),
                 &mut ctx,
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
@@ -6174,7 +6204,7 @@ mod typecheck_tests {
         // ID and overlay - None case
         assert_eq!(
             typecheck_value(
-                &app!(Pair[0, seq!(app!(Elt[7, app!(None)]))]),
+                &parse("Pair 0 {Elt 7 None}").unwrap(),
                 &mut ctx,
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
@@ -6210,7 +6240,7 @@ mod typecheck_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             typecheck_instruction(
-                &app!(PUSH[app!(contract[app!(unit)]), app!(Unit)]),
+                &parse("PUSH (contract unit) Unit").unwrap(),
                 &mut ctx,
                 &mut tc_stk![]
             ),
@@ -6898,14 +6928,18 @@ mod typecheck_tests {
 
     #[test]
     fn test_address_short() {
-        too_short_test(&app!(ADDRESS), Prim::ADDRESS, 1);
+        too_short_test(&parse("ADDRESS").unwrap(), Prim::ADDRESS, 1);
     }
 
     #[test]
     fn test_address_mismatch() {
         let mut ctx = Ctx::default();
         assert_eq!(
-            typecheck_instruction(&app!(ADDRESS), &mut ctx, &mut tc_stk![Type::Unit]),
+            typecheck_instruction(
+                &parse("ADDRESS").unwrap(),
+                &mut ctx,
+                &mut tc_stk![Type::Unit]
+            ),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::ADDRESS,
                 stack: stk![Type::Unit],
@@ -6926,7 +6960,7 @@ mod typecheck_tests {
 
     #[test]
     fn left_too_short() {
-        too_short_test(&app!(LEFT["nat"]), Prim::LEFT, 1);
+        too_short_test(&parse("LEFT nat").unwrap(), Prim::LEFT, 1);
     }
 
     #[test]
@@ -6945,7 +6979,7 @@ mod typecheck_tests {
 
     #[test]
     fn right_too_short() {
-        too_short_test(&app!(RIGHT["nat"]), Prim::RIGHT, 1);
+        too_short_test(&parse("RIGHT nat").unwrap(), Prim::RIGHT, 1);
     }
 
     #[test]
@@ -7098,7 +7132,11 @@ mod typecheck_tests {
             parse("CHECK_SIGNATURE").unwrap().typecheck_instruction(
                 &mut Ctx::default(),
                 None,
-                &[app!(bytes), app!(signature), app!(key)]
+                &[
+                    parse("bytes").unwrap(),
+                    parse("signature").unwrap(),
+                    parse("key").unwrap()
+                ]
             ),
             Ok(CheckSignature)
         );
@@ -7110,7 +7148,11 @@ mod typecheck_tests {
             parse("CHECK_SIGNATURE").unwrap().typecheck_instruction(
                 &mut Ctx::default(),
                 None,
-                &[app!(bytes), app!(key), app!(key)]
+                &[
+                    parse("bytes").unwrap(),
+                    parse("key").unwrap(),
+                    parse("key").unwrap()
+                ]
             ),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::CHECK_SIGNATURE,
@@ -7122,7 +7164,7 @@ mod typecheck_tests {
 
     #[test]
     fn check_signature_too_short() {
-        too_short_test(&app!(CHECK_SIGNATURE), Prim::CHECK_SIGNATURE, 3)
+        too_short_test(&parse("CHECK_SIGNATURE").unwrap(), Prim::CHECK_SIGNATURE, 3)
     }
 
     #[test]
@@ -7131,9 +7173,7 @@ mod typecheck_tests {
             parse("PAIRING_CHECK").unwrap().typecheck_instruction(
                 &mut Ctx::default(),
                 None,
-                &[app!(
-                    list[app!(pair[app!(bls12_381_g1), app!(bls12_381_g2)])]
-                )]
+                &[parse("list (pair bls12_381_g1 bls12_381_g2)").unwrap()]
             ),
             Ok(PairingCheck)
         );
@@ -7145,9 +7185,7 @@ mod typecheck_tests {
             parse("PAIRING_CHECK").unwrap().typecheck_instruction(
                 &mut Ctx::default(),
                 None,
-                &[app!(
-                    list[app!(pair[app!(bls12_381_g1), app!(bls12_381_g1)])]
-                )]
+                &[parse("list (pair bls12_381_g1 bls12_381_g1)").unwrap()]
             ),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::PAIRING_CHECK,
@@ -7168,7 +7206,7 @@ mod typecheck_tests {
 
     #[test]
     fn pairing_check_too_short() {
-        too_short_test(&app!(PAIRING_CHECK), Prim::PAIRING_CHECK, 1)
+        too_short_test(&parse("PAIRING_CHECK").unwrap(), Prim::PAIRING_CHECK, 1)
     }
 
     mod mul {
@@ -7232,7 +7270,7 @@ mod typecheck_tests {
                 parse("MUL").unwrap().typecheck_instruction(
                     &mut Ctx::default(),
                     None,
-                    &[app!(unit), app!(unit)]
+                    &[parse("unit").unwrap(), parse("unit").unwrap()]
                 ),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::MUL,
@@ -7244,7 +7282,7 @@ mod typecheck_tests {
 
         #[test]
         fn too_short() {
-            too_short_test(&app!(MUL), Prim::MUL, 2)
+            too_short_test(&parse("MUL").unwrap(), Prim::MUL, 2)
         }
     }
 
@@ -7290,7 +7328,7 @@ mod typecheck_tests {
                 parse("NEG").unwrap().typecheck_instruction(
                     &mut Ctx::default(),
                     None,
-                    &[app!(unit)]
+                    &[parse("unit").unwrap()]
                 ),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::NEG,
@@ -7302,7 +7340,7 @@ mod typecheck_tests {
 
         #[test]
         fn too_short() {
-            too_short_test(&app!(NEG), Prim::NEG, 1)
+            too_short_test(&parse("NEG").unwrap(), Prim::NEG, 1)
         }
     }
 
@@ -7404,7 +7442,7 @@ mod typecheck_tests {
 
     #[test]
     fn slice_too_short() {
-        too_short_test(&app!(SLICE), Prim::SLICE, 3);
+        too_short_test(&parse("SLICE").unwrap(), Prim::SLICE, 3);
     }
 
     #[test]
@@ -7412,7 +7450,7 @@ mod typecheck_tests {
         let mut ctx = Ctx::default();
         assert_eq!(
             typecheck_instruction(
-                &app!(SLICE),
+                &parse("SLICE").unwrap(),
                 &mut ctx,
                 &mut tc_stk![Type::Bool, Type::Nat, Type::Nat]
             ),
@@ -7444,7 +7482,7 @@ mod typecheck_tests {
                 .unwrap()
                 .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Ok(Push(TypedValue::Lambda(Closure::Lambda(Lambda::Lambda {
-                micheline_code: seq! { app!(DROP); app!(UNIT) },
+                micheline_code: parse("{DROP; UNIT}").unwrap(),
                 code: vec![Drop(None), Unit].into()
             }))))
         );
@@ -7453,7 +7491,7 @@ mod typecheck_tests {
                 .unwrap()
                 .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Ok(Lambda(Lambda::Lambda {
-                micheline_code: seq! { app!(DROP); app!(UNIT) },
+                micheline_code: parse("{DROP; UNIT}").unwrap(),
                 code: vec![Drop(None), Unit].into()
             }))
         );
@@ -7512,13 +7550,13 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH (lambda unit unit) { SELF }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), Some(&app!(unit)), &[]),
+                .typecheck_instruction(&mut Ctx::default(), Some(&parse("unit").unwrap()), &[]),
             Err(TcError::SelfForbidden)
         );
         assert_eq!(
             parse("LAMBDA unit unit { SELF }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), Some(&app!(unit)), &[]),
+                .typecheck_instruction(&mut Ctx::default(), Some(&parse("unit").unwrap()), &[]),
             Err(TcError::SelfForbidden)
         );
     }
@@ -7528,13 +7566,13 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH (lambda unit unit) (Lambda_rec { SELF })")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), Some(&app!(unit)), &[]),
+                .typecheck_instruction(&mut Ctx::default(), Some(&parse("unit").unwrap()), &[]),
             Err(TcError::SelfForbidden)
         );
         assert_eq!(
             parse("LAMBDA_REC unit unit { SELF }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), Some(&app!(unit)), &[]),
+                .typecheck_instruction(&mut Ctx::default(), Some(&parse("unit").unwrap()), &[]),
             Err(TcError::SelfForbidden)
         );
     }
@@ -7547,7 +7585,7 @@ mod typecheck_tests {
                 .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Ok(Push(TypedValue::Lambda(Closure::Lambda(
                 Lambda::LambdaRec {
-                    micheline_code: seq! { app!(SWAP) ; app!(DROP) },
+                    micheline_code: parse("{SWAP; DROP}").unwrap(),
                     code: vec![Swap, Drop(None)].into(),
                     in_ty: Type::Unit,
                     out_ty: Type::Unit
@@ -7559,7 +7597,7 @@ mod typecheck_tests {
                 .unwrap()
                 .typecheck_instruction(&mut Ctx::default(), None, &[]),
             Ok(Lambda(Lambda::LambdaRec {
-                micheline_code: seq! { app!(SWAP) ; app!(DROP) },
+                micheline_code: parse("{SWAP; DROP}").unwrap(),
                 code: vec![Swap, Drop(None)].into(),
                 in_ty: Type::Unit,
                 out_ty: Type::Unit,
@@ -7829,7 +7867,7 @@ mod typecheck_tests {
 
     #[test]
     fn hash_key_too_short() {
-        too_short_test(&app!(HASH_KEY), Prim::HASH_KEY, 1);
+        too_short_test(&parse("HASH_KEY").unwrap(), Prim::HASH_KEY, 1);
     }
 
     mod hash_instructions {
@@ -7860,7 +7898,11 @@ mod typecheck_tests {
 
                     #[test]
                     fn too_short() {
-                        too_short_test(&app!($instr_prim), Prim::$instr_prim, 1);
+                        too_short_test(
+                            &parse(stringify!($instr_prim)).unwrap(),
+                            Prim::$instr_prim,
+                            1,
+                        );
                     }
 
                     #[test]
@@ -7868,7 +7910,7 @@ mod typecheck_tests {
                         let mut stack = tc_stk![Type::Unit];
                         assert_eq!(
                             typecheck_instruction(
-                                &app!($instr_prim),
+                                &parse(stringify!($instr_prim)).unwrap(),
                                 &mut Ctx::default(),
                                 &mut stack,
                             ),
@@ -7885,7 +7927,7 @@ mod typecheck_tests {
                         assert!(matches!(
                             typecheck_instruction(
                                 // instruction with unit argument
-                                &app!($instr_prim[app!(unit)]),
+                                &parse(&format!("{} unit", stringify!($instr_prim))).unwrap(),
                                 &mut Ctx::default(),
                                 &mut tc_stk![],
                             ),
@@ -8276,7 +8318,7 @@ mod typecheck_tests {
 
     #[test]
     fn unpack_short_stack() {
-        too_short_test(&app!(UNPACK[app!(unit)]), Prim::UNPACK, 1)
+        too_short_test(&parse("UNPACK unit").unwrap(), Prim::UNPACK, 1)
     }
 
     #[test]
