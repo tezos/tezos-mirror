@@ -66,7 +66,7 @@ oc.docker-build-rockylinux-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -100,7 +100,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -208,7 +208,7 @@ oc.build-rockylinux-data:
       - gcp_arm64
 
 rpm_repo_rockylinux:
-  image: rockylinux:9.3
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/rockylinux:9.3
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -264,7 +264,7 @@ oc.docker-build-fedora-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
-    BASE_IMAGE: ${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -299,7 +299,7 @@ oc.docker-systemd-tests-rpm-fedora:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
-    BASE_IMAGE: ${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -410,7 +410,7 @@ oc.build-fedora-data:
       - gcp_arm64
 
 rpm_repo_fedora:
-  image: fedora:39
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/fedora:39
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -442,7 +442,7 @@ rpm_repo_fedora:
   retry: 0
 
 oc.install_bin_fedora_39.doc:
-  image: fedora:39
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/fedora:39
   stage: publishing_tests
   tags:
   - gcp
@@ -494,7 +494,7 @@ oc.install_bin_fedora_39_systemd:
     RELEASE: "39"
 
 oc.install_bin_rockylinux_9.3.doc:
-  image: rockylinux:9.3
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/rockylinux:9.3
   stage: publishing_tests
   tags:
   - gcp
