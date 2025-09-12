@@ -18,7 +18,7 @@ class TestForging: XCTestCase {
 
     func messageForging() {
         let msg = "message"
-        let rawMsg = try! forgeMessage(msg: msg)
+        let rawMsg = forgeMessage(msg: msg)
         let expectedBytes: [UInt8] = [
           0x05, 0x01, 0x00, 0x00, 0x00, 0x07,
           UInt8(ascii: "m"), UInt8(ascii: "e"), UInt8(ascii: "s"),

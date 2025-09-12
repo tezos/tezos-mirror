@@ -466,8 +466,7 @@ mod tests {
                         $b58_sig,
                         stringify!($sig_ty)
                     ));
-                    let raw_msg = forge_message($msg)
-                        .expect(&format!("Forging message {} should succeed", $msg));
+                    let raw_msg = forge_message($msg);
                     let res = &pk.verify_signature(&sig, &raw_msg).expect(&format!(
                         "Verifying signature {} with public key {} for message {} should succeed",
                         $b58_pk, $b58_sig, $msg
@@ -564,7 +563,7 @@ mod tests {
             .expect(&format!("Converting public key {} should succeed", b58_pk));
         let sig = Ed25519Signature::from_b58check(b58_sig)
             .expect(&format!("Converting signature {} should succeed", b58_sig));
-        let raw_msg = forge_message(msg).expect(&format!("Forging message {} should succeed", msg));
+        let raw_msg = forge_message(msg);
         assert!(
             matches!(
                 &pk.verify_signature(&sig, &raw_msg),
@@ -585,7 +584,7 @@ mod tests {
             .expect(&format!("Converting public key {} should succeed", b58_pk));
         let sig = Secp256k1Signature::from_b58check(b58_sig)
             .expect(&format!("Converting signature {} should succeed", b58_sig));
-        let raw_msg = forge_message(msg).expect(&format!("Forging message {} should succeed", msg));
+        let raw_msg = forge_message(msg);
         let res = &pk.verify_signature(&sig, &raw_msg).expect(&format!(
             "Verifying signature {} with public key {} for message {} should succeed",
             b58_sig, b58_pk, msg
@@ -605,7 +604,7 @@ mod tests {
             .expect(&format!("Converting public key {} should succeed", b58_pk));
         let sig = Signature::from_b58check(b58_sig)
             .expect(&format!("Converting signature {} should succeed", b58_sig));
-        let raw_msg = forge_message(msg).expect(&format!("Forging message {} should succeed", msg));
+        let raw_msg = forge_message(msg);
         assert!(
             matches!(
                 &pk.verify_signature(&sig, &raw_msg),
