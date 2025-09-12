@@ -69,60 +69,41 @@ impl TryFrom<U256> for BlockNumber {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
-pub struct OperationHash(pub H256);
+macro_rules! define_h256 {
+    ($name:ident) => {
+        #[derive(PartialEq, Debug, Clone)]
+        pub struct $name(pub H256);
 
-impl NomReader<'_> for OperationHash {
-    fn nom_read(bytes: &[u8]) -> NomResult<'_, Self> {
-        let (remaining, hash) =
-            map(take::<usize, &[u8], NomError>(32_usize), H256::from_slice)(bytes)?;
-        Ok((remaining, OperationHash(hash)))
-    }
-}
+        impl NomReader<'_> for $name {
+            fn nom_read(bytes: &[u8]) -> NomResult<'_, Self> {
+                let (remaining, hash) = map(
+                    take::<usize, &[u8], NomError>(32_usize),
+                    H256::from_slice,
+                )(bytes)?;
+                Ok((remaining, $name(hash)))
+            }
+        }
 
-impl BinWriter for OperationHash {
-    fn bin_write(&self, data: &mut Vec<u8>) -> BinResult {
-        tezos_enc::put_bytes(&self.0.to_fixed_bytes(), data);
-        Ok(())
-    }
-}
+        impl BinWriter for $name {
+            fn bin_write(&self, data: &mut Vec<u8>) -> BinResult {
+                tezos_enc::put_bytes(&self.0.to_fixed_bytes(), data);
+                Ok(())
+            }
+        }
 
-impl From<H256> for OperationHash {
-    fn from(hash: H256) -> Self {
-        Self(hash)
-    }
-}
+        impl From<H256> for $name {
+            fn from(hash: H256) -> Self {
+                Self(hash)
+            }
+        }
 
-impl From<OperationHash> for H256 {
-    fn from(hash: OperationHash) -> Self {
-        hash.0
-    }
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub struct BlockHash(pub H256);
-impl NomReader<'_> for BlockHash {
-    fn nom_read(bytes: &[u8]) -> NomResult<'_, Self> {
-        let (remaining, hash) =
-            map(take::<usize, &[u8], NomError>(32_usize), H256::from_slice)(bytes)?;
-        Ok((remaining, BlockHash(hash)))
-    }
+        impl From<$name> for H256 {
+            fn from(hash: $name) -> Self {
+                hash.0
+            }
+        }
+    };
 }
 
-impl BinWriter for BlockHash {
-    fn bin_write(&self, data: &mut Vec<u8>) -> BinResult {
-        tezos_enc::put_bytes(&self.0.to_fixed_bytes(), data);
-        Ok(())
-    }
-}
-
-impl From<H256> for BlockHash {
-    fn from(hash: H256) -> Self {
-        Self(hash)
-    }
-}
-impl From<BlockHash> for H256 {
-    fn from(hash: BlockHash) -> Self {
-        hash.0
-    }
-}
+define_h256!(OperationHash);
+define_h256!(BlockHash);
