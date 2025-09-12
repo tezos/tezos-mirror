@@ -1570,6 +1570,39 @@ module Images = struct
   (* Include external images here for convenience. *)
   include Images_external
 
+  module Base_images = struct
+    let make_img distro =
+      Image.mk_external
+        ~image_path:
+          (sf
+             "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/%s"
+             distro)
+
+    let debian_bookworm = make_img "debian:bookworm"
+
+    let debian_trixie = make_img "debian:trixie"
+
+    let debian_unstable = make_img "debian:unstable"
+
+    let ubuntu_noble = make_img "ubuntu:noble"
+
+    let ubuntu_jammy = make_img "ubuntu:jammy"
+
+    let ubuntu_plucky = make_img "ubuntu:plucky"
+
+    let rockylinux_9_3 = make_img "rockylinux:9.3"
+
+    let rockylinux_9_6 = make_img "rockylinux:9.6"
+
+    let rockylinux_10_0 = make_img "rockylinux:10.0"
+
+    let fedora_39 = make_img "fedora:39"
+
+    let fedora_41 = make_img "fedora:41"
+
+    let fedora_42 = make_img "fedora:42"
+  end
+
   (* Internal images are built in the stage {!Stages.images}. *)
   let stage = Stages.images
 
