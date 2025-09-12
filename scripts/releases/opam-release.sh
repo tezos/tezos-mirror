@@ -35,10 +35,13 @@ if [ -z "$url" ]; then
 fi
 
 log() {
-  printf '\e[1m%s\e[0m' "$1"
+  printf '\e[1m%s\e[0m\n' "$1"
 }
 
 current_dir=$(pwd)
+
+opam_repository="https://github.com/ocaml/opam-repository"
+opam_repository_fork="https://github.com/tezos/opam-repository"
 
 if [ -d "$opam_dir" ]; then
   log "Checking $opam_dir..."
@@ -53,7 +56,7 @@ if [ -d "$opam_dir" ]; then
   fi
 else
   log "Cloning ocaml/opam-repository..."
-  git clone https://github.com/ocaml/opam-repository "$opam_dir"
+  git clone "$opam_repository" "$opam_dir"
   cd "$opam_dir"
   git checkout master
 fi
@@ -66,7 +69,7 @@ fi
 
 cd "$current_dir"
 # We need to move back to current_dir because $url could be relative path
-"$script_dir/opam-prepare-repo.sh" "$version" "$url" "$opam_dir"
+"$script_dir/../opam-prepare-repo.sh" "$version" "$url" "$opam_dir"
 cd "$opam_dir"
 
 log "Creating commit..."
@@ -75,3 +78,18 @@ git add packages
 git commit -am "Octez $version packages"
 
 log "A branch named $branch_name has been created in $opam_dir."
+
+log "Updating octez-latest branch..."
+latest_branch="octez-latest"
+git remote add tezos "$opam_repository_fork"
+git fetch tezos
+if ! git checkout "$latest_branch"; then
+  log "Failed to update ${latest_branch}: Branch not found"
+fi
+log "Merge $branch_name -> $latest_branch"
+
+if git merge --no-ff --no-edit "$branch_name"; then
+  log "$latest_branch updated."
+else
+  log "Failed to update ${latest_branch}: Unable to merge $branch_name"
+fi
