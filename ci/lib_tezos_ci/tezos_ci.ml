@@ -178,6 +178,9 @@ let has_cache job =
   | Job job -> (
       match job.cache with None | Some [] -> false | Some (_ :: _) -> true)
 
+let is_trigger_job job =
+  match job.job with Trigger_job _ -> true | Job _ -> false
+
 let has_stage target_stage job =
   let stage_opt =
     match job.job with Trigger_job job -> job.stage | Job job -> job.stage
@@ -186,7 +189,8 @@ let has_stage target_stage job =
   | None -> false
   | Some stage -> String.equal stage target_stage
 
-let has_cache_or_start_stage job = has_cache job || has_stage "start" job
+let has_cache_or_start_stage_or_is_trigger job =
+  has_cache job || has_stage "start" job || is_trigger_job job
 
 type tezos_image =
   | Internal of {
