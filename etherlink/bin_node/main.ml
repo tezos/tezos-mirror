@@ -1230,15 +1230,8 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_keys ?rpc_addr ?rpc_port
   let*! () = set_gc_parameters configuration in
   let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
 
-  let* signer =
-    Option.map_es
-      (Evm_node_lib_dev.Signer.of_sequencer_keys configuration wallet_ctxt)
-      sequencer_keys
-  in
-
   Evm_node_lib_dev.Sequencer.main
     ~cctxt:wallet_ctxt
-    ?signer
     ~data_dir
     ?genesis_timestamp
     ~configuration

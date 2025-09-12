@@ -333,7 +333,7 @@ let test_make_l2_kernel_installer_config chain_family =
         preimage_dir = Some preimages_dir;
         private_rpc_port = Some (Port.fresh ());
         time_between_blocks = Some Nothing;
-        sequencer = Constant.bootstrap1.alias;
+        sequencer_keys = [Constant.bootstrap1.alias];
         genesis_timestamp = None;
         max_blueprints_lag = None;
         max_blueprints_ahead = None;
@@ -509,7 +509,7 @@ let test_observer_reset =
              preimage_dir = Some preimages_dir;
              private_rpc_port = Some (Port.fresh ());
              time_between_blocks = Some Nothing;
-             sequencer = valid_sequencer.alias;
+             sequencer_keys = [valid_sequencer.alias];
              genesis_timestamp = None;
              max_blueprints_lag = None;
              max_blueprints_ahead = None;
@@ -553,7 +553,7 @@ let test_observer_reset =
              preimage_dir = Some preimages_dir;
              private_rpc_port = Some (Port.fresh ());
              time_between_blocks = Some Nothing;
-             sequencer = invalid_sequencer.alias;
+             sequencer_keys = [invalid_sequencer.alias];
              genesis_timestamp = None;
              max_blueprints_lag = None;
              max_blueprints_ahead = None;
@@ -6286,7 +6286,7 @@ let test_sequencer_upgrade =
           Evm_node.Sequencer
             {
               config with
-              sequencer = new_sequencer_key.alias;
+              sequencer_keys = [new_sequencer_key.alias];
               private_rpc_port = Some (Port.fresh ());
             }
       | _ -> Test.fail "impossible case, it's a sequencer"
@@ -6508,7 +6508,7 @@ let test_duplicate_sequencer_upgrade =
           Evm_node.Sequencer
             {
               config with
-              sequencer = new_sequencer_key.alias;
+              sequencer_keys = [new_sequencer_key.alias];
               private_rpc_port = Some (Port.fresh ());
             }
       | _ -> Test.fail "impossible case, it's a sequencer"
@@ -13478,8 +13478,14 @@ let call_evm_based_sequencer_key_change ~sender ~sequencer ~sequencer_owner
   let*@ tx = Rpc.send_raw_transaction ~raw_tx:raw_sequencer_upgrade sequencer in
   return tx
 
-let test_evm_based_sequencer_upgrade =
+let test_sequencer_key_change =
   let sequencer_owner = Constant.bootstrap1 in
+  let new_sequencer_owner = Constant.bootstrap2 in
+  let genesis_timestamp_str = "2020-01-01T00:00:00Z" in
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn genesis_timestamp_str))
+  in
+  let activation_timestamp = "2020-01-02T01:00:00Z" in
   register_all
     ~__FILE__
     ~kernels:[Latest]
@@ -13488,9 +13494,11 @@ let test_evm_based_sequencer_upgrade =
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
     ~sequencer:sequencer_owner
-  @@ fun {sequencer; _} _protocol ->
+    ~additional_sequencer_keys:[new_sequencer_owner]
+    ~genesis_timestamp
+  @@ fun {sequencer; sc_rollup_node; proxy; client; _} _protocol ->
   let whale = Eth_account.bootstrap_accounts.(0) in
-  let new_key = Constant.bootstrap2.public_key in
+  let new_key = new_sequencer_owner.public_key in
   let* tx =
     call_evm_based_sequencer_key_change
       ~sender:whale.private_key
@@ -13498,30 +13506,42 @@ let test_evm_based_sequencer_upgrade =
       ~sequencer_owner
       ~new_key
   in
-  let* _ = produce_block sequencer in
+  let*@ _ = produce_block sequencer ~timestamp:genesis_timestamp_str in
   let*@! Transaction.{logs; status; _} =
     Rpc.get_transaction_receipt ~tx_hash:tx sequencer
   in
   Check.((status = true) bool ~error_msg:"Transaction failed") ;
   Check.((List.length logs = 1) int ~error_msg:"Expected 1 log") ;
-  let next_timestamp = Unix.gmtime (Unix.time () +. 86401.) in
-  let next_timestamp_str =
-    Format.asprintf
-      "%04d-%02d-%02dT%02d:%02d:%02dZ"
-      (next_timestamp.tm_year + 1900)
-      (next_timestamp.tm_mon + 1)
-      next_timestamp.tm_mday
-      next_timestamp.tm_hour
-      next_timestamp.tm_min
-      next_timestamp.tm_sec
+  let*@ _ = produce_block ~timestamp:activation_timestamp sequencer in
+  let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
+  let*@ _ = produce_block ~timestamp:activation_timestamp sequencer in
+  let*@! value = Rpc.state_value sequencer Durable_storage_path.sequencer in
+  let expected_key = Hex.of_string new_key |> Hex.show in
+  Check.(
+    (value = expected_key)
+      string
+      ~error_msg:"Expected sequencer key to be %R, got %L") ;
+  let* () = Evm_node.wait_for_blueprint_injected sequencer 3 in
+  let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
+  let* current_sequencer_in_rollup_hex =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:Durable_storage_path.sequencer
+         ()
   in
-  let* _ = produce_block ~timestamp:next_timestamp_str sequencer in
-  let* _ = produce_block ~timestamp:next_timestamp_str sequencer in
-  (* Apply blueprint in node fail here because we only manage this upgrade in kernel *)
+  Check.(
+    (current_sequencer_in_rollup_hex = Some expected_key)
+      (option string)
+      ~error_msg:
+        "Expected sequencer key in rollup to be %R, got %L (rollup might be \
+         not in sync)") ;
   unit
 
-let test_evm_based_sequencer_upgrade_fails_if_governance_upgrade_exists =
+let test_sequencer_key_change_fails_if_governance_upgrade_exists =
   let sequencer_owner = Constant.bootstrap1 in
+  let new_sequencer_owner = Constant.bootstrap2 in
   let genesis_timestamp =
     Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
   in
@@ -13536,6 +13556,7 @@ let test_evm_based_sequencer_upgrade_fails_if_governance_upgrade_exists =
     ~time_between_blocks:Nothing
     ~genesis_timestamp
     ~sequencer:sequencer_owner
+    ~additional_sequencer_keys:[new_sequencer_owner]
   @@
   fun {sequencer; sc_rollup_address; sc_rollup_node; l1_contracts; client; _}
       _protocol
@@ -13561,7 +13582,7 @@ let test_evm_based_sequencer_upgrade_fails_if_governance_upgrade_exists =
   in
   let* _res = waiting_sequencer_upgrade in
   let whale = Eth_account.bootstrap_accounts.(0) in
-  let new_key = Constant.bootstrap2.public_key in
+  let new_key = new_sequencer_owner.public_key in
   let* tx =
     call_evm_based_sequencer_key_change
       ~sender:whale.private_key
@@ -13569,7 +13590,7 @@ let test_evm_based_sequencer_upgrade_fails_if_governance_upgrade_exists =
       ~sequencer_owner
       ~new_key
   in
-  let* _ = produce_block sequencer in
+  let*@ _ = produce_block sequencer in
   let*@! Transaction.{status; _} =
     Rpc.get_transaction_receipt ~tx_hash:tx sequencer
   in
@@ -14224,8 +14245,8 @@ let () =
   test_fa_deposit_can_be_claimed_and_withdrawn [Alpha] ;
   test_fast_fa_deposit_can_be_claimed_and_withdrawn [Alpha] ;
   test_claim_deposit_event [Alpha] ;
-  test_evm_based_sequencer_upgrade [Alpha] ;
-  test_evm_based_sequencer_upgrade_fails_if_governance_upgrade_exists [Alpha] ;
+  test_sequencer_key_change [Alpha] ;
+  test_sequencer_key_change_fails_if_governance_upgrade_exists [Alpha] ;
   test_eip2930_storage_access [Alpha] ;
   test_eip7702 [Alpha] ;
   test_eip7702_auto_sign [Alpha] ;

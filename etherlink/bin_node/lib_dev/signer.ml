@@ -44,8 +44,24 @@ let of_sequencer_keys config cctxt keys =
     PKMap.empty
     keys
 
-let first_signer map =
-  match PKMap.bindings map with [] -> None | signer :: _ -> Some signer
+let first_lexicographic_signer map =
+  let open Result_syntax in
+  match PKMap.bindings map with
+  | [] -> fail [error_of_fmt "Excepted at list one signer defined but found 0."]
+  | signer :: _ -> return signer
+
+let get_signer map pk =
+  let open Result_syntax in
+  match PKMap.find pk map with
+  | Some k -> return k
+  | None ->
+      [
+        error_of_fmt
+          "Public key %a don't have signer associated"
+          Signature.Public_key.pp
+          pk;
+      ]
+      |> fail
 
 let of_string config cctxt key_str =
   let open Lwt_result_syntax in

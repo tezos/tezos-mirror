@@ -6,6 +6,9 @@
 
 ### Configuration changes
 
+- Use correct sequencer key from config (you can
+  now define multiple and it will adapt) (!19267).
+
 ### RPCs changes
 
 ### Monitoring changes
@@ -58,7 +61,7 @@ introduced by version 0.40 on the RPC `eth_getCode`.
 ### Configuration changes
 
 - Add support for multiple sequencer keys in the configuration
-  (only first one used for now) (!19251).
+  (only one should be defined for now) (!19251).
 
 ### RPCs changes
 

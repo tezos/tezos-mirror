@@ -79,7 +79,8 @@ type mode =
       time_between_blocks : time_between_blocks option;
           (** See {!time_between_blocks}, if the value is not
               provided, the sequencer uses it default value. *)
-      sequencer : string;  (** Secret key used to sign the blueprints. *)
+      sequencer_keys : string list;
+          (** Secret keys used to sign the blueprints. *)
       genesis_timestamp : Client.timestamp option;  (** Genesis timestamp *)
       max_blueprints_lag : int option;
       max_blueprints_ahead : int option;

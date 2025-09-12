@@ -19,7 +19,12 @@ val of_sequencer_keys :
   Configuration.sequencer_key list ->
   map tzresult Lwt.t
 
-val first_signer : map -> (Signature.public_key * t) option
+(** Get the first lexicographic signer from the map.
+It's not very useful but it's used in the sandbox node to have
+a first signer. Shouldn't be used in production. *)
+val first_lexicographic_signer : map -> (Signature.public_key * t) tzresult
+
+val get_signer : map -> Signature.public_key -> t tzresult
 
 val of_sequencer_key :
   Configuration.t ->
