@@ -132,7 +132,7 @@ workflow:
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
     variables:
-      PIPELINE_TYPE: schedule_merge_train_cache_refresh
+      PIPELINE_TYPE: schedule_cache_refresh
     when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_RPC_TESTS"
     variables:
@@ -353,7 +353,7 @@ include:
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"
     when: always
-- local: .gitlab/ci/pipelines/schedule_merge_train_cache_refresh.yml
+- local: .gitlab/ci/pipelines/schedule_cache_refresh.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
     when: always

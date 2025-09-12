@@ -54,7 +54,7 @@ let scheduled = pipeline_source_eq Schedule
 let schedule_extended_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_TESTS"
 
-let schedule_merge_train_cache_refresh =
+let schedule_cache_refresh =
   scheduled && var "TZ_SCHEDULE_KIND" == str "CACHE_REFRESH"
 
 let schedule_extended_rpc_tests =

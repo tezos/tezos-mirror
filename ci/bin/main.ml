@@ -363,8 +363,8 @@ let () =
        the MR. This \"safety net\"-pipeline ensures that all jobs run at least \
        daily." ;
   register
-    "schedule_merge_train_cache_refresh"
-    schedule_merge_train_cache_refresh
+    "schedule_cache_refresh"
+    schedule_cache_refresh
     ~jobs:
       (Code_verification.jobs Merge_train
        @ !Hooks.before_merging

@@ -64,7 +64,7 @@ val schedule_extended_tests : If.t
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
     [TZ_SCHEDULE_KIND] set to [CACHE_REFRESH]. *)
-val schedule_merge_train_cache_refresh : If.t
+val schedule_cache_refresh : If.t
 
 (** A rule that is true for scheduled extended RPC test pipelines.
 

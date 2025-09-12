@@ -346,10 +346,7 @@ let jobs pipeline_type =
             ~stage:Stages.start
             ~rules:
               [
-                job_rule
-                  ~if_:Rules.schedule_merge_train_cache_refresh
-                  ~when_:Always
-                  ();
+                job_rule ~if_:Rules.schedule_cache_refresh ~when_:Always ();
                 job_rule
                   ~if_:(If.not Rules.is_final_pipeline)
                   ~allow_failure:No
