@@ -375,7 +375,7 @@ mod test {
                 ChangeSequencerKeyEvent,
             },
             constants::{
-                CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, FA_WITHDRAWAL_SOL_ADDR,
+                CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, FA_BRIDGE_SOL_ADDR,
                 PRECOMPILE_BURN_ADDRESS, WITHDRAWAL_SOL_ADDR,
             },
             initializer::init_precompile_bytecodes,
@@ -1027,7 +1027,7 @@ mod test {
         let call_and_revert_call =
             CallAndRevert::CallAndRevertCalls::callAndRevert(callAndRevertCall {
                 callArgs: Bytes::from(calldata),
-                target: FA_WITHDRAWAL_SOL_ADDR,
+                target: FA_BRIDGE_SOL_ADDR,
             });
 
         // Insert account information
@@ -1245,7 +1245,7 @@ mod test {
             &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             caller,
-            Some(FA_WITHDRAWAL_SOL_ADDR),
+            Some(FA_BRIDGE_SOL_ADDR),
             FAWithdrawal::claimCall {
                 deposit_id: U256::from(2),
             }

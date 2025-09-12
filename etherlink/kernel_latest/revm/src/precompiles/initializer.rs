@@ -13,8 +13,8 @@ use crate::{
     custom,
     helpers::storage::bytes_hash,
     precompiles::constants::{
-        FA_WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_CONTRACT,
-        INTERNAL_FORWARDER_SOL_CONTRACT, WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CONTRACT,
+        FA_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT,
+        WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CONTRACT,
     },
     storage::{
         code::CodeStorage,
@@ -42,8 +42,8 @@ pub fn init_precompile_bytecodes<'a, Host: Runtime>(
     init_precompile_bytecode(
         host,
         world_state_handler,
-        &FA_WITHDRAWAL_SOL_ADDR,
-        FA_WITHDRAWAL_SOL_CONTRACT,
+        &FA_BRIDGE_SOL_ADDR,
+        FA_BRIDGE_SOL_CONTRACT,
     )
 }
 
