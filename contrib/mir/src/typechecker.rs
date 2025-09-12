@@ -2140,6 +2140,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(IMPLICIT_ACCOUNT, [], _), []) => no_overload!(IMPLICIT_ACCOUNT, len 1),
         (App(IMPLICIT_ACCOUNT, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(IS_IMPLICIT_ACCOUNT, [], _), [.., T::Address]) => {
+            stack[0] = T::new_option(T::KeyHash);
+            I::IsImplicitAccount
+        }
+        (App(IS_IMPLICIT_ACCOUNT, [], _), [.., _]) => no_overload!(IS_IMPLICIT_ACCOUNT),
+        (App(IS_IMPLICIT_ACCOUNT, [], _), []) => no_overload!(IS_IMPLICIT_ACCOUNT, len 1),
+        (App(IS_IMPLICIT_ACCOUNT, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(TOTAL_VOTING_POWER, [], _), ..) => {
             stack.push(T::Nat);
             I::TotalVotingPower
@@ -8148,6 +8156,48 @@ mod typecheck_tests {
             ),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::IMPLICIT_ACCOUNT,
+                stack: stk![Type::Unit],
+                reason: None
+            })
+        );
+    }
+
+    #[test]
+    fn is_implicit_account() {
+        let stk = &mut tc_stk![Type::Address];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("IS_IMPLICIT_ACCOUNT").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Ok(IsImplicitAccount)
+        );
+        assert_eq!(stk, &tc_stk![Type::new_option(Type::KeyHash)]);
+
+        let stk = &mut tc_stk![];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("IS_IMPLICIT_ACCOUNT").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IS_IMPLICIT_ACCOUNT,
+                stack: stk![],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 1 })
+            })
+        );
+
+        let stk = &mut tc_stk![Type::Unit];
+        assert_eq!(
+            typecheck_instruction(
+                &parse("IS_IMPLICIT_ACCOUNT").unwrap(),
+                &mut Ctx::default(),
+                stk
+            ),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::IS_IMPLICIT_ACCOUNT,
                 stack: stk![Type::Unit],
                 reason: None
             })

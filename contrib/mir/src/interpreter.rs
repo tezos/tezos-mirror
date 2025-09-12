@@ -1727,6 +1727,14 @@ fn interpret_one<'a>(
                 entrypoint: Entrypoint::default(),
             }));
         }
+        I::IsImplicitAccount => {
+            ctx.gas().consume(interpret_cost::IS_IMPLICIT_ACCOUNT)?;
+            let addr = pop!(V::Address);
+            stack.push(TypedValue::new_option(match addr.hash {
+                AddressHash::Implicit(keyhash) => Some(TypedValue::KeyHash(keyhash)),
+                _ => None,
+            }));
+        }
         I::VotingPower => {
             ctx.gas().consume(interpret_cost::VOTING_POWER)?;
             let keyhash = pop!(V::KeyHash);
