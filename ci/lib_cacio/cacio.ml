@@ -92,6 +92,7 @@ type job = {
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
   retry : Gitlab_ci.Types.retry option;
   image_dependencies : Tezos_ci.Image.t list;
+  services : Gitlab_ci.Types.service list option;
 }
 
 type trigger = Auto | Immediate | Manual
@@ -374,6 +375,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     allow_failure;
                     retry;
                     image_dependencies;
+                    services;
                   };
                 trigger;
                 only_if;
@@ -501,6 +503,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 ~image_dependencies
                 ~dependencies:(Dependent dependencies)
                 ?rules
+                ?services
                 ~interruptible:(interruptible_stage && interruptible_pipeline)
                 ?interruptible_runner:
                   (if interruptible_stage then
@@ -576,6 +579,7 @@ module type COMPONENT_API = sig
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     ?image_dependencies:Tezos_ci.Image.t list ->
+    ?services:Gitlab_ci.Types.service list ->
     string ->
     string list ->
     job
@@ -619,7 +623,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?(needs_legacy = []) ?variables ?artifacts ?(cargo_cache = false)
       ?(cargo_target_caches = false) ?sccache ?dune_cache
       ?(test_coverage = false) ?allow_failure ?retry ?(image_dependencies = [])
-      name script =
+      ?services name script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -664,6 +668,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       allow_failure;
       retry;
       image_dependencies;
+      services;
     }
 
   let register_before_merging_jobs jobs =
