@@ -176,6 +176,10 @@ let check_samples protocols =
   protocol_sample "operation.raw" ;
   protocol_sample "operation.unsigned" ;
   protocol_sample ~supports:(From_protocol 023) "operation.bls_mode_unsigned" ;
+  protocol_sample
+    ~supports:(From_protocol 023)
+    "operation.internal_and_metadata" ;
+  protocol_sample ~supports:(From_protocol 023) "operation.data_and_metadata" ;
   protocol_sample "period" ;
   protocol_sample "raw_level" ;
   protocol_sample "seed" ;
