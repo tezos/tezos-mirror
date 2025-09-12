@@ -101,6 +101,19 @@ impl Operation {
         let op_hash = digest_256(&serialized_op);
         Ok(OperationHash(H256::from_slice(&op_hash)))
     }
+
+    pub fn verify_signature(self, pk: &PublicKey) -> Result<bool, BinError> {
+        let serialized_unsigned_operation =
+            serialize_unsigned_operation(&self.branch, &self.content)?;
+        let signature = &self.signature.into();
+        // The verify_signature function never returns false. If the verification
+        // is incorrect the function will return an Error and it's up to us to
+        // transform that into a `false` boolean if we want.
+        let check = pk
+            .verify_signature(signature, &serialized_unsigned_operation)
+            .unwrap_or(false);
+        Ok(check)
+    }
 }
 
 impl Decodable for Operation {
@@ -275,23 +288,6 @@ pub fn sign_operation(
     let signature = sk.sign(serialized_unsigned_operation)?;
 
     Ok(signature.into())
-}
-
-pub fn verify_signature(
-    pk: &PublicKey,
-    branch: BlockHash,
-    content: Vec<ManagerOperationContent>,
-    signature: UnknownSignature,
-) -> Result<bool, BinError> {
-    let serialized_unsigned_operation = serialize_unsigned_operation(&branch, &content)?;
-    let signature = &signature.into();
-    // The verify_signature function never returns false. If the verification
-    // is incorrect the function will return an Error and it's up to us to
-    // transform that into a `false` boolean if we want.
-    let check = pk
-        .verify_signature(signature, &serialized_unsigned_operation)
-        .unwrap_or(false);
-    Ok(check)
 }
 
 pub fn zip_operations(

@@ -33,8 +33,7 @@ use tezos_tezlink::operation_result::{
 };
 use tezos_tezlink::{
     operation::{
-        verify_signature, ManagerOperation, OperationContent, Parameter, RevealContent,
-        TransferContent,
+        ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
     },
     operation_result::{
         produce_operation_result, Balance, BalanceTooLow, BalanceUpdate, OperationError,
@@ -922,12 +921,7 @@ fn execute_validation<Host: Runtime>(
         balance_updates.push(op_balance_updates);
     }
 
-    match verify_signature(
-        &pk,
-        operation.branch,
-        operation.content,
-        operation.signature,
-    ) {
+    match operation.verify_signature(&pk) {
         Ok(true) => Ok(ValidationInfo {
             source_account,
             balance_updates,
