@@ -1242,7 +1242,7 @@ mod test {
 
         write_u256_le(&mut host, &path, U256::from(255)).unwrap();
         assert_eq!(
-            hex::encode(host.store_read_all(&path).unwrap()),
+            hex::encode(host.store_read(&path, 0, 32).unwrap()),
             "ff00000000000000000000000000000000000000000000000000000000000000"
         );
     }

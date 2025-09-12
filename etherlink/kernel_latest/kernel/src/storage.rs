@@ -903,7 +903,7 @@ pub fn evm_node_flag(host: &impl Runtime) -> anyhow::Result<bool> {
 }
 
 pub fn max_blueprint_lookahead_in_seconds(host: &impl Runtime) -> anyhow::Result<i64> {
-    let bytes = host.store_read_all(&MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS)?;
+    let bytes = host.store_read(&MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS, 0, 8)?;
     let bytes: [u8; 8] = bytes.as_slice().try_into()?;
     Ok(i64::from_le_bytes(bytes))
 }

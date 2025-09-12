@@ -14,7 +14,7 @@ use crate::{
         sequencer_key_change::store_sequencer_key_change,
         world_state_handler::{
             StorageAccount, WorldStateHandler, GOVERNANCE_SEQUENCER_UPGRADE_PATH,
-            SEQUENCER_KEY_PATH, WITHDRAWALS_TICKETER_PATH,
+            KT1_B58_SIZE, SEQUENCER_KEY_PATH, WITHDRAWALS_TICKETER_PATH,
         },
     },
     Error,
@@ -246,7 +246,9 @@ impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
     }
 
     fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError> {
-        let ticketer = self.host.store_read_all(&WITHDRAWALS_TICKETER_PATH)?;
+        let ticketer =
+            self.host
+                .store_read(&WITHDRAWALS_TICKETER_PATH, 0, KT1_B58_SIZE)?;
         let kt1_b58 = String::from_utf8(ticketer.to_vec()).map_err(custom)?;
         Ok(ContractKt1Hash::from_b58check(&kt1_b58).map_err(custom)?)
     }

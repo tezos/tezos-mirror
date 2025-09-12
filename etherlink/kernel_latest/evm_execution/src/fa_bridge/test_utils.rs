@@ -318,7 +318,7 @@ pub fn withdrawal_counter_next(
         .unwrap();
 
     let path = system.custom_path(&WITHDRAWAL_COUNTER_PATH).unwrap();
-    match host.store_read_all(&path) {
+    match host.store_read(&path, 0, 32) {
         Ok(bytes) => Some(U256::from_little_endian(&bytes)),
         _ => None,
     }

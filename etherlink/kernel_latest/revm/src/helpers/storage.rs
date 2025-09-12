@@ -28,7 +28,7 @@ pub fn read_u64_le_default(
     path: &impl Path,
     default: u64,
 ) -> Result<u64, Error> {
-    match host.store_read_all(path) {
+    match host.store_read(path, 0, std::mem::size_of::<u64>()) {
         Ok(bytes) if bytes.len() == std::mem::size_of::<u64>() => {
             let bytes_array: [u8; std::mem::size_of::<u64>()] = match bytes.try_into() {
                 Ok(bytes) => bytes,
@@ -50,7 +50,7 @@ pub fn read_u256_le_default(
     path: &impl Path,
     default: U256,
 ) -> Result<U256, RuntimeError> {
-    match host.store_read_all(path) {
+    match host.store_read(path, 0, 32) {
         Ok(bytes) if bytes.len() == 32 => Ok(U256::from_le_slice(&bytes)),
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
         Err(runtime_error) => Err(runtime_error),
@@ -62,7 +62,7 @@ pub fn read_u256_be_default(
     path: &impl Path,
     default: U256,
 ) -> Result<U256, RuntimeError> {
-    match host.store_read_all(path) {
+    match host.store_read(path, 0, 32) {
         Ok(bytes) if bytes.len() == 32 => Ok(U256::from_be_slice(&bytes)),
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
         Err(runtime_error) => Err(runtime_error),
@@ -73,7 +73,7 @@ pub fn read_b256_be_opt(
     host: &impl Runtime,
     path: &impl Path,
 ) -> Result<Option<B256>, RuntimeError> {
-    match host.store_read_all(path) {
+    match host.store_read(path, 0, 32) {
         Ok(bytes) if bytes.len() == 32 => Ok(Some(B256::from_slice(&bytes))),
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(None),
         Err(runtime_error) => Err(runtime_error),
