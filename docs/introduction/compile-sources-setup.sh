@@ -14,7 +14,7 @@ apt-get update
 apt-get install -y sudo
 export OPAMYES=true
 # [install packages]
-sudo apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc
+sudo apt-get install -y rsync git m4 build-essential patch unzip wget opam jq bc libev4 postgresql cmake
 # [install rust]
 wget https://sh.rustup.rs/rustup-init.sh
 chmod +x rustup-init.sh
