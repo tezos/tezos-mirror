@@ -38,10 +38,9 @@ use tezos_tezlink::{
     operation_result::{
         produce_operation_result, Balance, BalanceTooLow, BalanceUpdate, OperationError,
         OperationResultSum, OriginationError, RevealError, RevealSuccess, TransferError,
-        TransferSuccess, UpdateOrigin, ValidityError,
+        TransferSuccess, UpdateOrigin,
     },
 };
-use validate::{validate_individual_operation, ValidationInfo};
 
 use crate::address::OriginationNonce;
 
@@ -892,45 +891,6 @@ fn execute_smart_contract<'a>(
     Ok((internal_operations, new_storage))
 }
 
-fn execute_validation<Host: Runtime>(
-    host: &mut Host,
-    context: &Context,
-    operation: Operation,
-) -> Result<ValidationInfo, ValidityError> {
-    let unvalidated_operation = operation
-        .content
-        .clone()
-        .into_iter()
-        .map(Into::into)
-        .collect();
-    let (pk, source_account) =
-        validate::validate_source(host, context, &unvalidated_operation)?;
-    let mut balance_updates = vec![];
-    for c in &unvalidated_operation {
-        let (new_source_balance, op_balance_updates) =
-            validate_individual_operation(host, &source_account, c)?;
-
-        source_account
-            .set_balance(host, &new_source_balance)
-            .map_err(|_| ValidityError::FailedToUpdateBalance)?;
-
-        source_account
-            .increment_counter(host)
-            .map_err(|_| ValidityError::FailedToIncrementCounter)?;
-
-        balance_updates.push(op_balance_updates);
-    }
-
-    match operation.verify_signature(&pk) {
-        Ok(true) => Ok(ValidationInfo {
-            source_account,
-            balance_updates,
-            validated_operations: unvalidated_operation,
-        }),
-        _ => Err(ValidityError::InvalidSignature),
-    }
-}
-
 pub fn validate_and_apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
@@ -949,18 +909,19 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 
     log!(safe_host, Debug, "Verifying that the batch is valid");
 
-    let validation_info = match execute_validation(&mut safe_host, context, operation) {
-        Ok(validation_info) => validation_info,
-        Err(validity_err) => {
-            log!(
-                safe_host,
-                Debug,
-                "Reverting the changes because the batch is invalid."
-            );
-            safe_host.revert()?;
-            return Err(OperationError::Validation(validity_err));
-        }
-    };
+    let validation_info =
+        match validate::execute_validation(&mut safe_host, context, operation) {
+            Ok(validation_info) => validation_info,
+            Err(validity_err) => {
+                log!(
+                    safe_host,
+                    Debug,
+                    "Reverting the changes because the batch is invalid."
+                );
+                safe_host.revert()?;
+                return Err(OperationError::Validation(validity_err));
+            }
+        };
 
     log!(safe_host, Debug, "Batch is valid!");
 
@@ -1005,12 +966,12 @@ fn apply_batch<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     origination_nonce: &mut OriginationNonce,
-    validation_info: ValidationInfo,
+    validation_info: validate::ValidationInfo,
     level: &BlockNumber,
     now: &Timestamp,
     chain_id: &ChainId,
 ) -> (Vec<OperationResultSum>, bool) {
-    let ValidationInfo {
+    let validate::ValidationInfo {
         source_account,
         balance_updates,
         validated_operations,

@@ -12,7 +12,7 @@ use tezos_tezlink::{
 };
 
 use crate::{
-    account_storage::{Manager, TezlinkImplicitAccount},
+    account_storage::{Manager, TezlinkAccount, TezlinkImplicitAccount},
     context::Context,
     BalanceUpdate,
 };
@@ -214,4 +214,42 @@ pub fn validate_individual_operation<Host: Runtime>(
             .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
 
     Ok((new_balance, vec![src_delta, block_fees]))
+}
+
+pub fn execute_validation<Host: Runtime>(
+    host: &mut Host,
+    context: &Context,
+    operation: tezos_tezlink::operation::Operation,
+) -> Result<ValidationInfo, ValidityError> {
+    let unvalidated_operation = operation
+        .content
+        .clone()
+        .into_iter()
+        .map(Into::into)
+        .collect();
+    let (pk, source_account) = validate_source(host, context, &unvalidated_operation)?;
+    let mut balance_updates = vec![];
+    for c in &unvalidated_operation {
+        let (new_source_balance, op_balance_updates) =
+            validate_individual_operation(host, &source_account, c)?;
+
+        source_account
+            .set_balance(host, &new_source_balance)
+            .map_err(|_| ValidityError::FailedToUpdateBalance)?;
+
+        source_account
+            .increment_counter(host)
+            .map_err(|_| ValidityError::FailedToIncrementCounter)?;
+
+        balance_updates.push(op_balance_updates);
+    }
+
+    match operation.verify_signature(&pk) {
+        Ok(true) => Ok(ValidationInfo {
+            source_account,
+            balance_updates,
+            validated_operations: unvalidated_operation,
+        }),
+        _ => Err(ValidityError::InvalidSignature),
+    }
 }
