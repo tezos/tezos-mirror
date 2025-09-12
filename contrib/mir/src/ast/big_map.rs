@@ -74,14 +74,22 @@ pub struct BigMap<'a> {
 }
 
 impl<'a> BigMap<'a> {
-    /// Michelson's `EMPTY_BIG_MAP`
-    pub fn empty(key_type: Type, value_type: Type) -> Self {
-        let content = BigMapContent::InMemory(BTreeMap::new());
+    /// Create an in-memory big map from a BTreeMap
+    pub fn new(
+        key_type: Type,
+        value_type: Type,
+        map: BTreeMap<TypedValue<'a>, TypedValue<'a>>,
+    ) -> Self {
         Self {
-            content,
+            content: BigMapContent::InMemory(map),
             key_type,
             value_type,
         }
+    }
+
+    /// Michelson's `EMPTY_BIG_MAP`
+    pub fn empty(key_type: Type, value_type: Type) -> Self {
+        Self::new(key_type, value_type, BTreeMap::new())
     }
 
     /// Michelson's `GET`.

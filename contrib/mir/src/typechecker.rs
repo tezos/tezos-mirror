@@ -2379,12 +2379,7 @@ pub(crate) fn typecheck_value<'a>(
             // In-memory big maps have the same syntax as regular maps
             let (tk, tv) = m.as_ref();
             let map = typecheck_map(ctx, t, tk, tv, vs)?;
-            let content = big_map::BigMapContent::InMemory(map);
-            TV::BigMap(BigMap {
-                content,
-                key_type: tk.clone(),
-                value_type: tv.clone(),
-            })
+            TV::BigMap(BigMap::new(tk.clone(), tv.clone(), map))
         }
         (T::BigMap(m), v) => {
             let (id, vs_opt, diff) = match v {
