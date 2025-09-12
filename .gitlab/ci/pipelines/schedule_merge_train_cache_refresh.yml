@@ -982,42 +982,6 @@ build-layer1-profiling:
     - ./octez-binaries/x86_64/octez-client
   when: always
 
-trigger:debian_repository_partial_auto:
-  stage: test
-  variables:
-    PIPELINE_TYPE: merge_train-debian_repository_partial_auto
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  needs:
-  - trigger
-  when: always
-  trigger:
-    include: .gitlab/ci/pipelines/debian_repository_partial_auto.yml
-    strategy: depend
-
-trigger:rpm_repository_partial_auto:
-  stage: test
-  variables:
-    PIPELINE_TYPE: merge_train-rpm_repository_partial_auto
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  needs:
-  - trigger
-  when: always
-  trigger:
-    include: .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
-    strategy: depend
-
-trigger:homebrew_auto:
-  stage: test
-  variables:
-    PIPELINE_TYPE: merge_train-homebrew_auto
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  needs:
-  - trigger
-  when: always
-  trigger:
-    include: .gitlab/ci/pipelines/homebrew_auto.yml
-    strategy: depend
-
 kaitai_checks:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
