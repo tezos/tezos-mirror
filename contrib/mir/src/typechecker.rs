@@ -33,7 +33,7 @@ use crate::ast::michelson_address::AddressHash;
 use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
-use crate::context::Ctx;
+use crate::context::CtxTrait;
 use crate::gas::OutOfGas;
 use crate::gas::{self, tc_cost, Gas};
 use crate::irrefutable_match::irrefutable_match;
@@ -256,8 +256,8 @@ impl<'a> Micheline<'a> {
     /// Validates the type.
     pub fn typecheck_value(
         &self,
-        ctx: &mut Ctx,
-        value_type: &Micheline,
+        ctx: &mut impl CtxTrait<'a>,
+        value_type: &Micheline<'a>,
     ) -> Result<TypedValue<'a>, TcError> {
         let ty = parse_ty(ctx, value_type)?;
         typecheck_value(self, ctx, &ty)
@@ -272,14 +272,14 @@ impl<'a> Micheline<'a> {
     /// in lambdas).
     pub fn typecheck_instruction(
         &self,
-        ctx: &mut Ctx,
-        self_type: Option<&Micheline>,
-        stack: &[Micheline],
+        ctx: &mut impl CtxTrait<'a>,
+        self_type: Option<&Micheline<'a>>,
+        stack: &[Micheline<'a>],
     ) -> Result<Instruction<'a>, TcError> {
         let entrypoints = self_type
             .map(|ty| {
                 let (entrypoints, _, ty) = parse_parameter_ty_with_entrypoints(ctx, ty)?;
-                ty.ensure_prop(&mut ctx.gas, TypeProperty::Passable)?;
+                ty.ensure_prop(ctx.gas(), TypeProperty::Passable)?;
                 Ok::<_, TcError>(entrypoints)
             })
             .transpose()?;
@@ -293,13 +293,13 @@ impl<'a> Micheline<'a> {
     }
 
     /// Parse `Micheline` as a type. Validates the type.
-    pub fn parse_ty(&self, ctx: &mut Ctx) -> Result<Type, TcError> {
+    pub fn parse_ty(&self, ctx: &mut impl CtxTrait<'a>) -> Result<Type, TcError> {
         parse_ty(ctx, self)
     }
 
     /// Interpreting `Micheline` as a contract parameter type, collect its
     /// entrypoints into [Entrypoints].
-    pub fn get_entrypoints(&self, ctx: &mut Ctx) -> Result<Entrypoints, TcError> {
+    pub fn get_entrypoints(&self, ctx: &mut impl CtxTrait<'a>) -> Result<Entrypoints, TcError> {
         let (entrypoints, _, _) = parse_parameter_ty_with_entrypoints(ctx, self)?;
         Ok(entrypoints)
     }
@@ -309,7 +309,10 @@ impl<'a> Micheline<'a> {
     /// typechecked script.
     /// If the script contains some views, they are not typechecked.
     /// TODO https://linear.app/tezos/issue/L2-376/type-check-views
-    pub fn typecheck_script(&self, ctx: &mut Ctx) -> Result<ContractScript<'a>, TcError> {
+    pub fn typecheck_script(
+        &self,
+        ctx: &mut impl CtxTrait<'a>,
+    ) -> Result<ContractScript<'a>, TcError> {
         let seq = match self {
             // top-level allows one level of nesting
             Micheline::Seq([Micheline::Seq(seq)]) => seq,
@@ -377,8 +380,8 @@ impl<'a> Micheline<'a> {
         let storage = storage_ty
             .ok_or(TcError::MissingTopLevelElt(Prim::storage))?
             .parse_ty(ctx)?;
-        parameter.ensure_prop(&mut ctx.gas, TypeProperty::Passable)?;
-        storage.ensure_prop(&mut ctx.gas, TypeProperty::Storable)?;
+        parameter.ensure_prop(ctx.gas(), TypeProperty::Passable)?;
+        storage.ensure_prop(ctx.gas(), TypeProperty::Storable)?;
         let mut stack = tc_stk![Type::new_pair(parameter.clone(), storage.clone())];
         let code = typecheck_instruction(
             code.ok_or(TcError::MissingTopLevelElt(Prim::code))?,
@@ -404,11 +407,14 @@ impl<'a> Micheline<'a> {
     }
 }
 
-pub(crate) fn parse_ty(ctx: &mut Ctx, ty: &Micheline) -> Result<Type, TcError> {
+pub(crate) fn parse_ty<'a>(
+    ctx: &mut impl CtxTrait<'a>,
+    ty: &Micheline<'a>,
+) -> Result<Type, TcError> {
     parse_ty_with_entrypoints(ctx, ty, None, &mut HashMap::new(), Vec::new())
 }
 
-fn parse_ty_with_entrypoints<'a>(
+fn parse_ty_with_entrypoints<'a, Ctx: CtxTrait<'a>>(
     ctx: &mut Ctx,
     ty: &Micheline<'a>,
     mut entrypoints: Option<&mut Entrypoints>,
@@ -417,10 +423,10 @@ fn parse_ty_with_entrypoints<'a>(
 ) -> Result<Type, TcError> {
     use Micheline::*;
     use Prim::*;
-    ctx.gas.consume(gas::tc_cost::PARSE_TYPE_STEP)?;
-    fn make_pair(
+    ctx.gas().consume(gas::tc_cost::PARSE_TYPE_STEP)?;
+    fn make_pair<'a, Ctx: CtxTrait<'a>>(
         ctx: &mut Ctx,
-        args: (&Micheline, &Micheline, &[Micheline]),
+        args: (&Micheline<'a>, &Micheline<'a>, &[Micheline<'a>]),
         // NB: the tuple models a slice of at least 2 elements
     ) -> Result<Type, TcError> {
         Ok(match args {
@@ -466,7 +472,7 @@ fn parse_ty_with_entrypoints<'a>(
             let t = parse_ty(ctx, t)?;
             // NB: The inner type of ticket only needs to be comparable.
             // See https://tezos.gitlab.io/michelson-reference/#type-ticket
-            t.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            t.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             Type::new_ticket(t)
         }
         App(ticket, ..) => unexpected()?,
@@ -507,21 +513,21 @@ fn parse_ty_with_entrypoints<'a>(
             // argument doesn't need to be. The only constraint is that it needs
             // to be passable, as it represents the contract's parameter type.
             // See https://tezos.gitlab.io/michelson-reference/#type-contract
-            t.ensure_prop(&mut ctx.gas, TypeProperty::Passable)?;
+            t.ensure_prop(ctx.gas(), TypeProperty::Passable)?;
             Type::new_contract(t)
         }
         App(contract, ..) => unexpected()?,
 
         App(set, [k], _) => {
             let k = parse_ty(ctx, k)?;
-            k.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            k.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             Type::new_set(k)
         }
         App(set, ..) => unexpected()?,
 
         App(map, [k, v], _) => {
             let k = parse_ty(ctx, k)?;
-            k.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            k.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             let v = parse_ty(ctx, v)?;
             Type::new_map(k, v)
         }
@@ -529,9 +535,9 @@ fn parse_ty_with_entrypoints<'a>(
 
         App(big_map, [k, v], _) => {
             let k = parse_ty(ctx, k)?;
-            k.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            k.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             let v = parse_ty(ctx, v)?;
-            v.ensure_prop(&mut ctx.gas, TypeProperty::BigMapValue)?;
+            v.ensure_prop(ctx.gas(), TypeProperty::BigMapValue)?;
             Type::new_big_map(k, v)
         }
         App(big_map, ..) => unexpected()?,
@@ -598,7 +604,7 @@ fn parse_ty_with_entrypoints<'a>(
 
 #[allow(clippy::type_complexity)]
 fn parse_parameter_ty_with_entrypoints<'a>(
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     parameter_ty: &Micheline<'a>,
 ) -> Result<
     (
@@ -636,7 +642,7 @@ fn parse_parameter_ty_with_entrypoints<'a>(
 /// has to be locally overridden during typechecking.
 fn typecheck<'a>(
     ast: &[Micheline<'a>],
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
 ) -> Result<Vec<Instruction<'a>>, TcError> {
@@ -664,7 +670,7 @@ macro_rules! nothing_to_none {
 /// has to be locally overridden during typechecking.
 pub(crate) fn typecheck_instruction<'a>(
     i: &Micheline<'a>,
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
 ) -> Result<Instruction<'a>, TcError> {
@@ -770,7 +776,7 @@ pub(crate) fn typecheck_instruction<'a>(
         };
     }
 
-    ctx.gas.consume(gas::tc_cost::INSTR_STEP)?;
+    ctx.gas().consume(gas::tc_cost::INSTR_STEP)?;
 
     use Micheline::*;
     use Prim::*;
@@ -1085,7 +1091,7 @@ pub(crate) fn typecheck_instruction<'a>(
             };
             let protected_height = opt_height.unwrap_or(1) as usize;
 
-            ctx.gas.consume(gas::tc_cost::dip_n(&opt_height)?)?;
+            ctx.gas().consume(gas::tc_cost::dip_n(&opt_height)?)?;
 
             ensure_stack_len(Prim::DIP, stack, protected_height)?;
             // Here we split off the protected portion of the stack, typecheck the code with the
@@ -1105,7 +1111,7 @@ pub(crate) fn typecheck_instruction<'a>(
                 _ => unexpected_micheline!(),
             };
             let drop_height: usize = opt_height.unwrap_or(1) as usize;
-            ctx.gas.consume(gas::tc_cost::drop_n(&opt_height)?)?;
+            ctx.gas().consume(gas::tc_cost::drop_n(&opt_height)?)?;
             ensure_stack_len(Prim::DROP, stack, drop_height)?;
             stack.drop_top(drop_height);
             I::Drop(opt_height)
@@ -1122,7 +1128,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
             ensure_stack_len(Prim::DUP, stack, dup_height)?;
             let ty = &stack[dup_height - 1];
-            ty.ensure_prop(&mut ctx.gas, TypeProperty::Duplicable)?;
+            ty.ensure_prop(ctx.gas(), TypeProperty::Duplicable)?;
             stack.push(ty.clone());
             I::Dup(opt_height)
         }
@@ -1130,7 +1136,8 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(DIG, [Int(height)], _), ..) => {
             let dig_height = validate_u10(height)?;
             ensure_stack_len(Prim::DIG, stack, dig_height as usize)?;
-            ctx.gas.consume(gas::tc_cost::dig_n(dig_height as usize)?)?;
+            ctx.gas()
+                .consume(gas::tc_cost::dig_n(dig_height as usize)?)?;
             if dig_height > 0 {
                 let e = stack.remove(dig_height as usize);
                 stack.push(e);
@@ -1142,7 +1149,8 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(DUG, [Int(height)], _), ..) => {
             let dug_height = validate_u10(height)?;
-            ctx.gas.consume(gas::tc_cost::dug_n(dug_height as usize)?)?;
+            ctx.gas()
+                .consume(gas::tc_cost::dug_n(dug_height as usize)?)?;
             if dug_height > 0 {
                 ensure_stack_len(Prim::DUG, stack, dug_height as usize)?;
                 let e = pop!();
@@ -1456,7 +1464,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(PUSH, [t, v], _), ..) => {
             let t = parse_ty(ctx, t)?;
-            t.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            t.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
             let v = typecheck_value(v, ctx, &t)?;
             stack.push(t);
             I::Push(v)
@@ -1477,7 +1485,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // the type needs to be packable, but that's not quite correct, as
             // `contract _` is forbidden. The correct constraint is seemingly
             // "pushable", as "pushable" is just "packable" without `contract _`
-            ty.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            ty.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
             // mark stack as failed
             *opt_stack = FailingTypeStack::Failed;
             I::Failwith(ty)
@@ -1533,7 +1541,7 @@ pub(crate) fn typecheck_instruction<'a>(
             if stack.len() < n as usize {
                 no_overload!(PAIR, len n as usize);
             }
-            ctx.gas.consume(tc_cost::pair_n(n as usize)?)?;
+            ctx.gas().consume(tc_cost::pair_n(n as usize)?)?;
             // unwrap is fine, n is non-zero.
             let res = stack
                 .drain_top(n as usize)
@@ -1558,7 +1566,7 @@ pub(crate) fn typecheck_instruction<'a>(
             if n < 2 {
                 return Err(TcError::PairN01(UNPAIR, n));
             }
-            ctx.gas.consume(tc_cost::unpair_n(n as usize)?)?;
+            ctx.gas().consume(tc_cost::unpair_n(n as usize)?)?;
             fn fill(n: u16, stack: &mut Stack<Type>, p: &Type) -> Result<(), TcError> {
                 if n == 0 {
                     stack.push(p.clone());
@@ -1598,7 +1606,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NONE, expect_args!(1), _), _) => unexpected_micheline!(),
 
         (App(COMPARE, [], _), [.., u, t]) => {
-            ensure_ty_eq(&mut ctx.gas, t, u).map_err(|e| match e {
+            ensure_ty_eq(ctx.gas(), t, u).map_err(|e| match e {
                 TcError::TypesNotEqual(e) => TcError::NoMatchingOverload {
                     instr: Prim::COMPARE,
                     stack: stack.clone(),
@@ -1606,7 +1614,7 @@ pub(crate) fn typecheck_instruction<'a>(
                 },
                 e => e,
             })?;
-            t.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            t.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             pop!();
             stack[0] = T::Int;
             I::Compare
@@ -1628,7 +1636,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(NIL, ..), _) => unexpected_micheline!(),
 
         (App(CONS, [], _), [.., T::List(ty1), ty2]) => {
-            ensure_ty_eq(&mut ctx.gas, ty1, ty2)?;
+            ensure_ty_eq(ctx.gas(), ty1, ty2)?;
             pop!();
             I::Cons
         }
@@ -1660,7 +1668,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(EMPTY_SET, [ty], _), _) => {
             let ty = parse_ty(ctx, ty)?;
-            ty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            ty.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             stack.push(T::new_set(ty));
             I::EmptySet
         }
@@ -1668,18 +1676,18 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(EMPTY_MAP, [kty, vty], _), _) => {
             let kty = parse_ty(ctx, kty)?;
-            kty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            kty.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             let vty = parse_ty(ctx, vty)?;
-            stack.push(T::new_map(kty.clone(), vty));
+            stack.push(T::new_map(kty, vty));
             I::EmptyMap
         }
         (App(EMPTY_MAP, expect_args!(2), _), _) => unexpected_micheline!(),
 
         (App(EMPTY_BIG_MAP, [kty, vty], _), _) => {
             let kty = parse_ty(ctx, kty)?;
-            kty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
+            kty.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
             let vty = parse_ty(ctx, vty)?;
-            vty.ensure_prop(&mut ctx.gas, TypeProperty::BigMapValue)?;
+            vty.ensure_prop(ctx.gas(), TypeProperty::BigMapValue)?;
             stack.push(T::new_big_map(kty.clone(), vty.clone()));
             I::EmptyBigMap(kty, vty)
         }
@@ -1688,21 +1696,21 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(MEM, [], _), [.., T::Set(..), _]) => {
             let ty_ = pop!();
             let ty = pop!(T::Set);
-            ensure_ty_eq(&mut ctx.gas, &ty, &ty_)?;
+            ensure_ty_eq(ctx.gas(), &ty, &ty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Set)
         }
         (App(MEM, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::Map);
-            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
+            ensure_ty_eq(ctx.gas(), &map_tys.0, &kty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Map)
         }
         (App(MEM, [], _), [.., T::BigMap(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::BigMap);
-            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
+            ensure_ty_eq(ctx.gas(), &map_tys.0, &kty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::BigMap)
         }
@@ -1713,14 +1721,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GET, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::Map);
-            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
+            ensure_ty_eq(ctx.gas(), &map_tys.0, &kty_)?;
             stack.push(T::new_option(map_tys.1.clone()));
             I::Get(overloads::Get::Map)
         }
         (App(GET, [], _), [.., T::BigMap(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::BigMap);
-            ensure_ty_eq(&mut ctx.gas, &map_tys.0, &kty_)?;
+            ensure_ty_eq(ctx.gas(), &map_tys.0, &kty_)?;
             stack.push(T::new_option(map_tys.1.clone()));
             I::Get(overloads::Get::BigMap)
         }
@@ -1732,7 +1740,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // no_overload! below won't report the type on the top of the stack.
             let ty = &mut stack[0];
             let n = validate_u10(n)?;
-            ctx.gas.consume(tc_cost::get_n(n as usize)?)?;
+            ctx.gas().consume(tc_cost::get_n(n as usize)?)?;
             let res = match get_nth_field_ref(n, ty) {
                 Ok(res) => res,
                 Err(ty) => no_overload!(GET, NMOR::ExpectedPair(ty)),
@@ -1746,21 +1754,21 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GET, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(UPDATE, [], _), [.., T::Set(ty), T::Bool, ty_]) => {
-            ensure_ty_eq(&mut ctx.gas, ty, ty_)?;
+            ensure_ty_eq(ctx.gas(), ty, ty_)?;
             stack.drop_top(2);
             I::Update(overloads::Update::Set)
         }
         (App(UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
-            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            ensure_ty_eq(ctx.gas(), kty, kty_)?;
+            ensure_ty_eq(ctx.gas(), vty, vty_new)?;
             stack.drop_top(2);
             I::Update(overloads::Update::Map)
         }
         (App(UPDATE, [], _), [.., T::BigMap(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
-            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            ensure_ty_eq(ctx.gas(), kty, kty_)?;
+            ensure_ty_eq(ctx.gas(), vty, vty_new)?;
             stack.drop_top(2);
             I::Update(overloads::Update::BigMap)
         }
@@ -1787,15 +1795,15 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(GET_AND_UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
-            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            ensure_ty_eq(ctx.gas(), kty, kty_)?;
+            ensure_ty_eq(ctx.gas(), vty, vty_new)?;
             pop!();
             I::GetAndUpdate(overloads::GetAndUpdate::Map)
         }
         (App(GET_AND_UPDATE, [], _), [.., T::BigMap(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(&mut ctx.gas, kty, kty_)?;
-            ensure_ty_eq(&mut ctx.gas, vty, vty_new)?;
+            ensure_ty_eq(ctx.gas(), kty, kty_)?;
+            ensure_ty_eq(ctx.gas(), vty, vty_new)?;
             pop!();
             I::GetAndUpdate(overloads::GetAndUpdate::BigMap)
         }
@@ -1862,7 +1870,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(PACK, [], _), [.., _]) => {
             let t = pop!();
-            t.ensure_prop(&mut ctx.gas, TypeProperty::Packable)?;
+            t.ensure_prop(ctx.gas(), TypeProperty::Packable)?;
             stack.push(T::Bytes);
             I::Pack
         }
@@ -1875,7 +1883,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // not quite correct, as `contract _` is forbidden. The correct
             // constraint is seemingly "pushable", as "pushable" is just
             // "packable" without `contract _`
-            ty.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            ty.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
             stack[0] = T::new_option(ty.clone());
             I::Unpack(ty)
         }
@@ -1886,7 +1894,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(UNPACK, expect_args!(1), _), _) => unexpected_micheline!(),
 
         (App(TRANSFER_TOKENS, [], _), [.., T::Contract(ct), T::Mutez, arg_t]) => {
-            ensure_ty_eq(&mut ctx.gas, ct, arg_t)?;
+            ensure_ty_eq(ctx.gas(), ct, arg_t)?;
             stack.drop_top(3);
             stack.push(T::Operation);
             I::TransferTokens
@@ -1957,7 +1965,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EXEC, [], _), [.., T::Lambda(_), _]) => {
             let ty = pop!();
             let lam_tys = pop!(T::Lambda);
-            ensure_ty_eq(&mut ctx.gas, &lam_tys.0, &ty)?;
+            ensure_ty_eq(ctx.gas(), &lam_tys.0, &ty)?;
             stack.push(lam_tys.1.clone());
             I::Exec
         }
@@ -1988,7 +1996,7 @@ pub(crate) fn typecheck_instruction<'a>(
                     });
                 }
             };
-            ensure_ty_eq(&mut ctx.gas, &pair_ty.0, &ty)?;
+            ensure_ty_eq(ctx.gas(), &pair_ty.0, &ty)?;
             stack.push(T::new_lambda(pair_ty.1.clone(), lam_ty.1.clone()));
             I::Apply { arg_ty: ty }
         }
@@ -2033,7 +2041,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let lt = irrefutable_match!(&tickets.0; Type::Ticket);
             let rt = irrefutable_match!(&tickets.1; Type::Ticket);
 
-            ensure_ty_eq(&mut ctx.gas, lt, rt)?;
+            ensure_ty_eq(ctx.gas(), lt, rt)?;
             stack[0] = Type::new_option(tickets.0.clone());
             I::JoinTickets
         }
@@ -2149,13 +2157,13 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EMIT, [t], anns), [.., _]) => {
             let emit_val_type = pop!();
             let emit_type_arg = parse_ty(ctx, t)?;
-            ensure_ty_eq(&mut ctx.gas, &emit_type_arg, &emit_val_type)?;
+            ensure_ty_eq(ctx.gas(), &emit_type_arg, &emit_val_type)?;
             // NB: the docs for the EMIT instruction
             // https://tezos.gitlab.io/michelson-reference/#instr-EMIT claim
             // the type needs to be packable, but that's not quite correct, as
             // `contract _` is forbidden. The correct constraint is seemingly
             // "pushable", as "pushable" is just "packable" without `contract _`
-            emit_val_type.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            emit_val_type.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
             let opt_tag = anns.get_single_field_ann()?;
             if let Option::Some(t) = &opt_tag {
                 check_ep_name_len(t.as_str().as_bytes()).map_err(TcError::EntrypointError)?;
@@ -2168,7 +2176,7 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(EMIT, [], anns), [.., _]) => {
             let emit_val_type = pop!();
-            emit_val_type.ensure_prop(&mut ctx.gas, TypeProperty::Pushable)?;
+            emit_val_type.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
             let opt_tag = anns.get_single_field_ann()?;
             if let Option::Some(t) = &opt_tag {
                 check_ep_name_len(t.as_str().as_bytes()).map_err(TcError::EntrypointError)?;
@@ -2210,7 +2218,7 @@ pub(crate) fn typecheck_instruction<'a>(
             if matches!(opt_keyhash.as_ref(), Type::KeyHash) =>
         {
             let contract_script = cs.typecheck_script(ctx)?;
-            ensure_ty_eq(&mut ctx.gas, &contract_script.storage, new_storage)?;
+            ensure_ty_eq(ctx.gas(), &contract_script.storage, new_storage)?;
             stack.drop_top(3);
             stack.push(Type::Address);
             stack.push(Type::Operation);
@@ -2232,8 +2240,8 @@ pub(crate) fn typecheck_instruction<'a>(
     })
 }
 
-pub(crate) fn typecheck_contract_address(
-    _ctx: &mut Ctx,
+pub(crate) fn typecheck_contract_address<'a>(
+    _ctx: &mut impl CtxTrait<'a>,
     address: Address,
     ep: Entrypoint,
     typ: &Type,
@@ -2268,8 +2276,9 @@ pub(crate) fn typecheck_contract_address(
         AddressHash::Kt1(_) | AddressHash::Sr1(_) => {
             // Check if we have a contract at the address_hash of the given address.
             // and we have found a valid entrypoint to use.
-            let contract_entrypoints =
-                (_ctx.lookup_contract)(&address.hash).ok_or(TcError::NoSuchContract)?;
+            let contract_entrypoints = _ctx
+                .lookup_contract(&address.hash)
+                .ok_or(TcError::NoSuchContract)?;
 
             // Do we have the entrypoint for the call in the entrypoints parsed
             // from the destination contract parameter?
@@ -2279,7 +2288,7 @@ pub(crate) fn typecheck_contract_address(
 
             // if the entrypoint is present, check that it is of the required
             // type.
-            ensure_ty_eq(&mut _ctx.gas, typ, contract_entrypoint_type)?;
+            ensure_ty_eq(_ctx.gas(), typ, contract_entrypoint_type)?;
 
             Ok(Address {
                 entrypoint,
@@ -2315,13 +2324,13 @@ fn get_nth_field_ref(mut m: u16, mut ty: &mut Type) -> Result<&mut Type, Type> {
 /// illegal types like `set operation` or `contract operation`.
 pub(crate) fn typecheck_value<'a>(
     v: &Micheline<'a>,
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     t: &Type,
 ) -> Result<TypedValue<'a>, TcError> {
     use Micheline as V;
     use Type as T;
     use TypedValue as TV;
-    ctx.gas.consume(gas::tc_cost::VALUE_STEP)?;
+    ctx.gas().consume(gas::tc_cost::VALUE_STEP)?;
     macro_rules! invalid_value_for_type {
         () => {
             TcError::InvalidValueForType(format!("{v:?}"), t.clone())
@@ -2384,14 +2393,17 @@ pub(crate) fn typecheck_value<'a>(
 
             let big_map_id = if let Some(id) = id_opt {
                 let big_map_id = BigMapId(id.clone());
-                let (key_type, value_type) = ctx
-                    .big_map_storage
-                    .big_map_get_type(&big_map_id)
-                    .map_err(TcError::LazyStorageError)?
-                    .ok_or(TcError::BigMapNotFound(id))?;
-
-                ensure_ty_eq(&mut ctx.gas, key_type, tk)?;
-                ensure_ty_eq(&mut ctx.gas, value_type, tv)?;
+                let (key_type, value_type) = {
+                    let big_map_storage = ctx.big_map_storage();
+                    big_map_storage
+                        .big_map_get_type(&big_map_id)
+                        .map_err(TcError::LazyStorageError)?
+                        .ok_or(TcError::BigMapNotFound(id))?
+                };
+                let key_type = &key_type.clone();
+                let value_type = &value_type.clone();
+                ensure_ty_eq(ctx.gas(), key_type, tk)?;
+                ensure_ty_eq(ctx.gas(), value_type, tv)?;
                 Some(big_map_id)
             } else {
                 None
@@ -2410,14 +2422,14 @@ pub(crate) fn typecheck_value<'a>(
             })
         }
         (T::Address, V::String(str)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_HASH_READABLE)?;
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
             TV::Address(
                 Address::from_base58_check(str)
                     .map_err(|e| TcError::ByteReprError(T::Address, e))?,
             )
         }
         (T::Address, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
             TV::Address(Address::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Address, e))?)
         }
         (T::Contract(ty), addr) => {
@@ -2426,47 +2438,47 @@ pub(crate) fn typecheck_value<'a>(
                 .map(TypedValue::Contract)?
         }
         (T::ChainId, V::String(str)) => {
-            ctx.gas.consume(gas::tc_cost::CHAIN_ID_READABLE)?;
+            ctx.gas().consume(gas::tc_cost::CHAIN_ID_READABLE)?;
             TV::ChainId(
                 ChainId::from_base58_check(str).map_err(|x| TcError::ChainIdError(x.into()))?,
             )
         }
         (T::ChainId, V::Bytes(bs)) => {
             use tezos_crypto_rs::hash::HashTrait;
-            ctx.gas.consume(gas::tc_cost::CHAIN_ID_OPTIMIZED)?;
+            ctx.gas().consume(gas::tc_cost::CHAIN_ID_OPTIMIZED)?;
             TV::ChainId(ChainId::try_from_bytes(bs).map_err(|x| TcError::ChainIdError(x.into()))?)
         }
         (T::Bytes, V::Bytes(bs)) => TV::Bytes(bs.clone()),
         (T::Key, V::String(str)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_READABLE)?;
+            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
             TV::Key(Key::from_base58_check(str).map_err(|e| TcError::ByteReprError(T::Key, e))?)
         }
         (T::Key, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_OPTIMIZED)?;
+            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
             TV::Key(Key::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Key, e))?)
         }
         (T::Signature, V::String(str)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_READABLE)?;
+            ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
             TV::Signature(
                 Signature::from_base58_check(str)
                     .map_err(|e| TcError::ByteReprError(T::Signature, e))?,
             )
         }
         (T::Signature, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_OPTIMIZED)?;
+            ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
             TV::Signature(
                 Signature::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Signature, e))?,
             )
         }
         (T::KeyHash, V::String(str)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_HASH_READABLE)?;
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_READABLE)?;
             TV::KeyHash(
                 PublicKeyHash::from_b58check(str)
                     .map_err(|e| TcError::ByteReprError(T::KeyHash, e.into()))?,
             )
         }
         (T::KeyHash, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
+            ctx.gas().consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
             TV::KeyHash(PublicKeyHash::nom_read_exact(bs).map_err(|err| {
                 TcError::ByteReprError(
                     T::KeyHash,
@@ -2479,7 +2491,7 @@ pub(crate) fn typecheck_value<'a>(
         }
         (T::Timestamp, V::Int(n)) => TV::Timestamp(n.clone()),
         (T::Timestamp, V::String(n)) => {
-            ctx.gas
+            ctx.gas()
                 .consume(gas::tc_cost::timestamp_decoding(n.len())?)?;
             // First, try to parse the string as an integer
             if let Ok(int_value) = n.parse::<i64>() {
@@ -2511,7 +2523,7 @@ pub(crate) fn typecheck_value<'a>(
             V::App(Prim::Ticket, [ticketer, content_type_bis, content, amount], _),
         ) => {
             let content_type_bis = parse_ty(ctx, content_type_bis)?;
-            ensure_ty_eq(&mut ctx.gas, content_type, &content_type_bis)?;
+            ensure_ty_eq(ctx.gas(), content_type, &content_type_bis)?;
             let ticketer = typecheck_value(ticketer, ctx, &T::Address)?;
             let ticketer = irrefutable_match!(ticketer; TV::Address);
             let content = typecheck_value(content, ctx, content_type)?;
@@ -2549,22 +2561,22 @@ pub(crate) fn typecheck_value<'a>(
         }
         #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Int(i)) => {
-            ctx.gas.consume(gas::tc_cost::BLS_FR)?;
+            ctx.gas().consume(gas::tc_cost::BLS_FR)?;
             TV::Bls12381Fr(bls::Fr::from_big_int(i))
         }
         #[cfg(feature = "bls")]
         (T::Bls12381Fr, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::BLS_FR)?;
+            ctx.gas().consume(gas::tc_cost::BLS_FR)?;
             TV::Bls12381Fr(bls::Fr::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
         #[cfg(feature = "bls")]
         (T::Bls12381G1, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::BLS_G1)?;
+            ctx.gas().consume(gas::tc_cost::BLS_G1)?;
             TV::new_bls12381_g1(bls::G1::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
         #[cfg(feature = "bls")]
         (T::Bls12381G2, V::Bytes(bs)) => {
-            ctx.gas.consume(gas::tc_cost::BLS_G2)?;
+            ctx.gas().consume(gas::tc_cost::BLS_G2)?;
             TV::new_bls12381_g2(bls::G2::from_bytes(bs).ok_or_else(|| invalid_value_for_type!())?)
         }
         (_, _) => return Err(invalid_value_for_type!()),
@@ -2573,7 +2585,7 @@ pub(crate) fn typecheck_value<'a>(
 
 fn typecheck_lambda<'a>(
     instrs: &'a [Micheline<'a>],
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     in_ty: Type,
     out_ty: Type,
     recursive: bool,
@@ -2611,7 +2623,7 @@ fn typecheck_lambda<'a>(
 fn typecheck_map_block<'a>(
     nested: &[Micheline<'a>],
     ty1: Type,
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     self_entrypoints: Option<&Entrypoints>,
     stack: &TypeStack,
 ) -> Result<(Vec<Instruction<'a>>, Type), TcError> {
@@ -2644,12 +2656,12 @@ fn validate_u10(n: &BigInt) -> Result<u16, TcError> {
 }
 
 fn typecheck_set<'a>(
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     set_ty: &Type,
     elem_ty: &Type,
     vs: &[Micheline<'a>],
 ) -> Result<BTreeSet<TypedValue<'a>>, TcError> {
-    ctx.gas.consume(gas::tc_cost::construct_set(
+    ctx.gas().consume(gas::tc_cost::construct_set(
         elem_ty.size_for_gas(),
         vs.len(),
     )?)?;
@@ -2660,7 +2672,7 @@ fn typecheck_set<'a>(
     for elt in vs.iter() {
         let elt = typecheck_value(elt, ctx, elem_ty)?;
         if let Some(prev_elt) = prev_elt {
-            ctx.gas
+            ctx.gas()
                 .consume(gas::interpret_cost::compare(&prev_elt, &elt)?)?;
             match prev_elt.cmp(&elt) {
                 std::cmp::Ordering::Less => (),
@@ -2679,13 +2691,13 @@ fn typecheck_set<'a>(
 }
 
 fn typecheck_map<'a>(
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     map_ty: &Type,
     key_type: &Type,
     value_type: &Type,
     vs: &[Micheline<'a>],
 ) -> Result<BTreeMap<TypedValue<'a>, TypedValue<'a>>, TcError> {
-    ctx.gas.consume(gas::tc_cost::construct_map(
+    ctx.gas().consume(gas::tc_cost::construct_map(
         key_type.size_for_gas(),
         vs.len(),
     )?)?;
@@ -2708,7 +2720,7 @@ fn typecheck_map<'a>(
             }
         };
         if let Some(prev_key) = prev_key {
-            ctx.gas
+            ctx.gas()
                 .consume(gas::interpret_cost::compare(&prev_key, &key)?)?;
             match prev_key.cmp(&key) {
                 std::cmp::Ordering::Less => (),
@@ -2727,14 +2739,14 @@ fn typecheck_map<'a>(
 }
 
 fn typecheck_big_map<'a>(
-    ctx: &mut Ctx,
+    ctx: &mut impl CtxTrait<'a>,
     map_ty: &Type,
     key_type: &Type,
     value_type: &Type,
     vs: &[Micheline<'a>],
     diff: bool,
 ) -> Result<BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>, TcError> {
-    ctx.gas.consume(gas::tc_cost::construct_map(
+    ctx.gas().consume(gas::tc_cost::construct_map(
         key_type.size_for_gas(),
         vs.len(),
     )?)?;
@@ -2773,7 +2785,7 @@ fn typecheck_big_map<'a>(
             }
         };
         if let Some(prev_key) = prev_key {
-            ctx.gas
+            ctx.gas()
                 .consume(gas::interpret_cost::compare(&prev_key, &key)?)?;
             match prev_key.cmp(&key) {
                 std::cmp::Ordering::Less => (),
@@ -2811,8 +2823,8 @@ fn ensure_stack_len(instr: Prim, stack: &TypeStack, l: usize) -> Result<(), TcEr
 /// instead.
 ///
 /// Failed stacks unify with anything.
-fn unify_stacks(
-    ctx: &mut Ctx,
+fn unify_stacks<'a>(
+    ctx: &mut impl CtxTrait<'a>,
     dest: &mut FailingTypeStack,
     aux: FailingTypeStack,
 ) -> Result<(), TcError> {
@@ -2830,7 +2842,11 @@ fn unify_stacks(
     Ok(())
 }
 
-fn ensure_stacks_eq(ctx: &mut Ctx, stack1: &TypeStack, stack2: &TypeStack) -> Result<(), TcError> {
+fn ensure_stacks_eq<'a>(
+    ctx: &mut impl CtxTrait<'a>,
+    stack1: &TypeStack,
+    stack2: &TypeStack,
+) -> Result<(), TcError> {
     if stack1.len() != stack2.len() {
         return Err(TcError::StacksNotEqual(
             stack1.clone(),
@@ -2839,7 +2855,7 @@ fn ensure_stacks_eq(ctx: &mut Ctx, stack1: &TypeStack, stack2: &TypeStack) -> Re
         ));
     }
     for (ty1, ty2) in stack1.iter().zip(stack2.iter()) {
-        ensure_ty_eq(&mut ctx.gas, ty1, ty2).map_err(|e| match e {
+        ensure_ty_eq(ctx.gas(), ty1, ty2).map_err(|e| match e {
             TcError::TypesNotEqual(e) => {
                 TcError::StacksNotEqual(stack1.clone(), stack2.clone(), e.into())
             }
@@ -2861,9 +2877,11 @@ fn ensure_ty_eq(gas: &mut Gas, ty1: &Type, ty2: &Type) -> Result<(), TcError> {
 #[cfg(test)]
 mod typecheck_tests {
     use super::{Lambda, Or};
+    use crate::ast::big_map::LazyStorage;
     use crate::ast::michelson_address as addr;
     use crate::ast::michelson_address::entrypoint::DEFAULT_EP_NAME;
     use crate::ast::or::Or::{Left, Right};
+    use crate::context::{Ctx, CtxTrait};
     use crate::gas::Gas;
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
@@ -2874,7 +2892,7 @@ mod typecheck_tests {
     /// hack to simplify syntax in tests
     fn typecheck_instruction<'a>(
         i: &Micheline<'a>,
-        ctx: &mut Ctx,
+        ctx: &mut impl CtxTrait<'a>,
         opt_stack: &mut FailingTypeStack,
     ) -> Result<Instruction<'a>, TcError> {
         super::typecheck_instruction(i, ctx, None, opt_stack)
