@@ -248,13 +248,11 @@ pub fn serialize_unsigned_operation(
 
     let mut serialized_unsigned_operation = vec![watermark];
 
-    let branch: [u8; 32] = branch.0.to_fixed_bytes();
-    tezos_data_encoding::enc::put_bytes(&branch, &mut serialized_unsigned_operation);
+    branch.bin_write(&mut serialized_unsigned_operation)?;
     tezos_data_encoding::enc::list(ManagerOperationContent::bin_write)(
         content,
         &mut serialized_unsigned_operation,
-    )
-    .expect("Failed to serialize the content");
+    )?;
 
     Ok(serialized_unsigned_operation)
 }
