@@ -111,12 +111,9 @@ pub fn transfer_tez<Host: Runtime>(
     amount: &Narith,
     receiver_account: &impl TezlinkAccount,
 ) -> Result<TransferSuccess, TransferError> {
-    let balance_updates = compute_balance_updates(
-        &giver_account.contract(),
-        &receiver_account.contract(),
-        amount,
-    )
-    .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
+    let balance_updates =
+        compute_balance_updates(giver_account, receiver_account, amount)
+            .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
 
     apply_balance_changes(host, giver_account, receiver_account, &amount.0)?;
     Ok(TransferSuccess {
@@ -707,15 +704,10 @@ fn originate_contract<Host: Runtime>(
         return Err(OriginationError::CantOriginateEmptyContract);
     }
 
-    let source_contract = source_account.contract();
-
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
-    let mut balance_updates = compute_balance_updates(
-        &sender_account.contract(),
-        &smart_contract.contract(),
-        initial_balance,
-    )
-    .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+    let mut balance_updates =
+        compute_balance_updates(sender_account, &smart_contract, initial_balance)
+            .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
 
     // Balance updates for the impacts of origination on storage space.
     // storage_fees = total_size * COST_PER_BYTES
@@ -723,13 +715,13 @@ fn originate_contract<Host: Runtime>(
         .checked_mul(&BigUint::from(COST_PER_BYTES))
         .ok_or(OriginationError::FailedToComputeBalanceUpdate)?;
     let storage_fees_balance_updates =
-        compute_storage_balance_updates(&source_contract, storage_fees.clone())
+        compute_storage_balance_updates(source_account, storage_fees.clone())
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
     balance_updates.extend(storage_fees_balance_updates);
 
     // Balance updates for the base origination cost.
     let origination_fees_balance_updates =
-        compute_storage_balance_updates(&source_contract, ORIGINATION_COST.into())
+        compute_storage_balance_updates(source_account, ORIGINATION_COST.into())
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
     balance_updates.extend(origination_fees_balance_updates);
 
@@ -783,8 +775,8 @@ fn compute_fees_balance_updates(
 
 /// Prepares balance updates in the format expected by the Tezos operation.
 fn compute_balance_updates(
-    giver: &Contract,
-    receiver: &Contract,
+    giver: &impl TezlinkAccount,
+    receiver: &impl TezlinkAccount,
     amount: &Narith,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
     if amount.eq(&0_u64.into()) {
@@ -795,13 +787,13 @@ fn compute_balance_updates(
     let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
 
     let giver_update = BalanceUpdate {
-        balance: Balance::Account(giver.clone()),
+        balance: Balance::Account(giver.contract()),
         changes: giver_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
 
     let receiver_update = BalanceUpdate {
-        balance: Balance::Account(receiver.clone()),
+        balance: Balance::Account(receiver.contract()),
         changes: receiver_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
@@ -811,14 +803,14 @@ fn compute_balance_updates(
 
 /// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
 pub fn compute_storage_balance_updates(
-    source: &Contract,
+    source: &TezlinkImplicitAccount,
     fee: BigUint,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
     let source_delta = BigInt::from_biguint(num_bigint::Sign::Minus, fee.clone());
     let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, fee);
 
     let source_update = BalanceUpdate {
-        balance: Balance::Account(source.clone()),
+        balance: Balance::Account(source.contract()),
         changes: source_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
