@@ -45,13 +45,15 @@ open struct
   let section = ["dal"]
 
   let starting_node =
-    declare_0
+    declare_2
       ~section
       ~prefix_name_with_section:true
       ~name:"starting"
-      ~msg:"starting the DAL node"
+      ~msg:
+        "starting the DAL node (network: {network}, octez version: {version})"
       ~level:Notice
-      ()
+      ("network", Distributed_db_version.Name.encoding)
+      ("version", Data_encoding.string)
 
   let waiting_l1_node_bootstrapped =
     declare_0
@@ -108,15 +110,13 @@ open struct
       ()
 
   let node_is_ready =
-    declare_2
+    declare_0
       ~section
       ~prefix_name_with_section:true
       ~name:"is_ready"
-      ~msg:
-        "the DAL node is ready (network: {network}, octez version: {version})"
+      ~msg:"the DAL node is ready"
       ~level:Notice
-      ("network", Distributed_db_version.Name.encoding)
-      ("version", Data_encoding.string)
+      ()
 
   let config_file_not_found =
     declare_1
@@ -1193,7 +1193,8 @@ let emit_fetching_slot_from_backup_failed ~published_level ~slot_index
       Uri.to_string backup_uri,
       Cohttp.Code.string_of_status status )
 
-let emit_starting_node () = emit starting_node ()
+let emit_starting_node ~network_name ~version =
+  emit starting_node (network_name, version)
 
 let emit_waiting_l1_node_bootstrapped () = emit waiting_l1_node_bootstrapped ()
 
@@ -1207,8 +1208,7 @@ let emit_dal_node_sqlite3_store_init () = emit dal_node_sqlite3_store_init ()
 
 let emit_store_is_ready () = emit store_is_ready ()
 
-let emit_node_is_ready ~network_name ~version =
-  emit node_is_ready (network_name, version)
+let emit_node_is_ready () = emit node_is_ready ()
 
 let emit_config_file_not_found ~path = emit config_file_not_found path
 

@@ -297,7 +297,6 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
     in
     Tezos_base_unix.Internal_event_unix.init ~config:internal_events ()
   in
-  let*! () = Event.emit_starting_node () in
   let* ({
           rpc_addr;
           (* These are not the cryptographic identities of peers, but the points
@@ -324,6 +323,8 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   let*! () = Event.emit_configuration_loaded () in
   let cctxt = Rpc_context.make endpoint in
   let* network_name = L1_helpers.infer_dal_network_name cctxt in
+  let version = Tezos_version_value.Bin_version.octez_version_string in
+  let*! () = Event.emit_starting_node ~network_name ~version in
   let* initial_peers_names =
     if ignore_l1_config_peers then return points
     else
@@ -621,8 +622,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   (* Register topics with gossipsub worker. *)
   let* () = update_and_register_profiles ctxt in
   (* Start never-ending monitoring daemons *)
-  let version = Tezos_version_value.Bin_version.octez_version_string in
-  let*! () = Event.emit_node_is_ready ~network_name ~version in
+  let*! () = Event.emit_node_is_ready () in
   () [@profiler.overwrite may_start_profiler data_dir] ;
   let* () = daemonize [on_new_finalized_head ctxt cctxt crawler] in
   return_unit
