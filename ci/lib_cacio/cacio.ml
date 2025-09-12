@@ -88,6 +88,7 @@ type job = {
   cargo_target_caches : bool;
   sccache : sccache_config option;
   dune_cache : dune_cache_config option;
+  test_coverage : bool;
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
   retry : Gitlab_ci.Types.retry option;
 }
@@ -368,6 +369,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     cargo_target_caches;
                     sccache;
                     dune_cache;
+                    test_coverage;
                     allow_failure;
                     retry;
                   };
@@ -478,6 +480,12 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                       ?policy
                       job
               in
+              let maybe_enable_test_coverage job =
+                if test_coverage then
+                  job |> Tezos_ci.Coverage.enable_instrumentation
+                  |> Tezos_ci.Coverage.enable_output_artifact
+                else job
+              in
               Tezos_ci.job
                 ~__POS__:source_location
                 ~name
@@ -504,6 +512,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 script
               |> maybe_enable_cargo_cache |> maybe_enable_cargo_target_caches
               |> maybe_enable_sccache |> maybe_enable_dune_cache
+              |> maybe_enable_test_coverage
         in
         result := UID_map.add uid result_node !result ;
         result_node
@@ -560,6 +569,7 @@ module type COMPONENT_API = sig
     ?cargo_target_caches:bool ->
     ?sccache:sccache_config ->
     ?dune_cache:dune_cache_config ->
+    ?test_coverage:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     string ->
@@ -603,8 +613,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
       ?(needs_legacy = []) ?variables ?artifacts ?(cargo_cache = false)
-      ?(cargo_target_caches = false) ?sccache ?dune_cache ?allow_failure ?retry
-      name script =
+      ?(cargo_target_caches = false) ?sccache ?dune_cache
+      ?(test_coverage = false) ?allow_failure ?retry name script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -645,6 +655,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       cargo_target_caches;
       sccache;
       dune_cache;
+      test_coverage;
       allow_failure;
       retry;
     }

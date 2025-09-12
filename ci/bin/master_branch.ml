@@ -133,7 +133,7 @@ let jobs =
          _coverage_report/download_coverage.log";
         "./scripts/ci/report_coverage.sh";
       ]
-    |> enable_coverage_location |> enable_coverage_report
+    |> Coverage.enable_location |> Coverage.enable_report
   in
 
   (* Smart Rollup: Kernel SDK

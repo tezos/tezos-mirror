@@ -544,6 +544,20 @@ val append_after_script : string list -> tezos_job -> tezos_job
     Has no effect on {!trigger_job}s. *)
 val with_interruptible : bool -> tezos_job -> tezos_job
 
+(** A [script:] that executes a given command and propagates its exit code.
+
+    This might seem like a noop but is in fact necessary to please his majesty GitLab.
+
+    For more info, see:
+     - https://gitlab.com/tezos/tezos/-/merge_requests/9923#note_1538894754;
+     - https://gitlab.com/tezos/tezos/-/merge_requests/12141; and
+     - https://gitlab.com/groups/gitlab-org/-/epics/6074
+
+   TODO: replace this with [FF_USE_NEW_BASH_EVAL_STRATEGY=true], see
+   {{:https://docs.gitlab.com/runner/configuration/feature-flags.html}GitLab
+   Runner feature flags}. *)
+val script_propagate_exit_code : string -> string list
+
 val job_docker_authenticated :
   ?skip_docker_initialization:bool ->
   ?ci_docker_hub:bool ->
@@ -735,3 +749,57 @@ module Hooks : sig
 end
 
 val job_datadog_pipeline_trace : tezos_job
+
+module Coverage : sig
+  (** Coverage-related helpers. *)
+
+  (** Add the [COVERAGE_OPTIONS] variable to enable [bisect_ppx].
+
+      This function should be applied in jobs that build executables such that:
+      - at least part of the code is in OCaml;
+      - at least one of these executables is used in test jobs;
+      - we want coverage reports for those tests.
+
+      Note that this includes not only build jobs but also some test jobs
+      in which we both build and run tests. *)
+  val enable_instrumentation : tezos_job -> tezos_job
+
+  (** Add the [BISECT_FILE] variable to specify the location of the coverage trace.
+
+      This function should be applied to jobs that produce or consume coverage traces.
+      This includes test jobs and jobs like [unified_coverage].
+      This also enables coverage trace output for instrumented executables. *)
+  val enable_location : tezos_job -> tezos_job
+
+  (** Add the coverage report artifact and the [SLACK_COVERAGE_CHANNEL] variable.
+
+      This is meant to be used in [unified_coverage] jobs. *)
+  val enable_report : tezos_job -> tezos_job
+
+  (** Declare that a job produces coverage traces.
+
+      This has the following effects:
+      - add the coverage trace artifact;
+      - append [merge_coverage.sh];
+      - applies {!enable_location};
+      - registers the job so that it is used by {!close}.
+
+      This function should be applied to test jobs that produce coverage traces. *)
+  val enable_output_artifact :
+    ?expire_in:Gitlab_ci.Types.expiration -> tezos_job -> tezos_job
+
+  (** Generate the [unified_coverage] job.
+
+      After this, {!enable_output_artifact} cannot be called anymore,
+      except on jobs with the same name as a job on which {!enable_output_artifact}
+      was already applied.
+
+      The first time this is called, this creates the job
+      and generates [script-inputs/ci-coverage-producing-jobs].
+      After that, [close] just returns the already-computed [unified_coverage] job.
+
+      The argument is the changeset to use to trigger the [unified_coverage] job.
+      It is supposed to be [changeset_octez], which is unfortunately not defined
+      in [Tezos_ci] but in [ci/bin]. *)
+  val close : Changeset.t -> tezos_job
+end
