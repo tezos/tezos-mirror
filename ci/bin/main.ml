@@ -246,6 +246,7 @@ let () =
       && (has_tag_match octez_major_release_tag_re
          || has_tag_match octez_minor_release_tag_re))
     ~jobs:(Release_tag.octez_jobs ~major:false Release_tag)
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       ("Release tag pipelines for Octez.\n\n\
         This pipeline is created when the release manager pushes a tag in the \
