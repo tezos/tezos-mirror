@@ -5,7 +5,7 @@
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
 use context::Context;
-use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
+use mir::ast::{AddressHash, Entrypoint, OperationInfo, PublicKeyHash, TransferTokens};
 use mir::{
     ast::{IntoMicheline, Micheline},
     context::CtxTrait,
@@ -23,7 +23,7 @@ use tezos_crypto_rs::{
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
-use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash, Timestamp};
+use tezos_smart_rollup::types::{Contract, PublicKey, Timestamp};
 use tezos_tezlink::enc_wrappers::{BlockNumber, OperationHash};
 use tezos_tezlink::operation::{Operation, OriginationContent, Script};
 use tezos_tezlink::operation_result::{
@@ -54,8 +54,7 @@ mod validate;
 
 fn reveal<Host: Runtime>(
     host: &mut Host,
-    provided_hash: &PublicKeyHash,
-    source_account: &mut TezlinkImplicitAccount,
+    source_account: &TezlinkImplicitAccount,
     public_key: &PublicKey,
 ) -> Result<RevealSuccess, RevealError> {
     log!(host, Debug, "Applying a reveal operation");
@@ -69,7 +68,7 @@ fn reveal<Host: Runtime>(
     };
 
     // Ensure that the source of the operation is equal to the retrieved hash.
-    if &expected_hash != provided_hash {
+    if &expected_hash != source_account.pkh() {
         return Err(RevealError::InconsistentHash(expected_hash));
     }
 
@@ -108,23 +107,15 @@ fn address_from_contract(contract: Contract) -> AddressHash {
 
 pub fn transfer_tez<Host: Runtime>(
     host: &mut Host,
-    giver_contract: &Contract,
-    giver_account: &mut impl TezlinkAccount,
+    giver_account: &impl TezlinkAccount,
     amount: &Narith,
-    receiver_contract: &Contract,
-    receiver_account: &mut impl TezlinkAccount,
+    receiver_account: &impl TezlinkAccount,
 ) -> Result<TransferSuccess, TransferError> {
     let balance_updates =
-        compute_balance_updates(giver_contract, receiver_contract, amount)
+        compute_balance_updates(giver_account, receiver_account, amount)
             .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
 
-    apply_balance_changes(
-        host,
-        giver_contract,
-        giver_account,
-        receiver_account,
-        &amount.0,
-    )?;
+    apply_balance_changes(host, giver_account, receiver_account, &amount.0)?;
     Ok(TransferSuccess {
         storage: None,
         lazy_storage_diff: None,
@@ -140,7 +131,6 @@ pub fn transfer_tez<Host: Runtime>(
 
 fn burn_tez(
     host: &mut impl Runtime,
-    contract: &Contract,
     account: &impl TezlinkAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<Narith, TransferError> {
@@ -151,7 +141,7 @@ fn burn_tez(
         None => {
             log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: contract.clone(),
+                contract: account.contract(),
                 balance: balance.clone(),
                 amount: amount.into(),
             }));
@@ -169,10 +159,9 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
-    sender_contract: &Contract,
-    sender_account: &mut TezlinkOriginatedAccount,
+    sender_account: &TezlinkOriginatedAccount,
     parser: &'a Parser<'a>,
-    source: &PublicKeyHash,
+    source_account: &TezlinkImplicitAccount,
     gas: &mut Gas,
     operation_counter: &mut u128,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
@@ -222,7 +211,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 if failed.is_some() {
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
-                        sender: sender_contract.clone(),
+                        sender: sender_account.contract(),
                         nonce,
                         result: ContentResult::Skipped,
                     })
@@ -230,7 +219,6 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                     let receipt = transfer(
                         host,
                         context,
-                        sender_contract,
                         sender_account,
                         &content.amount,
                         &content.destination,
@@ -240,7 +228,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                             .map_or(&Entrypoint::default(), |param| &param.entrypoint),
                         value,
                         parser,
-                        source,
+                        source_account,
                         gas,
                         operation_counter,
                         all_internal_receipts,
@@ -251,7 +239,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                     );
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
-                        sender: sender_contract.clone(),
+                        sender: sender_account.contract(),
                         nonce,
                         result: match receipt {
                             Ok(success) => ContentResult::Applied(success.into()),
@@ -287,18 +275,16 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                             delegate,
                             script,
                         },
-                        sender: sender_contract.clone(),
+                        sender: sender_account.contract(),
                         nonce,
                         result: ContentResult::Skipped,
                     })
                 } else {
-                    let source_contract = Contract::Implicit(source.clone());
                     let receipt = originate_contract(
                         host,
                         context,
                         address,
-                        &source_contract,
-                        sender_contract,
+                        source_account,
                         sender_account,
                         &amount,
                         &script,
@@ -310,7 +296,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                             delegate,
                             script,
                         },
-                        sender: sender_contract.clone(),
+                        sender: sender_account.contract(),
                         nonce,
                         result: match receipt {
                             Ok(success) => ContentResult::Applied(success),
@@ -461,14 +447,13 @@ impl<'a, Host: Runtime> CtxTrait<'a>
 pub fn transfer<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
-    sender_contract: &Contract,
-    sender_account: &mut impl TezlinkAccount,
+    sender_account: &impl TezlinkAccount,
     amount: &Narith,
     dest_contract: &Contract,
     entrypoint: &Entrypoint,
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
-    source: &PublicKeyHash,
+    source_account: &TezlinkImplicitAccount,
     gas: &mut Gas,
     operation_counter: &mut u128,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
@@ -482,22 +467,14 @@ pub fn transfer<'a, Host: Runtime>(
             if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Err(TransferError::NonSmartContractExecutionCall);
             }
+
+            let dest_account = TezlinkImplicitAccount::from_public_key_hash(context, pkh)
+                .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             // Allocated is not being used on purpose (see below the comment on the allocated_destination_contract field)
-            let _allocated =
-                TezlinkImplicitAccount::allocate(host, context, dest_contract)
-                    .map_err(|_| TransferError::FailedToAllocateDestination)?;
-            let mut dest_account =
-                TezlinkImplicitAccount::from_public_key_hash(context, pkh)
-                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            transfer_tez(
-                host,
-                sender_contract,
-                sender_account,
-                amount,
-                dest_contract,
-                &mut dest_account,
-            )
-            .map(|success| {
+            let _allocated = dest_account
+                .allocate(host)
+                .map_err(|_| TransferError::FailedToAllocateDestination)?;
+            transfer_tez(host, sender_account, amount, &dest_account).map(|success| {
                 TransferSuccess {
                     // This boolean is kept at false on purpose to maintain compatibility with TZKT.
                     // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
@@ -508,19 +485,11 @@ pub fn transfer<'a, Host: Runtime>(
                 }
             })
         }
-        Contract::Originated(_) => {
-            let mut dest_account =
-                TezlinkOriginatedAccount::from_contract(context, dest_contract)
-                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            let receipt = transfer_tez(
-                host,
-                sender_contract,
-                sender_account,
-                amount,
-                dest_contract,
-                &mut dest_account,
-            )?;
-            let sender = address_from_contract(sender_contract.clone());
+        Contract::Originated(kt1) => {
+            let dest_account = TezlinkOriginatedAccount::from_kt1(context, kt1)
+                .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+            let receipt = transfer_tez(host, sender_account, amount, &dest_account)?;
+            let sender = address_from_contract(sender_account.contract());
             let amount = amount.0.clone().try_into().map_err(
                 |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
                     TransferError::MirAmountToNarithError(err.to_string())
@@ -545,7 +514,7 @@ pub fn transfer<'a, Host: Runtime>(
                 host,
                 context,
                 gas,
-                source: source.clone(),
+                source: source_account.pkh().clone(),
                 sender,
                 amount,
                 self_address,
@@ -569,10 +538,9 @@ pub fn transfer<'a, Host: Runtime>(
                 host,
                 context,
                 internal_operations,
-                dest_contract,
-                &mut dest_account,
+                &dest_account,
                 parser,
-                source,
+                source_account,
                 gas,
                 ctx.operation_counter,
                 all_internal_receipts,
@@ -629,8 +597,7 @@ fn get_contract_entrypoint(
 pub fn transfer_external<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
-    source: &PublicKeyHash,
-    source_account: &mut TezlinkImplicitAccount,
+    source_account: &TezlinkImplicitAccount,
     amount: &Narith,
     dest: &Contract,
     parameter: &Option<Parameter>,
@@ -644,13 +611,12 @@ pub fn transfer_external<Host: Runtime>(
         host,
         Debug,
         "Applying an external transfer operation from {} to {:?} of {:?} mutez with parameters {:?}",
-        source,
+        source_account.pkh(),
         dest,
         amount,
         parameter
     );
 
-    let source_contract = Contract::Implicit(source.clone());
     let parser = Parser::new();
     let (entrypoint, value) = match parameter {
         Some(param) => (
@@ -663,14 +629,13 @@ pub fn transfer_external<Host: Runtime>(
     transfer(
         host,
         context,
-        &source_contract,
         source_account,
         amount,
         dest,
         entrypoint,
         value,
         &parser,
-        source,
+        source_account,
         &mut mir::gas::Gas::default(),
         &mut 0,
         all_internal_receipts,
@@ -694,9 +659,8 @@ fn originate_contract<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     contract: ContractKt1Hash,
-    source_contract: &Contract,
-    sender_contract: &Contract,
-    sender_account: &mut impl TezlinkAccount,
+    source_account: &TezlinkImplicitAccount,
+    sender_account: &impl TezlinkAccount,
     initial_balance: &Narith,
     script: &Script,
     typecheck: bool,
@@ -719,14 +683,11 @@ fn originate_contract<Host: Runtime>(
             })?;
     }
 
-    let dest_contract = Contract::Originated(contract.clone());
-
     // TODO: Handle lazy_storage diff, a lot of the origination is concerned
 
     // Set the storage of the contract
-    let mut smart_contract =
-        TezlinkOriginatedAccount::from_contract(context, &dest_contract)
-            .map_err(|_| OriginationError::FailedToFetchOriginated)?;
+    let smart_contract = TezlinkOriginatedAccount::from_kt1(context, &contract)
+        .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
     let total_size = smart_contract
         .init(host, &script.code, &script.storage)
@@ -741,7 +702,7 @@ fn originate_contract<Host: Runtime>(
 
     // Compute the initial_balance setup of the smart contract as a balance update for the origination.
     let mut balance_updates =
-        compute_balance_updates(sender_contract, &dest_contract, initial_balance)
+        compute_balance_updates(sender_account, &smart_contract, initial_balance)
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
 
     // Balance updates for the impacts of origination on storage space.
@@ -750,36 +711,22 @@ fn originate_contract<Host: Runtime>(
         .checked_mul(&BigUint::from(COST_PER_BYTES))
         .ok_or(OriginationError::FailedToComputeBalanceUpdate)?;
     let storage_fees_balance_updates =
-        compute_storage_balance_updates(source_contract, storage_fees.clone())
+        compute_storage_balance_updates(source_account, storage_fees.clone())
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
     balance_updates.extend(storage_fees_balance_updates);
 
     // Balance updates for the base origination cost.
     let origination_fees_balance_updates =
-        compute_storage_balance_updates(source_contract, ORIGINATION_COST.into())
+        compute_storage_balance_updates(source_account, ORIGINATION_COST.into())
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
     balance_updates.extend(origination_fees_balance_updates);
 
     // Apply the balance change, accordingly to the balance updates computed
-    apply_balance_changes(
-        host,
-        sender_contract,
-        sender_account,
-        &mut smart_contract,
-        &initial_balance.0,
-    )
-    .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
+    apply_balance_changes(host, sender_account, &smart_contract, &initial_balance.0)
+        .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
-    // Retrieve the source account to charge the fees.
-    let source_account = TezlinkImplicitAccount::from_contract(context, source_contract)
-        .map_err(|_| OriginationError::FailedToFetchSourceAccount)?;
-    let _ = burn_tez(
-        host,
-        source_contract,
-        &source_account,
-        &(ORIGINATION_COST + storage_fees),
-    )
-    .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
+    let _ = burn_tez(host, source_account, &(ORIGINATION_COST + storage_fees))
+        .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
     let dummy_origination_sucess = OriginationSuccess {
         balance_updates,
@@ -798,7 +745,7 @@ fn originate_contract<Host: Runtime>(
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
 fn compute_fees_balance_updates(
-    source: &PublicKeyHash,
+    source: &TezlinkImplicitAccount,
     amount: &Narith,
 ) -> Result<
     (BalanceUpdate, BalanceUpdate),
@@ -808,7 +755,7 @@ fn compute_fees_balance_updates(
     let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
 
     let source_update = BalanceUpdate {
-        balance: Balance::Account(Contract::Implicit(source.clone())),
+        balance: Balance::Account(source.contract()),
         changes: source_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
@@ -824,8 +771,8 @@ fn compute_fees_balance_updates(
 
 /// Prepares balance updates in the format expected by the Tezos operation.
 fn compute_balance_updates(
-    giver: &Contract,
-    receiver: &Contract,
+    giver: &impl TezlinkAccount,
+    receiver: &impl TezlinkAccount,
     amount: &Narith,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
     if amount.eq(&0_u64.into()) {
@@ -836,13 +783,13 @@ fn compute_balance_updates(
     let receiver_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
 
     let giver_update = BalanceUpdate {
-        balance: Balance::Account(giver.clone()),
+        balance: Balance::Account(giver.contract()),
         changes: giver_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
 
     let receiver_update = BalanceUpdate {
-        balance: Balance::Account(receiver.clone()),
+        balance: Balance::Account(receiver.contract()),
         changes: receiver_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
@@ -852,14 +799,14 @@ fn compute_balance_updates(
 
 /// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
 pub fn compute_storage_balance_updates(
-    source: &Contract,
+    source: &TezlinkImplicitAccount,
     fee: BigUint,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
     let source_delta = BigInt::from_biguint(num_bigint::Sign::Minus, fee.clone());
     let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, fee);
 
     let source_update = BalanceUpdate {
-        balance: Balance::Account(source.clone()),
+        balance: Balance::Account(source.contract()),
         changes: source_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
@@ -876,9 +823,8 @@ pub fn compute_storage_balance_updates(
 /// Applies balance changes by updating both source and destination accounts.
 fn apply_balance_changes(
     host: &mut impl Runtime,
-    giver_contract: &Contract,
-    giver_account: &mut impl TezlinkAccount,
-    receiver_account: &mut impl TezlinkAccount,
+    giver_account: &impl TezlinkAccount,
+    receiver_account: &impl TezlinkAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<(), TransferError> {
     let giver_balance = giver_account
@@ -888,8 +834,8 @@ fn apply_balance_changes(
         None => {
             log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: giver_contract.clone(),
-                balance: giver_balance.clone(),
+                contract: giver_account.contract(),
+                balance: giver_balance,
                 amount: amount.into(),
             }));
         }
@@ -957,13 +903,12 @@ fn execute_validation<Host: Runtime>(
         .into_iter()
         .map(|op| op.into())
         .collect::<Vec<ManagerOperation<OperationContent>>>();
-    let (source, pk, source_account) =
-        validate::validate_source(host, context, &content)?;
+    let (pk, source_account) = validate::validate_source(host, context, &content)?;
     let mut balance_updates = vec![];
 
     for c in &content {
         let (new_source_balance, op_balance_updates) =
-            validate_individual_operation(host, &source, &source_account, c)?;
+            validate_individual_operation(host, &source_account, c)?;
 
         source_account
             .set_balance(host, &new_source_balance)
@@ -978,7 +923,6 @@ fn execute_validation<Host: Runtime>(
 
     match verify_signature(&pk, &operation.branch, content, operation.signature) {
         Ok((true, validated_operations)) => Ok(ValidationInfo {
-            source,
             source_account,
             balance_updates,
             validated_operations,
@@ -1067,8 +1011,7 @@ fn apply_batch<Host: Runtime>(
     chain_id: &ChainId,
 ) -> (Vec<OperationResultSum>, bool) {
     let ValidationInfo {
-        source,
-        mut source_account,
+        source_account,
         balance_updates,
         validated_operations,
     } = validation_info;
@@ -1101,8 +1044,7 @@ fn apply_batch<Host: Runtime>(
                 context,
                 origination_nonce,
                 &content,
-                &source,
-                &mut source_account,
+                &source_account,
                 balance_uppdate,
                 level,
                 now,
@@ -1133,8 +1075,7 @@ fn apply_operation<Host: Runtime>(
     context: &Context,
     origination_nonce: &mut OriginationNonce,
     content: &ManagerOperation<OperationContent>,
-    source: &PublicKeyHash,
-    source_account: &mut TezlinkImplicitAccount,
+    source_account: &TezlinkImplicitAccount,
     balance_updates: Vec<BalanceUpdate>,
     level: &BlockNumber,
     now: &Timestamp,
@@ -1143,7 +1084,7 @@ fn apply_operation<Host: Runtime>(
     let mut internal_operations_receipts = Vec::new();
     match &content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
-            let reveal_result = reveal(host, source, source_account, pk);
+            let reveal_result = reveal(host, source_account, pk);
             let manager_result = produce_operation_result(
                 balance_updates,
                 reveal_result.map_err(Into::into),
@@ -1159,7 +1100,6 @@ fn apply_operation<Host: Runtime>(
             let transfer_result = transfer_external(
                 host,
                 context,
-                source,
                 source_account,
                 amount,
                 destination,
@@ -1183,13 +1123,11 @@ fn apply_operation<Host: Runtime>(
             ref script,
         }) => {
             let address = origination_nonce.generate_kt1();
-            let source_contract = Contract::Implicit(source.clone());
             let origination_result = originate_contract(
                 host,
                 context,
                 address,
-                &source_contract,
-                &source_contract,
+                source_account,
                 source_account,
                 balance,
                 script,
@@ -1513,12 +1451,13 @@ mod tests {
 
         let context = context::Context::init_context();
 
-        // Allocate the account
-        TezlinkImplicitAccount::allocate(host, &context, &contract)
-            .expect("Account initialization should have succeed");
-
         let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account creation should have succeed");
+
+        // Allocate the account
+        account
+            .allocate(host)
+            .expect("Account allocation should have succeed");
 
         // Setting the balance to pass the validity check
         account
@@ -1759,7 +1698,7 @@ mod tests {
                 .expect("PublicKeyHash b58 conversion should have succeed");
 
         account
-            .set_manager_public_key_hash(&mut host, &inconsistent_pkh)
+            .force_set_manager_public_key_hash(&mut host, &inconsistent_pkh)
             .expect("Setting manager field should have succeed");
 
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());

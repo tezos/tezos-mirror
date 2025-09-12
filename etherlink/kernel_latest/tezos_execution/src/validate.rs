@@ -5,7 +5,7 @@
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
+use tezos_smart_rollup::types::PublicKey;
 use tezos_tezlink::{
     operation::{ManagerOperation, OperationContent, RevealContent},
     operation_result::{CounterError, ValidityError},
@@ -126,7 +126,6 @@ fn check_storage_limit(
 }
 
 pub struct ValidationInfo {
-    pub source: PublicKeyHash,
     pub source_account: TezlinkImplicitAccount,
     pub balance_updates: Vec<Vec<BalanceUpdate>>,
     pub validated_operations: Vec<ManagerOperation<OperationContent>>,
@@ -136,7 +135,7 @@ pub fn validate_source<Host: Runtime>(
     host: &Host,
     context: &Context,
     content: &[ManagerOperation<OperationContent>],
-) -> Result<(PublicKeyHash, PublicKey, TezlinkImplicitAccount), ValidityError> {
+) -> Result<(PublicKey, TezlinkImplicitAccount), ValidityError> {
     if content.is_empty() {
         return Err(ValidityError::EmptyBatch);
     }
@@ -162,12 +161,11 @@ pub fn validate_source<Host: Runtime>(
 
     let pk = get_revealed_key(host, &account, &content[0].operation)?;
 
-    Ok((source.clone(), pk, account))
+    Ok((pk, account))
 }
 
 pub fn validate_individual_operation<Host: Runtime>(
     host: &Host,
-    source: &PublicKeyHash,
     account: &TezlinkImplicitAccount,
     content: &ManagerOperation<OperationContent>,
 ) -> Result<(Narith, Vec<BalanceUpdate>), ValidityError> {
@@ -212,7 +210,7 @@ pub fn validate_individual_operation<Host: Runtime>(
     );
 
     let (src_delta, block_fees) =
-        crate::compute_fees_balance_updates(source, &content.fee)
+        crate::compute_fees_balance_updates(account, &content.fee)
             .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
 
     Ok((new_balance, vec![src_delta, block_fees]))

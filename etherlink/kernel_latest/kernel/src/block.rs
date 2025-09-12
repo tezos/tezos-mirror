@@ -1125,7 +1125,8 @@ mod tests {
             .expect("Account interface should be correct");
 
         // Allocate bootstrap 1
-        TezlinkImplicitAccount::allocate(&mut host, &context, &contract)
+        account
+            .allocate(&mut host)
             .expect("Contract initialization should have succeeded");
 
         let pk = PublicKey::from_b58check(
@@ -1182,7 +1183,8 @@ mod tests {
                 .expect("Account interface should be correct");
 
         // Allocate bootstrap 1 and give some mutez for a transfer
-        TezlinkImplicitAccount::allocate(&mut host, &context, &bootstrap1_contract)
+        bootstrap1
+            .allocate(&mut host)
             .expect("Contract initialization should have succeed");
 
         bootstrap1
@@ -1308,7 +1310,8 @@ mod tests {
             TezlinkImplicitAccount::from_contract(&context, &bootstrap1_contract)
                 .expect("Account interface should be correct");
         // Allocate bootstrap 1 and give some mutez for a transfer
-        TezlinkImplicitAccount::allocate(&mut host, &context, &bootstrap1_contract)
+        bootstrap1
+            .allocate(&mut host)
             .expect("Contract initialization should have succeed");
         bootstrap1
             .set_balance(&mut host, &500_000u64.into())
