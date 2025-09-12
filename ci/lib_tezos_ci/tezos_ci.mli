@@ -24,10 +24,6 @@ val name_of_tezos_job : tezos_job -> string
 val set_tezos_job_cache_policy :
   Gitlab_ci.Types.cache_policy -> tezos_job -> tezos_job
 
-(** Removes any rules in jobs. Used in
-    [schedule_merge_train_cache_refresh] pipeline. *)
-val no_rules : tezos_job -> tezos_job
-
 (** Make jobs always start. Used in
     [schedule_merge_train_cache_refresh] pipeline.
     NB: needed because some jobs have no [needs]. They will only start if all jobs of previous stages either succeed or are allowed to fail. Also make [no_rules] less useful, apart from simplifying the yaml.

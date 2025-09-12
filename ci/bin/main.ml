@@ -372,7 +372,7 @@ let () =
        @ Rpm_repository.jobs Full
       |> List.filter Tezos_ci.has_cache_or_start_images_stages
       |> List.map (Tezos_ci.set_tezos_job_cache_policy Gitlab_ci.Types.Push)
-      |> List.map Tezos_ci.no_rules
+      |> List.map Schedule_cache_refresh.no_rules
       |> List.map Tezos_ci.when_always
       |> List.map (with_interruptible false))
     ~description:
