@@ -33,16 +33,14 @@ use tezos_tezlink::operation_result::{
 };
 use tezos_tezlink::{
     operation::{
-        verify_signature, ManagerOperation, OperationContent, Parameter, RevealContent,
-        TransferContent,
+        ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
     },
     operation_result::{
         produce_operation_result, Balance, BalanceTooLow, BalanceUpdate, OperationError,
         OperationResultSum, OriginationError, RevealError, RevealSuccess, TransferError,
-        TransferSuccess, UpdateOrigin, ValidityError,
+        TransferSuccess, UpdateOrigin,
     },
 };
-use validate::{validate_individual_operation, ValidationInfo};
 
 use crate::address::OriginationNonce;
 
@@ -105,7 +103,7 @@ fn address_from_contract(contract: Contract) -> AddressHash {
     }
 }
 
-pub fn transfer_tez<Host: Runtime>(
+fn transfer_tez<Host: Runtime>(
     host: &mut Host,
     giver_account: &impl TezlinkAccount,
     amount: &Narith,
@@ -155,7 +153,7 @@ fn burn_tez(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn execute_internal_operations<'a, Host: Runtime>(
+fn execute_internal_operations<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
@@ -444,7 +442,7 @@ impl<'a, Host: Runtime> CtxTrait<'a>
 
 /// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
 #[allow(clippy::too_many_arguments)]
-pub fn transfer<'a, Host: Runtime>(
+fn transfer<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     sender_account: &impl TezlinkAccount,
@@ -594,7 +592,7 @@ fn get_contract_entrypoint(
 
 // Handles manager transfer operations.
 #[allow(clippy::too_many_arguments)]
-pub fn transfer_external<Host: Runtime>(
+fn transfer_external<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     source_account: &TezlinkImplicitAccount,
@@ -798,7 +796,7 @@ fn compute_balance_updates(
 }
 
 /// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
-pub fn compute_storage_balance_updates(
+fn compute_storage_balance_updates(
     source: &TezlinkImplicitAccount,
     fee: BigUint,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
@@ -893,44 +891,6 @@ fn execute_smart_contract<'a>(
     Ok((internal_operations, new_storage))
 }
 
-fn execute_validation<Host: Runtime>(
-    host: &mut Host,
-    context: &Context,
-    operation: Operation,
-) -> Result<ValidationInfo, ValidityError> {
-    let content = operation
-        .content
-        .into_iter()
-        .map(|op| op.into())
-        .collect::<Vec<ManagerOperation<OperationContent>>>();
-    let (pk, source_account) = validate::validate_source(host, context, &content)?;
-    let mut balance_updates = vec![];
-
-    for c in &content {
-        let (new_source_balance, op_balance_updates) =
-            validate_individual_operation(host, &source_account, c)?;
-
-        source_account
-            .set_balance(host, &new_source_balance)
-            .map_err(|_| ValidityError::FailedToUpdateBalance)?;
-
-        source_account
-            .increment_counter(host)
-            .map_err(|_| ValidityError::FailedToIncrementCounter)?;
-
-        balance_updates.push(op_balance_updates);
-    }
-
-    match verify_signature(&pk, &operation.branch, content, operation.signature) {
-        Ok((true, validated_operations)) => Ok(ValidationInfo {
-            source_account,
-            balance_updates,
-            validated_operations,
-        }),
-        _ => Err(ValidityError::InvalidSignature),
-    }
-}
-
 pub fn validate_and_apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
@@ -949,18 +909,19 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 
     log!(safe_host, Debug, "Verifying that the batch is valid");
 
-    let validation_info = match execute_validation(&mut safe_host, context, operation) {
-        Ok(validation_info) => validation_info,
-        Err(validity_err) => {
-            log!(
-                safe_host,
-                Debug,
-                "Reverting the changes because the batch is invalid."
-            );
-            safe_host.revert()?;
-            return Err(OperationError::Validation(validity_err));
-        }
-    };
+    let validation_info =
+        match validate::execute_validation(&mut safe_host, context, operation) {
+            Ok(validation_info) => validation_info,
+            Err(validity_err) => {
+                log!(
+                    safe_host,
+                    Debug,
+                    "Reverting the changes because the batch is invalid."
+                );
+                safe_host.revert()?;
+                return Err(OperationError::Validation(validity_err));
+            }
+        };
 
     log!(safe_host, Debug, "Batch is valid!");
 
@@ -1005,12 +966,12 @@ fn apply_batch<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     origination_nonce: &mut OriginationNonce,
-    validation_info: ValidationInfo,
+    validation_info: validate::ValidationInfo,
     level: &BlockNumber,
     now: &Timestamp,
     chain_id: &ChainId,
 ) -> (Vec<OperationResultSum>, bool) {
-    let ValidationInfo {
+    let validate::ValidationInfo {
         source_account,
         balance_updates,
         validated_operations,

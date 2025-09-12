@@ -101,6 +101,19 @@ impl Operation {
         let op_hash = digest_256(&serialized_op);
         Ok(OperationHash(H256::from_slice(&op_hash)))
     }
+
+    pub fn verify_signature(self, pk: &PublicKey) -> Result<bool, BinError> {
+        let serialized_unsigned_operation =
+            serialize_unsigned_operation(&self.branch, &self.content)?;
+        let signature = &self.signature.into();
+        // The verify_signature function never returns false. If the verification
+        // is incorrect the function will return an Error and it's up to us to
+        // transform that into a `false` boolean if we want.
+        let check = pk
+            .verify_signature(signature, &serialized_unsigned_operation)
+            .unwrap_or(false);
+        Ok(check)
+    }
 }
 
 impl Decodable for Operation {
@@ -248,13 +261,11 @@ pub fn serialize_unsigned_operation(
 
     let mut serialized_unsigned_operation = vec![watermark];
 
-    let branch: [u8; 32] = branch.0.to_fixed_bytes();
-    tezos_data_encoding::enc::put_bytes(&branch, &mut serialized_unsigned_operation);
+    branch.bin_write(&mut serialized_unsigned_operation)?;
     tezos_data_encoding::enc::list(ManagerOperationContent::bin_write)(
         content,
         &mut serialized_unsigned_operation,
-    )
-    .expect("Failed to serialize the content");
+    )?;
 
     Ok(serialized_unsigned_operation)
 }
@@ -277,30 +288,6 @@ pub fn sign_operation(
     let signature = sk.sign(serialized_unsigned_operation)?;
 
     Ok(signature.into())
-}
-
-pub fn verify_signature(
-    pk: &PublicKey,
-    branch: &BlockHash,
-    content: Vec<ManagerOperation<OperationContent>>,
-    signature: UnknownSignature,
-) -> Result<(bool, Vec<ManagerOperation<OperationContent>>), BinError> {
-    let content = content
-        .into_iter()
-        .map(|op| op.into())
-        .collect::<Vec<ManagerOperationContent>>();
-    let serialized_unsigned_operation = serialize_unsigned_operation(branch, &content)?;
-
-    let signature = &signature.into();
-
-    // The verify_signature function never returns false. If the verification
-    // is incorrect the function will return an Error and it's up to us to
-    // transform that into a `false` boolean if we want.
-    let check = pk
-        .verify_signature(signature, &serialized_unsigned_operation)
-        .unwrap_or(false);
-    let content = content.into_iter().map(|op| op.into()).collect();
-    Ok((check, content))
 }
 
 pub fn zip_operations(
