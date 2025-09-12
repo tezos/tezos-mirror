@@ -485,10 +485,9 @@ pub fn transfer<'a, Host: Runtime>(
                 }
             })
         }
-        Contract::Originated(_) => {
-            let dest_account =
-                TezlinkOriginatedAccount::from_contract(context, dest_contract)
-                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+        Contract::Originated(kt1) => {
+            let dest_account = TezlinkOriginatedAccount::from_kt1(context, kt1)
+                .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             let receipt = transfer_tez(host, sender_account, amount, &dest_account)?;
             let sender = address_from_contract(sender_account.contract());
             let amount = amount.0.clone().try_into().map_err(
