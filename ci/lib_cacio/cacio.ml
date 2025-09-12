@@ -91,6 +91,7 @@ type job = {
   test_coverage : bool;
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
   retry : Gitlab_ci.Types.retry option;
+  image_dependencies : Tezos_ci.Image.t list;
 }
 
 type trigger = Auto | Immediate | Manual
@@ -372,6 +373,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     test_coverage;
                     allow_failure;
                     retry;
+                    image_dependencies;
                   };
                 trigger;
                 only_if;
@@ -496,6 +498,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 ?cpu
                 ?storage
                 ~image
+                ~image_dependencies
                 ~dependencies:(Dependent dependencies)
                 ?rules
                 ~interruptible:(interruptible_stage && interruptible_pipeline)
@@ -572,6 +575,7 @@ module type COMPONENT_API = sig
     ?test_coverage:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
+    ?image_dependencies:Tezos_ci.Image.t list ->
     string ->
     string list ->
     job
@@ -614,7 +618,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
       ?(needs_legacy = []) ?variables ?artifacts ?(cargo_cache = false)
       ?(cargo_target_caches = false) ?sccache ?dune_cache
-      ?(test_coverage = false) ?allow_failure ?retry name script =
+      ?(test_coverage = false) ?allow_failure ?retry ?(image_dependencies = [])
+      name script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -658,6 +663,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       test_coverage;
       allow_failure;
       retry;
+      image_dependencies;
     }
 
   let register_before_merging_jobs jobs =

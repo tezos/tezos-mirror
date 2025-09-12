@@ -213,6 +213,10 @@ module type COMPONENT_API = sig
       {!Tezos_ci.Coverage.enable_instrumentation} and
       {!Tezos_ci.Coverage.enable_output_artifact}.
 
+      [?image_dependencies] is temporary,
+      it will be removed once the image feature is implemented in Cacio.
+      See the Future work section for more details.
+
       See {!Tezos_ci.job} for information about other arguments.
 
       The default number of retries is 0 for [Publish] jobs.
@@ -240,6 +244,7 @@ module type COMPONENT_API = sig
     ?test_coverage:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
+    ?image_dependencies:Tezos_ci.Image.t list ->
     string ->
     string list ->
     job
@@ -362,3 +367,8 @@ module Make (_ : COMPONENT) : COMPONENT_API
 
 (** Another idea would be to have the default ~force_if_label be ["ci--" ^ component_name].
     Or to automatically add this label to the list. *)
+
+(** The function [job] currently takes [?image_dependencies] as an optional argument.
+    This is temporary and should be replaced by ~needs:[job_to_build_image]
+    once all the images have been migrated to Cacio.
+    In that case, Cacio would add the [job_to_build_image] in the pipeline, as a dependency. *)
