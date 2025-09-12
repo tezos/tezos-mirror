@@ -28,3 +28,4 @@ mir.workspace = true
 fixed-hash = { version = "0.8", features = ["rand"] }
 rand = "0.9.1"
 pretty_assertions = "1.4.0"
+regex = "1.11.2"
