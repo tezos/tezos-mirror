@@ -377,21 +377,28 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                 m.into_iter()
                     .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
             )),
-            TV::BigMap(m) => {
-                let id_part = m.id.map(|i| V::Int(i.0));
-                let overlay_empty = m.overlay.is_empty();
-                let map_part = V::Seq(V::alloc_iter(
+            TV::BigMap(m) => match m.content {
+                big_map::BigMapContent::InMemory(m) => V::Seq(V::alloc_iter(
                     arena,
-                    m.overlay.into_iter().map(|(key, val)| {
-                        V::prim2(arena, Prim::Elt, go(key), option_into_micheline(val))
-                    }),
-                ));
-                match id_part {
-                    Some(id_part) if overlay_empty => id_part,
-                    Some(id_part) => V::prim2(arena, Prim::Pair, id_part, map_part),
-                    None => map_part,
+                    m.into_iter()
+                        .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
+                )),
+                big_map::BigMapContent::FromLazyStorage(m) => {
+                    let id_part = V::Int(m.id.0);
+                    let overlay_empty = m.overlay.is_empty();
+                    let map_part = V::Seq(V::alloc_iter(
+                        arena,
+                        m.overlay.into_iter().map(|(key, val)| {
+                            V::prim2(arena, Prim::Elt, go(key), option_into_micheline(val))
+                        }),
+                    ));
+                    if overlay_empty {
+                        id_part
+                    } else {
+                        V::prim2(arena, Prim::Pair, id_part, map_part)
+                    }
                 }
-            }
+            },
             TV::Option(x) => option_into_micheline(x.map(|v| *v)),
             TV::Or(or) => match *or {
                 Or::Left(x) => V::prim1(arena, Prim::Left, go(x)),
@@ -761,11 +768,16 @@ pub mod test_strategies {
                         .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
                         .is_ok())
                     .prop_map(Type::new_ticket),
-                (inner.clone(), inner)
+                (inner.clone(), inner.clone())
                     .prop_filter("Key must be comparable", |(k, _)| k
                         .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
                         .is_ok())
                     .prop_map(|(k, v)| Type::new_map(k, v)),
+                (inner.clone(), inner)
+                    .prop_filter("Key must be comparable", |(k, _)| k
+                        .ensure_prop(&mut Gas::default(), TypeProperty::Comparable)
+                        .is_ok())
+                    .prop_map(|(k, v)| Type::new_big_map(k, v)),
             ]
         })
     }
@@ -849,6 +861,25 @@ pub mod test_strategies {
                 .prop_map(V::Map)
                 .boxed()
             }
+            // We don't generate all the allowed syntaxes for big maps
+            // but only id-free ones because these are the only ones
+            // which can be typechecked in any context.
+            T::BigMap(m) => {
+                let (key_ty, val_ty) = m.as_ref();
+                (Just(key_ty.clone()), Just(val_ty.clone()), prop::collection::btree_map(
+                    typed_value_by_type(key_ty),
+                    typed_value_by_type(val_ty),
+                    0..=3,
+                ))
+                    .prop_map(|(key_type, value_type, map)|
+                              {
+                                  let content = big_map::BigMapContent::InMemory(map);
+                                  V::BigMap(BigMap {
+                                      content,
+                                      key_type,
+                                      value_type,
+                                  })}).boxed()
+            }
             T::Address => prop_oneof![
                 Just(V::Address(
                     Address::from_base58_check("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap()
@@ -923,7 +954,6 @@ pub mod test_strategies {
                 Just(V::Bls12381G2(Box::new(bls::g2::G2::zero()))).boxed(),
             T::Contract(_) => panic!("Cannot generate typed value for contract"),
             T::Operation => panic!("Cannot generate typed value for operation"),
-            T::BigMap(_) => panic!("Cannot generate typed value for big_map"),
             T::Lambda(_) => panic!("Cannot generate typed value for lambda"),
             T::Never =>  panic!("Cannot generate typed value for never"),
             // NOTE: if you append clauses here, you likely need to update other generators too
@@ -947,5 +977,15 @@ mod test_untypers {
             let typed_ = typecheck_value(&untyped, &mut ctx, &typed.ty);
             assert_eq!(typed_, Ok(typed.val))
         }
+    }
+
+    // We used to have a bug in which a panic was raised in the
+    // following case, this test is there to avoid a regression.
+    #[test]
+    fn test_big_map_without_id() {
+        let arena = Arena::new();
+        let mut m = BigMap::empty(Type::Nat, Type::Unit);
+        m.update(TypedValue::Nat(0u32.into()), None);
+        TypedValue::BigMap(m).into_micheline_optimized_legacy(&arena);
     }
 }

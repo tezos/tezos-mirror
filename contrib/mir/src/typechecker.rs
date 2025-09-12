@@ -2373,44 +2373,46 @@ pub(crate) fn typecheck_value<'a>(
             let (tk, tv) = m.as_ref();
             TV::Map(typecheck_map(ctx, t, tk, tv, vs)?)
         }
+        // All valid instantiations of big map are mentioned in
+        // https://tezos.gitlab.io/michelson-reference/#type-big_map
+        (T::BigMap(m), V::Seq(vs)) => {
+            // In-memory big maps have the same syntax as regular maps
+            let (tk, tv) = m.as_ref();
+            let map = typecheck_map(ctx, t, tk, tv, vs)?;
+            TV::BigMap(BigMap::new(tk.clone(), tv.clone(), map))
+        }
         (T::BigMap(m), v) => {
-            let (id_opt, vs_opt, diff) = match v {
-                // All valid instantiations of big map are mentioned in
-                // https://tezos.gitlab.io/michelson-reference/#type-big_map
-                V::Int(i) => (Some(i.clone()), None, false),
-                V::Seq(vs) => (None, Some(vs), false),
-                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (Some(i.clone()), Some(vs), true),
+            let (id, vs_opt, diff) = match v {
+                V::Int(i) => (i, None, false),
+                V::App(Prim::Pair, [V::Int(i), V::Seq(vs)], _) => (i, Some(vs), true),
                 _ => return Err(invalid_value_for_type!()),
             };
 
             let (tk, tv) = m.as_ref();
 
-            let big_map_id = if let Some(id) = id_opt {
-                let big_map_id = BigMapId(id.clone());
-                let (key_type, value_type) = {
-                    let big_map_storage = ctx.big_map_storage();
-                    big_map_storage
-                        .big_map_get_type(&big_map_id)
-                        .map_err(TcError::LazyStorageError)?
-                        .ok_or(TcError::BigMapNotFound(id))?
-                };
-                let key_type = &key_type.clone();
-                let value_type = &value_type.clone();
-                ensure_ty_eq(ctx.gas(), key_type, tk)?;
-                ensure_ty_eq(ctx.gas(), value_type, tv)?;
-                Some(big_map_id)
-            } else {
-                None
-            };
+            let big_map_id = BigMapId(id.clone());
+            let (key_type, value_type) = ctx
+                .big_map_storage()
+                .big_map_get_type(&big_map_id)
+                .map_err(TcError::LazyStorageError)?
+                .ok_or(TcError::BigMapNotFound(id.clone()))?;
+
+            let key_type = &key_type.clone();
+            let value_type = &value_type.clone();
+            ensure_ty_eq(ctx.gas(), key_type, tk)?;
+            ensure_ty_eq(ctx.gas(), value_type, tv)?;
 
             let overlay = if let Some(vs) = vs_opt {
                 typecheck_big_map(ctx, t, tk, tv, vs, diff)?
             } else {
                 BTreeMap::default()
             };
-            TV::BigMap(BigMap {
+            let content = big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
                 id: big_map_id,
                 overlay,
+            });
+            TV::BigMap(BigMap {
+                content,
                 key_type: tk.clone(),
                 value_type: tv.clone(),
             })
@@ -6106,8 +6108,10 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                id: Some(id0.clone()),
-                overlay: BTreeMap::new(),
+                content: big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+                    id: id0.clone(),
+                    overlay: BTreeMap::new()
+                }),
                 key_type: Type::Int,
                 value_type: Type::Int
             }))
@@ -6153,8 +6157,10 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                id: None,
-                overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))]),
+                content: big_map::BigMapContent::InMemory(BTreeMap::from([(
+                    TypedValue::int(7),
+                    TypedValue::int(8)
+                )])),
                 key_type: Type::Int,
                 value_type: Type::Int
             }))
@@ -6194,8 +6200,10 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                id: Some(id0.clone()),
-                overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))]),
+                content: big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+                    id: id0.clone(),
+                    overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))])
+                }),
                 key_type: Type::Int,
                 value_type: Type::Int
             }))
@@ -6209,8 +6217,10 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                id: Some(id0),
-                overlay: BTreeMap::from([(TypedValue::int(7), None)]),
+                content: big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+                    id: id0,
+                    overlay: BTreeMap::from([(TypedValue::int(7), None)])
+                }),
                 key_type: Type::Int,
                 value_type: Type::Int
             }))
