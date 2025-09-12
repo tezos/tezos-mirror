@@ -4,6 +4,12 @@
 
 //! Tezos operations
 
+use crate::lazy_storage_diff::LazyStorageDiffList;
+use crate::operation::OriginationContent;
+use crate::operation::{
+    ManagerOperation, ManagerOperationContent, OperationContent, RevealContent,
+    TransferContent,
+};
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/apply_result.ml` to represent the result of an operation
 /// In Tezlink, operation is equivalent to manager operation because there is no other type of operation that interests us.
 use nom::error::ParseError;
@@ -21,12 +27,6 @@ use tezos_smart_rollup::types::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
-
-use crate::operation::OriginationContent;
-use crate::operation::{
-    ManagerOperation, ManagerOperationContent, OperationContent, RevealContent,
-    TransferContent,
-};
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub struct CounterError {
@@ -389,8 +389,7 @@ pub struct OriginationSuccess {
     pub consumed_gas: Narith,
     pub storage_size: Zarith,
     pub paid_storage_size_diff: Zarith,
-    // TODO: Placeholder for lazy storage diff issue : #8018
-    pub lazy_storage_diff: Option<()>,
+    pub lazy_storage_diff: Option<LazyStorageDiffList>,
 }
 
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
@@ -409,8 +408,7 @@ pub struct TransferSuccess {
     pub storage_size: Zarith,
     pub paid_storage_size_diff: Zarith,
     pub allocated_destination_contract: bool,
-    // TODO: Placeholder for lazy storage diff issue : #8018
-    pub lazy_storage_diff: Option<()>,
+    pub lazy_storage_diff: Option<LazyStorageDiffList>,
 }
 
 // An operation error in a Tezos receipt has no specific format
