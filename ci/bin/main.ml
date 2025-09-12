@@ -369,6 +369,7 @@ let () =
       (Code_verification.jobs Merge_train
        @ !Hooks.before_merging
        @ Debian_repository.jobs Full
+       @ Rpm_repository.jobs Full
       |> List.filter Tezos_ci.has_cache_or_start_images_stages
       |> List.map (Tezos_ci.set_tezos_job_cache_policy Gitlab_ci.Types.Push)
       |> List.map Tezos_ci.no_rules
