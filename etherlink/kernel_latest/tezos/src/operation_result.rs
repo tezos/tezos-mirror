@@ -697,6 +697,7 @@ impl BinWriter for OperationWithMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::encoding_test_data_helper::test_helpers::fetch_generated_data;
     use crate::operation::{ManagerOperation, OriginationContent, TransferContent};
     use pretty_assertions::assert_eq;
 
@@ -851,116 +852,42 @@ mod tests {
         );
     }
 
-    // The operation with metadata below is produced by using the following command:
-    /* octez-codec encode 022-PsRiotum.operation.data_and_metadata from '{"contents":
-    [{"kind":"transaction","source":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
-      "fee":"468","counter":"1","gas_limit":"2169","storage_limit":"0",
-      "amount":"42000000","destination":"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
-      "metadata":{"balance_updates":[],
-      "operation_result":{"status":"applied",
-      "balance_updates":[{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-42000000","origin":"block"},{"kind":"contract","contract":"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN","change":"42000000","origin":"block"}],
-      "consumed_milligas":"2169000"}}}],
-      "signature":"sigPc9gwEse2o5nsicnNeWLjLgoMbEGumXw7PErAkMMa1asXVKRq43RPd7TnUKYwuHmejxEu15XTyV1iKGiaa8akFHK7CCEF"}' */
     #[test]
     fn tezos_compatibility_for_successful_operation_with_metadata() {
         let mut output = vec![];
         dummy_test_result_operation()
             .bin_write(output.as_mut())
             .expect("Operation with metadata should be encodable");
-        let operation_and_receipt_bytes = "00000000966c0002298c03ed7d454a101eb7022bc95f7e5f41ac78d40301f9100080bd83140000e7670f32038107a59a2b9cfefae36ea21f5aa63c00000000000000000000004000000002298c03ed7d454a101eb7022bc95f7e5f41ac78fffffffffd7f218000000000e7670f32038107a59a2b9cfefae36ea21f5aa63c000000000280de80000000000000000000a8b1840100000000000000000c5e6f3021d6effcc1b99d918a3db6dd4820893f076386fb9c85bf62f497870936898e970901e5f8b3e41a8eb0aa1a578811c110415c01719e6ed2dc6e96bb0a";
+        let operation_and_receipt_bytes =
+            fetch_generated_data("S023", "operation.data_and_metadata", "tez_transfer");
 
-        assert_eq!(hex::encode(output), operation_and_receipt_bytes);
+        assert_eq!(output, operation_and_receipt_bytes);
     }
 
-    // The operation with metadata below is produced by using the following command:
-    /* octez-codec encode 023-PtSeouLo.operation.data_and_metadata from '{"contents":
-    [{"kind":"origination","source":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
-      "fee":"343","counter":"1","gas_limit":"679","storage_limit":"323",
-      "balance":"1000000",
-      "script":{"code":[
-        {"prim":"parameter","args":[{"prim":"string"}]},
-        {"prim":"storage","args":[{"prim":"string"}]},
-        {"prim":"code","args":[[{"prim":"CAR"},{"prim":"NIL","args":[{"prim":"operation"}]},{"prim":"PAIR"}]]}],
-      "storage":{"string":"hello"}},
-      "metadata":
-        {"balance_updates":[
-        {"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-343","origin":"block"},
-        {"kind":"accumulator","category":"block fees","change":"343","origin":"block"}],
-         "operation_result":{
-            "status":"applied",
-            "balance_updates":[{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-11500","origin":"block"},{"kind":"burned","category":"storage fees","change":"11500","origin":"block"},{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-64250","origin":"block"},{"kind":"burned","category":"storage fees","change":"64250","origin":"block"},{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-1000000","origin":"block"},{"kind":"contract","contract":"KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe","change":"1000000","origin":"block"}],
-            "originated_contracts":["KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe"],
-            "consumed_milligas":"578755",
-            "storage_size":"46",
-            "paid_storage_size_diff":"46"}}}],
-            "signature":"sigjUkDaz4jjfp7EvsPGryCBoGKZ1B3FiAn4kX9adpwmcKUEpobhkNJjbYqjxB1mgBe7wGGGQp4T8MPzithFpbBMCN2L5RUa"}' */
     #[test]
     fn tezos_compatibility_for_successful_origination_with_metadata() {
         let mut output = vec![];
         simple_origination_operation()
             .bin_write(output.as_mut())
             .expect("Operation with metadata should be encodable");
-        let operation_and_receipt_bytes = "000000013a6d0002298c03ed7d454a101eb7022bc95f7e5f41ac78d70201a705c302c0843d000000001c02000000170500036805010368050202000000080316053d036d03420000000a010000000568656c6c6f0000002a00000002298c03ed7d454a101eb7022bc95f7e5f41ac78fffffffffffffea90002000000000000015700000000009400000002298c03ed7d454a101eb7022bc95f7e5f41ac78ffffffffffffd314000b0000000000002cec0000000002298c03ed7d454a101eb7022bc95f7e5f41ac78ffffffffffff0506000b000000000000fafa0000000002298c03ed7d454a101eb7022bc95f7e5f41ac78fffffffffff0bdc0000001f1a40a8574cf5dd73ddaa5c3a4eabad41e64ae0b0000000000000f4240000000001601f1a40a8574cf5dd73ddaa5c3a4eabad41e64ae0b00c3a9232e2e0000000000a443d5393c979c3685198d8fb754bfd9bd59c4c96423fc3928cfcf9742921c7b0490057599fa9367cc74d6bcb5c0004adcf69037e655779642e1b94586544a00";
+        let operation_and_receipt_bytes =
+            fetch_generated_data("S023", "operation.data_and_metadata", "origination");
 
-        assert_eq!(hex::encode(output), operation_and_receipt_bytes);
+        assert_eq!(output, operation_and_receipt_bytes);
     }
 
-    /*
-        octez-codec encode alpha.operation.data_and_metadata from '{ "contents":
-      [ { "kind": "transaction",
-          "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", "fee": "255",
-          "counter": "1", "gas_limit": "0", "storage_limit": "0",
-          "amount": "27942405962072064",
-          "destination": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
-          "metadata":
-            { "operation_result":
-                { "status": "failed",
-                  "errors":
-                    [ "Transfer(BalanceTooLow(BalanceTooLow { contract: Implicit(Ed25519(ContractTz1Hash(\"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\"))), balance: Narith(10), amount: Narith(21) }))",
-                      "Transfer(BalanceTooLow(BalanceTooLow { contract: Implicit(Ed25519(ContractTz1Hash(\"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN\"))), balance: Narith(55), amount: Narith(1111) }))" ] } } } ],
-    "signature":
-      "sigvVF2FguUHvZHytQ4AoRn4R6tSMteAt4nEHfYEbwQi3nXa3xvsgE93V1XYL99FYFUAH83iSpcAe7KxGaAeE1tLJ3M2jGJT" }'
-         */
     #[test]
     fn tezos_compatibility_for_failed_operation_with_metadata() {
         let operation = dummy_failed_operation();
         let output = operation
             .to_bytes()
             .expect("Operation with metadata should be encodable");
-        let operation_and_receipt_bytes = "00000002276c0002298c03ed7d454a101eb7022bc95f7e5f41ac78ff010100008080a8ec85afd1310000e7670f32038107a59a2b9cfefae36ea21f5aa63c000000000001000001e0000000ebeb000000026b696e64000a0000007065726d616e656e7400026964000e00000074657a6c696e6b5f6572726f7200026572726f725f6d65737361676500a90000005472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a314b715470455a37596f62375162504534487934576f38664847384c684b785a5378222929292c2062616c616e63653a204e6172697468283130292c20616d6f756e743a204e617269746828323129207d29290000000000eded000000026b696e64000a0000007065726d616e656e7400026964000e00000074657a6c696e6b5f6572726f7200026572726f725f6d65737361676500ab0000005472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a31676a614638315a525276647a6a6f627966564e7341655343365053636a6651774e222929292c2062616c616e63653a204e6172697468283535292c20616d6f756e743a204e6172697468283131313129207d2929000000000000f868f45f51a0c7a5733ab2c7f29781303904d9ef5b8fbf7b96429f00fe487c1d0f174c205b49c7393e5436b9522b88d3951113c32115e518465e029439874306";
+        let operation_and_receipt_bytes =
+            fetch_generated_data("S023", "operation.data_and_metadata", "failed");
 
-        assert_eq!(hex::encode(output), operation_and_receipt_bytes);
+        assert_eq!(output, operation_and_receipt_bytes);
     }
 
-    /*
-    octez-codec encode alpha.operation.internal_and_metadata from '{
-      "kind": "transaction",
-      "source": "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb",
-      "nonce": 0,
-      "amount": "1000000",
-      "destination": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
-      "result": {
-        "status": "applied",
-        "consumed_milligas": "100000",
-        "storage_size": "0",
-        "paid_storage_size_diff": "0",
-        "balance_updates": [
-          {
-            "kind": "contract",
-            "contract": "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb",
-            "change": "-1000000",
-            "origin": "block"
-          },
-          {
-            "kind": "contract",
-            "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
-            "change": "1000000",
-            "origin": "block"
-          }
-        ]
-      }
-    }'
-    */
     #[test]
     fn tezos_compatibility_for_internal_operation_with_metadata() {
         let operation = InternalOperationSum::Transfer(InternalContentWithMetadata {
@@ -1011,40 +938,11 @@ mod tests {
         let output = operation
             .to_bytes()
             .expect("Internal operation with metadata should be encodable");
-        let operation_and_receipt_bytes = "0100006b82198cb179e8306c1bedd08f12dc863f3288860000c0843d01b752c7f3de31759bce246416a6823e86b9756c6c0000000000000000400000006b82198cb179e8306c1bedd08f12dc863f328886fffffffffff0bdc0000001b752c7f3de31759bce246416a6823e86b9756c6c0000000000000f4240000000000000000000a08d0600000000";
-        assert_eq!(hex::encode(output), operation_and_receipt_bytes);
+        let operation_and_receipt_bytes =
+            fetch_generated_data("S023", "operation.internal_and_metadata", "applied");
+        assert_eq!(output, operation_and_receipt_bytes);
     }
 
-    /*
-    ./octez-codec encode 023-PtSeouLo.operation.internal_and_metadata from '{
-      "kind": "transaction",
-      "source": "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb",
-      "nonce": 0,
-      "amount": "1000000",
-      "destination": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
-      "result": {
-        "status": "backtracked",
-        "storage": {"string":"hello" },
-        "consumed_milligas": "100000",
-        "storage_size": "0",
-        "paid_storage_size_diff": "0",
-        "balance_updates": [
-          {
-            "kind": "contract",
-            "contract": "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb",
-            "change": "-1000000",
-            "origin": "block"
-          },
-          {
-            "kind": "contract",
-            "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
-            "change": "1000000",
-            "origin": "block"
-          }
-        ]
-      }
-    }'
-      */
     #[test]
     fn test_backtracked_encoding() {
         let operation = InternalOperationSum::Transfer(InternalContentWithMetadata {
@@ -1098,7 +996,11 @@ mod tests {
         let output = operation
             .to_bytes()
             .expect("Internal operation with metadata should be encodable");
-        let operation_and_receipt_bytes = "0100006b82198cb179e8306c1bedd08f12dc863f3288860000c0843d01b752c7f3de31759bce246416a6823e86b9756c6c0000030000ff010000000568656c6c6f000000400000006b82198cb179e8306c1bedd08f12dc863f328886fffffffffff0bdc0000001b752c7f3de31759bce246416a6823e86b9756c6c0000000000000f4240000000000000000000a08d0600000000";
-        assert_eq!(hex::encode(output), operation_and_receipt_bytes);
+        let operation_and_receipt_bytes = fetch_generated_data(
+            "S023",
+            "operation.internal_and_metadata",
+            "backtracked",
+        );
+        assert_eq!(output, operation_and_receipt_bytes);
     }
 }
