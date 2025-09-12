@@ -7,6 +7,7 @@
   "sequencer": {
     "time_between_blocks": 5,
     "max_number_of_chunks": 128,
+    "sequencer": [],
     "blueprints_publisher_config": {
       "max_blueprints_lag": 50,
       "max_blueprints_ahead": 100,
@@ -88,6 +89,7 @@
   "sequencer": {
     "time_between_blocks": 5,
     "max_number_of_chunks": 128,
+    "sequencer": [],
     "blueprints_publisher_config": {
       "max_blueprints_lag": 50,
       "max_blueprints_ahead": 100,
@@ -169,6 +171,7 @@
   "sequencer": {
     "time_between_blocks": 5,
     "max_number_of_chunks": 128,
+    "sequencer": [],
     "blueprints_publisher_config": {
       "max_blueprints_lag": 50,
       "max_blueprints_ahead": 100,

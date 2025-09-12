@@ -1147,7 +1147,7 @@ let add_tezlink_to_node_configuration tezlink_chain_id configuration =
   in
   {configuration with experimental_features}
 
-let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_key ?rpc_addr ?rpc_port
+let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_keys ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
     ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
     ~keep_alive ?rollup_node_endpoint ~verbose ?profiling ?preimages
@@ -1171,7 +1171,7 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_key ?rpc_addr ?rpc_port
       ?tx_queue_max_size
       ?tx_queue_tx_per_addr_limit
       ~keep_alive
-      ?sequencer_key
+      ?sequencer_keys
       ?rollup_node_endpoint
       ~verbose
       ?profiling
@@ -1219,8 +1219,8 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_key ?rpc_addr ?rpc_port
 
   let* signer =
     Option.map_es
-      (Evm_node_lib_dev.Signer.of_sequencer_key configuration wallet_ctxt)
-      sequencer_key
+      (Evm_node_lib_dev.Signer.of_sequencer_keys configuration wallet_ctxt)
+      sequencer_keys
   in
 
   Evm_node_lib_dev.Sequencer.main
@@ -2041,6 +2041,7 @@ let init_config_command =
           (Evm_node_lib_dev.Signer.sequencer_key_of_string wallet_ctxt)
           sequencer_str
       in
+      let sequencer_keys = Option.map (fun k -> [k]) sequencer_key in
       let* config =
         Cli.create_or_read_config
           ~data_dir
@@ -2069,7 +2070,7 @@ let init_config_command =
           ?time_between_blocks
           ?max_number_of_chunks
           ?private_rpc_port
-          ?sequencer_key
+          ?sequencer_keys
           ?evm_node_endpoint
           ?max_blueprints_lag
           ?max_blueprints_ahead
@@ -2614,9 +2615,10 @@ let sequencer_command =
           (Evm_node_lib_dev.Signer.sequencer_key_of_string wallet_ctxt)
           sequencer_str
       in
+      let sequencer_keys = Option.map (fun k -> [k]) sequencer_key in
       start_sequencer
         ~wallet_ctxt
-        ?sequencer_key
+        ?sequencer_keys
         ~data_dir
         ?rpc_addr
         ?rpc_port
@@ -2739,7 +2741,7 @@ let sandbox_command =
       let config_file = config_filename ~data_dir config_file in
       start_sequencer
         ~wallet_ctxt
-        ~sequencer_key
+        ~sequencer_keys:[sequencer_key]
         ~data_dir
         ?rpc_addr
         ?rpc_port
@@ -2857,7 +2859,7 @@ let tezlink_sandbox_command =
       let config_file = config_filename ~data_dir config_file in
       start_sequencer
         ~wallet_ctxt
-        ~sequencer_key
+        ~sequencer_keys:[sequencer_key]
         ~data_dir
         ?rpc_addr
         ?rpc_port

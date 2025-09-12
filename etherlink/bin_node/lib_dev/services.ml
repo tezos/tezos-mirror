@@ -111,7 +111,7 @@ let configuration_handler config =
   let kernel_execution =
     Configuration.{config.kernel_execution with preimages = hidden}
   in
-  let sequencer = {config.sequencer with sequencer = None} in
+  let sequencer = {config.sequencer with sequencer = []} in
   let observer =
     Option.map
       (fun (observer : observer) ->

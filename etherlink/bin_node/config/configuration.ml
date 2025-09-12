@@ -180,7 +180,7 @@ type sequencer_key = Wallet of Client_keys.sk_uri | Gcp_key of gcp_key
 type sequencer = {
   time_between_blocks : time_between_blocks;
   max_number_of_chunks : int;
-  sequencer : sequencer_key option;
+  sequencer : sequencer_key list;
   blueprints_publisher_config : blueprints_publisher_config;
   sunset_sec : int64;
 }
@@ -537,7 +537,7 @@ let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks ?sequencer
       Option.value ~default:default_time_between_blocks time_between_blocks;
     max_number_of_chunks =
       Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
-    sequencer;
+    sequencer = Option.value ~default:[] sequencer;
     blueprints_publisher_config;
     sunset_sec = Option.value ~default:default_sequencer_sunset_sec sunset_sec;
   }
@@ -750,6 +750,24 @@ let sequencer_key_encoding =
         (fun sk_uri -> Wallet (Client_keys.sk_uri_of_string sk_uri));
     ]
 
+let sequencer_key_list_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        Json_only
+        ~title:"List"
+        (list sequencer_key_encoding)
+        (function l -> Some l)
+        Fun.id;
+      case
+        Json_only
+        ~title:"Single"
+        sequencer_key_encoding
+        (function [k] -> Some k | _ -> None)
+        (fun k -> [k]);
+    ]
+
 let sequencer_encoding =
   let open Data_encoding in
   let default_blueprints_publisher_config =
@@ -785,10 +803,11 @@ let sequencer_encoding =
     (obj5
        time_between_blocks_field
        max_number_of_chunks_field
-       (opt
-          ~description:"Secret key URI of the sequencer."
+       (dft
+          ~description:"List of (or single) Secret key URI of the sequencer."
           "sequencer"
-          sequencer_key_encoding)
+          sequencer_key_list_encoding
+          [])
        (dft
           "blueprints_publisher_config"
           blueprints_publisher_config_encoding
@@ -1893,10 +1912,7 @@ let load ?network ~data_dir config_file =
 
 let error_missing_config ~name = [error_of_fmt "missing %s config" name]
 
-let sequencer_key {sequencer = {sequencer; _}; _} =
-  Option.to_result
-    ~none:(error_missing_config ~name:"sequencer.sequencer")
-    sequencer
+let sequencer_keys {sequencer = {sequencer; _}; _} = Ok sequencer
 
 let observer_config_exn {observer; _} =
   Option.to_result ~none:(error_missing_config ~name:"observer") observer
@@ -1979,7 +1995,7 @@ module Cli = struct
       ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?profiling
       ?preimages ?preimages_endpoint ?native_execution_policy
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
-      ?sequencer_key ?evm_node_endpoint ?log_filter_max_nb_blocks
+      ?sequencer_keys ?evm_node_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?history_mode
@@ -2046,6 +2062,9 @@ module Cli = struct
       let sunset_sec =
         Option.value ~default:sequencer_config.sunset_sec sunset_sec
       in
+      let sequencer_keys =
+        Option.value ~default:sequencer_config.sequencer sequencer_keys
+      in
       {
         time_between_blocks =
           Option.value
@@ -2055,7 +2074,7 @@ module Cli = struct
           Option.value
             ~default:sequencer_config.max_number_of_chunks
             max_number_of_chunks;
-        sequencer = Option.either sequencer_key sequencer_config.sequencer;
+        sequencer = sequencer_keys;
         blueprints_publisher_config;
         sunset_sec;
       }
@@ -2177,7 +2196,7 @@ module Cli = struct
       ?tx_queue_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
       ?dont_track_rollup_node ?verbose ?profiling ?preimages ?preimages_endpoint
       ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
-      ?private_rpc_port ?sequencer_key ?evm_node_endpoint
+      ?private_rpc_port ?sequencer_keys ?evm_node_endpoint
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?restricted_rpcs ?finalized_view
@@ -2205,7 +2224,7 @@ module Cli = struct
          ?time_between_blocks
          ?max_number_of_chunks
          ?private_rpc_port
-         ?sequencer_key
+         ?sequencer_keys
          ?evm_node_endpoint
          ?log_filter_max_nb_blocks
          ?log_filter_max_nb_logs
@@ -2227,7 +2246,7 @@ module Cli = struct
       ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?profiling
       ?preimages ?preimages_endpoint ?native_execution_policy
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
-      ?sequencer_key ?evm_node_endpoint ?max_blueprints_lag
+      ?sequencer_keys ?evm_node_endpoint ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?dal_slots
@@ -2260,7 +2279,7 @@ module Cli = struct
           ?cors_headers
           ?enable_websocket
           ?keep_alive
-          ?sequencer_key
+          ?sequencer_keys
           ?evm_node_endpoint
           ?preimages
           ?preimages_endpoint
@@ -2302,7 +2321,7 @@ module Cli = struct
           ?cors_headers
           ?enable_websocket
           ?keep_alive
-          ?sequencer_key
+          ?sequencer_keys
           ?evm_node_endpoint
           ?preimages
           ?preimages_endpoint
