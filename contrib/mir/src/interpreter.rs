@@ -22,7 +22,7 @@ use tezos_crypto_rs::{
 };
 use typed_arena::Arena;
 
-use crate::ast::big_map::{BigMap, LazyStorageError};
+use crate::ast::big_map::{dump_big_map_updates, BigMap, LazyStorageError};
 use crate::ast::michelson_address::entrypoint::Direction;
 use crate::ast::*;
 #[cfg(feature = "bls")]
@@ -88,16 +88,27 @@ impl<'a> ContractScript<'a> {
         arena: &'a Arena<Micheline<'a>>,
         parameter: Micheline<'a>,
         entrypoint: &Entrypoint,
-        storage: &Micheline<'a>,
+        storage_in: &Micheline<'a>,
     ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>>
     {
         let wrapped_parameter = self.wrap_parameter(arena, parameter, entrypoint, ctx)?;
-        let storage = self.typecheck_storage(ctx, storage)?;
+        let mut storage = self.typecheck_storage(ctx, storage_in)?;
+        let mut started_with_map_ids = vec![];
+        storage.view_big_map_ids(&mut started_with_map_ids);
+
         let tc_val = TypedValue::new_pair(wrapped_parameter, storage);
         let mut stack = stk![tc_val];
         self.code.interpret(ctx, arena, &mut stack)?;
+
         use TypedValue as V;
-        match stack.pop().expect("empty execution stack") {
+
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/8061
+        // Handle errors instead of panicking.
+        let mut result = stack.pop().expect("empty execution stack");
+        let mut finished_with_maps = vec![];
+        result.view_big_maps_mut(&mut finished_with_maps);
+        dump_big_map_updates(ctx, &started_with_map_ids, &mut finished_with_maps)?;
+        match result {
             V::Pair(p) => match *p {
                 (V::List(vec), storage) => Ok((
                     vec.into_iter()
