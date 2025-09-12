@@ -134,7 +134,7 @@ pub struct ValidationInfo {
 pub fn validate_source<Host: Runtime>(
     host: &Host,
     context: &Context,
-    content: &[ManagerOperation<OperationContent>],
+    content: &Vec<ManagerOperation<OperationContent>>,
 ) -> Result<(PublicKey, TezlinkImplicitAccount), ValidityError> {
     if content.is_empty() {
         return Err(ValidityError::EmptyBatch);

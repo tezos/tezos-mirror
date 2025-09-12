@@ -898,16 +898,16 @@ fn execute_validation<Host: Runtime>(
     context: &Context,
     operation: Operation,
 ) -> Result<ValidationInfo, ValidityError> {
-    let content = operation
+    let unvalidated_operation = operation
         .content
         .clone()
         .into_iter()
-        .map(|op| op.into())
-        .collect::<Vec<ManagerOperation<OperationContent>>>();
-    let (pk, source_account) = validate::validate_source(host, context, &content)?;
+        .map(Into::into)
+        .collect();
+    let (pk, source_account) =
+        validate::validate_source(host, context, &unvalidated_operation)?;
     let mut balance_updates = vec![];
-
-    for c in &content {
+    for c in &unvalidated_operation {
         let (new_source_balance, op_balance_updates) =
             validate_individual_operation(host, &source_account, c)?;
 
@@ -931,7 +931,7 @@ fn execute_validation<Host: Runtime>(
         Ok(true) => Ok(ValidationInfo {
             source_account,
             balance_updates,
-            validated_operations: content,
+            validated_operations: unvalidated_operation,
         }),
         _ => Err(ValidityError::InvalidSignature),
     }
