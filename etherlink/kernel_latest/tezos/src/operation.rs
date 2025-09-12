@@ -279,26 +279,19 @@ pub fn sign_operation(
 
 pub fn verify_signature(
     pk: &PublicKey,
-    branch: &BlockHash,
-    content: Vec<ManagerOperation<OperationContent>>,
+    branch: BlockHash,
+    content: Vec<ManagerOperationContent>,
     signature: UnknownSignature,
-) -> Result<(bool, Vec<ManagerOperation<OperationContent>>), BinError> {
-    let content = content
-        .into_iter()
-        .map(|op| op.into())
-        .collect::<Vec<ManagerOperationContent>>();
-    let serialized_unsigned_operation = serialize_unsigned_operation(branch, &content)?;
-
+) -> Result<bool, BinError> {
+    let serialized_unsigned_operation = serialize_unsigned_operation(&branch, &content)?;
     let signature = &signature.into();
-
     // The verify_signature function never returns false. If the verification
     // is incorrect the function will return an Error and it's up to us to
     // transform that into a `false` boolean if we want.
     let check = pk
         .verify_signature(signature, &serialized_unsigned_operation)
         .unwrap_or(false);
-    let content = content.into_iter().map(|op| op.into()).collect();
-    Ok((check, content))
+    Ok(check)
 }
 
 pub fn zip_operations(

@@ -900,6 +900,7 @@ fn execute_validation<Host: Runtime>(
 ) -> Result<ValidationInfo, ValidityError> {
     let content = operation
         .content
+        .clone()
         .into_iter()
         .map(|op| op.into())
         .collect::<Vec<ManagerOperation<OperationContent>>>();
@@ -921,11 +922,16 @@ fn execute_validation<Host: Runtime>(
         balance_updates.push(op_balance_updates);
     }
 
-    match verify_signature(&pk, &operation.branch, content, operation.signature) {
-        Ok((true, validated_operations)) => Ok(ValidationInfo {
+    match verify_signature(
+        &pk,
+        operation.branch,
+        operation.content,
+        operation.signature,
+    ) {
+        Ok(true) => Ok(ValidationInfo {
             source_account,
             balance_updates,
-            validated_operations,
+            validated_operations: content,
         }),
         _ => Err(ValidityError::InvalidSignature),
     }
