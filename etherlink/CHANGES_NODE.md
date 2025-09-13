@@ -11,6 +11,8 @@
 
 ### RPCs changes
 
+- Fixes `eth_getCode` regression introduced in the previous version. (!19270)
+
 ### Monitoring changes
 
 ### Command-line interface changes

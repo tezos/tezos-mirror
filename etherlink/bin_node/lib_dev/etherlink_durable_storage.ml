@@ -80,36 +80,39 @@ let code read address =
   let decode bytes =
     bytes |> Hex.of_bytes |> Hex.show |> Ethereum_types.hex_of_string
   in
-  let* hash_opt =
-    let* account_opt = inspect_and_decode_opt_account read address in
-    match account_opt with
-    | Some info -> return (Some info.code_hash)
-    | None ->
+  let* account_opt = inspect_and_decode_opt_account read address in
+  match account_opt with
+  | Some info ->
+      inspect_durable_and_decode_default
+        ~default
+        read
+        (Durable_storage_path.Code.code info.code_hash)
+        decode
+  | None -> (
+      let* code_opt =
         inspect_durable_and_decode_opt
-          read
-          (Durable_storage_path.Accounts.code_hash address)
-          (fun bytes ->
-            Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hash_of_string)
-  in
-  match hash_opt with
-  | Some hash ->
-      let* code =
-        inspect_durable_and_decode_default
-          ~default
-          read
-          (Durable_storage_path.Code.code hash)
-          decode
-      in
-      return code
-  | None ->
-      let* code =
-        inspect_durable_and_decode_default
-          ~default
           read
           (Durable_storage_path.Accounts.code address)
           decode
       in
-      return code
+      match code_opt with
+      | Some code -> return code
+      | None -> (
+          let* hash_opt =
+            inspect_durable_and_decode_opt
+              read
+              (Durable_storage_path.Accounts.code_hash address)
+              (fun bytes ->
+                Hex.of_bytes bytes |> Hex.show |> Ethereum_types.hash_of_string)
+          in
+          match hash_opt with
+          | None -> return default
+          | Some hash ->
+              inspect_durable_and_decode_default
+                ~default
+                read
+                (Durable_storage_path.Code.code hash)
+                decode))
 
 let current_block_number read =
   Durable_storage.block_number ~root read Durable_storage_path.Block.Current
