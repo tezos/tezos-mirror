@@ -140,7 +140,35 @@ module Stores_dirs = struct
 end
 
 module Shards_disk = struct
-  type nonrec t = (Types.slot_id, int, Cryptobox.share) KVS.t
+  type error += Invalid_min_shards_to_reconstruct_slot of {given : int}
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal.shards.invalid_min_shards_to_reconstruct_slot"
+      ~title:"Invalid minimum shards to reconstruct a slot"
+      ~description:
+        "The minimum number of shards required to reconstruct a slot must be \
+         strictly greater than 0."
+      ~pp:(fun ppf given ->
+        Format.fprintf
+          ppf
+          "Invalid minimum shards to reconstruct a slot: %d (must be > 0)."
+          given)
+      Data_encoding.(obj1 (req "given" int31))
+      (function
+        | Invalid_min_shards_to_reconstruct_slot {given} -> Some given
+        | _ -> None)
+      (fun given -> Invalid_min_shards_to_reconstruct_slot {given})
+
+  type t = {
+    shards_store : (Types.slot_id, int, Cryptobox.share) KVS.t;
+    min_shards_to_reconstruct_slot : int;
+        (* Minimum number of distinct shards that must be persisted per slot in
+           order to be able to reconstruct the whole slot (k in a k-of-n
+           erasure-coding scheme). This value is derived from the DAL cryptobox
+           parameters. It must always be > 0. *)
+  }
 
   let file_layout ~root_dir (slot_id : Types.slot_id) =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7045
@@ -172,7 +200,8 @@ module Shards_disk = struct
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4973
      Make storage more resilient to DAL parameters change. *)
-  let number_of_shards_available store slot_id shard_indexes =
+  let number_of_shards_available {shards_store = store; _} slot_id shard_indexes
+      =
     let open Lwt_result_syntax in
     List.fold_left_es
       (fun count shard_index ->
@@ -186,7 +215,7 @@ module Shards_disk = struct
    - Count how many shards are already stored for [slot_id].
    - If that count >= N, return immediately.
    - Otherwise, store new shards from the incoming [shards] seq until we reach N. *)
-  let write_all ?keep_partial_shards shards_store slot_id shards =
+  let write_all ?keep_partial_shards {shards_store; _} slot_id shards =
     let open Lwt_result_syntax in
     let* remaining =
       (match keep_partial_shards with
@@ -253,13 +282,13 @@ module Shards_disk = struct
       in
       return_unit
 
-  let read_all shards_store slot_id ~number_of_shards =
+  let read_all {shards_store; _} slot_id ~number_of_shards =
     Seq.ints 0
     |> Seq.take_while (fun x -> x < number_of_shards)
     |> Seq.map (fun shard_index -> (slot_id, shard_index))
     |> KVS.read_values shards_store file_layout
 
-  let read store slot_id shard_id =
+  let read {shards_store = store; _} slot_id shard_id =
     let open Lwt_result_syntax in
     let*! res =
       with_metrics store @@ fun () ->
@@ -272,19 +301,28 @@ module Shards_disk = struct
         let data_kind = Types.Store.Shard in
         fail @@ Errors.decoding_failed data_kind err
 
-  let count_values store slot_id =
+  let count_values {shards_store = store; _} slot_id =
     with_metrics store @@ fun () -> KVS.count_values store file_layout slot_id
 
-  let remove store slot_id =
+  let remove {shards_store = store; _} slot_id =
     let open Lwt_result_syntax in
     let* () =
       with_metrics store @@ fun () -> KVS.remove_file store file_layout slot_id
     in
     return_unit
 
-  let init node_store_dir shard_store_dir =
-    let root_dir = Filename.concat node_store_dir shard_store_dir in
-    KVS.init ~lru_size:Constants.shards_store_lru_size ~root_dir
+  let init node_store_dir shard_store_dir ~min_shards_to_reconstruct_slot =
+    let open Lwt_result_syntax in
+    if min_shards_to_reconstruct_slot <= 0 then
+      tzfail
+        (Invalid_min_shards_to_reconstruct_slot
+           {given = min_shards_to_reconstruct_slot})
+    else
+      let root_dir = Filename.concat node_store_dir shard_store_dir in
+      let* shards_store =
+        KVS.init ~lru_size:Constants.shards_store_lru_size ~root_dir
+      in
+      return {shards_store; min_shards_to_reconstruct_slot}
 end
 
 module Shards_cache = struct
@@ -389,7 +427,8 @@ end
   Shards -- cache-first selector via [source_target]
 
   Policy:
-  - Reads/counts: If the slot is present in cache, use the cache, otherwise use the disk (if available, otherwise the data is missing).
+  - Reads/counts: If the slot is present in cache, use the cache, otherwise use
+  the disk (if available, otherwise the data is missing).
   - Writes:
       * cache-only (disk=None): write to cache with events (silent=false).
       * disk-backed: write to disk (must succeed) then write to cache silently (silent=true).
@@ -406,7 +445,18 @@ module Shards = struct
     let* disk =
       if Profile_manager.is_attester_only_profile profile_ctxt then return_none
       else
-        let* store = Disk.init node_store_dir shard_store_dir in
+        let min_shards_to_reconstruct_slot =
+          let cryptobox = proto_parameters.Types.cryptobox_parameters in
+          (* The minimum number of shards required to reconstruct a slot (k in
+             k-of-n). *)
+          cryptobox.number_of_shards / cryptobox.redundancy_factor
+        in
+        let* store =
+          Disk.init
+            node_store_dir
+            shard_store_dir
+            ~min_shards_to_reconstruct_slot
+        in
         return_some store
     in
     let storage_period =
