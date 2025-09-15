@@ -1,4 +1,8 @@
 [{
-  "action": "remove",
-  "big_map": "0"
+  "kind":"big_map",
+  "id":"0",
+  "diff":
+  {
+    "action": "remove"
+  }
 }]
