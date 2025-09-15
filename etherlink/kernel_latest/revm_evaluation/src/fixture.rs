@@ -13,6 +13,9 @@ use revm::{
 };
 use serde::Deserialize;
 
+// TODO: `dead_code` attribute will be removed soon once used in the main loop of
+// the binary.
+#[allow(dead_code)]
 pub type Fixtures = HashMap<String, TestCase>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
