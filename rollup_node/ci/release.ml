@@ -181,4 +181,18 @@ let register () =
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release);
       (Manual, job_release_page `real);
+    ] ;
+  CI.register_global_release_jobs
+    [
+      (Auto, job_build_static_binaries Arm64);
+      (Auto, job_build_static_binaries Amd64);
+      (Auto, job_docker_merge_manifests `real);
+      (Manual, job_release_page `real);
+    ] ;
+  CI.register_global_test_release_jobs
+    [
+      (Auto, job_build_static_binaries Arm64);
+      (Auto, job_build_static_binaries Amd64);
+      (Auto, job_docker_merge_manifests `test);
+      (Manual, job_release_page `test);
     ]

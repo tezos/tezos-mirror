@@ -1028,6 +1028,240 @@ rpm_repo_fedora:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
+octez-smart-rollup-node.build:static-arm64-binaries:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_arm64
+  needs:
+  - oc.docker:ci:arm64
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: rust-targets-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: arm64
+    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
+    VERSION_EXECUTABLE: octez-smart-rollup-node
+    CARGO_NET_OFFLINE: "false"
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 2G
+  artifacts:
+    expire_in: 90 days
+    paths:
+    - octez-binaries/$ARCH/*
+
+octez-smart-rollup-node.build:static-x86_64-binaries:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: rust-targets-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: x86_64
+    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
+    VERSION_EXECUTABLE: octez-smart-rollup-node
+    CARGO_NET_OFFLINE: "false"
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 2G
+  artifacts:
+    expire_in: 90 days
+    paths:
+    - octez-binaries/$ARCH/*
+
+octez-smart-rollup-node.release-page:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  rules:
+  - when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:ci:amd64
+  - octez-smart-rollup-node.build:static-x86_64-binaries
+  - octez-smart-rollup-node.build:static-arm64-binaries
+  dependencies:
+  - oc.docker:ci:amd64
+  - octez-smart-rollup-node.build:static-x86_64-binaries
+  - octez-smart-rollup-node.build:static-arm64-binaries
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - sudo apk add aws-cli pandoc
+  - eval $(opam env)
+  - ./scripts/rollup_node/releases/publish_release_page.sh
+  - cp /tmp/release_page*/index.md ./index.md
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    S3_BUCKET: release-page-test.nomadic-labs.com
+    DISTRIBUTION_ID: E19JF46UG3Z747
+    AWS_ACCESS_KEY_ID: ${AWS_KEY_RELEASE_PUBLISH}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_RELEASE_PUBLISH}
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - index.md
+    - index.html
+  retry: 0
+
+octez-smart-rollup-node.docker:arm64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp_arm64
+  needs:
+  - oc.docker:ci:arm64
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    IMAGE_ARCH_PREFIX: arm64_
+    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
+
+octez-smart-rollup-node.docker:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    IMAGE_ARCH_PREFIX: amd64_
+    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
+
+octez-smart-rollup-node.docker:merge_manifests:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  needs:
+  - octez-smart-rollup-node.docker:amd64
+  - octez-smart-rollup-node.docker:arm64
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_initialize.sh
+  - ./scripts/ci/docker_merge_manifests.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  retry: 0
+
 teztale.build-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
