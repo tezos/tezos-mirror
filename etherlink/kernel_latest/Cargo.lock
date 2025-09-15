@@ -2477,6 +2477,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "revm-evaluation"
+version = "0.1.0"
+dependencies = [
+ "revm",
+ "revm-etherlink",
+]
+
+[[package]]
 name = "revm-handler"
 version = "10.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

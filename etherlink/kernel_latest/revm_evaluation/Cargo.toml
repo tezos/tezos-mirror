@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = 'revm-evaluation'
+version = '0.1.0'
+edition = '2021'
+license = "MIT"
+
+[dependencies]
+revm-etherlink.workspace = true
+revm.workspace = true

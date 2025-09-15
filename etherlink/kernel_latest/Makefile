@@ -47,6 +47,14 @@ else
 	@cargo build --release --package evm-evaluation
 endif
 
+.PHONY: build-revm-evaluation
+build-revm-evaluation:
+ifdef EVM_EVALUATION_FEATURES
+	@cargo build --features ${EVM_EVALUATION_FEATURES} --release --package revm-evaluation
+else
+	@cargo build --release --package revm-evaluation
+endif
+
 .PHONY: build-revm
 build-revm:
 	@cargo build --target wasm32-unknown-unknown --package revm-etherlink
