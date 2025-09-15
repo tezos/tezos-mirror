@@ -704,6 +704,8 @@ module Images : sig
     val fedora_41 : Image.t
 
     val fedora_42 : Image.t
+
+    val rust_toolchain_unstable : Image.t
   end
 end
 

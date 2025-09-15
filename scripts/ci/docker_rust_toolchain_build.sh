@@ -87,6 +87,7 @@ echo "Build ${image_name}"
   "${image_tag}" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --build-arg APT_PROXY="${APT_PROXY_DEB:-}" \
+  --build-arg IMAGE="${IMAGE:-}" \
   --cache-from="${image_base}:${docker_image_ref_tag}" \
   --cache-from="${image_base}:${CI_DEFAULT_BRANCH}" \
   --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
