@@ -201,8 +201,9 @@ module Transport_layer_hooks : sig
   val activate :
     Worker.t ->
     Transport_layer.t ->
-    app_messages_callback:
+    app_out_callback:
       (Types.Message.t -> Types.Message_id.t -> unit tzresult Lwt.t) ->
+    app_in_callback:(Types.Message_id.t -> Types.Peer.t -> unit tzresult Lwt.t) ->
     verbose:bool ->
     unit Lwt.t
 end

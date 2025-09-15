@@ -266,11 +266,17 @@ let gs_worker_p2p_output_handler gs_worker p2p_layer =
 
 (** This handler forwards p2p messages received via Octez p2p to the Gossipsub
     worker. *)
-let transport_layer_inputs_handler gs_worker p2p_layer =
+let transport_layer_inputs_handler gs_worker p2p_layer ~app_in_callback =
   let open Lwt_syntax in
   let rec loop () =
     let* conn, p2p_message = P2p.recv_any p2p_layer in
     let from_peer = peer_of_connection p2p_layer conn in
+    let* _res =
+      match p2p_message with
+      | Message_with_header {message_id; _} ->
+          app_in_callback message_id from_peer
+      | _ -> return_ok_unit
+    in
     Worker.(In_message {from_peer; p2p_message} |> p2p_input gs_worker) ;
     loop ()
   in
@@ -278,13 +284,13 @@ let transport_layer_inputs_handler gs_worker p2p_layer =
 
 (** This loop pops messages from application output stream and calls the given
     [app_messages_callback] on them. *)
-let app_messages_handler gs_worker ~app_messages_callback ~verbose =
+let app_messages_handler gs_worker ~app_out_callback ~verbose =
   let open Lwt_syntax in
   let rec loop app_output_stream =
     let* Worker.{message; message_id; topic = _} =
       Worker.Stream.pop app_output_stream
     in
-    let* res = app_messages_callback message message_id in
+    let* res = app_out_callback message message_id in
     let* () =
       match res with
       | Ok () ->
@@ -296,7 +302,7 @@ let app_messages_handler gs_worker ~app_messages_callback ~verbose =
   in
   Worker.app_output_stream gs_worker |> loop
 
-let activate gs_worker p2p_layer ~app_messages_callback ~verbose =
+let activate gs_worker p2p_layer ~app_out_callback ~app_in_callback ~verbose =
   (* Register a handler to notify new P2P connections to GS. *)
   let () =
     new_connections_handler gs_worker p2p_layer
@@ -307,6 +313,6 @@ let activate gs_worker p2p_layer ~app_messages_callback ~verbose =
   Lwt.join
     [
       gs_worker_p2p_output_handler gs_worker p2p_layer;
-      transport_layer_inputs_handler gs_worker p2p_layer;
-      app_messages_handler gs_worker ~app_messages_callback ~verbose;
+      transport_layer_inputs_handler gs_worker p2p_layer ~app_in_callback;
+      app_messages_handler gs_worker ~app_out_callback ~verbose;
     ]
