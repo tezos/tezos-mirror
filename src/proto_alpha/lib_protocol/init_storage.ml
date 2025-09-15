@@ -274,6 +274,13 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
               (* this can happen iff the previous protocol is Genesis *)
               return ctxt
         in
+        let*! ctxt =
+          (* Decrease the voting period to one cycle on Shadownet *)
+          if Chain_id.equal chain_id Constants_repr.shadownet_id then
+            Raw_context.patch_constants ctxt (fun c ->
+                {c with cycles_per_voting_period = 1l})
+          else Lwt.return ctxt
+        in
         let* ctxt = Address_registry_storage.init ctxt in
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)

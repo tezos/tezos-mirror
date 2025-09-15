@@ -30,6 +30,8 @@ let version = "v1"
 
 let mainnet_id = Chain_id.of_b58check_exn "NetXdQprcVkpaWU"
 
+let shadownet_id = Chain_id.of_b58check_exn "NetXsqzbfFenSTS"
+
 (* The fitness version number was:
    - "\000" until and including proto 004
    - "\001" until and including proto 010
