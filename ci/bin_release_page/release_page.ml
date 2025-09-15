@@ -9,7 +9,8 @@ let temp_dir = Filename.temp_dir "release_page" ""
 
 let sf = Printf.sprintf
 
-(* [get_field n line] returns the [n]th filed of [line]. *)
+(* [get_field n line] returns the [n]th field of [line].
+   Fields are non-empty space-separated values. *)
 let get_field n line =
   let fields =
     String.split_on_char ' ' line
@@ -119,22 +120,34 @@ let string_of_arch = function X86_64 -> "x86_64" | Arm64 -> "arm64"
 
 (* [show_markdown content] returns a string that contains the
    markdown associated with [content]. *)
-let rec show_markdown ?(level = 1) = function
-  | Concat list ->
-      String.concat ""
-      @@ List.map (fun content -> show_markdown ~level content) list
-  | Items list ->
-      (* List are preceeded by an empty line,
+let show_markdown ?(level = 1) content =
+  let buf = Buffer.create 0 in
+  let pp string = Buffer.add_string buf string in
+  let rec aux ~level = function
+    | Concat list -> List.iter (fun content -> aux ~level content) list
+    | Items list ->
+        (* List are preceeded by an empty line,
          and followed by an empty line. *)
-      ("\n\n" ^ String.concat "\n"
-      @@ List.map (fun content -> "- " ^ show_markdown ~level content) list)
-      ^ "\n\n"
-  | Link {text; url} -> sf "[%s](%s)" text url
-  | Text text -> text
-  | Section {title; content} ->
-      (String.make level '#' ^ " " ^ title ^ "\n")
-      ^ show_markdown ~level:(level + 1) content
-      ^ "\n"
+        pp "\n" ;
+        List.iter
+          (fun content ->
+            pp "- " ;
+            aux ~level content ;
+            pp "\n")
+          list ;
+        pp "\n\n"
+    | Link {text; url} -> pp @@ sf "[%s](%s)" text url
+    | Text text -> pp text
+    | Section {title; content} ->
+        pp @@ String.make level '#' ;
+        pp " " ;
+        pp title ;
+        pp "\n" ;
+        aux ~level:(level + 1) content ;
+        pp "\n"
+  in
+  aux ~level content ;
+  Buffer.contents buf
 
 (* [markdown_of_page page] returns a string that contains the
    markdown associated with the [page]. *)
