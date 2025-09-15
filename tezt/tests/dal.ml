@@ -5282,7 +5282,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   in
   let attester = Dal_node.create ~name:"attester" ~node () in
   let* () = Dal_node.init_config ~attester_profiles:all_pkhs ~peers attester in
-  let* () = Dal_node.run ~wait_ready:true attester in
+  let* () = Dal_node.run ~event_level:`Debug ~wait_ready:true attester in
   let* attester_peer_id = peer_id attester in
 
   let client = Client.with_dal_node client ~dal_node:attester in
@@ -5856,7 +5856,9 @@ module Amplification = struct
       let pkh = account.public_key_hash in
       let dal_node = Dal_node.create ~name ~node () in
       let* () = Dal_node.init_config ~attester_profiles:[pkh] ~peers dal_node in
-      let* () = Dal_node.run ~wait_ready:true dal_node in
+      (* Setting [event_level] to `Debug so that the [stored_slot_shard] event
+         will be emitted. *)
+      let* () = Dal_node.run ~event_level:`Debug ~wait_ready:true dal_node in
       return {name; index; dal_node; pkh; account; peer_id = None}
     in
     let* all_attesters =
@@ -5885,7 +5887,9 @@ module Amplification = struct
     let* () =
       Dal_node.init_config ~observer_profiles:[slot_index] ~peers observer
     in
-    let* () = Dal_node.run ~wait_ready:true observer in
+    (* Setting [event_level] to `Debug so that the [stored_slot_shard] event
+       will be emitted. *)
+    let* () = Dal_node.run ~event_level:`Debug ~wait_ready:true observer in
 
     (* Check that the DAL nodes have the expected profiles. *)
     let* () =
@@ -8751,7 +8755,7 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
       ~peers
       attester
   in
-  let* () = Dal_node.run attester in
+  let* () = Dal_node.run ~event_level:`Debug attester in
   let client = Client.with_dal_node client ~dal_node:attester in
 
   let num_cycles = 1 + consensus_rights_delay in
