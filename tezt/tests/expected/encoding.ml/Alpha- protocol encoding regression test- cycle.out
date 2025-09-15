@@ -1,12 +1,2 @@
-
-./octez-codec encode alpha.cycle from 2147483647
-7fffffff
-
-./octez-codec decode alpha.cycle from 7fffffff
-2147483647
-
-./octez-codec encode alpha.cycle from 0
-00000000
-
-./octez-codec decode alpha.cycle from 00000000
-0
+cycle-positive: 7fffffff
+cycle-zero: 00000000

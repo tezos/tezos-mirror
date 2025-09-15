@@ -1,10 +1,1 @@
-
-./octez-codec encode network_version from '{
-  "p2p_version": 0,
-  "distributed_db_version": 1,
-  "chain_name": "main"
-}'
-000000046d61696e00010000
-
-./octez-codec decode network_version from 000000046d61696e00010000
-{ "chain_name": "main", "distributed_db_version": 1, "p2p_version": 0 }
+network_version: 000000046d61696e00010000

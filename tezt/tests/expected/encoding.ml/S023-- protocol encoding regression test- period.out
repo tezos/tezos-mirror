@@ -1,12 +1,2 @@
-
-./octez-codec encode 023-PtSeouLo.period from '"2789"'
-0000000000000ae5
-
-./octez-codec decode 023-PtSeouLo.period from 0000000000000ae5
-"2789"
-
-./octez-codec encode 023-PtSeouLo.period from '"0"'
-0000000000000000
-
-./octez-codec decode 023-PtSeouLo.period from 0000000000000000
-"0"
+period-positive: 0000000000000ae5
+period-zero: 0000000000000000
