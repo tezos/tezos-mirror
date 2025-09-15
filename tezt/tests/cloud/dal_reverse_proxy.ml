@@ -207,6 +207,8 @@ let init_dal_reverse_proxy_observers ~external_rpc ~network ~snapshot
            in
            let* () =
              Dal_node.Agent.run
+               ~prometheus:Tezt_cloud_cli.prometheus
+               ~event_level:`Notice
                ?otel
                ~memtrace
                ~ppx_profiling_verbosity

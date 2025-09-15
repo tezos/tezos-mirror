@@ -430,7 +430,7 @@ let make_arguments node =
       ~some:(fun pkhs -> "--ignore-topics" :: [String.concat "," pkhs])
       node.persistent_state.ignore_pkhs
 
-let do_runlike_command ?env ?(event_level = `Debug) node arguments =
+let do_runlike_command ?env ?(event_level = `Info) node arguments =
   if node.status <> Not_running then
     Test.fail "DAL node %s is already running" node.name ;
   let on_terminate _status =

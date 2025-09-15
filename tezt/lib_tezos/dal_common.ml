@@ -796,7 +796,7 @@ module Helpers = struct
         ~is_trusted:false
         ()
     in
-    let* () = Dal_node.run dal_node2 in
+    let* () = Dal_node.run ~event_level:`Debug dal_node2 in
     Log.info
       "Node %s started. Waiting for connection with node %s"
       (Dal_node.name dal_node2)
