@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## Version 0.41 (2025-09-15)
 
-### Breaking changes
+This release of the EVM node is a bug fix release which addresses a regression
+introduced by version 0.40 on the RPC `eth_getCode`.
 
 ### Configuration changes
 
@@ -12,23 +13,6 @@
 ### RPCs changes
 
 - Fixes `eth_getCode` regression introduced in the previous version. (!19270)
-
-### Monitoring changes
-
-### Command-line interface changes
-
-### Execution changes
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.40 (2025-09-11)
 
