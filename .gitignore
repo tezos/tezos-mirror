@@ -121,6 +121,7 @@ evm_installer.wasm
 evm_kernel_unstripped.wasm
 evm_kernel_debug.wasm
 evm-evaluation-assessor
+revm-evaluation-assessor
 smart-rollup-installer
 _evm_installer_preimages/
 tx_kernel.wasm
@@ -141,6 +142,9 @@ courier
 etherlink-outbox-monitor
 /fa-bridge-watchtower
 /etherlink/docs/book/*
+/etherlink/kernel_latest/revm_evaluation/fixtures/shanghai
+/etherlink/kernel_latest/revm_evaluation/fixtures/cancun
+/etherlink/kernel_latest/revm_evaluation/fixtures/prague
 
 # Terraform
 

@@ -18,6 +18,7 @@ members = [
   "logging",
   "storage",
   "revm",
+  "revm_evaluation",
   "runtime",
 ]
 
