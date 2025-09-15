@@ -656,7 +656,7 @@ impl<'a> TypedValue<'a> {
 
     /// Same as [TypedValue::view_big_maps_mut], but only collects `big_map`
     /// identifiers.
-    pub fn view_big_map_ids<T>(&mut self, out: &mut Vec<BigMapId>) {
+    pub fn view_big_map_ids(&mut self, out: &mut Vec<BigMapId>) {
         self.collect_big_maps(&mut |m| {
             if let BigMapContent::FromLazyStorage(content) = &m.content {
                 out.push(content.id.clone())
