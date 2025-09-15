@@ -223,29 +223,43 @@ let get_peer_score dal_node peer_id =
   in
   return peer_score.score
 
-let wait_for_stored_slot ?shard_index dal_node ~published_level ~slot_index =
+let wait_for_cached_slot ~shard_index dal_node ~published_level ~slot_index =
   let check_slot_id e =
     JSON.(e |-> "published_level" |> as_int) = published_level
     && JSON.(e |-> "slot_index" |> as_int) = slot_index
   in
   let check_shard_index e =
-    match shard_index with
-    | None -> true
-    | Some shard_index -> JSON.(e |-> "shard_index" |> as_int) = shard_index
+    JSON.(e |-> "shard_index" |> as_int) = shard_index
   in
-  Dal_node.wait_for dal_node "dal_stored_slot_shard.v0" (fun e ->
+  Dal_node.wait_for dal_node "dal_cached_slot_shard.v0" (fun e ->
       if check_slot_id e && check_shard_index e then Some () else None)
+
+let wait_for_stored_slot_shards ~num_stored_shards dal_node ~published_level
+    ~slot_index =
+  let check_slot_id e =
+    JSON.(e |-> "published_level" |> as_int) = published_level
+    && JSON.(e |-> "slot_index" |> as_int) = slot_index
+  in
+  if num_stored_shards <= 0 then Lwt.return_unit
+  else
+    let num_remaining_shards = ref num_stored_shards in
+    Dal_node.wait_for dal_node "dal_stored_slot_shard.v0" (fun e ->
+        if check_slot_id e then (
+          decr num_remaining_shards ;
+          if !num_remaining_shards <= 0 then Some () else None)
+        else None)
 
 (* Wait until the given [dal_node] receives all the shards whose
    indices are [shards] for the given published level and slot index. *)
-let wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index =
+let wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index
+    ~(storage_profile : [`Cache_only | `Disk of int]) =
   let nshards = List.length shards in
   let count = ref 0 in
   let promises =
     List.map
       (fun shard_index ->
         let* () =
-          wait_for_stored_slot
+          wait_for_cached_slot
             ~shard_index
             ~published_level
             ~slot_index
@@ -262,7 +276,17 @@ let wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index =
         unit)
       shards
   in
-  Lwt.join promises
+  let save_on_disk_promise =
+    match storage_profile with
+    | `Cache_only -> Lwt.return_unit
+    | `Disk num_stored_shards ->
+        wait_for_stored_slot_shards
+          ~num_stored_shards
+          dal_node
+          ~published_level
+          ~slot_index
+  in
+  Lwt.join (save_on_disk_promise :: promises)
 
 let wait_for_shard_validation_is_disabled dal_node =
   Dal_node.wait_for dal_node "shard_validation_is_disabled.v0" (fun _json ->
@@ -5331,7 +5355,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
     Lwt.join
     @@ List.map
          (fun shard_index ->
-           wait_for_stored_slot
+           wait_for_cached_slot
              ~shard_index
              attester
              ~published_level
@@ -6005,11 +6029,15 @@ module Amplification = struct
         0
         assigned_shard_indices_non_banned
     in
-
+    (* Minimum number of shards required to reconstruct a slot.
+       This is also the (minimum) count that relevant profiles (non-attester,
+       non-bootstrap) must store on disk. *)
+    let num_minimal_shards_to_reconstruct =
+      number_of_shards / redundancy_factor
+    in
     (* Check that the non-banned attesters have collectively enough
        assigned shards to reconstruct the slot. *)
-    Check.(
-      number_of_shards / redundancy_factor < total_number_of_assigned_shards)
+    Check.(num_minimal_shards_to_reconstruct < total_number_of_assigned_shards)
       ~__LOC__
       Check.int
       ~error_msg:
@@ -6035,8 +6063,7 @@ module Amplification = struct
     List.iter2
       (fun assigned_shard_indices attester ->
         Check.(
-          number_of_shards / redundancy_factor
-          > List.length assigned_shard_indices)
+          num_minimal_shards_to_reconstruct > List.length assigned_shard_indices)
           ~__LOC__
           Check.int
           ~error_msg:
@@ -6046,9 +6073,15 @@ module Amplification = struct
       assigned_shard_indices_non_banned
       non_banned_attesters ;
 
-    let wait_for_shards ~dal_node ~shards ~published_level ~slot_index =
+    let wait_for_shards ~storage_profile ~dal_node ~shards ~published_level
+        ~slot_index =
       let* () =
-        wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index
+        wait_for_shards_promises
+          ~storage_profile
+          ~dal_node
+          ~shards
+          ~published_level
+          ~slot_index
       in
       let () =
         Log.debug "Dal node %s has received its shards" (Dal_node.name dal_node)
@@ -6063,14 +6096,18 @@ module Amplification = struct
         Lwt.join
         @@ List.map2
              (fun {dal_node; _} shards ->
-               wait_for_shards ~dal_node ~shards ~published_level ~slot_index)
+               wait_for_shards
+                 ~storage_profile:`Cache_only
+                 ~dal_node
+                 ~shards
+                 ~published_level
+                 ~slot_index)
              attesters
              assigned_shard_indices
       in
       info message ;
       unit
     in
-
     let wait_shards_reach_observer ~published_level ~slot_index =
       let* () =
         Lwt.join
@@ -6078,6 +6115,7 @@ module Amplification = struct
              (fun attester shards ->
                let* () =
                  wait_for_shards
+                   ~storage_profile:(`Disk num_minimal_shards_to_reconstruct)
                    ~dal_node:observer
                    ~shards
                    ~published_level
@@ -8782,6 +8820,7 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
   let wait_for_shards_promises =
     wait_for_shards_promises
       ~dal_node:attester
+      ~storage_profile:`Cache_only
       ~shards:assigned_shard_indexes
       ~published_level
       ~slot_index
