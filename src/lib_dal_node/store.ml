@@ -210,29 +210,18 @@ module Shards_disk = struct
       0
       shard_indexes
 
-  (* Persist all shards, or at most [keep_partial_shards] per slot if provided.
-   If [keep_partial_shards = Some N]:
-   - Count how many shards are already stored for [slot_id].
-   - If that count >= N, return immediately.
-   - Otherwise, store new shards from the incoming [shards] seq until we reach N. *)
-  let write_all ?keep_partial_shards {shards_store; _} slot_id shards =
+  (* Persist shards for [slot_id], but never more than
+     [min_shards_to_reconstruct_slot]. *)
+  let write_all {shards_store; min_shards_to_reconstruct_slot} slot_id shards =
     let open Lwt_result_syntax in
-    let* remaining =
-      (match keep_partial_shards with
-      | None ->
-          (* Full mode: store all shards. *)
-          return max_int
-      | Some n when n <= 0 ->
-          (* Non-positive value: do nothing. *)
-          return 0
-      | Some target_to_store ->
-          (* Partial mode: compute how many shards are already persisted. *)
-          let* already_stored =
-            KVS.count_values shards_store file_layout slot_id
-          in
-          return (target_to_store - already_stored))
+    (* Invariant of init below: [min_shards_to_reconstruct_slot > 0] *)
+    (* Get how many shards are already persisted. *)
+    let* already_stored =
+      KVS.count_values shards_store file_layout slot_id
       |> Errors.other_lwt_result
     in
+    (* Compute how many shards need to be persisted to reach threshold. *)
+    let remaining = min_shards_to_reconstruct_slot - already_stored in
     let rec loop remaining s =
       if remaining <= 0 then
         (* Target reached. *)
