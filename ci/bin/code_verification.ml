@@ -253,102 +253,111 @@ type manual =
   | Yes  (** Add rule for manual start. *)
   | On_changes of Changeset.t  (** Add manual start on certain [changes:] *)
 
+(* [make_rules] makes rules for jobs that are:
+   - automatic in scheduled pipelines;
+   - conditional in [before_merging] pipelines.
+
+   If a job has non-optional dependencies, then [dependent] must be
+   set to [true] to ensure that we only run the job in case previous
+   jobs succeeded (setting [when: on_success]).
+
+   If [label] is set, add rule that selects the job in
+   [Before_merging] pipelines for merge requests with the given
+   label. Rules for manual start can be configured using [manual].
+
+   If [label], [changes] and [manual] are omitted, then rules will
+   enable the job [On_success] in the [before_merging] pipeline. This
+   is safe, but prefer specifying a [changes] clause if possible.
+
+   If [final_pipeline_disable] is set to true (default false), this job is
+   disabled in final [Before_merging] pipelines. *)
+let make_rules ~pipeline_type ?label ?changes ?(manual = No)
+    ?(dependent = false) ?(final_pipeline_disable = false) () =
+  match pipeline_type with
+  | Schedule_extended_test ->
+      (* The scheduled pipeline always runs all jobs unconditionally
+           -- unless they are dependent on a previous job (which is
+           not [job_start] defined below), in the pipeline. *)
+      [job_rule ~when_:(if dependent then On_success else Always) ()]
+  | Before_merging | Merge_train -> (
+      (* MR labels can be used to force tests to run. *)
+      (if final_pipeline_disable then
+         [job_rule ~if_:Rules.is_final_pipeline ~when_:Never ()]
+       else [])
+      @ (match label with
+        | Some label ->
+            [job_rule ~if_:Rules.(has_mr_label label) ~when_:On_success ()]
+        | None -> [])
+      (* Modifying some files can force tests to run. *)
+      @ (match changes with
+        | None -> []
+        | Some changes ->
+            [job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()])
+      (* It can be relevant to start some jobs manually. *)
+      @
+      match manual with
+      | No -> []
+      | Yes -> [job_rule ~when_:Manual ()]
+      | On_changes changes ->
+          [job_rule ~when_:Manual ~changes:(Changeset.encode changes) ()])
+
+(* Define the [start] job.
+
+   The purpose of this job is to implement a manual trigger
+   for [Before_merging] pipelines, instead of running it on
+   each update to the merge request. *)
+let job_start =
+  job
+    ~__POS__
+    ~image:Images.datadog_ci
+    ~stage:Stages.start
+    ~rules:
+      [
+        job_rule
+          ~if_:(If.not Rules.is_final_pipeline)
+          ~allow_failure:No
+          ~when_:Manual
+          ();
+        job_rule ~when_:Always ();
+      ]
+    ~timeout:(Minutes 10)
+    ~name:"trigger"
+    [
+      "echo 'Trigger pipeline!'";
+      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
+      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
+       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
+    ]
+
+(* Use this function to define jobs that depend on the pipeline type.
+   Without this function, you risk defining the same job multiple times
+   for the same pipeline type. *)
+let depending_on_pipeline_type :
+    (code_verification_pipeline -> 'a) -> code_verification_pipeline -> 'a =
+  (* Same as [Cacio.parameterize]: this is just a memoization function.
+     We just specialize its type to make it more clear what we are doing. *)
+  Cacio.parameterize
+
+let job_build_kernels =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_kernels
+    ~rules:
+      (make_rules
+         ~pipeline_type
+         ~changes:changeset_octez_or_kernels_or_doc
+         ~dependent:true
+         ())
+    ()
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
-  (* [make_rules] makes rules for jobs that are:
-     - automatic in scheduled pipelines;
-     - conditional in [before_merging] pipelines.
-
-     If a job has non-optional dependencies, then [dependent] must be
-     set to [true] to ensure that we only run the job in case previous
-     jobs succeeded (setting [when: on_success]).
-
-     If [label] is set, add rule that selects the job in
-     [Before_merging] pipelines for merge requests with the given
-     label. Rules for manual start can be configured using [manual].
-
-     If [label], [changes] and [manual] are omitted, then rules will
-     enable the job [On_success] in the [before_merging] pipeline. This
-     is safe, but prefer specifying a [changes] clause if possible.
-
-     If [final_pipeline_disable] is set to true (default false), this job is
-     disabled in final [Before_merging] pipelines. *)
-  let make_rules ?label ?changes ?(manual = No) ?(dependent = false)
-      ?(final_pipeline_disable = false) () =
-    match pipeline_type with
-    | Schedule_extended_test ->
-        (* The scheduled pipeline always runs all jobs unconditionally
-           -- unless they are dependent on a previous job (which is
-           not [job_start] defined below), in the pipeline. *)
-        [job_rule ~when_:(if dependent then On_success else Always) ()]
-    | Before_merging | Merge_train -> (
-        (* MR labels can be used to force tests to run. *)
-        (if final_pipeline_disable then
-           [job_rule ~if_:Rules.is_final_pipeline ~when_:Never ()]
-         else [])
-        @ (match label with
-          | Some label ->
-              [job_rule ~if_:Rules.(has_mr_label label) ~when_:On_success ()]
-          | None -> [])
-        (* Modifying some files can force tests to run. *)
-        @ (match changes with
-          | None -> []
-          | Some changes ->
-              [
-                job_rule ~changes:(Changeset.encode changes) ~when_:On_success ();
-              ])
-        (* It can be relevant to start some jobs manually. *)
-        @
-        match manual with
-        | No -> []
-        | Yes -> [job_rule ~when_:Manual ()]
-        | On_changes changes ->
-            [job_rule ~when_:Manual ~changes:(Changeset.encode changes) ()])
-  in
-
+  let make_rules = make_rules ~pipeline_type in
   (* Stages *)
-  let start_stage, make_dependencies =
+  let start_stage =
     match pipeline_type with
-    | Schedule_extended_test ->
-        let make_dependencies ~before_merging:_ ~schedule_extended_test =
-          schedule_extended_test ()
-        in
-        ([job_datadog_pipeline_trace], make_dependencies)
-    | Before_merging | Merge_train ->
-        (* Define the [start] job.
-
-           The purpose of this job is to implement a manual trigger
-           for [Before_merging] pipelines, instead of running it on
-           each update to the merge request. *)
-        let job_start =
-          job
-            ~__POS__
-            ~image:Images.datadog_ci
-            ~stage:Stages.start
-            ~rules:
-              [
-                job_rule
-                  ~if_:(If.not Rules.is_final_pipeline)
-                  ~allow_failure:No
-                  ~when_:Manual
-                  ();
-                job_rule ~when_:Always ();
-              ]
-            ~timeout:(Minutes 10)
-            ~name:"trigger"
-            [
-              "echo 'Trigger pipeline!'";
-              "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
-              "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline \
-               --tags pipeline_type:$PIPELINE_TYPE --tags \
-               mr_number:$CI_MERGE_REQUEST_IID";
-            ]
-        in
-        let make_dependencies ~before_merging ~schedule_extended_test:_ =
-          before_merging job_start
-        in
-        ([job_start], make_dependencies)
+    | Schedule_extended_test -> [job_datadog_pipeline_trace]
+    | Before_merging | Merge_train -> [job_start]
   in
 
   (* Used in trigger job definitions. For code verification pipelines,
@@ -368,11 +377,7 @@ let jobs pipeline_type =
   (* Sanity jobs *)
   let sanity =
     let stage = Stages.sanity in
-    let dependencies =
-      make_dependencies
-        ~before_merging:(fun _ -> Dependent [])
-        ~schedule_extended_test:(fun () -> Dependent [])
-    in
+    let dependencies = Dependent [] in
     let job_sanity_ci : tezos_job =
       (* Quick, CI-related sanity checks.
 
@@ -570,9 +575,9 @@ let jobs pipeline_type =
      stage does not succeed. Since some sanity jobs are conditional,
      we make these dependencies optional. *)
   let dependencies_needs_start =
-    make_dependencies
-      ~before_merging:(fun job_start -> Dependent [Job job_start])
-      ~schedule_extended_test:(fun () -> Staged [])
+    match pipeline_type with
+    | Before_merging | Merge_train -> Dependent [Job job_start]
+    | Schedule_extended_test -> Staged []
   in
   (* The build_x86_64 jobs are split in two to keep the artifact size
      under the 1GB hard limit set by GitLab. *)
@@ -628,15 +633,7 @@ let jobs pipeline_type =
     job_build_arm64_extra_exp ~rules:build_arm_rules ()
   in
 
-  let job_build_kernels =
-    job_build_kernels
-      ~rules:
-        (make_rules
-           ~changes:changeset_octez_or_kernels_or_doc
-           ~dependent:true
-           ())
-      ()
-  in
+  let job_build_kernels = job_build_kernels pipeline_type in
   let job_tezt_fetch_records =
     Tezt.job_tezt_fetch_records
       ~rules:(make_rules ~changes:changeset_octez ())
@@ -832,16 +829,16 @@ let jobs pipeline_type =
      [Scheduled_extended_test] we are not in a hurry and we let them
      be [Staged []]. *)
   let order_after_build =
-    make_dependencies
-      ~before_merging:(fun job_start ->
+    match pipeline_type with
+    | Before_merging | Merge_train ->
         Dependent
           (Job job_start
           :: [
                Optional job_build_x86_64_release;
                Optional job_build_x86_64_extra_dev;
                Optional job_build_x86_64_extra_exp;
-             ]))
-      ~schedule_extended_test:(fun () -> Staged [])
+             ])
+    | Schedule_extended_test -> Staged []
   in
 
   (* Test jobs*)
