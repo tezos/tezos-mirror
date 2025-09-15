@@ -129,6 +129,12 @@ let daemonize handlers =
    return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
+module IntSet = Set.Make (struct
+  type t = int
+
+  let compare = compare
+end)
+
 let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     node_store node_ctxt amplificator ~verbose =
   let timing_table_size =
@@ -271,11 +277,6 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
         ~sender:from_peer
     in
     let slot_id : Types.slot_id = {slot_level = level; slot_index} in
-    let rec remove_if_in x = function
-      | [] -> []
-      | hd :: tl when hd = x -> tl
-      | hd :: tl -> if hd < x then hd :: remove_if_in x tl else hd :: tl
-    in
     let update_metric_and_emit_event if_no_shards_yet =
       let still_to_receive_shards =
         match
@@ -287,14 +288,14 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
         | Some l -> l
       in
       let last_expected_shard =
-        if still_to_receive_shards = [] then false
+        if IntSet.is_empty still_to_receive_shards then false
         else
-          let new_list = remove_if_in shard_index still_to_receive_shards in
+          let new_set = IntSet.remove shard_index still_to_receive_shards in
           Dal_metrics.Slot_id_bounded_map.replace
             still_to_receive_indices
             slot_id
-            new_list ;
-          new_list = []
+            new_set ;
+          IntSet.is_empty new_set
       in
       let updated, slot_metrics =
         (Dal_metrics.update_timing_shard_received
@@ -322,7 +323,8 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
         let total_number_of_shards =
           proto_parameters.cryptobox_parameters.number_of_shards
         in
-        update_metric_and_emit_event (fun () -> 0 -- total_number_of_shards)
+        update_metric_and_emit_event (fun () ->
+            IntSet.of_list (0 -- total_number_of_shards))
     | Controller profile when Controller_profiles.has_attester profile ->
         (* If one is not observing the slot but is an attester, then they
                expect a number of shards depending of the committee draw. *)
@@ -340,9 +342,10 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
               (fun pkh acc ->
                 match Signature.Public_key_hash.Map.find pkh committee with
                 | None -> acc
-                | Some (shard_indices, _) -> List.merge compare acc shard_indices)
+                | Some (shard_indices, _) ->
+                    IntSet.union acc (IntSet.of_list shard_indices))
               attesters
-              [])
+              IntSet.empty)
     | _ -> return_unit
   in
   let still_to_receive_indices =
