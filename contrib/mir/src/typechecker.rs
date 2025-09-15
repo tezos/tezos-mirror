@@ -24,7 +24,7 @@ pub mod type_props;
 use type_props::TypeProperty;
 
 use crate::ast::annotations::{AnnotationError, NO_ANNS};
-use crate::ast::big_map::{BigMap, LazyStorage};
+use crate::ast::big_map::BigMap;
 use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types,
     micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
@@ -2400,7 +2400,6 @@ pub(crate) fn typecheck_value<'a>(
 
             let big_map_id = id.clone().into();
             let (key_type, value_type) = ctx
-                .big_map_storage()
                 .big_map_get_type(&big_map_id)
                 .map_err(|e| TcError::LazyStorageError(e.to_string()))?
                 .ok_or(TcError::BigMapNotFound(id.clone()))?;

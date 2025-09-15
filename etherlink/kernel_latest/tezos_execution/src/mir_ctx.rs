@@ -3,19 +3,24 @@
 // SPDX-License-Identifier: MIT
 
 use crate::address::OriginationNonce;
-use crate::context::Context;
+use crate::context::{big_maps::*, Context};
 use crate::get_contract_entrypoint;
 use mir::{
-    ast::{AddressHash, PublicKeyHash},
+    ast::{
+        big_map::{BigMapId, LazyStorage, LazyStorageError},
+        AddressHash, IntoMicheline, Micheline, PublicKeyHash, Type, TypedValue,
+    },
     context::CtxTrait,
 };
 use num_bigint::BigUint;
 use tezos_crypto_rs::hash::ChainId;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
+use tezos_storage::{read_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
+use typed_arena::Arena;
 
-pub struct Ctx<'a, Host, Context, Gas, OpCounter, OrigNonce> {
+pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
     pub host: Host,
     pub context: Context,
     pub sender: AddressHash,
@@ -30,15 +35,11 @@ pub struct Ctx<'a, Host, Context, Gas, OpCounter, OrigNonce> {
     pub gas: Gas,
     pub operation_counter: OpCounter,
     pub origination_nonce: OrigNonce,
-
-    pub lazy_storage: mir::ast::big_map::InMemoryLazyStorage<'a>,
 }
 
 impl<'a, Host: Runtime> CtxTrait<'a>
-    for Ctx<'a, &mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
+    for Ctx<&mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
 {
-    type BigMapStorage = mir::ast::big_map::InMemoryLazyStorage<'a>;
-
     fn sender(&self) -> AddressHash {
         self.sender.clone()
     }
@@ -91,10 +92,6 @@ impl<'a, Host: Runtime> CtxTrait<'a>
         self.origination_nonce.operation.0 .0
     }
 
-    fn big_map_storage(&mut self) -> &mut mir::ast::big_map::InMemoryLazyStorage<'a> {
-        &mut self.lazy_storage
-    }
-
     fn origination_counter(&mut self) -> u32 {
         let c: &mut u32 = &mut self.origination_nonce.index;
         *c += 1;
@@ -112,5 +109,123 @@ impl<'a, Host: Runtime> CtxTrait<'a>
         address: &AddressHash,
     ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
         get_contract_entrypoint(self.host, self.context, address)
+    }
+}
+
+impl<'a, Host: Runtime> LazyStorage<'a>
+    for Ctx<&mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
+{
+    fn big_map_get(
+        &mut self,
+        arena: &'a Arena<Micheline<'a>>,
+        id: &BigMapId,
+        key: &TypedValue,
+    ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
+        let value_path = value_path(self.context, id, key)?;
+        if self.host.store_has(&value_path)?.is_none() {
+            return Ok(None);
+        }
+
+        let value_type_path = value_type_path(self.context, id)?;
+        let encoded_value_type = self.host.store_read_all(&value_type_path)?;
+        let value_type = Micheline::decode_raw(arena, &encoded_value_type)?;
+
+        let encoded_value = self.host.store_read_all(&value_path)?;
+        let value = Micheline::decode_raw(arena, &encoded_value)?;
+        Ok(Some(value.typecheck_value(self, &value_type)?))
+    }
+
+    fn big_map_mem(
+        &mut self,
+        id: &BigMapId,
+        key: &TypedValue,
+    ) -> Result<bool, LazyStorageError> {
+        let path = value_path(self.context, id, key)?;
+        Ok(self.host.store_has(&path)?.is_some())
+    }
+
+    fn big_map_update(
+        &mut self,
+        id: &BigMapId,
+        key: TypedValue<'a>,
+        value: Option<TypedValue<'a>>,
+    ) -> Result<(), LazyStorageError> {
+        let value_path = value_path(self.context, id, &key)?;
+        match value {
+            None => {
+                if self.host.store_has(&value_path)?.is_some() {
+                    self.host.store_delete(&value_path)?;
+                }
+                Ok(())
+            }
+            Some(v) => {
+                let arena = Arena::new();
+                let encoded = v.into_micheline_optimized_legacy(&arena).encode();
+                Ok(self.host.store_write_all(&value_path, &encoded)?)
+            }
+        }
+    }
+
+    fn big_map_get_type(
+        &mut self,
+        id: &BigMapId,
+    ) -> Result<Option<(Type, Type)>, LazyStorageError> {
+        let big_map_path = big_map_path(self.context, id)?;
+        if self.host.store_has(&big_map_path)?.is_none() {
+            return Ok(None);
+        }
+
+        let arena = Arena::new();
+        let key_type_path = key_type_path(self.context, id)?;
+        let value_type_path = value_type_path(self.context, id)?;
+
+        let encoded_key_type = self.host.store_read_all(&key_type_path)?;
+        let key_type =
+            Micheline::decode_raw(&arena, &encoded_key_type)?.parse_ty(self)?;
+
+        let encoded_value_type = self.host.store_read_all(&value_type_path)?;
+        let value_type =
+            Micheline::decode_raw(&arena, &encoded_value_type)?.parse_ty(self)?;
+
+        Ok(Some((key_type, value_type)))
+    }
+
+    fn big_map_new(
+        &mut self,
+        key_type: &Type,
+        value_type: &Type,
+    ) -> Result<BigMapId, LazyStorageError> {
+        let arena = Arena::new();
+        let next_id_path = next_id_path(self.context)?;
+        let id: BigMapId = read_nom_value(self.host, &next_id_path).unwrap_or(0.into());
+        let key_type_path = key_type_path(self.context, &id)?;
+        let value_type_path = value_type_path(self.context, &id)?;
+        let key_type_encoded = key_type.into_micheline_optimized_legacy(&arena).encode();
+        let value_type_encoded =
+            value_type.into_micheline_optimized_legacy(&arena).encode();
+        self.host
+            .store_write_all(&value_type_path, &value_type_encoded)?;
+        self.host
+            .store_write_all(&key_type_path, &key_type_encoded)?;
+        store_bin(&id.succ(), self.host, &next_id_path)
+            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+        Ok(id)
+    }
+
+    fn big_map_copy(&mut self, id: &BigMapId) -> Result<BigMapId, LazyStorageError> {
+        let src_path = big_map_path(self.context, id)?;
+        let next_id_path = next_id_path(self.context)?;
+        let dest_id: BigMapId = read_nom_value(self.host, &next_id_path)
+            .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
+        let dest_path = big_map_path(self.context, &dest_id)?;
+        self.host.store_copy(&src_path, &dest_path)?;
+        store_bin(&dest_id.succ(), self.host, &next_id_path)
+            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+        Ok(dest_id)
+    }
+
+    fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
+        let big_map_path = big_map_path(self.context, id)?;
+        Ok(self.host.store_delete(&big_map_path)?)
     }
 }

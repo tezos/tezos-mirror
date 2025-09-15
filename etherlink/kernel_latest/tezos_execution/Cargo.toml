@@ -11,6 +11,7 @@ license = "MIT"
 [dependencies]
 thiserror.workspace = true
 anyhow.workspace = true
+typed-arena.workspace = true
 
 tezos_crypto_rs.workspace = true
 hex.workspace = true

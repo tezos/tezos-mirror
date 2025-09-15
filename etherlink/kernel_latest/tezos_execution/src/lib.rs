@@ -428,7 +428,6 @@ fn transfer<'a, Host: Runtime>(
                 level: *level,
                 now: *now,
                 chain_id: chain_id.clone(),
-                lazy_storage: mir::ast::big_map::InMemoryLazyStorage::new(),
             };
             let (internal_operations, new_storage) = execute_smart_contract(
                 code, storage, entrypoint, param, parser, &mut ctx,
