@@ -169,6 +169,7 @@ let check_samples protocols =
   protocol_sample "fitness" ;
   protocol_sample "gas.cost" ;
   protocol_sample "gas" ;
+  protocol_sample "lazy_storage_diff" ;
   protocol_sample "level" ;
   protocol_sample "nonce" ;
   protocol_sample "operation.internal" ;
