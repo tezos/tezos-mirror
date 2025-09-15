@@ -11,3 +11,6 @@ license = "MIT"
 [dependencies]
 revm-etherlink.workspace = true
 revm.workspace = true
+serde.workspace = true
+
+serde_json = { version = "1.0.145", features = ["preserve_order"] }
