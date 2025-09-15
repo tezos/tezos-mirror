@@ -59,3 +59,108 @@ pub struct LazyStorageDiffList {
     #[encoding(dynamic, list)]
     pub diff: Vec<LazyStorageDiff>,
 }
+
+impl From<LazyStorageDiff> for LazyStorageDiffList {
+    fn from(value: LazyStorageDiff) -> Self {
+        LazyStorageDiffList { diff: vec![value] }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use crate::{
+        enc_wrappers::ScriptExprHash,
+        encoding_test_data_helper::test_helpers::fetch_generated_data,
+        lazy_storage_diff::{
+            Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff,
+            Update,
+        },
+    };
+    use mir::ast::BinWriter;
+    use primitive_types::H256;
+
+    #[test]
+    pub fn big_map_alloc_compatibility() {
+        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat).encode();
+        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit).encode();
+        let diff: LazyStorageDiffList = LazyStorageDiff::BigMap(BigMapDiff {
+            id: 0u64.into(),
+            storage_diff: StorageDiff::Alloc(Alloc {
+                updates: vec![],
+                key_type,
+                value_type,
+            }),
+        })
+        .into();
+        let expected =
+            fetch_generated_data("S023", "lazy_storage_diff", "big_map_diff-alloc");
+        assert_eq!(
+            diff.to_bytes()
+                .expect("Lazy storage diff encoding should have succeed"),
+            expected,
+            "Lazy storage diff encoding should have been compatible"
+        );
+    }
+
+    #[test]
+    pub fn big_map_copy_compatibility() {
+        let diff: LazyStorageDiffList = LazyStorageDiff::BigMap(BigMapDiff {
+            id: 0u64.into(),
+            storage_diff: StorageDiff::Copy(Copy {
+                source: 0u64.into(),
+                updates: vec![],
+            }),
+        })
+        .into();
+        let expected =
+            fetch_generated_data("S023", "lazy_storage_diff", "big_map_diff-copy");
+        assert_eq!(
+            diff.to_bytes()
+                .expect("Lazy storage diff encoding should have succeed"),
+            expected,
+            "Lazy storage diff encoding should have been compatible"
+        );
+    }
+
+    #[test]
+    pub fn big_map_remove_compatibility() {
+        let diff: LazyStorageDiffList = LazyStorageDiff::BigMap(BigMapDiff {
+            id: 0u64.into(),
+            storage_diff: StorageDiff::Remove,
+        })
+        .into();
+        let expected =
+            fetch_generated_data("S023", "lazy_storage_diff", "big_map_diff-remove");
+        assert_eq!(
+            diff.to_bytes()
+                .expect("Lazy storage diff encoding should have succeed"),
+            expected,
+            "Lazy storage diff encoding should have been compatible"
+        );
+    }
+
+    #[test]
+    pub fn big_map_update_compatibility() {
+        let key = mir::ast::Micheline::Int(1u64.into()).encode();
+        let value = Some(mir::ast::Micheline::prim0(mir::lexer::Prim::UNIT).encode());
+        let diff: LazyStorageDiffList = LazyStorageDiff::BigMap(BigMapDiff {
+            id: 0u64.into(),
+            storage_diff: StorageDiff::Update(vec![Update {
+                key_hash: ScriptExprHash(H256::from_str("cffedbaf00cb581448a5683abdefe0d5cd4d4ba4923f1a489791810c3fec3325").unwrap()),
+                key,
+                value,
+            }]),
+        })
+        .into();
+        let expected =
+            fetch_generated_data("S023", "lazy_storage_diff", "big_map_diff-update");
+        assert_eq!(
+            diff.to_bytes()
+                .expect("Lazy storage diff encoding should have succeed"),
+            expected,
+            "Lazy storage diff encoding should have been compatible"
+        );
+    }
+}
