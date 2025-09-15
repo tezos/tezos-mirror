@@ -97,6 +97,8 @@ oc.build:static-x86_64-linux-binaries:
   - gcp_very_high_cpu_ramfs
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -147,6 +149,8 @@ oc.build:static-arm64-linux-binaries:
   - gcp_arm64
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -198,6 +202,8 @@ oc.build_arm64-released:
   rules:
   - when: manual
     allow_failure: true
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -253,6 +259,8 @@ oc.build_arm64-extra-dev:
   rules:
   - when: manual
     allow_failure: true
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -315,6 +323,8 @@ oc.build_arm64-extra-exp:
   rules:
   - when: manual
     allow_failure: true
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -374,6 +384,7 @@ datadog_pipeline_trace:
   stage: start
   tags:
   - gcp
+  needs: []
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
@@ -396,6 +407,8 @@ oc.unified_coverage:
   - gcp
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   allow_failure: true
@@ -526,6 +539,8 @@ publish_kernel_sdk:
   rules:
   - when: manual
     allow_failure: true
+  needs:
+  - oc.docker:rust-toolchain:amd64
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes

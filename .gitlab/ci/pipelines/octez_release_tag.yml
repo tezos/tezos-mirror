@@ -68,6 +68,7 @@ datadog_pipeline_trace:
   stage: start
   tags:
   - gcp
+  needs: []
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
@@ -1007,6 +1008,8 @@ opam:release:
   stage: publish
   tags:
   - gcp_not_interruptible
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes

@@ -68,6 +68,7 @@ datadog_pipeline_trace:
   stage: start
   tags:
   - gcp
+  needs: []
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
@@ -88,6 +89,8 @@ oc.build:static-arm64-linux-binaries:
   stage: build
   tags:
   - gcp_arm64
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -138,6 +141,8 @@ oc.build:static-x86_64-linux-binaries:
   stage: build
   tags:
   - gcp_very_high_cpu_ramfs
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes

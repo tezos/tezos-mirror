@@ -146,6 +146,7 @@ datadog_pipeline_trace:
   stage: start
   tags:
   - gcp
+  needs: []
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
@@ -347,6 +348,8 @@ oc.build_arm64-released:
   - gcp_arm64
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -402,6 +405,8 @@ oc.build_arm64-extra-dev:
   - gcp_arm64
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -464,6 +469,8 @@ oc.build_arm64-extra-exp:
   - gcp_arm64
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -828,6 +835,8 @@ oc.build_kernels:
   - gcp
   rules:
   - when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
@@ -878,6 +887,8 @@ oc.tezt:fetch-records:
   - gcp
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   allow_failure: true
@@ -912,6 +923,8 @@ build_octez_source:
   - gcp_very_high_cpu_ramfs
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -959,6 +972,8 @@ build-layer1-profiling:
   - gcp_very_high_cpu
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes

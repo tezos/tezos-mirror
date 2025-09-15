@@ -788,8 +788,8 @@ let enc_git_strategy = function
 
 let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     ?artifacts ?(before_script = []) ?cache ?id_tokens ?interruptible
-    ?(dependencies = Staged []) ?(image_dependencies = []) ?services ?variables
-    ?(rules : Gitlab_ci.Types.job_rule list option)
+    ?(dependencies = Dependent []) ?(image_dependencies = []) ?services
+    ?variables ?(rules : Gitlab_ci.Types.job_rule list option)
     ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
     ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
     ?interruptible_runner ?git_strategy ?coverage ?retry ?parallel ?description
