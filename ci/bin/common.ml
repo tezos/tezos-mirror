@@ -85,11 +85,6 @@ let before_script ?(take_ownership = false) ?(source_version = false)
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []
 
-(** Add common variables used by jobs compiling kernels *)
-let enable_kernels =
-  Tezos_ci.append_variables
-    [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
-
 (** {2 Child repositories pipelines} *)
 
 (** Return a tuple (ARCHITECTURES, <archs>) based on the type
@@ -250,6 +245,14 @@ let changeset_octez_docs =
 
 (** Only if reStructured Text files have changed *)
 let changeset_octez_docs_rst = Changeset.(changeset_base @ make ["**/*.rst"])
+
+(* Job [documentation:manuals] requires the build jobs, because it needs
+   to run Octez executables to generate the man pages.
+   So the build jobs need to be included if the documentation changes. *)
+let changeset_octez_or_doc = Changeset.(changeset_octez @ changeset_octez_docs)
+
+let changeset_octez_or_kernels_or_doc =
+  Changeset.(changeset_octez_or_kernels @ changeset_octez_docs)
 
 let changeset_octez_docker_changes_or_master =
   Changeset.(

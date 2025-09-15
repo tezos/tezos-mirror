@@ -1901,3 +1901,7 @@ module Coverage = struct
         unified_coverage_job := Some job ;
         job
 end
+
+let enable_kernels =
+  append_variables
+    [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]

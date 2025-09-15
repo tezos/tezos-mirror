@@ -574,15 +574,6 @@ let jobs pipeline_type =
       ~before_merging:(fun job_start -> Dependent [Job job_start])
       ~schedule_extended_test:(fun () -> Staged [])
   in
-  (* Job [documentation:manuals] requires the build jobs, because it needs
-     to run Octez executables to generate the man pages.
-     So the build jobs need to be included if the documentation changes. *)
-  let changeset_octez_or_doc =
-    Changeset.(changeset_octez @ changeset_octez_docs)
-  in
-  let changeset_octez_or_kernels_or_doc =
-    Changeset.(changeset_octez_or_kernels @ changeset_octez_docs)
-  in
   (* The build_x86_64 jobs are split in two to keep the artifact size
      under the 1GB hard limit set by GitLab. *)
   (* [job_build_x86_64_release] builds the released executables. *)
