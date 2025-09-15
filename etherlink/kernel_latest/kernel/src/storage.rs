@@ -231,7 +231,7 @@ pub fn store_transaction_receipt<Host: Runtime>(
     let receipt_path = receipt_path(&receipt.hash)?;
     let src: &[u8] = &receipt.rlp_bytes();
     log!(host, Benchmarking, "Storing receipt of size {}", src.len());
-    host.store_write_all(&receipt_path, src)?;
+    host.store_write(&receipt_path, src, 0)?;
     Ok(src.len().try_into()?)
 }
 
@@ -251,7 +251,7 @@ pub fn store_transaction_object<Host: Runtime>(
         "Storing transaction object of size {}",
         encoded.len()
     );
-    host.store_write_all(&object_path, encoded)?;
+    host.store_write(&object_path, encoded, 0)?;
     Ok(encoded.len().try_into()?)
 }
 
@@ -641,7 +641,7 @@ pub fn store_storage_version<Host: Runtime>(
 pub fn read_storage_version<Host: Runtime>(
     host: &mut Host,
 ) -> Result<StorageVersion, Error> {
-    match host.store_read(&STORAGE_VERSION_PATH, 0, 8) {
+    match host.store_read(&STORAGE_VERSION_PATH, 0, std::mem::size_of::<u64>()) {
         Ok(bytes) => {
             let slice_of_bytes: [u8; 8] =
                 bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;

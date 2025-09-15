@@ -91,7 +91,7 @@ impl CodeStorage {
         let code = Self::new(&code_hash)?;
         if !code.exists(host)? {
             let code_path = concat(&code.path, &CODE_PATH)?;
-            host.store_write_all(&code_path, bytecode)?;
+            host.store_write(&code_path, bytecode, 0)?;
         };
         code.increment_code_usage(host)?;
         Ok(code_hash)

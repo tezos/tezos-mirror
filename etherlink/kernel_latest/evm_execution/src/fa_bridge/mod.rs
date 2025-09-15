@@ -243,7 +243,7 @@ pub fn queue_fa_deposit<'a, Host: Runtime>(
 
         handler
             .host
-            .store_write_all(&deposit_path, &deposit.to_rlp_bytes())?;
+            .store_write(&deposit_path, &deposit.to_rlp_bytes(), 0)?;
 
         handler.add_log(deposit.queued_log(&withdrawal_id))?;
 

@@ -274,7 +274,7 @@ impl StorageAccount {
                     Err(RuntimeError::PathNotFound) => (),
                     Err(err) => return Err(Error::Runtime(err)),
                 };
-                host.store_write_all(&path, &info.rlp_bytes())?;
+                host.store_write(&path, &info.rlp_bytes(), 0)?;
 
                 // Delete legacy account entries
                 for path in &[balance_path, nonce_path, code_hash_path, code_path] {
