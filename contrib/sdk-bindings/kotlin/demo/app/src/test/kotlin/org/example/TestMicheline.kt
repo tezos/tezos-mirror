@@ -6,6 +6,7 @@
 package org.example.tezos
 
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 class TestMicheline {
 
@@ -16,7 +17,7 @@ class TestMicheline {
     */
     @Test
     fun testBuildBasicScriptMicheline() {
-        Micheline.Seq(
+        val micheline = Micheline.Seq(
             listOf(
                 Micheline.App(
                     Prim.K_PARAMETER,
@@ -46,6 +47,10 @@ class TestMicheline {
                 ),
             )
         )
+
+        val michelineManager = MichelineManager()
+
+        assertTrue(michelineManager.equalMicheline(micheline, micheline))
     }
 
     /*
@@ -54,7 +59,7 @@ class TestMicheline {
     @OptIn(kotlin.ExperimentalStdlibApi::class) // `hexToByteArray` is experimental
     @Test
     fun testBuildSimpleDataMicheline() {
-        Micheline.App(
+        val micheline = Micheline.App(
             Prim.D_PAIR,
             listOf(
                 Micheline.String("string"),
@@ -63,6 +68,10 @@ class TestMicheline {
             ),
             listOf(Annotation.Type("foo"))
         )
+
+        val michelineManager = MichelineManager()
+
+        assertTrue(michelineManager.equalMicheline(micheline, micheline))
     }
 
 }

@@ -18,7 +18,7 @@ class TestMicheline: XCTestCase {
      code {CDR; NIL operation; PAIR};
      */
     func testBuildBasicScriptMicheline() {
-        let _ = Micheline.seq(
+        let micheline = Micheline.seq(
           seq: [
             Micheline.app(
               prim: Prim.kParameter,
@@ -47,13 +47,17 @@ class TestMicheline: XCTestCase {
               annots: []
             ),
           ])
+
+        let michelineManager = MichelineManager()
+
+        XCTAssertTrue(michelineManager.equalMicheline(micheline1: micheline, micheline2: micheline))
     }
 
     /*
      (Pair :foo "string" 0 0x00)
     */
     func testBuildSimpleDataMicheline() {
-        let _ = Micheline.app(
+        let micheline = Micheline.app(
           prim: Prim.dPair,
           seq: [
             Micheline.string(string: "string"),
@@ -62,6 +66,10 @@ class TestMicheline: XCTestCase {
           ],
           annots: [Annotation.type("foo")]
         )
+
+        let michelineManager = MichelineManager()
+
+        XCTAssertTrue(michelineManager.equalMicheline(micheline1: micheline, micheline2: micheline))
     }
 
 }

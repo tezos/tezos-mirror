@@ -205,6 +205,27 @@ pub enum Micheline {
     },
 }
 
+// Because uniffi does not allow bindings of methods implemented on
+// structures tagged as `uniffi::Enum` (this restriction also applies
+// to the traits `Debug`, `Display`, and `Eq`), a dedicated manager
+// for the `Micheline` enum has been introduced to be able to bind the
+// features associated with it.
+#[derive(uniffi::Object)]
+struct MichelineManager;
+
+#[uniffi::export]
+impl MichelineManager {
+    #[uniffi::constructor]
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Check that two micheline are equal.
+    pub fn equal_micheline(&self, micheline_1: &Micheline, micheline_2: &Micheline) -> bool {
+        micheline_1 == micheline_2
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,7 +237,7 @@ mod tests {
     */
     #[test]
     fn build_basic_script_micheline() {
-        let _ = Micheline::Seq {
+        let micheline = Micheline::Seq {
             seq: vec![
                 Micheline::App {
                     prim: Prim::K_parameter,
@@ -265,6 +286,13 @@ mod tests {
                 },
             ],
         };
+
+        let micheline_manager = MichelineManager::new();
+
+        assert!(
+            micheline_manager.equal_micheline(&micheline, &micheline),
+            "Micheline must be equal to itself"
+        );
     }
 
     /*
@@ -272,7 +300,7 @@ mod tests {
     */
     #[test]
     fn build_simple_data_micheline() {
-        let _ = Micheline::App {
+        let micheline = Micheline::App {
             prim: Prim::D_Pair,
             seq: vec![
                 Micheline::String {
@@ -287,5 +315,12 @@ mod tests {
             ],
             annots: vec![Annotation::Type("foo".to_owned())],
         };
+
+        let micheline_manager = MichelineManager::new();
+
+        assert!(
+            micheline_manager.equal_micheline(&micheline, &micheline),
+            "Micheline must be equal to itself"
+        );
     }
 }
