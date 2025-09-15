@@ -105,7 +105,7 @@ pub fn write_h256_be(
     path: &impl Path,
     hash: H256,
 ) -> anyhow::Result<()> {
-    Ok(host.store_write_all(path, hash.as_bytes())?)
+    Ok(host.store_write(path, hash.as_bytes(), 0)?)
 }
 
 /// Return an unsigned 32 bytes value from storage at the given `path`.
@@ -142,7 +142,7 @@ pub fn write_u256_le(
 ) -> Result<(), Error> {
     let mut bytes: [u8; WORD_SIZE] = value.into();
     value.to_little_endian(&mut bytes);
-    host.store_write_all(path, &bytes).map_err(Error::from)
+    host.store_write(path, &bytes, 0).map_err(Error::from)
 }
 
 /// Return an unsigned 8 bytes value from storage at the given `path`.
@@ -206,7 +206,7 @@ pub fn write_u64_le(
     path: &impl Path,
     value: u64,
 ) -> Result<(), Error> {
-    host.store_write_all(path, value.to_le_bytes().as_slice())
+    host.store_write(path, value.to_le_bytes().as_slice(), 0)
         .map_err(Error::from)
 }
 

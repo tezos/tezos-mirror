@@ -96,7 +96,7 @@ pub fn write_u64_le(
     path: &impl Path,
     value: u64,
 ) -> Result<(), RuntimeError> {
-    host.store_write_all(path, value.to_le_bytes().as_slice())
+    host.store_write(path, value.to_le_bytes().as_slice(), 0)
 }
 
 pub fn write_u256_le(
@@ -104,7 +104,7 @@ pub fn write_u256_le(
     path: &impl Path,
     value: U256,
 ) -> Result<(), RuntimeError> {
-    host.store_write_all(path, &value.to_le_bytes::<{ U256::BYTES }>())
+    host.store_write(path, &value.to_le_bytes::<{ U256::BYTES }>(), 0)
 }
 
 pub fn bytes_hash(bytes: &[u8]) -> B256 {

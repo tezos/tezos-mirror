@@ -727,9 +727,10 @@ mod test {
             .unwrap();
 
         // Store the ticketer address required to build the outbox message
-        host.store_write_all(
+        host.store_write(
             &WITHDRAWALS_TICKETER_PATH,
             "KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4".as_bytes(),
+            0,
         )
         .unwrap();
 

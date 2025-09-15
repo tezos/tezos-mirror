@@ -437,7 +437,7 @@ impl EthereumAccount {
         if !to_default {
             let value_bytes = value.to_fixed_bytes();
 
-            host.store_write_all(&path, &value_bytes)?;
+            host.store_write(&path, &value_bytes, 0)?;
         }
 
         Ok(StorageEffect {
@@ -458,7 +458,7 @@ impl EthereumAccount {
 
         let value_bytes = value.to_fixed_bytes();
 
-        host.store_write_all(&path, &value_bytes)
+        host.store_write(&path, &value_bytes, 0)
             .map_err(AccountStorageError::from)
     }
 
@@ -1273,12 +1273,12 @@ mod test {
         let code_hash_path =
             concat(&a1.path, &CODE_HASH_PATH).expect("Could not get code hash path");
 
-        host.store_write_all(&code_hash_path, &code_hash_bytes)
+        host.store_write(&code_hash_path, &code_hash_bytes, 0)
             .expect("Could not write code hash into code hash path");
 
         let code_path = concat(&a1.path, &CODE_PATH).expect("Could not get code path");
 
-        host.store_write_all(&code_path, &sample_code)
+        host.store_write(&code_path, &sample_code, 0)
             .expect("Could not write code into code path");
 
         storage

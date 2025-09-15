@@ -321,7 +321,7 @@ impl StorageAccount {
         }
         let value = AccountInfoInternal::from(new_infos).rlp_bytes();
 
-        host.store_write_all(&path, &value)?;
+        host.store_write(&path, &value, 0)?;
         Ok(())
     }
 
@@ -333,7 +333,7 @@ impl StorageAccount {
         let path = concat(&self.path, &INFO_PATH)?;
         let value = AccountInfoInternal::from(new_infos).rlp_bytes();
 
-        host.store_write_all(&path, &value)?;
+        host.store_write(&path, &value, 0)?;
         Ok(())
     }
 
@@ -366,7 +366,7 @@ impl StorageAccount {
         let path = self.storage_path(index)?;
         let value_bytes = value.to_be_bytes::<{ U256::BYTES }>();
 
-        Ok(host.store_write_all(&path, &value_bytes)?)
+        Ok(host.store_write(&path, &value_bytes, 0)?)
     }
 
     pub fn clear_storage(&mut self, host: &mut impl Runtime) -> Result<(), Error> {

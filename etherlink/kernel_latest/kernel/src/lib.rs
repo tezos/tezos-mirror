@@ -756,9 +756,7 @@ mod tests {
 
         // enable FA bridge feature
         if enable_fa_bridge {
-            mock_host
-                .store_write_all(&ENABLE_FA_BRIDGE, &[1u8])
-                .unwrap();
+            mock_host.store_write(&ENABLE_FA_BRIDGE, &[1u8], 0).unwrap();
         }
 
         // run level in order to initialize outbox counter (by SOL message)
