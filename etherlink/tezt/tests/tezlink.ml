@@ -1200,6 +1200,52 @@ let test_tezlink_batch =
     ~error_msg:"Wrong balance for bootstrap3: expected %R, actual %L" ;
   unit
 
+(* The goal of this test is twofold:
+   - Test that long transfer batches are supported by Tezlink (see also
+     [test_tezlink_batch] for a test checking the balance changes on a batch of
+     size 2),
+   - Test that there is no regression for the counter RPC which used to return
+     128 instead of 64 (see MR !19237).
+*)
+let test_tezlink_long_batch =
+  register_tezlink_test
+    ~title:"Long transaction batch"
+    ~tags:["transaction"; "long"; "batch"; "counter"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let batch_size = 64 in
+  let json_transfer =
+    `O
+      [
+        ("destination", `String Constant.bootstrap1.alias);
+        ("amount", `String Tez.(to_string one));
+      ]
+  in
+  let json_batch =
+    `A (List.init batch_size (fun _op_index -> json_transfer)) |> JSON.encode_u
+  in
+  let*! () =
+    Client.multiple_transfers
+      ~endpoint
+      ~giver:Constant.bootstrap1.alias
+      ~json_batch
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* counter = account_rpc sequencer Constant.bootstrap1 "counter" in
+  Check.(
+    (batch_size = (counter |> JSON.as_int))
+      int
+      ~error_msg:
+        "Wrong counter after batch application: expected: %L, actual: %R.") ;
+  unit
+
 let test_tezlink_sandbox () =
   Test.register
     ~__FILE__
@@ -1540,6 +1586,7 @@ let () =
   test_tezlink_execution [Alpha] ;
   test_tezlink_reveal_transfer_batch [Alpha] ;
   test_tezlink_batch [Alpha] ;
+  test_tezlink_long_batch [Alpha] ;
   test_tezlink_bootstrap_block_info [Alpha] ;
   test_tezlink_sandbox () ;
   test_tezlink_internal_operation [Alpha] ;
