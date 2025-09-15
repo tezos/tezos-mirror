@@ -6,6 +6,9 @@
 
 ### Configuration changes
 
+- Add support for multiple sequencer keys in the CLI
+  (only first one used for now) (!19280).
+
 ### RPCs changes
 
 ### Monitoring changes
