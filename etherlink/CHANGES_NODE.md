@@ -6,12 +6,7 @@
 
 ### Configuration changes
 
-- Add support for multiple sequencer keys in the configuration
-  (only first one used for now) (!19251).
-
 ### RPCs changes
-
-- Fixes `eth_getCode` regression introduced in the previous version. (!19270)
 
 ### Monitoring changes
 
@@ -29,6 +24,20 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.41 (2025-09-15)
+
+This release of the EVM node is a bug fix release which addresses a regression
+introduced by version 0.40 on the RPC `eth_getCode`.
+
+### Configuration changes
+
+- Add support for multiple sequencer keys in the configuration
+  (only first one used for now) (!19251).
+
+### RPCs changes
+
+- Fixes `eth_getCode` regression introduced in the previous version. (!19270)
 
 ## Version 0.40 (2025-09-11)
 
