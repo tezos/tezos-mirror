@@ -5,7 +5,7 @@
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
 use context::Context;
-use mir::ast::{AddressHash, Entrypoint, OperationInfo, PublicKeyHash, TransferTokens};
+use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
 use mir::{
     ast::{IntoMicheline, Micheline},
     context::CtxTrait,
@@ -43,11 +43,13 @@ use tezos_tezlink::{
 };
 
 use crate::address::OriginationNonce;
+use crate::mir_ctx::Ctx;
 
 extern crate alloc;
 pub mod account_storage;
 mod address;
 pub mod context;
+mod mir_ctx;
 mod validate;
 
 fn reveal<Host: Runtime>(
@@ -338,106 +340,6 @@ fn execute_internal_operations<'a, Host: Runtime>(
             .for_each(InternalOperationSum::transform_result_backtrack);
     }
     Ok(())
-}
-
-struct Ctx<'a, Host, Context, Gas, OpCounter, OrigNonce> {
-    host: Host,
-    context: Context,
-    sender: AddressHash,
-    amount: i64,
-    self_address: AddressHash,
-    balance: i64,
-    level: BlockNumber,
-    now: Timestamp,
-    chain_id: ChainId,
-
-    source: PublicKeyHash,
-    gas: Gas,
-    operation_counter: OpCounter,
-    origination_nonce: OrigNonce,
-
-    lazy_storage: mir::ast::big_map::InMemoryLazyStorage<'a>,
-}
-
-impl<'a, Host: Runtime> CtxTrait<'a>
-    for Ctx<'a, &mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
-{
-    type BigMapStorage = mir::ast::big_map::InMemoryLazyStorage<'a>;
-
-    fn sender(&self) -> AddressHash {
-        self.sender.clone()
-    }
-
-    fn source(&self) -> PublicKeyHash {
-        self.source.clone()
-    }
-
-    fn amount(&self) -> i64 {
-        self.amount
-    }
-
-    fn self_address(&self) -> AddressHash {
-        self.self_address.clone()
-    }
-
-    fn balance(&self) -> i64 {
-        self.balance
-    }
-
-    fn gas(&mut self) -> &mut mir::gas::Gas {
-        self.gas
-    }
-
-    fn level(&self) -> BigUint {
-        self.level.block_number.into()
-    }
-
-    fn min_block_time(&self) -> BigUint {
-        1u32.into()
-    }
-
-    fn chain_id(&self) -> mir::ast::ChainId {
-        self.chain_id.clone()
-    }
-
-    fn voting_power(&self, _: &PublicKeyHash) -> BigUint {
-        0u32.into()
-    }
-
-    fn now(&self) -> num_bigint::BigInt {
-        i64::from(self.now).into()
-    }
-
-    fn total_voting_power(&self) -> BigUint {
-        1u32.into()
-    }
-
-    fn operation_group_hash(&self) -> [u8; 32] {
-        self.origination_nonce.operation.0 .0
-    }
-
-    fn big_map_storage(&mut self) -> &mut mir::ast::big_map::InMemoryLazyStorage<'a> {
-        &mut self.lazy_storage
-    }
-
-    fn origination_counter(&mut self) -> u32 {
-        let c: &mut u32 = &mut self.origination_nonce.index;
-        *c += 1;
-        *c
-    }
-
-    fn operation_counter(&mut self) -> u128 {
-        let c: &mut u128 = self.operation_counter;
-        *c += 1;
-        *c
-    }
-
-    fn lookup_contract(
-        &self,
-        address: &AddressHash,
-    ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
-        get_contract_entrypoint(self.host, self.context, address)
-    }
 }
 
 /// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
