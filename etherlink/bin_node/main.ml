@@ -1097,19 +1097,25 @@ let register_wallet ?password_filename ~wallet_dir () =
   in
   wallet_ctxt
 
-let get_key_or_generate wallet_ctxt key =
+let get_keys_or_generate_one wallet_ctxt keys =
   let open Lwt_result_syntax in
-  match key with
-  | Some key ->
-      let open Evm_node_lib_dev in
-      let* signer = Signer.sequencer_key_of_string wallet_ctxt key in
-      return signer
-  | None ->
-      let _pkh, _pk, sk =
-        Tezos_crypto.Signature.(generate_key ~algo:Ed25519) ()
-      in
-      let*? sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
-      return (Configuration.Wallet sk_uri)
+  let get key =
+    let open Evm_node_lib_dev in
+    let* signer = Signer.sequencer_key_of_string wallet_ctxt key in
+    return signer
+  in
+  let generate () =
+    let _pkh, _pk, sk =
+      Tezos_crypto.Signature.(generate_key ~algo:Ed25519) ()
+    in
+    let*? sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
+    return (Configuration.Wallet sk_uri)
+  in
+  match keys with
+  | None | Some [] ->
+      let+ key = generate () in
+      [key]
+  | Some keys -> List.map_es get keys
 
 let sequencer_disable_native_execution configuration =
   let open Lwt_syntax in
@@ -2717,9 +2723,7 @@ let sandbox_command =
       in
       let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
       let* sequencer_keys =
-        Option.map_es
-          (List.map_es (fun k -> get_key_or_generate wallet_ctxt (Some k)))
-          sequencer_keys_str
+        get_keys_or_generate_one wallet_ctxt sequencer_keys_str
       in
       let rollup_node_endpoint =
         Option.value ~default:Uri.empty rollup_node_endpoint
@@ -2752,7 +2756,7 @@ let sandbox_command =
       let config_file = config_filename ~data_dir config_file in
       start_sequencer
         ~wallet_ctxt
-        ?sequencer_keys
+        ~sequencer_keys
         ~data_dir
         ?rpc_addr
         ?rpc_port
@@ -2849,9 +2853,7 @@ let tezlink_sandbox_command =
       in
       let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
       let* sequencer_keys =
-        Option.map_es
-          (List.map_es (fun k -> get_key_or_generate wallet_ctxt (Some k)))
-          sequencer_keys_str
+        get_keys_or_generate_one wallet_ctxt sequencer_keys_str
       in
       let sandbox_config =
         Evm_node_lib_dev.Sequencer.
@@ -2874,7 +2876,7 @@ let tezlink_sandbox_command =
       let config_file = config_filename ~data_dir config_file in
       start_sequencer
         ~wallet_ctxt
-        ?sequencer_keys
+        ~sequencer_keys
         ~data_dir
         ?rpc_addr
         ?rpc_port
