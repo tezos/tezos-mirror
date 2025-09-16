@@ -100,7 +100,7 @@ impl<'a> BigMap<'a> {
         &self,
         arena: &'a Arena<Micheline<'a>>,
         key: &TypedValue,
-        storage: &(impl LazyStorage<'a> + ?Sized),
+        storage: &mut (impl LazyStorage<'a> + ?Sized),
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
         Ok(match &self.content {
             BigMapContent::InMemory(m) => m.get(key).cloned(),
@@ -120,7 +120,7 @@ impl<'a> BigMap<'a> {
     pub fn mem(
         &self,
         key: &TypedValue,
-        storage: &(impl LazyStorage<'a> + ?Sized),
+        storage: &mut (impl LazyStorage<'a> + ?Sized),
     ) -> Result<bool, LazyStorageError> {
         Ok(match &self.content {
             BigMapContent::InMemory(m) => m.get(key).is_some(),
@@ -213,7 +213,7 @@ pub trait LazyStorage<'a> {
     /// The specified big map id must point to a valid map in the lazy storage.
     /// Key type must match the type of key of the stored map.
     fn big_map_get(
-        &self,
+        &mut self,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key: &TypedValue,
@@ -224,7 +224,7 @@ pub trait LazyStorage<'a> {
     ///
     /// The specified big map id must point to a valid map in the lazy storage.
     /// Key type must match the type of key of the stored map.
-    fn big_map_mem(&self, id: &BigMapId, key: &TypedValue) -> Result<bool, LazyStorageError>;
+    fn big_map_mem(&mut self, id: &BigMapId, key: &TypedValue) -> Result<bool, LazyStorageError>;
 
     /// Add or remove a value in big map, accepts `Option` as value like in
     /// Michelson.
@@ -241,7 +241,8 @@ pub trait LazyStorage<'a> {
     /// Get key and value types of the map.
     ///
     /// This returns None if the map with such ID is not present in the storage.
-    fn big_map_get_type(&self, id: &BigMapId) -> Result<Option<(Type, Type)>, LazyStorageError>;
+    fn big_map_get_type(&mut self, id: &BigMapId)
+        -> Result<Option<(Type, Type)>, LazyStorageError>;
 
     /// Allocate a new empty big map.
     fn big_map_new(
@@ -363,7 +364,7 @@ impl<'a> InMemoryLazyStorage<'a> {
 
 impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
     fn big_map_get(
-        &self,
+        &mut self,
         _arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key: &TypedValue,
@@ -372,7 +373,7 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         Ok(info.map.get(key).cloned())
     }
 
-    fn big_map_mem(&self, id: &BigMapId, key: &TypedValue) -> Result<bool, LazyStorageError> {
+    fn big_map_mem(&mut self, id: &BigMapId, key: &TypedValue) -> Result<bool, LazyStorageError> {
         let info = self.access_big_map(id)?;
         Ok(info.map.contains_key(key))
     }
@@ -395,7 +396,10 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         Ok(())
     }
 
-    fn big_map_get_type(&self, id: &BigMapId) -> Result<Option<(Type, Type)>, LazyStorageError> {
+    fn big_map_get_type(
+        &mut self,
+        id: &BigMapId,
+    ) -> Result<Option<(Type, Type)>, LazyStorageError> {
         Ok(self
             .big_maps
             .get(id)
