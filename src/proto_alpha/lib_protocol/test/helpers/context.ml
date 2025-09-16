@@ -31,6 +31,9 @@ open Plugin
 
 type t = B of Block.t | I of Incremental.t
 
+type raw_context_modifier =
+  Raw_context.t -> Raw_context.t Environment.Error_monad.tzresult Lwt.t
+
 (* Begins the construction of a block with the first available baker.
    Fails if no baker can bake the next block. *)
 let get_alpha_ctxt c =
@@ -837,7 +840,7 @@ let create_bootstrap_accounts_algo_list algo_list =
   let bootstrap_accounts = Account.make_bootstrap_accounts accounts in
   (bootstrap_accounts, contracts)
 
-let init_with_constants_gen ?algo tup constants =
+let init_with_constants_gen ?algo ?prepare_context tup constants =
   let open Lwt_result_syntax in
   let n = tup_n tup in
   let*? bootstrap_accounts, contracts = create_bootstrap_accounts ?algo n in
@@ -846,13 +849,13 @@ let init_with_constants_gen ?algo tup constants =
       ~bootstrap_accounts
       constants
   in
-  let* blk = Block.genesis_with_parameters parameters in
+  let* blk = Block.genesis_with_parameters ?prepare_context parameters in
   return (blk, tup_get tup contracts)
 
-let init_with_constants_n ?algo constants n =
-  init_with_constants_gen ?algo (TList n) constants
+let init_with_constants_n ?algo ?prepare_context constants n =
+  init_with_constants_gen ?algo ?prepare_context (TList n) constants
 
-let init_with_constants_algo_list constants algo_list =
+let init_with_constants_algo_list ?prepare_context constants algo_list =
   let open Lwt_result_syntax in
   let n = List.length algo_list in
   let tup = TList n in
@@ -864,19 +867,19 @@ let init_with_constants_algo_list constants algo_list =
       ~bootstrap_accounts
       constants
   in
-  let* blk = Block.genesis_with_parameters parameters in
+  let* blk = Block.genesis_with_parameters ?prepare_context parameters in
   return (blk, tup_get tup contracts)
 
 let init_with_constants1 = init_with_constants_gen T1
 
 let init_with_constants2 = init_with_constants_gen T2
 
-let init_with_parameters_gen tup parameters =
+let init_with_parameters_gen ?prepare_context tup parameters =
   let open Lwt_result_syntax in
   let n = tup_n tup in
   let*? bootstrap_accounts, contracts = create_bootstrap_accounts n in
   let parameters = Parameters.{parameters with bootstrap_accounts} in
-  let* blk = Block.genesis_with_parameters parameters in
+  let* blk = Block.genesis_with_parameters ?prepare_context parameters in
   return (blk, tup_get tup contracts)
 
 let init_with_parameters_n params n = init_with_parameters_gen (TList n) params
