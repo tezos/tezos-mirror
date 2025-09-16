@@ -147,7 +147,7 @@ let () =
   register
     "master_branch"
     If.(on_tezos_namespace && push && on_branch "master")
-    ~jobs:Master_branch.jobs
+    ~jobs:(Master_branch.jobs @ !Hooks.master)
     ~description:
       "Publishes artifacts (docs, static binaries) from master on each merge.\n\n\
        This pipeline publishes the documentation at tezos.gitlab.io, builds \
