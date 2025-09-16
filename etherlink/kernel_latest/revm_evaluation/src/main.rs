@@ -2,6 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
+mod deserializer;
+mod fixture;
+
 pub fn main() {
     println!("REVM evaluation ꜩ")
 }
