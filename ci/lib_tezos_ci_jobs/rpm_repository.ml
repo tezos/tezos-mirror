@@ -99,7 +99,9 @@ let jobs pipeline_type =
            ~kind:"systemd-tests"
            [
              ("DISTRIBUTION", distribution);
-             ("BASE_IMAGE", "${DISTRIBUTION}:${RELEASE}");
+             ( "BASE_IMAGE",
+               "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}"
+             );
            ])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
@@ -132,7 +134,9 @@ let jobs pipeline_type =
         (variables
            [
              ("DISTRIBUTION", distribution);
-             ("BASE_IMAGE", "${DISTRIBUTION}:${RELEASE}");
+             ( "BASE_IMAGE",
+               "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}"
+             );
            ])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
@@ -212,7 +216,7 @@ let jobs pipeline_type =
            ])
       ~variables:(archs_variables pipeline_type)
       ~id_tokens:Tezos_ci.id_tokens
-      ~image:Images.rockylinux_93
+      ~image:Images.Base_images.rockylinux_9_3
       ~before_script:
         (before_script
            ~source_version:true
@@ -234,7 +238,7 @@ let jobs pipeline_type =
            ])
       ~variables:(archs_variables pipeline_type)
       ~id_tokens:Tezos_ci.id_tokens
-      ~image:Images.fedora_39
+      ~image:Images.Base_images.fedora_39
       ~before_script:
         (before_script
            ~source_version:true
@@ -285,7 +289,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.install_bin_fedora_39.doc"
         ~dependencies:(Dependent [Job job_rpm_repo_fedora])
-        ~image:Images.fedora_39
+        ~image:Images.Base_images.fedora_39
         ["./docs/introduction/install-bin-rpm.sh fedora 39"];
       job_install_systemd_bin
         ~__POS__
@@ -314,7 +318,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.install_bin_rockylinux_9.3.doc"
         ~dependencies:(Dependent [Job job_rpm_repo_rockylinux])
-        ~image:Images.rockylinux_93
+        ~image:Images.Base_images.rockylinux_9_3
         ["./docs/introduction/install-bin-rpm.sh rockylinux 9.3"];
       job_install_systemd_bin
         ~__POS__
