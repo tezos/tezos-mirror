@@ -70,7 +70,8 @@ RUN curl https://sh.rustup.rs --silent --show-error --fail | \
 ENV PATH=/root/.cargo/bin:$PATH
 
 # install rust toolchains and compilation targets
-RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 1.80.1 1.84.1 1.86.0 1.88.0 nightly-2025-01-30 nightly-2023-12-15 && \
+# nightly-2025-01-30 is installed separately as it's only used for formatting
+RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 1.80.1 1.84.1 1.86.0 1.88.0 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
         rustup target add --toolchain="$tc" wasm32-unknown-unknown; \
         rustup target add --toolchain="$tc" riscv64gc-unknown-none-elf; \
@@ -78,5 +79,5 @@ RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 1.80.1 1.84.1 1.86.0 1.88.0 nightl
         rustup target add --toolchain="$tc" riscv64gc-unknown-linux-musl; \
         rustup target add --toolchain="$tc" x86_64-unknown-linux-musl; \
     done && \
-    rustup component add --toolchain=nightly-2025-01-30 rustfmt miri rust-src && \
-    rustup component add --toolchain=nightly-2023-12-15 rust-src llvm-tools
+    rustup update nightly-2025-01-30 && \
+    rustup component add --toolchain=nightly-2025-01-30 rustfmt miri rust-src
