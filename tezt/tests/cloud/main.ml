@@ -28,6 +28,7 @@ let () =
         @@ fun () -> `cloud );
       ]
   in
+  Clap.close () ;
   (match command with
   | `basic -> Basic.register ()
   | `dal m -> Dal.register m
