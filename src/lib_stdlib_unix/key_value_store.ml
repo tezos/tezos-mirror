@@ -412,6 +412,30 @@ end = struct
   let position_of layout index =
     file_prefix_bitset_size + (index * layout.value_size)
 
+  let read_value_from fd layout key =
+    let open Result_syntax in
+    let value_size = layout.value_size in
+    let index = layout.index_of key in
+    let pos = position_of layout index in
+    let buf = Bytes.create value_size in
+
+    (* Helper to decode exactly one fixed-size bytes in [buf]. *)
+    let decode () =
+      catch_f
+        (fun () -> Data_encoding.Binary.of_bytes_exn layout.encoding buf)
+        (fun _exn -> Decoding_failed {filepath = layout.filepath; index})
+    in
+    let mmap =
+      Lwt_bytes.map_file
+        ~fd:(Lwt_unix.unix_file_descr fd)
+        ~pos:(Int64.of_int pos)
+        ~size:value_size
+        ~shared:true
+        ()
+    in
+    Lwt_bytes.blit_to_bytes mmap 0 buf 0 value_size ;
+    decode ()
+
   let read_with_opened_file layout opened_file key =
     let open Lwt_syntax in
     let index = layout.index_of key in
@@ -435,23 +459,7 @@ end = struct
         | None -> (
             (* If the value is not in the cache, we do an "I/O" via mmap. *)
             (* Note that the following code executes atomically Lwt-wise. *)
-            let pos = position_of layout index in
-            let mmap =
-              Lwt_bytes.map_file
-                ~fd:(Lwt_unix.unix_file_descr opened_file.fd)
-                ~pos:(Int64.of_int pos)
-                ~size:layout.value_size
-                ~shared:true
-                ()
-            in
-            let bytes = Bytes.make layout.value_size '\000' in
-            Lwt_bytes.blit_to_bytes mmap 0 bytes 0 layout.value_size ;
-            let data =
-              catch_f
-                (fun () ->
-                  Data_encoding.Binary.of_bytes_exn layout.encoding bytes)
-                (fun _ -> Encoding_failed {filepath; index})
-            in
+            let data = read_value_from opened_file.fd layout key in
             match data with
             | Error err -> Lwt.return (Some opened_file, Error err)
             | Ok data ->
