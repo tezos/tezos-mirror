@@ -935,25 +935,59 @@ module Agnostic_baker = struct
           ()
       in
       let runner = Agent.runner agent in
-      init
-        ?env:
-          (may_add_profiling_to_env
-             ~ppx_profiling_verbosity
-             ~ppx_profiling_backends
-             env)
-        ?event_sections_levels
-        ?name
-        ~event_level:`Notice
-        ?runner
-        ~path
-        ~delegates
-        ?dal_node_rpc_endpoint
-        ?dal_node_timeout_percentage
-        ?allow_fixed_random_seed
-        ?allow_signing_delay
-        ?extra_arguments
-        node
-        client
+      let* baker =
+        init
+          ?env:
+            (may_add_profiling_to_env
+               ~ppx_profiling_verbosity
+               ~ppx_profiling_backends
+               env)
+          ?event_sections_levels
+          ?name
+          ~event_level:`Notice
+          ?runner
+          ~path
+          ~delegates
+          ?dal_node_rpc_endpoint
+          ?dal_node_timeout_percentage
+          ?allow_fixed_random_seed
+          ?allow_signing_delay
+          ?extra_arguments
+          node
+          client
+      in
+      let name =
+        (* Baker logs are stored in its base-dir that is the client base-dir in
+           teztcloud. *)
+        Filename.basename (Client.base_dir client)
+      in
+      let on_shutdown =
+        match Agent.artifacts_dir agent with
+        | Some destination_root ->
+            (if Tezt_cloud_cli.retrieve_daily_logs then
+               [
+                 (fun () ->
+                   Agent_kind.Logs.scp_logs
+                     ~log_dir_name:"logs"
+                     ~destination_root
+                     ~daemon_name:name
+                     agent);
+               ]
+             else [])
+            @
+            if Tezt_cloud_cli.retrieve_ppx_profiling_traces then
+              [
+                (fun () ->
+                  Agent_kind.Logs.scp_profiling
+                    ~destination_root
+                    ~daemon_name:name
+                    agent);
+              ]
+            else []
+        | None -> []
+      in
+      Cloud.service_register ~name ~executable:path ~on_shutdown agent ;
+      Lwt.return baker
   end
 end
 

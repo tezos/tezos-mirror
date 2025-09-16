@@ -151,7 +151,8 @@ module Logs = struct
                 Lwt.return_unit))
           profiling_files
 
-  let scp_logs ~destination_root ~daemon_name agent =
+  let scp_logs ?(log_dir_name = "daily_logs") ~destination_root ~daemon_name
+      agent =
     let agent_name = Agent.name agent in
     (* This is not compatible with the --proxy mode as the Agent's location of
        the proxy might differ from the localhost one. *)
@@ -171,8 +172,8 @@ module Logs = struct
             Agent.scp
               agent
               ~is_directory:true
-              ~source:(tezt_root_path // daemon_name // "daily_logs")
-              ~destination:(local_path // "daily_logs")
+              ~source:(tezt_root_path // daemon_name // log_dir_name)
+              ~destination:(local_path // log_dir_name)
               `FromRunner)
           (fun exn ->
             Log.warn
