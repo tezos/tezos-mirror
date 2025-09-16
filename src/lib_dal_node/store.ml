@@ -760,6 +760,14 @@ module Commitment_indexed_cache =
         let hash = Hashtbl.hash
       end)
 
+module Chain_id = Single_value_store.Make (struct
+  type t = Chain_id.t
+
+  let name = "chain_id"
+
+  let encoding = Chain_id.encoding
+end)
+
 module Last_processed_level = Single_value_store.Make (struct
   type t = int32
 
@@ -845,6 +853,7 @@ type t = {
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
       (* The length of the array is the number of shards per slot *)
+  chain_id : Chain_id.t;
   finalized_commitments : Slot_id_cache.t;
   last_processed_level : Last_processed_level.t;
   first_seen_level : First_seen_level.t;
@@ -852,6 +861,8 @@ type t = {
 }
 
 let cache {cache; _} = cache
+
+let chain_id {chain_id; _} = chain_id
 
 let first_seen_level {first_seen_level; _} = first_seen_level
 
@@ -960,6 +971,7 @@ let init config profile_ctxt proto_parameters =
   let* slots = Slots.init base_dir Stores_dirs.slot in
   let* () = Version.write_version_file ~base_dir in
   let traps = Traps.create ~capacity:Constants.traps_cache_size in
+  let* chain_id = Chain_id.init ~root_dir:base_dir in
   let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
   let* first_seen_level = First_seen_level.init ~root_dir:base_dir in
   let* skip_list_cells_store = init_sqlite_skip_list_cells_store base_dir in
@@ -973,6 +985,7 @@ let init config profile_ctxt proto_parameters =
       cache = Commitment_indexed_cache.create Constants.cache_size;
       finalized_commitments =
         Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;
+      chain_id;
       last_processed_level;
       first_seen_level;
       skip_list_cells_store;

@@ -42,3 +42,7 @@ val infer_dal_network_name :
     known DAL plugin, and returns its header along with the plugin module. *)
 val wait_for_block_with_plugin :
   Rpc_context.t -> (Block_header.t * Proto_plugins.t) tzresult Lwt.t
+
+(** [fetch_l1_chain_id cctxt] fetches the chain id from the connected L1
+    node. *)
+val fetch_l1_chain_id : Rpc_context.t -> Chain_id.t tzresult Lwt.t
