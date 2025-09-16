@@ -236,6 +236,28 @@ let get_slot_content_from_shards cryptobox shards =
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
   return slot
 
+let http_request_path_from_kind backup_uri published_level slot_index slot_size
+    store_kind =
+  let kind, filename =
+    match store_kind with
+    | `Shards_archive ->
+        ("shards", Format.sprintf "%ld_%d" published_level slot_index)
+    | `Slots_archive ->
+        ( "slots",
+          Format.sprintf "%ld_%d_%d" published_level slot_index slot_size )
+  in
+  Uri.with_path
+    backup_uri
+    String.(concat "/" ["v0"; kind; "by_published_level"; filename])
+
+let local_filename_from_kind backup_uri published_level slot_index slot_size
+    store_kind =
+  let uri = Uri.path_and_query backup_uri in
+  match store_kind with
+  | `Shards_archive -> Format.sprintf "%s/%ld_%d" uri published_level slot_index
+  | `Slots_archive ->
+      Format.sprintf "%s/%ld_%d_%d" uri published_level slot_index slot_size
+
 let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
     backup_uri =
   let open Lwt_result_syntax in
