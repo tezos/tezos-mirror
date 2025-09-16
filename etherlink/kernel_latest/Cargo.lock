@@ -2480,10 +2480,16 @@ dependencies = [
 name = "revm-evaluation"
 version = "0.1.0"
 dependencies = [
+ "primitive-types",
  "revm",
  "revm-etherlink",
  "serde",
  "serde_json",
+ "tezos-evm-logging-latest",
+ "tezos-evm-runtime-latest",
+ "tezos-smart-rollup-core",
+ "tezos-smart-rollup-host",
+ "tezos_ethereum_latest",
 ]
 
 [[package]]
