@@ -38,6 +38,9 @@ pub const EVM_ACCOUNTS_PATH: RefPath =
 pub(crate) const WITHDRAWALS_TICKETER_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/ticketer");
 
+/// Size of contract hash encoded in base58.
+pub const KT1_B58_SIZE: usize = 36;
+
 /// Path where a possible waiting sequencer upgrade triggered by a precompile
 /// is store.
 pub const SEQUENCER_KEY_CHANGE_PATH: RefPath =
@@ -122,6 +125,12 @@ pub struct AccountInfoInternal {
     pub balance: U256,
     pub nonce: u64,
     pub code_hash: B256,
+}
+
+impl AccountInfoInternal {
+    // This value is used for optimizing reads in the durable storage,
+    // don't change it without changing StorageAccount::info.
+    const RLP_SIZE: usize = 77;
 }
 
 impl Encodable for AccountInfoInternal {
@@ -222,7 +231,7 @@ impl StorageAccount {
 
     pub fn info(&self, host: &mut impl Runtime) -> Result<AccountInfo, Error> {
         let path = concat(&self.path, &INFO_PATH)?;
-        match host.store_read_all(&path) {
+        match host.store_read(&path, 0, AccountInfoInternal::RLP_SIZE) {
             Ok(bytes) => {
                 let account_info = AccountInfoInternal::decode(&Rlp::new(&bytes))
                     .map_err(|_| RuntimeError::DecodingError)?;
@@ -286,7 +295,7 @@ impl StorageAccount {
         host: &impl Runtime,
     ) -> Result<Option<AccountInfo>, Error> {
         let path = concat(&self.path, &INFO_PATH)?;
-        match host.store_read_all(&path) {
+        match host.store_read(&path, 0, AccountInfoInternal::RLP_SIZE) {
             Ok(bytes) => {
                 let account_info = AccountInfoInternal::decode(&Rlp::new(&bytes))
                     .map_err(|_| RuntimeError::DecodingError)?;
@@ -486,6 +495,7 @@ mod test {
         primitives::{hex::FromHex, Bytes, FixedBytes, KECCAK_EMPTY},
         state::Bytecode,
     };
+    use rlp::Encodable;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
 
     fn bytecode_from_hex_str(hex_str: &str) -> Result<Bytecode, Error> {
@@ -551,5 +561,14 @@ mod test {
         let code_voucher = Bytecode::new();
 
         check_account_code_info_fetching(&mut host, code_voucher, KECCAK_EMPTY);
+    }
+
+    #[test]
+    fn account_info_size_constant() {
+        use crate::storage::world_state_handler::AccountInfoInternal;
+
+        let rlp_size = AccountInfoInternal::default().rlp_bytes().len();
+        assert_eq!(rlp_size, AccountInfoInternal::RLP_SIZE);
+        assert_eq!(rlp_size, 77);
     }
 }

@@ -330,7 +330,7 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> V
 pub fn read_logs_verbosity<Host: tezos_smart_rollup_host::runtime::Runtime>(
     host: &Host,
 ) -> Level {
-    match host.store_read_all(&VERBOSITY_PATH) {
+    match host.store_read(&VERBOSITY_PATH, 0, 1) {
         Ok(value) if value.len() == 1 => {
             Level::try_from(value[0]).unwrap_or(Level::default())
         }

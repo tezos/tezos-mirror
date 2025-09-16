@@ -21,6 +21,7 @@ use tezos_ethereum::{access_list::AccessList, block::BlockConstants};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_storage::StorageError;
+use tezos_storage::KT1_B58_SIZE;
 use thiserror::Error;
 
 mod access_record;
@@ -419,7 +420,9 @@ pub const NATIVE_TOKEN_TICKETER_PATH: RefPath =
 
 /// Reads the ticketer address set by the installer, if any, encoded in b58.
 pub fn read_ticketer(host: &impl Runtime) -> Option<ContractKt1Hash> {
-    let ticketer = host.store_read_all(&NATIVE_TOKEN_TICKETER_PATH).ok()?;
+    let ticketer = host
+        .store_read(&NATIVE_TOKEN_TICKETER_PATH, 0, KT1_B58_SIZE)
+        .ok()?;
 
     let kt1_b58 = String::from_utf8(ticketer.to_vec()).ok()?;
     ContractKt1Hash::from_b58check(&kt1_b58).ok()
@@ -431,7 +434,7 @@ pub const ENABLE_FAST_WITHDRAWAL: RefPath =
     RefPath::assert_from(b"/evm/world_state/feature_flags/enable_fast_withdrawal");
 
 pub fn fast_withdrawals_enabled<Host: Runtime>(host: &Host) -> bool {
-    host.store_read_all(&ENABLE_FAST_WITHDRAWAL).is_ok()
+    host.store_read(&ENABLE_FAST_WITHDRAWAL, 0, 1).is_ok()
 }
 
 // Path to the EVM version.
@@ -464,7 +467,7 @@ pub const ENABLE_FAST_FA_WITHDRAWAL: RefPath =
     RefPath::assert_from(b"/evm/world_state/feature_flags/enable_fast_fa_withdrawal");
 
 pub fn fast_fa_withdrawals_enabled<Host: Runtime>(host: &Host) -> bool {
-    host.store_read_all(&ENABLE_FAST_FA_WITHDRAWAL).is_ok()
+    host.store_read(&ENABLE_FAST_FA_WITHDRAWAL, 0, 1).is_ok()
 }
 
 #[cfg(test)]

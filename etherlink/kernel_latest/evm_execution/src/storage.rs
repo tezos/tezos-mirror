@@ -171,7 +171,7 @@ pub mod blocks {
         block_number: U256,
     ) -> Result<H256, EvmBlockStorageError> {
         let block_path = to_block_hash_path(block_number)?;
-        let block_hash = host.store_read_all(&block_path)?;
+        let block_hash = host.store_read(&block_path, 0, 32)?;
 
         if block_hash.len() == 32 {
             Ok(H256::from_slice(&block_hash))

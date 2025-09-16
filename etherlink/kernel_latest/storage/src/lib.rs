@@ -29,6 +29,9 @@ use tezos_smart_rollup_host::runtime::{RuntimeError, ValueType};
 /// The size of one 256 bit word. Size in bytes.
 pub const WORD_SIZE: usize = 32usize;
 
+/// The size of contract hash encoded in base58.
+pub const KT1_B58_SIZE: usize = 36usize;
+
 /// Return up to buffer.len() from the given path in storage and
 /// store the read slice in `buffer`.
 ///
@@ -72,7 +75,7 @@ pub fn read_h256_be_opt(
     host: &impl Runtime,
     path: &impl Path,
 ) -> Result<Option<H256>, Error> {
-    match host.store_read_all(path) {
+    match host.store_read(path, 0, WORD_SIZE) {
         Ok(bytes) if bytes.len() == WORD_SIZE => Ok(Some(H256::from_slice(&bytes))),
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(None),
         Err(err) => Err(err.into()),
@@ -109,7 +112,7 @@ pub fn write_h256_be(
 ///
 /// NB: The given bytes are interpreted in little endian order.
 pub fn read_u256_le(host: &impl Runtime, path: &impl Path) -> Result<U256, Error> {
-    let bytes = host.store_read_all(path)?;
+    let bytes = host.store_read(path, 0, 32)?;
     Ok(U256::from_little_endian(&bytes))
 }
 
@@ -122,7 +125,7 @@ pub fn read_u256_le_default(
     path: &impl Path,
     default: U256,
 ) -> Result<U256, Error> {
-    match host.store_read_all(path) {
+    match host.store_read(path, 0, WORD_SIZE) {
         Ok(bytes) if bytes.len() == WORD_SIZE => Ok(U256::from_little_endian(&bytes)),
         Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
         Err(err) => Err(err.into()),
@@ -160,7 +163,7 @@ pub fn read_u64_le_default(
     path: &impl Path,
     default: u64,
 ) -> Result<u64, Error> {
-    match host.store_read_all(path) {
+    match host.store_read(path, 0, std::mem::size_of::<u64>()) {
         Ok(bytes) if bytes.len() == std::mem::size_of::<u64>() => {
             let bytes_array: [u8; std::mem::size_of::<u64>()] = bytes
                 .try_into()
@@ -183,7 +186,7 @@ pub fn read_u16_le_default(
 ) -> Result<u16, Error> {
     // This is exactly the same function as `read_u64_le_default`, but you know
     // the rule, you start sharing code on the 3rd duplication ;-).
-    match host.store_read_all(path) {
+    match host.store_read(path, 0, std::mem::size_of::<u16>()) {
         Ok(bytes) if bytes.len() == std::mem::size_of::<u16>() => {
             let bytes_array: [u8; std::mem::size_of::<u16>()] = bytes
                 .try_into()
@@ -243,7 +246,7 @@ pub fn read_optional_rlp<T: Decodable>(
 
 /// Return a base58 contract address from storage at the given `path`.
 pub fn read_b58_kt1(host: &impl Runtime, path: &impl Path) -> Option<ContractKt1Hash> {
-    let bytes = host.store_read_all(path).ok()?;
+    let bytes = host.store_read(path, 0, KT1_B58_SIZE).ok()?;
     let kt1_b58 = String::from_utf8(bytes).ok()?;
     ContractKt1Hash::from_b58check(&kt1_b58).ok()
 }
