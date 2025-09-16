@@ -258,18 +258,56 @@ let local_filename_from_kind backup_uri published_level slot_index slot_size
   | `Slots_archive ->
       Format.sprintf "%s/%ld_%d_%d" uri published_level slot_index slot_size
 
+(* The function below fetches a slot payload (or its shards) from a local file
+   or over HTTP(S), depending on the URI scheme, with the choice between slots
+   and shards driven by the URI fragment:
+
+    - No fragment or ["#slots"]  -> consider the source as a *slots* archive
+    - ["#shards"]                -> consider the source as a *shards* archive
+    - Any other fragment         -> [Failure "Invalid backup_uri fragment ..."]
+
+    The fragment is only a DAL-side indication to extend the
+    [--slots-backup-uri] option and associated code to handle shards without
+    breaking compatibility. It is stripped from [backup_uri]
+    before computing the local path or issuing the HTTP request.
+
+   URL/path shapes look as follows:
+
+   - Local (file://): the fragment affects the *filename*, not the directory.
+     * #slots  -> <base>/<published_level>_<slot_index>_<slot_size>
+     * #shards -> <base>/<published_level>_<slot_index>
+
+   - Remote (http[s]://): the fragment selects a server-side subtree.
+     * #slots  -> <base>/v0/slots/by_published_level/<published_level>_<slot_index>_<slot_size>
+     * #shards -> <base>/v0/shards/by_published_level/<published_level>_<slot_index>
+*)
 let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
     backup_uri =
   let open Lwt_result_syntax in
+  (* Extract the fragment of the URI. We expect nothing, #slots or #shards. *)
+  let fragment_kind = Uri.fragment backup_uri in
+  let archive_kind =
+    match fragment_kind with
+    | None -> `Slots_archive (* default *)
+    | Some "slots" -> `Slots_archive
+    | Some "shards" -> `Shards_archive
+    | Some s ->
+        Stdlib.failwith
+          (Format.sprintf
+             "Invalid backup_uri fragment %S. Expecting 'slots' or 'shards'."
+             s)
+  in
+  (* Drop the fragment part from the URI *)
+  let backup_uri = Uri.with_fragment backup_uri None in
   match Uri.scheme backup_uri with
   | Some "file" ->
       let slot_filename =
-        Format.sprintf
-          "%s/%ld_%d_%d"
-          (Uri.path_and_query backup_uri)
+        local_filename_from_kind
+          backup_uri
           published_level
           slot_index
           slot_size
+          archive_kind
       in
       if Sys.file_exists slot_filename then
         let*! content =
@@ -278,30 +316,30 @@ let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
               let*! res =
                 Lwt_io.with_file ~mode:Lwt_io.Input slot_filename Lwt_io.read
               in
-              Lwt.return_some (`Slot (Bytes.of_string res)))
+              let res = Bytes.of_string res in
+              Lwt.return_some
+                (if archive_kind = `Shards_archive then `Shards res
+                 else `Slot res))
             (fun _ -> Lwt.return_none)
         in
         return content
       else return_none
   | Some ("http" | "https") -> (
       let url =
-        Uri.with_path
+        http_request_path_from_kind
           backup_uri
-          String.(
-            concat
-              "/"
-              [
-                "v0";
-                "slots";
-                "by_published_level";
-                Format.sprintf "%ld_%d_%d" published_level slot_index slot_size;
-              ])
+          published_level
+          slot_index
+          slot_size
+          archive_kind
       in
       let*! resp, body = Cohttp_lwt_unix.Client.get url in
       match resp.status with
       | `OK ->
           let*! body_str = Cohttp_lwt.Body.to_string body in
-          return_some (`Slot (Bytes.of_string body_str))
+          let res = Bytes.of_string body_str in
+          return_some
+            (if archive_kind = `Shards_archive then `Shards res else `Slot res)
       | #Cohttp.Code.status_code as status ->
           (* Consume the body of the request in case of failure to avoid leaking stream!
              See https://github.com/mirage/ocaml-cohttp/issues/730 *)
@@ -367,6 +405,7 @@ let try_fetch_slot_from_backup ~slot_size ~published_level ~slot_index cryptobox
                slot_bytes
                Key_value_store.file_prefix_bitset_size
                slot_size
+    | Some (`Shards _shards_bytes) -> Stdlib.failwith "TODO in next commit"
   in
   let* slot_opt =
     fetch_and_sanitize_slot_content () |> Errors.other_lwt_result
