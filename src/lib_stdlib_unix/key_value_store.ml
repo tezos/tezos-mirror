@@ -228,6 +228,12 @@ module Files : sig
 
   val remove : 'value t -> ('key, 'value) layout -> unit tzresult Lwt.t
 
+  val read_value_from :
+    [`Fd of Lwt_unix.file_descr | `Bytes of bytes] ->
+    ('key, 'value) layout ->
+    'key ->
+    'value tzresult
+
   module View : sig
     val opened_files : 'value t -> int
 
@@ -1133,6 +1139,17 @@ let read_values t file_layout seq =
   Seq_s.of_seq seq
   |> Seq_s.S.map (fun (file, key) ->
          let* maybe_value = read_value t file_layout file key in
+         return (file, key, maybe_value))
+
+let read_values_from_bytes file_layout bytes seq =
+  let open Lwt_syntax in
+  (* Fake root dir for [file_layout] in this case. We don't have a valid
+     root_dir for data in memory. *)
+  let root_dir = "memory://dal_shard" in
+  Seq_s.of_seq seq
+  |> Seq_s.S.map (fun (file, key) ->
+         let layout = file_layout ~root_dir file in
+         let maybe_value = Files.read_value_from (`Bytes bytes) layout key in
          return (file, key, maybe_value))
 
 let values_exist t file_layout seq =

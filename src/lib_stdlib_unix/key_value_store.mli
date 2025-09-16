@@ -178,6 +178,14 @@ val read_values :
   ('file * 'key) Seq.t ->
   ('file * 'key * 'value tzresult) Seq_s.t
 
+(** variant of read_values, but decodes the shards stored in the given bytes
+    using the given store's layout. *)
+val read_values_from_bytes :
+  ('file, 'key, 'value) file_layout ->
+  bytes ->
+  ('file * 'key) Seq.t ->
+  ('file * 'key * 'value tzresult) Seq_s.t
+
 (** Same as {!read_value} expect that this function returns whether the given
     entry exists without reading it. *)
 val value_exists :
