@@ -420,7 +420,7 @@ impl EthBlockInProgress {
                 let new_receipt_path = concat(&Self::RECEIPTS, &receipt_path)?;
                 host.store_copy(&receipt_path, &new_receipt_path)?;
             }
-            host.store_write_all(&Self::RECEIPTS_PREVIOUS_ROOT, previous_receipts_root)?;
+            host.store_write(&Self::RECEIPTS_PREVIOUS_ROOT, previous_receipts_root, 0)?;
             let receipts_root = Self::safe_store_get_hash(host, &Self::RECEIPTS)?;
             host.store_delete(&Self::RECEIPTS)?;
             Ok(receipts_root)
@@ -444,9 +444,10 @@ impl EthBlockInProgress {
                 let new_object_path = concat(&Self::OBJECTS, &object_path)?;
                 host.store_copy(&object_path, &new_object_path)?;
             }
-            host.store_write_all(
+            host.store_write(
                 &Self::OBJECTS_PREVIOUS_ROOT,
                 previous_transactions_root,
+                0,
             )?;
             let objects_root = Self::safe_store_get_hash(host, &Self::OBJECTS)?;
             host.store_delete(&Self::OBJECTS)?;

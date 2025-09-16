@@ -101,7 +101,7 @@ pub fn reveal_storage(
     if let Some(admin) = admin {
         let kt1_b58 = admin.to_base58_check();
         let bytes = String::as_bytes(&kt1_b58);
-        host.store_write_all(&ADMIN, bytes).unwrap();
+        host.store_write(&ADMIN, bytes, 0).unwrap();
     }
 
     log!(host, Info, "Done revealing");

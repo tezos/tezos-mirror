@@ -231,7 +231,7 @@ pub fn store_transaction_receipt<Host: Runtime>(
     let receipt_path = receipt_path(&receipt.hash)?;
     let src: &[u8] = &receipt.rlp_bytes();
     log!(host, Benchmarking, "Storing receipt of size {}", src.len());
-    host.store_write_all(&receipt_path, src)?;
+    host.store_write(&receipt_path, src, 0)?;
     Ok(src.len().try_into()?)
 }
 
@@ -251,7 +251,7 @@ pub fn store_transaction_object<Host: Runtime>(
         "Storing transaction object of size {}",
         encoded.len()
     );
-    host.store_write_all(&object_path, encoded)?;
+    host.store_write(&object_path, encoded, 0)?;
     Ok(encoded.len().try_into()?)
 }
 
@@ -541,7 +541,7 @@ pub fn store_sequencer_pool_address(
     address: H160,
 ) -> Result<(), Error> {
     let bytes = address.to_fixed_bytes();
-    host.store_write_all(&SEQUENCER_POOL_PATH, bytes.as_slice())?;
+    host.store_write(&SEQUENCER_POOL_PATH, bytes.as_slice(), 0)?;
     Ok(())
 }
 
@@ -634,14 +634,14 @@ pub fn store_storage_version<Host: Runtime>(
     storage_version: StorageVersion,
 ) -> Result<(), Error> {
     let storage_version = u64::from(storage_version);
-    host.store_write_all(&STORAGE_VERSION_PATH, &storage_version.to_le_bytes())
+    host.store_write(&STORAGE_VERSION_PATH, &storage_version.to_le_bytes(), 0)
         .map_err(Error::from)
 }
 
 pub fn read_storage_version<Host: Runtime>(
     host: &mut Host,
 ) -> Result<StorageVersion, Error> {
-    match host.store_read_all(&STORAGE_VERSION_PATH) {
+    match host.store_read(&STORAGE_VERSION_PATH, 0, std::mem::size_of::<u64>()) {
         Ok(bytes) => {
             let slice_of_bytes: [u8; 8] =
                 bytes[..].try_into().map_err(|_| Error::InvalidConversion)?;
@@ -758,7 +758,7 @@ pub fn tweak_dal_activation<Host: Runtime>(
     activate_dal: bool,
 ) -> anyhow::Result<()> {
     if activate_dal {
-        host.store_write_all(&ENABLE_DAL, &[])?
+        host.store_write(&ENABLE_DAL, &[], 0)?
     } else {
         host.store_delete(&ENABLE_DAL)?
     }
@@ -791,7 +791,7 @@ pub fn store_sequencer<Host: Runtime>(
 ) -> anyhow::Result<()> {
     let pk_b58 = PublicKey::to_b58check(public_key);
     let bytes = String::as_bytes(&pk_b58);
-    host.store_write_all(&SEQUENCER, bytes).map_err(Into::into)
+    host.store_write(&SEQUENCER, bytes, 0).map_err(Into::into)
 }
 
 pub fn clear_events<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {

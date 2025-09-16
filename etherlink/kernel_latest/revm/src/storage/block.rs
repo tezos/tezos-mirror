@@ -45,7 +45,7 @@ mod test {
 
         let block_number = 1u64;
         let path = to_block_hash_path(block_number).unwrap();
-        host.store_write_all(&path, &[1; 31]).unwrap();
+        host.store_write(&path, &[1; 31], 0).unwrap();
 
         if let Err(Error::Custom(error)) = get_block_hash(&host, block_number) {
             if error != MALFORMED_HASH_ERR {
@@ -66,7 +66,7 @@ mod test {
         let block_number = 1u64;
         let block_hash = &[42; 32];
         let path = to_block_hash_path(block_number).unwrap();
-        host.store_write_all(&path, block_hash).unwrap();
+        host.store_write(&path, block_hash, 0).unwrap();
 
         assert_eq!(
             get_block_hash(&host, block_number).unwrap(),

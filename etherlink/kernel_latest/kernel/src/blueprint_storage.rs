@@ -209,7 +209,7 @@ fn store_blueprint_nb_chunks<Host: Runtime>(
 ) -> Result<(), Error> {
     let path = blueprint_nb_chunks_path(blueprint_path)?;
     let bytes = nb_chunks.to_le_bytes();
-    host.store_write_all(&path, &bytes).map_err(Error::from)
+    host.store_write(&path, &bytes, 0).map_err(Error::from)
 }
 
 pub fn store_sequencer_blueprint<Host: Runtime>(

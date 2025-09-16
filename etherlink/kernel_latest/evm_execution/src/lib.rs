@@ -444,7 +444,7 @@ pub fn store_evm_version(
     host: &mut impl Runtime,
     evm_version: &EVMVersion,
 ) -> Result<(), RuntimeError> {
-    host.store_write_all(&EVM_VERSION, &evm_version.to_le_bytes())
+    host.store_write(&EVM_VERSION, &evm_version.to_le_bytes(), 0)
 }
 
 pub fn read_evm_version(host: &mut impl Runtime) -> EVMVersion {

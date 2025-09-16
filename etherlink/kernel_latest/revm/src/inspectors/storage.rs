@@ -56,7 +56,7 @@ pub fn store_trace_gas<Host: Runtime>(
     hash: &Option<B256>,
 ) -> Result<(), Error> {
     let path = trace_tx_path(hash, &GAS)?;
-    host.store_write_all(&path, gas.to_le_bytes().as_slice())?;
+    host.store_write(&path, gas.to_le_bytes().as_slice(), 0)?;
     Ok(())
 }
 
@@ -66,7 +66,7 @@ pub fn store_trace_failed<Host: Runtime>(
     hash: &Option<B256>,
 ) -> Result<(), Error> {
     let path = trace_tx_path(hash, &FAILED)?;
-    host.store_write_all(&path, &[u8::from(!is_success)])?;
+    host.store_write(&path, &[u8::from(!is_success)], 0)?;
     log!(host, Debug, "Store trace info: is_success {is_success}");
     Ok(())
 }
@@ -77,7 +77,7 @@ pub fn store_return_value<Host: Runtime>(
     hash: &Option<B256>,
 ) -> Result<(), Error> {
     let path = trace_tx_path(hash, &RETURN_VALUE)?;
-    host.store_write_all(&path, value)?;
+    host.store_write(&path, value, 0)?;
     log!(host, Debug, "Store trace info: value {value:?}");
     Ok(())
 }
