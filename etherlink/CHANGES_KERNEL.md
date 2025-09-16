@@ -46,6 +46,8 @@ Its storage version is 38.
 ### Internal
 
 - Optimize storage reads for fixed-size values (host functions). (!19268)
+- Optimize storage writes for fixed-size values and new paths (host
+  functions). (!19274)
 
 ## Etherlink 4 (Dionysus)
 
