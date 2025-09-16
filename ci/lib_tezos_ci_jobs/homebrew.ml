@@ -11,7 +11,7 @@ open Tezos_ci.Cache
 type homebrew_pipeline = Full | Release
 
 let jobs pipeline_type : tezos_job list =
-  let image = Images.debian_bookworm in
+  let image = Images.Base_images.debian_bookworm in
   let stage = Stages.build in
 
   (* this job creates a formula from a template
@@ -43,6 +43,7 @@ let jobs pipeline_type : tezos_job list =
       ~image
       ~stage
       ~dependencies:(Dependent [Job job_create_homebrew_formula])
+      ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
       ~before_script:
         [
           "apt-get update && apt-get install -y git curl";
