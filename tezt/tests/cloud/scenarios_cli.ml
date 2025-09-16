@@ -1146,24 +1146,26 @@ module Tezlink () : Tezlink = struct
 
   let time_between_blocks =
     let s =
-      Clap.mandatory_string
+      Clap.default_string
         ~section
         ~long:"time-between-blocks"
         ~description:
           "Interval (in seconds) at which the sequencer creates an empty block \
            by default. If set to `none`, blocks are produced on demand only \
-           (see octez-evm-node private method produceBlock). (default: 10.)"
-        ~placeholder:"10."
-        ()
+           (see octez-evm-node private method produceBlock). (default: 8.)"
+        ~placeholder:"<float>"
+        "8."
     in
     if s = "none" then Tezos.Evm_node.Nothing
     else
       match Float.of_string_opt s with
       | None ->
-          failwith
+          Clap.error
             (sf
                "unrecognized value \"%s\": option --time-between-blocks only \
                 accepts \"none\" or a float"
-               s)
+               s) ;
+          (* `Tezos.Evm_node.Nothing` is a placeholder and will be ignored as we registered an error in Clap *)
+          Tezos.Evm_node.Nothing
       | Some f -> Time_between_blocks f
 end
