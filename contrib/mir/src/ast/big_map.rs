@@ -241,7 +241,7 @@ pub trait LazyStorage<'a> {
     /// Get key and value types of the map.
     ///
     /// This returns None if the map with such ID is not present in the storage.
-    fn big_map_get_type(&self, id: &BigMapId) -> Result<Option<(&Type, &Type)>, LazyStorageError>;
+    fn big_map_get_type(&self, id: &BigMapId) -> Result<Option<(Type, Type)>, LazyStorageError>;
 
     /// Allocate a new empty big map.
     fn big_map_new(
@@ -395,11 +395,11 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         Ok(())
     }
 
-    fn big_map_get_type(&self, id: &BigMapId) -> Result<Option<(&Type, &Type)>, LazyStorageError> {
+    fn big_map_get_type(&self, id: &BigMapId) -> Result<Option<(Type, Type)>, LazyStorageError> {
         Ok(self
             .big_maps
             .get(id)
-            .map(|info| (&info.key_type, &info.value_type)))
+            .map(|info| (info.key_type.clone(), info.value_type.clone())))
     }
 
     fn big_map_new(
