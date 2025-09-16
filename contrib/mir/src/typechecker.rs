@@ -24,7 +24,7 @@ pub mod type_props;
 use type_props::TypeProperty;
 
 use crate::ast::annotations::{AnnotationError, NO_ANNS};
-use crate::ast::big_map::{BigMap, BigMapId, LazyStorage, LazyStorageError};
+use crate::ast::big_map::{BigMap, BigMapId, LazyStorage};
 use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types,
     micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
@@ -157,7 +157,7 @@ pub enum TcError {
     BigMapNotFound(BigInt),
     /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0:?}")]
-    LazyStorageError(LazyStorageError),
+    LazyStorageError(String),
     /// Output stack after `MAP` instruction's code block is empty.
     #[error("MAP block returned an empty stack")]
     MapBlockEmptyStack,
@@ -2402,7 +2402,7 @@ pub(crate) fn typecheck_value<'a>(
             let (key_type, value_type) = ctx
                 .big_map_storage()
                 .big_map_get_type(&big_map_id)
-                .map_err(TcError::LazyStorageError)?
+                .map_err(|e| TcError::LazyStorageError(e.to_string()))?
                 .ok_or(TcError::BigMapNotFound(id.clone()))?;
 
             let key_type = &key_type.clone();

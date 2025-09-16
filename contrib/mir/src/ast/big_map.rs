@@ -13,9 +13,12 @@ use std::{
     fmt::Display,
     mem,
 };
+use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
 use typed_arena::Arena;
 
 use super::{Micheline, Type, TypedValue};
+use crate::serializer::DecodeError;
+use crate::typechecker::TcError;
 
 /// Id of big map in the lazy storage.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -164,12 +167,24 @@ impl<'a> BigMap<'a> {
 /// Errors that can happen when working with lazy storage.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum LazyStorageError {
-    /// Decoding from the internal representation failed.
-    #[error("decode failed {0}")]
-    DecodingError(String),
-    /// Some other error happened.
-    #[error("{0}")]
-    OtherError(String),
+    /// Error when computing path in storage
+    #[error("Error generating path: {0}")]
+    PathError(#[from] PathError),
+    /// Error when decoding value from storage
+    #[error("Error decoding stored value: {0}")]
+    DecodeError(#[from] DecodeError),
+    /// Runtime error while manipulating storage
+    #[error("Runtime error: {0}")]
+    RuntimeError(#[from] RuntimeError),
+    /// Typecheck error when returning value from storage
+    #[error("Error typechecking stored value: {0}")]
+    TcError(#[from] TcError),
+    /// Error when using nom_read to interact with the storage
+    #[error("Error nom_reading stored value: {0}")]
+    NomReadError(String),
+    /// Error when using bin_write to interact with the storage
+    #[error("Error bin_writing value to store: {0}")]
+    BinWriteError(String),
 }
 
 /// All the operations for working with the lazy storage.

@@ -878,6 +878,7 @@ dependencies = [
  "smallvec",
  "strum 0.26.3",
  "strum_macros 0.26.4",
+ "tezos-smart-rollup-host",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror",
@@ -1550,6 +1551,36 @@ version = "0.1.0"
 dependencies = [
  "hex",
  "nom",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+ "thiserror",
+]
+
+[[package]]
+name = "tezos-smart-rollup-build-utils"
+version = "0.2.2"
+dependencies = [
+ "rustc_version",
+]
+
+[[package]]
+name = "tezos-smart-rollup-constants"
+version = "0.2.2"
+
+[[package]]
+name = "tezos-smart-rollup-core"
+version = "0.2.2"
+dependencies = [
+ "tezos-smart-rollup-build-utils",
+ "tezos-smart-rollup-constants",
+]
+
+[[package]]
+name = "tezos-smart-rollup-host"
+version = "0.2.2"
+dependencies = [
+ "tezos-smart-rollup-build-utils",
+ "tezos-smart-rollup-core",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror",
