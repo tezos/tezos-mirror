@@ -412,7 +412,7 @@ end = struct
   let position_of layout index =
     file_prefix_bitset_size + (index * layout.value_size)
 
-  let read_value_from fd layout key =
+  let read_value_from data layout key =
     let open Result_syntax in
     let value_size = layout.value_size in
     let index = layout.index_of key in
@@ -425,16 +425,25 @@ end = struct
         (fun () -> Data_encoding.Binary.of_bytes_exn layout.encoding buf)
         (fun _exn -> Decoding_failed {filepath = layout.filepath; index})
     in
-    let mmap =
-      Lwt_bytes.map_file
-        ~fd:(Lwt_unix.unix_file_descr fd)
-        ~pos:(Int64.of_int pos)
-        ~size:value_size
-        ~shared:true
-        ()
-    in
-    Lwt_bytes.blit_to_bytes mmap 0 buf 0 value_size ;
-    decode ()
+    (* Copy the correct data frame into [buf], regardless of the data source. *)
+    match data with
+    | `Fd fd ->
+        let mmap =
+          Lwt_bytes.map_file
+            ~fd:(Lwt_unix.unix_file_descr fd)
+            ~pos:(Int64.of_int pos)
+            ~size:value_size
+            ~shared:true
+            ()
+        in
+        Lwt_bytes.blit_to_bytes mmap 0 buf 0 value_size ;
+        decode ()
+    | `Bytes src ->
+        if pos + value_size > Bytes.length src then
+          tzfail @@ Decoding_failed {filepath = layout.filepath; index}
+        else (
+          Bytes.blit src pos buf 0 value_size ;
+          decode ())
 
   let read_with_opened_file layout opened_file key =
     let open Lwt_syntax in
@@ -459,7 +468,7 @@ end = struct
         | None -> (
             (* If the value is not in the cache, we do an "I/O" via mmap. *)
             (* Note that the following code executes atomically Lwt-wise. *)
-            let data = read_value_from opened_file.fd layout key in
+            let data = read_value_from (`Fd opened_file.fd) layout key in
             match data with
             | Error err -> Lwt.return (Some opened_file, Error err)
             | Ok data ->
