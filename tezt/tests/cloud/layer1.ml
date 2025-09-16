@@ -409,7 +409,7 @@ let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
           Random.self_init () ;
           env
       | Some seed ->
-          Random.init seed ;
+          Random.init (seed + i) ;
           (* each baker will have a different seed *)
           fixed_seed_env env
     in
