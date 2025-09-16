@@ -45,6 +45,32 @@ let ci_lib_cacio =
     ~deps:[ci_lib_gitlab_ci_main; ci_lib_tezos_ci]
     ~release_status:Unreleased
 
+let ci_sdk_bindings =
+  private_lib
+    "sdk_bindings_ci"
+    ~opam:""
+    ~path:"contrib/sdk-bindings/ci"
+    ~bisect_ppx:No
+    ~modules:["sdk_bindings_ci"]
+    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
+    ~release_status:Unreleased
+
+let ci_lib_tezos_ci_jobs =
+  private_lib
+    "tezos_ci_jobs"
+    ~opam:""
+    ~path:"ci/lib_tezos_ci_jobs"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        ci_lib_gitlab_ci_main |> open_ ~m:"Base";
+        ci_lib_tezos_ci;
+        ci_lib_cacio;
+        ci_sdk_bindings;
+        tezt_core_lib;
+      ]
+    ~release_status:Unreleased
+
 let _release_page =
   private_exe
     "release_page"
@@ -81,16 +107,6 @@ let ci_rollup_node =
     ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
     ~release_status:Unreleased
 
-let ci_sdk_bindings =
-  private_lib
-    "sdk_bindings_ci"
-    ~opam:""
-    ~path:"contrib/sdk-bindings/ci"
-    ~bisect_ppx:No
-    ~modules:["sdk_bindings_ci"]
-    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
-    ~release_status:Unreleased
-
 let _ci_bin_main =
   private_exe
     "main"
@@ -101,12 +117,10 @@ let _ci_bin_main =
       [
         ci_lib_gitlab_ci_main |> open_ ~m:"Base";
         ci_lib_tezos_ci;
+        ci_lib_tezos_ci_jobs |> open_;
         ci_grafazos;
         ci_teztale;
         ci_rollup_node;
         ci_sdk_bindings;
-        yaml;
-        unix;
-        tezt_core_lib;
       ]
     ~release_status:Unreleased
