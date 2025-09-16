@@ -751,7 +751,7 @@ let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
     create_node agent cloud
   in
   let create_nodes fmt =
-    Lwt_list.filter_map_s
+    Lwt_list.filter_map_p
       (fun agent ->
         if match_agent_name fmt agent then
           create_node agent cloud |> Lwt.map Option.some
