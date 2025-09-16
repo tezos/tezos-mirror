@@ -189,8 +189,14 @@ let filter_up_to_staking_share share total_stake to_mutez keys_list =
   match share with
   | None ->
       List.map
-        (fun (pkh, pk, ck, stb, frz, unstk_frz) ->
-          (pkh, pk, ck, to_mutez stb, to_mutez frz, to_mutez unstk_frz))
+        (fun (pkh, pk, consensus_key, companion_key, stb, frz, unstk_frz) ->
+          ( pkh,
+            pk,
+            consensus_key,
+            companion_key,
+            to_mutez stb,
+            to_mutez frz,
+            to_mutez unstk_frz ))
         keys_list
   | Some share ->
       let staking_amount_limit =
@@ -205,12 +211,18 @@ let filter_up_to_staking_share share total_stake to_mutez keys_list =
         staking_amount_limit ;
       let rec loop ((keys_acc, stb_acc) as acc) = function
         | [] -> acc
-        | (pkh, pk, ck, stb, frz, unstk_frz) :: l ->
+        | (pkh, pk, consensus_key, companion_key, stb, frz, unstk_frz) :: l ->
             if Compare.Int64.(stb_acc > staking_amount_limit) then acc
               (* Stop whenever the limit is exceeded. *)
             else
               loop
-                ( (pkh, pk, ck, to_mutez stb, to_mutez frz, to_mutez unstk_frz)
+                ( ( pkh,
+                    pk,
+                    consensus_key,
+                    companion_key,
+                    to_mutez stb,
+                    to_mutez frz,
+                    to_mutez unstk_frz )
                   :: keys_acc,
                   Int64.add (to_mutez stb) stb_acc )
                 l
@@ -249,7 +261,7 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
       ~init:(Ok ([], P.Tez.zero))
       ~f:(fun pkh acc ->
         let* pk = P.Delegate.pubkey ctxt pkh in
-        let* ck =
+        let* consensus_key =
           let* cpk = P.Delegate.consensus_key ctxt pkh in
           if
             Tezos_crypto.Signature.Public_key.equal
@@ -262,6 +274,14 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
                 (P.Signature.To_latest.public_key cpk)
             in
             return_some (cpkh, P.Signature.To_latest.public_key cpk)
+        in
+        let* companion_key =
+          let* pk_opt = P.Delegate.companion_key ctxt pkh in
+          match pk_opt with
+          | None -> return_none
+          | Some pk ->
+              let pkh = Tezos_crypto.Signature.Bls.Public_key.hash pk in
+              return_some (pkh, pk)
         in
         let*? key_list_acc, staking_balance_acc = acc in
         let* staking_balance = P.Delegate.staking_balance ctxt pkh in
@@ -276,12 +296,15 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
             Signature.public_key_hash
             * Signature.public_key
             * (Signature.public_key_hash * Signature.public_key) option
+            * (Signature.Bls.Public_key_hash.t * Bls12_381_signature.MinPk.pk)
+              option
             * P.Tez.t
             * P.Tez.t
             * P.Tez.t =
           ( P.Signature.To_latest.public_key_hash pkh,
             P.Signature.To_latest.public_key pk,
-            ck,
+            consensus_key,
+            companion_key,
             staking_balance,
             frozen_deposits,
             unstaked_frozen_deposits )
@@ -306,7 +329,7 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
       @@
       (* By swapping x and y we do a descending sort *)
       List.sort
-        (fun (_, _, _, x, _, _) (_, _, _, y, _, _) -> P.Tez.compare y x)
+        (fun (_, _, _, _, x, _, _) (_, _, _, _, y, _, _) -> P.Tez.compare y x)
         delegates,
       accounts )
 
@@ -750,6 +773,8 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
            (Signature.public_key_hash
            * Signature.public_key
            * (Signature.public_key_hash * Signature.public_key) option
+           * (Signature.Bls.Public_key_hash.t * Bls12_381_signature.MinPk.pk)
+             option
            * int64
            * int64
            * int64)
@@ -768,12 +793,18 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
     List.fold_left_i
       (fun i
            acc
-           (pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits)
+           ( pkh,
+             pk,
+             consensus_key,
+             companion_key,
+             stake,
+             frozen_deposits,
+             unstake_frozen_deposits )
          ->
         let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
         let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
-        let ck =
-          match ck with
+        let consensus_key =
+          match consensus_key with
           | Some (cpkh, cpk) ->
               let cpkh =
                 Tezos_crypto.Signature.Public_key_hash.to_b58check cpkh
@@ -792,15 +823,31 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
           Option.value_f alias ~default:(fun () -> Format.asprintf "baker_%d" i)
         in
         let delegate_alias =
-          (alias, pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits)
+          ( alias,
+            pkh,
+            pk,
+            consensus_key,
+            stake,
+            frozen_deposits,
+            unstake_frozen_deposits )
         in
         let consensus_key_alias =
-          match ck with
+          match consensus_key with
           | None -> []
           | Some (cpkh, cpk) ->
               [(alias ^ "_consensus_key", cpkh, cpk, None, 0L, 0L, 0L)]
         in
-        consensus_key_alias @ (delegate_alias :: acc))
+        let companion_key_alias =
+          match companion_key with
+          | None -> []
+          | Some (pkh, pk) ->
+              let pkh =
+                Tezos_crypto.Signature.Bls.Public_key_hash.to_b58check pkh
+              in
+              let pk = Tezos_crypto.Signature.Bls.Public_key.to_b58check pk in
+              [(alias ^ "_companion_key", pkh, pk, None, 0L, 0L, 0L)]
+        in
+        companion_key_alias @ consensus_key_alias @ (delegate_alias :: acc))
       []
       delegates
     |> List.rev
