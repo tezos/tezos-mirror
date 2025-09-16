@@ -212,7 +212,7 @@ oc.base-images.rust:
   parallel:
     matrix:
     - RELEASE:
-      - unstable
+      - trixie
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -241,7 +241,7 @@ oc.base-images.rust.merge:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    RELEASE: unstable
+    RELEASE: trixie
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
 
 oc.base-images.debian-homebrew:

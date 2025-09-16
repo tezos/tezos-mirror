@@ -156,7 +156,7 @@ let jobs =
         ~name:"oc.base-images.rust"
         ~image_name:"debian-rust"
         ~base_name:"debian"
-        ~matrix:[("RELEASE", ["unstable"])]
+        ~matrix:[("RELEASE", ["trixie"])]
         ~compilation:Native
         "images/base-images/Dockerfile.rust"
     in
@@ -168,7 +168,7 @@ let jobs =
         ~dependencies:(Dependent [Job images])
         ~variables:
           [
-            ("RELEASE", "unstable");
+            ("RELEASE", "trixie");
             ("IMAGE_NAME", "${GCP_REGISTRY}/tezos/tezos/debian-rust");
           ]
         ["scripts/ci/docker-merge-base-images.sh"]
