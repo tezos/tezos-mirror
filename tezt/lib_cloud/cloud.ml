@@ -562,10 +562,13 @@ let set_faketime agent faketime =
       Process.run cmd args
 
 (** Optionally add some latency and jitter to network connection *)
-let adjust_traffic_control agent =
+let adjust_traffic_control i agent =
   match (Env.tc_delay, Env.tc_jitter) with
   | None, None -> Lwt.return_unit
   | tc_delay, tc_jitter ->
+      let () =
+        Option.iter (fun seed -> Random.init (seed + i)) Tezt.Cli.Options.seed
+      in
       let rand = function
         | Some (min, max) -> min +. Random.float (max -. min)
         | None -> 0.
@@ -698,9 +701,9 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
       else
         let tezt_cloud = Env.tezt_cloud in
         let ensure_ready =
-          let ensure_ready agent =
+          let ensure_ready i agent =
             let* () = wait_ssh_server_running agent in
-            let* () = adjust_traffic_control agent in
+            let* () = adjust_traffic_control i agent in
             let* () =
               match Env.faketime with
               | None -> Lwt.return_unit
@@ -709,7 +712,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
             Lwt.return_unit
           in
           fun deployement ->
-            Deployement.agents deployement |> List.map ensure_ready |> Lwt.join
+            Deployement.agents deployement |> List.mapi ensure_ready |> Lwt.join
         in
         match Env.mode with
         | `Remote_orchestrator_local_agents ->
