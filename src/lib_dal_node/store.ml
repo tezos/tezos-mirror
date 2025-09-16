@@ -419,8 +419,8 @@ end
   - Reads/counts: If the slot is present in cache, use the cache, otherwise use
   the disk (if available, otherwise the data is missing).
   - Writes:
-      * cache-only (disk=None): write to cache with events (silent=false).
-      * disk-backed: write to disk (must succeed) then write to cache silently (silent=true).
+      * cache-only (disk=None): write to cache.
+      * disk-backed: write to disk (must succeed) then write to cache.
   - Removal always clears cache first, then disk if present.
 *)
 module Shards = struct
