@@ -40,6 +40,7 @@ module Shards : sig
 
   (** Same as [read_values] but for all possible shards of the given slot id. *)
   val read_all :
+    ?from_bytes:bytes ->
     t ->
     Types.slot_id ->
     number_of_shards:int ->

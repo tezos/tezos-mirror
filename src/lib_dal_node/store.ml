@@ -271,11 +271,16 @@ module Shards_disk = struct
       in
       return_unit
 
-  let read_all {shards_store; _} slot_id ~number_of_shards =
+  let read_all ?from_bytes {shards_store; _} slot_id ~number_of_shards =
+    let reader =
+      match from_bytes with
+      | None -> KVS.read_values shards_store file_layout
+      | Some bytes -> KVS.read_values_from_bytes file_layout bytes
+    in
     Seq.ints 0
     |> Seq.take_while (fun x -> x < number_of_shards)
     |> Seq.map (fun shard_index -> (slot_id, shard_index))
-    |> KVS.read_values shards_store file_layout
+    |> reader
 
   let read {shards_store = store; _} slot_id shard_id =
     let open Lwt_result_syntax in
@@ -483,10 +488,10 @@ module Shards = struct
     | `Cache c -> Cache.read c slot_id shard_id
     | `Disk d -> Disk.read d slot_id shard_id
 
-  let read_all st slot_id ~number_of_shards =
+  let read_all ?from_bytes st slot_id ~number_of_shards =
     match source_target st slot_id with
     | `Cache c -> Cache.read_all c slot_id
-    | `Disk d -> Disk.read_all d slot_id ~number_of_shards
+    | `Disk d -> Disk.read_all ?from_bytes d slot_id ~number_of_shards
 
   let count_values st slot_id =
     match source_target st slot_id with
