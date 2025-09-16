@@ -26,7 +26,7 @@ type configuration = {
   producer_machine_type : string option;
   (* The first argument is the deconnection frequency, the second is the
      reconnection delay *)
-  echo_rollup : bool;
+  echo_rollups : int;
   disconnect : (int * int) option;
   network : Network.t;
   simulate_network : Network_simulation.t;
@@ -76,7 +76,7 @@ type t = {
       (* NOTE: they have the observer profile*)
   observers : Dal_node_helpers.observer list;
   etherlink : Etherlink_helpers.etherlink option;
-  echo_rollup : Echo_rollup.operator option;
+  echo_rollups : Echo_rollup.operator list;
   time_between_blocks : int;
   parameters : Dal_common.Parameters.t;
   infos : (int, Metrics.per_level_info) Hashtbl.t;
@@ -224,7 +224,7 @@ let get_infos_per_level t ~level ~metadata =
   in
   let* echo_rollup_fetched_data =
     Echo_rollup.fetch_echo_rollup_data
-      ~echo_rollup:t.echo_rollup
+      ~echo_rollup:(List.nth_opt t.echo_rollups 0)
       ~dal_node_producers:t.configuration.dal_node_producers
       ~level
   in
@@ -394,11 +394,11 @@ let init_public_network cloud (configuration : configuration)
       ~client:bootstrap.client
       etherlink_configuration
   in
-  let* echo_rollup_key =
-    Echo_rollup.init_echo_rollup_account
-      ~client:bootstrap.client
-      ~echo_rollup:configuration.echo_rollup
+  let* echo_rollup_keys =
+    Client.stresstest_gen_keys
       ~alias_prefix:"echo_operator"
+      configuration.echo_rollups
+      bootstrap.client
   in
   let accounts_to_fund =
     (if configuration.producer_key = None then
@@ -412,10 +412,7 @@ let init_public_network cloud (configuration : configuration)
     @ List.map
         (fun batcher -> (batcher, 10 * 1_000_000))
         etherlink_batching_operator_keys
-    @ Option.fold
-        ~none:[]
-        ~some:(fun operator -> [(operator, 11_000 * 1_000_000)])
-        echo_rollup_key
+    @ List.map (fun operator -> (operator, 11_000 * 1_000_000)) echo_rollup_keys
   in
   let* () =
     Dal_node_helpers.fund_producers_accounts
@@ -432,7 +429,7 @@ let init_public_network cloud (configuration : configuration)
       producer_accounts,
       etherlink_rollup_operator_key,
       etherlink_batching_operator_keys,
-      echo_rollup_key )
+      echo_rollup_keys )
 
 let round_robin_split m lst =
   assert (m > 0) ;
@@ -672,11 +669,11 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
   let* etherlink_rollup_operator_key, etherlink_batching_operator_keys =
     Etherlink_helpers.init_etherlink_operators ~client etherlink_configuration
   in
-  let* echo_rollup_key =
-    Echo_rollup.init_echo_rollup_account
-      ~client
-      ~echo_rollup:configuration.echo_rollup
-      ~alias_prefix:"echo_rollup_key"
+  let* echo_rollup_keys =
+    Client.stresstest_gen_keys
+      ~alias_prefix:"echo_operator_key"
+      configuration.echo_rollups
+      client
   in
   let* () =
     if configuration.simulate_network = Disabled then
@@ -694,8 +691,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           List.map
             (fun key -> (key, Some 1_000_000_000_000, false))
             (producer_accounts @ etherlink_rollup_operator_key
-           @ etherlink_batching_operator_keys
-            @ Option.fold ~none:[] ~some:(fun k -> [k]) echo_rollup_key)
+           @ etherlink_batching_operator_keys @ echo_rollup_keys)
         in
         let overrides =
           (match configuration.slot_size with
@@ -789,7 +785,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       producer_accounts,
       etherlink_rollup_operator_key,
       etherlink_batching_operator_keys,
-      echo_rollup_key )
+      echo_rollup_keys )
 
 let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
     (bakers : Baker_helpers.baker list)
@@ -851,7 +847,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
          producer_accounts,
          etherlink_rollup_operator_key,
          etherlink_batching_operator_keys,
-         echo_rollup_key ) =
+         echo_rollup_keys ) =
     match configuration.network with
     | `Sandbox ->
         let bootstrap_agent = Option.get bootstrap_agent in
@@ -938,22 +934,26 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       (observers_slot_index_agents @ observers_bakers_agents)
   in
   let () = toplog "Init: all producers and observers have been initialized" in
-  let* echo_rollup =
-    Echo_rollup.init_echo_rollup
-      cloud
-      ~data_dir:configuration.data_dir
-      ~simulate_network:configuration.simulate_network
-      ~external_rpc:configuration.external_rpc
-      ~network:configuration.network
-      ~snapshot:configuration.snapshot
-      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
-      ~ppx_profiling_backends:configuration.ppx_profiling_backends
-      ~memtrace:configuration.memtrace
-      ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
-      ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
-      ~next_agent
-      producers
-      echo_rollup_key
+  let* echo_rollups =
+    Lwt_list.mapi_s
+      (fun index echo_rollup_key ->
+        Echo_rollup.init_echo_rollup
+          cloud
+          ~data_dir:configuration.data_dir
+          ~simulate_network:configuration.simulate_network
+          ~external_rpc:configuration.external_rpc
+          ~network:configuration.network
+          ~snapshot:configuration.snapshot
+          ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+          ~ppx_profiling_backends:configuration.ppx_profiling_backends
+          ~memtrace:configuration.memtrace
+          ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
+          ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
+          ~next_agent
+          producers
+          index
+          echo_rollup_key)
+      echo_rollup_keys
   in
   let* etherlink =
     Etherlink_helpers.init_etherlink
@@ -1033,7 +1033,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       bakers;
       producers;
       observers;
-      echo_rollup;
+      echo_rollups;
       etherlink;
       time_between_blocks;
       parameters;
@@ -1219,7 +1219,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let etherlink = Cli.etherlink in
     let etherlink_sequencer = Cli.etherlink_sequencer in
     let etherlink_producers = Cli.etherlink_producers in
-    let echo_rollup = Cli.echo_rollup in
+    let echo_rollups = Cli.echo_rollups in
     let disconnect = Cli.disconnect in
     let network = Cli.network in
     let snapshot = Cli.snapshot in
@@ -1281,7 +1281,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         observer_pkhs;
         protocol;
         producer_machine_type;
-        echo_rollup;
+        echo_rollups;
         disconnect;
         network;
         simulate_network;
@@ -1347,11 +1347,15 @@ let register (module Cli : Scenarios_cli.Dal) =
            | None -> []
            | Some {etherlink_producers; _} ->
                List.init etherlink_producers (fun i -> Etherlink_producer i));
-           (if configuration.echo_rollup then
-              Echo_rollup_operator :: Reverse_proxy
-              :: List.map
-                   (fun slot_index -> Echo_rollup_dal_observer {slot_index})
-                   configuration.dal_node_producers
+           (if configuration.echo_rollups > 0 then
+              Reverse_proxy
+              :: List.concat
+                   (List.init configuration.echo_rollups (fun operator ->
+                        Echo_rollup_operator operator
+                        :: List.map
+                             (fun slot_index ->
+                               Echo_rollup_dal_observer {operator; slot_index})
+                             configuration.dal_node_producers))
             else []);
          ]
   in
@@ -1384,7 +1388,7 @@ let register (module Cli : Scenarios_cli.Dal) =
            | Observer _ | Etherlink_dal_operator | Etherlink_dal_observer _
            | Echo_rollup_dal_observer _ ->
                Agent.Configuration.make ?docker_image ~name ()
-           | Echo_rollup_operator -> default_vm_configuration ~name
+           | Echo_rollup_operator _ -> default_vm_configuration ~name
            | Etherlink_operator -> default_vm_configuration ~name
            | Etherlink_producer _ -> default_vm_configuration ~name
            | Reverse_proxy -> default_vm_configuration ~name
@@ -1417,7 +1421,7 @@ let register (module Cli : Scenarios_cli.Dal) =
              ["octez-teztale-archiver"; "octez-teztale-server"]
            else []
          else [])
-      @ (if Cli.echo_rollup then ["dal_echo_kernel_bandwidth.wasm"] else [])
+      @ (if Cli.echo_rollups > 0 then ["dal_echo_kernel_bandwidth.wasm"] else [])
       @ Option.fold
           ~none:[]
           ~some:(fun x -> [x])

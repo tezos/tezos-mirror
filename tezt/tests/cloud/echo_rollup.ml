@@ -57,17 +57,11 @@ let fetch_echo_rollup_data ~echo_rollup ~dal_node_producers ~level =
   in
   return slots
 
-let init_echo_rollup_account ~client ~echo_rollup ~alias_prefix =
-  if echo_rollup then
-    let () = toplog "Initializing the echo rollup key" in
-    let* key = Client.stresstest_gen_keys ~alias_prefix 1 client in
-    Lwt.return_some (List.hd key)
-  else Lwt.return_none
-
 let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
     ~snapshot ~ppx_profiling_verbosity ~ppx_profiling_backends ~memtrace
-    ~node_p2p_endpoint ~dal_node_p2p_endpoint operator dal_slots next_agent =
-  let name = name_of Echo_rollup_operator in
+    ~node_p2p_endpoint ~dal_node_p2p_endpoint operator dal_slots next_agent
+    index =
+  let name = name_of (Echo_rollup_operator index) in
   let* agent = next_agent ~name in
   let data_dir = data_dir |> Option.map (fun data_dir -> data_dir // name) in
   let with_yes_crypto = should_enable_yes_crypto simulate_network in
@@ -111,7 +105,9 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
         toplog "Echo rollup doesn't follow any slot" ;
         none
     | [slot_index] ->
-        let name = name_of (Echo_rollup_dal_observer {slot_index}) in
+        let name =
+          name_of (Echo_rollup_dal_observer {operator = index; slot_index})
+        in
         let* agent = next_agent ~name in
         let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
         let* () =
@@ -140,7 +136,7 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
             ~memtrace
             ~simulate_network
             ~name_of:(fun slot_index ->
-              name_of (Echo_rollup_dal_observer {slot_index}))
+              name_of (Echo_rollup_dal_observer {operator = index; slot_index}))
             ~default_endpoint:None
             ~node_p2p_endpoint
             ~dal_node_p2p_endpoint
@@ -243,30 +239,26 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
 
 let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
     ~snapshot ~ppx_profiling_verbosity ~ppx_profiling_backends ~memtrace
-    ~node_p2p_endpoint ~dal_node_p2p_endpoint ~next_agent producers
+    ~node_p2p_endpoint ~dal_node_p2p_endpoint ~next_agent producers index
     echo_rollup_key =
-  match echo_rollup_key with
-  | Some operator ->
-      let dal_slots =
-        List.map (fun p -> p.Dal_node_helpers.slot_index) producers
-      in
-      let* echo_rollup =
-        init_echo_rollup
-          cloud
-          ~data_dir
-          ~simulate_network
-          ~external_rpc
-          ~network
-          ~snapshot
-          ~ppx_profiling_verbosity
-          ~ppx_profiling_backends
-          ~memtrace
-          ~node_p2p_endpoint
-          ~dal_node_p2p_endpoint
-          operator
-          dal_slots
-          next_agent
-      in
-      let () = toplog "Init: Echo rollup has been initialized" in
-      Lwt.return_some echo_rollup
-  | _ -> Lwt.return_none
+  let dal_slots = List.map (fun p -> p.Dal_node_helpers.slot_index) producers in
+  let* echo_rollup =
+    init_echo_rollup
+      cloud
+      ~data_dir
+      ~simulate_network
+      ~external_rpc
+      ~network
+      ~snapshot
+      ~ppx_profiling_verbosity
+      ~ppx_profiling_backends
+      ~memtrace
+      ~node_p2p_endpoint
+      ~dal_node_p2p_endpoint
+      echo_rollup_key
+      dal_slots
+      next_agent
+      index
+  in
+  let () = toplog "Init: Echo rollup has been initialized" in
+  Lwt.return echo_rollup

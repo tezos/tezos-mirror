@@ -29,9 +29,9 @@ type t =
   | Etherlink_dal_observer of {slot_index : int}
       (** An Etherlink DAL observer responsible for a specific slot index. *)
   | Etherlink_producer of int  (** A DAL slot producer used by Etherlink. *)
-  | Echo_rollup_operator  (** The main rollup operator for the Echo rollup. *)
-  | Echo_rollup_dal_observer of {slot_index : int}
-      (** A DAL observer node for the Echo rollup, indexed by slot. *)
+  | Echo_rollup_operator of int  (** A rollup operator for the Echo rollup. *)
+  | Echo_rollup_dal_observer of {operator : int; slot_index : int}
+      (** A DAL observer node for the Echo rollup, indexed by operator and slot. *)
   | Stresstest of int
 
 val rex_bootstrap : rex
@@ -54,9 +54,9 @@ val rex_etherlink_dal_observer_index : rex
 
 val rex_etherlink_producer_index : rex
 
-val rex_echo_rollup_operator : rex
+val rex_echo_rollup_operator_index : rex
 
-val rex_echo_rollup_dal_observer_index : rex
+val rex_echo_rollup_dal_observer_index : int -> rex
 
 val rex_stresstest_index : rex
 

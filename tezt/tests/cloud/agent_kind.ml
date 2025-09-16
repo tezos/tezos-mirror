@@ -16,8 +16,8 @@ type t =
   | Etherlink_dal_operator
   | Etherlink_dal_observer of {slot_index : int}
   | Etherlink_producer of int
-  | Echo_rollup_operator
-  | Echo_rollup_dal_observer of {slot_index : int}
+  | Echo_rollup_operator of int
+  | Echo_rollup_dal_observer of {operator : int; slot_index : int}
   | Stresstest of int
 
 let rex_bootstrap = rex "bootstrap"
@@ -40,9 +40,10 @@ let rex_etherlink_dal_observer_index = rex "etherlink-dal-operator-(\\d+)"
 
 let rex_etherlink_producer_index = rex "etherlink-producer-(\\d+)"
 
-let rex_echo_rollup_operator = rex "echo-rollup-operator"
+let rex_echo_rollup_operator_index = rex "echo-rollup-operator-(\\d+)"
 
-let rex_echo_rollup_dal_observer_index = rex "echo-rollup-dal-node-(\\d+)"
+let rex_echo_rollup_dal_observer_index operator =
+  rex (Format.sprintf "echo-rollup-dal-node-operator-%d-slot-(\\d+)" operator)
 
 let rex_stresstest_index = rex "stresstest-(\\d+)"
 
@@ -69,9 +70,9 @@ let name_of = function
   | Etherlink_dal_observer {slot_index} ->
       rex_replace_index rex_etherlink_dal_operator slot_index
   | Etherlink_producer i -> rex_replace_index rex_etherlink_producer_index i
-  | Echo_rollup_operator -> rex_constant rex_echo_rollup_operator
-  | Echo_rollup_dal_observer {slot_index} ->
-      rex_replace_index rex_echo_rollup_dal_observer_index slot_index
+  | Echo_rollup_operator i -> rex_replace_index rex_echo_rollup_operator_index i
+  | Echo_rollup_dal_observer {operator; slot_index} ->
+      rex_replace_index (rex_echo_rollup_dal_observer_index operator) slot_index
   | Stresstest i -> rex_replace_index rex_stresstest_index i
 
 type daemon =
