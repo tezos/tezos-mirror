@@ -410,7 +410,7 @@ end = struct
   (* This computation relies on the fact that the size of all the
      values are fixed, and the values are stored after the bitset. *)
   let position_of layout index =
-    file_prefix_bitset_size + (index * layout.value_size) |> Int64.of_int
+    file_prefix_bitset_size + (index * layout.value_size)
 
   let read_with_opened_file layout opened_file key =
     let open Lwt_syntax in
@@ -439,7 +439,7 @@ end = struct
             let mmap =
               Lwt_bytes.map_file
                 ~fd:(Lwt_unix.unix_file_descr opened_file.fd)
-                ~pos
+                ~pos:(Int64.of_int pos)
                 ~size:layout.value_size
                 ~shared:true
                 ()
@@ -477,7 +477,7 @@ end = struct
         let mmap =
           Lwt_bytes.map_file
             ~fd:(Lwt_unix.unix_file_descr opened_file.fd)
-            ~pos
+            ~pos:(Int64.of_int pos)
             ~size:layout.value_size
             ~shared:true
             ()
