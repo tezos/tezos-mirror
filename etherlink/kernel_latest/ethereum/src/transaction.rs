@@ -234,6 +234,32 @@ impl Encodable for TransactionReceipt {
     }
 }
 
+// For now all the receipts we support encode the same payload
+// Can't use `Encodable2718` from alloy because one parameter is
+// `bytes::BufMut` which use floats
+// Standard for eips : Legacy, 2930, 1559, 4844, 7702
+impl TransactionReceipt {
+    pub fn encode_2718(&self, out: &mut Vec<u8>) {
+        let mut rlp_stream = RlpStream::new();
+
+        if self.type_ != TransactionType::Legacy {
+            rlp_stream.begin_list(4);
+        } else {
+            rlp_stream.begin_list(5);
+            rlp_stream.append::<u8>(&self.type_.into());
+        }
+        match &self.status {
+            TransactionStatus::Success => rlp_stream.append::<bool>(&true),
+            TransactionStatus::Failure => rlp_stream.append_empty_data(),
+        };
+        rlp_stream
+            .append(&self.cumulative_gas_used)
+            .append(&self.logs_bloom)
+            .append_list(&self.logs);
+        out.extend_from_slice(&rlp_stream.out());
+    }
+}
+
 impl TryFrom<&[u8]> for TransactionReceipt {
     type Error = DecoderError;
 
@@ -330,6 +356,16 @@ impl Encodable for TransactionObject {
         stream.append(&self.index);
         append_u256_le(stream, &self.value);
         rlp_append_opt(&self.signature, stream);
+    }
+}
+
+// Not ethereum compatible because we don't have the type field here
+// For now all the receipts we support encode the same payload
+// Can't use `Encodable2718` from alloy because one parameter is
+// `bytes::BufMut` which use floats
+impl TransactionObject {
+    pub fn encode_2718(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.rlp_bytes());
     }
 }
 

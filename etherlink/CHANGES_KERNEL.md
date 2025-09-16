@@ -4,6 +4,9 @@
 
 ### Features
 
+- Optimize computation of receipt and transaction root. Receipt root is now
+  Ethereum standard compatible (EIP 2718) (!19300)
+
 ### Bug fixes
 
 - FA deposit events are now emitted by the FA bridge address: `0xff00000000000000000000000000000000000002` (!19239)
