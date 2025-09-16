@@ -256,7 +256,7 @@ let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
               let*! res =
                 Lwt_io.with_file ~mode:Lwt_io.Input slot_filename Lwt_io.read
               in
-              Lwt.return_some (Bytes.of_string res))
+              Lwt.return_some (`Slot (Bytes.of_string res)))
             (fun _ -> Lwt.return_none)
         in
         return content
@@ -279,7 +279,7 @@ let fetch_slot_from_backup_uri ~slot_size ~published_level ~slot_index
       match resp.status with
       | `OK ->
           let*! body_str = Cohttp_lwt.Body.to_string body in
-          return_some (Bytes.of_string body_str)
+          return_some (`Slot (Bytes.of_string body_str))
       | #Cohttp.Code.status_code as status ->
           (* Consume the body of the request in case of failure to avoid leaking stream!
              See https://github.com/mirage/ocaml-cohttp/issues/730 *)
@@ -324,7 +324,7 @@ let try_fetch_slot_from_backup ~slot_size ~published_level ~slot_index cryptobox
     in
     match slot_opt with
     | None -> return_none
-    | Some slot_bytes ->
+    | Some (`Slot slot_bytes) ->
         let expected_size =
           slot_size + Key_value_store.file_prefix_bitset_size
         in
