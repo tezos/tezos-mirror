@@ -304,7 +304,8 @@ let warning_clean_directory files =
       files
   in
   Format.sprintf
-    "Please provide a clean directory by removing the following files: %s"
+    "Please provide a clean directory by removing the following files: %s@.You \
+     can also use --force to automatically erase the above files."
     to_delete
 
 let clean_directory ~data_dir =
