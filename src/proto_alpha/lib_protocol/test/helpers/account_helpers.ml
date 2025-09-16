@@ -70,7 +70,8 @@ let init_account ~name ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     ?(unstaked_finalizable = Unstaked_finalizable.zero)
     ?(staking_delegator_numerator = Z.zero)
     ?(staking_delegate_denominator = Z.zero) ?(frozen_rights = CycleMap.empty)
-    ?(slashed_cycles = []) ?last_seen_activity () =
+    ?(slashed_cycles = []) ?last_seen_activity ?consensus_key ?companion_key ()
+    =
   let frozen_deposits =
     Option.value frozen_deposits ~default:(Frozen_tez.init Tez.zero name name)
   in
@@ -90,8 +91,16 @@ let init_account ~name ?delegate ~pkh ~contract ~parameters ?(liquid = Tez.zero)
     frozen_rights;
     slashed_cycles;
     last_seen_activity;
-    consensus_keys = CycleMap.empty;
-    companion_keys = CycleMap.empty;
+    consensus_keys =
+      Option.fold
+        ~none:CycleMap.empty
+        ~some:(CycleMap.singleton Cycle.root)
+        consensus_key;
+    companion_keys =
+      Option.fold
+        ~none:CycleMap.empty
+        ~some:(CycleMap.singleton Cycle.root)
+        companion_key;
   }
 
 type account_map = account_state String.Map.t

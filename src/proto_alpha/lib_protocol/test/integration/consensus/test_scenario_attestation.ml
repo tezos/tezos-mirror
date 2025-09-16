@@ -153,7 +153,10 @@ let test_preattest_all =
 
 let test_attest_aggreg =
   init_constants ()
-  --> begin_test ["delegate1"; "delegate2"] ~algo:Bls ~force_attest_all:false
+  --> begin_test
+        ["delegate1"; "delegate2"]
+        ~default_algo:Bls
+        ~force_attest_all:false
   --> next_block
   --> attest_aggreg_with ["delegate1"; "delegate2"]
   --> next_block
@@ -165,7 +168,10 @@ let test_attest_aggreg =
 
 let test_preattest_aggreg =
   init_constants ()
-  --> begin_test ["delegate1"; "delegate2"] ~algo:Bls ~force_preattest_all:false
+  --> begin_test
+        ["delegate1"; "delegate2"]
+        ~default_algo:Bls
+        ~force_preattest_all:false
   --> set_baked_round 1 --> next_block
   --> finalize_payload ~payload_round:0 ()
   --> preattest_aggreg_with ["delegate1"; "delegate2"]
@@ -203,13 +209,13 @@ let test_attestation_rewards =
       |+ Tag "tz4 (solo)"
          --> begin_test
                ["delegate"]
-               ~algo:Bls
+               ~default_algo:Bls
                ~disable_default_checks:true
                ~force_attest_all:true
       |+ Tag "tz4 (with others)"
          --> begin_test
                ["delegate"; "bozo1"; "bozo2"]
-               ~algo:Bls
+               ~default_algo:Bls
                ~disable_default_checks:true
                ~force_attest_all:true)
   --> dawn_of_next_cycle
@@ -234,7 +240,7 @@ let test_missed_attestations_rewards_tz4 =
   (* Default checks are disabled because rewards have been changed *)
   --> begin_test
         ["delegate"; "bozo1"; "bozo2"]
-        ~algo:Bls
+        ~default_algo:Bls
         ~disable_default_checks:true
   --> snapshot_balances "init" ["delegate"]
   --> next_block
@@ -285,7 +291,7 @@ let test_forbidden_delegate_tries_to_attest_but_fails_miserably_tz4_edition =
   init_constants ()
   --> begin_test
         ["delegate"; "baker"; "attester"]
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_preattest_all:false
         ~force_attest_all:false
   --> set_baker ~min_round:1 "baker"
@@ -318,13 +324,13 @@ let test_attestations_keep_activation_status =
   --> (Tag "tz4, attest"
        --> begin_test
              accounts
-             ~algo:Bls
+             ~default_algo:Bls
              ~force_preattest_all:false
              ~force_attest_all:true
       |+ Tag "tz4, preattest"
          --> begin_test
                accounts
-               ~algo:Bls
+               ~default_algo:Bls
                ~force_preattest_all:true
                ~force_attest_all:false
       |+ Tag "non tz4, attest"
@@ -357,7 +363,8 @@ let test_consensus_threshold =
   --> set S.consensus_committee_size 1000
   --> set S.consensus_threshold_size req_attestations
   --> begin_test
-        ~delegates_with_algo:[("delegate_1", Bls); ("delegate_2", Bls)]
+        ~bootstrap_info_list:
+          [make "delegate_1" ~algo:Bls; make "delegate_2" ~algo:Bls]
         ["delegate_3"]
   (* Genesis cannot be attested *)
   --> next_block
@@ -411,7 +418,8 @@ let test_include_valid_dal_content =
   --> set S.Dal.number_of_slots number_of_slots
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
-        ~delegates_with_algo:[("delegate_1", Bls); ("delegate_2", Bls)]
+        ~bootstrap_info_list:
+          [make "delegate_1" ~algo:Bls; make "delegate_2" ~algo:Bls]
         ["delegate_3"]
   --> next_block
   (* setup companion keys *)
