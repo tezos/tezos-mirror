@@ -101,4 +101,4 @@ let traps_cache_size = 50
    its final destination, the waiting delay accumulates and may be of a few
    seconds. It looks fine with 8 blocks of attestation lag and 8 seconds block
    time but if those values are reduced a lot, this might become an issue. *)
-let batch_time_interval = 1.2
+let batch_time_interval = Types.Span.of_float_s 1.2

@@ -84,9 +84,7 @@ module Make (C : AUTOMATON_CONFIG) :
 
   type set_application_score = {peer : Peer.t; score : float}
 
-  type message_handling =
-    | Sequentially
-    | In_batches of {time_interval : float (* In seconds *)}
+  type message_handling = Sequentially | In_batches of {time_interval : span}
 
   (* FIXME not sure subtyping for output is useful. If it is, it is
      probably for few ouputs and could be removed. *)

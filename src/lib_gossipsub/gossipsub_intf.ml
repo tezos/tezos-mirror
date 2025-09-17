@@ -636,9 +636,7 @@ module type AUTOMATON = sig
 
   type set_application_score = {peer : Peer.t; score : float}
 
-  type message_handling =
-    | Sequentially
-    | In_batches of {time_interval : float (* In seconds *)}
+  type message_handling = Sequentially | In_batches of {time_interval : span}
 
   (** Output produced by one of the actions below. *)
   type _ output =
@@ -1239,7 +1237,7 @@ module type WORKER = sig
   val make :
     ?events_logging:(event -> unit Monad.t) ->
     ?initial_points:(unit -> Point.t list) ->
-    ?batching_interval:float ->
+    ?batching_interval:GS.span ->
     self:GS.Peer.t ->
     Random.State.t ->
     (GS.Topic.t, GS.Peer.t, GS.Message_id.t, GS.span) limits ->
