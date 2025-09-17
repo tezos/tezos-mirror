@@ -18,12 +18,10 @@ val inject_entrapment_evidences :
      with type attestation_operation = 'attestation_operation
       and type dal_attestation = 'dal_attestation
       and type tb_slot = 'tb_slot) ->
-  ('tb_slot
-  * Signature.public_key_hash option
-  * 'attestation_operation
-  * 'dal_attestation option)
-  list ->
+  ('tb_slot * 'attestation_operation * 'dal_attestation option) list ->
+  (int * (Signature.public_key_hash * int trace)) trace ->
   Node_context.t ->
   Rpc_context.t ->
   attested_level:int32 ->
+  ('tb_slot -> int) ->
   unit tzresult Lwt.t

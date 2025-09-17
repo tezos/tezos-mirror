@@ -44,6 +44,8 @@ module type T = sig
 
   type tb_slot
 
+  val tb_slot_to_int : tb_slot -> int
+
   val block_info :
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
@@ -65,12 +67,7 @@ module type T = sig
   val get_attestations :
     block_level:int32 ->
     Tezos_rpc__RPC_context.generic ->
-    (tb_slot
-    * Signature.public_key_hash option
-    * attestation_operation
-    * dal_attestation option)
-    list
-    tzresult
+    (tb_slot * attestation_operation * dal_attestation option) list tzresult
     Lwt.t
 
   val get_committee :
