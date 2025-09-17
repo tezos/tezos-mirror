@@ -251,8 +251,12 @@ struct
     let set_application_score x = Set_application_score x |> i
   end
 
-  let dispatch : type a. a input -> GS.state -> GS.state * a GS.output =
-   fun i state ->
+  let dispatch : type a.
+      a input ->
+      ?batching_configuration:GS.message_handling ->
+      GS.state ->
+      GS.state * a GS.output =
+   fun i ?(batching_configuration = Sequentially) state ->
     match i with
     | Add_peer m -> GS.add_peer m state
     | Remove_peer m -> GS.remove_peer m state
@@ -260,7 +264,8 @@ struct
     | Iwant m -> GS.handle_iwant m state
     | Graft m -> GS.handle_graft m state
     | Prune m -> GS.handle_prune m state
-    | Receive_message m -> GS.handle_receive_message_sequentially m state
+    | Receive_message m ->
+        GS.handle_receive_message ~batching_configuration m state
     | Publish_message m -> GS.publish_message m state
     | Heartbeat -> GS.heartbeat state
     | Join m -> GS.join m state
@@ -465,7 +470,7 @@ struct
     (* Construction of the trace generator. *)
 
     (* Evaluate a [raw] on an initial state yields a trace. *)
-    let raw_to_trace state raw =
+    let raw_to_trace ?batching_configuration state raw =
       let open M in
       let seq = SeqM.M.unfold next raw in
       let* _, _, rev_trace =
@@ -474,7 +479,7 @@ struct
             match event with
             | Input i ->
                 Time.set time ;
-                let state', output = dispatch i state in
+                let state', output = dispatch ?batching_configuration i state in
                 let step =
                   Transition {time; input = i; state; state'; output}
                 in
@@ -501,10 +506,10 @@ struct
     let seq = SeqM.M.unfold Fragment.next raw in
     SeqM.fold_left (fun acc event -> f event acc) init seq
 
-  let run state fragment : trace t =
+  let run ?batching_configuration state fragment : trace t =
     let open M in
     let* raw = Fragment.raw_generator fragment in
-    Fragment.raw_to_trace state raw
+    Fragment.raw_to_trace ?batching_configuration state raw
 
   let check_fold (type e inv) (f : transition -> inv -> (inv, e) result) init
       trace : (unit, e * trace) result =
