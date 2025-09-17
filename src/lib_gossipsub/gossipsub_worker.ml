@@ -271,10 +271,6 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           Some (value, t)
   end
 
-  type message_treatment =
-    | Sequentially
-    | In_batches of {time_interval : float (* In seconds *)}
-
   type batch_state =
     | Pending
     | Accumulating of (GS.receive_message * Peer.Set.t) list
@@ -295,7 +291,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     unknown_validity_messages : Bounded_message_map.t;
     unreachable_points : int64 Point.Map.t;
         (* For each point, stores the next heartbeat tick when we can try to recontact this point again. *)
-    message_handling : message_treatment;
+    message_handling : GS.message_handling;
   }
 
   (** A worker instance is made of its status and state. *)
@@ -799,7 +795,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                     | Pending -> []
                   in
                   current_batch := Pending ;
-                  Stream.push (Batch_to_treat batch) events_stream ;
+                  Stream.push (Process_batch batch) events_stream ;
                   return_unit) ;
               current_batch := Accumulating [content]
           | Accumulating prev_contents ->
@@ -808,25 +804,26 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   (** Handling messages received from the P2P network. *)
   let apply_p2p_message ~self ({gossip_state; _} as state) from_peer = function
-    | Message_with_header {message; topic; message_id} -> (
+    | Message_with_header {message; topic; message_id} ->
         (let receive_message =
            {GS.sender = from_peer; topic; message_id; message}
          in
-         match state.message_handling with
-         | Sequentially ->
-             GS.handle_receive_message_sequentially receive_message gossip_state
-             |> update_gossip_state state
-             |> handle_receive_message receive_message
+         let batching_configuration = state.message_handling in
+         let new_state, output =
+           GS.handle_receive_message
+             ~batching_configuration
+             receive_message
+             gossip_state
+         in
+         (match batching_configuration with
+         | Sequentially -> ()
          | In_batches {time_interval} ->
-             let new_state, output =
-               GS.handle_receive_message_batch receive_message gossip_state
-             in
-             batch_accumulator output time_interval state.events_stream ;
-             update_gossip_state state (new_state, output)
-             |> handle_receive_message receive_message)
+             batch_accumulator output time_interval state.events_stream) ;
+         update_gossip_state state (new_state, output)
+         |> handle_receive_message receive_message)
         [@profiler.span_f
           {verbosity = Notice}
-            ["apply_event"; "P2P_input"; "In_message"; "Message_with_header"]])
+            ["apply_event"; "P2P_input"; "In_message"; "Message_with_header"]]
     | Graft {topic} ->
         let graft : GS.graft = {peer = from_peer; topic} in
         (GS.handle_graft graft gossip_state
@@ -932,7 +929,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         match GS.Message_id.valid message.message_id with
         | `Valid | `Invalid ->
             let state = {state with unknown_validity_messages} in
-            GS.handle_receive_message_sequentially message state.gossip_state
+            GS.handle_receive_message
+              ~batching_configuration:state.message_handling
+              message
+              state.gossip_state
             |> update_gossip_state state
             |> handle_receive_message message
             |> (* Other messages are processed recursively *)
