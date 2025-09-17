@@ -104,6 +104,9 @@ let enable ~keep_alive ?evm_node_endpoint store =
       let+ block = get_block_exn n in
       let s = Ethereum_types.hash_to_bytes block.transactionRoot in
       Ok (Bytes.unsafe_of_string s)
-    else Wasm_runtime_callbacks.store_get_hash tree key
+    else
+      Wasm_runtime_callbacks.store_get_hash
+        (Evm_node_state.Wasm_internal.to_irmin tree)
+        key
   in
   Callback.register "layer2_store__store_get_hash" store_get_hash

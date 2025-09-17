@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Irmin_context.PVMState.value
+type t = Evm_node_state.PVMState.value
 
 (** Directory where the kernel logs are stored. The function {!execute} below
     expect the directory to exist.*)
