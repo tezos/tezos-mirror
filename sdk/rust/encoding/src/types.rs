@@ -43,7 +43,7 @@ impl From<&BigInt> for num_bigint::BigInt {
 }
 
 /// Zarith number
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Zarith(pub num_bigint::BigInt);
 
 impl From<num_bigint::BigInt> for Zarith {
@@ -109,7 +109,7 @@ impl From<Narith> for Zarith {
 has_encoding!(Zarith, ZARITH_ENCODING, { Encoding::Z });
 
 /// Mutez number
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub struct Narith(pub num_bigint::BigUint);
 
 #[deprecated = "Mutez has been replaced by Narith, which has identical semantics for encoding & decoding"]
