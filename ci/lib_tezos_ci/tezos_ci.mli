@@ -710,6 +710,9 @@ module Images : sig
   end
 
   module Base_images : sig
+    (** The prefix of the path of the base images. *)
+    val path_prefix : string
+
     val debian_unstable : Image.t
 
     val debian_bookworm : Image.t

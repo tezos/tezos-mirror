@@ -395,7 +395,7 @@ oc.docker-build-debian-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -482,7 +482,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/debian:bookworm
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -539,7 +539,7 @@ oc.docker-build-ubuntu-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -596,7 +596,7 @@ oc.build-ubuntu:
       - gcp_arm64
 
 apt_repo_ubuntu:
-  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/ubuntu:noble
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -653,7 +653,7 @@ oc.docker-build-rockylinux-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -687,7 +687,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -795,7 +795,7 @@ oc.build-rockylinux-data:
       - gcp_arm64
 
 rpm_repo_rockylinux:
-  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/rockylinux:9.3
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux:9.3
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -851,7 +851,7 @@ oc.docker-build-fedora-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -886,7 +886,7 @@ oc.docker-systemd-tests-rpm-fedora:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
-    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -997,7 +997,7 @@ oc.build-fedora-data:
       - gcp_arm64
 
 rpm_repo_fedora:
-  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/fedora:39
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora:39
   stage: publish
   tags:
   - gcp_not_interruptible

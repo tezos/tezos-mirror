@@ -1571,12 +1571,10 @@ module Images = struct
   include Images_external
 
   module Base_images = struct
+    let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
+
     let make_img distro =
-      Image.mk_external
-        ~image_path:
-          (sf
-             "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/%s"
-             distro)
+      Image.mk_external ~image_path:(sf "%s/%s" path_prefix distro)
 
     let debian_bookworm = make_img "debian:bookworm"
 

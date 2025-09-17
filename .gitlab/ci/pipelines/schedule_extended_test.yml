@@ -3223,7 +3223,7 @@ oc.install_opam_noble:
     OPAMJOBS: "4"
 
 oc.compile_sources_doc_deps:
-  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$IMAGE
   stage: test
   tags:
   - gcp_very_high_cpu
@@ -3251,7 +3251,7 @@ oc.compile_sources_doc_deps:
       - ubuntu:noble
 
 oc.compile_sources_doc:
-  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$IMAGE
   stage: test
   tags:
   - gcp_very_high_cpu_ramfs
