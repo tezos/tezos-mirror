@@ -437,11 +437,18 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
         {peer_id = identity.peer_id; maybe_reachable_point = public_addr}
     in
     let gs_worker =
+      let batching_interval =
+        match config.batching_configuration with
+        | Disabled -> None
+        | Enabled {time_interval} ->
+            let time_in_second = float_of_int time_interval /. 1000. in
+            Some (Types.Span.of_float_s time_in_second)
+      in
       Gossipsub.Worker.(
         make
           ~initial_points:get_initial_points
           ~events_logging:(Logging.event ~verbose:config.verbose)
-          ~batching_interval:Constants.batch_time_interval
+          ?batching_interval
           ~self
           rng
           limits
@@ -547,12 +554,19 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
         Node_context.warn_if_attesters_not_delegates ctxt profile
     | _ -> return_unit
   in
-  Gossipsub.Worker.Validate_message_hook.set_batch
-    (Message_validation.gossipsub_batch_validation
-       ctxt
-       cryptobox
-       ~head_level
-       proto_parameters) ;
+  let () =
+    match config.batching_configuration with
+    | Enabled _ ->
+        Gossipsub.Worker.Validate_message_hook.set_batch
+          (Message_validation.gossipsub_batch_validation
+             ctxt
+             cryptobox
+             ~head_level
+             proto_parameters)
+    | Disabled -> ()
+  in
+  (* Even if the batch validation is activated, one has to register a per message
+    validation for the validation of message id. *)
   Gossipsub.Worker.Validate_message_hook.set
     (Message_validation.gossipsub_app_messages_validation
        ctxt

@@ -90,15 +90,3 @@ let bootstrap_dns_refresh_delay = 300.
    acceptable since the cache is sparsely populated due to
    [proto_parameters.traps_fraction]. *)
 let traps_cache_size = 50
-
-(* When a shard is received, we wait for 1 second for other shards before
-   launching the cryptographic validation of the shards.
-   Since there shards are supposed to be received several levels in advance,
-   the risk that this 1.2 second delay makes the validation happen too late
-   is very low.
-   It also slows down gossiping a bit, since messages are advertised only after
-   validation, so if a message has to go through several nodes before reaching
-   its final destination, the waiting delay accumulates and may be of a few
-   seconds. It looks fine with 8 blocks of attestation lag and 8 seconds block
-   time but if those values are reduced a lot, this might become an issue. *)
-let batch_time_interval = Types.Span.of_float_s 1.2
