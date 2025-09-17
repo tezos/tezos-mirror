@@ -81,4 +81,4 @@ val traps_cache_size : int
 
 (** The time (in seconds) for which shards are accumulated by the gossipsub
     automaton before triggering the validation of the batch. *)
-val batch_time_interval : float
+val batch_time_interval : Types.Span.t

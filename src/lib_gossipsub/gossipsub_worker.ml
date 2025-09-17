@@ -788,7 +788,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           | Pending ->
               let open Lwt_syntax in
               Lwt.async (fun () ->
-                  let* () = Lwt_unix.sleep time_interval in
+                  let* () = Lwt_unix.sleep (GS.Span.to_float_s time_interval) in
                   let batch =
                     match !current_batch with
                     | Accumulating batch -> batch
