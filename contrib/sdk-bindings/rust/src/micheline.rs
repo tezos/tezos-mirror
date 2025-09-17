@@ -10,6 +10,7 @@ use mir::{
     parser::Parser,
 };
 use std::sync::Arc;
+use typed_arena::Arena;
 
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 #[allow(non_camel_case_types, clippy::upper_case_acronyms, missing_docs)]
@@ -355,6 +356,179 @@ impl From<&MirPrim> for Prim {
     }
 }
 
+impl From<&Prim> for MirPrim {
+    fn from(prim: &Prim) -> Self {
+        match prim {
+            Prim::K_parameter => Self::parameter,
+            Prim::K_storage => Self::storage,
+            Prim::K_code => Self::code,
+            Prim::D_False => Self::False,
+            Prim::D_Elt => Self::Elt,
+            Prim::D_Left => Self::Left,
+            Prim::D_None => Self::None,
+            Prim::D_Pair => Self::Pair,
+            Prim::D_Right => Self::Right,
+            Prim::D_Some => Self::Some,
+            Prim::D_True => Self::True,
+            Prim::D_Unit => Self::Unit,
+            Prim::I_PACK => Self::PACK,
+            Prim::I_UNPACK => Self::UNPACK,
+            Prim::I_BLAKE2B => Self::BLAKE2B,
+            Prim::I_SHA256 => Self::SHA256,
+            Prim::I_SHA512 => Self::SHA512,
+            Prim::I_ABS => Self::ABS,
+            Prim::I_ADD => Self::ADD,
+            Prim::I_AMOUNT => Self::AMOUNT,
+            Prim::I_AND => Self::AND,
+            Prim::I_BALANCE => Self::BALANCE,
+            Prim::I_CAR => Self::CAR,
+            Prim::I_CDR => Self::CDR,
+            Prim::I_CHECK_SIGNATURE => Self::CHECK_SIGNATURE,
+            Prim::I_COMPARE => Self::COMPARE,
+            Prim::I_CONCAT => Self::CONCAT,
+            Prim::I_CONS => Self::CONS,
+            Prim::I_CREATE_ACCOUNT => Self::CREATE_ACCOUNT,
+            Prim::I_CREATE_CONTRACT => Self::CREATE_CONTRACT,
+            Prim::I_IMPLICIT_ACCOUNT => Self::IMPLICIT_ACCOUNT,
+            Prim::I_DIP => Self::DIP,
+            Prim::I_DROP => Self::DROP,
+            Prim::I_DUP => Self::DUP,
+            Prim::I_EDIV => Self::EDIV,
+            Prim::I_EMPTY_MAP => Self::EMPTY_MAP,
+            Prim::I_EMPTY_SET => Self::EMPTY_SET,
+            Prim::I_EQ => Self::EQ,
+            Prim::I_EXEC => Self::EXEC,
+            Prim::I_FAILWITH => Self::FAILWITH,
+            Prim::I_GE => Self::GE,
+            Prim::I_GET => Self::GET,
+            Prim::I_GT => Self::GT,
+            Prim::I_HASH_KEY => Self::HASH_KEY,
+            Prim::I_IF => Self::IF,
+            Prim::I_IF_CONS => Self::IF_CONS,
+            Prim::I_IF_LEFT => Self::IF_LEFT,
+            Prim::I_IF_NONE => Self::IF_NONE,
+            Prim::I_INT => Self::INT,
+            Prim::I_LAMBDA => Self::LAMBDA,
+            Prim::I_LE => Self::LE,
+            Prim::I_LEFT => Self::LEFT,
+            Prim::I_LOOP => Self::LOOP,
+            Prim::I_LSL => Self::LSL,
+            Prim::I_LSR => Self::LSR,
+            Prim::I_LT => Self::LT,
+            Prim::I_MAP => Self::MAP,
+            Prim::I_MEM => Self::MEM,
+            Prim::I_MUL => Self::MUL,
+            Prim::I_NEG => Self::NEG,
+            Prim::I_NEQ => Self::NEQ,
+            Prim::I_NIL => Self::NIL,
+            Prim::I_NONE => Self::NONE,
+            Prim::I_NOT => Self::NOT,
+            Prim::I_NOW => Self::NOW,
+            Prim::I_OR => Self::OR,
+            Prim::I_PAIR => Self::PAIR,
+            Prim::I_PUSH => Self::PUSH,
+            Prim::I_RIGHT => Self::RIGHT,
+            Prim::I_SIZE => Self::SIZE,
+            Prim::I_SOME => Self::SOME,
+            Prim::I_SOURCE => Self::SOURCE,
+            Prim::I_SENDER => Self::SENDER,
+            Prim::I_SELF => Self::SELF,
+            Prim::I_STEPS_TO_QUOTA => Self::STEPS_TO_QUOTA,
+            Prim::I_SUB => Self::SUB,
+            Prim::I_SWAP => Self::SWAP,
+            Prim::I_TRANSFER_TOKENS => Self::TRANSFER_TOKENS,
+            Prim::I_SET_DELEGATE => Self::SET_DELEGATE,
+            Prim::I_UNIT => Self::UNIT,
+            Prim::I_UPDATE => Self::UPDATE,
+            Prim::I_XOR => Self::XOR,
+            Prim::I_ITER => Self::ITER,
+            Prim::I_LOOP_LEFT => Self::LOOP_LEFT,
+            Prim::I_ADDRESS => Self::ADDRESS,
+            Prim::I_CONTRACT => Self::CONTRACT,
+            Prim::I_ISNAT => Self::ISNAT,
+            Prim::I_CAST => Self::CAST,
+            Prim::I_RENAME => Self::RENAME,
+            Prim::T_bool => Self::bool,
+            Prim::T_contract => Self::contract,
+            Prim::T_int => Self::int,
+            Prim::T_key => Self::key,
+            Prim::T_key_hash => Self::key_hash,
+            Prim::T_lambda => Self::lambda,
+            Prim::T_list => Self::list,
+            Prim::T_map => Self::map,
+            Prim::T_big_map => Self::big_map,
+            Prim::T_nat => Self::nat,
+            Prim::T_option => Self::option,
+            Prim::T_or => Self::or,
+            Prim::T_pair => Self::pair,
+            Prim::T_set => Self::set,
+            Prim::T_signature => Self::signature,
+            Prim::T_string => Self::string,
+            Prim::T_bytes => Self::bytes,
+            Prim::T_mutez => Self::mutez,
+            Prim::T_timestamp => Self::timestamp,
+            Prim::T_unit => Self::unit,
+            Prim::T_operation => Self::operation,
+            Prim::T_address => Self::address,
+            Prim::I_SLICE => Self::SLICE,
+            Prim::I_DIG => Self::DIG,
+            Prim::I_DUG => Self::DUG,
+            Prim::I_EMPTY_BIG_MAP => Self::EMPTY_BIG_MAP,
+            Prim::I_APPLY => Self::APPLY,
+            Prim::T_chain_id => Self::chain_id,
+            Prim::I_CHAIN_ID => Self::CHAIN_ID,
+            Prim::I_LEVEL => Self::LEVEL,
+            Prim::I_SELF_ADDRESS => Self::SELF_ADDRESS,
+            Prim::T_never => Self::never,
+            Prim::I_NEVER => Self::NEVER,
+            Prim::I_UNPAIR => Self::UNPAIR,
+            Prim::I_VOTING_POWER => Self::VOTING_POWER,
+            Prim::I_TOTAL_VOTING_POWER => Self::TOTAL_VOTING_POWER,
+            Prim::I_KECCAK => Self::KECCAK,
+            Prim::I_SHA3 => Self::SHA3,
+            Prim::I_PAIRING_CHECK => Self::PAIRING_CHECK,
+            Prim::T_bls12_381_g1 => Self::bls12_381_g1,
+            Prim::T_bls12_381_g2 => Self::bls12_381_g2,
+            Prim::T_bls12_381_fr => Self::bls12_381_fr,
+            Prim::T_sapling_state => Self::sapling_state,
+            Prim::T_sapling_transaction_deprecated => Self::sapling_transaction_deprecated,
+            Prim::I_SAPLING_EMPTY_STATE => Self::SAPLING_EMPTY_STATE,
+            Prim::I_SAPLING_VERIFY_UPDATE => Self::SAPLING_VERIFY_UPDATE,
+            Prim::T_ticket => Self::ticket,
+            Prim::I_TICKET_DEPRECATED => Self::TICKET_DEPRECATED,
+            Prim::I_READ_TICKET => Self::READ_TICKET,
+            Prim::I_SPLIT_TICKET => Self::SPLIT_TICKET,
+            Prim::I_JOIN_TICKETS => Self::JOIN_TICKETS,
+            Prim::I_GET_AND_UPDATE => Self::GET_AND_UPDATE,
+            Prim::T_chest => Self::chest,
+            Prim::T_chest_key => Self::chest_key,
+            Prim::I_OPEN_CHEST => Self::OPEN_CHEST,
+            Prim::I_VIEW => Self::VIEW,
+            Prim::K_view => Self::view,
+            Prim::H_constant => Self::constant,
+            Prim::I_SUB_MUTEZ => Self::SUB_MUTEZ,
+            Prim::T_tx_rollup_l2_address => Self::tx_rollup_l2_address,
+            Prim::I_MIN_BLOCK_TIME => Self::MIN_BLOCK_TIME,
+            Prim::T_sapling_transaction => Self::sapling_transaction,
+            Prim::I_EMIT => Self::EMIT,
+            Prim::D_Lambda_rec => Self::Lambda_rec,
+            Prim::I_LAMBDA_REC => Self::LAMBDA_REC,
+            Prim::I_TICKET => Self::TICKET,
+            Prim::I_BYTES => Self::BYTES,
+            Prim::I_NAT => Self::NAT,
+            Prim::D_Ticket => Self::Ticket,
+            Prim::I_IS_IMPLICIT_ACCOUNT => Self::IS_IMPLICIT_ACCOUNT,
+            Prim::I_INDEX_ADDRESS => Self::INDEX_ADDRESS,
+            Prim::I_GET_ADDRESS_INDEX => Self::GET_ADDRESS_INDEX,
+            // Unstable primitives (they are not part of a released protocol)
+            Prim::UNSTABLE_Transfer_tokens => Self::Transfer_tokens,
+            Prim::UNSTABLE_Set_delegate => Self::Set_delegate,
+            Prim::UNSTABLE_Create_contract => Self::Create_contract,
+            Prim::UNSTABLE_Emit => Self::Emit,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum Annotation {
     Special(String),
@@ -370,6 +544,17 @@ impl From<&MirAnnotation<'_>> for Annotation {
             MirAnnotation::Field(s) => Self::Field(s.clone().into_owned()),
             MirAnnotation::Variable(s) => Self::Variable(s.clone().into_owned()),
             MirAnnotation::Type(s) => Self::Type(s.clone().into_owned()),
+        }
+    }
+}
+
+impl From<&Annotation> for MirAnnotation<'_> {
+    fn from(annotation: &Annotation) -> Self {
+        match annotation {
+            Annotation::Special(s) => Self::Special(s.clone().into()),
+            Annotation::Field(s) => Self::Field(s.clone().into()),
+            Annotation::Variable(s) => Self::Variable(s.clone().into()),
+            Annotation::Type(s) => Self::Type(s.clone().into()),
         }
     }
 }
@@ -420,6 +605,30 @@ impl From<&MirMicheline<'_>> for Micheline {
 }
 
 impl Micheline {
+    fn to_mir_micheline<'a>(&self, arena: &'a Arena<MirMicheline<'a>>) -> MirMicheline<'a> {
+        match self {
+            Self::Int { big_int } => MirMicheline::Int(big_int.0.clone()),
+            Self::String { string } => MirMicheline::String(string.clone()),
+            Self::Bytes { bytes } => MirMicheline::Bytes(bytes.clone()),
+            Self::App { prim, seq, annots } => {
+                let prim = prim.into();
+                let seq = seq
+                    .iter()
+                    .map(|micheline| micheline.to_mir_micheline(arena))
+                    .collect::<Vec<MirMicheline>>();
+                let annots = annots.iter().map(MirAnnotation::from).collect();
+                MirMicheline::App(prim, arena.alloc_extend(seq), annots)
+            }
+            Self::Seq { seq } => {
+                let seq = seq
+                    .iter()
+                    .map(|micheline| micheline.to_mir_micheline(arena))
+                    .collect::<Vec<MirMicheline>>();
+                MirMicheline::Seq(arena.alloc_extend(seq))
+            }
+        }
+    }
+
     pub fn parse(script: &str) -> Result<Self, Error> {
         let parser = Parser::new();
         let micheline = &parser
