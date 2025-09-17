@@ -11,9 +11,7 @@ import kotlin.test.assertTrue
 class TestMicheline {
 
     /*
-    parameter unit;
-    storage unit;
-    code {CDR; NIL operation; PAIR};
+    { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
     */
     @Test
     fun testBuildBasicScriptMicheline() {
@@ -50,7 +48,10 @@ class TestMicheline {
 
         val michelineManager = MichelineManager()
 
-        assertTrue(michelineManager.equalMicheline(micheline, micheline))
+        val parsedMicheline = michelineManager.parse(
+            "{ parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }"
+        )
+        assertTrue(michelineManager.equalMicheline(micheline, parsedMicheline))
     }
 
     /*
@@ -71,7 +72,8 @@ class TestMicheline {
 
         val michelineManager = MichelineManager()
 
-        assertTrue(michelineManager.equalMicheline(micheline, micheline))
+        val parsedMicheline = michelineManager.parse("""(Pair :foo "string" 0 0x00)""")
+        assertTrue(michelineManager.equalMicheline(micheline, parsedMicheline))
     }
 
 }

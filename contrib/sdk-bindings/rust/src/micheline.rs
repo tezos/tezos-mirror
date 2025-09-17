@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: MIT
 
 use crate::types::BigInt;
+use crate::Error;
 use mir::{
     ast::{annotations::Annotation as MirAnnotation, micheline::Micheline as MirMicheline},
     lexer::Prim as MirPrim,
+    parser::Parser,
 };
 use std::sync::Arc;
 
@@ -417,6 +419,16 @@ impl From<&MirMicheline<'_>> for Micheline {
     }
 }
 
+impl Micheline {
+    pub fn parse(script: &str) -> Result<Self, Error> {
+        let parser = Parser::new();
+        let micheline = &parser
+            .parse(script)
+            .map_err(|err| Error::Parsing(err.to_string()))?;
+        Ok(micheline.into())
+    }
+}
+
 // Because uniffi does not allow bindings of methods implemented on
 // structures tagged as `uniffi::Enum` (this restriction also applies
 // to the traits `Debug`, `Display`, and `Eq`), a dedicated manager
@@ -436,6 +448,11 @@ impl MichelineManager {
     pub fn equal_micheline(&self, micheline_1: &Micheline, micheline_2: &Micheline) -> bool {
         micheline_1 == micheline_2
     }
+
+    /// Build a micheline value.
+    pub fn parse(&self, micheline: &str) -> Result<Micheline, Error> {
+        Micheline::parse(micheline)
+    }
 }
 
 #[cfg(test)]
@@ -443,9 +460,7 @@ mod tests {
     use super::*;
 
     /*
-    parameter unit;
-    storage unit;
-    code {CDR; NIL operation; PAIR};
+    { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
     */
     #[test]
     fn build_basic_script_micheline() {
@@ -501,9 +516,12 @@ mod tests {
 
         let micheline_manager = MichelineManager::new();
 
+        let parsed_micheline = micheline_manager
+            .parse("{ parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }")
+            .expect("Micheline parsing");
         assert!(
-            micheline_manager.equal_micheline(&micheline, &micheline),
-            "Micheline must be equal to itself"
+            micheline_manager.equal_micheline(&micheline, &parsed_micheline),
+            "Parsed micheline must be equal to the manually constructed micheline"
         );
     }
 
@@ -530,9 +548,12 @@ mod tests {
 
         let micheline_manager = MichelineManager::new();
 
+        let parsed_micheline = micheline_manager
+            .parse(r#"(Pair :foo "string" 0 0x00)"#)
+            .expect("Micheline parsing");
         assert!(
-            micheline_manager.equal_micheline(&micheline, &micheline),
-            "Micheline must be equal to itself"
+            micheline_manager.equal_micheline(&micheline, &parsed_micheline),
+            "Parsed micheline must be equal to the manually constructed micheline"
         );
     }
 }
