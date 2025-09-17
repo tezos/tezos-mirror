@@ -53,7 +53,11 @@ module type AUTOMATON_SUBCONFIG = sig
   end
 
   module Message : sig
-    include PRINTABLE
+    type t
+
+    include PRINTABLE with type t := t
+
+    include COMPARABLE with type t := t
 
     (** [valid] performs an application layer-level validity check on a message
         id and a message if given.
@@ -564,7 +568,13 @@ module type AUTOMATON = sig
   end
 
   (** Module for message *)
-  module Message : PRINTABLE
+  module Message : sig
+    type t
+
+    include PRINTABLE with type t := t
+
+    include COMPARABLE with type t := t
+  end
 
   (** Module for time *)
   module Time : PRINTABLE

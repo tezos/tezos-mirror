@@ -199,14 +199,18 @@ val string_of_commit_error :
   string
 
 (** A portion of the data represented by a polynomial. *)
-type share
+module Share : Compare.COMPARABLE
+
+type share = Share.t
 
 (** A shard is share with its index (see
      {!val:shards_from_polynomial}). *)
 type shard = {index : int; share : share}
 
 (** A proof that a shard belongs to some commitment. *)
-type shard_proof
+module Proof : Compare.COMPARABLE
+
+type shard_proof = Proof.t
 
 module Verifier :
   VERIFIER
