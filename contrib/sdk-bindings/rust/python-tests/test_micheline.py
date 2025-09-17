@@ -12,7 +12,9 @@ from tezos import (
 
 def test_build_basic_script_micheline():
     """
+    octez-client convert data "
     { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
+    " from Michelson to binary
     """
 
     micheline = Micheline.SEQ([
@@ -34,9 +36,13 @@ def test_build_basic_script_micheline():
     )
     assert micheline_manager.equal_micheline(micheline, parsed_micheline)
 
+    raw_micheline = micheline_manager.encode(micheline)
+    expected_bytes = bytes.fromhex('02000000170500036c0501036c050202000000080317053d036d0342')
+    assert raw_micheline == expected_bytes
+
 def test_build_simple_data_micheline():
     """
-    (Pair :foo "string" 0 0x00)
+    octez-client convert data '(Pair :foo "string" 0 0x00)' from Michelson to binary
     """
 
     micheline = Micheline.APP(Prim.D_PAIR, [
@@ -49,3 +55,7 @@ def test_build_simple_data_micheline():
 
     parsed_micheline = micheline_manager.parse("""(Pair :foo "string" 0 0x00)""")
     assert micheline_manager.equal_micheline(micheline, parsed_micheline)
+
+    raw_micheline = micheline_manager.encode(micheline)
+    expected_bytes = bytes.fromhex('0907000000130100000006737472696e6700000a0000000100000000043a666f6f')
+    assert raw_micheline == expected_bytes

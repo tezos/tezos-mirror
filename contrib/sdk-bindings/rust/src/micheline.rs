@@ -6,6 +6,7 @@ use crate::types::BigInt;
 use crate::Error;
 use mir::{
     ast::{annotations::Annotation as MirAnnotation, micheline::Micheline as MirMicheline},
+    gas::Gas,
     lexer::Prim as MirPrim,
     parser::Parser,
 };
@@ -636,6 +637,15 @@ impl Micheline {
             .map_err(|err| Error::Parsing(err.to_string()))?;
         Ok(micheline.into())
     }
+
+    pub fn encode(&self) -> Result<Vec<u8>, Error> {
+        let arena = Arena::new();
+        // Encoding is performed off-chain: gas accounting does not apply.
+        self.to_mir_micheline(&arena)
+            .encode(&mut Gas::unmetered())
+            .map_err(|_| Error::Encoding("out of gas".to_string()))?
+            .map_err(|err| Error::Encoding(err.to_string()))
+    }
 }
 
 // Because uniffi does not allow bindings of methods implemented on
@@ -662,6 +672,11 @@ impl MichelineManager {
     pub fn parse(&self, micheline: &str) -> Result<Micheline, Error> {
         Micheline::parse(micheline)
     }
+
+    /// Encode micheline into bytes.
+    pub fn encode(&self, micheline: &Micheline) -> Result<Vec<u8>, Error> {
+        micheline.encode()
+    }
 }
 
 #[cfg(test)]
@@ -669,7 +684,9 @@ mod tests {
     use super::*;
 
     /*
+    octez-client convert data "
     { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
+    " from Michelson to binary
     */
     #[test]
     fn build_basic_script_micheline() {
@@ -732,10 +749,18 @@ mod tests {
             micheline_manager.equal_micheline(&micheline, &parsed_micheline),
             "Parsed micheline must be equal to the manually constructed micheline"
         );
+
+        let raw_micheline = micheline_manager.encode(&micheline).unwrap();
+        let bytes =
+            hex::decode("02000000170500036c0501036c050202000000080317053d036d0342").unwrap();
+        assert_eq!(
+            bytes, raw_micheline,
+            "Micheline must be encoded into the expected bytes"
+        );
     }
 
     /*
-    (Pair :foo "string" 0 0x00)
+    octez-client convert data '(Pair :foo "string" 0 0x00)' from Michelson to binary
     */
     #[test]
     fn build_simple_data_micheline() {
@@ -763,6 +788,15 @@ mod tests {
         assert!(
             micheline_manager.equal_micheline(&micheline, &parsed_micheline),
             "Parsed micheline must be equal to the manually constructed micheline"
+        );
+
+        let raw_micheline = micheline_manager.encode(&micheline).unwrap();
+        let bytes =
+            hex::decode("0907000000130100000006737472696e6700000a0000000100000000043a666f6f")
+                .unwrap();
+        assert_eq!(
+            bytes, raw_micheline,
+            "Micheline must be encoded into the expected bytes"
         );
     }
 }

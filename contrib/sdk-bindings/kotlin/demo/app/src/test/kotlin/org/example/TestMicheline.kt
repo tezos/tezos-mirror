@@ -7,12 +7,16 @@ package org.example.tezos
 
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import kotlin.test.assertContentEquals
 
 class TestMicheline {
 
     /*
+    octez-client convert data "
     { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
+    " from Michelson to binary
     */
+    @OptIn(kotlin.ExperimentalStdlibApi::class) // `hexToByteArray` is experimental
     @Test
     fun testBuildBasicScriptMicheline() {
         val micheline = Micheline.Seq(
@@ -52,10 +56,14 @@ class TestMicheline {
             "{ parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }"
         )
         assertTrue(michelineManager.equalMicheline(micheline, parsedMicheline))
+
+        val rawMicheline = michelineManager.encode(micheline)
+        val expectedBytes = "02000000170500036c0501036c050202000000080317053d036d0342".hexToByteArray()
+        assertContentEquals(rawMicheline, expectedBytes)
     }
 
     /*
-    (Pair :foo "string" 0 0x00)
+    octez-client convert data '(Pair :foo "string" 0 0x00)' from Michelson to binary
     */
     @OptIn(kotlin.ExperimentalStdlibApi::class) // `hexToByteArray` is experimental
     @Test
@@ -74,6 +82,10 @@ class TestMicheline {
 
         val parsedMicheline = michelineManager.parse("""(Pair :foo "string" 0 0x00)""")
         assertTrue(michelineManager.equalMicheline(micheline, parsedMicheline))
+
+        val rawMicheline = michelineManager.encode(micheline)
+        val expectedBytes = "0907000000130100000006737472696e6700000a0000000100000000043a666f6f".hexToByteArray()
+        assertContentEquals(rawMicheline, expectedBytes)
     }
 
 }

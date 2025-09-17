@@ -26,4 +26,6 @@ pub enum Error {
     Entrypoint(#[from] entrypoint::EntrypointError),
     #[error("Parsing failure: {0:?}")]
     Parsing(String),
+    #[error("Encoding failure: {0:?}")]
+    Encoding(String),
 }
