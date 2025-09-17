@@ -338,6 +338,11 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
                     commitment
                     shards
                     proofs)
+              [@profiler.wrap_f
+                {driver_ids = [Opentelemetry]}
+                  (Opentelemetry_helpers.trace_slot
+                     ~name:"verify_shards"
+                     Types.Slot_id.{slot_level = level; slot_index})]
           in
           match res with
           | Ok () ->
