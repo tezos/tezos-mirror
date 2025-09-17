@@ -70,10 +70,10 @@ module type T = sig
     (tb_slot * attestation_operation * dal_attestation option) list tzresult
     Lwt.t
 
-  val get_committee :
+  val get_committees :
     Tezos_rpc.Context.generic ->
     level:int32 ->
-    int list Signature.Public_key_hash.Map.t tzresult Lwt.t
+    (int list * int) Signature.Public_key_hash.Map.t tzresult Lwt.t
 
   val dal_attestation : block_info -> dal_attestation tzresult
 

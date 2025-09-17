@@ -255,7 +255,7 @@ module Plugin = struct
            | _ -> Ok [])
          consensus_ops
 
-  let get_committee ctxt ~level =
+  let get_committees ctxt ~level =
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     let*? level = Raw_level.of_int32 level |> wrap in
@@ -265,7 +265,23 @@ module Plugin = struct
     List.fold_left
       (fun acc ({delegate; indexes} : Plugin.RPC.Dal.S.shards_assignment) ->
         let delegate = Tezos_crypto.Signature.Of_V2.public_key_hash delegate in
-        Tezos_crypto.Signature.Public_key_hash.Map.add delegate indexes acc)
+        let tb_slot =
+          (* Associating delegate public key hash to Tenderbake attestation
+               slot can be done by matching the first DAL slot index of a given
+               attester as there is a DAL protocol invariant that enforces that
+               the first DAL slot index corresponds to the TB attestation slot
+               index of a give attester. *)
+          match List.hd indexes with
+          | Some slot -> slot
+          | None ->
+              (* We assume that the set indexes associated to a delegate is
+                   never empty. *)
+              assert false
+        in
+        Tezos_crypto.Signature.Public_key_hash.Map.add
+          delegate
+          (indexes, tb_slot)
+          acc)
       Tezos_crypto.Signature.Public_key_hash.Map.empty
       pkh_to_shards
 
