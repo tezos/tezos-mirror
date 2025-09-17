@@ -573,6 +573,30 @@ module Term = struct
 
   let ignore_topics = arg_list_to_cmdliner ignore_topics_arg
 
+  let batching_configuration_arg =
+    let open Configuration_file in
+    let pp fmt = function
+      | Disabled -> Format.fprintf fmt "disabled"
+      | Enabled {time_interval} -> Format.fprintf fmt "%d" time_interval
+    in
+    let parse = function
+      | "disabled" -> Ok Disabled
+      | s -> (
+          try Ok (Enabled {time_interval = int_of_string s})
+          with Failure _ -> Error "Unrecognized int")
+    in
+    make_arg
+      ~parse
+      ~doc:
+        "The time (in milliseconds) for which shards are accumulated by the \
+         gossipsub automaton before triggering the validation of the batch. \
+         \"disabled\" to deactivate the batching of shards."
+      ~placeholder:"INT|\"disabled\""
+      ~pp
+      "batching-time-interval"
+
+  let batching_configuration = arg_to_cmdliner batching_configuration_arg
+
   let term process =
     Cmdliner.Term.(
       ret
@@ -582,7 +606,7 @@ module Term = struct
        $ operator_profile $ observer_profile $ bootstrap_profile $ peers
        $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
        $ disable_shard_validation $ verbose $ ignore_l1_config_peers
-       $ disable_amplification $ ignore_topics))
+       $ disable_amplification $ ignore_topics $ batching_configuration))
 end
 
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
@@ -748,13 +772,15 @@ type options = {
   ignore_l1_config_peers : bool;
   disable_amplification : bool;
   ignore_topics : Signature.public_key_hash list;
+  batching_configuration : Configuration_file.batching_configuration option;
 }
 
 let cli_options_to_options data_dir config_file rpc_addr expected_pow
     listen_addr public_addr endpoint slots_backup_uris trust_slots_backup_uris
     metrics_addr attesters operators observers bootstrap_flag peers history_mode
     service_name service_namespace fetch_trusted_setup disable_shard_validation
-    verbose ignore_l1_config_peers disable_amplification ignore_topics =
+    verbose ignore_l1_config_peers disable_amplification ignore_topics
+    batching_configuration =
   let open Result_syntax in
   let profile = Controller_profiles.make ~attesters ~operators ?observers () in
   let* profile =
@@ -800,6 +826,7 @@ let cli_options_to_options data_dir config_file rpc_addr expected_pow
       ignore_l1_config_peers;
       disable_amplification;
       ignore_topics;
+      batching_configuration;
     }
 
 let merge_experimental_features _ _configuration = ()
@@ -828,6 +855,7 @@ let merge
       ignore_l1_config_peers;
       disable_amplification;
       ignore_topics = _;
+      batching_configuration;
     } configuration =
   let profile =
     match profile with
@@ -876,6 +904,10 @@ let merge
       configuration.ignore_l1_config_peers || ignore_l1_config_peers;
     disable_amplification =
       configuration.disable_amplification || disable_amplification;
+    batching_configuration =
+      Option.value
+        ~default:configuration.batching_configuration
+        batching_configuration;
   }
 
 let wrap_with_error main_promise =
@@ -977,7 +1009,7 @@ let commands =
       metrics_addr attesters operators observers bootstrap_flag peers
       history_mode service_name service_namespace fetch_trusted_setup
       disable_shard_validation verbose ignore_l1_config_peers
-      disable_amplification ignore_pkhs =
+      disable_amplification ignore_pkhs batching_configuration =
     match
       cli_options_to_options
         data_dir
@@ -1004,6 +1036,7 @@ let commands =
         ignore_l1_config_peers
         disable_amplification
         ignore_pkhs
+        batching_configuration
     with
     | Ok options -> main_run subcommand options
     | Error msg -> `Error msg

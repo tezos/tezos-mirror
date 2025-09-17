@@ -34,6 +34,15 @@ type history_mode =
           profile. *)
   | Full  (** [Full] keeps the shards forever *)
 
+(** The configuration of the validation of shards in batch mode.*)
+type batching_configuration =
+  | Disabled
+      (** [Disabled] enforces the validation of shards one by one at reception time. *)
+  | Enabled of {time_interval : int}
+      (** [Enabled {time_interval}] accumulates messages received during
+          [time_interval] milliseconds and verifies all shards related to the
+          same commitment in the same batch in one pass. *)
+
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
 type experimental_features = unit
@@ -73,6 +82,9 @@ type t = {
   ignore_l1_config_peers : bool;
       (** Ignore the boot(strap) peers provided by L1. *)
   disable_amplification : bool;  (** Disable amplification. *)
+  batching_configuration : batching_configuration;
+      (** The configuration of the batching of the shards.
+          The default is [Enabled{time_interval=100}]. *)
 }
 
 (** [default] is the default configuration. *)
