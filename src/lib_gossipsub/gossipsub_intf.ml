@@ -636,6 +636,10 @@ module type AUTOMATON = sig
 
   type set_application_score = {peer : Peer.t; score : float}
 
+  type message_handling =
+    | Sequentially
+    | In_batches of {time_interval : float (* In seconds *)}
+
   (** Output produced by one of the actions below. *)
   type _ output =
     | Ihave_from_peer_with_low_score : {
@@ -839,25 +843,17 @@ module type AUTOMATON = sig
       on this topic. *)
   val handle_prune : prune -> [`Prune] monad
 
-  (** [handle_receive_message_sequentially received_message] handles a
+  (** [handle_receive_message ~batching_configuration received_message] handles a
       [received_message] on the gossip network. The function returns either a
-      rejection reason for the message or a set of peers to which the (full)
-      message will be directly forwarded. *)
-  val handle_receive_message_sequentially :
-    receive_message -> [`Receive_message] monad
-
-  (** [handle_receive_message_batch callback time_interval received_message]
-      handles a message received from [sender] on the gossip network.
-      The function computes a set of peers to which the (full) message will be
-      directly forwarded.
-      If no batch is currently in production, it creates a new one.
-      It appends the received message paired with the computed set of peers to
-      the current batch.
-      When a batch exists for [time_interval] seconds, the list of received
-      messages (with their associated set of peers) is passed to the [callback]
-      function, which pushes an event [Batch_to_treat batch] on the stream of
-      events the automaton should handle. *)
-  val handle_receive_message_batch : receive_message -> [`Receive_message] monad
+      rejection reason for the message or a set of peers to which:
+      - the (full) message will be directly forwarded if [batching_configuration]
+         is [Sequential].
+      - the message might be forwarded after validation of the batch it will be
+        included in. *)
+  val handle_receive_message :
+    batching_configuration:message_handling ->
+    receive_message ->
+    [`Receive_message] monad
 
   (** [publish { topic; message_id; message }] allows to publish a message
       on the gossip network from the local node. The function returns a set of peers

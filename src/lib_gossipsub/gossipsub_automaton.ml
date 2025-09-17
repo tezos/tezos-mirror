@@ -84,6 +84,10 @@ module Make (C : AUTOMATON_CONFIG) :
 
   type set_application_score = {peer : Peer.t; score : float}
 
+  type message_handling =
+    | Sequentially
+    | In_batches of {time_interval : float (* In seconds *)}
+
   (* FIXME not sure subtyping for output is useful. If it is, it is
      probably for few ouputs and could be removed. *)
   type _ output =
@@ -1192,41 +1196,35 @@ module Make (C : AUTOMATON_CONFIG) :
       let* direct_peers = get_direct_peers topic in
       return (Peer.Set.union peers direct_peers)
 
-    let handle_sequentially
+    let handle ~batching_configuration
         ({sender; topic; message_id; message} as receive_message) :
         [`Receive_message] output Monad.t =
       let open Monad.Syntax in
       let*? peers_in_mesh = initial_message_checks receive_message in
-      let*? () = check_message_valid sender topic message message_id in
-      let* () =
-        put_message_in_cache ~peer:(Some sender) message_id message topic
-      in
-      let* () =
-        update_score sender (fun stats ->
-            Score.first_message_delivered stats topic)
-      in
-      let* to_route = peers_to_route sender peers_in_mesh topic in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5272
+      match batching_configuration with
+      | Sequentially ->
+          let*? () = check_message_valid sender topic message message_id in
+          let* () =
+            put_message_in_cache ~peer:(Some sender) message_id message topic
+          in
+          let* () =
+            update_score sender (fun stats ->
+                Score.first_message_delivered stats topic)
+          in
+          let* to_route = peers_to_route sender peers_in_mesh topic in
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5272
 
          Filter out peers from which we already received the message, or an
          IHave message? *)
-      Route_message {to_route} |> return
-
-    let handle_batch ({sender; topic; message_id; _} as receive_message) =
-      let open Monad.Syntax in
-      let*? peers_in_mesh = initial_message_checks receive_message in
-      let*? () = check_message_id_valid sender topic message_id in
-      let* to_route = peers_to_route sender peers_in_mesh topic in
-      return (To_include_in_batch (receive_message, to_route))
+          Route_message {to_route} |> return
+      | In_batches _ ->
+          let* to_route = peers_to_route sender peers_in_mesh topic in
+          return (To_include_in_batch (receive_message, to_route))
   end
 
-  let handle_receive_message_sequentially :
-      receive_message -> [`Receive_message] output Monad.t =
-   fun receive_message -> Receive_message.handle_sequentially receive_message
-
-  let handle_receive_message_batch :
-      receive_message -> [`Receive_message] output Monad.t =
-   fun receive_message -> Receive_message.handle_batch receive_message
+  let handle_receive_message ~batching_configuration receive_message :
+      [`Receive_message] output Monad.t =
+    Receive_message.handle ~batching_configuration receive_message
 
   let check_message_batch batch =
     let unfolded_batch =
