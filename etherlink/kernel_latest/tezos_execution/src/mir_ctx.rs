@@ -11,6 +11,7 @@ use mir::{
         AddressHash, IntoMicheline, Micheline, PublicKeyHash, Type, TypedValue,
     },
     context::CtxTrait,
+    gas::Gas,
 };
 use num_bigint::BigUint;
 use tezos_crypto_rs::hash::ChainId;
@@ -113,7 +114,7 @@ impl<'a, Host: Runtime> CtxTrait<'a>
 }
 
 impl<'a, Host: Runtime> LazyStorage<'a>
-    for Ctx<&mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
+    for Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce>
 {
     fn big_map_get(
         &mut self,
@@ -227,5 +228,114 @@ impl<'a, Host: Runtime> LazyStorage<'a>
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
         let big_map_path = big_map_path(self.context, id)?;
         Ok(self.host.store_delete(&big_map_path)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mir::ast::big_map::{dump_big_map_updates, BigMap, BigMapContent};
+    use primitive_types::H256;
+    use std::collections::BTreeMap;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_tezlink::enc_wrappers::OperationHash;
+
+    macro_rules! make_default_ctx {
+        ($ctx:ident) => {
+            let mut host = MockKernelHost::default();
+            let context = Context::init_context();
+            let mut gas = Gas::default();
+            let mut operation_counter = 0;
+            let mut origination_nonce =
+                OriginationNonce::initial(OperationHash(H256::zero()));
+
+            let mut $ctx = Ctx {
+                host: &mut host,
+                context: &context,
+                gas: &mut gas,
+                balance: 0,
+                amount: 0,
+                level: 0u32.into(),
+                now: 0i64.into(),
+                // default chain id NetXynUjJNZm7wi
+                chain_id: tezos_crypto_rs::hash::ChainId::try_from(vec![
+                    0xf3, 0xd4, 0x85, 0x54,
+                ])
+                .unwrap(),
+                self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
+                sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
+                source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
+                operation_counter: &mut operation_counter,
+                origination_nonce: &mut origination_nonce,
+            };
+        };
+    }
+
+    #[track_caller]
+    fn check_is_dumped_map(map: BigMap, id: BigMapId) {
+        match map.content {
+            BigMapContent::InMemory(_) => panic!("Big map has not been dumped"),
+            BigMapContent::FromLazyStorage(map) => {
+                assert_eq!((map.id, map.overlay), (id, BTreeMap::new()))
+            }
+        };
+    }
+
+    fn assert_big_map_eq<'a, Host: Runtime>(
+        ctx: &mut Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce>,
+        arena: &'a Arena<Micheline<'a>>,
+        id: &BigMapId,
+        key_type: Type,
+        value_type: Type,
+        content: BTreeMap<TypedValue<'a>, TypedValue<'a>>,
+    ) {
+        let (stored_key_type, stored_value_type) = ctx
+            .big_map_get_type(id)
+            .expect("Failed to read key and value types from storage")
+            .expect("Big map should be present in storage");
+
+        assert_eq!(stored_key_type, key_type);
+        assert_eq!(stored_value_type, value_type);
+
+        let big_map_path = big_map_path(ctx.context, id).unwrap();
+        let nb_passed_keys = content.len();
+        let nb_stored_keys = ctx.host.store_count_subkeys(&big_map_path).unwrap();
+        // The big_map storage contains the key_type and value_type subkeys followed by the other keys corresponding to values
+        assert_eq!(nb_passed_keys + 2, nb_stored_keys.try_into().unwrap());
+
+        for (key, value) in &content {
+            let stored_value = ctx
+                .big_map_get(arena, id, key)
+                .expect("Failed to read value from storage")
+                .expect("Key should be present in storage");
+            assert_eq!(&stored_value, value);
+        }
+    }
+
+    #[test]
+    fn test_map_from_memory() {
+        make_default_ctx!(storage);
+        let content = BTreeMap::from([
+            (TypedValue::int(1), TypedValue::String("one".into())),
+            (TypedValue::int(2), TypedValue::String("two".into())),
+        ]);
+
+        let mut map = BigMap {
+            content: BigMapContent::InMemory(content.clone()),
+            key_type: Type::Int,
+            value_type: Type::String,
+        };
+        dump_big_map_updates(&mut storage, &[], &mut [&mut map]).unwrap();
+
+        check_is_dumped_map(map, 0.into());
+
+        assert_big_map_eq(
+            &mut storage,
+            &Arena::new(),
+            &0.into(),
+            Type::Int,
+            Type::String,
+            content,
+        );
     }
 }
