@@ -59,6 +59,24 @@ fn skip_file(file_name: &OsStr) -> bool {
     )
 }
 
+fn skip_test(test_name: &str) -> bool {
+    // Some tests are mixed to work with blobs.
+    // Blobs are not supported on Etherlink.
+    if test_name.contains("blob") {
+        return true;
+    }
+
+    matches!(
+        test_name,
+        // We don't exactly implement EIP-1559 as the sequencer is already
+        // compensated via DA fees.
+        // The following test checks that max fee per gas isn't lower than
+        // max priority fee per gas, but we do not need to make this check
+        // as our effective gas price is always the current base fee.
+        | "fork_Prague-state_test-priority_greater_than_max_fee_per_gas"
+    )
+}
+
 fn find_fixture(path: &Path, acc: &mut Fixtures) {
     if path.is_dir() {
         if path.file_name().map(skip_dir).unwrap_or(false) {
@@ -265,9 +283,7 @@ pub fn main() {
         {
             let test_name = extract_brackets(&test_name);
 
-            // Some tests are mixed to work with blobs.
-            // Blobs are not supported on Etherlink.
-            if test_name.contains("blob") {
+            if skip_test(test_name) {
                 continue;
             }
 
