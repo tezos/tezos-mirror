@@ -36,27 +36,13 @@ let char =
     ~construct:(fun c -> String.make 1 c)
     ()
 
-let option_int =
-  Resto.Arg.make
-    ~name:"optional int"
-    ~destruct:(function
-      | "" -> Ok None
-      | str -> (
-          try Ok (Some (int_of_string str))
-          with Failure _ -> Error "int expected"))
-    ~construct:(function None -> "" | Some i -> string_of_int i)
-    ()
-
-let slot_query =
+let padding_query =
   let open Tezos_rpc.Query in
-  query (fun padding slot_index ->
+  query (fun padding ->
       object
         method padding = padding
-
-        method slot_index = slot_index
       end)
   |+ field "padding" char '\x00' (fun obj -> obj#padding)
-  |+ field "slot_index" option_int None (fun obj -> obj#slot_index)
   |> seal
 
 let wait_query =
@@ -173,7 +159,7 @@ let post_slot :
     ; output : Cryptobox.commitment * Cryptobox.commitment_proof
     ; prefix : unit
     ; params : unit
-    ; query : < padding : char ; slot_index : slot_index option > >
+    ; query : < padding : char > >
     service =
   Tezos_rpc.Service.post_service
     ~description:
@@ -181,10 +167,8 @@ let post_slot :
        proof, then computes the correspoding shards with their proof. The \
        result of this RPC can be directly used to publish a slot header. If \
        the sent data is smaller than the size of a DAL slot, it is padded with \
-       the character provided as padding query parameter (defaults to \\000). \
-       If the slot_index query parameter is provided, the DAL node checks that \
-       its profile allows to publish data on the given slot index."
-    ~query:slot_query
+       the character provided as padding query parameter (defaults to \\000)."
+    ~query:padding_query
       (* With [Data_encoding.string], the body of the HTTP request contains
          two length prefixes: one for the full body, and one for the string.
          Using [Variable.string] instead fixes this. *)

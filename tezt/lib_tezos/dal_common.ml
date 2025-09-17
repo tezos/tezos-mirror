@@ -237,14 +237,10 @@ module Dal_RPC = struct
     in
     `O [("invalid_utf8_string", `A l)]
 
-  let post_slot ?slot_index slot =
+  let post_slot slot =
     let data : RPC_core.data = Data (unistring_to_json slot) in
     make
       ~data
-      ?query_string:
-        (Option.map
-           (fun slot_index -> [("slot_index", string_of_int slot_index)])
-           slot_index)
       POST
       ["slots"]
       JSON.(
@@ -688,20 +684,20 @@ module Helpers = struct
         ]
         client)
 
-  let store_slot dal_node_or_endpoint ~slot_index slot =
+  let store_slot dal_node_or_endpoint slot =
     let call = function
       | Either.Left node -> Dal_RPC.Local.call node
       | Either.Right endpoint -> Dal_RPC.Remote.call endpoint
     in
-    call dal_node_or_endpoint @@ Dal_RPC.post_slot ~slot_index slot
+    call dal_node_or_endpoint @@ Dal_RPC.post_slot slot
 
-  let store_slot_uri dal_node_endpoint ~slot_index slot =
-    store_slot (Either.Right dal_node_endpoint) ~slot_index slot
+  let store_slot_uri dal_node_endpoint slot =
+    store_slot (Either.Right dal_node_endpoint) slot
 
   (* We override store slot so that it uses a DAL node in this file. *)
-  let store_slot dal_node ~slot_index slot =
+  let store_slot dal_node slot =
     match Dal_node.runner dal_node with
-    | None -> store_slot ~slot_index (Either.Left dal_node) slot
+    | None -> store_slot (Either.Left dal_node) slot
     | Some runner ->
         let endpoint =
           Endpoint.make
@@ -710,14 +706,12 @@ module Helpers = struct
             ~port:(Dal_node.rpc_port dal_node)
             ()
         in
-        store_slot ~slot_index (Either.Right endpoint) slot
+        store_slot (Either.Right endpoint) slot
 
   let publish_and_store_slot ?dont_wait ?counter ?force ?fee ?gas_limit client
       dal_node source ~index content =
     (* We override store slot so that it uses a DAL node in this file. *)
-    let* commitment_string, proof =
-      store_slot ~slot_index:index dal_node content
-    in
+    let* commitment_string, proof = store_slot dal_node content in
     let commitment = Commitment.of_string commitment_string in
     let proof = Commitment.proof_of_string proof in
     let* _ =

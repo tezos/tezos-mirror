@@ -365,7 +365,7 @@ let test_dal_publish_commitment =
   let test _protocol dal_parameters _cryptobox node client dal_node =
     let* commitment, proof =
       Dal.Helpers.(
-        store_slot dal_node ~slot_index:0
+        store_slot dal_node
         @@ make_slot
              ~slot_size:dal_parameters.Dal_common.Parameters.cryptobox.slot_size
              "content1")

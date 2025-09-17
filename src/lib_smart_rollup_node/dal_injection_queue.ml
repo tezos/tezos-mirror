@@ -281,10 +281,7 @@ let inject_slot state ~slot_index ~slot_content =
   let dal_cctxt = state.dal_node_ctxt in
   let* commitment, operation =
     let* commitment, commitment_proof =
-      Tezos_dal_node_lib.Dal_node_client.post_slot
-        dal_cctxt
-        ~slot_index
-        slot_content
+      Tezos_dal_node_lib.Dal_node_client.post_slot dal_cctxt slot_content
     in
     return
       ( commitment,
