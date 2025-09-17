@@ -177,6 +177,7 @@ let init_etherlink_dal_node ~external_rpc ~network ~snapshot
           ~node_p2p_endpoint
           ~dal_node_p2p_endpoint
           ~dal_slots
+          ~index:0
           ~next_agent
           ~otel
           ~cloud

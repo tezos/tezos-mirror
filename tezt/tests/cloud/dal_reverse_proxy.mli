@@ -37,6 +37,7 @@ val init_dal_reverse_proxy_observers :
   node_p2p_endpoint:string ->
   dal_node_p2p_endpoint:string option ->
   dal_slots:int list ->
+  index:int ->
   next_agent:(name:string -> Agent.t Lwt.t) ->
   otel:string option ->
   cloud:Cloud.t ->

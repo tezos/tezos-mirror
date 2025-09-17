@@ -83,7 +83,7 @@ let generate_nginx_config ~port out ~default_endpoint
              ("location /", [Directive (sf "proxy_pass %s" default_endpoint)]);
          ] ))
 
-let init_reverse_proxy cloud ~next_agent ~default_endpoint
+let init_reverse_proxy cloud ~next_agent ~default_endpoint ~index
     (proxified_dal_nodes : (int * string) Seq.t) =
   (* A NGINX reverse proxy which balances load between producer DAL
      nodes based on the requested slot index. *)
@@ -93,7 +93,7 @@ let init_reverse_proxy cloud ~next_agent ~default_endpoint
   let port = Agent.next_available_port agent in
   let () = toplog "Launching reverse proxy" in
   let () = toplog "Generating nginx reverse proxy config" in
-  let config_filename = "nginx_reverse_proxy_config" in
+  let config_filename = Format.sprintf "nginx_reverse_proxy_config_%d" index in
   let out_chan = Stdlib.open_out config_filename in
   let config_ppf = Format.formatter_of_out_channel out_chan in
   Format.fprintf
@@ -106,7 +106,8 @@ let init_reverse_proxy cloud ~next_agent ~default_endpoint
   (* Upload the configuration file. *)
   let* (_ : string) =
     Agent.copy
-      ~destination:"/etc/nginx/sites-available/reverse_proxy"
+      ~destination:
+        (Format.sprintf "/etc/nginx/sites-available/reverse_proxy_%d" index)
       ~source:config_filename
       agent
   in
@@ -124,8 +125,8 @@ let init_reverse_proxy cloud ~next_agent ~default_endpoint
       "ln"
       [
         "-s";
-        "/etc/nginx/sites-available/reverse_proxy";
-        "/etc/nginx/sites-enabled/reverse_proxy";
+        Format.sprintf "/etc/nginx/sites-available/reverse_proxy_%d" index;
+        Format.sprintf "/etc/nginx/sites-enabled/reverse_proxy_%d" index;
       ]
     |> Process.check
   in
@@ -160,7 +161,7 @@ let init_reverse_proxy cloud ~next_agent ~default_endpoint
   let l1_node_endpoint = Endpoint.make ~host:"" ~scheme:"" ~port:0 () in
   let* dal_node =
     Dal_node.Agent.create_from_endpoint
-      ~name:"reverse-proxy-dal-node"
+      ~name:(Format.sprintf "reverse-proxy-dal-node-%d" index)
       ~rpc_port:port
       cloud
       agent
@@ -171,7 +172,7 @@ let init_reverse_proxy cloud ~next_agent ~default_endpoint
 let init_dal_reverse_proxy_observers ~external_rpc ~network ~snapshot
     ~ppx_profiling_verbosity ~ppx_profiling_backends ~memtrace ~simulate_network
     ~name_of ~default_endpoint ~node_p2p_endpoint ~dal_node_p2p_endpoint
-    ~dal_slots ~next_agent ~otel ~cloud =
+    ~dal_slots ~index ~next_agent ~otel ~cloud =
   if dal_slots = [] then failwith "Expected at least a DAL slot." ;
   let* dal_slots_and_nodes =
     dal_slots
@@ -228,4 +229,5 @@ let init_dal_reverse_proxy_observers ~external_rpc ~network ~snapshot
     cloud
     ~next_agent
     ~default_endpoint
+    ~index
     (List.to_seq dal_slots_and_nodes)

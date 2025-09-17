@@ -141,6 +141,7 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
             ~node_p2p_endpoint
             ~dal_node_p2p_endpoint
             ~dal_slots
+            ~index
             ~next_agent
             ~otel
             ~cloud
