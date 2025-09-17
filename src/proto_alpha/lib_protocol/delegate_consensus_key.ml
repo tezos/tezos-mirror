@@ -213,6 +213,18 @@ let init ctxt delegate pk =
   let*! ctxt = set_used ctxt pkh in
   Storage.Contract.Consensus_key.init ctxt (Contract_repr.Implicit delegate) pk
 
+let init_bootstrap ctxt delegate pk =
+  let open Lwt_result_syntax in
+  (* bootstrap account should be self delegate *)
+  let*! ctxt = set_unused ctxt delegate in
+  let pkh = Signature.Public_key.hash pk in
+  let* () = check_unused ctxt Consensus pkh in
+  let*! ctxt = set_used ctxt pkh in
+  let*! ctxt =
+    Storage.Contract.Consensus_key.add ctxt (Contract_repr.Implicit delegate) pk
+  in
+  return ctxt
+
 let active_pubkey_kind (type a) ctxt ~(kind : a typed_kind) delegate :
     a tzresult Lwt.t =
   match kind with

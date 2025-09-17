@@ -82,6 +82,15 @@ val init :
   Signature.Public_key.t ->
   Raw_context.t tzresult Lwt.t
 
+(** Initialize the consensus key when registering a bootstrap account.
+    This function must be called after setting the bootstrap account as
+    a self delegate. *)
+val init_bootstrap :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Signature.Public_key.t ->
+  Raw_context.t tzresult Lwt.t
+
 (** Returns the active consensus key for the current cycle. *)
 val active_pubkey :
   Raw_context.t -> Signature.Public_key_hash.t -> pk tzresult Lwt.t

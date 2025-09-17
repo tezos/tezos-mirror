@@ -25,6 +25,8 @@
 
 type error += Unrevealed_public_key of Signature.Public_key_hash.t
 
+type error += Delegator_with_consensus_key of Signature.Public_key_hash.t
+
 let () =
   register_error_kind
     `Permanent
@@ -39,7 +41,22 @@ let () =
         delegate)
     Data_encoding.(obj1 (req "delegator" Signature.Public_key_hash.encoding))
     (function Unrevealed_public_key pkh -> Some pkh | _ -> None)
-    (fun pkh -> Unrevealed_public_key pkh)
+    (fun pkh -> Unrevealed_public_key pkh) ;
+  register_error_kind
+    `Permanent
+    ~id:"bootstrap.delegator_with_consensus_key"
+    ~title:"Forbidden delegation from bootstrap with consensus key"
+    ~description:"Tried to set a consensus key to a non delegate"
+    ~pp:(fun ppf delegate ->
+      Format.fprintf
+        ppf
+        "Setting both a consensus key and a delegate other than self (for %a) \
+         is forbidden."
+        Signature.Public_key_hash.pp
+        delegate)
+    Data_encoding.(obj1 (req "bootstrap" Signature.Public_key_hash.encoding))
+    (function Delegator_with_consensus_key pkh -> Some pkh | _ -> None)
+    (fun pkh -> Delegator_with_consensus_key pkh)
 
 let init_account (ctxt, balance_updates)
     ({public_key_hash; public_key; amount; delegate_to; consensus_key} :
@@ -64,16 +81,24 @@ let init_account (ctxt, balance_updates)
             public_key
         in
         let* ctxt =
-          Delegate_storage.Contract.set
-            ctxt
-            contract
-            (Some (Option.value ~default:public_key_hash delegate_to))
-        in
-        let* ctxt =
-          match consensus_key with
-          | None -> return ctxt
-          | Some consensus_key ->
-              Delegate_consensus_key.init ctxt public_key_hash consensus_key
+          match (consensus_key, delegate_to) with
+          | None, None ->
+              Delegate_storage.Contract.set ctxt contract (Some public_key_hash)
+          | None, Some delegate_to ->
+              Delegate_storage.Contract.set ctxt contract (Some delegate_to)
+          | Some consensus_key, None ->
+              let* ctxt =
+                Delegate_storage.Contract.set
+                  ctxt
+                  contract
+                  (Some public_key_hash)
+              in
+              Delegate_consensus_key.init_bootstrap
+                ctxt
+                public_key_hash
+                consensus_key
+          | Some _, Some _ ->
+              tzfail (Delegator_with_consensus_key public_key_hash)
         in
         match delegate_to with
         | Some delegate
