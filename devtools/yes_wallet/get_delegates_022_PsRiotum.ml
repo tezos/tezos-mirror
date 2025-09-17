@@ -127,6 +127,10 @@ module Get_delegates = struct
         |> Lwt.map Environment.wrap_tzresult
       in
       return consensus_pk
+
+    let companion_key _ctxt _pkh =
+      let open Lwt_result_syntax in
+      return_none
   end
 
   let prepare_context ctxt ~level ~predecessor_timestamp ~timestamp =

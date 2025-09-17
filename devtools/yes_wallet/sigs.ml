@@ -147,6 +147,11 @@ module type PROTOCOL = sig
       context ->
       Signature.public_key_hash ->
       Signature.public_key tzresult Lwt.t
+
+    val companion_key :
+      context ->
+      Signature.public_key_hash ->
+      Bls12_381_signature.MinPk.pk option tzresult Lwt.t
   end
 
   val hash : Protocol_hash.t
