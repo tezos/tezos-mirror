@@ -31,7 +31,7 @@ type parameters = {
 }
 
 type session_state = {
-  mutable context : Irmin_context.rw;
+  mutable context : Evm_node_state.rw;
   mutable finalized_number : Ethereum_types.quantity;
   mutable next_blueprint_number : Ethereum_types.quantity;
   mutable current_block_hash : Ethereum_types.block_hash;
@@ -50,7 +50,7 @@ type session_state = {
 type t = {
   configuration : Configuration.t;
   data_dir : string;
-  index : Irmin_context.rw_index;
+  index : Evm_node_state.rw_index;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   store : Evm_store.t;
   session : session_state;
@@ -292,8 +292,8 @@ module State = struct
     in
     match latest with
     | Some (Qty latest_blueprint_number, checkpoint) ->
-        let*! context = Irmin_context.checkout_exn index checkpoint in
-        let*! evm_state = Irmin_context.PVMState.get context in
+        let*! context = Evm_node_state.checkout_exn index checkpoint in
+        let*! evm_state = Evm_node_state.PVMState.get context in
         let+ current_block_hash =
           Evm_state.current_block_hash ~chain_family evm_state
         in
@@ -303,7 +303,7 @@ module State = struct
           current_block_hash,
           Loaded )
     | None ->
-        let context = Irmin_context.empty index in
+        let context = Evm_node_state.empty index in
         let genesis_parent_hash = L2_types.genesis_parent_hash ~chain_family in
         return
           ( store,
@@ -312,10 +312,10 @@ module State = struct
             genesis_parent_hash,
             Created )
 
-  let commit store (context : Irmin_context.rw) evm_state number =
+  let commit store (context : Evm_node_state.rw) evm_state number =
     let open Lwt_result_syntax in
-    let*! context = Irmin_context.PVMState.set context evm_state in
-    let*! checkpoint = Irmin_context.commit context in
+    let*! context = Evm_node_state.PVMState.set context evm_state in
+    let*! checkpoint = Evm_node_state.commit context in
     let* () = Evm_store.Context_hashes.store store number checkpoint in
     return context
 
@@ -336,11 +336,11 @@ module State = struct
         hash
     in
     let* () = Evm_store.reset_before conn ~l2_level:gc_level ~history_mode in
-    let*! () = Irmin_context.gc ctxt.index hash in
+    let*! () = Evm_node_state.gc ctxt.index hash in
     Metrics.start_pruning () ;
     let gc_waiter () =
       let open Lwt_syntax in
-      let* () = Irmin_context.wait_gc_completion ctxt.index in
+      let* () = Evm_node_state.wait_gc_completion ctxt.index in
       let stop_timestamp = Time.System.now () in
       Metrics.stop_pruning () ;
       Evm_context_events.gc_finished
@@ -394,7 +394,7 @@ module State = struct
                        (of_int gc_param.split_frequency_in_seconds)))
         in
         if split then (
-          Irmin_context.split ctxt.index ;
+          Evm_node_state.split ctxt.index ;
           let* () = Evm_store.Irmin_chunks.insert conn level timestamp in
           let*! () = Evm_context_events.gc_split level timestamp in
           let* chunk_needing_gc =
@@ -504,8 +504,8 @@ module State = struct
     let open Lwt_result_syntax in
     let*! () = Evm_context_events.reset_at_level l2_level in
     (* Find the [l2_level] evm_state. *)
-    let*! context = Irmin_context.checkout_exn ctxt.index checkpoint in
-    let*! evm_state = Irmin_context.PVMState.get context in
+    let*! context = Evm_node_state.checkout_exn ctxt.index checkpoint in
+    let*! evm_state = Evm_node_state.PVMState.get context in
     (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
     let* () =
       let (Ex_tx_container tx_container) = ctxt.tx_container in
@@ -1613,7 +1613,7 @@ module State = struct
           | None -> return_unit)
       | _ -> return_unit
     in
-    Irmin_context.load
+    Evm_node_state.load
       ~cache_size:100_000
       ~async_domain:true
       Read_write
@@ -1701,7 +1701,7 @@ module State = struct
               when_ (on_disk_kernel kernel) @@ fun () ->
               Lwt_result.ok (Events.ignored_kernel_arg ())
             in
-            let*! evm_state = Irmin_context.PVMState.get context in
+            let*! evm_state = Evm_node_state.PVMState.get context in
             return (evm_state, context)
           else
             let* evm_state = Evm_state.init ~kernel in
@@ -1750,7 +1750,7 @@ module State = struct
             return (evm_state, context)
       | None ->
           if init_status = Loaded then
-            let*! evm_state = Irmin_context.PVMState.get context in
+            let*! evm_state = Evm_node_state.PVMState.get context in
             return (evm_state, context)
           else
             failwith
@@ -1851,8 +1851,8 @@ module State = struct
           let* hash = Evm_store.Context_hashes.find conn block_number in
           match hash with
           | Some hash ->
-              let*! context = Irmin_context.checkout_exn ctxt.index hash in
-              let*! evm_state = Irmin_context.PVMState.get context in
+              let*! context = Evm_node_state.checkout_exn ctxt.index hash in
+              let*! evm_state = Evm_node_state.PVMState.get context in
               return evm_state
           | None ->
               failwith
@@ -2337,7 +2337,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
     | None -> failwith "Rollup node has no finalized l2 block"
   in
   let checkpoint =
-    Irmin_context.hash_of_context_hash final_l2_block.header.context
+    Evm_node_state.hash_of_context_hash final_l2_block.header.context
   in
   let rollup_node_context_dir =
     Filename.Infix.(rollup_node_data_dir // "context")
@@ -2366,16 +2366,16 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
     return_unit
   in
   let* evm_node_index =
-    Irmin_context.load
+    Evm_node_state.load
       ~cache_size:100_000
       ~async_domain:true
       Read_write
       evm_context_dir
   in
   let*! evm_node_context =
-    Irmin_context.checkout_exn evm_node_index checkpoint
+    Evm_node_state.checkout_exn evm_node_index checkpoint
   in
-  let*! evm_state = Irmin_context.PVMState.get evm_node_context in
+  let*! evm_state = Evm_node_state.PVMState.get evm_node_context in
   return (evm_node_context, evm_state, final_l2_block.header.level)
 
 let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
@@ -2389,8 +2389,10 @@ let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
   let*! evm_state = Evm_state.clear_delayed_inbox evm_state in
 
   (* For changes made to [evm_state] to take effect, we commit the result *)
-  let*! evm_node_context = Irmin_context.PVMState.set irmin_context evm_state in
-  let*! checkpoint = Irmin_context.commit evm_node_context in
+  let*! evm_node_context =
+    Evm_node_state.PVMState.set irmin_context evm_state
+  in
+  let*! checkpoint = Evm_node_state.commit evm_node_context in
 
   (* Assert we can read the current blueprint number *)
   let* current_blueprint_number =
