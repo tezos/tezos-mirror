@@ -325,12 +325,18 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
               (List.hd batch_list)
           in
           let res =
-            Dal_metrics.sample_time
-              ~sampling_frequency:
-                Constants.shards_verification_sampling_frequency
-              ~metric_updater:Dal_metrics.update_shards_verification_time
-              ~to_sample:(fun () ->
-                Cryptobox.verify_shard_multi cryptobox commitment shards proofs)
+            if Node_context.get_disable_shard_validation ctxt then Ok ()
+            else
+              Dal_metrics.sample_time
+                ~sampling_frequency:
+                  Constants.shards_verification_sampling_frequency
+                ~metric_updater:Dal_metrics.update_shards_verification_time
+                ~to_sample:(fun () ->
+                  Cryptobox.verify_shard_multi
+                    cryptobox
+                    commitment
+                    shards
+                    proofs)
           in
           match res with
           | Ok () ->
