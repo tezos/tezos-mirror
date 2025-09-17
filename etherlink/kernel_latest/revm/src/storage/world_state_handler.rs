@@ -202,7 +202,7 @@ impl From<AccountInfo> for AccountInfoInternal {
 impl StorageAccount {
     pub fn get_account(
         host: &impl Runtime,
-        world_state_handler: &mut Storage<Self>,
+        world_state_handler: &mut WorldStateHandler,
         address: Address,
     ) -> Result<Option<StorageAccount>, Error> {
         world_state_handler
@@ -212,7 +212,7 @@ impl StorageAccount {
 
     pub fn get_or_create_account(
         host: &impl Runtime,
-        world_state_handler: &Storage<Self>,
+        world_state_handler: &WorldStateHandler,
         address: Address,
     ) -> Result<StorageAccount, Error> {
         world_state_handler

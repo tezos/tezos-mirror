@@ -2,21 +2,32 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::deserializer::{
-    from_fixture_access_list, from_fixture_authorization_list, from_hex_b256,
-    from_hex_opt_address, from_hex_opt_u128, from_hex_u256, from_hex_u64,
-    from_hex_vec_u256, from_hex_vec_u64,
+use crate::{
+    deserializer::{
+        from_fixture_access_list, from_fixture_authorization_list, from_hex_b256,
+        from_hex_opt_address, from_hex_opt_u128, from_hex_u256, from_hex_u64,
+        from_hex_vec_u256, from_hex_vec_u64,
+    },
+    helpers::bytes_hash,
 };
 use revm::{
     context::transaction::{AccessList, SignedAuthorization},
-    primitives::{Address, Bytes, HashMap, StorageKey, StorageValue, B256, U256},
+    primitives::{
+        hardfork::SpecId, Address, Bytes, HashMap, StorageKey, StorageValue, B256,
+        KECCAK_EMPTY, U256,
+    },
+    state::{AccountInfo, Bytecode},
 };
 use serde::Deserialize;
+use std::{cmp::min, path::PathBuf};
 
-// TODO: `dead_code` attribute will be removed soon once used in the main loop of
-// the binary.
-#[allow(dead_code)]
-pub type Fixtures = HashMap<String, TestCase>;
+pub type Fixtures = Vec<NamedFixture>;
+
+#[derive(Debug)]
+pub struct NamedFixture {
+    pub path: PathBuf,
+    pub fixtures: HashMap<String, TestCase>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct TestCase {
@@ -55,6 +66,25 @@ pub struct Account {
     pub storage: HashMap<StorageKey, StorageValue>,
 }
 
+impl From<Account> for AccountInfo {
+    fn from(account: Account) -> Self {
+        let (code_hash, code) = if account.code.is_empty() {
+            (KECCAK_EMPTY, None)
+        } else {
+            (
+                bytes_hash(account.code.as_ref()),
+                Some(Bytecode::new_raw_checked(account.code).unwrap()),
+            )
+        };
+        AccountInfo {
+            balance: account.balance,
+            nonce: account.nonce,
+            code_hash,
+            code,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Transaction {
@@ -62,6 +92,10 @@ pub struct Transaction {
     pub nonce: u64,
     #[serde(default, deserialize_with = "from_hex_opt_u128")]
     pub gas_price: Option<u128>,
+    #[serde(default, deserialize_with = "from_hex_opt_u128")]
+    pub max_priority_fee_per_gas: Option<u128>,
+    #[serde(default, deserialize_with = "from_hex_opt_u128")]
+    pub max_fee_per_gas: Option<u128>,
     #[serde(deserialize_with = "from_hex_vec_u64")]
     pub gas_limit: Vec<u64>,
     #[serde(deserialize_with = "from_hex_opt_address")]
@@ -76,6 +110,19 @@ pub struct Transaction {
     pub sender: Address,
 }
 
+impl Transaction {
+    pub fn derive_gas_price(&self, base_fee: u128) -> u128 {
+        match self.gas_price {
+            Some(gas_price) => gas_price,
+            None => {
+                let max_fee_per_gas = self.max_fee_per_gas.unwrap();
+                let max_priority_fee_per_gas = self.max_priority_fee_per_gas.unwrap();
+                min(max_fee_per_gas, base_fee + max_priority_fee_per_gas)
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash, Ord, Deserialize)]
 pub enum SpecName {
     Shanghai,
@@ -83,6 +130,17 @@ pub enum SpecName {
     Prague,
     #[serde(other)]
     Unknown,
+}
+
+impl From<SpecName> for SpecId {
+    fn from(spec: SpecName) -> Self {
+        match spec {
+            SpecName::Shanghai => SpecId::SHANGHAI,
+            SpecName::Cancun => SpecId::CANCUN,
+            SpecName::Prague => SpecId::PRAGUE,
+            SpecName::Unknown => panic!("Unknown EVM spec id"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -98,9 +156,9 @@ pub struct PostEntry {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Indexes {
-    pub data: u64,
-    pub gas: u64,
-    pub value: u64,
+    pub data: usize,
+    pub gas: usize,
+    pub value: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -125,7 +183,8 @@ pub struct Info {
 
 #[cfg(test)]
 mod test {
-    use crate::fixture::Fixtures;
+    use crate::fixture::TestCase;
+    use revm::primitives::HashMap;
 
     #[test]
     fn test_parse_execution_spec_fixture() {
@@ -353,6 +412,8 @@ mod test {
                 },
                 "transaction": {
                     "nonce": "0x00",
+                    "maxPriorityFeePerGas": "0x00",
+                    "maxFeePerGas": "0x0e",
                     "gasLimit": [
                         "0x4c4b40"
                     ],
@@ -468,7 +529,7 @@ mod test {
         "#;
 
         // The deserialization should be enough to validate the test.
-        let parsed: Fixtures =
+        let parsed: HashMap<String, TestCase> =
             serde_json::from_str(data).expect("Parsing should succeed.");
 
         // Here's a couple sanity checks just in case:
