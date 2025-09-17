@@ -104,3 +104,12 @@ The set of registered pipelines types, and their documentation, can be
 accessed by:
 
     make -s -C ci list-pipelines
+
+or, if you prefer a more compact view:
+
+    make -s -C ci overview-pipelines
+
+Additionally, you can list the jobs of a given pipeline and their description
+with the following command (replace `before_merging` with the pipeline of your choice):
+
+    make -s -C ci before_merging.describe-pipeline

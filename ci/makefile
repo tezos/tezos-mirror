@@ -18,6 +18,13 @@ remove-extra-files: manifest # Regenerate GitLab CI configuration and remove any
 list-pipelines: manifest # List and describe the set of registered pipelines
 	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --list-pipelines
 
+.PHONY: overview-pipelines
+overview-pipelines: manifest # List and describe the set of registered pipelines
+	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --overview-pipelines
+
+%.describe-pipeline: manifest # List and describe the set of registered pipelines
+	cd .. && . ./scripts/version.sh && dune exec ci/bin/main.exe -- --describe-pipeline $*
+
 .PHONY: manifest
 manifest:
 	cd .. && ${MAKE} --silent -C manifest
