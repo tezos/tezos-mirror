@@ -151,6 +151,8 @@ module Q : S with type t = Q.t
 
 module List (P : COMPARABLE) : S with type t = P.t list
 
+module Array (P : COMPARABLE) : S with type t = P.t array
+
 module Option (P : COMPARABLE) : S with type t = P.t option
 
 module Result (Ok : COMPARABLE) (Error : COMPARABLE) :
