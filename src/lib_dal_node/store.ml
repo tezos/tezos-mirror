@@ -788,8 +788,7 @@ module Storage_backend = struct
   (** The type [kind] represents the available storage backend types.
       [SQLite3] corresponds to the current implementation integrating a
       [Sqlite.t] database into the DAL node for storing skip list
-      cells and whose purpose is to replace the
-      [Kvs_skip_list_cells_store] module. *)
+      cells. *)
   type kind = SQLite3
 
   let encoding =
