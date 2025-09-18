@@ -19,9 +19,14 @@ packages() {
   EXECUTABLES=$(cat script-inputs/*-executables)
   for ex in $EXECUTABLES; do
     if [ -f "$ex" ]; then
-      cp -f "$ex" scripts/packaging/octez/binaries/
+      mv -f "$ex" scripts/packaging/octez/binaries/
     fi
   done
+
+  # on the CI cleanup everything before building the packages
+  if [ -z "${CI:-}" ]; then
+    make clean
+  fi
 
   # Build the debian packages
   cd scripts/packaging/octez/
