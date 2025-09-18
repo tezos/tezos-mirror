@@ -87,7 +87,7 @@ You can specify the network with argument --network, for instance:
 
 Daemons:
 - octez-node [args]
-  Initialize a new identity and run the octez node.
+  Run the octez node.
 
 - octez-smart-rollup-node [args]
   Run the octez smart rollup node.

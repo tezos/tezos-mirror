@@ -136,14 +136,6 @@ launch_node() {
     if [ "$i" = "--help" ]; then exit 0; fi
   done
 
-  # Generate a new identity if not present
-
-  if [ ! -f "$node_data_dir/identity.json" ]; then
-    echo "Generating a new node identity..."
-    "$node" identity generate "${IDENTITY_POW:-26}". \
-      --data-dir "$node_data_dir"
-  fi
-
   configure_client
 
   # Launching the node
