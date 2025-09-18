@@ -82,8 +82,7 @@ entrypoint using --entrypoint . All binaries are in
 $BIN_DIR and the tezos data in $DATA_DIR
 
 You can specify the network with argument --network, for instance:
-  --network carthagenet
-(default is mainnet).
+  --network mainnet
 
 Daemons:
 - octez-node [args]
