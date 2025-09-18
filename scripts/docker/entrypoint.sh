@@ -21,7 +21,6 @@ export node="$BIN_DIR/octez-node"
 export client="$BIN_DIR/octez-client"
 export admin_client="$BIN_DIR/octez-admin-client"
 export baker="$BIN_DIR/octez-baker-$PROTOCOL"
-export endorser="$BIN_DIR/octez-endorser-$PROTOCOL"
 export accuser="$BIN_DIR/octez-accuser-$PROTOCOL"
 export signer="$BIN_DIR/octez-signer"
 export smart_rollup_node="$BIN_DIR/octez-smart-rollup-node"
@@ -52,12 +51,6 @@ octez-baker)
   ;;
 octez-baker-test)
   launch_baker_test "$@"
-  ;;
-octez-endorser)
-  launch_endorser "$@"
-  ;;
-octez-endorser-test)
-  launch_endorser_test "$@"
   ;;
 octez-accuser)
   launch_accuser "$@"
