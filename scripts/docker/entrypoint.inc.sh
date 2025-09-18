@@ -198,7 +198,7 @@ launch_smart_rollup_node() {
   configure_client
 
   if [ ! -f "$smart_rollup_node_data_dir/config.json" ]; then
-    echo "Configuring the rollup node..."
+    echo "Configuring the smart rollup node..."
     "$smart_rollup_node" init observer config \
       for "$SOR_ALIAS_OR_ADDR" \
       with operators \
