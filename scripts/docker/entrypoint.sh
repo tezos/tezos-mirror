@@ -14,14 +14,18 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 # outside world.
 : "${NODE_RPC_ADDR:="[::]"}"
 
-: "${PROTOCOL:="unspecified-PROTOCOL-variable"}"
-
 # export all these variables to be used in the inc script
 export node="$BIN_DIR/octez-node"
 export client="$BIN_DIR/octez-client"
 export admin_client="$BIN_DIR/octez-admin-client"
-export baker="$BIN_DIR/octez-baker-$PROTOCOL"
-export accuser="$BIN_DIR/octez-accuser-$PROTOCOL"
+# Set default only if PROTOCOL is unset or empty
+if [ -z "$PROTOCOL" ]; then
+  export baker="$BIN_DIR/octez-baker"
+  export accuser="$BIN_DIR/octez-accuser"
+else
+  export baker="$BIN_DIR/octez-baker-$PROTOCOL"
+  export accuser="$BIN_DIR/octez-accuser-$PROTOCOL"
+fi
 export signer="$BIN_DIR/octez-signer"
 export smart_rollup_node="$BIN_DIR/octez-smart-rollup-node"
 
