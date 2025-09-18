@@ -423,4 +423,15 @@ mod tests {
             content,
         );
     }
+
+    #[test]
+    fn test_remove_big_map() {
+        make_default_ctx!(storage);
+        let map_id = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        storage
+            .big_map_update(&map_id, TypedValue::int(0), Some(TypedValue::int(0)))
+            .unwrap();
+        storage.big_map_remove(&map_id).unwrap();
+        assert!(!storage.big_map_mem(&map_id, &TypedValue::int(0)).unwrap());
+    }
 }
