@@ -138,6 +138,11 @@ fn tx_env<'a, Host: Runtime>(
 
     let tx_env_builder = match authorization_list {
         Some(authorization_list) => {
+            if authorization_list.is_empty() {
+                return Err(Error::Custom(
+                    "Authorization list cannot be empty per EIP-7702.".to_string(),
+                ));
+            }
             tx_env_builder.authorization_list_signed(authorization_list)
         }
         None => tx_env_builder,
