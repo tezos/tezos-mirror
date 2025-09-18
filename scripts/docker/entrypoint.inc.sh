@@ -5,7 +5,6 @@ node=${node:?}
 client=${client:?}
 admin_client=${admin_client:?}
 baker=${baker:?}
-endorser=${endorser:?}
 accuser=${accuser:?}
 signer=${signer:?}
 smart_rollup_node=${smart_rollup_node:?}
@@ -184,24 +183,6 @@ launch_baker_test() {
     --base-dir "$client_dir" \
     --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
     run with local node "$node_data_dir" "$@"
-}
-
-launch_endorser() {
-  configure_client
-  wait_for_the_node_to_be_bootstrapped
-  exec "$endorser" --chain main \
-    --base-dir "$client_dir" \
-    --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
-    run "$@"
-}
-
-launch_endorser_test() {
-  configure_client
-  wait_for_the_node_to_be_bootstrapped
-  exec "$endorser" --chain test \
-    --base-dir "$client_dir" \
-    --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
-    run "$@"
 }
 
 launch_accuser() {
