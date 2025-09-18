@@ -525,6 +525,21 @@ open struct
       ("message_id", Types.Message_id.encoding)
       ("validation_error", Data_encoding.string)
 
+  let batch_validation_error =
+    declare_3
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"batch_validation_failed"
+      ~msg:
+        "validating batch of messages for level {level} and slot {slot_index} \
+         failed with error {validation_error}"
+      ~level:Warning
+      ~pp1:(fun fmt -> Format.fprintf fmt "%ld")
+      ~pp2:(fun fmt -> Format.fprintf fmt "%d")
+      ("level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("validation_error", Data_encoding.string)
+
   let p2p_server_is_ready =
     declare_1
       ~section
@@ -1322,6 +1337,12 @@ let emit_dont_wait__message_validation_error ~message_id ~validation_error =
   emit__dont_wait__use_with_care
     message_validation_error
     (message_id, validation_error)
+
+let emit_dont_wait__batch_validation_error ~level ~slot_index ~validation_error
+    =
+  emit__dont_wait__use_with_care
+    batch_validation_error
+    (level, slot_index, validation_error)
 
 let emit_p2p_server_is_ready ~point = emit p2p_server_is_ready point
 

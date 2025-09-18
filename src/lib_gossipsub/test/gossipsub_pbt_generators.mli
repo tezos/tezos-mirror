@@ -226,7 +226,11 @@ val fold : Fragment.t -> (event -> 'a -> 'a) -> 'a -> 'a t
 
 (** [run s0 f] constructs a {!trace} generator by running the gossipsub automaton on inputs
     generated from [f]. *)
-val run : GS.state -> Fragment.t -> trace t
+val run :
+  ?batching_configuration:GS.message_handling ->
+  GS.state ->
+  Fragment.t ->
+  trace t
 
 (** [check_fold step inv trace] folds the predicate [step] with initial invariant
     [inv] on [trace]. If the [step] fails with [Error e], [check_predicate] returns [Error (e, prefix)]

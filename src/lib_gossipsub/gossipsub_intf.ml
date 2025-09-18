@@ -69,6 +69,23 @@ module type AUTOMATON_SUBCONFIG = sig
       message_id:Message_id.t ->
       unit ->
       [`Valid | `Unknown | `Outdated | `Invalid]
+
+    (** [valid_batch] performs an application layer-level validity check on a
+        message batch.
+
+        If the [message_handling] field of the gossipsub worker is [Sequentially],
+        this function is never called.
+        This function is called when the field is [In_batches]. However, [valid]
+        is still called even in this case: since message ids are not batched
+        and [valid_batch] cannot be called without providing a message, [valid]
+        remains used when processing message ids without the message, especially
+        the [IHave] events.
+
+        The output is a list of the same length as the input, containing the
+        result for each message of the batch. *)
+    val valid_batch :
+      (Peer.t * Topic.t * Message_id.t * t * Peer.Set.t) list ->
+      [`Valid | `Unknown | `Outdated | `Invalid] list
   end
 end
 
@@ -619,6 +636,8 @@ module type AUTOMATON = sig
 
   type set_application_score = {peer : Peer.t; score : float}
 
+  type message_handling = Sequentially | In_batches of {time_interval : span}
+
   (** Output produced by one of the actions below. *)
   type _ output =
     | Ihave_from_peer_with_low_score : {
@@ -705,7 +724,7 @@ module type AUTOMATON = sig
             - Direct peers for the message's topic;
             - The peers in the topic's mesh minus the original sender of the message. *)
     | Already_received : [`Receive_message] output
-        (** Received a message that has already been recevied before. *)
+        (** Received a message that has already been received before. *)
     | Not_subscribed : [`Receive_message] output
         (** Received a message from a remote peer for a topic we are not
             subscribed to (called "unknown topic" in the Go implementation). *)
@@ -714,6 +733,17 @@ module type AUTOMATON = sig
     | Unknown_validity : [`Receive_message] output
         (** Validity cannot be decided yet. *)
     | Outdated : [`Receive_message] output  (** The message is outdated. *)
+    | To_include_in_batch :
+        (receive_message * Peer.Set.t)
+        -> [`Receive_message] output
+        (** The message passed all the Gossipsub checks. The worker should add this
+            message in the current batch. It must be noted that most checks
+            (especially cryptographic ones) are done when the batch is processed. *)
+    | Batch_result :
+        (receive_message * [`Receive_message] output) list
+        -> [`Treated_batch] output
+        (** Result of the processing of the batch. It contains the list of all
+            messages of the batch with their respective output. *)
     | Already_joined : [`Join] output
         (** Attempting to join a topic we already joined. *)
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
@@ -811,10 +841,17 @@ module type AUTOMATON = sig
       on this topic. *)
   val handle_prune : prune -> [`Prune] monad
 
-  (** [handle_receive_message { sender; topic; message_id; message }] handles
-      a message received from [sender] on the gossip network. The function returns
-      a set of peers to which the (full) message will be directly forwarded.  *)
-  val handle_receive_message : receive_message -> [`Receive_message] monad
+  (** [handle_receive_message ~batching_configuration received_message] handles a
+      [received_message] on the gossip network. The function returns either a
+      rejection reason for the message or a set of peers to which:
+      - the (full) message will be directly forwarded if [batching_configuration]
+         is [Sequential].
+      - the message might be forwarded after validation of the batch it will be
+        included in. *)
+  val handle_receive_message :
+    batching_configuration:message_handling ->
+    receive_message ->
+    [`Receive_message] monad
 
   (** [publish { topic; message_id; message }] allows to publish a message
       on the gossip network from the local node. The function returns a set of peers
@@ -833,6 +870,12 @@ module type AUTOMATON = sig
       returns the set of peers, forming the mesh, that have been pruned for that
       topic. *)
   val leave : leave -> [`Leave] monad
+
+  (** [apply_batch batch] handles a complete batch and outputs an element of the
+      state monad which encapsulates the list of [[`Receive_message] ouptut]
+      result for each entry of the batch. *)
+  val apply_batch :
+    (receive_message * Peer.Set.t) list -> [`Treated_batch] monad
 
   (** [set_application_score {peer; score}] handles setting the application score
       of [peer]. If the peer is not known, this does nothing. *)
@@ -1183,6 +1226,7 @@ module type WORKER = sig
     | P2P_input of p2p_input
     | App_input of app_input
     | Check_unknown_messages
+    | Process_batch of (GS.receive_message * GS.Peer.Set.t) list
 
   (** [make ~events_logging ~initial_points rng limits parameters] initializes
       a new Gossipsub automaton with the given arguments. Then, it initializes
@@ -1193,6 +1237,7 @@ module type WORKER = sig
   val make :
     ?events_logging:(event -> unit Monad.t) ->
     ?initial_points:(unit -> Point.t list) ->
+    ?batching_interval:GS.span ->
     self:GS.Peer.t ->
     Random.State.t ->
     (GS.Topic.t, GS.Peer.t, GS.Message_id.t, GS.span) limits ->

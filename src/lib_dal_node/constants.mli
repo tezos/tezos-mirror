@@ -78,3 +78,7 @@ val bootstrap_dns_refresh_delay : float
     is acceptable since the cache is sparsely populated due to
     [proto_parameters.traps_fraction]. *)
 val traps_cache_size : int
+
+(** The time (in seconds) for which shards are accumulated by the gossipsub
+    automaton before triggering the validation of the batch. *)
+val batch_time_interval : Types.Span.t

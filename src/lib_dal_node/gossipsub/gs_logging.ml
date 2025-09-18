@@ -43,6 +43,15 @@ module Events = struct
       ~level:Debug
       ()
 
+  let batch_treatment =
+    declare_0
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"batch_treatment"
+      ~msg:"Validation of a message batch"
+      ~level:Debug
+      ()
+
   let check_unknown_messages =
     declare_0
       ~section
@@ -254,3 +263,4 @@ let event ~verbose =
           | IHave {topic; message_ids} ->
               emit ihave (from_peer.peer_id, topic, message_ids)
           | IWant {message_ids} -> emit iwant (from_peer.peer_id, message_ids)))
+  | Process_batch _ -> emit batch_treatment ()

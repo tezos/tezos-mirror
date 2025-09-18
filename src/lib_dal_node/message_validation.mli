@@ -53,9 +53,35 @@
 val gossipsub_app_messages_validation :
   Node_context.t ->
   Cryptobox.t ->
-  int32 ->
+  head_level:int32 ->
   Types.proto_parameters ->
   ?message:Types.Message.t ->
   message_id:Types.Message_id.t ->
   unit ->
   [> `Invalid | `Outdated | `Unknown | `Valid]
+
+(** [gossipsub_batch_validation ctxt cryptobox head_level
+    proto_parameters batch ()] validates a batch of Gossipsub messages and
+    their associated message ids in the context of the given DAL node.
+
+    The validation follows the same layered approach as [gossipsub_app_messages_validation]
+    except that after checking the age and validity of the id of a message,
+    each message is affected to a sub-batch with only messages for the same
+    level and slot.
+
+    The cryptographic verification is then done per sub-batch.
+
+    This function is intended to be registered as the Gossipsub batch validation hook.
+*)
+val gossipsub_batch_validation :
+  Node_context.t ->
+  Cryptobox.t ->
+  head_level:int32 ->
+  Types.proto_parameters ->
+  (Types.Peer.t
+  * Types.Topic.t
+  * Types.Message_id.t
+  * Types.Message.t
+  * Types.Peer.Set.t)
+  list ->
+  [> `Invalid | `Outdated | `Unknown | `Valid] list

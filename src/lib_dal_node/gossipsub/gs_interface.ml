@@ -35,6 +35,13 @@ module Validate_message_hook = struct
       ~msg:"The message validation function is not set"
       ~level:Warning
 
+  let warn_batch_validation_function_not_set =
+    Internal_event.Simple.declare_0
+      ~section:["dal"; "gs_interface"]
+      ~name:"batch_validation_function_not_set"
+      ~msg:"The batch validation function is not set"
+      ~level:Warning
+
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5674
      Refactor gossipsub integration to avoid this mutable hook in the lib. *)
   let check_message =
@@ -45,11 +52,25 @@ module Validate_message_hook = struct
             ()) ;
         `Unknown)
 
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5674
+     Refactor gossipsub integration to avoid this mutable hook in the lib. *)
+  let check_message_batch =
+    ref (fun batch ->
+        Internal_event.Simple.(
+          emit__dont_wait__use_with_care
+            (warn_batch_validation_function_not_set ())
+            ()) ;
+        List.map (fun _ -> `Unknown) batch)
+
   let set func = check_message := func
+
+  let set_batch func = check_message_batch := func
 end
 
 let message_valid ?message ~message_id () =
   !Validate_message_hook.check_message ?message ~message_id ()
+
+let message_valid_batch batch = !Validate_message_hook.check_message_batch batch
 
 module Automaton_config :
   AUTOMATON_CONFIG
@@ -76,6 +97,8 @@ module Automaton_config :
       include Types.Message
 
       let valid = message_valid
+
+      let valid_batch = message_valid_batch
     end
   end
 end

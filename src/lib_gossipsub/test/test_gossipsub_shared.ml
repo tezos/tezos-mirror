@@ -167,6 +167,8 @@ module Automaton_config :
       include String_iterable
 
       let valid ?message ~message_id () = Validity_hook.apply message message_id
+
+      let valid_batch = List.map (fun _ -> `Valid)
     end
   end
 end
