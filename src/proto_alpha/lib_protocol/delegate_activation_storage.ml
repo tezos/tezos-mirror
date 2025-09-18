@@ -73,15 +73,17 @@ let tolerated_inactivity_period ctxt delegate =
             ctxt
             current_cycle
         in
-        let compare_stake_ratio_with_threshold =
+        (* If [(delegate_baking_power / total_baking_power) > (tolerance_threshold / 1000)]
+           use low tolerance, otherwise use high tolerance.  *)
+        let compare_power_ratio_with_threshold =
           Int64.(
             compare
-              (div
-                 (mul 1000L (Stake_repr.staking_weight delegate_stake))
-                 (Stake_repr.staking_weight total_stake))
-              (of_int tolerance_threshold))
+              (mul 1000L (Stake_repr.staking_weight delegate_stake))
+              (mul
+                 (of_int tolerance_threshold)
+                 (Stake_repr.staking_weight total_stake)))
         in
-        if Compare.Int.(compare_stake_ratio_with_threshold > 0) then
+        if Compare.Int.(compare_power_ratio_with_threshold > 0) then
           (ctxt, tolerance_low)
         else (ctxt, tolerance_high)
 

@@ -8,6 +8,8 @@
 open State_account
 open State
 
+(** Mimics
+    {!Protocol.Delegate_activation_storage.tolerated_inactivity_period}. *)
 let tolerated_inactivity_period ~block ~state account =
   let open Lwt_result_syntax in
   let tolerance_threshold =
@@ -24,13 +26,13 @@ let tolerated_inactivity_period ~block ~state account =
     match delegate_stake with
     | None -> tolerance_low
     | Some delegate_stake ->
-        let compare_stake_ratio_with_threshold =
+        let compare_power_ratio_with_threshold =
           Int64.(
             compare
-              (div (mul 1000L delegate_stake) total_stake)
-              (of_int tolerance_threshold))
+              (mul 1000L delegate_stake)
+              (mul (of_int tolerance_threshold) total_stake))
         in
-        if Compare.Int.(compare_stake_ratio_with_threshold > 0) then
+        if Compare.Int.(compare_power_ratio_with_threshold > 0) then
           tolerance_low
         else tolerance_high
 
