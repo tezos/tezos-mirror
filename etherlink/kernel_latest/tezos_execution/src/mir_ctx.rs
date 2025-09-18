@@ -338,4 +338,56 @@ mod tests {
             content,
         );
     }
+
+    #[test]
+    fn test_map_updates_to_storage() {
+        make_default_ctx!(storage);
+        let map_id = storage.big_map_new(&Type::Int, &Type::String).unwrap();
+        storage
+            .big_map_update(
+                &map_id,
+                TypedValue::int(1),
+                Some(TypedValue::String("a".into())),
+            )
+            .unwrap();
+        storage
+            .big_map_update(
+                &map_id,
+                TypedValue::int(2),
+                Some(TypedValue::String("b".into())),
+            )
+            .unwrap();
+        storage
+            .big_map_update(
+                &map_id,
+                TypedValue::int(3),
+                Some(TypedValue::String("c".into())),
+            )
+            .unwrap();
+
+        storage
+            .big_map_update(&map_id, TypedValue::int(2), None)
+            .unwrap();
+        storage
+            .big_map_update(
+                &map_id,
+                TypedValue::int(3),
+                Some(TypedValue::String("gamma".into())),
+            )
+            .unwrap();
+
+        let expected_content = BTreeMap::from([
+            (TypedValue::int(1), TypedValue::String("a".into())),
+            (TypedValue::int(3), TypedValue::String("gamma".into())),
+        ]);
+
+        assert_big_map_eq(
+            &mut storage,
+            &Arena::new(),
+            &map_id,
+            Type::Int,
+            Type::String,
+            expected_content,
+        );
+    }
 }
