@@ -390,4 +390,37 @@ mod tests {
             expected_content,
         );
     }
+
+    #[test]
+    fn test_copy() {
+        make_default_ctx!(storage);
+        let content = BTreeMap::from([
+            (TypedValue::int(1), TypedValue::String("one".into())),
+            (TypedValue::int(2), TypedValue::String("two".into())),
+        ]);
+
+        let mut map = BigMap {
+            content: BigMapContent::InMemory(content.clone()),
+            key_type: Type::Int,
+            value_type: Type::String,
+        };
+        dump_big_map_updates(&mut storage, &[], &mut [&mut map]).unwrap();
+
+        check_is_dumped_map(map, 0.into());
+
+        let copied_id = storage
+            .big_map_copy(&0.into())
+            .expect("Failed to copy big_map in storage");
+
+        assert_eq!(copied_id, 1.into());
+
+        assert_big_map_eq(
+            &mut storage,
+            &Arena::new(),
+            &copied_id,
+            Type::Int,
+            Type::String,
+            content,
+        );
+    }
 }
