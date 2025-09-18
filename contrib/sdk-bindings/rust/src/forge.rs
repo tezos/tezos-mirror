@@ -75,6 +75,7 @@ pub mod operation {
     use super::*;
     use crate::entrypoint::Entrypoint;
     use crate::hash::{BlsSignature, Contract, PublicKey, PublicKeyHash};
+    use crate::micheline::Micheline;
     use crate::Error;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_protocol::operation::{
@@ -123,27 +124,31 @@ pub mod operation {
             amount: u64,
             destination: &Contract,
             entrypoint: Option<Arc<Entrypoint>>,
-            value: Option<Vec<u8>>,
-        ) -> Self {
-            Self(OperationContent::Transaction(ManagerOperationContent {
-                source: source.0.clone(),
-                fee: fee.into(),
-                counter: counter.into(),
-                gas_limit: gas_limit.into(),
-                storage_limit: storage_limit.into(),
-                operation: TransactionContent {
-                    amount: amount.into(),
-                    destination: destination.0.clone(),
-                    parameters: Parameters {
-                        entrypoint: entrypoint.map_or_else(
-                            tezos_protocol::entrypoint::Entrypoint::default,
-                            |entrypoint| entrypoint.0.clone(),
-                        ),
-                        // octez-client convert data "Unit" from Michelson to binary
-                        value: value.unwrap_or(vec![0x03, 0x0b]).clone(),
+            value: Option<Micheline>,
+        ) -> Result<Self, Error> {
+            Ok(Self(OperationContent::Transaction(
+                ManagerOperationContent {
+                    source: source.0.clone(),
+                    fee: fee.into(),
+                    counter: counter.into(),
+                    gas_limit: gas_limit.into(),
+                    storage_limit: storage_limit.into(),
+                    operation: TransactionContent {
+                        amount: amount.into(),
+                        destination: destination.0.clone(),
+                        parameters: Parameters {
+                            entrypoint: entrypoint.map_or_else(
+                                tezos_protocol::entrypoint::Entrypoint::default,
+                                |entrypoint| entrypoint.0.clone(),
+                            ),
+                            value: match value {
+                                None => Parameters::default().value,
+                                Some(value) => value.encode()?,
+                            },
+                        },
                     },
                 },
-            }))
+            )))
         }
 
         /// Build a origination operation.
@@ -220,6 +225,8 @@ mod tests {
     use super::*;
     use crate::entrypoint::Entrypoint;
     use crate::hash::{BlockHash, BlsSignature, Contract, PublicKey, PublicKeyHash};
+    use crate::micheline::{Micheline, Prim};
+    use crate::types::BigInt;
     use operation::*;
 
     // All messages bytes were generated using `octez-codec encode "alpha.script.expr" from '{ "string": "$MSG" }'`
@@ -366,7 +373,18 @@ mod tests {
         let (fee, counter, gas_limit, storage_limit, amount) = (8318, 72014, 145000, 1204, 34);
         let destination = Contract::from_b58check("KT1G4D3W9cf86dzAmZBN9nwUn7sYh4DYMRb4").unwrap();
         let entrypoint = Entrypoint::new("foo").unwrap();
-        let value = hex::decode("07070001010000000161").unwrap();
+        let value = Micheline::App {
+            prim: Prim::D_Pair,
+            seq: vec![
+                Micheline::Int {
+                    big_int: Arc::new(BigInt::from_int(1.into())),
+                },
+                Micheline::String {
+                    string: "a".to_owned(),
+                },
+            ],
+            annots: vec![],
+        };
         let transaction = Operation::transaction(
             &source,
             fee,
@@ -376,9 +394,9 @@ mod tests {
             amount,
             &destination,
             Some(Arc::new(entrypoint)),
-            // octez-client convert data 'Pair 1 "a"' from Michelson to binary
             Some(value),
-        );
+        )
+        .unwrap();
         let raw_transaction = transaction.forge().expect(&format!(
             "Forging operation {:?} should succeed",
             transaction
@@ -423,7 +441,8 @@ mod tests {
             &destination,
             Some(Arc::new(entrypoint)),
             None,
-        );
+        )
+        .unwrap();
         let raw_transaction = transaction.forge().expect(&format!(
             "Forging operation {:?} should succeed",
             transaction
@@ -463,7 +482,8 @@ mod tests {
             &destination,
             None,
             None,
-        );
+        )
+        .unwrap();
         let raw_transaction = transaction.forge().expect(&format!(
             "Forging operation {:?} should succeed",
             transaction
@@ -473,6 +493,58 @@ mod tests {
         assert_eq!(
             bytes, raw_transaction,
             "Transaction must be forged into the expected bytes"
+        );
+    }
+
+    #[test]
+    fn transaction_default_parameters_forging() {
+        let source = PublicKeyHash::from_b58check("tz1SMHZCpzRUoaoz9gA18pNUghpyYY4N6fif").unwrap();
+        let (fee, counter, gas_limit, storage_limit, amount) = (99, 1401, 1, 0, 200);
+        let destination = Contract::from_b58check("KT1S5cQmS4wXjG7JubRUCWzH3DaU7S2XfeFT").unwrap();
+
+        let transaction_without_parameters = Operation::transaction(
+            &source,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            amount,
+            &destination,
+            None,
+            None,
+        )
+        .unwrap();
+        let raw_transaction_without_parameters =
+            transaction_without_parameters.forge().expect(&format!(
+                "Forging operation {:?} should succeed",
+                transaction_without_parameters
+            ));
+
+        let transaction_with_default_parameters = Operation::transaction(
+            &source,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            amount,
+            &destination,
+            Some(Arc::new(Entrypoint::new("default").unwrap())),
+            Some(Micheline::App {
+                prim: Prim::D_Unit,
+                seq: vec![],
+                annots: vec![],
+            }),
+        )
+        .unwrap();
+        let raw_transaction_with_default_parameters =
+            transaction_with_default_parameters.forge().expect(&format!(
+                "Forging operation {:?} should succeed",
+                transaction_with_default_parameters
+            ));
+
+        assert_eq!(
+            raw_transaction_without_parameters, raw_transaction_with_default_parameters,
+            "Transaction with default parameters must be forged as transaction without parameters"
         );
     }
 
@@ -674,9 +746,13 @@ mod tests {
             753,
             &Contract::from_b58check("KT1EHorBhV6bEJH7wsyxSuDXsQ5dw4VWVwL4").unwrap(),
             Some(Arc::new(Entrypoint::new("unstake").unwrap())),
-            // octez-client convert data 'Unit' from Michelson to binary
-            Some(hex::decode("030b").unwrap()),
-        );
+            Some(Micheline::App {
+                prim: Prim::D_Unit,
+                seq: vec![],
+                annots: vec![],
+            }),
+        )
+        .unwrap();
 
         let branch =
             BlockHash::from_b58check("BL2fRnPdMqU3z6iEvEYNofAwYoTTLhaMLsvMES2Wf4Zj7Lf69qy")

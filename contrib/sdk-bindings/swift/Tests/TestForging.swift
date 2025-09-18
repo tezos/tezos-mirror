@@ -83,7 +83,7 @@ class TestForging: XCTestCase {
         let source = try! PublicKeyHash.fromB58check(data: "tz2GNQB7rXjNXBX6msePzQ2nBWYUUGutYy5p")
         let destination = try! Contract.fromB58check(data: "tz2GNQB7rXjNXBX6msePzQ2nBWYUUGutYy5p")
         let entrypoint = try! Entrypoint(name: "finalize_unstake")
-        let transaction = Operation.transaction(
+        let transaction = try! Operation.transaction(
           source: source,
           fee: 0,
           counter: 14,
@@ -202,7 +202,7 @@ class TestForging: XCTestCase {
         let source = try! PublicKeyHash.fromB58check(data: "tz2BctFU4ggoq31YSKu5L3MgSmFhvU7zDhY8")
         let destination = try! Contract.fromB58check(data: "tz3i3aDaYUtfSnza4VC1XQKGFJgf99pFtoHk")
 
-        let transaction = Operation.transaction(
+        let transaction = try! Operation.transaction(
           source: source,
           fee: 537,
           counter: 623698,
