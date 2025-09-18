@@ -19,6 +19,9 @@ module Set = struct
       (c : t) =
     {c with delegate_parameters_activation_delay}
 
+  let tolerated_inactivity_period tolerated_inactivity_period (c : t) =
+    {c with tolerated_inactivity_period}
+
   let blocks_per_cycle blocks_per_cycle (c : t) = {c with blocks_per_cycle}
 
   let blocks_per_commitment blocks_per_commitment (c : t) =
