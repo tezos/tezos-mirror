@@ -7,6 +7,19 @@
 
 let temp_dir = Filename.temp_dir "release_page" ""
 
+let sf = Printf.sprintf
+
+(* [get_field n line] returns the [n]th field of [line].
+   Fields are non-empty space-separated values. *)
+let get_field n line =
+  let fields =
+    String.split_on_char ' ' line
+    |> List.map String.trim
+    |> List.filter (( <> ) "")
+  in
+  if n >= 0 then List.nth_opt fields n
+  else List.nth_opt fields (List.length fields + n)
+
 (* Module to handle the storage (S3 bucket).
    All used files are stored in temporary directoy. *)
 module Storage = struct
@@ -17,7 +30,7 @@ module Storage = struct
     let target = Option.value ~default:file target in
     Format.printf "Getting %s from %s@." file path ;
     let command =
-      Format.sprintf
+      sf
         "aws s3 cp \"s3://%s/%s\" \"%s\""
         path
         file
@@ -29,22 +42,19 @@ module Storage = struct
           "File %s stored in %s@."
           file
           (Filename.concat temp_dir target)
-    | _ -> failwith (Format.sprintf "Unable to get %s in %s" file path)
+    | _ -> failwith (sf "Unable to get %s in %s" file path)
 
   (* [get_folder_content ~path] returns the list of files in [path]. *)
   let get_folder_content ~path =
-    let command =
-      (* awk is used to print only the last field from each line. *)
-      Format.sprintf
-        "aws s3 ls \"s3://%s\" --recursive | awk '{print $NF}'"
-        path
-    in
+    let command = sf "aws s3 ls \"s3://%s\" --recursive" path in
     let ic = Unix.open_process_in command in
     let result = ref [] in
     (try
        while true do
          let line = input_line ic in
-         result := line :: !result
+         match get_field (-1) line with
+         | Some field -> result := field :: !result
+         | None -> ()
        done
      with End_of_file -> ()) ;
     let _ = Unix.close_process_in ic in
@@ -110,22 +120,34 @@ let string_of_arch = function X86_64 -> "x86_64" | Arm64 -> "arm64"
 
 (* [show_markdown content] returns a string that contains the
    markdown associated with [content]. *)
-let rec show_markdown ?(level = 1) = function
-  | Concat list ->
-      String.concat ""
-      @@ List.map (fun content -> show_markdown ~level content) list
-  | Items list ->
-      (* List are preceeded by an empty line,
+let show_markdown ?(level = 1) content =
+  let buf = Buffer.create 0 in
+  let pp string = Buffer.add_string buf string in
+  let rec aux ~level = function
+    | Concat list -> List.iter (fun content -> aux ~level content) list
+    | Items list ->
+        (* List are preceeded by an empty line,
          and followed by an empty line. *)
-      ("\n\n" ^ String.concat "\n"
-      @@ List.map (fun content -> "- " ^ show_markdown ~level content) list)
-      ^ "\n\n"
-  | Link {text; url} -> Format.sprintf "[%s](%s)" text url
-  | Text text -> text
-  | Section {title; content} ->
-      (String.make level '#' ^ " " ^ title ^ "\n")
-      ^ show_markdown ~level:(level + 1) content
-      ^ "\n"
+        pp "\n" ;
+        List.iter
+          (fun content ->
+            pp "- " ;
+            aux ~level content ;
+            pp "\n")
+          list ;
+        pp "\n\n"
+    | Link {text; url} -> pp @@ sf "[%s](%s)" text url
+    | Text text -> pp text
+    | Section {title; content} ->
+        pp @@ String.make level '#' ;
+        pp " " ;
+        pp title ;
+        pp "\n" ;
+        aux ~level:(level + 1) content ;
+        pp "\n"
+  in
+  aux ~level content ;
+  Buffer.contents buf
 
 (* [markdown_of_page page] returns a string that contains the
    markdown associated with the [page]. *)
@@ -148,7 +170,7 @@ let get_checksum_file ?arch ~component ~version ~asset () =
     | Some arch ->
         let arch = string_of_arch arch in
         ( Filename.concat (component.asset_path version asset) arch,
-          Format.sprintf "%s_sha256sums.txt" arch )
+          sf "%s_sha256sums.txt" arch )
     | None -> (component.asset_path version asset, "sha256sums.txt")
   in
   let file = "sha256sums.txt" in
@@ -223,12 +245,14 @@ let make_links ?arch ~component assets =
           in
           let command =
             Format.asprintf
-              "grep '%s' %s | awk '{print $1}'"
+              "grep '%s' %s"
               (Filename.basename asset)
               checksum_path
           in
           let ic = Unix.open_process_in command in
-          let checksum = input_line ic in
+          let checksum =
+            input_line ic |> get_field 0 |> Option.value ~default:""
+          in
           let _ = Unix.close_process_in ic in
           Concat
             [
@@ -237,9 +261,7 @@ let make_links ?arch ~component assets =
                 ("https://" ^ component.url ^ "/" ^ asset);
               Text " ";
               Text
-                (Format.sprintf
-                   "<span class=\"sha256\">(**sha256:** `%s`)</span>"
-                   checksum);
+                (sf "<span class=\"sha256\">(**sha256:** `%s`)</span>" checksum);
             ])
       assets
   in
@@ -290,7 +312,7 @@ let asset_content ~component ~version = function
           Text ""
       | Some announcement ->
           text_empty_line
-            (Format.sprintf
+            (sf
                "Details and changelogs available in [the documentation](%s)"
                announcement))
 
@@ -302,7 +324,7 @@ let version_section ~component ~asset_types ~version =
   let title =
     match rc with
     | Some rcn ->
-        Format.sprintf
+        sf
           "%s Release Candidate %i.%i~rc%i\n"
           (String.capitalize_ascii component.name)
           major
@@ -310,17 +332,13 @@ let version_section ~component ~asset_types ~version =
           rcn
     | None ->
         if latest then
-          Format.sprintf
+          sf
             "%s %i.%i (latest)\n"
             (String.capitalize_ascii component.name)
             major
             minor
         else
-          Format.sprintf
-            "%s %i.%i\n"
-            (String.capitalize_ascii component.name)
-            major
-            minor
+          sf "%s %i.%i\n" (String.capitalize_ascii component.name) major minor
   in
   {
     title;
@@ -357,7 +375,7 @@ let generate_md ~component ~versions ~asset_types =
 let generate_html ~template ~title ~path =
   let index = Filename.concat temp_dir "index.md" in
   let command =
-    Format.sprintf
+    sf
       "pandoc %s -s --template=\"%s\" --metadata=title=\"%s\" \
        --metadata=path=\"%s\" --css=%s/style.css -o index.html"
       index
@@ -469,12 +487,12 @@ let () =
       name = component;
       path =
         (* For octez, the path is root of the bucket. *)
-        (if component = "octez" then Format.sprintf "%s%s" bucket path
-         else Format.sprintf "%s%s/%s" bucket path component);
+        (if component = "octez" then sf "%s%s" bucket path
+         else sf "%s%s/%s" bucket path component);
       asset_path =
         (fun version asset_type ->
           if component = "octez" then
-            Format.sprintf
+            sf
               "%s%s/%s-v%i.%i%s/%s"
               bucket
               path
@@ -482,11 +500,11 @@ let () =
               version.major
               version.minor
               (match version.rc with
-              | Some n -> Format.sprintf "-rc%s" @@ string_of_int n
+              | Some n -> sf "-rc%s" @@ string_of_int n
               | None -> "")
               (string_of_asset_type asset_type |> String.lowercase_ascii)
           else
-            Format.sprintf
+            sf
               "%s%s/%s/%s-v%i.%i%s/%s"
               bucket
               path
@@ -495,7 +513,7 @@ let () =
               version.major
               version.minor
               (match version.rc with
-              | Some n -> Format.sprintf "-rc%s" @@ string_of_int n
+              | Some n -> sf "-rc%s" @@ string_of_int n
               | None -> "")
               (string_of_asset_type asset_type |> String.lowercase_ascii));
       url;
