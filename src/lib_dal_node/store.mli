@@ -264,6 +264,18 @@ module Skip_list_cells : sig
     slot_index:Types.slot_index ->
     Dal_proto_types.Skip_list_cell.t option tzresult Lwt.t
 
+  (** See {!Dal_store_sqlite3.Skip_list_cells.find_by_level}. *)
+  val find_by_level :
+    ?conn:Sqlite.conn ->
+    t ->
+    attested_level:int32 ->
+    (Dal_proto_types.Skip_list_cell.t
+    * Dal_proto_types.Skip_list_hash.t
+    * Types.slot_index)
+    list
+    tzresult
+    Lwt.t
+
   (** [insert ?conn store ~attested_level values] inserts the given list of [values]
       associated to the given [attested_level] in the [store]. Any existing value
       is overridden. *)

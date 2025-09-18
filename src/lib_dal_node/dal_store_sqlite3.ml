@@ -186,6 +186,22 @@ module Skip_list_cells = struct
         WHERE attested_level = $1 AND slot_index = $2
       )|sql}
 
+    let find_by_level :
+        ( level,
+          Skip_list_cell.t * Skip_list_hash.t * int,
+          [`Zero | `One | `Many] )
+        t =
+      let open Caqti_type.Std in
+      (attested_level ->* t3 skip_list_cell skip_list_hash int)
+      @@ {sql|
+        SELECT c.cell, c.hash, c.slot_index
+        FROM skip_list_cells AS c
+        JOIN skip_list_slots AS s
+        ON s.skip_list_cell_hash = c.hash
+        WHERE s.attested_level = $1
+        ORDER BY s.slot_index DESC
+      |sql}
+
     let insert_skip_list_slot :
         (level * slot_index * Skip_list_hash.t, unit, [`Zero]) t =
       (t3 attested_level dal_slot_index skip_list_hash ->. unit)
@@ -231,6 +247,10 @@ module Skip_list_cells = struct
   let find_by_slot_id_opt ?conn store ~attested_level ~slot_index =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.find_by_slot_id_opt (attested_level, slot_index)
+
+  let find_by_level ?conn store ~attested_level =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.collect_list conn Q.find_by_level attested_level
 
   let remove ?conn store ~attested_level =
     let open Lwt_result_syntax in

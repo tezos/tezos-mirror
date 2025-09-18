@@ -910,6 +910,12 @@ module Skip_list_cells = struct
       ~attested_level
       ~slot_index
 
+  let find_by_level ?conn t ~attested_level =
+    Dal_store_sqlite3.Skip_list_cells.find_by_level
+      ?conn
+      t.skip_list_cells_store
+      ~attested_level
+
   let insert ?conn t ~attested_level items =
     Dal_store_sqlite3.Skip_list_cells.insert
       ?conn
