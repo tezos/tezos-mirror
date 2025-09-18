@@ -275,36 +275,41 @@ let validate_gas_limit session (transaction : Transaction.transaction) :
               execution_gas_limit))
   else return (Ok ())
 
-let validate_authorizations (type state) ~session ~chain_id authorization_list =
+let validate_authorizations (type state) ~session ~chain_id
+    Transaction.{transaction_type; authorization_list; _} =
   let open Lwt_result_syntax in
-  let (module Backend_rpc : Services_backend_sig.S
-        with type Reader.state = state) =
-    session.state_backend
-  in
-  let read_nonce address =
-    Etherlink_durable_storage.nonce
-      (Backend_rpc.Reader.read session.state)
-      address
-    |> lwt_map_error (fun _ -> "Couldn't retrieve address' nonce")
-  in
-  let check_auth (item : Transaction.authorization_list_item) =
-    if chain_id != item.chain_id then fail "Authorization chain id mismatch"
-    else
-      let*? signer_address = Transaction.auth_signer item in
-      let* current_nonce = read_nonce signer_address in
-      let current_nonce =
-        match current_nonce with
-        | Some (Qty current_nonce) -> current_nonce
-        | None -> Z.zero
-      in
-      if Z.equal current_nonce item.nonce then return_unit
-      else fail "Authorization nonce mismatch"
-  in
-  let*! opt_err =
-    Lwt_list.map_p check_auth authorization_list
-    |> Lwt.map (List.find Result.is_error)
-  in
-  match opt_err with Some error -> return error | None -> return (Ok ())
+  if transaction_type != Transaction.Eip7702 then return (Ok ())
+  else if List.is_empty authorization_list then
+    return (Error "Authorization list cannot be empty per EIP-7702.")
+  else
+    let (module Backend_rpc : Services_backend_sig.S
+          with type Reader.state = state) =
+      session.state_backend
+    in
+    let read_nonce address =
+      Etherlink_durable_storage.nonce
+        (Backend_rpc.Reader.read session.state)
+        address
+      |> lwt_map_error (fun _ -> "Couldn't retrieve address' nonce")
+    in
+    let check_auth (item : Transaction.authorization_list_item) =
+      if chain_id != item.chain_id then fail "Authorization chain id mismatch"
+      else
+        let*? signer_address = Transaction.auth_signer item in
+        let* current_nonce = read_nonce signer_address in
+        let current_nonce =
+          match current_nonce with
+          | Some (Qty current_nonce) -> current_nonce
+          | None -> Z.zero
+        in
+        if Z.equal current_nonce item.nonce then return_unit
+        else fail "Authorization nonce mismatch"
+    in
+    let*! opt_err =
+      Lwt_list.map_p check_auth authorization_list
+      |> Lwt.map (List.find Result.is_error)
+    in
+    match opt_err with Some error -> return error | None -> return (Ok ())
 
 let validate_sender_not_a_contract (type state) session caller :
     (unit, string) result tzresult Lwt.t =
@@ -478,9 +483,7 @@ let minimal_validation ~next_nonce ~max_number_of_chunks ctxt transaction
   let** () = validate_chain_id chain_id transaction in
   let** () = validate_nonce ~next_nonce transaction in
   let** () = validate_sender_not_a_contract session caller in
-  let** () =
-    validate_authorizations ~session ~chain_id transaction.authorization_list
-  in
+  let** () = validate_authorizations ~session ~chain_id transaction in
   let** () = validate_tx_data_size ~max_number_of_chunks transaction in
   let** () = validate_gas_limit session transaction in
   return (Ok ())
