@@ -454,7 +454,6 @@ mod tests {
     use tezos_data_encoding::nom::NomReader;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::TransactionStatus;
-    use tezos_ethereum::tx_common::AuthorizationList;
     use tezos_ethereum::{
         transaction::TransactionType, tx_common::EthereumTransactionCommon,
     };
@@ -586,7 +585,7 @@ mod tests {
             U256::from(1000000000000000000u64),
             data,
             vec![],
-            AuthorizationList::default(),
+            None,
             None,
         );
 
@@ -814,7 +813,7 @@ mod tests {
             U256::zero(),
             data,
             vec![],
-            AuthorizationList::default(),
+            None,
             None,
         );
 

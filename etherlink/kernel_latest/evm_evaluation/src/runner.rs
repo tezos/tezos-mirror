@@ -279,7 +279,7 @@ fn execute_transaction(
         ),
         access_list,
         // TODO: add authorization list when Prague tests are enabled.
-        vec![],
+        None,
         None,
     )
 }

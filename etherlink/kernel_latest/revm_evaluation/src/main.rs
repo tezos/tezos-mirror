@@ -323,7 +323,7 @@ pub fn main() {
                         effective_gas_price,
                         transaction.value[indexes.value],
                         access_lists,
-                        transaction.authorization_list.clone().unwrap_or_default(),
+                        transaction.authorization_list.clone(),
                         None,
                     );
 

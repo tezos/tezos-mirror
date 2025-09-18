@@ -58,7 +58,7 @@ pub(crate) fn custom<E: std::fmt::Display>(e: E) -> Error {
 
 impl DBErrorMarker for Error {}
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ExecutionOutcome {
     /// Result of the VM transaction execution.
     /// In particular contains gas used and emitted logs.
@@ -109,7 +109,7 @@ fn tx_env<'a, Host: Runtime>(
     value: U256,
     data: Bytes,
     access_list: AccessList,
-    authorization_list: Vec<SignedAuthorization>,
+    authorization_list: Option<Vec<SignedAuthorization>>,
     chain_id: u64,
 ) -> Result<TxEnv, Error> {
     let kind = match destination {
@@ -125,7 +125,7 @@ fn tx_env<'a, Host: Runtime>(
     // Using the transaction environment builder helps to
     // derive the transaction type directly from the different
     // fields of the transaction.
-    let tx_env = TxEnvBuilder::new()
+    let tx_env_builder = TxEnvBuilder::new()
         .caller(caller)
         .gas_limit(gas_limit)
         .gas_price(gas_price)
@@ -134,14 +134,25 @@ fn tx_env<'a, Host: Runtime>(
         .data(data)
         .nonce(info.nonce)
         .chain_id(Some(chain_id))
-        .access_list(access_list)
-        .authorization_list_signed(authorization_list)
-        .build()
-        .map_err(|err| {
-            Error::Custom(format!(
-                "Building the transaction environment failed with: {err:?}"
-            ))
-        })?;
+        .access_list(access_list);
+
+    let tx_env_builder = match authorization_list {
+        Some(authorization_list) => {
+            if authorization_list.is_empty() {
+                return Err(Error::Custom(
+                    "Authorization list cannot be empty per EIP-7702.".to_string(),
+                ));
+            }
+            tx_env_builder.authorization_list_signed(authorization_list)
+        }
+        None => tx_env_builder,
+    };
+
+    let tx_env = tx_env_builder.build().map_err(|err| {
+        Error::Custom(format!(
+            "Building the transaction environment failed with: {err:?}"
+        ))
+    })?;
 
     Ok(tx_env)
 }
@@ -255,7 +266,7 @@ pub fn run_transaction<'a, Host: Runtime>(
     effective_gas_price: u128,
     value: U256,
     access_list: AccessList,
-    authorization_list: Vec<SignedAuthorization>,
+    authorization_list: Option<Vec<SignedAuthorization>>,
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, EVMError<Error>> {
     let block_env = block_env(block_constants)?;
@@ -341,6 +352,7 @@ mod test {
     use alloy_sol_types::{SolCall, SolError};
     use nom::AsBytes;
     use primitive_types::H256;
+    use revm::context::result::EVMError;
     use revm::{
         context::{
             result::{ExecutionResult, Output},
@@ -361,6 +373,7 @@ mod test {
         block_constants_with_fees, block_constants_with_no_fees, DEFAULT_SPEC_ID,
     };
 
+    use super::Error;
     use crate::helpers::storage::bytes_hash;
     use crate::storage::code::{CodeStorage, EVM_CODES_PATH};
     use crate::test::utilities::CreateAndRevert::{
@@ -513,7 +526,7 @@ mod test {
             0,
             value_sent,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
@@ -600,7 +613,7 @@ mod test {
             1,
             value_sent,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
@@ -670,7 +683,7 @@ mod test {
             1,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         );
 
@@ -756,7 +769,7 @@ mod test {
             0,
             withdrawn_amount,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
@@ -841,7 +854,7 @@ mod test {
             0,
             U256::MAX,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
@@ -906,7 +919,7 @@ mod test {
             1,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         );
 
@@ -936,7 +949,7 @@ mod test {
             1,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         );
 
@@ -977,7 +990,7 @@ mod test {
             0,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         );
 
@@ -1064,7 +1077,7 @@ mod test {
             0,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
@@ -1126,7 +1139,7 @@ mod test {
             0,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         );
         world_state_handler.commit_transaction(&mut host).unwrap();
@@ -1168,7 +1181,7 @@ mod test {
             0,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
@@ -1256,12 +1269,76 @@ mod test {
             0,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
 
         let caller_account_info = caller_account.info(&mut host).unwrap();
         assert_eq!(initial_balance, caller_account_info.balance);
+    }
+
+    #[test]
+    fn test_empty_authorization_list_are_prohibited() {
+        let mut host = MockKernelHost::default();
+        let mut world_state_handler = new_world_state_handler().unwrap();
+        let precompiles = EtherlinkPrecompiles::new();
+        let block_constants = block_constants_with_no_fees();
+
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let destination =
+            Address::from_hex("2222222222222222222222222222222222222222").unwrap();
+
+        let value_sent = U256::from(5);
+
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+
+        let mut caller_account = world_state_handler
+            .get_or_create(&host, &account_path(&caller).unwrap())
+            .unwrap();
+
+        let destination_account = world_state_handler
+            .get_or_create(&host, &account_path(&destination).unwrap())
+            .unwrap();
+
+        caller_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
+
+        let caller_info = caller_account.info(&mut host).unwrap();
+        let destination_info = destination_account.info(&mut host).unwrap();
+        // Check balances before executing the transfer
+        assert_eq!(caller_info.balance, U256::MAX);
+        assert_eq!(destination_info.balance, U256::ZERO);
+
+        let result = run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            &mut world_state_handler,
+            precompiles,
+            caller,
+            Some(destination),
+            Bytes::new(),
+            30_000_000,
+            0,
+            value_sent,
+            AccessList(vec![]),
+            Some(vec![]),
+            None,
+        );
+
+        assert_eq!(
+            result,
+            Err(EVMError::Database(Error::Custom(
+                "Authorization list cannot be empty per EIP-7702.".to_owned()
+            )))
+        );
     }
 }
