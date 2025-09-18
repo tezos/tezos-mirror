@@ -75,13 +75,7 @@ let job_unit_tests =
          ~when_:Always)
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    ~dune_cache:
-      (Cacio.dune_cache
-         ~key:
-           ("dune-build-cache-"
-           ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id))
-         ~policy:Pull
-         ())
+    ~dune_cache:(Cacio.dune_cache ())
     ~test_coverage:true
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~retry:{max = 2; when_ = []}
