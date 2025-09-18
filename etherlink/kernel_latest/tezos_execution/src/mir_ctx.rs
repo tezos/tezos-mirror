@@ -234,7 +234,9 @@ impl<'a, Host: Runtime> LazyStorage<'a>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mir::ast::big_map::{dump_big_map_updates, BigMap, BigMapContent};
+    use mir::ast::big_map::{
+        dump_big_map_updates, BigMap, BigMapContent, BigMapFromLazyStorage,
+    };
     use primitive_types::H256;
     use std::collections::BTreeMap;
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -433,5 +435,50 @@ mod tests {
             .unwrap();
         storage.big_map_remove(&map_id).unwrap();
         assert!(!storage.big_map_mem(&map_id, &TypedValue::int(0)).unwrap());
+    }
+
+    #[test]
+    fn test_remove_with_dump() {
+        make_default_ctx!(storage);
+        let map_id1 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        storage
+            .big_map_update(&map_id1, TypedValue::int(0), Some(TypedValue::int(0)))
+            .unwrap();
+        let map_id2 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        storage
+            .big_map_update(&map_id2, TypedValue::int(0), Some(TypedValue::int(0)))
+            .unwrap();
+        let content_diff = BigMapContent::FromLazyStorage(BigMapFromLazyStorage {
+            id: map_id1.clone(),
+            overlay: BTreeMap::from([(TypedValue::int(1), Some(TypedValue::int(1)))]),
+        });
+        let mut map1 = BigMap {
+            content: content_diff,
+            key_type: Type::Int,
+            value_type: Type::Int,
+        };
+
+        dump_big_map_updates(
+            &mut storage,
+            &[map_id1.clone(), map_id2.clone()],
+            &mut [&mut map1],
+        )
+        .unwrap();
+
+        let expected_content = BTreeMap::from([
+            (TypedValue::int(0), TypedValue::int(0)),
+            (TypedValue::int(1), TypedValue::int(1)),
+        ]);
+
+        assert!(!storage.big_map_mem(&map_id2, &TypedValue::int(0)).unwrap());
+
+        assert_big_map_eq(
+            &mut storage,
+            &Arena::new(),
+            &map_id1,
+            Type::Int,
+            Type::Int,
+            expected_content,
+        );
     }
 }
