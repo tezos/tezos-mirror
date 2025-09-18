@@ -100,8 +100,7 @@ let jobs pipeline_type =
            [
              ("DISTRIBUTION", distribution);
              ( "BASE_IMAGE",
-               "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}"
-             );
+               Images.Base_images.path_prefix ^ "/${DISTRIBUTION}:${RELEASE}" );
            ])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
@@ -135,8 +134,7 @@ let jobs pipeline_type =
            [
              ("DISTRIBUTION", distribution);
              ( "BASE_IMAGE",
-               "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}"
-             );
+               Images.Base_images.path_prefix ^ "/${DISTRIBUTION}:${RELEASE}" );
            ])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic

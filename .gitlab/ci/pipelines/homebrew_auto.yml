@@ -39,7 +39,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.install-homebrew:
-  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/debian:bookworm
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm
   stage: build
   tags:
   - gcp_very_high_cpu
@@ -67,7 +67,7 @@ oc.install-homebrew:
     CARGO_NET_OFFLINE: "false"
 
 oc.build-homebrew:
-  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/debian:bookworm
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm
   stage: build
   tags:
   - gcp

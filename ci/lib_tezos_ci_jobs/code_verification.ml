@@ -1398,8 +1398,7 @@ let jobs pipeline_type =
           ~cpu:Very_high
           ~image:
             (Image.mk_external
-               ~image_path:
-                 "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE")
+               ~image_path:(Images.Base_images.path_prefix ^ "/$IMAGE"))
           ~parallel:(Matrix matrix)
           ?retry
           ~dependencies:dependencies_needs_start
@@ -1421,8 +1420,7 @@ let jobs pipeline_type =
           ~storage:Ramfs
           ~image:
             (Image.mk_external
-               ~image_path:
-                 "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE")
+               ~image_path:(Images.Base_images.path_prefix ^ "/$IMAGE"))
           ~parallel:(Matrix matrix)
           ?retry
           ~dependencies:dependencies_needs_start
