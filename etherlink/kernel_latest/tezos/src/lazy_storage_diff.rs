@@ -66,6 +66,19 @@ impl From<LazyStorageDiff> for LazyStorageDiffList {
     }
 }
 
+impl StorageDiff {
+    /// Push a big_map update in an already existing diff
+    /// If the already existing diff is a remove does nothing
+    pub fn push_update(&mut self, update: Update) {
+        match self {
+            StorageDiff::Update(updates) => updates.push(update),
+            StorageDiff::Remove => (),
+            StorageDiff::Copy(copy) => copy.updates.push(update),
+            StorageDiff::Alloc(alloc) => alloc.updates.push(update),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;

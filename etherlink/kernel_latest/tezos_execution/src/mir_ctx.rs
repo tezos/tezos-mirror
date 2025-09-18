@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::collections::BTreeMap;
+
 use crate::address::OriginationNonce;
 use crate::context::{big_maps::*, Context};
 use crate::get_contract_entrypoint;
@@ -14,11 +16,15 @@ use mir::{
     gas::Gas,
 };
 use num_bigint::BigUint;
+use primitive_types::H256;
 use tezos_crypto_rs::hash::ChainId;
+use tezos_data_encoding::types::Zarith;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_storage::{read_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
+use tezos_tezlink::lazy_storage_diff::StorageDiff;
+use tezos_tezlink::lazy_storage_diff::{Alloc, Copy, Update};
 use typed_arena::Arena;
 
 pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
@@ -30,6 +36,8 @@ pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
     pub balance: i64,
     pub level: BlockNumber,
     pub now: Timestamp,
+    #[allow(dead_code)]
+    pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub chain_id: ChainId,
 
     pub source: PublicKeyHash,
@@ -110,6 +118,61 @@ impl<'a, Host: Runtime> CtxTrait<'a>
         address: &AddressHash,
     ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
         get_contract_entrypoint(self.host, self.context, address)
+    }
+}
+
+impl<Host: Runtime> Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce> {
+    /// Insert in the context a big_map diff that represents an allocation
+    fn _big_map_diff_alloc(
+        &mut self,
+        id: Zarith,
+        key_type: Vec<u8>,
+        value_type: Vec<u8>,
+    ) {
+        let allocation = StorageDiff::Alloc(Alloc {
+            updates: vec![],
+            key_type,
+            value_type,
+        });
+        self.big_map_diff.insert(id, allocation);
+    }
+
+    /// Insert in the context a big_map diff that represents an update
+    fn _big_map_diff_update(
+        &mut self,
+        id: &Zarith,
+        key_hash: Vec<u8>,
+        key: Vec<u8>,
+        value: Option<Vec<u8>>,
+    ) {
+        let update = Update {
+            key_hash: H256::from_slice(&key_hash).into(),
+            key,
+            value,
+        };
+        match self.big_map_diff.get_mut(id) {
+            None => {
+                self.big_map_diff
+                    .insert(id.clone(), StorageDiff::Update(vec![update]));
+            }
+            Some(diff) => diff.push_update(update),
+        }
+    }
+
+    /// Insert in the context a big_map diff that represents a remove
+    fn _big_map_diff_remove(&mut self, id: Zarith) {
+        self.big_map_diff.insert(id, StorageDiff::Remove);
+    }
+
+    /// Insert in the context a big_map diff that represents a copy
+    fn _big_map_diff_copy(&mut self, id: Zarith, source: Zarith) {
+        self.big_map_diff.insert(
+            id,
+            StorageDiff::Copy(Copy {
+                source,
+                updates: vec![],
+            }),
+        );
     }
 }
 
@@ -264,6 +327,7 @@ mod tests {
                     0xf3, 0xd4, 0x85, 0x54,
                 ])
                 .unwrap(),
+                big_map_diff: BTreeMap::new(),
                 self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
                 sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
                 source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),

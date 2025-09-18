@@ -15,7 +15,7 @@ use mir::{
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use tezos_crypto_rs::{
     hash::{ChainId, ContractKt1Hash},
     PublicKeyWithHash,
@@ -422,6 +422,7 @@ fn transfer<'a, Host: Runtime>(
                 sender,
                 amount,
                 self_address,
+                big_map_diff: BTreeMap::new(),
                 balance,
                 operation_counter,
                 origination_nonce,
