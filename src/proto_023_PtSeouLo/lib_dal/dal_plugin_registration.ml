@@ -316,6 +316,9 @@ module Plugin = struct
 
     let cell_hash = Dal.Slots_history.hash
 
+    (* The feature is not available for this protocol. *)
+    let back_pointer _cell ~index:_ = Error ()
+
     (* This function returns the list of cells of the DAL skip list constructed
        at the level of the block whose info are given. For that, it calls the
        {!Plugin.RPC.Dal.skip_list_cells_of_level} RPC that directly retrieves

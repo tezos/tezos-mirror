@@ -153,6 +153,17 @@ module type T = sig
 
     val cell_hash : cell -> hash
 
+    (** [back_pointer cell ~index:i] returns [Ok (Some hash)] if [hash] is the
+        [i]-th back pointer of [cell]. Returns [Ok None] if the cell contains
+        fewer than [i + 1] back pointers.
+
+        [back_pointer cell ~index:0] returns the {!hash} of the previous cell,
+        if any.
+
+        The function returns [Error ()] for older protocols that don't expose
+        the needed function to access cells' back pointers. *)
+    val back_pointer : cell -> index:int -> (hash option, unit) result
+
     (* Returns the DAL skip list cells produced at the given attested level.
        Each cell is associated with its hash and slot index. There are
        [number_of_slots] cells per level. *)
