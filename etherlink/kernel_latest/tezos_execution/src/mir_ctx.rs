@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use crate::address::OriginationNonce;
 use crate::context::{big_maps::*, Context};
 use crate::get_contract_entrypoint;
+use mir::parser::Parser;
 use mir::{
     ast::{
         big_map::{BigMapId, LazyStorage, LazyStorageError},
@@ -17,6 +18,7 @@ use mir::{
 };
 use num_bigint::BigUint;
 use primitive_types::H256;
+use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::ChainId;
 use tezos_data_encoding::types::Zarith;
 use tezos_evm_runtime::runtime::Runtime;
@@ -36,7 +38,6 @@ pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
     pub balance: i64,
     pub level: BlockNumber,
     pub now: Timestamp,
-    #[allow(dead_code)]
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub chain_id: ChainId,
 
@@ -123,12 +124,7 @@ impl<'a, Host: Runtime> CtxTrait<'a>
 
 impl<Host: Runtime> Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce> {
     /// Insert in the context a big_map diff that represents an allocation
-    fn _big_map_diff_alloc(
-        &mut self,
-        id: Zarith,
-        key_type: Vec<u8>,
-        value_type: Vec<u8>,
-    ) {
+    fn big_map_diff_alloc(&mut self, id: Zarith, key_type: Vec<u8>, value_type: Vec<u8>) {
         let allocation = StorageDiff::Alloc(Alloc {
             updates: vec![],
             key_type,
@@ -138,7 +134,7 @@ impl<Host: Runtime> Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut Originati
     }
 
     /// Insert in the context a big_map diff that represents an update
-    fn _big_map_diff_update(
+    fn big_map_diff_update(
         &mut self,
         id: &Zarith,
         key_hash: Vec<u8>,
@@ -160,12 +156,12 @@ impl<Host: Runtime> Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut Originati
     }
 
     /// Insert in the context a big_map diff that represents a remove
-    fn _big_map_diff_remove(&mut self, id: Zarith) {
+    fn big_map_diff_remove(&mut self, id: Zarith) {
         self.big_map_diff.insert(id, StorageDiff::Remove);
     }
 
     /// Insert in the context a big_map diff that represents a copy
-    fn _big_map_diff_copy(&mut self, id: Zarith, source: Zarith) {
+    fn big_map_diff_copy(&mut self, id: Zarith, source: Zarith) {
         self.big_map_diff.insert(
             id,
             StorageDiff::Copy(Copy {
@@ -174,6 +170,15 @@ impl<Host: Runtime> Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut Originati
             }),
         );
     }
+}
+
+/// Function to retrieve the hash of a TypedValue.
+/// Used to retrieve the path where a value is stored in the
+/// lazy storage.
+fn hash_key(key: TypedValue<'_>) -> Vec<u8> {
+    let parser = Parser::new();
+    let key_encoded = key.into_micheline_optimized_legacy(&parser.arena).encode();
+    digest_256(&key_encoded)
 }
 
 impl<'a, Host: Runtime> LazyStorage<'a>
@@ -185,7 +190,7 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
-        let value_path = value_path(self.context, id, key)?;
+        let value_path = value_path(self.context, id, &hash_key(key.clone()))?;
         if self.host.store_has(&value_path)?.is_none() {
             return Ok(None);
         }
@@ -204,7 +209,7 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<bool, LazyStorageError> {
-        let path = value_path(self.context, id, key)?;
+        let path = value_path(self.context, id, &hash_key(key.clone()))?;
         Ok(self.host.store_has(&path)?.is_some())
     }
 
@@ -214,18 +219,33 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         key: TypedValue<'a>,
         value: Option<TypedValue<'a>>,
     ) -> Result<(), LazyStorageError> {
-        let value_path = value_path(self.context, id, &key)?;
+        let parser = Parser::new();
+        let key_encoded = key.into_micheline_optimized_legacy(&parser.arena).encode();
+        let key_hashed = digest_256(&key_encoded);
+        let value_path = value_path(self.context, id, &key_hashed)?;
         match value {
             None => {
                 if self.host.store_has(&value_path)?.is_some() {
                     self.host.store_delete(&value_path)?;
                 }
+
+                // Write the update in the big_map_diff
+                self.big_map_diff_update(&id.value, key_hashed, key_encoded, None);
                 Ok(())
             }
             Some(v) => {
                 let arena = Arena::new();
                 let encoded = v.into_micheline_optimized_legacy(&arena).encode();
-                Ok(self.host.store_write_all(&value_path, &encoded)?)
+                self.host.store_write_all(&value_path, &encoded)?;
+
+                // Write the update in the big_map_diff
+                self.big_map_diff_update(
+                    &id.value,
+                    key_hashed,
+                    key_encoded,
+                    Some(encoded),
+                );
+                Ok(())
             }
         }
     }
@@ -273,6 +293,9 @@ impl<'a, Host: Runtime> LazyStorage<'a>
             .store_write_all(&key_type_path, &key_type_encoded)?;
         store_bin(&id.succ(), self.host, &next_id_path)
             .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+
+        // Write in the diff that there was an allocation
+        self.big_map_diff_alloc(id.value.clone(), key_type_encoded, value_type_encoded);
         Ok(id)
     }
 
@@ -285,12 +308,19 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         self.host.store_copy(&src_path, &dest_path)?;
         store_bin(&dest_id.succ(), self.host, &next_id_path)
             .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+
+        // Write in the diff that there was a copy
+        self.big_map_diff_copy(dest_id.value.clone(), id.value.clone());
         Ok(dest_id)
     }
 
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
         let big_map_path = big_map_path(self.context, id)?;
-        Ok(self.host.store_delete(&big_map_path)?)
+        self.host.store_delete(&big_map_path)?;
+
+        // Write in the diff that there was a remove
+        self.big_map_diff_remove(id.value.clone());
+        Ok(())
     }
 }
 
