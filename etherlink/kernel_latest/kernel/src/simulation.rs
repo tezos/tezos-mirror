@@ -40,7 +40,6 @@ use tezos_ethereum::rlp_helpers::{
     decode_timestamp, next, VersionedEncoding,
 };
 use tezos_ethereum::transaction::TransactionObject;
-use tezos_ethereum::tx_common::AuthorizationList;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
@@ -497,7 +496,7 @@ impl Evaluation {
             gas_price,
             // TODO: Replace this by the decoded access lists if any.
             empty_access_list(),
-            AuthorizationList::default(),
+            None,
             evm_configuration,
             tracer_input,
         ) {

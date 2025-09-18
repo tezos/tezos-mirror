@@ -329,7 +329,7 @@ pub fn revm_run_transaction<Host: Runtime>(
     call_data: Vec<u8>,
     effective_gas_price: U256,
     access_list: AccessList,
-    authorization_list: AuthorizationList,
+    authorization_list: Option<AuthorizationList>,
     config: &Config,
     tracer_input: Option<TracerInput>,
 ) -> Result<Option<ExecutionOutcome>, anyhow::Error> {
@@ -401,7 +401,7 @@ pub fn revm_run_transaction<Host: Runtime>(
                 )
                 .collect::<Vec<revm::context::transaction::AccessListItem>>(),
         ),
-        signed_authorization(authorization_list),
+        authorization_list.map(signed_authorization),
         tracer_input.map(|tracer_input| match tracer_input {
             TracerInput::CallTracer(CallTracerInput {
                 transaction_hash,
@@ -927,7 +927,7 @@ mod tests {
     use tezos_ethereum::{
         block::{BlockConstants, BlockFees},
         transaction::TransactionType,
-        tx_common::{AuthorizationList, EthereumTransactionCommon},
+        tx_common::EthereumTransactionCommon,
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -998,7 +998,7 @@ mod tests {
             U256::zero(),
             vec![],
             vec![],
-            AuthorizationList::default(),
+            None,
             None,
         );
         // sign tx

@@ -109,7 +109,7 @@ fn tx_env<'a, Host: Runtime>(
     value: U256,
     data: Bytes,
     access_list: AccessList,
-    authorization_list: Vec<SignedAuthorization>,
+    authorization_list: Option<Vec<SignedAuthorization>>,
     chain_id: u64,
 ) -> Result<TxEnv, Error> {
     let kind = match destination {
@@ -125,7 +125,7 @@ fn tx_env<'a, Host: Runtime>(
     // Using the transaction environment builder helps to
     // derive the transaction type directly from the different
     // fields of the transaction.
-    let tx_env = TxEnvBuilder::new()
+    let tx_env_builder = TxEnvBuilder::new()
         .caller(caller)
         .gas_limit(gas_limit)
         .gas_price(gas_price)
@@ -134,14 +134,20 @@ fn tx_env<'a, Host: Runtime>(
         .data(data)
         .nonce(info.nonce)
         .chain_id(Some(chain_id))
-        .access_list(access_list)
-        .authorization_list_signed(authorization_list)
-        .build()
-        .map_err(|err| {
-            Error::Custom(format!(
-                "Building the transaction environment failed with: {err:?}"
-            ))
-        })?;
+        .access_list(access_list);
+
+    let tx_env_builder = match authorization_list {
+        Some(authorization_list) => {
+            tx_env_builder.authorization_list_signed(authorization_list)
+        }
+        None => tx_env_builder,
+    };
+
+    let tx_env = tx_env_builder.build().map_err(|err| {
+        Error::Custom(format!(
+            "Building the transaction environment failed with: {err:?}"
+        ))
+    })?;
 
     Ok(tx_env)
 }
@@ -255,7 +261,7 @@ pub fn run_transaction<'a, Host: Runtime>(
     effective_gas_price: u128,
     value: U256,
     access_list: AccessList,
-    authorization_list: Vec<SignedAuthorization>,
+    authorization_list: Option<Vec<SignedAuthorization>>,
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, EVMError<Error>> {
     let block_env = block_env(block_constants)?;
@@ -513,7 +519,7 @@ mod test {
             0,
             value_sent,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
@@ -600,7 +606,7 @@ mod test {
             1,
             value_sent,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
@@ -670,7 +676,7 @@ mod test {
             1,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         );
 
@@ -756,7 +762,7 @@ mod test {
             0,
             withdrawn_amount,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
@@ -841,7 +847,7 @@ mod test {
             0,
             U256::MAX,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
@@ -906,7 +912,7 @@ mod test {
             1,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         );
 
@@ -936,7 +942,7 @@ mod test {
             1,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         );
 
@@ -977,7 +983,7 @@ mod test {
             0,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         );
 
@@ -1064,7 +1070,7 @@ mod test {
             0,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
@@ -1126,7 +1132,7 @@ mod test {
             0,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         );
         world_state_handler.commit_transaction(&mut host).unwrap();
@@ -1168,7 +1174,7 @@ mod test {
             0,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();
@@ -1256,7 +1262,7 @@ mod test {
             0,
             U256::ZERO,
             AccessList(vec![]),
-            vec![],
+            None,
             None,
         )
         .unwrap();

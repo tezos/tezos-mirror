@@ -604,7 +604,6 @@ mod tests {
     use crate::transaction::{Transaction, TransactionContent};
     use primitive_types::{H160, H256, U256};
     use rlp::{Decodable, Encodable, Rlp};
-    use tezos_ethereum::tx_common::AuthorizationList;
     use tezos_ethereum::{
         transaction::{TransactionType, TRANSACTION_HASH_SIZE},
         tx_common::EthereumTransactionCommon,
@@ -629,7 +628,7 @@ mod tests {
             U256::from(i),
             Vec::new(),
             vec![],
-            AuthorizationList::default(),
+            None,
             Some(new_sig_unsafe(
                 (36 + i * 2).into(), // need to be consistent with chain_id
                 H256::from([i; 32]),

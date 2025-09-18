@@ -390,7 +390,6 @@ mod tests {
     use crate::storage::read_last_info_per_level_timestamp;
     use crate::transaction::Transaction;
     use primitive_types::{H160, U256};
-    use tezos_ethereum::tx_common::AuthorizationList;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
@@ -416,7 +415,7 @@ mod tests {
             U256::from(500000000u64),
             vec![],
             vec![],
-            AuthorizationList::default(),
+            None,
             None,
         )
     }

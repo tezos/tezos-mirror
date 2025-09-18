@@ -618,7 +618,6 @@ mod tests {
     use tezos_ethereum::transaction::{
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
     };
-    use tezos_ethereum::tx_common::AuthorizationList;
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -906,7 +905,7 @@ mod tests {
             value,
             data,
             vec![],
-            AuthorizationList::default(),
+            None,
             None,
         )
     }
@@ -974,7 +973,7 @@ mod tests {
             value,
             data,
             vec![],
-            AuthorizationList::default(),
+            None,
             None,
         );
 
@@ -2067,7 +2066,7 @@ mod tests {
             U256::zero(),
             data,
             vec![],
-            AuthorizationList::default(),
+            None,
             None,
         );
         unsigned_tx

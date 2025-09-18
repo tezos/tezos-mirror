@@ -189,7 +189,8 @@ pub struct EthereumTransactionCommon {
     /// enabling externally owned accounts (EOAs) to delegate execution context
     /// to designated smart contract code.
     /// For more information see https://eips.ethereum.org/EIPS/eip-7702
-    pub authorization_list: AuthorizationList,
+    /// Will alwasy be None for non EIP-7702 transactions.
+    pub authorization_list: Option<AuthorizationList>,
     /// If transaction is unsigned then this field is None
     /// See encoding details in <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md>
     pub signature: Option<TxSignature>,
@@ -208,7 +209,7 @@ impl EthereumTransactionCommon {
         value: U256,
         data: Vec<u8>,
         access_list: AccessList,
-        authorization_list: AuthorizationList,
+        authorization_list: Option<AuthorizationList>,
         signature: Option<TxSignature>,
     ) -> Self {
         Self {
@@ -319,7 +320,7 @@ impl EthereumTransactionCommon {
             value,
             data,
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
             signature,
         })
     }
@@ -362,7 +363,7 @@ impl EthereumTransactionCommon {
             value,
             data,
             access_list,
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
             signature,
         })
     }
@@ -406,7 +407,7 @@ impl EthereumTransactionCommon {
             value,
             data,
             access_list,
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
             signature,
         })
     }
@@ -452,7 +453,7 @@ impl EthereumTransactionCommon {
             value,
             data,
             access_list,
-            authorization_list,
+            authorization_list: Some(authorization_list),
             signature,
         })
     }
@@ -591,7 +592,7 @@ impl EthereumTransactionCommon {
         stream.append(&self.value);
         append_vec(stream, &self.data);
         stream.append_list(&self.access_list);
-        stream.append_list(&self.authorization_list);
+        stream.append_list(self.authorization_list.as_deref().unwrap_or_default());
 
         // If tx is NOT legacy and unsigned: DON'T append anything like (0, 0, 0)
         if let Some(sig) = &self.signature {
@@ -819,7 +820,7 @@ mod test {
             value: U256::from(1000000000000000000u64),
             data: vec![],
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
             signature: Some(TxSignature::new_unsafe(
                 37,
                 string_to_h256_unsafe(
@@ -858,7 +859,7 @@ mod test {
                 )
                 .unwrap()],
             }],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
             signature: Some(TxSignature::new_unsafe(
                 0,
                 string_to_h256_unsafe(
@@ -883,7 +884,7 @@ mod test {
             value: U256::from(0),
             data: hex::decode("a9059cbb000000000000000000000000a9d1e08c7793af67e9d92fe308d5697fb81d3e43000000000000000000000000000000000000000000000000f020482e89b73c14").unwrap(),
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
             signature: Some(TxSignature::new_unsafe(
                 0,
                 string_to_h256_unsafe(
@@ -1050,7 +1051,7 @@ mod test {
             value,
             data,
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
             signature: Some(TxSignature::new_unsafe(38, r, s)),
         }
     }
@@ -1123,7 +1124,7 @@ mod test {
             value,
             data,
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
             signature: Some(TxSignature::new_unsafe(37, r, s)),
         };
         let signed_data = "f90150808509502f900082520894423163e58aabec5daa3dd1130b759d24bef0f6ea8711c37937e08000b8e4deace8f5000000000000000000000000000000000000000000000000000000000000a4b100000000000000000000000041bca408a6b4029b42883aeb2c25087cab76cb58000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000002357a49c7d75f600000000000000000000000000000000000000000000000000000000640b5549000000000000000000000000710bda329b2a6224e4b44833de30f38e7f81d564000000000000000000000000000000000000000000000000000000000000000025a025dd6c973368c45ddfc17f5148e3f468a2e3f2c51920cbe9556a64942b0ab2eba031da07ce40c24b0a01f46fb2abc028b5ccd70dbd1cb330725323edc49a2a9558";
@@ -1185,7 +1186,7 @@ mod test {
             value,
             data,
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
             signature: Some(TxSignature::new_unsafe(37, r, s)),
         };
 
@@ -1231,7 +1232,7 @@ mod test {
             value,
             data,
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
 
             signature: Some(TxSignature::new_unsafe(37, r, s)),
         };
@@ -1271,7 +1272,7 @@ mod test {
             value: U256::from(1000000000u64),
             data: vec![],
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
 
             signature: Some(TxSignature::new_unsafe(
                 38,
@@ -1320,7 +1321,7 @@ mod test {
             value: U256::from(1000000000u64),
             data: vec![],
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
 
             signature: Some(TxSignature::new_unsafe(
                 38,
@@ -1369,7 +1370,7 @@ mod test {
             value: U256::from(1000000000u64),
             data: vec![],
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
 
             signature: None,
         };
@@ -1490,7 +1491,7 @@ mod test {
             value: U256::from(760460536160301065u64),
             data,
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
 
             signature: Some(TxSignature::new_unsafe(
                 37,
@@ -1529,7 +1530,7 @@ mod test {
             value: U256::from(760460536160301065u64),
             data,
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
 
             signature: None,
         };
@@ -1565,7 +1566,7 @@ mod test {
             value: U256::from(760460536160301065u64),
             data,
             access_list: vec![],
-            authorization_list: AuthorizationList::default(),
+            authorization_list: None,
 
             signature: None,
         };
@@ -1866,7 +1867,7 @@ mod test {
         //    }
         // ]
         assert_eq!(
-            signed_authorization(tx_decoded.authorization_list.clone()),
+            signed_authorization(tx_decoded.authorization_list.as_deref().unwrap_or_default().to_owned()),
             [
                 revm::context::transaction::SignedAuthorization::new_unchecked(
                     revm::context::transaction::Authorization {

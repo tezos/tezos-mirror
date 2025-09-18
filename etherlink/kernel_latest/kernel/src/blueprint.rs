@@ -57,8 +57,7 @@ mod tests {
     use primitive_types::{H160, U256};
     use rlp::Rlp;
     use tezos_ethereum::{
-        transaction::TRANSACTION_HASH_SIZE,
-        tx_common::{AuthorizationList, EthereumTransactionCommon},
+        transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
     };
 
     fn address_from_str(s: &str) -> Option<H160> {
@@ -77,7 +76,7 @@ mod tests {
             U256::from(500000000u64),
             vec![],
             vec![],
-            AuthorizationList::default(),
+            None,
             None,
         )
     }
