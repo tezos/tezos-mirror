@@ -5,7 +5,8 @@
  (name rollup_node)
  (libraries
   gitlab_ci
-  tezos_ci)
+  tezos_ci
+  cacio)
  (flags
   (:standard)
   -open Gitlab_ci.Base))

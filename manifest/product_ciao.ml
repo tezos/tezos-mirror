@@ -102,9 +102,10 @@ let ci_rollup_node =
   private_lib
     "rollup_node"
     ~opam:""
-    ~path:"ci/bin/rollup_node"
+    ~path:"rollup_node/ci"
     ~bisect_ppx:No
-    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
+    ~deps:
+      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
     ~release_status:Unreleased
 
 let _ci_bin_main =

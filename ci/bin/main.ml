@@ -112,6 +112,8 @@ let () = Grafazos.register ()
 
 let () = Teztale.register ()
 
+let () = Rollup_node.Release.register ()
+
 let () = Documentation.register ()
 
 (** {3 General pipelines} *)
@@ -286,30 +288,6 @@ let () =
        intended, without publishing any release. Developers or release \
        managers can create this pipeline by pushing a tag to a fork of \
        'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
-  register
-    "octez_smart_rollup_node_release_tag_test"
-    If.(
-      not_on_tezos_namespace && push
-      && has_tag_match octez_smart_rollup_node_release_tag_re)
-    ~jobs:(Rollup_node.Release.jobs ~test:true ())
-    ~description:
-      "Test release pipeline for the Smart Rollup node.\n\n\
-       This pipeline checks that 'octez_smart_rollup_node_release_tag' \
-       pipelines work as intended, without publishing any release. Developers \
-       or release managers can create this pipeline by pushing a tag to a fork \
-       of 'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
-  register
-    "octez_smart_rollup_node_release_tag"
-    If.(
-      on_tezos_namespace && push
-      && has_tag_match octez_smart_rollup_node_release_tag_re)
-    ~jobs:(Rollup_node.Release.jobs ())
-    ~description:
-      ("Release tag pipelines for the Smart Rollup node.\n\n\
-        Created when the release manager pushes a tag in the format \
-        octez-smart-rollup-node-vX.Y(-rcN|betaN). Creates and publishes a \
-        release on GitLab with associated artifacts for the smart rollup node \
-        (static binaries and Docker image)." ^ release_description) ;
   register
     "octez_evm_node_release_tag"
     If.(push && has_tag_match octez_evm_node_release_tag_re)
