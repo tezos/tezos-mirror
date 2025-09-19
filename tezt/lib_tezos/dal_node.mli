@@ -172,6 +172,7 @@ val init_config :
   ?history_mode:history_mode ->
   ?slots_backup_uris:string list ->
   ?trust_slots_backup_uris:bool ->
+  ?batching_time_interval:string ->
   t ->
   unit Lwt.t
 
@@ -185,6 +186,7 @@ val update_config :
   ?history_mode:history_mode ->
   ?slots_backup_uris:string list ->
   ?trust_slots_backup_uris:bool ->
+  ?batching_time_interval:string ->
   t ->
   unit Lwt.t
 
