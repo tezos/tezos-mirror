@@ -27,32 +27,17 @@ This is the manual page of the command line tool ``octez-client``. See :ref:`how
          :file: octez-client.html
 
 
-.. _baker_manual_alpha:
-
 Baker manual
 ============
 
-This is the manual page of the baker command line tool. See :ref:`baker_run` for a general description of this tool.
+The manual page of the baker command line tool has moved :ref:`here <baker_manual>`.
 
-.. note::
-	The protocol-independent baker executable now available is meant to replace all the protocol-specific bakers like this one. Please refer to :ref:`its manual <baker_manual>`.
-
-.. raw:: html
-         :file: octez-baker.html
-
-
-.. _accuser_manual_alpha:
 
 Accuser manual
 ==============
 
-This is the manual page of the accuser command line tool. See :ref:`accuser_run` for a general description of this tool.
+The manual page of the accuser command line tool has moved :ref:`here <accuser_manual>`.
 
-.. note::
-	The protocol-independent accuser executable now available is meant to replace all the protocol-specific accusers like this one. Please refer to :ref:`its manual <accuser_manual>`.
-
-.. raw:: html
-         :file: octez-accuser.html
 
 Protocol-independent tools
 ==========================

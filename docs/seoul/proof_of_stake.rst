@@ -57,6 +57,7 @@ Moreover, to participate in consensus and governance, the delegate
 needs to be :ref:`active<active_delegate_seoul>` and to meet
 :ref:`minimal balance requirements<minimal_baking_power_seoul>`.
 
+.. _security_deposit:
 .. _security_deposit_seoul:
 
 Delegates and delegators may :doc:`stake<staking>` their tez. Staked
@@ -66,6 +67,7 @@ mentioned above, staked tez are weighted higher than non-staked tez
 when computing the baking power.
 
 
+.. _consensus_key:
 .. _consensus_key_seoul:
 
 Consensus key
@@ -104,6 +106,7 @@ including client commands that are helpful for handling consensus keys.
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _active_delegate:
 .. _active_delegate_seoul:
 
 A delegate can be marked as either active or passive. A passive
@@ -130,6 +133,7 @@ Tezos being proof-of-stake, the delegates' rights are selected at
 random based on their :doc:`baking power<baking_power>`. Let us detail
 the selection mechanism used in Tezos.
 
+.. _random_seed:
 .. _random_seed_seoul:
 
 Random seed
@@ -141,7 +145,9 @@ values in the protocol, in particular for selecting delegates to participate in 
 
 For more information on randomness generation, see :doc:`randomness-generation<randomness_generation>`.
 
+.. _rights:
 .. _rights_seoul:
+.. _slots:
 .. _slots_seoul:
 
 Slot selection
@@ -173,6 +179,7 @@ simple procedure which has as its initial state: the level, the
 level belongs, and the slot.
 
 
+.. _ps_constants:
 .. _ps_constants_seoul:
 
 Proof-of-stake parameters

@@ -49,19 +49,6 @@ Their OpenAPI specification can be found at:
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Rio RPCs
---------
-
-The OpenAPI specifications for RPCs which are specific to the Rio (``PsRiotum``)
-protocol can be found at:
-
-- `rio-openapi <../_static/rio-openapi.html>`__ (version 23.2)
-
-The OpenAPI specifications for RPCs which are related to the mempool
-and specific to the Rio protocol can be found at:
-
-- `rio-mempool-openapi <../_static/rio-mempool-openapi.html>`__ (version 23.2)
-
 Seoul RPCs
 ----------
 
@@ -97,14 +84,6 @@ protocol in use. Their specification is given in the sections below.
 seen in the field ``.info.version`` within each file.)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
-
-Rio RPCs
---------
-
-The OpenAPI specifications for the RPCs of the smart rollup node for the Rio
-(``PsRiotum``) protocol can be found at:
-
-- `rio-smart-rollup-node-openapi <../_static/rio-smart-rollup-node-openapi.html>`__ (version 23.2)
 
 Seoul RPCs
 ----------
