@@ -23,8 +23,11 @@ open Tezos
 open Yes_crypto
 open Agent_kind
 
-(** A baker account is its delegate account and its consensus key account *)
-type baker_account = {delegate : Account.key; consensus : Account.key}
+type baker_account = {
+  delegate : Account.key;
+  consensus : Account.key;
+  companion : Account.key option;
+}
 
 let wait_next_level ?(offset = 1) node =
   Lwt.bind
@@ -201,6 +204,8 @@ module Node = struct
         migration_offset
     in
     let* client = client ~local:true ~node agent in
+    (* Build a temporary yes_wallet from the context to retrieve delegate keys.
+       The wallet is cleared afterwards. *)
     let* yes_wallet = Node_helpers.yes_wallet agent in
     let* _filename =
       Yes_wallet.create_from_context
@@ -216,24 +221,24 @@ module Node = struct
         ~network:(Network.to_octez_network_options network)
         yes_wallet
     in
-    let* delegates, consensus_keys, rich_account_opt =
+    let* delegates, consensus_keys, companion_keys, rich_account_opt =
       let* known_addresses = Client.list_known_addresses client in
       let get_account alias = Client.show_address ~alias client in
       (Lwt_list.fold_left_s
-         (fun (delegates, consensus_keys, rich_accounts) (alias, _pkh) ->
+         (fun
+           ((delegates, consensus_keys, companion_keys, rich_accounts) as acc)
+           (alias, _pkh)
+         ->
            if alias =~ rex "rich_" then
              (* if the alias match "rich_n" *)
              let* rich_account = get_account alias in
-             return (delegates, consensus_keys, rich_account :: rich_accounts)
+             return
+               ( delegates,
+                 consensus_keys,
+                 companion_keys,
+                 rich_account :: rich_accounts )
            else
              match alias =~* rex "(\\w+)_consensus_key" with
-             | None ->
-                 (* if the alias does not contain "_consensus_key" *)
-                 let* delegate_account = get_account alias in
-                 return
-                   ( String_map.add alias delegate_account delegates,
-                     consensus_keys,
-                     rich_accounts )
              | Some consensus_key_alias ->
                  (* if the alias match "baker_n_consensus_key" *)
                  let* consensus_account = get_account alias in
@@ -243,20 +248,49 @@ module Node = struct
                        consensus_key_alias
                        consensus_account
                        consensus_keys,
-                     rich_accounts )))
-        (String_map.empty, String_map.empty, [])
+                     companion_keys,
+                     rich_accounts )
+             | None -> (
+                 match alias =~* rex "(\\w+)_companion_key" with
+                 | Some companion_key_alias ->
+                     (* if the alias match "baker_n_companion_key" *)
+                     let* consensus_account = get_account alias in
+                     return
+                       ( delegates,
+                         consensus_keys,
+                         String_map.add
+                           companion_key_alias
+                           consensus_account
+                           companion_keys,
+                         rich_accounts )
+                 | None ->
+                     if alias =~ rex "baker_" then
+                       (* otherwise, if the alias match "baker_n" *)
+                       let* delegate_account = get_account alias in
+                       return
+                         ( String_map.add alias delegate_account delegates,
+                           consensus_keys,
+                           companion_keys,
+                           rich_accounts )
+                     else (
+                       toplog "Discarded unexpected yes_wallet alias: %s" alias ;
+                       return acc))))
+        (String_map.empty, String_map.empty, String_map.empty, [])
         (List.rev known_addresses)
     in
-    let delegates_with_consensus_keys =
+    let baker_accounts =
       String_map.mapi
         (fun alias delegate ->
-          match String_map.find_opt alias consensus_keys with
-          | None -> {delegate; consensus = delegate}
-          | Some consensus -> {delegate; consensus})
+          let consensus =
+            String_map.find_opt alias consensus_keys
+            |> Option.value ~default:delegate
+          in
+          let companion = String_map.find_opt alias companion_keys in
+          {delegate; consensus; companion})
         delegates
     in
     let* () = Client.forget_all_keys client in
-    Lwt.return (client, delegates_with_consensus_keys, rich_account_opt)
+    Lwt.return (client, baker_accounts, rich_account_opt)
 
   (** Initialize the node,
       create the associated client,
