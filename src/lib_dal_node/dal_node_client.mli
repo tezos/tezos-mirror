@@ -56,5 +56,6 @@ val get_slot_page_proof :
     and returns the corresponding commitment hash alongside its proof. *)
 val post_slot :
   cctxt ->
+  ?slot_index:Tezos_dal_node_services.Types.slot_index ->
   string ->
   (Cryptobox.commitment * Cryptobox.commitment_proof) tzresult Lwt.t
