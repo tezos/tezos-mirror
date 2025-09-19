@@ -29,7 +29,7 @@ module DAL = struct
     etherlink_sequencer : bool option;
     etherlink_producers : int option;
     etherlink_chain_id : int option;
-    echo_rollup : bool option;
+    echo_rollups : int option;
     disconnect : (int * int) option;
     etherlink_dal_slots : int list;
     teztale : bool option;
@@ -84,7 +84,7 @@ module DAL = struct
              etherlink_sequencer;
              etherlink_producers;
              etherlink_chain_id;
-             echo_rollup;
+             echo_rollups;
              disconnect;
              etherlink_dal_slots;
              teztale;
@@ -129,7 +129,7 @@ module DAL = struct
                 etherlink_sequencer ) ),
             ( ( etherlink_producers,
                 etherlink_chain_id,
-                echo_rollup,
+                echo_rollups,
                 disconnect,
                 etherlink_dal_slots,
                 teztale,
@@ -170,7 +170,7 @@ module DAL = struct
                    etherlink_sequencer ) ),
                ( ( etherlink_producers,
                    etherlink_chain_id,
-                   echo_rollup,
+                   echo_rollups,
                    disconnect,
                    etherlink_dal_slots,
                    teztale,
@@ -213,7 +213,7 @@ module DAL = struct
           etherlink_sequencer;
           etherlink_producers;
           etherlink_chain_id;
-          echo_rollup;
+          echo_rollups;
           disconnect;
           etherlink_dal_slots;
           teztale;
@@ -264,7 +264,7 @@ module DAL = struct
                (obj10
                   (opt "etherlink_producers" int31)
                   (opt "etherlink_chain_id" int31)
-                  (opt "echo_rollup" bool)
+                  (opt "echo_rollups" int31)
                   (opt "disconnect" (tup2 int31 int31))
                   (dft "etherlink_dal_slots" (list int31) [])
                   (opt "teztale" bool)

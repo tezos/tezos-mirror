@@ -22,15 +22,6 @@ type operator = {
   origination_level : int;
 }
 
-(** [init_echo_rollup_account ~client ~echo_rollup ~alias_prefix] generates
-    a new rollup operator key if [~echo_rollup] is [true]. The key alias will
-    start with [~alias_prefix]. *)
-val init_echo_rollup_account :
-  client:Client.t ->
-  echo_rollup:bool ->
-  alias_prefix:string ->
-  Account.key option Lwt.t
-
 (** Initialize an Echo rollup. *)
 val init_echo_rollup :
   Cloud.t ->
@@ -46,8 +37,9 @@ val init_echo_rollup :
   dal_node_p2p_endpoint:string option ->
   next_agent:(name:string -> Agent.t Lwt.t) ->
   Dal_node_helpers.producer list ->
-  Account.key option ->
-  operator option Lwt.t
+  int ->
+  Account.key ->
+  operator Lwt.t
 
 (** [fetch_echo_rollup_data ~echo_rollup ~data_node_producers ~level]
     fetches payload size in bytes for each DAL slot given by [~data_node_producers]

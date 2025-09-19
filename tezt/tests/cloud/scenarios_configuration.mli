@@ -29,7 +29,7 @@ module DAL : sig
     etherlink_sequencer : bool option;
     etherlink_producers : int option;
     etherlink_chain_id : int option;
-    echo_rollup : bool option;
+    echo_rollups : int option;
     disconnect : (int * int) option;
     etherlink_dal_slots : int list;
     teztale : bool option;

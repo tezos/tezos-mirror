@@ -83,7 +83,7 @@ module type Dal = sig
 
   val etherlink_chain_id : int option
 
-  val echo_rollup : bool
+  val echo_rollups : int
 
   val disconnect : (int * int) option
 
@@ -436,11 +436,15 @@ module Dal () : Dal = struct
     let from_cli = Clap.optional_int ~section ~long:"etherlink-chain-id" () in
     Option.fold ~none:config.etherlink_chain_id ~some:Option.some from_cli
 
-  let echo_rollup =
-    Clap.flag
+  let echo_rollups =
+    Clap.default_int
       ~section
-      ~set_long:"echo-rollup"
-      (Option.value ~default:false config.echo_rollup)
+      ~long:"echo-rollups"
+      ~description:
+        "Number of echo-rollup operators to run (0 = disabled). Each operator \
+         will spawn its own DAL node observer for each slot from the list \
+         given by [--producer-slot-indices]."
+      (Option.value ~default:0 config.echo_rollups)
 
   let disconnect =
     let disconnect_typ =
