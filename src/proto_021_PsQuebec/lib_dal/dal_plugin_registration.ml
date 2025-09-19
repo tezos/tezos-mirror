@@ -246,6 +246,9 @@ module Plugin = struct
 
     let cell_hash = Dal.Slots_history.hash
 
+    (* The feature is not available for this protocol. *)
+    let back_pointer _cell ~index:_ = Error ()
+
     (*
       This function mimics what the protocol does in
       {!Dal_slot_storage.finalize_pending_slot_headers}. Given a block_info at

@@ -3131,6 +3131,8 @@ module Dal : sig
 
     val hash : t -> hash
 
+    val back_pointer : t -> index:int -> hash option
+
     module History_cache :
       Bounded_history_repr.S with type key = hash and type value = t
 

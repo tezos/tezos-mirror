@@ -312,6 +312,14 @@ module History : sig
   (** Encoding of the datatype. *)
   val encoding : t Data_encoding.t
 
+  (** [back_pointer cell ~index:i] returns [Some hash] if [hash] is the [i]-th
+      back pointer of [cell]. Returns [None] if the cell contains less than
+      [i + 1] back pointers.
+
+      [back_pointer cell ~index:0] returns the {!hash} of the previous cell, if
+      any. *)
+  val back_pointer : t -> index:int -> hash option
+
   (** The genesis skip list that contains one dummy cell. This cell has
       {!Raw_level_repr.root} as published level and no attested slots. Since Dal
       is not necessarily activated in the genesis block (e.g. this will be the case

@@ -602,6 +602,8 @@ module History = struct
 
     type t = history
 
+    let back_pointer cell ~index = Skip_list.back_pointer cell index
+
     let genesis, genesis_level =
       (Skip_list.genesis Content.zero, Content.zero_level)
 

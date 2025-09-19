@@ -117,6 +117,8 @@ module type T = sig
 
     val cell_hash : cell -> hash
 
+    val back_pointer : cell -> index:int -> (hash option, unit) result
+
     val cells_of_level :
       attested_level:int32 ->
       Tezos_rpc.Context.generic ->
