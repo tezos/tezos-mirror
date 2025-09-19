@@ -70,7 +70,11 @@
     "headers": [],
     "batch_traces": 400,
     "batch_logs": 400,
-    "batch_timeout_ms": 500
+    "batch_timeout_ms": 500,
+    "gc_telemetry": {
+      "enable": false,
+      "min_duration_ms": 1
+    }
   },
   "tx_pool": {
     "max_size": 1000,
@@ -152,7 +156,11 @@
     "headers": [],
     "batch_traces": 400,
     "batch_logs": 400,
-    "batch_timeout_ms": 500
+    "batch_timeout_ms": 500,
+    "gc_telemetry": {
+      "enable": false,
+      "min_duration_ms": 1
+    }
   },
   "tx_pool": {
     "max_size": 1000,
@@ -239,7 +247,11 @@
     "headers": [],
     "batch_traces": 400,
     "batch_logs": 400,
-    "batch_timeout_ms": 500
+    "batch_timeout_ms": 500,
+    "gc_telemetry": {
+      "enable": false,
+      "min_duration_ms": 1
+    }
   },
   "tx_pool": {
     "max_size": 1000,

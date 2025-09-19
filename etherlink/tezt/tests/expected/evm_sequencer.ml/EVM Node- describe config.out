@@ -368,7 +368,58 @@
         integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
       "batch_timeout_ms"?:
         integer ∈ [-2^30, 2^30]
-        /* Milliseconds after which we emit a batch, even incomplete */ }
+        /* Milliseconds after which we emit a batch, even incomplete */,
+      "gc_telemetry"?:
+        { /* Enable traces for GC events (costly) */
+          "enable"?: boolean,
+          "filter"?:
+            [ "finalise_update_last"
+              | "interrupt_remote"
+              | "minor_leave_barrier"
+              | "finalise_update_first"
+              | "major_gc_stw"
+              | "minor_remembered_set_promote"
+              | "explicit_gc_full_major"
+              | "minor_finalizers_oldify"
+              | "major"
+              | "minor_finalized"
+              | "major_slice"
+              | "minor_finalizers_admin"
+              | "minor_global_roots"
+              | "minor_local_roots"
+              | "stw_handler"
+              | "major_mark_roots"
+              | "major_finish_marking"
+              | "compaction_evacuate"
+              | "explicit_gc_stat"
+              | "major_finish_cycle"
+              | "major_gc_cycle_domains"
+              | "compaction_release"
+              | "compaction"
+              | "explicit_gc_compact"
+              | "explicit_gc_major"
+              | "explicit_gc_major_slice"
+              | "major_gc_phase_change"
+              | "major_ephe_sweep"
+              | "stw_api_barrier"
+              | "major_finish_sweeping"
+              | "minor_local_roots_promote"
+              | "major_mark"
+              | "major_mark_opportunistic"
+              | "explicit_gc_set"
+              | "minor"
+              | "compaction_forward"
+              | "minor_remembered_set"
+              | "major_sweep"
+              | "stw_leader"
+              | "minor_clear"
+              | "domain_resize_heap_reservation"
+              | "explicit_gc_minor"
+              | "major_ephe_mark" ... ]
+            /* Filter for which GC events to emit traces */,
+          "min_duration_ms"?:
+            /* Minimal span duration for a GC event to be emitted */
+            number /* Some */ || null /* None */ } }
     || boolean
     /* opentelemetry_boolean */
     || null
