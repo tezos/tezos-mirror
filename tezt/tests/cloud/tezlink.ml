@@ -321,6 +321,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
     ~title:"Tezlink sandbox"
     ~tags:[]
     (fun cloud ->
+      Clap.close () ;
       let () = toplog "Creating the agents" in
       let agents = Cloud.agents cloud in
       let next_agent ~name =
