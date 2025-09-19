@@ -106,6 +106,10 @@ DAL node
   after the first valid JSON object. Now, any extraneous data will cause the
   function to return an error. (MR :gl:`!18745`)
 
+- **Breaking change** Removed the optional ``slot_index`` query parameter from
+  ``POST /slots``, since the RPC is index-agnostic and only computes the provided
+  slot's ``commitment`` and ``commitment_proof``.
+
 Version 23.0~rc1
 ================
 
