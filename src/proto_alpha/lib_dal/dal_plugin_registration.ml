@@ -391,6 +391,14 @@ module Plugin = struct
                 slot_index = Dal.Slot_index.to_int id.index;
                 commitment;
               }
+
+    let proto_attestation_status cell =
+      Option.some
+      @@
+      match Dal.Slots_history.(content cell) with
+      | Dal.Slots_history.Unpublished _ -> `Unpublished
+      | Published {is_proto_attested; _} ->
+          if is_proto_attested then `Attested else `Unattested
   end
 
   module RPC = struct

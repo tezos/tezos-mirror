@@ -181,6 +181,15 @@ module type T = sig
     (** Extracts and returns the slot header of the given cell if it was
         published to L1. *)
     val slot_header_of_cell : cell -> slot_header option
+
+    (** Returns [Some (`Attested | `Unattested | `Unpublished)] when the protocol
+       attestation status of the given cell is attested, unattested, or
+       unpublished.
+
+       The function returns [None] for older protocols that do not expose
+       the necessary information to access the status. *)
+    val proto_attestation_status :
+      cell -> [`Attested | `Unattested | `Unpublished] option
   end
 
   module RPC : sig
