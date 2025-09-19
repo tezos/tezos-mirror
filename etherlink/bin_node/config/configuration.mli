@@ -204,6 +204,11 @@ type gcp_kms = {
 
 type performance_profile = Default | Performance
 
+type telemetry_config = {
+  config : Octez_telemetry.Opentelemetry_config.t;
+  trace_host_functions : bool;
+}
+
 type t = {
   public_rpc : rpc;
   private_rpc : rpc option;
@@ -222,7 +227,7 @@ type t = {
   finalized_view : bool;
   history_mode : history_mode option;
   db : db;
-  opentelemetry : Octez_telemetry.Opentelemetry_config.t;
+  opentelemetry : telemetry_config;
   tx_queue : tx_queue;
   performance_profile : performance_profile;
 }

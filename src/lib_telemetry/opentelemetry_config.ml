@@ -195,14 +195,14 @@ let detailed_encoding =
                 gc_telemetry_encoding
                 default.gc_telemetry)))
 
-let encoding =
+let extended_encoding extra_encoding default_extra =
   let open Data_encoding in
   union
     [
       case
         ~title:"detailed_opentelemetry_config"
         (Tag 0)
-        detailed_encoding
+        (merge_objs detailed_encoding extra_encoding)
         Option.some
         Fun.id;
       case
@@ -210,11 +210,17 @@ let encoding =
         (Tag 1)
         bool
         (Fun.const None)
-        (fun enable -> {default with enable});
+        (fun enable -> ({default with enable}, default_extra));
       case
         ~title:"opentelemetry_null"
         (Tag 2)
         null
         (Fun.const None)
-        (Fun.const default);
+        (Fun.const (default, default_extra));
     ]
+
+let encoding =
+  let open Data_encoding in
+  conv (fun c -> (c, ())) (fun (c, ()) -> c) @@ extended_encoding empty ()
+
+let enable c b = {c with enable = b}

@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 
 //! Module containing the types and functions exposed to OCaml.
 
@@ -6,7 +7,7 @@ use crate::{
     bindings,
     host::Host,
     runtime::{self, InputsBuffer, RunStatus},
-    telemetry::Span,
+    telemetry::Scope,
     types::{ContextHash, EvmTree, OCamlString, OpenTelemetryScope, SmartRollupAddress},
 };
 use log::trace;
@@ -137,10 +138,11 @@ pub fn wasm_runtime_run(
 ) -> Result<EvmTree, Error> {
     let ctxt = ctxt.as_mut();
     let mut inputs_buffer = InputsBuffer::new(level, inputs.into_vec());
-    let span = Span::start(otel_scope, "wasm_runtime_run")?;
-
+    let mut scope = Scope::new(otel_scope);
+    scope.start("wasm_runtime_run")?;
     loop {
         let host = Host::new(
+            &scope,
             &tree,
             rollup_address,
             inputs_buffer,
@@ -155,8 +157,11 @@ pub fn wasm_runtime_run(
             native_execution,
         )?;
 
-        match runtime.run(&span)? {
-            RunStatus::Done(evm_tree) => return Ok(evm_tree),
+        match runtime.run()? {
+            RunStatus::Done(evm_tree) => {
+                scope.close_all();
+                return Ok(evm_tree);
+            }
             RunStatus::PendingKernelUpgrade(new_tree, remaining_inputs) => {
                 tree = new_tree;
                 inputs_buffer = remaining_inputs;

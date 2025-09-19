@@ -419,7 +419,11 @@
             /* Filter for which GC events to emit traces */,
           "min_duration_ms"?:
             /* Minimal span duration for a GC event to be emitted */
-            number /* Some */ || null /* None */ } }
+            number /* Some */ || null /* None */ },
+      "trace_host_functions"?:
+        boolean
+        /* Activate tracing for kernel host functions. Only recommended for
+           debug or profiling as this will emit a lot of spans. */ }
     || boolean
     /* opentelemetry_boolean */
     || null

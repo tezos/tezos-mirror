@@ -16,6 +16,7 @@ type t = {
   finalized_view : bool;
   block_storage_sqlite3 : bool;
   execution_pool : Lwt_domain.pool;
+  trace_host_funs : bool;
 }
 
 (** [load ~data_dir configuration] creates a new read-only handler on the

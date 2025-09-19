@@ -68,6 +68,7 @@ let pvm_config ctxt =
     ?preimage_endpoint:ctxt.configuration.kernel_execution.preimages_endpoint
     ~kernel_debug:true
     ~destination:ctxt.smart_rollup_address
+    ~trace_host_funs:ctxt.configuration.opentelemetry.trace_host_functions
     ()
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
@@ -1708,6 +1709,8 @@ module State = struct
                 ?preimage_endpoint:
                   configuration.kernel_execution.preimages_endpoint
                 ~kernel_debug:true
+                ~trace_host_funs:
+                  configuration.opentelemetry.trace_host_functions
                 ~destination:smart_rollup_address
                 ()
             in

@@ -37,6 +37,8 @@ let default_dal_pages_directory = "dal_pages"
 
 let default_kernel_debug = false
 
+let default_trace_host_funs = false
+
 let default_flamecharts_directory = Filename.get_temp_dir_name ()
 
 type config = {
@@ -49,6 +51,7 @@ type config = {
   kernel_debug : bool;
   flamecharts_directory : string;
   timings_file : string option;
+  trace_host_funs : bool;
 }
 
 let config ?(sender = default_sender) ?(source = default_source)
@@ -56,7 +59,8 @@ let config ?(sender = default_sender) ?(source = default_source)
     ?(preimage_directory = default_preimage_directory) ?preimage_endpoint
     ?(dal_pages_directory = default_dal_pages_directory)
     ?(kernel_debug = default_kernel_debug)
-    ?(flamecharts_directory = default_flamecharts_directory) ?timings_file () =
+    ?(flamecharts_directory = default_flamecharts_directory) ?timings_file
+    ?(trace_host_funs = default_trace_host_funs) () =
   {
     sender;
     source;
@@ -67,4 +71,5 @@ let config ?(sender = default_sender) ?(source = default_source)
     kernel_debug;
     flamecharts_directory;
     timings_file;
+    trace_host_funs;
   }

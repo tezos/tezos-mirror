@@ -113,6 +113,7 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
             (fun () ->
               Wasm_runtime.run
                 ~pool
+                ~trace_host_funs:config.trace_host_funs
                 ?l1_timestamp:execution_timestamp
                 ~preimages_dir:config.preimage_directory
                 ?preimages_endpoint:config.preimage_endpoint

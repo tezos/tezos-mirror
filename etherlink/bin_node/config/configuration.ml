@@ -234,6 +234,11 @@ type db = {pool_size : int; max_conn_reuse_count : int option}
 
 type performance_profile = Default | Performance
 
+type telemetry_config = {
+  config : Octez_telemetry.Opentelemetry_config.t;
+  trace_host_functions : bool;
+}
+
 type t = {
   public_rpc : rpc;
   private_rpc : rpc option;
@@ -252,7 +257,7 @@ type t = {
   finalized_view : bool;
   history_mode : history_mode option;
   db : db;
-  opentelemetry : Octez_telemetry.Opentelemetry_config.t;
+  opentelemetry : telemetry_config;
   tx_queue : tx_queue;
   performance_profile : performance_profile;
 }
@@ -1508,6 +1513,28 @@ let db_encoding =
 let performance_profile_encoding =
   Data_encoding.string_enum [("default", Default); ("performance", Performance)]
 
+let default_telemetry_config =
+  {
+    config = Octez_telemetry.Opentelemetry_config.default;
+    trace_host_functions = false;
+  }
+
+let telemetry_config_encoding =
+  let open Data_encoding in
+  conv
+    (fun {config; trace_host_functions} -> (config, trace_host_functions))
+    (fun (config, trace_host_functions) -> {config; trace_host_functions})
+  @@ Octez_telemetry.Opentelemetry_config.extended_encoding
+       (obj1
+          (dft
+             "trace_host_functions"
+             ~description:
+               "Activate tracing for kernel host functions. Only recommended \
+                for debug or profiling as this will emit a lot of spans."
+             bool
+             default_telemetry_config.trace_host_functions))
+       default_telemetry_config.trace_host_functions
+
 let encoding ?network data_dir : t Data_encoding.t =
   let open Data_encoding in
   let observer_field name encoding =
@@ -1699,8 +1726,8 @@ let encoding ?network data_dir : t Data_encoding.t =
              (dft
                 "opentelemetry"
                 ~description:"Enable or disable opentelemetry profiling"
-                Octez_telemetry.Opentelemetry_config.encoding
-                Octez_telemetry.Opentelemetry_config.default)
+                telemetry_config_encoding
+                default_telemetry_config)
              (dft
                 "tx_pool"
                 ~description:"Configuration for the tx pool"
@@ -1955,7 +1982,7 @@ module Cli = struct
       finalized_view = default_finalized_view;
       history_mode = None;
       db = default_db;
-      opentelemetry = Octez_telemetry.Opentelemetry_config.default;
+      opentelemetry = default_telemetry_config;
       tx_queue = default_tx_queue;
       performance_profile = default_performance_profile;
     }
@@ -2030,7 +2057,14 @@ module Cli = struct
     let opentelemetry =
       match profiling with
       | None -> configuration.opentelemetry
-      | Some enable -> {configuration.opentelemetry with enable}
+      | Some enable ->
+          {
+            configuration.opentelemetry with
+            config =
+              Octez_telemetry.Opentelemetry_config.enable
+                configuration.opentelemetry.config
+                enable;
+          }
     in
     let sequencer =
       let sequencer_config = configuration.sequencer in
