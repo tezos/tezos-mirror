@@ -49,6 +49,7 @@ module DAL : sig
     tezlink : bool option;
     slot_size : int option;
     number_of_slots : int option;
+    attestation_lag : int option;
     traps_fraction : Q.t option;
   }
 

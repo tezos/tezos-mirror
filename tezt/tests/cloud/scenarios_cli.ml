@@ -123,6 +123,8 @@ module type Dal = sig
 
   val number_of_slots : int option
 
+  val attestation_lag : int option
+
   val config : Scenarios_configuration.DAL.t
 
   val traps_fraction : Q.t option
@@ -686,6 +688,18 @@ module Dal () : Dal = struct
         ()
     in
     Option.fold ~none:config.number_of_slots ~some:Option.some from_cli
+
+  let attestation_lag =
+    let from_cli =
+      Clap.optional_int
+        ~section
+        ~long:"attestation-lag"
+        ~description:
+          "Attestation lag - the number of L1 blocks between a slot's \
+           publication and its attestation."
+        ()
+    in
+    Option.fold ~none:config.attestation_lag ~some:Option.some from_cli
 
   let traps_fraction =
     let typ =
