@@ -183,7 +183,10 @@ let post_slot :
        the sent data is smaller than the size of a DAL slot, it is padded with \
        the character provided as padding query parameter (defaults to \\000). \
        If the slot_index query parameter is provided, the DAL node checks that \
-       its profile allows to publish data on the given slot index."
+       its profile allows to publish data on the given slot index. However, \
+       slot_index is optional and has NO SEMANTIC EFFECT on the produced \
+       commitment. It exists solely to help reverse proxies route POST /slots \
+       requests to a DAL node subscribed to the corresponding topics."
     ~query:slot_query
       (* With [Data_encoding.string], the body of the HTTP request contains
          two length prefixes: one for the full body, and one for the string.
