@@ -124,8 +124,10 @@ module Dal = struct
 
   let ignore_topics = arg_list_to_clic ignore_topics_arg
 
+  let batching_configuration = arg_to_clic batching_configuration_arg
+
   let args =
-    Tezos_clic.args24
+    Tezos_clic.args25
       data_dir
       config_file
       rpc_addr
@@ -150,6 +152,7 @@ module Dal = struct
       ignore_l1_config_peers
       disable_amplification
       ignore_topics
+      batching_configuration
 
   let commands =
     let open Tezos_clic in
@@ -184,7 +187,8 @@ module Dal = struct
             verbose,
             ignore_l1_config_peers,
             disable_amplification,
-            ignore_topics )
+            ignore_topics,
+            batching_configuration )
           _cctxt
         ->
           let attester_profile = Option.value ~default:[] attester_profile in
@@ -218,6 +222,7 @@ module Dal = struct
               ignore_l1_config_peers
               disable_amplification
               ignore_topics
+              batching_configuration
           in
           match options with
           | Ok options -> Cli.run cmd options

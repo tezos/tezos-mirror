@@ -101,6 +101,8 @@ module Term : sig
   val verbose_switch : switch
 
   val ignore_topics_arg : Signature.public_key_hash arg_list
+
+  val batching_configuration_arg : Configuration_file.batching_configuration arg
 end
 
 (** {2 Command-line options} *)
@@ -154,6 +156,9 @@ type options = {
       (** Disable amplification. Default value is false. *)
   ignore_topics : Signature.public_key_hash list;
       (** Do not distribute shards of these pkhs. *)
+  batching_configuration : Configuration_file.batching_configuration option;
+      (** The configuration used for batching verification of received shards
+          via GossipSub to save cryptographic computation. *)
 }
 
 (** Subcommands that can be used by the DAL node. In the future this type
@@ -186,6 +191,7 @@ val cli_options_to_options :
   bool ->
   bool ->
   Signature.public_key_hash list ->
+  Configuration_file.batching_configuration option ->
   (options, bool * string) result
 
 val run : t -> options -> unit tzresult Lwt.t
