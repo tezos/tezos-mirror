@@ -7,15 +7,14 @@
 
 use alloy_sol_types::SolEvent;
 use evm::Config;
-use evm_execution::{
-    account_storage::{account_path, AccountStorageError, EthereumAccountStorage},
-    utilities::alloy::{h160_to_alloy, u256_to_alloy},
-    EthereumError,
-};
 use primitive_types::{H160, H256, U256};
 use revm::context::result::{ExecutionResult, Output, SuccessReason};
 use revm::primitives::{Address, Bytes, Log, LogData, B256};
 use revm_etherlink::ExecutionOutcome;
+use revm_etherlink::{
+    helpers::legacy::{h160_to_alloy, u256_to_alloy},
+    storage::world_state_handler::{account_path, WorldStateHandler},
+};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
 use tezos_ethereum::{
@@ -65,7 +64,7 @@ pub struct Deposit {
 }
 
 impl Deposit {
-    const RECEIVER_LENGTH: usize = std::mem::size_of::<H160>();
+    const RECEIVER_LENGTH: usize = std::mem::size_of::<Address>();
 
     const RECEIVER_AND_CHAIN_ID_LENGTH: usize =
         Self::RECEIVER_LENGTH + std::mem::size_of::<U256>();
@@ -132,10 +131,9 @@ impl Deposit {
     pub fn event_log(&self) -> Log {
         let event_data = SolBridgeDepositEvent {
             receiver: h160_to_alloy(&self.receiver),
-            amount: u256_to_alloy(&self.amount).unwrap_or_default(),
-            inbox_level: u256_to_alloy(&U256::from(self.inbox_level)).unwrap_or_default(),
-            inbox_msg_id: u256_to_alloy(&U256::from(self.inbox_msg_id))
-                .unwrap_or_default(),
+            amount: u256_to_alloy(&self.amount),
+            inbox_level: u256_to_alloy(&U256::from(self.inbox_level)),
+            inbox_msg_id: u256_to_alloy(&U256::from(self.inbox_msg_id)),
         };
 
         let data = SolBridgeDepositEvent::encode_data(&event_data);
@@ -213,20 +211,20 @@ pub struct DepositResult {
 
 pub fn execute_deposit<Host: Runtime>(
     host: &mut Host,
-    evm_account_storage: &mut EthereumAccountStorage,
+    world_state_handler: &mut WorldStateHandler,
     deposit: &Deposit,
     config: &Config,
-) -> Result<DepositResult, EthereumError> {
+) -> Result<DepositResult, revm_etherlink::Error> {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
-    let to_account_path =
-        account_path(&deposit.receiver).map_err(AccountStorageError::from)?;
-    let mut to_account = evm_account_storage.get_or_create(host, &to_account_path)?;
-
+    let to_account_path = account_path(&h160_to_alloy(&deposit.receiver))?;
+    let mut to_account = world_state_handler
+        .get_or_create(host, &to_account_path)
+        .map_err(|e| revm_etherlink::Error::Custom(e.to_string()))?;
     // TODO: estimate how emitting an event influenced tick consumption
     let gas_used = config.gas_transaction_call;
 
-    let result = match to_account.balance_add(host, deposit.amount) {
+    let result = match to_account.add_balance(host, u256_to_alloy(&deposit.amount)) {
         Ok(()) => ExecutionResult::Success {
             reason: SuccessReason::Return,
             gas_used,
@@ -234,8 +232,8 @@ pub fn execute_deposit<Host: Runtime>(
             logs: vec![deposit.event_log()],
             output: Output::Call(Bytes::from_static(&[1u8])),
         },
-        Err(err) => {
-            log!(host, Info, "Deposit failed with {:?}", err);
+        Err(e) => {
+            log!(host, Info, "Deposit failed because of {}", e);
             ExecutionResult::Revert {
                 gas_used,
                 output: Bytes::from_static(&[0u8]),
@@ -257,11 +255,10 @@ pub fn execute_deposit<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::SolEvent;
+    use evm_execution::configuration::EVMVersion;
     use evm_execution::fa_bridge::test_utils::create_fa_ticket;
-    use evm_execution::{
-        account_storage::init_account_storage, configuration::EVMVersion,
-    };
     use primitive_types::{H160, U256};
+    use revm_etherlink::storage::world_state_handler::new_world_state_handler;
     use rlp::Decodable;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
@@ -283,8 +280,8 @@ mod tests {
 
     fn dummy_deposit() -> Deposit {
         Deposit {
-            amount: 1.into(),
-            receiver: H160([2u8; 20]),
+            amount: U256::from(1u64),
+            receiver: H160::from([2u8; 20]),
             inbox_level: 3,
             inbox_msg_id: 4,
         }
@@ -329,7 +326,7 @@ mod tests {
             deposit,
             Deposit {
                 amount: tezos_ethereum::wei::eth_from_mutez(2),
-                receiver: H160([1u8; 20]),
+                receiver: H160::from([1u8; 20]),
                 inbox_level: 0,
                 inbox_msg_id: 0,
             }
@@ -340,7 +337,9 @@ mod tests {
     #[test]
     fn deposit_decode_legacy() {
         let mut stream = rlp::RlpStream::new_list(2);
-        stream.append(&U256::one()).append(&H160([1u8; 20]));
+        stream
+            .append(&primitive_types::U256::one())
+            .append(&primitive_types::H160([1u8; 20]));
         let bytes = stream.out().to_vec();
         let decoder = rlp::Rlp::new(&bytes);
         let res = Deposit::decode(&decoder).unwrap();
@@ -348,7 +347,7 @@ mod tests {
             res,
             Deposit {
                 amount: U256::one(),
-                receiver: H160([1u8; 20]),
+                receiver: H160::from([1u8; 20]),
                 inbox_level: 0,
                 inbox_msg_id: 0,
             }
@@ -358,13 +357,13 @@ mod tests {
     #[test]
     fn deposit_execution_outcome_contains_event() {
         let mut host = MockKernelHost::default();
-        let mut evm_account_storage = init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
 
         let deposit = dummy_deposit();
 
         let DepositResult { outcome, .. } = execute_deposit(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &deposit,
             &EVMVersion::current_test_config(),
         )
@@ -386,14 +385,14 @@ mod tests {
     #[test]
     fn deposit_execution_fails_due_to_balance_overflow() {
         let mut host = MockKernelHost::default();
-        let mut evm_account_storage = init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
 
         let mut deposit = dummy_deposit();
         deposit.amount = U256::MAX;
 
         let DepositResult { outcome, .. } = execute_deposit(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &deposit,
             &EVMVersion::current_test_config(),
         )
@@ -402,7 +401,7 @@ mod tests {
 
         let DepositResult { outcome, .. } = execute_deposit(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &deposit,
             &EVMVersion::current_test_config(),
         )

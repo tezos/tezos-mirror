@@ -8,7 +8,6 @@
 
 use alloy_sol_types::{sol, SolCall};
 use evm::Config;
-use evm_execution::account_storage::{EthereumAccount, EthereumAccountStorage};
 use evm_execution::fa_bridge::deposit::{FaDeposit, FaDepositWithProxy};
 use evm_execution::handler::{FastWithdrawalInterface, RouterInterface};
 use evm_execution::precompiles::{FA_BRIDGE_PRECOMPILE_ADDRESS, SYSTEM_ACCOUNT_ADDRESS};
@@ -18,13 +17,22 @@ use evm_execution::trace::{
     get_tracer_configuration, CallTrace, CallTracerConfig, CallTracerInput,
     StructLoggerInput, TracerInput,
 };
-use evm_execution::utilities::alloy::h160_to_alloy;
+use evm_execution::EthereumError;
 use primitive_types::{H160, H256, U256};
-use revm::primitives::Log;
+use revm::{
+    primitives::{Address, Bytes, Log, B256},
+    state::AccountInfo,
+};
 use revm_etherlink::helpers::legacy::alloy_to_log;
 use revm_etherlink::precompiles::constants::FA_DEPOSIT_EXECUTION_COST;
 use revm_etherlink::precompiles::send_outbox_message::Withdrawal;
-use revm_etherlink::{u256_to_alloy, ExecutionOutcome};
+use revm_etherlink::storage::world_state_handler::{
+    account_path, StorageAccount, WorldStateHandler,
+};
+use revm_etherlink::{
+    helpers::legacy::{h160_to_alloy, u256_to_alloy},
+    ExecutionOutcome,
+};
 use std::borrow::Cow;
 use tezos_ethereum::access_list::{AccessList, AccessListItem};
 use tezos_ethereum::block::{BlockConstants, BlockFees};
@@ -186,10 +194,10 @@ fn make_object_info(
 fn account<Host: Runtime>(
     host: &mut Host,
     caller: H160,
-    evm_account_storage: &mut EthereumAccountStorage,
-) -> Result<Option<EthereumAccount>, Error> {
-    let caller_account_path = evm_execution::account_storage::account_path(&caller)?;
-    Ok(evm_account_storage.get(host, &caller_account_path)?)
+    world_state_handler: &mut WorldStateHandler,
+) -> Result<Option<StorageAccount>, Error> {
+    let caller_account_path = account_path(&h160_to_alloy(&caller))?;
+    Ok(world_state_handler.get(host, &caller_account_path)?)
 }
 
 #[derive(Debug, PartialEq)]
@@ -210,7 +218,7 @@ pub enum Validity {
 #[instrument(skip_all)]
 fn is_valid_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
-    evm_account_storage: &mut EthereumAccountStorage,
+    world_state_handler: &mut WorldStateHandler,
     transaction: &EthereumTransactionCommon,
     block_constant: &BlockConstants,
     effective_gas_price: U256,
@@ -242,19 +250,15 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
         }
     };
 
-    let account = account(host, caller, evm_account_storage)?;
+    let account = account(host, caller, world_state_handler)?;
 
-    let (nonce, balance, code): (u64, U256, Vec<u8>) = match account {
-        None => (0, U256::zero(), vec![]),
-        Some(account) => (
-            account.nonce(host)?,
-            account.balance(host)?,
-            account.code(host)?,
-        ),
+    let info = match account {
+        None => AccountInfo::default(),
+        Some(account) => account.info(host)?,
     };
 
     // The transaction nonce is valid.
-    if nonce != transaction.nonce {
+    if info.nonce != transaction.nonce {
         log!(host, Benchmarking, "Transaction status: ERROR_NONCE.");
         return Ok(Validity::InvalidNonce);
     };
@@ -265,15 +269,21 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
     // The sender can afford the max gas fee he set, see EIP-1559
     let max_fee = total_gas_limit.saturating_mul(transaction.max_fee_per_gas);
 
-    if balance < cost || balance < max_fee {
+    if info.balance < u256_to_alloy(&cost) || info.balance < u256_to_alloy(&max_fee) {
         log!(host, Benchmarking, "Transaction status: ERROR_PRE_PAY.");
         return Ok(Validity::InvalidPrePay);
     }
 
-    // The sender does not have code (EIP-3607) or isn't an EIP-7702 authorized account.
-    if !code.is_empty() && !code.starts_with(&[0xef, 0x01, 0x00]) {
-        log!(host, Benchmarking, "Transaction status: ERROR_CODE.");
-        return Ok(Validity::InvalidCode);
+    if let Some(code) = revm_etherlink::storage::code::CodeStorage::new(&info.code_hash)?
+        .get_code(host)?
+    {
+        // The sender does not have code (EIP-3607) or isn't an EIP-7702 authorized account.
+        if !code.is_empty()
+            && !code.original_byte_slice().starts_with(&[0xef, 0x01, 0x00])
+        {
+            log!(host, Benchmarking, "Transaction status: ERROR_CODE.");
+            return Ok(Validity::InvalidCode);
+        }
     }
 
     // check that enough gas is provided to cover fees
@@ -368,9 +378,9 @@ pub fn revm_run_transaction<Host: Runtime>(
         block_constants,
         &mut world_state_handler,
         revm_etherlink::precompiles::provider::EtherlinkPrecompiles::new(),
-        revm::primitives::Address::from_slice(&caller.0),
-        to.map(|to| revm::primitives::Address::from_slice(&to.0)),
-        revm::primitives::Bytes::from(call_data),
+        Address::from_slice(&caller.0),
+        to.map(|to| Address::from_slice(&to.0)),
+        Bytes::from(call_data),
         gas_limit,
         u128::from_le_bytes(if effective_gas_price.bits() < 128 {
             effective_gas_price.low_u128().to_le_bytes()
@@ -394,10 +404,10 @@ pub fn revm_run_transaction<Host: Runtime>(
                          storage_keys,
                      }| {
                         revm::context::transaction::AccessListItem {
-                            address: revm::primitives::Address::from_slice(&address.0),
+                            address: Address::from_slice(&address.0),
                             storage_keys: storage_keys
                                 .into_iter()
-                                .map(|key| revm::primitives::B256::from_slice(&key.0))
+                                .map(|key| B256::from_slice(&key.0))
                                 .collect(),
                         }
                     },
@@ -415,8 +425,7 @@ pub fn revm_run_transaction<Host: Runtime>(
                         only_top_call: config.only_top_call,
                         with_logs: config.with_logs,
                     },
-                    transaction_hash: transaction_hash
-                        .map(|hash| revm::primitives::B256::from(hash.0)),
+                    transaction_hash: transaction_hash.map(|hash| B256::from(hash.0)),
                 },
             ),
             TracerInput::StructLogger(StructLoggerInput {
@@ -431,8 +440,7 @@ pub fn revm_run_transaction<Host: Runtime>(
                             disable_stack: config.disable_stack,
                             disable_storage: config.disable_storage,
                         },
-                    transaction_hash: transaction_hash
-                        .map(|hash| revm::primitives::B256::from(hash.0)),
+                    transaction_hash: transaction_hash.map(|hash| B256::from(hash.0)),
                 },
             ),
         }),
@@ -450,7 +458,7 @@ pub fn revm_run_transaction<Host: Runtime>(
 fn apply_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
-    evm_account_storage: &mut EthereumAccountStorage,
+    world_state_handler: &mut WorldStateHandler,
     transaction: &EthereumTransactionCommon,
     is_delayed: bool,
     tracer_input: Option<TracerInput>,
@@ -460,7 +468,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     let effective_gas_price = block_constants.base_fee_per_gas();
     let (caller, gas_limit) = match is_valid_ethereum_transaction_common(
         host,
-        evm_account_storage,
+        world_state_handler,
         transaction,
         block_constants,
         effective_gas_price,
@@ -548,7 +556,7 @@ fn trace_deposit<Host: Runtime>(
 
 fn apply_deposit<Host: Runtime>(
     host: &mut Host,
-    evm_account_storage: &mut EthereumAccountStorage,
+    world_state_handler: &mut WorldStateHandler,
     deposit: &Deposit,
     transaction: &Transaction,
     tracer_input: Option<TracerInput>,
@@ -557,8 +565,13 @@ fn apply_deposit<Host: Runtime>(
     let DepositResult {
         outcome: execution_outcome,
         estimated_ticks_used,
-    } = execute_deposit(host, evm_account_storage, deposit, evm_configuration)
-        .map_err(Error::InvalidRunTransaction)?;
+    } = execute_deposit(host, world_state_handler, deposit, evm_configuration).map_err(
+        |e| {
+            Error::InvalidRunTransaction(EthereumError::WrappedError(Cow::Owned(
+                e.to_string(),
+            )))
+        },
+    )?;
 
     trace_deposit(
         host,
@@ -724,7 +737,7 @@ pub fn handle_transaction_result<Host: Runtime>(
     block_constants: &BlockConstants,
     transaction: &Transaction,
     index: u32,
-    evm_account_storage: &mut EthereumAccountStorage,
+    world_state_handler: &mut WorldStateHandler,
     transaction_result: TransactionResult,
     pay_fees: bool,
     sequencer_pool_address: Option<H160>,
@@ -771,7 +784,7 @@ pub fn handle_transaction_result<Host: Runtime>(
     }
 
     if pay_fees {
-        fee_updates.apply(host, evm_account_storage, caller, sequencer_pool_address)?;
+        fee_updates.apply(host, world_state_handler, caller, sequencer_pool_address)?;
     }
 
     let object_info = make_object_info(transaction, caller, index, &fee_updates)?;
@@ -803,7 +816,7 @@ pub fn apply_transaction<Host: Runtime>(
     block_constants: &BlockConstants,
     transaction: &Transaction,
     index: u32,
-    evm_account_storage: &mut EthereumAccountStorage,
+    world_state_handler: &mut WorldStateHandler,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
     evm_configuration: &Config,
@@ -814,7 +827,7 @@ pub fn apply_transaction<Host: Runtime>(
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,
             block_constants,
-            evm_account_storage,
+            world_state_handler,
             tx,
             false,
             tracer_input,
@@ -824,7 +837,7 @@ pub fn apply_transaction<Host: Runtime>(
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
             host,
             block_constants,
-            evm_account_storage,
+            world_state_handler,
             tx,
             true,
             tracer_input,
@@ -835,7 +848,7 @@ pub fn apply_transaction<Host: Runtime>(
             log!(host, Benchmarking, "Transaction type: DEPOSIT");
             apply_deposit(
                 host,
-                evm_account_storage,
+                world_state_handler,
                 deposit,
                 transaction,
                 tracer_input,
@@ -862,7 +875,7 @@ pub fn apply_transaction<Host: Runtime>(
                 block_constants,
                 transaction,
                 index,
-                evm_account_storage,
+                world_state_handler,
                 tx_result,
                 true,
                 sequencer_pool_address,
@@ -876,9 +889,18 @@ pub fn apply_transaction<Host: Runtime>(
 #[cfg(test)]
 mod tests {
 
-    use crate::{apply::Validity, chains::EvmLimits, fees::gas_for_fees};
-    use evm_execution::account_storage::{account_path, EthereumAccountStorage};
+    use crate::{
+        apply::{is_valid_ethereum_transaction_common, Validity},
+        chains::EvmLimits,
+        fees::gas_for_fees,
+    };
     use primitive_types::{H160, U256};
+    use revm_etherlink::{
+        helpers::legacy::{h160_to_alloy, u256_to_alloy},
+        storage::world_state_handler::{
+            account_path, new_world_state_handler, WorldStateHandler,
+        },
+    };
     use tezos_ethereum::{
         block::{BlockConstants, BlockFees},
         transaction::TransactionType,
@@ -886,8 +908,6 @@ mod tests {
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
-
-    use super::is_valid_ethereum_transaction_common;
 
     const CHAIN_ID: u32 = 1337;
 
@@ -913,23 +933,16 @@ mod tests {
 
     fn set_balance(
         host: &mut MockKernelHost,
-        evm_account_storage: &mut EthereumAccountStorage,
+        world_state_handler: &mut WorldStateHandler,
         address: &H160,
         balance: U256,
     ) {
-        let mut account = evm_account_storage
-            .get_or_create(host, &account_path(address).unwrap())
+        let mut account = world_state_handler
+            .get_or_create(host, &account_path(&h160_to_alloy(address)).unwrap())
             .unwrap();
-        let current_balance = account.balance(host).unwrap();
-        if current_balance > balance {
-            account
-                .balance_remove(host, current_balance - balance)
-                .unwrap();
-        } else {
-            account
-                .balance_add(host, balance - current_balance)
-                .unwrap();
-        }
+        let mut info = account.info(host).unwrap_or_default();
+        info.balance = u256_to_alloy(&balance);
+        account.set_info(host, info).unwrap();
     }
 
     fn resign(transaction: EthereumTransactionCommon) -> EthereumTransactionCommon {
@@ -973,8 +986,7 @@ mod tests {
     #[test]
     fn test_tx_is_valid() {
         let mut host = MockKernelHost::default();
-        let mut evm_account_storage =
-            evm_execution::account_storage::init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = mock_block_constants();
         // setup
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
@@ -984,12 +996,12 @@ mod tests {
         let gas_limit = 21000 + fee_gas;
         let transaction = valid_tx(gas_limit);
         // fund account
-        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+        set_balance(&mut host, &mut world_state_handler, &address, balance);
 
         // act
         let res = is_valid_ethereum_transaction_common(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &transaction,
             &block_constants,
             gas_price,
@@ -1006,8 +1018,7 @@ mod tests {
     #[test]
     fn test_tx_is_invalid_cannot_prepay() {
         let mut host = MockKernelHost::default();
-        let mut evm_account_storage =
-            evm_execution::account_storage::init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = mock_block_constants();
 
         // setup
@@ -1019,12 +1030,12 @@ mod tests {
         let gas_limit = 21000 + fee_gas;
         let transaction = valid_tx(gas_limit);
         // fund account
-        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+        set_balance(&mut host, &mut world_state_handler, &address, balance);
 
         // act
         let res = is_valid_ethereum_transaction_common(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &transaction,
             &block_constants,
             gas_price,
@@ -1041,8 +1052,7 @@ mod tests {
     #[test]
     fn test_tx_is_invalid_signature() {
         let mut host = MockKernelHost::default();
-        let mut evm_account_storage =
-            evm_execution::account_storage::init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = mock_block_constants();
 
         // setup
@@ -1054,12 +1064,12 @@ mod tests {
         let mut transaction = valid_tx(gas_limit);
         transaction.signature = None;
         // fund account
-        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+        set_balance(&mut host, &mut world_state_handler, &address, balance);
 
         // act
         let res = is_valid_ethereum_transaction_common(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &transaction,
             &block_constants,
             gas_price,
@@ -1076,8 +1086,7 @@ mod tests {
     #[test]
     fn test_tx_is_invalid_wrong_nonce() {
         let mut host = MockKernelHost::default();
-        let mut evm_account_storage =
-            evm_execution::account_storage::init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = mock_block_constants();
 
         // setup
@@ -1091,12 +1100,12 @@ mod tests {
         transaction = resign(transaction);
 
         // fund account
-        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+        set_balance(&mut host, &mut world_state_handler, &address, balance);
 
         // act
         let res = is_valid_ethereum_transaction_common(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &transaction,
             &block_constants,
             gas_price,
@@ -1113,8 +1122,7 @@ mod tests {
     #[test]
     fn test_tx_is_invalid_wrong_chain_id() {
         let mut host = MockKernelHost::default();
-        let mut evm_account_storage =
-            evm_execution::account_storage::init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = mock_block_constants();
 
         // setup
@@ -1126,12 +1134,12 @@ mod tests {
         transaction = resign(transaction);
 
         // fund account
-        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+        set_balance(&mut host, &mut world_state_handler, &address, balance);
 
         // act
         let res = is_valid_ethereum_transaction_common(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &transaction,
             &block_constants,
             gas_price,
@@ -1148,8 +1156,7 @@ mod tests {
     #[test]
     fn test_tx_is_invalid_max_fee_less_than_base_fee() {
         let mut host = MockKernelHost::default();
-        let mut evm_account_storage =
-            evm_execution::account_storage::init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = mock_block_constants();
 
         // setup
@@ -1166,7 +1173,7 @@ mod tests {
         // act
         let res = is_valid_ethereum_transaction_common(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &transaction,
             &block_constants,
             gas_price,
@@ -1183,8 +1190,7 @@ mod tests {
     #[test]
     fn test_tx_invalid_not_enough_gas_for_fee() {
         let mut host = MockKernelHost::default();
-        let mut evm_account_storage =
-            evm_execution::account_storage::init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = mock_block_constants();
 
         // setup
@@ -1192,7 +1198,7 @@ mod tests {
         let gas_price = U256::from(21000);
         let balance = U256::from(21000) * gas_price;
         // fund account
-        set_balance(&mut host, &mut evm_account_storage, &address, balance);
+        set_balance(&mut host, &mut world_state_handler, &address, balance);
 
         let gas_limit = 21000; // gas limit is not enough to cover fees
         let mut transaction = valid_tx(gas_limit);
@@ -1202,7 +1208,7 @@ mod tests {
         // act
         let res = is_valid_ethereum_transaction_common(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &transaction,
             &block_constants,
             gas_price,
@@ -1217,7 +1223,7 @@ mod tests {
 
         let res = is_valid_ethereum_transaction_common(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &transaction,
             &block_constants,
             gas_price,

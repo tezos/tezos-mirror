@@ -438,18 +438,22 @@ mod tests {
     use crate::storage::{
         read_transaction_receipt_status, store_chain_id, ENABLE_FA_BRIDGE,
     };
-    use evm_execution::account_storage::{self, EthereumAccountStorage};
     use evm_execution::fa_bridge::deposit::{ticket_hash, FaDeposit};
     use evm_execution::fa_bridge::test_utils::{
-        convert_h160, convert_u256, dummy_ticket, kernel_wrapper, ticket_balance_add,
-        ticket_id, SolCall,
+        convert_h160, convert_u256, dummy_ticket, kernel_wrapper, ticket_id, SolCall,
     };
     use evm_execution::handler::RouterInterface;
-    use evm_execution::precompiles::FA_BRIDGE_PRECOMPILE_ADDRESS;
+    use evm_execution::precompiles::{
+        FA_BRIDGE_PRECOMPILE_ADDRESS, SYSTEM_ACCOUNT_ADDRESS,
+    };
     use evm_execution::utilities::{bigint_to_u256, keccak256_hash};
     use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
     use pretty_assertions::assert_eq;
     use primitive_types::{H160, U256};
+    use revm_etherlink::helpers::legacy::{h160_to_alloy, h256_to_alloy, u256_to_alloy};
+    use revm_etherlink::storage::world_state_handler::{
+        account_path, new_world_state_handler, WorldStateHandler,
+    };
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_data_encoding::nom::NomReader;
     use tezos_ethereum::block::BlockFees;
@@ -476,23 +480,16 @@ mod tests {
 
     fn set_balance<Host: Runtime>(
         host: &mut Host,
-        evm_account_storage: &mut EthereumAccountStorage,
+        world_state_handler: &mut WorldStateHandler,
         address: &H160,
         balance: U256,
     ) {
-        let mut account = evm_account_storage
-            .get_or_create(host, &account_storage::account_path(address).unwrap())
+        let mut account = world_state_handler
+            .get_or_create(host, &account_path(&h160_to_alloy(address)).unwrap())
             .unwrap();
-        let current_balance = account.balance(host).unwrap();
-        if current_balance > balance {
-            account
-                .balance_remove(host, current_balance - balance)
-                .unwrap();
-        } else {
-            account
-                .balance_add(host, balance - current_balance)
-                .unwrap();
-        }
+        let mut info = account.info(host).unwrap();
+        info.balance = u256_to_alloy(&balance);
+        account.set_info(host, info).unwrap();
     }
 
     #[test]
@@ -553,10 +550,10 @@ mod tests {
         // provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        let mut evm_account_storage = account_storage::init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
         set_balance(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &sender,
             sender_initial_balance,
         );
@@ -764,27 +761,42 @@ mod tests {
         // provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        let mut evm_account_storage = account_storage::init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
         set_balance(
             &mut mock_host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             &sender,
             sender_initial_balance,
         );
 
         // construct ticket
         let ticket = dummy_ticket();
-        let ticket_hash = ticket_hash(&ticket).unwrap();
+        let ticket_hash = h256_to_alloy(&ticket_hash(&ticket).unwrap());
         let amount = bigint_to_u256(ticket.amount()).unwrap();
 
+        let mut system = world_state_handler
+            .get_or_create(
+                &mock_host,
+                &account_path(&h160_to_alloy(&SYSTEM_ACCOUNT_ADDRESS)).unwrap(),
+            )
+            .unwrap();
+
         // patch ticket table
-        ticket_balance_add(
-            &mut mock_host,
-            &mut evm_account_storage,
-            &ticket_hash,
-            &sender,
-            amount,
-        );
+        let ticket_balance = system
+            .read_ticket_balance(
+                &mock_host,
+                &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
+                &h160_to_alloy(&sender),
+            )
+            .unwrap();
+        system
+            .write_ticket_balance(
+                &mut mock_host,
+                &revm::primitives::U256::from_be_slice(ticket_hash.as_ref()),
+                &h160_to_alloy(&sender),
+                ticket_balance + u256_to_alloy(&amount),
+            )
+            .unwrap();
 
         // construct withdraw calldata
         let (ticketer, content) = ticket_id(&ticket);

@@ -42,8 +42,6 @@ pub mod storage;
 
 mod database;
 
-pub use helpers::legacy::u256_to_alloy;
-
 #[derive(Error, Debug, PartialEq, Eq, Clone)]
 pub enum Error {
     #[error("Runtime error: {0}")]

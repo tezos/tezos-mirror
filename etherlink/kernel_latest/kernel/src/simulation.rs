@@ -28,8 +28,8 @@ use evm::Config;
 use evm_execution::trace::TracerInput;
 use evm_execution::EthereumError;
 use primitive_types::{H160, U256};
-use revm::context::result::ExecutionResult as VMResult;
-use revm_etherlink::{u256_to_alloy, ExecutionOutcome};
+use revm::{context::result::ExecutionResult as VMResult, primitives::Address};
+use revm_etherlink::{helpers::legacy::u256_to_alloy, ExecutionOutcome};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use tezos_ethereum::access_list::empty_access_list;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
@@ -467,7 +467,7 @@ impl Evaluation {
 
         let mut simulation_caller =
             revm_etherlink::storage::world_state_handler::StorageAccount::from_address(
-                &revm::primitives::Address::from_slice(&from.0),
+                &Address::from_slice(&from.0),
             )?;
         let max_gas_limit =
             read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
@@ -676,12 +676,10 @@ pub fn start_simulation_mode<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::hex::FromHex;
     use evm_execution::configuration::EVMVersion;
     use primitive_types::H256;
-    use revm::{
-        primitives::{Address, Bytes},
-        state::AccountInfo,
-    };
+    use revm::primitives::Address;
     use revm_etherlink::{
         precompiles::provider::EtherlinkPrecompiles,
         run_transaction,
@@ -778,28 +776,18 @@ mod tests {
             crate::block::GAS_LIMIT,
             H160::zero(),
         );
-
-        let caller = Address::from_slice(&[1; 20]);
-
-        let caller_info = AccountInfo {
-            balance: revm::primitives::U256::MAX,
-            nonce: 0,
-            code_hash: Default::default(),
-            code: None,
-        };
-
         let mut world_state_handler = new_world_state_handler().unwrap();
 
-        let mut storage_account = world_state_handler
+        let caller =
+            Address::from_hex("0x2424242424242424242424242424242424242424").unwrap();
+        // give some funds to caller
+        let mut caller_account = world_state_handler
             .get_or_create(host, &account_path(&caller).unwrap())
             .unwrap();
-
-        storage_account
-            .set_info_without_code(host, caller_info)
-            .unwrap();
-
-        let call_data =
-            Bytes::from(hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap());
+        let mut info = caller_account.info(host).unwrap();
+        info.balance = u256_to_alloy(&U256::MAX);
+        caller_account.set_info_without_code(host, info).unwrap();
+        let call_data: Vec<u8> = hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap();
 
         // gas limit was estimated using Remix on Shanghai network (256,842)
         // plus a safety margin for gas accounting discrepancies
@@ -814,7 +802,7 @@ mod tests {
             EtherlinkPrecompiles::new(),
             caller,
             None,
-            call_data,
+            call_data.into(),
             gas_limit,
             gas_price.try_into().unwrap(),
             revm::primitives::U256::ZERO,

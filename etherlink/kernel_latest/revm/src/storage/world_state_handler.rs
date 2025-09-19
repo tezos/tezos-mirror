@@ -346,6 +346,34 @@ impl StorageAccount {
         Ok(())
     }
 
+    // In the future we might want to optimize reading to not use `info`.
+    pub fn add_balance(
+        &mut self,
+        host: &mut impl Runtime,
+        amount: U256,
+    ) -> Result<(), Error> {
+        let mut info = self.info(host)?;
+        info.balance = info
+            .balance
+            .checked_add(amount)
+            .ok_or(Error::Custom("Balance overflow".to_string()))?;
+        self.set_info(host, info)
+    }
+
+    // In the future we might want to optimize reading to not use `info`.
+    pub fn sub_balance(
+        &mut self,
+        host: &mut impl Runtime,
+        amount: U256,
+    ) -> Result<(), Error> {
+        let mut info = self.info(host)?;
+        info.balance = info
+            .balance
+            .checked_sub(amount)
+            .ok_or(Error::Custom("Balance underflow".to_string()))?;
+        self.set_info(host, info)
+    }
+
     pub fn storage_path(&self, index: &U256) -> Result<OwnedPath, Error> {
         let storage_path = concat(&self.path, &STORAGE_ROOT_PATH)?;
         let index_path = path_from_u256(index)?;
@@ -405,7 +433,7 @@ impl StorageAccount {
         )
     }
 
-    pub(crate) fn read_ticket_balance(
+    pub fn read_ticket_balance(
         &self,
         host: &impl Runtime,
         ticket_hash: &U256,

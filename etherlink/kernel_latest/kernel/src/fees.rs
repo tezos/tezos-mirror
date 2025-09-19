@@ -20,9 +20,10 @@
 use crate::simulation::SimulationOutcome;
 use crate::transaction::TransactionContent;
 
-use evm_execution::account_storage::{account_path, EthereumAccountStorage};
 use evm_execution::EthereumError;
 use primitive_types::{H160, H256, U256};
+use revm_etherlink::helpers::legacy::{h160_to_alloy, u256_to_alloy};
+use revm_etherlink::storage::world_state_handler::{account_path, WorldStateHandler};
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
@@ -170,7 +171,7 @@ impl FeeUpdates {
     pub fn apply(
         &self,
         host: &mut impl Runtime,
-        accounts: &mut EthereumAccountStorage,
+        accounts: &mut WorldStateHandler,
         caller: H160,
         sequencer_pool_address: Option<H160>,
     ) -> Result<(), anyhow::Error> {
@@ -180,12 +181,15 @@ impl FeeUpdates {
             "Applying {self:?} for {caller}"
         );
 
-        let caller_account_path = account_path(&caller)?;
+        let caller_account_path = account_path(&h160_to_alloy(&caller))?;
         let mut caller_account = accounts.get_or_create(host, &caller_account_path)?;
-        if !caller_account.balance_remove(host, self.charge_user_amount)? {
+        if let Err(e) =
+            caller_account.sub_balance(host, u256_to_alloy(&self.charge_user_amount))
+        {
             return Err(anyhow::anyhow!(
-                "Failed to charge {caller} additional fees of {}",
-                self.charge_user_amount
+                "Failed to charge {caller} additional fees of {}: {}",
+                self.charge_user_amount,
+                e
             ));
         }
 
@@ -204,11 +208,17 @@ impl FeeUpdates {
             }
         };
 
-        let sequencer_account_path = account_path(&sequencer)?;
-        accounts
-            .get_or_create(host, &sequencer_account_path)?
-            .balance_add(host, self.compensate_sequencer_amount)?;
-
+        let sequencer_account_path = account_path(&h160_to_alloy(&sequencer))?;
+        let mut account = accounts.get_or_create(host, &sequencer_account_path)?;
+        if let Err(e) =
+            account.add_balance(host, u256_to_alloy(&self.compensate_sequencer_amount))
+        {
+            return Err(anyhow::anyhow!(
+                "Failed to compensate sequencer {sequencer} of {}: {}",
+                self.compensate_sequencer_amount,
+                e
+            ));
+        }
         Ok(())
     }
 }
@@ -311,10 +321,13 @@ fn gas_as_u64(gas_for_fees: U256) -> Result<u64, EthereumError> {
 mod tests {
     use super::*;
     use alloy_primitives::Bytes;
-    use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, U256};
     use revm::context::result::{ExecutionResult, Output};
     use revm_etherlink::ExecutionOutcome;
+    use revm_etherlink::{
+        helpers::legacy::alloy_to_u256,
+        storage::world_state_handler::new_world_state_handler,
+    };
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     use proptest::prelude::*;
@@ -367,12 +380,11 @@ mod tests {
     fn apply_updates_balances_no_sequencer() {
         // Arrange
         let mut host = MockKernelHost::default();
-        let mut evm_account_storage =
-            evm_execution::account_storage::init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
 
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let balance = U256::from(1000);
-        set_balance(&mut host, &mut evm_account_storage, address, balance);
+        set_balance(&mut host, &mut world_state_handler, address, balance);
 
         let burn_amount = balance / 3;
         let compensate_sequencer_amount = balance / 4;
@@ -387,11 +399,11 @@ mod tests {
 
         // Act
         let result =
-            fee_updates.apply(&mut host, &mut evm_account_storage, address, None);
+            fee_updates.apply(&mut host, &mut world_state_handler, address, None);
 
         // Assert
         assert!(result.is_ok());
-        let new_balance = get_balance(&mut host, &mut evm_account_storage, address);
+        let new_balance = get_balance(&mut host, &mut world_state_handler, address);
         assert_eq!(balance / 2, new_balance);
 
         let burned = crate::storage::read_burned_fees(&mut host);
@@ -407,17 +419,16 @@ mod tests {
         let sequencer_address =
             address_from_str("0123456789ABCDEF0123456789ABCDEF01234567");
 
-        let mut evm_account_storage =
-            evm_execution::account_storage::init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
 
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let balance = U256::from(1000);
-        set_balance(&mut host, &mut evm_account_storage, address, balance);
+        set_balance(&mut host, &mut world_state_handler, address, balance);
 
         let sequencer_balance = U256::from(500);
         set_balance(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             sequencer_address,
             sequencer_balance,
         );
@@ -436,21 +447,21 @@ mod tests {
         // Act
         let result = fee_updates.apply(
             &mut host,
-            &mut evm_account_storage,
+            &mut world_state_handler,
             address,
             Some(sequencer_address),
         );
 
         // Assert
         assert!(result.is_ok());
-        let new_balance = get_balance(&mut host, &mut evm_account_storage, address);
+        let new_balance = get_balance(&mut host, &mut world_state_handler, address);
         assert_eq!(balance / 2, new_balance);
 
         let burned = crate::storage::read_burned_fees(&mut host);
         assert_eq!(burn_amount, burned);
 
         let sequencer_new_balance =
-            get_balance(&mut host, &mut evm_account_storage, sequencer_address);
+            get_balance(&mut host, &mut world_state_handler, sequencer_address);
         assert_eq!(
             sequencer_new_balance,
             sequencer_balance + compensate_sequencer_amount
@@ -461,12 +472,11 @@ mod tests {
     fn apply_fails_user_charge_too_large() {
         // Arrange
         let mut host = MockKernelHost::default();
-        let mut evm_account_storage =
-            evm_execution::account_storage::init_account_storage().unwrap();
+        let mut world_state_handler = new_world_state_handler().unwrap();
 
         let address = address_from_str("af1276cbb260bb13deddb4209ae99ae6e497f446");
         let balance = U256::from(1000);
-        set_balance(&mut host, &mut evm_account_storage, address, balance);
+        set_balance(&mut host, &mut world_state_handler, address, balance);
 
         let fee_updates = FeeUpdates {
             overall_gas_used: U256::zero(),
@@ -478,11 +488,11 @@ mod tests {
 
         // Act
         let result =
-            fee_updates.apply(&mut host, &mut evm_account_storage, address, None);
+            fee_updates.apply(&mut host, &mut world_state_handler, address, None);
 
         // Assert
         assert!(result.is_err());
-        let new_balance = get_balance(&mut host, &mut evm_account_storage, address);
+        let new_balance = get_balance(&mut host, &mut world_state_handler, address);
         assert_eq!(balance, new_balance);
     }
 
@@ -515,27 +525,29 @@ mod tests {
 
     fn get_balance(
         host: &mut MockKernelHost,
-        evm_account_storage: &mut EthereumAccountStorage,
+        world_state_handler: &mut WorldStateHandler,
         address: H160,
     ) -> U256 {
-        let account = evm_account_storage
-            .get_or_create(host, &account_path(&address).unwrap())
+        let account = world_state_handler
+            .get_or_create(host, &account_path(&h160_to_alloy(&address)).unwrap())
             .unwrap();
-        account.balance(host).unwrap()
+        let info = account.info(host).unwrap();
+        alloy_to_u256(&info.balance)
     }
 
     fn set_balance(
         host: &mut MockKernelHost,
-        evm_account_storage: &mut EthereumAccountStorage,
+        world_state_handler: &mut WorldStateHandler,
         address: H160,
         balance: U256,
     ) {
-        let mut account = evm_account_storage
-            .get_or_create(host, &account_path(&address).unwrap())
+        let mut account = world_state_handler
+            .get_or_create(host, &account_path(&h160_to_alloy(&address)).unwrap())
             .unwrap();
-        assert!(account.balance(host).unwrap().is_zero());
-
-        account.balance_add(host, balance).unwrap();
+        let mut info = account.info(host).unwrap();
+        assert!(info.balance.is_zero());
+        info.balance = info.balance.saturating_add(u256_to_alloy(&balance));
+        account.set_info(host, info).unwrap();
     }
 
     fn mock_execution_outcome(gas_used: u64) -> SimulationOutcome {
