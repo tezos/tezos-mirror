@@ -409,7 +409,7 @@ let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
           Random.self_init () ;
           env
       | Some seed ->
-          Random.init seed ;
+          Random.init (seed + i) ;
           (* each baker will have a different seed *)
           fixed_seed_env env
     in
@@ -1062,7 +1062,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
       ppx_profiling_verbosity = Cli.ppx_profiling_verbosity;
       ppx_profiling_backends = Cli.ppx_profiling_backends;
       signing_delay = Cli.signing_delay;
-      fixed_random_seed = Cli.fixed_random_seed;
+      fixed_random_seed = Tezt.Cli.Options.seed;
       octez_release = Cli.octez_release;
       auto_faketime = Cli.auto_faketime;
     }

@@ -717,8 +717,6 @@ module type Layer1 = sig
 
   val signing_delay : (float * float) option
 
-  val fixed_random_seed : int option
-
   val snapshot : Snapshot_helpers.t
 
   val octez_release : string option
@@ -943,15 +941,7 @@ module Layer1 () = struct
     Option.fold ~none:from_config ~some:Option.some from_cli
 
   let fixed_random_seed =
-    let from_cli =
-      Clap.optional_int
-        ~section
-        ~long:"fixed-seed"
-        ~description:
-          "Use a fixed seed for the client/baker random number generator. This \
-           can be useful for reproducing an experiment."
-        ()
-    in
+    let from_cli = Tezt.Cli.Options.seed in
     let from_config =
       Option.fold
         ~none:None
