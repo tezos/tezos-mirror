@@ -797,9 +797,11 @@ let internal_setup_formatter ppf format verbosity cols =
          {
            orig_out_functions with
            out_string =
-             (fun s i j ->
-               let buf = Buffer.create (j - i) in
-               for n = i to j - 1 do
+             (fun s i len ->
+               (* [i] is the start position and [len] the number of characters *)
+               let buf = Buffer.create len in
+               let end_pos = i + len - 1 in
+               for n = i to end_pos do
                  match s.[n] with
                  | '\003' -> Buffer.add_char buf '<'
                  | '\004' -> Buffer.add_char buf '>'
