@@ -1,0 +1,129 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "int256",
+        "name": "w",
+        "type": "int256"
+      },
+      {
+        "internalType": "int256",
+        "name": "h",
+        "type": "int256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint8",
+        "name": "spp",
+        "type": "uint8"
+      }
+    ],
+    "name": "Benchmark",
+    "outputs": [
+      {
+        "internalType": "bytes1",
+        "name": "r",
+        "type": "bytes1"
+      },
+      {
+        "internalType": "bytes1",
+        "name": "g",
+        "type": "bytes1"
+      },
+      {
+        "internalType": "bytes1",
+        "name": "b",
+        "type": "bytes1"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "int256",
+        "name": "spp",
+        "type": "int256"
+      }
+    ],
+    "name": "TraceImage",
+    "outputs": [
+      {
+        "internalType": "bytes",
+        "name": "",
+        "type": "bytes"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "int256",
+        "name": "x",
+        "type": "int256"
+      },
+      {
+        "internalType": "int256",
+        "name": "y",
+        "type": "int256"
+      },
+      {
+        "internalType": "int256",
+        "name": "spp",
+        "type": "int256"
+      }
+    ],
+    "name": "TracePixel",
+    "outputs": [
+      {
+        "internalType": "bytes1",
+        "name": "r",
+        "type": "bytes1"
+      },
+      {
+        "internalType": "bytes1",
+        "name": "g",
+        "type": "bytes1"
+      },
+      {
+        "internalType": "bytes1",
+        "name": "b",
+        "type": "bytes1"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "int256",
+        "name": "y",
+        "type": "int256"
+      },
+      {
+        "internalType": "int256",
+        "name": "spp",
+        "type": "int256"
+      }
+    ],
+    "name": "TraceScanline",
+    "outputs": [
+      {
+        "internalType": "bytes",
+        "name": "",
+        "type": "bytes"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

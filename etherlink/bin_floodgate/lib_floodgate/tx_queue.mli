@@ -73,6 +73,9 @@ val transfer :
   unit ->
   unit Lwt.t
 
+(** Stops the worker for the tx queue. *)
+val shutdown : unit -> unit Lwt.t
+
 module Misc : sig
   (** [send_raw_transaction ~relay_endpoint hex_raw_txn] sends [hex_raw_txn] to
       [relay_endpoint] using the [eth_sendRawTransaction] method, without going
