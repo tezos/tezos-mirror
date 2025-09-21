@@ -29,6 +29,7 @@ type t = {
   whitelist : whitelist_item list option;
       (** Optional list of whitelisted addresses *)
   monitor_all_deposits : bool;  (** Whether to store all deposits in the DB.  *)
+  block_timeout : float;  (** Timeout for receiving a new block. *)
 }
 
 let ctxt = Efunc_core.Eth.Crypto.context ()
@@ -75,6 +76,7 @@ let default =
     secret_key = default_secret_key;
     whitelist = default_whitelist;
     monitor_all_deposits = false;
+    block_timeout = 10. (* seconds *);
   }
 
 let rpc_encoding =
@@ -112,6 +114,7 @@ let encoding =
            secret_key;
            whitelist;
            monitor_all_deposits;
+           block_timeout;
          }
        ->
       ( evm_node_endpoint,
@@ -120,14 +123,16 @@ let encoding =
         rpc,
         secret_key,
         whitelist,
-        monitor_all_deposits ))
+        monitor_all_deposits,
+        block_timeout ))
     (fun ( evm_node_endpoint,
            gas_limit,
            max_fee_per_gas,
            rpc,
            secret_key,
            whitelist,
-           monitor_all_deposits )
+           monitor_all_deposits,
+           block_timeout )
        ->
       {
         evm_node_endpoint;
@@ -137,8 +142,9 @@ let encoding =
         secret_key;
         whitelist;
         monitor_all_deposits;
+        block_timeout;
       })
-    (obj7
+    (obj8
        (dft
           "evm_node_endpoint"
           ~description:"URL of the EVM node"
@@ -175,7 +181,12 @@ let encoding =
           "monitor_all_deposits"
           ~description:"Monitor and store all deposits in the DB."
           bool
-          false))
+          false)
+       (dft
+          "block_timeout"
+          ~description:"Timeout for receiving a new block in seconds."
+          float
+          default.block_timeout))
 
 (** [load_file ~data_dir] attempts to load the configuration file from the
     specified data directory. Returns [None] if the file doesn't exist or [Some

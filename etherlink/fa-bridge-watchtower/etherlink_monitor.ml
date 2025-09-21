@@ -16,6 +16,7 @@ type ctx = {
   gas_limit : Z.t;
   whitelist : Config.whitelist_item list option;
   mutable nonce : Ethereum_types.quantity;
+  block_timeout : float;
 }
 
 module Craft = struct
@@ -376,6 +377,16 @@ module Event = struct
       ~msg:"Disconnected from websocket, reconnecting in {delay}s."
       ~level:Error
       ("delay", Data_encoding.float)
+
+  let monitor_heads_timeout =
+    declare_1
+      ~section
+      ~name:"monitor_heads_timeout"
+      ~msg:
+        "Timeout after {timeout}s while waiting for a new head. Disconnecting  \
+         from websocket."
+      ~level:Warning
+      ("timeout", Data_encoding.float)
 end
 
 type error +=
@@ -585,15 +596,33 @@ let handle_one_log {ws_client; db; whitelist; _}
       in
       Db.Deposits.store db deposit.deposit deposit.log_info
 
-let lwt_stream_iter_es f stream =
-  let open Lwt_result_syntax in
+type lwt_stream_iter_with_timeout_ended = Closed | Timeout of float
+
+type 'a lwt_stream_get_result =
+  | Get_none
+  | Get_timeout of float
+  | Get_elt of 'a
+
+let lwt_stream_iter_es_with_timeout ~timeout f stream =
+  let open Lwt_syntax in
   let rec loop () =
-    let*! elt = Lwt_stream.get stream in
-    match elt with
-    | None -> return_unit
-    | Some elt ->
-        let* () = f elt in
-        loop ()
+    let get_promise =
+      let+ res = Lwt_stream.get stream in
+      match res with None -> Get_none | Some e -> Get_elt e
+    in
+    let timeout_promise =
+      let+ () = Lwt_unix.sleep timeout in
+      Get_timeout timeout
+    in
+    let* res = Lwt.pick [get_promise; timeout_promise] in
+    match res with
+    | Get_none -> return_ok Closed
+    | Get_timeout t -> return_ok (Timeout t)
+    | Get_elt elt -> (
+        let* res = protect @@ fun () -> f elt in
+        match res with
+        | Ok () -> (loop [@ocaml.tailcall]) ()
+        | Error trace -> return_error trace)
   in
   loop ()
 
@@ -772,8 +801,9 @@ let monitor_heads ctx =
   and* heads_subscription =
     Websocket_client.subscribe_newHeadNumbers ctx.ws_client
   in
-  let* () =
-    lwt_stream_iter_es
+  let* stopped =
+    lwt_stream_iter_es_with_timeout
+      ~timeout:ctx.block_timeout
       (fun number ->
         let*? number in
         let* last_l2_head = Db.Pointers.L2_head.get ctx.db in
@@ -790,7 +820,14 @@ let monitor_heads ctx =
          (Lwt_stream.return (Ok head))
          heads_subscription.stream)
   in
-  return_unit
+  match stopped with
+  | Closed -> return_unit
+  | Timeout timeout ->
+      (* We didn't receive a new head within ctx.block_timeout so we close the
+         connection (and will reconnect after). *)
+      let*! () = Event.(emit monitor_heads_timeout) timeout in
+      let*! () = Websocket_client.disconnect ctx.ws_client in
+      return_unit
 
 let init_db_pointers db ws_client ~first_block =
   let open Lwt_result_syntax in
@@ -898,6 +935,7 @@ let start db ~config ~notify_ws_change ~first_block =
         whitelist =
           (if config.monitor_all_deposits then None else config.whitelist);
         nonce = Ethereum_types.Qty.zero;
+        block_timeout = config.block_timeout;
       }
     in
     monitor_heads ctx
