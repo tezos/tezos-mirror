@@ -25,13 +25,11 @@ use crate::{error::Error, storage};
 use crate::{parsable, parsing, retrieve_chain_id};
 
 use evm::Config;
-use evm_execution::handler::{
-    ExecutionOutcome, ExecutionResult as ExecutionOutcomeResult,
-};
 use evm_execution::trace::TracerInput;
 use evm_execution::EthereumError;
 use primitive_types::{H160, U256};
-use revm_etherlink::u256_to_alloy;
+use revm::context::result::ExecutionResult as VMResult;
+use revm_etherlink::{u256_to_alloy, ExecutionOutcome};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use tezos_ethereum::access_list::empty_access_list;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
@@ -64,9 +62,6 @@ pub const SIMULATION_ENCODING_VERSION: u8 = 0x01;
 pub const OK_TAG: u8 = 0x1;
 pub const ERR_TAG: u8 = 0x2;
 
-const OUT_OF_TICKS_MSG: &str = "The transaction would exhaust all the ticks it
-    is allocated. Try reducing its gas consumption or splitting the call in
-    multiple steps, if possible.";
 // Redefined Result as we cannot implement Decodable and Encodable traits on Result
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SimulationResult<T, E> {
@@ -207,38 +202,53 @@ impl<T> From<EthereumError> for SimulationResult<T, String> {
     }
 }
 
-impl From<Result<Option<ExecutionOutcome>, EthereumError>>
+#[derive(PartialEq, Debug)]
+pub struct SimulationOutcome {
+    pub(crate) outcome: ExecutionOutcome,
+    pub gas_used: u64,
+}
+
+impl From<ExecutionOutcome> for SimulationOutcome {
+    fn from(outcome: ExecutionOutcome) -> Self {
+        let gas_used = outcome.result.gas_used();
+        Self { outcome, gas_used }
+    }
+}
+
+impl From<Result<SimulationOutcome, EthereumError>>
     for SimulationResult<CallResult, String>
 {
-    fn from(result: Result<Option<ExecutionOutcome>, EthereumError>) -> Self {
+    fn from(result: Result<SimulationOutcome, EthereumError>) -> Self {
         match result {
-            Ok(Some(ExecutionOutcome {
-                gas_used, result, ..
-            })) if result.is_success() => {
+            Ok(SimulationOutcome { outcome, .. }) => Ok(outcome).into(),
+            Err(err) => err.into(),
+        }
+    }
+}
+
+impl From<Result<ExecutionOutcome, EthereumError>>
+    for SimulationResult<CallResult, String>
+{
+    fn from(result: Result<ExecutionOutcome, EthereumError>) -> Self {
+        match result {
+            Ok(ExecutionOutcome { result, .. }) if result.is_success() => {
                 Self::Ok(SimulationResult::Ok(ExecutionResult {
                     value: result.output().map(|x| x.to_vec()),
-                    gas_used: Some(gas_used),
+                    gas_used: Some(result.gas_used()),
                 }))
             }
-            Ok(Some(
+            Ok(
                 outcome @ ExecutionOutcome {
-                    result: ExecutionOutcomeResult::CallReverted(_),
+                    result: VMResult::Revert { .. },
                     ..
                 },
-            )) => Self::Ok(SimulationResult::Err(
-                outcome.output().unwrap_or_default().to_vec(),
+            ) => Self::Ok(SimulationResult::Err(
+                outcome.result.output().unwrap_or_default().to_vec(),
             )),
-            Ok(Some(ExecutionOutcome {
-                result: ExecutionOutcomeResult::OutOfTicks,
-                ..
-            })) => Self::Err(String::from(OUT_OF_TICKS_MSG)),
-            Ok(Some(ExecutionOutcome { result, .. })) => {
+            Ok(ExecutionOutcome { result, .. }) => {
                 let msg = format!("The transaction failed: {result:?}.");
                 Self::Err(msg)
             }
-            Ok(None) => Self::Err(String::from(
-                "No outcome was produced when the transaction was ran",
-            )),
             Err(err) => err.into(),
         }
     }
@@ -502,36 +512,27 @@ impl Evaluation {
         ) {
             Ok(Some(outcome)) if !self.with_da_fees => {
                 let result: SimulationResult<CallResult, String> =
-                    Result::Ok(Some(outcome)).into();
+                    Result::Ok(outcome).into();
 
                 Ok(result)
             }
             Ok(Some(outcome)) => {
                 let outcome = simulation_add_gas_for_fees(
-                    outcome,
+                    outcome.into(),
                     &constants.block_fees,
                     &self.data,
                 )
                 .map_err(Error::Simulation)?;
 
                 let result: SimulationResult<CallResult, String> =
-                    Result::Ok(Some(outcome)).into();
+                    Result::Ok(outcome).into();
 
                 Ok(result)
             }
-            Ok(None) => {
-                let result: SimulationResult<CallResult, String> =
-                    Result::Ok(None).into();
-
-                Ok(result)
-            }
-            Err(err) => {
-                let result: SimulationResult<CallResult, String> =
-                    Result::Err(EthereumError::WrappedError(Cow::Owned(err.to_string())))
-                        .into();
-
-                Ok(result)
-            }
+            Ok(None) => Ok(SimulationResult::Err(
+                "No outcome was produced when the transaction was ran".to_owned(),
+            )),
+            Err(err) => Ok(SimulationResult::Err(err.to_string())),
         }
     }
 }
@@ -678,11 +679,17 @@ pub fn start_simulation_mode<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-
-    use evm_execution::{
-        account_storage, configuration::EVMVersion, precompiles::PrecompileBTreeMap,
-    };
+    use evm_execution::configuration::EVMVersion;
     use primitive_types::H256;
+    use revm::{
+        primitives::{Address, Bytes},
+        state::AccountInfo,
+    };
+    use revm_etherlink::{
+        precompiles::provider::EtherlinkPrecompiles,
+        run_transaction,
+        storage::world_state_handler::{account_path, new_world_state_handler},
+    };
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
 
@@ -758,10 +765,7 @@ mod tests {
     // call: get (public view)
     const STORAGE_CONTRACT_CALL_GET: &str = "6d4ce63c";
 
-    fn create_contract<Host>(host: &mut Host) -> H160
-    where
-        Host: Runtime,
-    {
+    fn create_contract<Host: Runtime>(host: &mut Host) -> H160 {
         let timestamp =
             read_last_info_per_level_timestamp(host).unwrap_or(Timestamp::from(0));
         let timestamp = U256::from(timestamp.as_u64());
@@ -777,41 +781,60 @@ mod tests {
             crate::block::GAS_LIMIT,
             H160::zero(),
         );
-        let mut evm_account_storage = account_storage::init_account_storage().unwrap();
 
-        let callee = None;
-        let caller = H160::from_low_u64_be(117);
-        let transaction_value = U256::from(0);
-        let call_data: Vec<u8> = hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap();
+        let caller = Address::from_slice(&[1; 20]);
+
+        let caller_info = AccountInfo {
+            balance: revm::primitives::U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+
+        let mut world_state_handler = new_world_state_handler().unwrap();
+
+        let mut storage_account = world_state_handler
+            .get_or_create(host, &account_path(&caller).unwrap())
+            .unwrap();
+
+        storage_account
+            .set_info_without_code(host, caller_info)
+            .unwrap();
+
+        let call_data =
+            Bytes::from(hex::decode(STORAGE_CONTRACT_INITIALIZATION).unwrap());
 
         // gas limit was estimated using Remix on Shanghai network (256,842)
         // plus a safety margin for gas accounting discrepancies
         let gas_limit = 300_000;
-        let gas_price = U256::from(21000);
+        let gas_price = block.base_fee_per_gas() + 1;
         // create contract
-        let outcome = evm_execution::run_transaction(
+        let outcome = run_transaction(
             host,
+            revm::primitives::hardfork::SpecId::SHANGHAI,
             &block,
-            &mut evm_account_storage,
-            &PrecompileBTreeMap::new(),
-            &EVMVersion::current_test_config(),
-            callee,
+            &mut world_state_handler,
+            EtherlinkPrecompiles::new(),
             caller,
-            call_data,
-            Some(gas_limit),
-            gas_price,
-            transaction_value,
-            false,
             None,
-            empty_access_list(),
+            call_data,
+            gas_limit,
+            gas_price.try_into().unwrap(),
+            revm::primitives::U256::ZERO,
+            vec![].into(),
+            None,
+            None,
         );
-        assert!(outcome.is_ok(), "contract should have been created");
+        assert!(
+            outcome.is_ok(),
+            "contract should have been created but got {outcome:?}",
+        );
         let outcome = outcome.unwrap();
         assert!(
-            outcome.is_some(),
+            outcome.result.created_address().is_some(),
             "execution should have produced some outcome"
         );
-        outcome.unwrap().new_address().unwrap()
+        H160(*outcome.result.created_address().unwrap().0)
     }
 
     #[test]

@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: 2024 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -15,10 +17,10 @@
 //!
 //! Additionally, we charge a _data-availability_ fee, for each tx posted through L1.
 
+use crate::simulation::SimulationOutcome;
 use crate::transaction::TransactionContent;
 
 use evm_execution::account_storage::{account_path, EthereumAccountStorage};
-use evm_execution::handler::ExecutionOutcome;
 use evm_execution::EthereumError;
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::access_list::AccessListItem;
@@ -161,7 +163,7 @@ impl FeeUpdates {
         }
     }
 
-    pub fn modify_outcome(&self, outcome: &mut ExecutionOutcome) {
+    pub fn modify_outcome(&self, outcome: &mut SimulationOutcome) {
         outcome.gas_used = self.overall_gas_used.as_u64();
     }
 
@@ -215,10 +217,10 @@ impl FeeUpdates {
 ///
 /// This is done by adjusting `gas_used` upwards.
 pub fn simulation_add_gas_for_fees(
-    mut outcome: ExecutionOutcome,
+    mut outcome: SimulationOutcome,
     block_fees: &BlockFees,
     tx_data: &[u8],
-) -> Result<ExecutionOutcome, EthereumError> {
+) -> Result<SimulationOutcome, EthereumError> {
     // Simulation does not have an access list
     let gas_for_fees = gas_for_fees(
         block_fees.da_fee_per_byte(),
@@ -308,9 +310,11 @@ fn gas_as_u64(gas_for_fees: U256) -> Result<u64, EthereumError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use evm::ExitSucceed;
+    use alloy_primitives::Bytes;
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, U256};
+    use revm::context::result::{ExecutionResult, Output};
+    use revm_etherlink::ExecutionOutcome;
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     use proptest::prelude::*;
@@ -534,17 +538,18 @@ mod tests {
         account.balance_add(host, balance).unwrap();
     }
 
-    fn mock_execution_outcome(gas_used: u64) -> ExecutionOutcome {
-        ExecutionOutcome {
-            gas_used,
-            logs: Vec::new(),
-            result: evm_execution::handler::ExecutionResult::CallSucceeded(
-                ExitSucceed::Stopped,
-                vec![],
-            ),
-            withdrawals: Vec::new(),
-            estimated_ticks_used: 1,
-        }
+    fn mock_execution_outcome(gas_used: u64) -> SimulationOutcome {
+        let outcome = ExecutionOutcome {
+            withdrawals: vec![],
+            result: ExecutionResult::Success {
+                reason: revm::context::result::SuccessReason::Return,
+                gas_used,
+                gas_refunded: 0,
+                logs: vec![],
+                output: Output::Call(Bytes::new()),
+            },
+        };
+        SimulationOutcome { gas_used, outcome }
     }
 
     fn mock_tx(max_fee_per_gas: U256, data: Vec<u8>) -> EthereumTransactionCommon {
@@ -572,13 +577,13 @@ mod tests {
         let simulated_outcome = mock_execution_outcome(initial_gas_used);
 
         // Act
-        let res = simulation_add_gas_for_fees(simulated_outcome, &block_fees, tx_data);
+        let res =
+            simulation_add_gas_for_fees(simulated_outcome, &block_fees, tx_data).unwrap();
 
         // Assert
-        let expected = mock_execution_outcome(initial_gas_used + extra);
         assert_eq!(
-            Ok(expected),
-            res,
+            initial_gas_used + extra,
+            res.gas_used,
             "unexpected extra gas at price {min_gas_price} and data_len {}",
             tx_data.len()
         );
