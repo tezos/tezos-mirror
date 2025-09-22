@@ -67,57 +67,52 @@ let update_account address state_override evm_state =
   if is_invalid state_override then tzfail State_and_state_diff
   else
     let* info = Evm_state.read evm_state (Accounts.info address) in
-    let* new_info =
+    let* evm_state =
       match info with
       | None ->
-          let* old_balance_opt =
-            Evm_state.read evm_state (Accounts.balance address)
+          let update v_opt key encode state =
+            match v_opt with
+            | None -> return state
+            | Some v ->
+                let*! state = Evm_state.modify ~key ~value:(encode v) state in
+                return state
           in
-          let old_balance =
-            Option.map
-              (fun b -> Ethereum_types.decode_number_le b)
-              old_balance_opt
-            |> Option.value ~default:Ethereum_types.Qty.zero
+
+          let durable_balance v =
+            v |> Ethereum_types.encode_u256_le |> Bytes.to_string
           in
-          let* old_nonce_opt =
-            Evm_state.read evm_state (Accounts.nonce address)
+          let durable_nonce v =
+            v |> Ethereum_types.encode_u64_le |> Bytes.to_string
           in
-          let old_nonce =
-            Option.map
-              (fun b -> Ethereum_types.decode_number_le b)
-              old_nonce_opt
-            |> Option.value ~default:Ethereum_types.Qty.zero
+          let durable_code = Ethereum_types.hex_to_bytes in
+          let* evm_state =
+            update
+              state_override.nonce
+              (Accounts.nonce address)
+              durable_nonce
+              evm_state
           in
-          let* old_code_hash_opt =
-            Evm_state.read evm_state (Accounts.code_hash address)
+          let* evm_state =
+            update
+              state_override.balance
+              (Accounts.balance address)
+              durable_balance
+              evm_state
           in
-          let old_code_hash =
-            Option.map (fun b -> Ethereum_types.decode_hash b) old_code_hash_opt
-            |> Option.value
-                 ~default:
-                   (Bytes.create 0 |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
-                  |> Ethereum_types.decode_hash)
+
+          let* evm_state =
+            update
+              state_override.code
+              (Accounts.code address)
+              durable_code
+              evm_state
           in
-          return
-            Etherlink_durable_storage.AccountInfo.
-              {
-                balance =
-                  Option.value ~default:old_balance state_override.balance;
-                nonce = Option.value ~default:old_nonce state_override.nonce;
-                code_hash =
-                  Option.fold
-                    ~none:old_code_hash
-                    ~some:(fun code ->
-                      code |> Ethereum_types.hex_to_real_bytes
-                      |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
-                      |> Ethereum_types.decode_hash)
-                    state_override.code;
-              }
-      | Some info ->
+          return evm_state
+      | Some info -> (
           let old_info =
             Etherlink_durable_storage.AccountInfo.decode_exn info
           in
-          return
+          let new_info =
             Etherlink_durable_storage.AccountInfo.
               {
                 balance =
@@ -133,26 +128,25 @@ let update_account address state_override evm_state =
                       |> Ethereum_types.decode_hash)
                     state_override.code;
               }
-    in
-    let*! evm_state =
-      Evm_state.modify
-        ~key:(Accounts.info address)
-        ~value:
-          (Etherlink_durable_storage.AccountInfo.encode new_info
-          |> Bytes.to_string)
-        evm_state
-    in
-    let* evm_state =
-      match state_override.code with
-      | None -> return evm_state
-      | Some code ->
+          in
           let*! evm_state =
             Evm_state.modify
-              ~key:(Code.code new_info.code_hash)
-              ~value:(Ethereum_types.hex_to_bytes code)
+              ~key:(Accounts.info address)
+              ~value:
+                (Etherlink_durable_storage.AccountInfo.encode new_info
+                |> Bytes.to_string)
               evm_state
           in
-          return evm_state
+          match state_override.code with
+          | None -> return evm_state
+          | Some code ->
+              let*! evm_state =
+                Evm_state.modify
+                  ~key:(Code.code new_info.code_hash)
+                  ~value:(Ethereum_types.hex_to_bytes code)
+                  evm_state
+              in
+              return evm_state)
     in
     let* evm_state =
       update_storage address state_override.state_diff evm_state

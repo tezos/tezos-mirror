@@ -45,7 +45,6 @@ let register ?genesis_timestamp ?eth_bootstrap_accounts ?tez_bootstrap_accounts
 
 let test_call_state_override_balance =
   register
-    ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "state_override"; "balance_override"; "eth_call"]
     ~title:"Can override balance in eth_call"
   @@ fun {sequencer; evm_version; _} _protocol ->
@@ -107,7 +106,6 @@ let test_call_state_override_balance =
 
 let test_call_state_override_code =
   register
-    ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "state_override"; "code_override"; "eth_call"]
     ~title:"Can override code in eth_call"
   @@ fun {sequencer; evm_version; _} _protocol ->
@@ -172,7 +170,6 @@ let test_call_state_override_code =
 
 let test_call_state_override_nonce =
   register
-    ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "state_override"; "nonce_override"; "eth_call"]
     ~title:"Can override nonce in eth_call"
   @@ fun {sequencer; evm_version; _} _protocol ->
@@ -237,7 +234,6 @@ let test_call_state_override_nonce =
 
 let test_call_state_override_state_diff =
   register
-    ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "state_override"; "state_diff"; "eth_call"]
     ~title:"Can override part of account storage in eth_call"
   @@ fun {sequencer; evm_version; _} _protocol ->
@@ -340,7 +336,6 @@ let test_call_state_override_state_diff =
 
 let test_call_state_override_state =
   register
-    ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "state_override"; "state_replace"; "eth_call"]
     ~title:"Can override completely account storage in eth_call"
   @@ fun {sequencer; evm_version; _} _protocol ->
@@ -451,7 +446,6 @@ let test_call_state_override_state =
 
 let test_call_state_override_state_empty =
   register
-    ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "state_override"; "state_empty"; "eth_call"]
     ~title:"Can override completely account storage in eth_call by empty state"
   @@ fun {sequencer; evm_version; _} _protocol ->
