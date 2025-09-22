@@ -132,12 +132,11 @@ let create_from_uris ?runner ?(path = Uses.path Constant.octez_agnostic_baker)
   agnostic_baker
 
 let handle_event node ({name; _} : event) =
-  Log.debug "Handling event for %s: %s" node.name name ;
   match name with
   | "starting_daemon.v0" ->
       Log.info "Baker %s received starting_daemon event" node.name ;
       set_ready node
-  | _ -> Log.debug "Ignoring unhandled event: %s" name
+  | _ -> ()
 
 let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
     ?(liquidity_baking_toggle_vote = Some Pass) ?force_apply_from_round
