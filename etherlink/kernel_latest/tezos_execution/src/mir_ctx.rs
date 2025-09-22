@@ -25,8 +25,7 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_storage::{read_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
-use tezos_tezlink::lazy_storage_diff::StorageDiff;
-use tezos_tezlink::lazy_storage_diff::{Alloc, Copy, Update};
+use tezos_tezlink::lazy_storage_diff::{Alloc, Copy, StorageDiff, Update};
 use typed_arena::Arena;
 
 pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
@@ -45,6 +44,36 @@ pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
     pub gas: Gas,
     pub operation_counter: OpCounter,
     pub origination_nonce: OrigNonce,
+}
+
+#[macro_export]
+macro_rules! make_default_ctx {
+    ($ctx:ident, $host: expr, $context: expr) => {
+        let mut gas = Gas::default();
+        let mut operation_counter = 0;
+        let mut origination_nonce =
+            OriginationNonce::initial(OperationHash(H256::zero()));
+        let mut $ctx = Ctx {
+            host: $host,
+            context: $context,
+            gas: &mut gas,
+            balance: 0,
+            amount: 0,
+            level: 0u32.into(),
+            now: 0i64.into(),
+            // default chain id NetXynUjJNZm7wi
+            chain_id: tezos_crypto_rs::hash::ChainId::try_from(vec![
+                0xf3, 0xd4, 0x85, 0x54,
+            ])
+            .unwrap(),
+            big_map_diff: BTreeMap::new(),
+            self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
+            sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
+            source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
+            operation_counter: &mut operation_counter,
+            origination_nonce: &mut origination_nonce,
+        };
+    };
 }
 
 impl<'a, Host: Runtime> CtxTrait<'a>
@@ -335,38 +364,6 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_tezlink::enc_wrappers::OperationHash;
 
-    macro_rules! make_default_ctx {
-        ($ctx:ident) => {
-            let mut host = MockKernelHost::default();
-            let context = Context::init_context();
-            let mut gas = Gas::default();
-            let mut operation_counter = 0;
-            let mut origination_nonce =
-                OriginationNonce::initial(OperationHash(H256::zero()));
-
-            let mut $ctx = Ctx {
-                host: &mut host,
-                context: &context,
-                gas: &mut gas,
-                balance: 0,
-                amount: 0,
-                level: 0u32.into(),
-                now: 0i64.into(),
-                // default chain id NetXynUjJNZm7wi
-                chain_id: tezos_crypto_rs::hash::ChainId::try_from(vec![
-                    0xf3, 0xd4, 0x85, 0x54,
-                ])
-                .unwrap(),
-                big_map_diff: BTreeMap::new(),
-                self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
-                sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
-                source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
-                operation_counter: &mut operation_counter,
-                origination_nonce: &mut origination_nonce,
-            };
-        };
-    }
-
     #[track_caller]
     fn check_is_dumped_map(map: BigMap, id: BigMapId) {
         match map.content {
@@ -410,7 +407,8 @@ mod tests {
 
     #[test]
     fn test_map_from_memory() {
-        make_default_ctx!(storage);
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &Context::init_context());
         let content = BTreeMap::from([
             (TypedValue::int(1), TypedValue::String("one".into())),
             (TypedValue::int(2), TypedValue::String("two".into())),
@@ -437,7 +435,8 @@ mod tests {
 
     #[test]
     fn test_map_updates_to_storage() {
-        make_default_ctx!(storage);
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &Context::init_context());
         let map_id = storage.big_map_new(&Type::Int, &Type::String).unwrap();
         storage
             .big_map_update(
@@ -489,7 +488,8 @@ mod tests {
 
     #[test]
     fn test_copy() {
-        make_default_ctx!(storage);
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &Context::init_context());
         let content = BTreeMap::from([
             (TypedValue::int(1), TypedValue::String("one".into())),
             (TypedValue::int(2), TypedValue::String("two".into())),
@@ -522,7 +522,8 @@ mod tests {
 
     #[test]
     fn test_remove_big_map() {
-        make_default_ctx!(storage);
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &Context::init_context());
         let map_id = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
         storage
             .big_map_update(&map_id, TypedValue::int(0), Some(TypedValue::int(0)))
@@ -533,7 +534,8 @@ mod tests {
 
     #[test]
     fn test_remove_with_dump() {
-        make_default_ctx!(storage);
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &Context::init_context());
         let map_id1 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
         storage
             .big_map_update(&map_id1, TypedValue::int(0), Some(TypedValue::int(0)))
