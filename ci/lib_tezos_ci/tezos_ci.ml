@@ -1375,12 +1375,6 @@ module Images_external = struct
      external image below and the internal image [e2etest]. *)
   let datadog_ci = Image.mk_external ~image_path:"datadog/ci:v2.44.0"
 
-  let ubuntu_oracular =
-    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:24.10_stable"
-
-  let opam_ubuntu_oracular =
-    Image.mk_external ~image_path:"ocaml/opam:ubuntu-24.10"
-
   let opam_ubuntu_noble =
     Image.mk_external ~image_path:"ocaml/opam:ubuntu-24.04"
 
