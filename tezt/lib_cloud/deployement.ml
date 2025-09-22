@@ -491,11 +491,12 @@ module Ssh_host = struct
         ~rm:true
         ~detach:true
         ~network:"host"
+        ~custom_docker_options:["--ulimit"; "nofile=65535:65535"]
         ~volumes
         ~publish_ports
         ~name
         docker_image
-        ["-D"; "-p"; guest_port; "--ulimit"; "nofile=65535:65535"]
+        ["-D"; "-p"; guest_port]
       |> Process.check
     in
     let agent =
