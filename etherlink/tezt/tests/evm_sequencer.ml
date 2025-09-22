@@ -13191,29 +13191,20 @@ let expect_failure msg k =
     (fun _ -> unit)
 
 let produce_proxy_owned_fa_deposit_and_claim ~client ~sequencer
-    ~sc_rollup_address ~evm_version ~fa_deposit =
-  let* incrementor = Solidity_contracts.incrementor evm_version in
+    ~sc_rollup_address ~evm_version ~l1_contracts =
+  let* ticketer_bytes = ticket_creator l1_contracts.fa_deposit in
+  let* content_bytes = ticket_content 0 in
+  let ticketer = ticketer_bytes |> Hex.of_bytes |> Hex.show in
+  let content = content_bytes |> Hex.of_bytes |> Hex.show in
 
-  let* incrementor, _tx_hash =
-    send_transaction_to_sequencer
-      (Eth_cli.deploy
-         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-         ~endpoint:(Evm_node.endpoint sequencer)
-         ~abi:incrementor.abi
-         ~bin:incrementor.bin)
-      sequencer
-  in
-
-  Log.info "Incrementor: %s" incrementor ;
-
-  let* proxy = Solidity_contracts.incrementor_proxy evm_version in
+  let* proxy = Solidity_contracts.etherlink_fa_proxy_mock evm_version in
 
   let* proxy, _tx_hash =
     send_transaction_to_sequencer
       (Eth_cli.deploy
          ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
          ~endpoint:(Evm_node.endpoint sequencer)
-         ~args:(sf {|["%s"]|} incrementor)
+         ~args:(sf {|["0x%s", "0x%s"]|} ticketer content)
          ~abi:proxy.abi
          ~bin:proxy.bin)
       sequencer
@@ -13226,7 +13217,7 @@ let produce_proxy_owned_fa_deposit_and_claim ~client ~sequencer
   let* () =
     Client.transfer
       ~giver:Constant.bootstrap4.public_key_hash
-      ~receiver:fa_deposit
+      ~receiver:l1_contracts.fa_deposit
       ~arg:
         (sf
            {|Pair 50 (Pair 0x%s%s "%s")|}
@@ -13260,30 +13251,31 @@ let produce_proxy_owned_fa_deposit_and_claim ~client ~sequencer
   in
   let produce_block () = Rpc.produce_block sequencer in
   let* _res = wait_for_application ~produce_block claim in
-  return nonce
+  return (nonce, proxy, ticketer, content)
 
-let test_fa_deposit_can_be_claimed =
+let test_fa_deposit_can_be_claimed_and_withdrawn =
   register_all
     ~__FILE__
     ~kernels:[Latest]
-    ~tags:["evm"; "fa_deposit"; "claim"]
+    ~tags:["evm"; "fa_deposit"; "claim"; "withdraw"]
     ~time_between_blocks:Nothing
     ~use_dal:Register_without_feature
     ~enable_fa_bridge:true
     ~use_multichain:Register_without_feature
     ~maximum_allowed_ticks:2_000_000_000L
-    ~title:"Claims are operational"
+    ~title:"FA deposit can be claimed and withdrawn"
+    ~additional_uses:[Constant.octez_codec]
   @@
   fun {client; sequencer; sc_rollup_address; evm_version; l1_contracts; _}
       _protocol
     ->
-  let* nonce =
+  let* nonce, proxy, ticketer, content =
     produce_proxy_owned_fa_deposit_and_claim
       ~client
       ~sequencer
       ~sc_rollup_address
       ~evm_version
-      ~fa_deposit:l1_contracts.fa_deposit
+      ~l1_contracts
   in
 
   let*@ block =
@@ -13295,6 +13287,25 @@ let test_fa_deposit_can_be_claimed =
     | Block.Full (tx :: _) ->
         Rpc.get_transaction_receipt ~tx_hash:tx.Transaction.hash sequencer
     | _ -> Test.fail "Inconsistent result"
+  in
+
+  let* dummy_l1_receiver = ticket_creator Constant.bootstrap4.public_key_hash in
+  let routing_info =
+    String.concat "" [dummy_l1_receiver |> Hex.of_bytes |> Hex.show; ticketer]
+  in
+
+  let account = Eth_account.bootstrap_accounts.(0) in
+  let* _tx =
+    call_fa_withdraw
+      ~sender:account
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~evm_node:sequencer
+      ~ticket_owner:proxy
+      ~routing_info
+      ~amount:25
+      ~ticketer
+      ~content
+      ()
   in
 
   let* () =
@@ -13323,6 +13334,60 @@ let test_fa_deposit_can_be_claimed =
 
   unit
 
+let test_fast_fa_deposit_can_be_claimed_and_withdrawn =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "fa_deposit"; "claim"; "withdraw"]
+    ~time_between_blocks:Nothing
+    ~use_dal:Register_without_feature
+    ~enable_fa_bridge:true
+    ~use_multichain:Register_without_feature
+    ~maximum_allowed_ticks:2_000_000_000L
+    ~title:"Fast FA deposit can be claimed and withdrawn"
+    ~additional_uses:[Constant.octez_codec]
+  @@
+  fun {client; sequencer; sc_rollup_address; evm_version; l1_contracts; _}
+      _protocol
+    ->
+  let* _nonce, proxy, ticketer, content =
+    produce_proxy_owned_fa_deposit_and_claim
+      ~client
+      ~sequencer
+      ~sc_rollup_address
+      ~evm_version
+      ~l1_contracts
+  in
+
+  let*@ block =
+    Rpc.get_block_by_number ~full_tx_objects:true ~block:"latest" sequencer
+  in
+
+  let*@ _receipt =
+    match block.transactions with
+    | Block.Full (tx :: _) ->
+        Rpc.get_transaction_receipt ~tx_hash:tx.Transaction.hash sequencer
+    | _ -> Test.fail "Inconsistent result"
+  in
+
+  let dummy_l1_receiver = Constant.bootstrap4.public_key_hash in
+  let dummy_fast_withdrawal = Constant.bootstrap3.public_key_hash in
+
+  let* _tx =
+    call_fa_fast_withdraw
+      ~sequencer
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      ~ticket_owner:proxy
+      ~amount:25
+      ~ticketer
+      ~content
+      ~fast_withdrawal_contract_address:dummy_fast_withdrawal
+      ~receiver:dummy_l1_receiver
+      ()
+  in
+
+  unit
+
 let test_claim_deposit_event =
   Protocol.register_regression_test
     ~__FILE__
@@ -13330,6 +13395,7 @@ let test_claim_deposit_event =
     ~title:"Regression test for the claimed FA deposit event"
     ~uses:(fun _protocol ->
       [
+        Constant.octez_codec;
         Constant.octez_smart_rollup_node;
         Constant.octez_evm_node;
         Constant.smart_rollup_installer;
@@ -13350,13 +13416,13 @@ let test_claim_deposit_event =
       ~enable_fast_fa_withdrawal:true
       protocol
   in
-  let* _nonce =
+  let* _ =
     produce_proxy_owned_fa_deposit_and_claim
       ~client
       ~sequencer
       ~sc_rollup_address
       ~evm_version
-      ~fa_deposit:l1_contracts.fa_deposit
+      ~l1_contracts
   in
   let* receipt = get_one_receipt_from_latest_or_fail sequencer in
   capture_logs ~header:"Claimed deposit" receipt.logs ;
@@ -14155,7 +14221,8 @@ let () =
   test_fa_deposit_and_withdrawals_events [Alpha] ;
   test_block_producer_validation [Alpha] ;
   test_durable_storage_consistency [Alpha] ;
-  test_fa_deposit_can_be_claimed [Alpha] ;
+  test_fa_deposit_can_be_claimed_and_withdrawn [Alpha] ;
+  test_fast_fa_deposit_can_be_claimed_and_withdrawn [Alpha] ;
   test_claim_deposit_event [Alpha] ;
   test_evm_based_sequencer_upgrade [Alpha] ;
   test_evm_based_sequencer_upgrade_fails_if_governance_upgrade_exists [Alpha] ;

@@ -420,15 +420,9 @@ let delegatecall_delegated =
     ~label:"delegatecall_delegated"
     ~contract:"Delegated"
 
-let incrementor =
+let etherlink_fa_proxy_mock =
   compile_contract
-    ~source:(solidity_contracts_path ^ "/incrementor_proxy.sol")
-    ~label:"incrementor"
-    ~contract:"Incrementor"
-
-let incrementor_proxy =
-  compile_contract
-    ~source:(solidity_contracts_path ^ "/incrementor_proxy.sol")
+    ~source:(solidity_contracts_path ^ "/etherlink_fa_proxy_mock.sol")
     ~label:"proxy"
     ~contract:"Proxy"
 
