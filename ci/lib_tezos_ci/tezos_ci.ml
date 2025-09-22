@@ -1375,8 +1375,6 @@ module Images_external = struct
      external image below and the internal image [e2etest]. *)
   let datadog_ci = Image.mk_external ~image_path:"datadog/ci:v2.44.0"
 
-  let debian_bookworm = Image.mk_external ~image_path:"debian:bookworm"
-
   let ubuntu_noble =
     Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:24.04_stable"
 

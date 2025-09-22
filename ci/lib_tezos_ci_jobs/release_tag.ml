@@ -208,7 +208,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~name:"oc.install-release-homebrew"
       ~arch:Amd64
       ~dependencies:(Dependent [])
-      ~image:Images.debian_bookworm
+      ~image:Images.Base_images.debian_bookworm
       ~stage:Stages.build
       ~artifacts
       [

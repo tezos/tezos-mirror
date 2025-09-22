@@ -610,8 +610,6 @@ module Images_external : sig
 
   val datadog_ci : Image.t
 
-  val debian_bookworm : Image.t
-
   val ubuntu_noble : Image.t
 
   val ubuntu_jammy : Image.t
@@ -643,8 +641,6 @@ module Images : sig
   val docker : Image.t
 
   val datadog_ci : Image.t
-
-  val debian_bookworm : Image.t
 
   val ubuntu_noble : Image.t
 

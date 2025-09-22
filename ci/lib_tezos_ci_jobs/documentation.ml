@@ -63,10 +63,11 @@ let job_install_python =
   Cacio.parameterize @@ fun os_distribution ->
   Cacio.parameterize @@ fun branch ->
   let os_distribution_name, image =
+    let open Tezos_ci in
     match os_distribution with
-    | `ubuntu_noble -> ("noble", Tezos_ci.Images.ubuntu_noble)
-    | `ubuntu_jammy -> ("jammy", Tezos_ci.Images.ubuntu_jammy)
-    | `debian_bookworm -> ("bookworm", Tezos_ci.Images.debian_bookworm)
+    | `ubuntu_noble -> ("noble", Images.ubuntu_noble)
+    | `ubuntu_jammy -> ("jammy", Images.ubuntu_jammy)
+    | `debian_bookworm -> ("bookworm", Images.Base_images.debian_bookworm)
   in
   let project, branch =
     match branch with
