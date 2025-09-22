@@ -31,9 +31,12 @@ module Level_map =
       let hash = Hashtbl.hash
     end)
 
+type tb_attestation_slot = int
+
 type shard_indexes = int list
 
-type committee = shard_indexes Signature.Public_key_hash.Map.t
+type committee =
+  (shard_indexes * tb_attestation_slot) Signature.Public_key_hash.Map.t
 
 type t = committee Level_map.t
 

@@ -153,7 +153,7 @@ let may_update_topics ctxt proto_parameters ~block_level =
         block_level
         (Int32.of_int proto_parameters.Types.attestation_lag)
     in
-    Node_context.fetch_committee ctxt ~level
+    Node_context.fetch_committees ctxt ~level
   in
   Profile_manager.on_new_head
     (Node_context.get_profile_ctxt ctxt)
@@ -359,10 +359,7 @@ let check_attesters_attested node_ctxt committee slot_to_committee parameters
         (fun attester ->
           match Signature.Public_key_hash.Map.find attester committee with
           | None -> Lwt.return_unit
-          | Some tb_slots -> (
-              match List.nth_opt tb_slots 0 with
-              | None -> Lwt.return_unit
-              | Some tb_slot -> check_attester attester tb_slot))
+          | Some (_dal_slots, tb_slot) -> check_attester attester tb_slot)
         tracked_attesters
     in
     return_unit
@@ -404,9 +401,13 @@ let process_block_data ctxt cctxt store proto_parameters block_level
     (* If a slot header was posted to the L1 and we have the corresponding
        data, post it to gossipsub.  Note that this is done independently
        of the profile. *)
-    let level_committee =
-      (Node_context.fetch_committee
-         ctxt [@profiler.record_f {verbosity = Notice} "fetch_committee"])
+    let level_committee ~level =
+      let* res =
+        (Node_context.fetch_committees
+           ctxt
+           ~level [@profiler.record_f {verbosity = Notice} "fetch_committee"])
+      in
+      return (Signature.Public_key_hash.Map.map fst res)
     in
     let slot_size = proto_parameters.cryptobox_parameters.slot_size in
     let gs_worker = Node_context.get_gs_worker ctxt in
@@ -455,29 +456,26 @@ let process_block_data ctxt cctxt store proto_parameters block_level
        ~block_level
        cctxt [@profiler.record_s {verbosity = Notice} "get_attestations"])
   in
-  let* committee =
+  let* committees =
     let attestation_level = Int32.pred block_level in
-    Node_context.fetch_committee ctxt ~level:attestation_level
+    Node_context.fetch_committees ctxt ~level:attestation_level
   in
   (* [slot_to_committee] associates a Tenderbake attestation slot index to an
-     attester public key hash an its associated list of DAL slots indexs. This
+     attester public key hash an its associated list of DAL slots indices. This
      can be done by matching the TB attestation slot index and the first DAL
      slot index of a given attester as there is a DAL invariant that enforces
      the fact that the first DAL slot index corresponds to the TB attestation
      slot index of a give attester. *)
   let slot_to_committee =
     Signature.Public_key_hash.Map.fold
-      (fun pkh slots l ->
-        match List.nth_opt slots 0 with
-        | Some slot -> (slot, (pkh, slots)) :: l
-        | None -> l)
-      committee
+      (fun pkh (dal_slots, tb_slot) l -> (tb_slot, (pkh, dal_slots)) :: l)
+      committees
       []
   in
   let* () =
     (check_attesters_attested
        ctxt
-       committee
+       committees
        slot_to_committee
        proto_parameters
        ~block_level
@@ -604,8 +602,8 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
         Int32.(
           pred @@ add level (of_int proto_parameters.Types.attestation_lag))
       in
-      let* _committee =
-        Node_context.fetch_committee ctxt ~level:attestation_level
+      let* (_committee : (int trace * int) Signature.Public_key_hash.Map.t) =
+        Node_context.fetch_committees ctxt ~level:attestation_level
       in
       return_unit
   in

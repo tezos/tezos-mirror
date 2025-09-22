@@ -204,10 +204,10 @@ val get_fetched_assigned_shard_indices :
   pkh:Signature.public_key_hash ->
   Committee_cache.shard_indexes option
 
-(** [fetch_committee ctxt ~level] fetches from L1 the shard indices assigned
-    to all attesters at [level].  It internally caches the DAL committee with
+(** [fetch_committees ctxt ~level] fetches from L1 the shard indices assigned to
+    all attesters at [level]. It internally caches the DAL committee with
     [level] as the key with FIFO strategy. *)
-val fetch_committee :
+val fetch_committees :
   t -> level:int32 -> Committee_cache.committee tzresult Lwt.t
 
 (** [version ctxt] returns the current version of the node *)

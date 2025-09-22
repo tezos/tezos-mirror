@@ -200,29 +200,30 @@ let set_ongoing_amplifications ctxt ongoing_amplifications =
 
 let get_ignore_pkhs ctxt = ctxt.ignore_pkhs
 
-let fetch_committee ctxt ~level =
+let fetch_committees ctxt ~level =
   let open Lwt_result_syntax in
   let {tezos_node_cctxt = cctxt; committee_cache = cache; _} = ctxt in
   match Committee_cache.find cache ~level with
   | Some committee -> return committee
   | None ->
       let*? (module Plugin) = get_plugin_for_level ctxt ~level in
-      let+ committee = Plugin.get_committee cctxt ~level in
-      Committee_cache.add cache ~level ~committee ;
-      committee
+      let+ committees = Plugin.get_committees cctxt ~level in
+      Committee_cache.add cache ~level ~committee:committees ;
+      committees
 
 let fetch_assigned_shard_indices ctxt ~level ~pkh =
   let open Lwt_result_syntax in
-  let+ committee = fetch_committee ctxt ~level in
-  match Signature.Public_key_hash.Map.find pkh committee with
+  let+ committees = fetch_committees ctxt ~level in
+  match Signature.Public_key_hash.Map.find pkh committees with
   | None -> []
-  | Some indexes -> indexes
+  | Some (indexes, _) -> indexes
 
 let get_fetched_assigned_shard_indices ctxt ~level ~pkh =
   Option.map
-    (fun committee ->
-      Signature.Public_key_hash.Map.find_opt pkh committee
-      |> Option.value ~default:[])
+    (fun committees ->
+      Signature.Public_key_hash.Map.find_opt pkh committees |> function
+      | None -> []
+      | Some (dal_committee, _tb_committee) -> dal_committee)
     (Committee_cache.find ctxt.committee_cache ~level)
 
 let version {network_name; _} =

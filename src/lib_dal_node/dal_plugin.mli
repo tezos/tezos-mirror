@@ -89,13 +89,16 @@ module type T = sig
     (tb_slot * attestation_operation * dal_attestation option) list tzresult
     Lwt.t
 
-  (** [get_committee ctxt ~level] retrieves the DAL committee at [level] from L1 as a
-      map that associates to the public key hash [pkh] of the member of
-      the committee its assigned shard indexes. *)
-  val get_committee :
+  (** [get_committees ctxt ~level] retrieves the DAL and Tenderbake attestation
+      committees at [level] from L1 as a map that associates to the public key
+      hash [pkh] of the member of the committee its assigned shard indexes and
+      attestation slot. Retrieving the attestation slot is particularly useful
+      to associate attestations to their senders without relying on a delegate
+      pkh.*)
+  val get_committees :
     Tezos_rpc.Context.generic ->
     level:int32 ->
-    int list Signature.Public_key_hash.Map.t tzresult Lwt.t
+    (int list * int) Signature.Public_key_hash.Map.t tzresult Lwt.t
 
   (** [dal_attestation block_info] returns the metadata of the given
       [block_info] as an abstract value of type [dal_attestation] to be passed

@@ -391,11 +391,15 @@ let reply_receiver_job {process; query_store; _} node_context =
           Store.Shards.write_all (Store.shards node_store) slot_id shards
           |> Errors.to_tzresult
         in
+        let level_committee ~level =
+          let* res = Node_context.fetch_committees node_context ~level in
+          return (Signature.Public_key_hash.Map.map fst res)
+        in
         let* () =
           Slot_manager.publish_proved_shards
             node_context
             slot_id
-            ~level_committee:(Node_context.fetch_committee node_context)
+            ~level_committee
             proto_parameters
             commitment
             shards
