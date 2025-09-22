@@ -2,7 +2,7 @@
 set -e
 
 . scripts/version.sh
-. scripts/ci/octez-release.sh
+. scripts/releases/octez-release.sh
 
 BUILDDIR=$(pwd)
 export BLST_PORTABLE=true

@@ -7,8 +7,8 @@ set -eu
 # In the GitLab namespace 'nomadic-labs', if you want to iterate using the same tag
 # you should manually delete any previously created release, otherwise it will error
 
-# shellcheck source=./scripts/ci/octez-release.sh
-. ./scripts/ci/octez-release.sh
+# shellcheck source=./scripts/releases/octez-release.sh
+. ./scripts/releases/octez-release.sh
 
 echo "Query GitLab to get generic package URL"
 

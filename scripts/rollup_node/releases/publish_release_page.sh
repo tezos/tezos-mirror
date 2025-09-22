@@ -39,7 +39,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
 
     # Add the new version to the $versions_list_filename JSON file.
     # Since jq cannot modify the file in-place, we write to a temporary file first.
-    # [release_rc_version], [release_major_version] and [release_minor_version] defined in [./scripts/ci/octez-release.sh]
+    # [release_rc_version], [release_major_version] and [release_minor_version] defined in [./scripts/releases/octez-release.sh]
     if [ -n "${release_rc_version}" ]; then
       rc="${release_rc_version}"
       jq ". += [{\"major\":${release_major_version}, \"minor\":${release_minor_version},\"rc\":${rc}}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
