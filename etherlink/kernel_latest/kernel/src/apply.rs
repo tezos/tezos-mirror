@@ -7,7 +7,6 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolCall};
-use ethereum::Log;
 use evm::Config;
 use evm_execution::account_storage::{EthereumAccount, EthereumAccountStorage};
 use evm_execution::fa_bridge::deposit::{FaDeposit, FaDepositWithProxy};
@@ -21,6 +20,8 @@ use evm_execution::trace::{
 };
 use evm_execution::utilities::alloy::h160_to_alloy;
 use primitive_types::{H160, H256, U256};
+use revm::primitives::Log;
+use revm_etherlink::helpers::legacy::alloy_to_log;
 use revm_etherlink::precompiles::constants::FA_DEPOSIT_EXECUTION_COST;
 use revm_etherlink::precompiles::send_outbox_message::Withdrawal;
 use revm_etherlink::{u256_to_alloy, ExecutionOutcome};
@@ -37,7 +38,7 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 
-use crate::bridge::{execute_deposit, Deposit};
+use crate::bridge::{execute_deposit, Deposit, DepositResult};
 use crate::chains::EvmLimits;
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
@@ -553,7 +554,8 @@ fn trace_deposit<Host: Runtime>(
         call_trace.add_to(receiver);
 
         if with_logs {
-            call_trace.add_logs(Some(logs.to_owned()))
+            let logs = logs.iter().map(alloy_to_log).collect();
+            call_trace.add_logs(Some(logs))
         }
 
         let _ = tracer::store_call_trace(host, call_trace, &transaction_hash);
@@ -568,23 +570,25 @@ fn apply_deposit<Host: Runtime>(
     tracer_input: Option<TracerInput>,
     evm_configuration: &Config,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
-    let execution_outcome =
-        execute_deposit(host, evm_account_storage, deposit, evm_configuration)
-            .map_err(Error::InvalidRunTransaction)?;
+    let DepositResult {
+        outcome: execution_outcome,
+        estimated_ticks_used,
+    } = execute_deposit(host, evm_account_storage, deposit, evm_configuration)
+        .map_err(Error::InvalidRunTransaction)?;
 
     trace_deposit(
         host,
         transaction.value(),
         transaction.to(),
-        execution_outcome.gas_used,
-        &execution_outcome.logs,
+        execution_outcome.result.gas_used(),
+        execution_outcome.result.logs(),
         tracer_input,
     );
 
     Ok(ExecutionResult::Valid(TransactionResult {
         caller: H160::zero(),
-        gas_used: execution_outcome.gas_used.into(),
-        estimated_ticks_used: execution_outcome.estimated_ticks_used,
+        gas_used: execution_outcome.result.gas_used().into(),
+        estimated_ticks_used,
         execution_outcome: Some(execution_outcome),
     }))
 }

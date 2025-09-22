@@ -20,6 +20,7 @@ use alloy_consensus::EMPTY_ROOT_HASH;
 use anyhow::Context;
 use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
 use primitive_types::{H160, H256, U256};
+use revm_etherlink::helpers::legacy::alloy_to_log;
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
 use tezos_ethereum::block::{BlockConstants, BlockFees, EthBlock};
@@ -374,7 +375,7 @@ impl EthBlockInProgress {
         let Some(gas_used) = receipt_info
             .execution_outcome
             .as_ref()
-            .map(|eo| eo.gas_used)
+            .map(|eo| eo.result.gas_used())
         else {
             anyhow::bail!(
                 "No execution outcome on valid transaction 0x{}",
@@ -533,9 +534,10 @@ impl EthBlockInProgress {
 
         match execution_outcome {
             Some(outcome) => {
-                let is_success = outcome.is_success();
-                let contract_address = outcome.new_address();
-                let log_iter = outcome.logs.into_iter();
+                let is_success = outcome.result.is_success();
+                let contract_address =
+                    outcome.result.created_address().map(|x| H160(*x.0));
+                let log_iter = outcome.result.logs().iter().map(alloy_to_log);
                 let logs: Vec<IndexedLog> = log_iter
                     .enumerate()
                     .map(|(i, log)| IndexedLog {

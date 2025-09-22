@@ -1,21 +1,21 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
 //! Native token (TEZ) bridge primitives and helpers.
 
-use std::borrow::Cow;
-
 use alloy_sol_types::SolEvent;
-use ethereum::Log;
-use evm::{Config, ExitError};
+use evm::Config;
 use evm_execution::{
     account_storage::{account_path, AccountStorageError, EthereumAccountStorage},
-    handler::{ExecutionOutcome, ExecutionResult},
     utilities::alloy::{h160_to_alloy, u256_to_alloy},
     EthereumError,
 };
 use primitive_types::{H160, H256, U256};
+use revm::context::result::{ExecutionResult, Output, SuccessReason};
+use revm::primitives::{Address, Bytes, Log, LogData, B256};
+use revm_etherlink::ExecutionOutcome;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
 use tezos_ethereum::{
@@ -26,7 +26,7 @@ use tezos_evm_logging::{log, Level::Info};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 
-use crate::tick_model;
+use crate::tick_model::constants::TICKS_FOR_DEPOSIT;
 
 /// Keccak256 of Deposit(uint256,address,uint256,uint256)
 /// This is main topic (non-anonymous event): https://docs.soliditylang.org/en/latest/abi-spec.html#events
@@ -142,11 +142,12 @@ impl Deposit {
 
         Log {
             // Emitted by the "system" contract
-            address: H160::zero(),
-            // Event ID (non-anonymous) and indexed fields
-            topics: vec![H256(DEPOSIT_EVENT_TOPIC)],
-            // Non-indexed fields
-            data,
+            address: Address::ZERO,
+            // (Event ID (non-anonymous) and indexed fields, Non-indexed fields)
+            data: LogData::new_unchecked(
+                vec![B256::from_slice(&DEPOSIT_EVENT_TOPIC)],
+                data.into(),
+            ),
         }
     }
 
@@ -205,44 +206,52 @@ impl Decodable for Deposit {
     }
 }
 
+pub struct DepositResult {
+    pub outcome: ExecutionOutcome,
+    pub estimated_ticks_used: u64,
+}
+
 pub fn execute_deposit<Host: Runtime>(
     host: &mut Host,
     evm_account_storage: &mut EthereumAccountStorage,
     deposit: &Deposit,
     config: &Config,
-) -> Result<ExecutionOutcome, EthereumError> {
+) -> Result<DepositResult, EthereumError> {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
     let to_account_path =
         account_path(&deposit.receiver).map_err(AccountStorageError::from)?;
     let mut to_account = evm_account_storage.get_or_create(host, &to_account_path)?;
 
+    // TODO: estimate how emitting an event influenced tick consumption
+    let gas_used = config.gas_transaction_call;
+
     let result = match to_account.balance_add(host, deposit.amount) {
-        Ok(()) => ExecutionResult::TransferSucceeded,
+        Ok(()) => ExecutionResult::Success {
+            reason: SuccessReason::Return,
+            gas_used,
+            gas_refunded: 0,
+            logs: vec![deposit.event_log()],
+            output: Output::Call(Bytes::from_static(&[1u8])),
+        },
         Err(err) => {
             log!(host, Info, "Deposit failed with {:?}", err);
-            ExecutionResult::Error(ExitError::Other(Cow::from("Deposit failed")))
+            ExecutionResult::Revert {
+                gas_used,
+                output: Bytes::from_static(&[0u8]),
+            }
         }
     };
 
-    let logs = if result.is_success() {
-        vec![deposit.event_log()]
-    } else {
-        vec![]
-    };
-
-    // TODO: estimate how emitting an event influenced tick consumption
-    let gas_used = config.gas_transaction_call;
-    let estimated_ticks_used = tick_model::constants::TICKS_FOR_DEPOSIT;
-
-    let execution_outcome = ExecutionOutcome {
-        gas_used,
-        logs,
+    let outcome = ExecutionOutcome {
         result,
         withdrawals: vec![],
-        estimated_ticks_used,
     };
-    Ok(execution_outcome)
+
+    Ok(DepositResult {
+        outcome,
+        estimated_ticks_used: TICKS_FOR_DEPOSIT,
+    })
 }
 
 #[cfg(test)]
@@ -257,7 +266,7 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
 
-    use crate::bridge::DEPOSIT_EVENT_TOPIC;
+    use crate::bridge::{DepositResult, DEPOSIT_EVENT_TOPIC};
 
     use super::{execute_deposit, Deposit};
 
@@ -353,21 +362,18 @@ mod tests {
 
         let deposit = dummy_deposit();
 
-        let outcome = execute_deposit(
+        let DepositResult { outcome, .. } = execute_deposit(
             &mut host,
             &mut evm_account_storage,
             &deposit,
             &EVMVersion::current_test_config(),
         )
         .unwrap();
-        assert!(outcome.is_success());
-        assert_eq!(outcome.logs.len(), 1);
+        let logs = outcome.result.logs();
+        assert!(outcome.result.is_success());
+        assert_eq!(logs.len(), 1);
 
-        let log_data = alloy_primitives::LogData::new_unchecked(
-            outcome.logs[0].topics.iter().map(|x| x.0.into()).collect(),
-            outcome.logs[0].data.clone().into(),
-        );
-        let event = events::Deposit::decode_log_data(&log_data).unwrap();
+        let event = events::Deposit::decode_log_data(&logs[0].data).unwrap();
         assert_eq!(event.amount, alloy_primitives::U256::from(1));
         assert_eq!(
             event.receiver,
@@ -385,24 +391,24 @@ mod tests {
         let mut deposit = dummy_deposit();
         deposit.amount = U256::MAX;
 
-        let outcome = execute_deposit(
+        let DepositResult { outcome, .. } = execute_deposit(
             &mut host,
             &mut evm_account_storage,
             &deposit,
             &EVMVersion::current_test_config(),
         )
         .unwrap();
-        assert!(outcome.is_success());
+        assert!(outcome.result.is_success());
 
-        let outcome = execute_deposit(
+        let DepositResult { outcome, .. } = execute_deposit(
             &mut host,
             &mut evm_account_storage,
             &deposit,
             &EVMVersion::current_test_config(),
         )
         .unwrap();
-        assert!(!outcome.is_success());
-        assert!(outcome.logs.is_empty());
+        assert!(!outcome.result.is_success());
+        assert!(outcome.result.logs().is_empty());
     }
 
     #[test]
@@ -413,6 +419,6 @@ mod tests {
                                         0000000000000000000000000202020202020202020202020202020202020202\
                                         0000000000000000000000000000000000000000000000000000000000000003\
                                         0000000000000000000000000000000000000000000000000000000000000004").unwrap();
-        assert_eq!(expected_log, log.data)
+        assert_eq!(expected_log, log.data.data)
     }
 }
