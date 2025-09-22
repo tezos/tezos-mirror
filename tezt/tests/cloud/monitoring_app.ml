@@ -912,7 +912,7 @@ module Alert = struct
   type attestation_transition = Stopped_attesting | Restarted_attesting
 
   let report_attestation_transition ~slack_channel_id ~slack_bot_token ~network
-      ~level ~pkh ~transition ~attestation_percentage =
+      ~level ~baker ~transition ~attestation_percentage =
     let data =
       let header =
         Format.asprintf
@@ -927,8 +927,8 @@ module Alert = struct
                threshold. New attestation rate is %.2f%%.")
           (Network.to_string network)
           level
-          pp_delegate
-          pkh
+          Baker_helpers.pp_baker_light
+          baker
           attestation_percentage
       in
       Format_app.section [header] ()
@@ -956,7 +956,8 @@ module Alert = struct
              as 100% attestation rate. *)
           if cycle_position < 20 then unit
           else
-            let treat_delegate pkh =
+            let treat_delegate baker =
+              let (PKH pkh) = baker.Baker_helpers.address in
               let* infos =
                 RPC_core.call endpoint
                 @@ RPC.get_chain_block_context_delegate pkh
@@ -1003,17 +1004,13 @@ module Alert = struct
                         ~slack_bot_token
                         ~network
                         ~level
-                        ~pkh
+                        ~baker
                         ~transition
                         ~attestation_percentage)
             in
             let refill_delegates_to_treat () =
-              let query_string = [("active", "true")] in
-              let* delegates =
-                RPC_core.call endpoint
-                @@ RPC.get_chain_block_context_delegates ~query_string ()
-              in
-              to_treat_delegates := delegates ;
+              let* bakers = Baker_helpers.get_current_baker_infos endpoint in
+              to_treat_delegates := bakers ;
               unit
             in
             (* To avoid spawning a high number of RPCs simultaneously, we treat 2 delegates at each level. *)
