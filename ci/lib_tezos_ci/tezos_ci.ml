@@ -1375,26 +1375,6 @@ module Images_external = struct
      external image below and the internal image [e2etest]. *)
   let datadog_ci = Image.mk_external ~image_path:"datadog/ci:v2.44.0"
 
-  let debian_bookworm = Image.mk_external ~image_path:"debian:bookworm"
-
-  let ubuntu_noble =
-    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:24.04_stable"
-
-  let ubuntu_jammy =
-    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:22.04_stable"
-
-  let ubuntu_oracular =
-    Image.mk_external ~image_path:"public.ecr.aws/lts/ubuntu:24.10_stable"
-
-  let fedora_37 = Image.mk_external ~image_path:"fedora:37"
-
-  let fedora_39 = Image.mk_external ~image_path:"fedora:39"
-
-  let rockylinux_93 = Image.mk_external ~image_path:"rockylinux:9.3"
-
-  let opam_ubuntu_oracular =
-    Image.mk_external ~image_path:"ocaml/opam:ubuntu-24.10"
-
   let opam_ubuntu_noble =
     Image.mk_external ~image_path:"ocaml/opam:ubuntu-24.04"
 

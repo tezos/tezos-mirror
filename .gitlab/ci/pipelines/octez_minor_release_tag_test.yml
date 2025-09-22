@@ -244,7 +244,7 @@ oc.docker:arm64:
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
 
 oc.install-release-homebrew:
-  image: debian:bookworm
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm
   stage: build
   tags:
   - gcp

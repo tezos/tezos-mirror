@@ -316,7 +316,7 @@ documentation.linkcheck:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_bookworm:
-  image: debian:bookworm
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm
   stage: test
   tags:
   - gcp
@@ -335,7 +335,7 @@ documentation.install_python_bookworm:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_jammy:
-  image: public.ecr.aws/lts/ubuntu:22.04_stable
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:jammy
   stage: test
   tags:
   - gcp
@@ -354,7 +354,7 @@ documentation.install_python_jammy:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_noble:
-  image: public.ecr.aws/lts/ubuntu:24.04_stable
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu:noble
   stage: test
   tags:
   - gcp
