@@ -15,6 +15,7 @@ use mir::{
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
+use primitive_types::H256;
 use std::collections::{BTreeMap, HashMap};
 use tezos_crypto_rs::{
     hash::{ChainId, ContractKt1Hash},
@@ -25,6 +26,7 @@ use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, Timestamp};
 use tezos_tezlink::enc_wrappers::{BlockNumber, OperationHash};
+use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{Operation, OriginationContent, Script};
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, ApplyOperationError, ContentResult,
@@ -572,6 +574,27 @@ fn typecheck_code_and_storage<'a, Ctx: mir::context::CtxTrait<'a>>(
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Storage : {e}")))
 }
 
+fn handle_storage_with_big_maps<Host: Runtime>(
+    host: &mut Host,
+    context: &Context,
+    script: &Script,
+) -> Result<(Vec<u8>, Option<LazyStorageDiffList>), OriginationError> {
+    let parser = Parser::new();
+    make_default_ctx!(ctx, host, context);
+    let mut storage = typecheck_code_and_storage(&mut ctx, &parser, script)?;
+    let mut big_maps = vec![];
+    storage.view_big_maps_mut(&mut big_maps);
+
+    // Dump big_map allocation, starting with empty big_maps
+    mir::ast::big_map::dump_big_map_updates(&mut ctx, &[], &mut big_maps)
+        .map_err(|err| OriginationError::MirBigMapAllocation(err.to_string()))?;
+    let storage = storage
+        .into_micheline_optimized_legacy(&parser.arena)
+        .encode();
+    let lazy_storage_diff = convert_big_map_diff(ctx.big_map_diff);
+    Ok((storage, lazy_storage_diff))
+}
+
 // Values from src/proto_023_PtSeouLo/lib_parameters/default_parameters.ml.
 const ORIGINATION_SIZE: u64 = 257;
 const COST_PER_BYTES: u64 = 250;
@@ -588,22 +611,26 @@ fn originate_contract<Host: Runtime>(
     sender_account: &impl TezlinkAccount,
     initial_balance: &Narith,
     script: &Script,
-    typecheck: bool,
+    external: bool,
 ) -> Result<OriginationSuccess, OriginationError> {
-    if typecheck {
-        let parser = Parser::new();
-        let mut ctx = mir::context::Ctx::default();
-        typecheck_code_and_storage(&mut ctx, &parser, script)?;
-    }
+    // If the origination is internal the big map are handled by the first transfer
+    // The big_maps vector will be filled only if the origination is "external"
 
-    // TODO: Handle lazy_storage diff, a lot of the origination is concerned
+    let mut script_storage = script.storage.clone();
+    let mut lazy_storage_diff = None;
+    if external {
+        let (new_storage, new_lazy_storage_diff) =
+            handle_storage_with_big_maps(host, context, script)?;
+        lazy_storage_diff = new_lazy_storage_diff;
+        script_storage = new_storage;
+    }
 
     // Set the storage of the contract
     let smart_contract = TezlinkOriginatedAccount::from_kt1(context, &contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
     let total_size = smart_contract
-        .init(host, &script.code, &script.storage)
+        .init(host, &script.code, &script_storage)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
@@ -651,7 +678,7 @@ fn originate_contract<Host: Runtime>(
         // participates in having the TzKT front-end not crash when originating.
         storage_size: total_size.clone().into(),
         paid_storage_size_diff: total_size.into(),
-        lazy_storage_diff: None,
+        lazy_storage_diff,
     };
     Ok(dummy_origination_sucess)
 }
