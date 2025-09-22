@@ -281,6 +281,46 @@ module Baker_helpers = struct
 
   let get_bakers_with_staking_power endpoint cycle =
     RPC_core.call endpoint (RPC.get_stake_distribution ~cycle ())
+
+  let get_current_baker_infos =
+    (* [current_bakers] contains the current cycle as well as the list of baker
+       infos for all bakers.
+       When trying to update it, we first look if the cycle changed, and compute
+       the new one only if it did. *)
+    let current_cycle = ref (-1) in
+    let current_bakers = ref [] in
+    fun endpoint ->
+      let* cycle = get_current_cycle endpoint in
+      let* () =
+        if cycle = !current_cycle then unit
+        else
+          let* bakers = get_bakers_with_staking_power endpoint cycle in
+          let total_baking_power =
+            List.fold_left
+              (fun acc RPC.{baking_power; _} -> acc + baking_power)
+              0
+              bakers
+          in
+          let* bakers_info =
+            Lwt_list.filter_map_p
+              (fun RPC.{delegate; baking_power} ->
+                let* attest_infos =
+                  fetch_baker_info
+                    ~origin:(Format.sprintf "fetch_baker_info.%s" delegate)
+                    ~tz1:delegate
+                in
+                let stake_fraction =
+                  float_of_int baking_power /. float_of_int total_baking_power
+                in
+                Lwt.return_some
+                  {address = PKH delegate; attest_infos; stake_fraction})
+              bakers
+          in
+          current_cycle := cycle ;
+          current_bakers := bakers_info ;
+          unit
+      in
+      return !current_bakers
 end
 
 module Tasks = struct
@@ -409,28 +449,7 @@ module Tasks = struct
 
   let fetch_bakers_info endpoint =
     let open Baker_helpers in
-    let* cycle = get_current_cycle endpoint in
-    let* bakers = get_bakers_with_staking_power endpoint cycle in
-    let total_baking_power =
-      List.fold_left
-        (fun acc RPC.{baking_power; _} -> acc + baking_power)
-        0
-        bakers
-    in
-    let* bakers_info =
-      Lwt_list.filter_map_p
-        (fun RPC.{delegate; baking_power} ->
-          let* attest_infos =
-            fetch_baker_info
-              ~origin:(Format.sprintf "fetch_baker_info.%s" delegate)
-              ~tz1:delegate
-          in
-          let stake_fraction =
-            float_of_int baking_power /. float_of_int total_baking_power
-          in
-          Lwt.return_some {address = PKH delegate; attest_infos; stake_fraction})
-        bakers
-    in
+    let* bakers_info = get_current_baker_infos endpoint in
     let rec classify_bakers already_classified = function
       | [] -> already_classified
       | ({attest_infos; _} as baker) :: tl -> (
