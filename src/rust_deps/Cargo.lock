@@ -211,12 +211,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "base58"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5024ee8015f02155eee35c711107ddd9a9bf3cb689cf2a9089c97e79b6e1ae83"
-
-[[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -285,10 +279,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "bit-set"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08807e080ed7f9d5433fa9b275196cfc35414f66a0c79d864dc51a0d825231a3"
+dependencies = [
+ "bit-vec 0.8.0",
+]
+
+[[package]]
 name = "bit-vec"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
+
+[[package]]
+name = "bit-vec"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e764a1d40d510daf35e07be9eb06e75770908c27d411ee6c92109c9840eaaf7"
 
 [[package]]
 name = "bitflags"
@@ -634,12 +643,6 @@ name = "colorchoice"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
-
-[[package]]
-name = "const-oid"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d6f2aa4d0537bcc1c74df8755072bd31c1ef1a3a1b85a68e8404a8c353b7b8b"
 
 [[package]]
 name = "const-oid"
@@ -990,29 +993,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
-name = "crypto"
-version = "3.1.1"
-source = "git+https://github.com/vch9/tezedge?branch=octez-compatible#0cca879fda37ce3713da717c40263f025b5501ea"
-dependencies = [
- "anyhow",
- "base58",
- "byteorder",
- "cryptoxide",
- "ed25519-compact",
- "hex",
- "libsecp256k1",
- "num-bigint 0.3.3",
- "num-traits",
- "p256",
- "rand 0.7.3",
- "serde",
- "strum 0.20.0",
- "strum_macros 0.20.1",
- "thiserror",
- "zeroize",
-]
-
-[[package]]
 name = "crypto-bigint"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1203,9 +1183,6 @@ name = "der"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79b71cca7d95d7681a4b3b9cdf63c8dbc3730d0584c2c74e31416d64a90493f4"
-dependencies = [
- "const-oid 0.6.2",
-]
 
 [[package]]
 name = "der"
@@ -1213,7 +1190,7 @@ version = "0.7.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f55bf8e7b65898637379c1b74eb1551107c8294ed26d855ceb9fd1a09cfc9bc0"
 dependencies = [
- "const-oid 0.9.6",
+ "const-oid",
  "zeroize",
 ]
 
@@ -1379,15 +1356,9 @@ version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
 dependencies = [
- "pkcs8 0.10.2",
+ "pkcs8",
  "signature 2.2.0",
 ]
-
-[[package]]
-name = "ed25519-compact"
-version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9b3460f44bea8cd47f45a0c70892f1eff856d97cd55358b2f73f663789f6190"
 
 [[package]]
 name = "ed25519-dalek"
@@ -1440,7 +1411,6 @@ dependencies = [
  "ff 0.10.1",
  "generic-array",
  "group 0.10.0",
- "pkcs8 0.7.6",
  "rand_core 0.6.4",
  "subtle",
  "zeroize",
@@ -1511,16 +1481,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.89",
-]
-
-[[package]]
-name = "env_logger"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a19187fea3ac7e84da7dacf48de0c45d63c6a76f9490dae389aead16c243fce3"
-dependencies = [
- "log",
- "regex",
 ]
 
 [[package]]
@@ -2303,18 +2263,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ipc"
-version = "3.1.1"
-source = "git+https://github.com/vch9/tezedge?branch=octez-compatible#0cca879fda37ce3713da717c40263f025b5501ea"
-dependencies = [
- "anyhow",
- "bincode",
- "rand 0.7.3",
- "serde",
- "thiserror",
-]
-
-[[package]]
 name = "ipnet"
 version = "2.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2818,7 +2766,6 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
- "rand 0.7.3",
  "serde",
 ]
 
@@ -2830,6 +2777,7 @@ checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
 dependencies = [
  "num-integer",
  "num-traits",
+ "rand 0.8.5",
  "serde",
 ]
 
@@ -2980,7 +2928,7 @@ dependencies = [
  "strum 0.26.3",
  "tezos-smart-rollup-constants",
  "tezos-smart-rollup-utils",
- "tezos_crypto_rs",
+ "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git)",
  "thiserror",
  "try-blocks",
  "tuples",
@@ -3292,22 +3240,12 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "pkcs8"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee3ef9b64d26bad0536099c816c6734379e45bbd5f14798def6809e5cc350447"
-dependencies = [
- "der 0.4.5",
- "spki 0.4.1",
-]
-
-[[package]]
-name = "pkcs8"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f950b2377845cebe5cf8b5165cb3cc1a5e0fa5cfa3e1f7f55707d8fd82e0a7b7"
 dependencies = [
  "der 0.7.9",
- "spki 0.7.3",
+ "spki",
 ]
 
 [[package]]
@@ -3418,6 +3356,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "proptest"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14cae93065090804185d3b75f0bf93b8eeda30c7a9b4a33d3bdb3988d6229e50"
+dependencies = [
+ "bit-set",
+ "bit-vec 0.8.0",
+ "bitflags 2.6.0",
+ "lazy_static",
+ "num-traits",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rand_xorshift",
+ "regex-syntax 0.8.5",
+ "rusty-fork",
+ "tempfile",
+ "unarray",
+]
+
+[[package]]
 name = "ptr_meta"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3469,25 +3427,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "quickcheck"
-version = "1.0.3"
+name = "quick-error"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "588f6378e4dd99458b60ec275b4477add41ce4fa9f64dcba6f15adccb19b50d6"
-dependencies = [
- "env_logger",
- "log",
- "rand 0.8.5",
-]
-
-[[package]]
-name = "quickcheck_derive"
-version = "0.3.0"
-source = "git+https://github.com/tezedge/quickcheck_derive#ad01cec7d62ffbed5490e155e57856672c102645"
-dependencies = [
- "proc-macro2",
- "syn 1.0.109",
- "synstructure 0.12.6",
-]
+checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quote"
@@ -3624,6 +3567,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca3129af7b92a17112d59ad498c6f81eaf463253766b90396d39ea7a39d6613c"
 dependencies = [
  "rand_core 0.5.1",
+]
+
+[[package]]
+name = "rand_xorshift"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d25bf25ec5ae4a3f1b92f929810509a2f53d7dca2f50b794ff57e3face536c8f"
+dependencies = [
+ "rand_core 0.6.4",
 ]
 
 [[package]]
@@ -3915,11 +3867,11 @@ dependencies = [
 name = "rust_tezos_context"
 version = "0.1.0"
 dependencies = [
- "crypto",
  "ocaml",
  "ocaml-build",
  "tezos_context",
  "tezos_context_api",
+ "tezos_crypto_rs 0.6.0",
 ]
 
 [[package]]
@@ -3977,6 +3929,18 @@ name = "rustversion"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e819f2bc632f285be6d7cd36e25940d45b2391dd6d9b939e79de557f7014248"
+
+[[package]]
+name = "rusty-fork"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb3dcc6e454c328bb824492db107ab7c0ae8fcffe4ad210136ef014458c1bc4f"
+dependencies = [
+ "fnv",
+ "quick-error",
+ "tempfile",
+ "wait-timeout",
+]
 
 [[package]]
 name = "ryu"
@@ -4200,15 +4164,6 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 
 [[package]]
 name = "spki"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c01a0c15da1b0b0e1494112e7af814a678fec9bd157881b49beac661e9b6f32"
-dependencies = [
- "der 0.4.5",
-]
-
-[[package]]
-name = "spki"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d91ed6c858b01f942cd56b37a94b3e0a1798290327d1236e4d9cf4eaca44d29d"
@@ -4317,18 +4272,6 @@ dependencies = [
 
 [[package]]
 name = "synstructure"
-version = "0.12.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f36bdaa60a83aca3921b5259d5400cbf5e90fc51931376a9bd4a0eb79aa7210f"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
- "unicode-xid",
-]
-
-[[package]]
-name = "synstructure"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8af7666ab7b6390ab78131fb5b0fce11d6b7a6951602017c35fa82800708971"
@@ -4432,8 +4375,8 @@ dependencies = [
  "regex",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
- "tezos_crypto_rs",
- "tezos_data_encoding",
+ "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git)",
+ "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git)",
  "thiserror",
  "time",
 ]
@@ -4445,8 +4388,8 @@ source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a
 dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
- "tezos_crypto_rs",
- "tezos_data_encoding",
+ "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git)",
+ "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git)",
  "thiserror",
 ]
 
@@ -4459,8 +4402,8 @@ dependencies = [
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
- "tezos_crypto_rs",
- "tezos_data_encoding",
+ "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git)",
+ "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git)",
 ]
 
 [[package]]
@@ -4476,17 +4419,15 @@ dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-mock",
- "tezos_crypto_rs",
- "tezos_data_encoding",
+ "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git)",
+ "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git)",
 ]
 
 [[package]]
 name = "tezos_api"
 version = "3.1.1"
-source = "git+https://github.com/vch9/tezedge?branch=octez-compatible#0cca879fda37ce3713da717c40263f025b5501ea"
 dependencies = [
  "anyhow",
- "crypto",
  "derive_builder",
  "nom 6.1.2",
  "num-bigint 0.3.3",
@@ -4495,28 +4436,50 @@ dependencies = [
  "slog",
  "strum 0.20.0",
  "strum_macros 0.20.1",
+ "tezos_base",
  "tezos_context_api",
- "tezos_encoding",
- "tezos_messages",
+ "tezos_crypto_rs 0.6.0",
+ "tezos_data_encoding 0.6.0",
  "thiserror",
  "time",
  "url",
 ]
 
 [[package]]
+name = "tezos_base"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "derive_builder",
+ "getset",
+ "hex",
+ "lazy_static",
+ "nom 7.1.3",
+ "num-bigint 0.3.3",
+ "num-traits",
+ "serde",
+ "slog",
+ "strum 0.20.0",
+ "strum_macros 0.20.1",
+ "tezos_crypto_rs 0.6.0",
+ "tezos_data_encoding 0.6.0",
+ "tezos_data_encoding_derive 0.6.0",
+ "thiserror",
+ "time",
+]
+
+[[package]]
 name = "tezos_context"
 version = "3.1.1"
-source = "git+https://github.com/vch9/tezedge?branch=octez-compatible#0cca879fda37ce3713da717c40263f025b5501ea"
 dependencies = [
  "anyhow",
  "bincode",
  "blake2",
  "crc32fast",
  "crossbeam-channel",
- "crypto",
  "fs_extra",
  "hex",
- "ipc",
  "lazy_static",
  "leb128",
  "libc",
@@ -4530,6 +4493,7 @@ dependencies = [
  "strum_macros 0.20.1",
  "tezos_api",
  "tezos_context_api",
+ "tezos_crypto_rs 0.6.0",
  "tezos_spsc",
  "tezos_timing",
  "thiserror",
@@ -4540,23 +4504,47 @@ dependencies = [
 [[package]]
 name = "tezos_context_api"
 version = "3.1.1"
-source = "git+https://github.com/vch9/tezedge?branch=octez-compatible#0cca879fda37ce3713da717c40263f025b5501ea"
 dependencies = [
- "crypto",
  "derive_builder",
  "nom 6.1.2",
  "serde",
  "strum 0.20.0",
  "strum_macros 0.20.1",
- "tezos_encoding",
- "tezos_messages",
+ "tezos_base",
+ "tezos_crypto_rs 0.6.0",
+ "tezos_data_encoding 0.6.0",
  "time",
 ]
 
 [[package]]
 name = "tezos_crypto_rs"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
+dependencies = [
+ "anyhow",
+ "bs58 0.5.1",
+ "byteorder",
+ "cryptoxide",
+ "ed25519-dalek",
+ "hex",
+ "libsecp256k1",
+ "nom 7.1.3",
+ "num-bigint 0.4.6",
+ "num-traits",
+ "p256",
+ "proptest",
+ "rand 0.7.3",
+ "serde",
+ "strum 0.20.0",
+ "strum_macros 0.20.1",
+ "tezos_data_encoding 0.6.0",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
+name = "tezos_crypto_rs"
+version = "0.6.0"
+source = "git+https://gitlab.com/tezos/tezos.git#e6142c76efb3d5b80c12b26d1eafaa6711bcd482"
 dependencies = [
  "anyhow",
  "bs58 0.5.1",
@@ -4573,7 +4561,7 @@ dependencies = [
  "serde",
  "strum 0.20.0",
  "strum_macros 0.20.1",
- "tezos_data_encoding",
+ "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git)",
  "thiserror",
  "zeroize",
 ]
@@ -4581,9 +4569,8 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
 dependencies = [
- "bit-vec",
+ "bit-vec 0.6.3",
  "bitvec 1.0.1",
  "hex",
  "lazy_static",
@@ -4591,8 +4578,37 @@ dependencies = [
  "num-bigint 0.4.6",
  "num-traits",
  "serde",
- "tezos_data_encoding_derive",
+ "tezos_data_encoding_derive 0.6.0",
  "thiserror",
+]
+
+[[package]]
+name = "tezos_data_encoding"
+version = "0.6.0"
+source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
+dependencies = [
+ "bit-vec 0.6.3",
+ "bitvec 1.0.1",
+ "hex",
+ "lazy_static",
+ "nom 7.1.3",
+ "num-bigint 0.4.6",
+ "num-traits",
+ "serde",
+ "tezos_data_encoding_derive 0.6.0 (git+https://gitlab.com/tezos/tezos.git)",
+ "thiserror",
+]
+
+[[package]]
+name = "tezos_data_encoding_derive"
+version = "0.6.0"
+dependencies = [
+ "lazy_static",
+ "once_cell",
+ "parse-display",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -4609,81 +4625,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos_encoding"
-version = "3.1.1"
-source = "git+https://github.com/vch9/tezedge?branch=octez-compatible#0cca879fda37ce3713da717c40263f025b5501ea"
-dependencies = [
- "bit-vec",
- "crypto",
- "hex",
- "lazy_static",
- "nom 6.1.2",
- "num-bigint 0.3.3",
- "num-traits",
- "serde",
- "tezos_encoding_derive",
- "thiserror",
-]
-
-[[package]]
-name = "tezos_encoding_derive"
-version = "3.1.1"
-source = "git+https://github.com/vch9/tezedge?branch=octez-compatible#0cca879fda37ce3713da717c40263f025b5501ea"
-dependencies = [
- "lazy_static",
- "once_cell",
- "parse-display",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "tezos_identity"
-version = "3.1.1"
-source = "git+https://github.com/vch9/tezedge?branch=octez-compatible#0cca879fda37ce3713da717c40263f025b5501ea"
-dependencies = [
- "anyhow",
- "crypto",
- "hex",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "tezos_messages"
-version = "3.1.1"
-source = "git+https://github.com/vch9/tezedge?branch=octez-compatible#0cca879fda37ce3713da717c40263f025b5501ea"
-dependencies = [
- "anyhow",
- "bytes",
- "crypto",
- "derive_builder",
- "getset",
- "hex",
- "lazy_static",
- "nom 6.1.2",
- "num-bigint 0.3.3",
- "num-traits",
- "quickcheck",
- "quickcheck_derive",
- "rand 0.7.3",
- "serde",
- "slog",
- "strum 0.20.0",
- "strum_macros 0.20.1",
- "tezos_encoding",
- "tezos_encoding_derive",
- "tezos_identity",
- "thiserror",
- "time",
-]
-
-[[package]]
 name = "tezos_spsc"
 version = "3.1.1"
-source = "git+https://github.com/vch9/tezedge?branch=octez-compatible#0cca879fda37ce3713da717c40263f025b5501ea"
 dependencies = [
  "loom",
 ]
@@ -4691,12 +4634,11 @@ dependencies = [
 [[package]]
 name = "tezos_timing"
 version = "3.1.1"
-source = "git+https://github.com/vch9/tezedge?branch=octez-compatible#0cca879fda37ce3713da717c40263f025b5501ea"
 dependencies = [
- "crypto",
  "rusqlite",
  "serde",
  "static_assertions",
+ "tezos_crypto_rs 0.6.0",
  "tezos_spsc",
 ]
 
@@ -4722,12 +4664,11 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "1.1.8"
+version = "1.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b9ef9bad013ada3808854ceac7b46812a6465ba368859a37e2100283d2d719c"
+checksum = "f60246a4944f24f6e018aa17cdeffb7818b76356965d03b07d6a9886e8962185"
 dependencies = [
  "cfg-if",
- "once_cell",
 ]
 
 [[package]]
@@ -4987,6 +4928,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "unarray"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eaea85b334db583fe3274d12b4cd1880032beab409c0d774be044d4480ab9a94"
+
+[[package]]
 name = "unicode-ident"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5012,12 +4959,6 @@ name = "unicode-width"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
-
-[[package]]
-name = "unicode-xid"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
 name = "universal-hash"
@@ -5093,6 +5034,15 @@ name = "vm-fdt"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e21282841a059bb62627ce8441c491f09603622cd5a21c43bfedc85a2952f23"
+
+[[package]]
+name = "wait-timeout"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09ac3b126d3914f9849036f826e054cbabdc8519970b8998ddaf3b5bd3c65f11"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "want"
@@ -5754,7 +5704,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.89",
- "synstructure 0.13.1",
+ "synstructure",
 ]
 
 [[package]]
@@ -5897,7 +5847,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.89",
- "synstructure 0.13.1",
+ "synstructure",
 ]
 
 [[package]]

@@ -62,6 +62,7 @@ fn make_fields<'a>(
 fn field_kind<'b>(meta: &[syn::Meta]) -> Option<FieldKind<'b>> {
     meta.iter().find_map(|meta| match meta {
         syn::Meta::Path(path) if path == symbol::SKIP => Some(FieldKind::Skip),
+        syn::Meta::Path(path) if path == symbol::HASH => Some(FieldKind::Hash),
         _ => None,
     })
 }

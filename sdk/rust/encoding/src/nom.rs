@@ -530,6 +530,25 @@ pub fn n_bignum(mut input: NomInput) -> NomResult<BigUint> {
     Ok((input, BigUint::from_bytes_be(&bitvec.into_vec())))
 }
 
+pub trait Hasher {
+    fn hash(&self, input: &[u8]) -> Vec<u8>;
+}
+
+pub fn hashed<'a, O, F, H>(
+    hasher: H,
+    mut parser: F,
+) -> impl FnMut(NomInput<'a>) -> NomResult<'a, (O, Vec<u8>)>
+where
+    F: FnMut(NomInput<'a>) -> NomResult<'a, O>,
+    H: Hasher,
+{
+    move |input| {
+        let (rest, result) = parser(input)?;
+        let hash = hasher.hash(&input[..input.len() - rest.len()]);
+        Ok((rest, (result, hash)))
+    }
+}
+
 mod integers {
     macro_rules! decode_integer {
         ($t:ident) => {

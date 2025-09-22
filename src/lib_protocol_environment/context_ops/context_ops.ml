@@ -926,7 +926,8 @@ let close context_index =
   | Brassaia_memory_index index -> Brassaia_memory.close index
   | Duo_index index -> Duo_context.close index
   | Duo_memory_index index -> Duo_memory_context.close index
-  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> Lwt.return_unit (* FIXME *)
+  | Tezedge_index index -> Lwt.return @@ Tezedge.close index
+  | Duo_irmin_tezedge_index _index -> Lwt.return_unit (* FIXME *)
 
 let compute_testchain_chain_id (context : Environment_context.t) block_hash =
   match[@profiler.span_f

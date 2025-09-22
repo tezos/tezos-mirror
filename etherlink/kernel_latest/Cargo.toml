@@ -77,7 +77,15 @@ tezos-storage = { package = "tezos-storage-latest", path = "./storage" }
 
 # SDK
 # we disable BLS, because we don’t need it and it is a roadblock for the native execution
-tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk", default-features = false, features = ["std", "crypto", "dlmalloc", "panic-hook", "data-encoding", "storage", "testing"]  }
+tezos-smart-rollup = { path = "../../src/kernel_sdk/sdk", default-features = false, features = [
+  "std",
+  "crypto",
+  "dlmalloc",
+  "panic-hook",
+  "data-encoding",
+  "storage",
+  "testing",
+] }
 tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core" }
 tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host" }
 tezos-smart-rollup-panic-hook = { path = "../../src/kernel_sdk/panic-hook" }
@@ -99,7 +107,7 @@ pretty_assertions = { version = "1.4.0" }
 
 # alloy
 alloy-sol-types = { version = "1.3.0", default-features = false, features = [
-    "json",
+  "json",
 ] }
 alloy-primitives = { version = "1.2.0", default-features = false }
 alloy-consensus = { version = "1.0.32", default-features = false }
@@ -113,7 +121,7 @@ format_no_std = "1.2.0"
 
 # kernel execution profiling
 nop-macros = { version = "0.2.0" }
-tracing = { version = "0.1.41", features = ["attributes"]}
+tracing = { version = "0.1.41", features = ["attributes"] }
 
 [profile.release]
 # Will apply heavy LTO which attempts to perform optimizations across all crates

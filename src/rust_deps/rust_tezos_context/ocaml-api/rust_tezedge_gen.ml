@@ -12,6 +12,7 @@ type o_caml_depth = Eq of int | Le of int | Lt of int | Ge of int | Gt of int
 type o_caml_order = Sorted | Undefined
 type kind = Value | Tree
 external index_init: string -> index = "index_init"
+external index_close: index -> unit = "index_close"
 external index: context -> index = "index"
 external context_init: index -> context = "context_init"
 external commit: context -> int64 -> string -> string -> bytes = "commit"

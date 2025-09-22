@@ -15,7 +15,9 @@ anyhow = "1.0"
 bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
 thiserror = "1.0"
 hex = "0.4"
-libsecp256k1 = { version = "0.7", default-features = false, features = ["static-context"] }
+libsecp256k1 = { version = "0.7", default-features = false, features = [
+  "static-context",
+] }
 byteorder = "1.4.3"
 num-bigint = { version = "0.4", default-features = false, features = ["serde"] }
 num-traits = "0.2.8"
@@ -26,7 +28,10 @@ strum = "0.20"
 strum_macros = "0.20"
 zeroize = { version = "1.5" }
 ed25519-dalek = { version = "2.0.0", default-features = false }
-cryptoxide = { version = "0.4.4", default-features = false, features = ["sha2", "blake2"] }
+cryptoxide = { version = "0.4.4", default-features = false, features = [
+  "sha2",
+  "blake2",
+] }
 blst = { version = "=0.3.10", optional = true }
 
 proptest = { version = "1.1", optional = true }
@@ -40,4 +45,10 @@ serde_json = "1.0"
 [features]
 default = ["std", "bls"]
 bls = ["blst"]
-std = ["rand/std", "num-bigint/rand", "libsecp256k1/std", "p256/std", "proptest"]
+std = [
+  "rand/std",
+  "num-bigint/rand",
+  "libsecp256k1/std",
+  "p256/std",
+  "proptest",
+]

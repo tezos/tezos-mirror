@@ -1,21 +1,20 @@
 use std::{ops::DerefMut, rc::Rc};
 
-use crypto::hash::{ContextHash, HashTrait};
 use ocaml::{FromValue, Pointer, Runtime, Value};
 use tezos_context::{
-    self,
+    self, IndexApi, ProtocolContextApi, ShellContextApi, TezedgeContext, TezedgeIndex,
     initializer::initialize_tezedge_index,
     working_tree::{
+        DirEntryKind,
         storage::DirectoryId,
         working_tree::{FoldDepth, FoldOrder, TreeWalker, WorkingTree},
-        DirEntryKind,
     },
-    IndexApi, ProtocolContextApi, ShellContextApi, TezedgeContext, TezedgeIndex,
 };
 use tezos_context_api::{
     ContextKvStoreConfiguration, TezosContextTezEdgeStorageConfiguration,
     TezosContextTezedgeOnDiskBackendOptions,
 };
+use tezos_crypto_rs::hash::{ContextHash, HashTrait};
 
 #[ocaml::sig]
 pub struct Index(TezedgeIndex);
@@ -76,6 +75,13 @@ pub fn index_init(base_path: String) -> Pointer<Index> {
     Pointer::alloc_custom(Index(
         initialize_tezedge_index(&storage_configuration, None).expect("index_init"),
     ))
+}
+
+#[ocaml::func]
+#[ocaml::sig("index -> unit")]
+pub fn index_close(index: Pointer<Index>) {
+    let index = index.as_ref();
+    index.0.close();
 }
 
 #[ocaml::func]

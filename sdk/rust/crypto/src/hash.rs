@@ -16,6 +16,16 @@ use zeroize::Zeroize;
 
 mod encoding;
 
+use tezos_data_encoding::nom::Hasher;
+
+pub struct TezosHasher;
+
+impl Hasher for TezosHasher {
+    fn hash(&self, input: &[u8]) -> Vec<u8> {
+        self::blake2b::digest_256(input)
+    }
+}
+
 const CRYPTO_KEY_SIZE: usize = 32;
 
 mod prefix_bytes {

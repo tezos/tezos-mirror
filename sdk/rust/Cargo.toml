@@ -2,12 +2,7 @@ cargo-features = ["named-profiles"]
 
 [workspace]
 resolver = "2"
-members = [
-    "crypto",
-    "encoding",
-    "encoding-derive",
-    "protocol",
-]
+members = ["crypto", "encoding", "encoding-derive", "protocol"]
 
 [workspace.dependencies.tezos_crypto_rs]
 version = "0.6.0"
@@ -36,7 +31,7 @@ version = "7.1"
 inherits = "release"
 opt-level = 3
 debug = 2
-debug-assertions = true  # TODO: test and disable if too slow
+debug-assertions = true # TODO: test and disable if too slow
 overflow-checks = true
 lto = false
 panic = "abort"
