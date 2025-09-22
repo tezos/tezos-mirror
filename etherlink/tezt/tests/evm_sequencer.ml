@@ -13659,6 +13659,7 @@ let test_eip7702 =
       ~authorization:eip7702_contract
       ~private_key:sponsored.private_key
       ~endpoint
+      ()
   in
   (* We craft the EIP-7702 transaction thanks to cast. The sponsor that has the
      necessary balance will use the signed authorization and post in on chain. *)
@@ -13733,6 +13734,7 @@ let test_eip7702 =
       ~authorization:redelegation_contract_address
       ~private_key:sponsored.private_key
       ~endpoint
+      ()
   in
   let* raw_set_eoa = base_tx ~nonce:4 ~authorization:signed_auth in
   let*@ set_eoa_hash = Rpc.send_raw_transaction ~raw_tx:raw_set_eoa sequencer in
@@ -13811,6 +13813,99 @@ let test_eip7702 =
          ~endpoint)
       sequencer
   in
+  unit
+
+let test_eip7702_auto_sign =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "eip7702"; "auto_sign"]
+    ~title:
+      "Check EIP-7702's semantic correctness regarding auth and tx sender and \
+       signer"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let endpoint = Evm_node.endpoint sequencer in
+  let* eip7702 = Solidity_contracts.eip7702 evm_version in
+  let* () = Eth_cli.add_abi ~label:eip7702.label ~abi:eip7702.abi () in
+  let* eip7702_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:eip7702.abi
+         ~bin:eip7702.bin)
+      sequencer
+  in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let base_tx ~nonce ~authorization =
+    Cast.craft_tx
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas:100_000
+      ~gas_price
+      ~value:Wei.zero
+      ~authorization
+      ~address:whale.address
+      ~arguments:[]
+      ~legacy:false
+      ()
+  in
+  let signed_auth ~nonce =
+    Cast.wallet_sign_auth
+      ~nonce
+      ~authorization:eip7702_contract
+      ~private_key:whale.private_key
+      ~endpoint
+      ()
+  in
+  let* authorization = signed_auth ~nonce:2 in
+  let* raw_set_eoa = base_tx ~nonce:1 ~authorization in
+  let*@ set_eoa_hash = Rpc.send_raw_transaction ~raw_tx:raw_set_eoa sequencer in
+  let* _ = produce_block sequencer in
+  let*@! Transaction.{type_; _} =
+    Rpc.get_transaction_receipt ~tx_hash:set_eoa_hash sequencer
+  in
+  (* Type 4 = EIP-7702 *)
+  Check.((type_ = Int32.of_int 4) int32)
+    ~error_msg:"Expected tx.type of %R, got %L" ;
+  (* We can retrieve the authorization list from the transaction object: *)
+  let*@! Transaction.{authorizationList; _} =
+    Rpc.get_transaction_by_hash ~transaction_hash:set_eoa_hash sequencer
+  in
+  (match authorizationList with
+  | Some [{address; _}] ->
+      Check.(
+        (String.lowercase_ascii address
+        = String.lowercase_ascii eip7702_contract)
+          string)
+        ~error_msg:"Expected msg.sender of %R, got %L"
+  | Some _ -> failwith "Authorization list should only contain one element."
+  | None -> failwith "Authorization list should not be empty.") ;
+  let* call_eoa_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:whale.private_key
+         ~endpoint
+         ~abi_label:eip7702.label
+         ~address:whale.address
+         ~method_call:"emitEvent()")
+      sequencer
+  in
+  let*@! Transaction.{logs; _} =
+    Rpc.get_transaction_receipt ~tx_hash:call_eoa_hash sequencer
+  in
+  let Transaction.{data; _} = List.hd logs in
+  let data_without_padding = "0x" ^ String.sub data 26 40 in
+  Check.(
+    (String.lowercase_ascii data_without_padding
+    = String.lowercase_ascii whale.address)
+      string)
+    ~error_msg:"Expected msg.sender of %R, got %L" ;
   unit
 
 let test_eip2537 =
@@ -14066,5 +14161,6 @@ let () =
   test_evm_based_sequencer_upgrade_fails_if_governance_upgrade_exists [Alpha] ;
   test_eip2930_storage_access [Alpha] ;
   test_eip7702 [Alpha] ;
+  test_eip7702_auto_sign [Alpha] ;
   test_validate_encoding_compatibility_accounts [Alpha] ;
   test_eip2537 [Alpha]
