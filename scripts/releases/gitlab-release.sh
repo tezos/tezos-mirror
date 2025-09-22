@@ -8,4 +8,4 @@ set -eu
 ./scripts/ci/create_gitlab_package.sh
 
 # create a GitLab release
-./scripts/ci/create_gitlab_release.sh
+./scripts/releases/create_gitlab_release.sh

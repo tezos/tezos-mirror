@@ -231,7 +231,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ?variables
       [
         "./scripts/ci/restrict_export_to_octez_source.sh";
-        "./scripts/ci/gitlab-release.sh";
+        "./scripts/releases/gitlab-release.sh";
       ]
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       ~tag:Gcp_not_interruptible
