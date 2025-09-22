@@ -610,10 +610,6 @@ module Images_external : sig
 
   val datadog_ci : Image.t
 
-  val ubuntu_noble : Image.t
-
-  val ubuntu_jammy : Image.t
-
   val ubuntu_oracular : Image.t
 
   val fedora_37 : Image.t
@@ -641,10 +637,6 @@ module Images : sig
   val docker : Image.t
 
   val datadog_ci : Image.t
-
-  val ubuntu_noble : Image.t
-
-  val ubuntu_jammy : Image.t
 
   val ubuntu_oracular : Image.t
 
