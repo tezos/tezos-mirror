@@ -35,6 +35,7 @@ type TicketBalanceKey = (Address, U256);
 pub struct PrecompileStateChanges {
     pub ticket_balances: HashMap<TicketBalanceKey, U256>,
     pub removed_deposits: HashSet<U256>,
+    pub deposits: Vec<(U256, FaDepositWithProxy)>,
     pub withdrawals: Vec<Withdrawal>,
     pub global_counter: Option<U256>,
     pub sequencer_key_change: Option<SequencerKeyChange>,
@@ -350,6 +351,10 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
     ) -> Result<(), CustomPrecompileError> {
         self.layered_state
             .remove_deposit(&deposit_id, &self.database)
+    }
+
+    pub fn queue_deposit(&mut self, deposit: FaDepositWithProxy, deposit_id: U256) {
+        self.layered_state.queue_deposit(deposit, deposit_id)
     }
 
     pub fn push_withdrawal(&mut self, withdrawal: Withdrawal) {

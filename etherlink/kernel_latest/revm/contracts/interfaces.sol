@@ -54,6 +54,11 @@ interface ITable {
         uint256 amount
     ) external;
 
+    function queue_deposit(
+        FaDepositWithProxy memory deposit,
+        uint256 deposit_id
+    ) external;
+
     function find_deposit(uint256 deposit_id) external;
 
     function remove_deposit(uint256 deposit_id) external;

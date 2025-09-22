@@ -6,25 +6,28 @@
 //
 // SPDX-License-Identifier: MIT
 
+use alloy_sol_types::{sol, SolCall};
 use ethereum::Log;
 use evm::{Config, ExitSucceed, Opcode};
 use evm_execution::account_storage::{EthereumAccount, EthereumAccountStorage};
-use evm_execution::fa_bridge::deposit::FaDeposit;
-use evm_execution::fa_bridge::queue_fa_deposit;
+use evm_execution::fa_bridge::deposit::{FaDeposit, FaDepositWithProxy};
 use evm_execution::handler::{
     ExecutionOutcome, FastWithdrawalInterface, RouterInterface,
 };
-use evm_execution::precompiles::{self, FA_BRIDGE_PRECOMPILE_ADDRESS};
+use evm_execution::precompiles::{FA_BRIDGE_PRECOMPILE_ADDRESS, SYSTEM_ACCOUNT_ADDRESS};
 use evm_execution::storage::tracer;
 use evm_execution::trace::TracerInput::CallTracer;
 use evm_execution::trace::{
     get_tracer_configuration, CallTrace, CallTracerConfig, CallTracerInput,
     StructLoggerInput, TracerInput,
 };
+use evm_execution::utilities::alloy::h160_to_alloy;
 use primitive_types::{H160, H256, U256};
+use revm_etherlink::precompiles::constants::FA_DEPOSIT_EXECUTION_COST;
+use revm_etherlink::u256_to_alloy;
 use std::borrow::Cow;
 use tezos_ethereum::access_list::{AccessList, AccessListItem};
-use tezos_ethereum::block::BlockConstants;
+use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
 use tezos_ethereum::tx_common::{
     signed_authorization, AuthorizationList, EthereumTransactionCommon,
@@ -694,53 +697,136 @@ fn apply_deposit<Host: Runtime>(
     }))
 }
 
-#[allow(clippy::too_many_arguments)]
+sol! {
+    struct SolFaDepositWithProxy {
+        uint256 amount;
+        address receiver;
+        address proxy;
+        uint256 ticket_hash;
+        uint256 inbox_level;
+        uint256 inbox_msg_id;
+    }
+
+    struct SolFaDepositWithoutProxy {
+        uint256 amount;
+        address receiver;
+        uint256 ticket_hash;
+        uint256 inbox_level;
+        uint256 inbox_msg_id;
+    }
+
+    function queue(SolFaDepositWithProxy memory deposit) external;
+
+    function execute_without_proxy(SolFaDepositWithoutProxy memory deposit);
+}
+
+impl From<&FaDepositWithProxy> for SolFaDepositWithProxy {
+    fn from(deposit: &FaDepositWithProxy) -> Self {
+        SolFaDepositWithProxy {
+            amount: u256_to_alloy(&deposit.amount),
+            receiver: h160_to_alloy(&deposit.receiver),
+            proxy: h160_to_alloy(&deposit.proxy),
+            inbox_level: u256_to_alloy(&U256::from(deposit.inbox_level)),
+            inbox_msg_id: u256_to_alloy(&U256::from(deposit.inbox_msg_id)),
+            ticket_hash: u256_to_alloy(&U256::from_big_endian(
+                deposit.ticket_hash.as_bytes(),
+            )),
+        }
+    }
+}
+
+impl From<&FaDeposit> for SolFaDepositWithoutProxy {
+    fn from(deposit: &FaDeposit) -> Self {
+        SolFaDepositWithoutProxy {
+            amount: u256_to_alloy(&deposit.amount),
+            receiver: h160_to_alloy(&deposit.receiver),
+            inbox_level: u256_to_alloy(&U256::from(deposit.inbox_level)),
+            inbox_msg_id: u256_to_alloy(&U256::from(deposit.inbox_msg_id)),
+            ticket_hash: u256_to_alloy(&U256::from_big_endian(
+                deposit.ticket_hash.as_bytes(),
+            )),
+        }
+    }
+}
+
 fn apply_fa_deposit<Host: Runtime>(
     host: &mut Host,
-    evm_account_storage: &mut EthereumAccountStorage,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
-    transaction: &Transaction,
     tracer_input: Option<TracerInput>,
     evm_configuration: &Config,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
-    let caller = H160::zero();
-    // Prevent inner calls to XTZ/FA withdrawal precompiles
-    let precompiles = precompiles::precompile_set_with_revert_withdrawals(true);
-    let (outcome, _) = queue_fa_deposit(
+    // Fees are set to zero, this is an internal call from the system address to the FA bridge solidity contract.
+    // We do not require the system address to pay for the execution cost.
+    let block_constants = BlockConstants {
+        block_fees: BlockFees::new(U256::zero(), U256::zero(), U256::zero()),
+        ..*block_constants
+    };
+
+    let caller = SYSTEM_ACCOUNT_ADDRESS;
+    let to = Some(FA_BRIDGE_PRECOMPILE_ADDRESS);
+    let value = U256::zero();
+    let gas_limit = FA_DEPOSIT_EXECUTION_COST;
+    let call_data = match fa_deposit.to_fa_deposit_with_proxy() {
+        Some(deposit) => queueCall {
+            deposit: SolFaDepositWithProxy::from(&deposit),
+        }
+        .abi_encode(),
+        None => execute_without_proxyCall {
+            deposit: SolFaDepositWithoutProxy::from(fa_deposit),
+        }
+        .abi_encode(),
+    };
+    let effective_gas_price = block_constants.base_fee_per_gas();
+    let execution_outcome = match revm_run_transaction(
         host,
-        block_constants,
-        evm_account_storage,
-        &precompiles,
+        &block_constants,
+        caller,
+        to,
+        value,
+        gas_limit,
+        call_data,
+        effective_gas_price,
+        Vec::new(),
+        None,
         evm_configuration,
-        caller,
-        fa_deposit,
         tracer_input,
-    )
-    .map_err(Error::InvalidRunTransaction)?;
+    ) {
+        Ok(outcome) => outcome,
+        Err(err) => {
+            return Err(Error::InvalidRunTransaction(
+                evm_execution::EthereumError::WrappedError(Cow::Owned(err.to_string())),
+            ));
+        }
+    };
 
-    log!(
-        host,
-        Benchmarking,
-        "Transaction status: OK_{}.",
-        outcome.is_success()
-    );
+    let (gas_used, estimated_ticks_used) = match &execution_outcome {
+        Some(execution_outcome) => {
+            log!(
+                host,
+                Benchmarking,
+                "Transaction status: OK_{}.",
+                execution_outcome.is_success()
+            );
+            (
+                execution_outcome.gas_used.into(),
+                execution_outcome.estimated_ticks_used,
+            )
+        }
+        None => {
+            log!(host, Benchmarking, "Transaction status: OK_UNKNOWN.");
+            (U256::zero(), 0)
+        }
+    };
 
-    trace_deposit(
-        host,
-        transaction.value(),
-        transaction.to(),
-        outcome.gas_used,
-        &outcome.logs,
-        tracer_input,
-    );
-
-    Ok(ExecutionResult::Valid(TransactionResult {
+    let transaction_result = TransactionResult {
         caller,
-        gas_used: outcome.gas_used.into(),
-        estimated_ticks_used: outcome.estimated_ticks_used,
-        execution_outcome: Some(outcome),
-    }))
+        execution_outcome,
+        gas_used,
+        estimated_ticks_used,
+    };
+
+    Ok(ExecutionResult::Valid(transaction_result))
 }
 
 pub const WITHDRAWAL_OUTBOX_QUEUE: RefPath =
@@ -889,10 +975,8 @@ pub fn apply_transaction<Host: Runtime>(
             log!(host, Benchmarking, "Transaction type: FA_DEPOSIT");
             apply_fa_deposit(
                 host,
-                evm_account_storage,
                 fa_deposit,
                 block_constants,
-                transaction,
                 tracer_input,
                 evm_configuration,
             )?

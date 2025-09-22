@@ -1023,7 +1023,9 @@ mod test {
             Address::ZERO,
         )
         .unwrap();
-        account_zero.write_deposit(&mut host, deposit, id).unwrap();
+        account_zero
+            .write_deposit(&mut host, &id, &deposit)
+            .unwrap();
         account_zero
             .write_ticket_balance(
                 &mut host,
@@ -1226,7 +1228,7 @@ mod test {
             .unwrap();
 
         system
-            .write_deposit(&mut host, dummy_deposit, deposit_id)
+            .write_deposit(&mut host, &deposit_id, &dummy_deposit)
             .unwrap();
 
         // Initialize caller with infinite balance to claim deposit
