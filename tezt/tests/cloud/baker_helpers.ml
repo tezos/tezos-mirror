@@ -28,7 +28,7 @@ type per_baker_dal_summary = {
   attestable_slots : int;
   attested_slots : int;
   in_committee : bool;
-  attestation_with_dal : bool;
+  attestation_with_dal : bool option;
 }
 
 let init_baker ?stake ~configuration_stake ~data_dir ~simulate_network
