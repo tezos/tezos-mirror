@@ -60,6 +60,8 @@ else
     else
       # protected, !tag, other protected branches
       # Not a valid release
+      # Temporary - as soon as not merged in master
+      export RELEASETYPE="TestBranch"
       : nop
     fi
   else
