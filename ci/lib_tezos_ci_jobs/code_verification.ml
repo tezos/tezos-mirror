@@ -686,23 +686,6 @@ let jobs pipeline_type =
       match pipeline_type with
       | Schedule_extended_test | Before_merging | Merge_train -> []
     in
-    let wasm_runtime_check : tezos_job =
-      job
-        ~__POS__
-        ~name:"wasm-runtime-check"
-        ~image:Images.CI.build
-        ~stage
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_wasm_runtime_check_files ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        ["etherlink/lib_wasm_runtime/lint.sh"]
-      |> enable_cargo_cache |> enable_sccache
-    in
     let build_octez_source =
       (* We check compilation of the octez tarball on scheduled
          pipelines because it's not worth testing it for every merge
@@ -745,7 +728,6 @@ let jobs pipeline_type =
       job_build_x86_64_release;
       job_build_x86_64_extra_dev;
       job_build_x86_64_extra_exp;
-      wasm_runtime_check;
       job_build_kernels;
       job_tezt_fetch_records;
       build_octez_source;
