@@ -1,32 +1,29 @@
 # Changelog
 
-## Unreleased
+## Version 0.42 (2025-09-22)
 
-### Breaking changes
+This release of the EVM node is a bug fix release which addresses a regression
+introduced by version 0.40 which accidentally removed support for state
+overrides on RPCs `eth_call` and `eth_estimateGas`. It also enriches
+Opentelemetry traces for better performance analysis.
 
 ### Configuration changes
 
-- Add support for multiple sequencer keys in the CLI
-  (only first one used for now) (!19280, !19302).
-
-### RPCs changes
+- Add support for multiple sequencer keys in the CLI (only first lexicographic
+  one used for now) (!19280, !19302).
 
 ### Monitoring changes
 
-### Command-line interface changes
+- Opentelemetry traces for host function calls can be activated in configuration
+  with `"opentelemetry" : { "trace_host_functions" : true }` (!19099)
+- Opentelemetry traces for the OCaml garbage collector can be activated in
+  configuration with `"opentelemetry" : { "gc_telemetry" : { "enable" : true }
+  }` and configured to trace only certain events (!19003)
 
-### Execution changes
+### RPCs changes
 
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
+- Fix regression in `eth_call` and `eth_estimateGas` to restore support for
+  state overrides. (!19362)
 
 ## Version 0.41 (2025-09-15)
 
