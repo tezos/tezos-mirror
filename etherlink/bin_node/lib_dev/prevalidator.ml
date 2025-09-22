@@ -275,7 +275,7 @@ let validate_gas_limit session (transaction : Transaction.transaction) :
               execution_gas_limit))
   else return (Ok ())
 
-let validate_authorizations (type state) ~session ~chain_id
+let validate_authorizations (type state) ~session ~chain_id ~caller
     Transaction.{transaction_type; authorization_list; _} =
   let open Lwt_result_syntax in
   if transaction_type != Transaction.Eip7702 then return (Ok ())
@@ -302,7 +302,16 @@ let validate_authorizations (type state) ~session ~chain_id
           | Some (Qty current_nonce) -> current_nonce
           | None -> Z.zero
         in
-        if Z.equal current_nonce item.nonce then return_unit
+        let nonce_check =
+          (* The authorization list is processed before the execution portion of
+             the transaction begins, but after the sender’s nonce is incremented.
+             If the sender of the transaction is also the one that signed the
+             authorization, the nonce of the signed authorization must be equal
+             to its current nonce + 1. *)
+          if Address.equal caller signer_address then Z.succ current_nonce
+          else current_nonce
+        in
+        if Z.equal nonce_check item.nonce then return_unit
         else fail "Authorization nonce mismatch"
     in
     let*! opt_err =
@@ -483,7 +492,7 @@ let minimal_validation ~next_nonce ~max_number_of_chunks ctxt transaction
   let** () = validate_chain_id chain_id transaction in
   let** () = validate_nonce ~next_nonce transaction in
   let** () = validate_sender_not_a_contract session caller in
-  let** () = validate_authorizations ~session ~chain_id transaction in
+  let** () = validate_authorizations ~session ~chain_id ~caller transaction in
   let** () = validate_tx_data_size ~max_number_of_chunks transaction in
   let** () = validate_gas_limit session transaction in
   return (Ok ())
