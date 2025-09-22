@@ -10,6 +10,8 @@ pub mod entrypoint;
 pub mod forge;
 pub mod hash;
 pub mod keys;
+pub mod micheline;
+mod types;
 
 #[derive(Debug, uniffi::Error, thiserror::Error)]
 #[uniffi(flat_error)]
@@ -22,4 +24,6 @@ pub enum Error {
     Crypto(CryptoError),
     #[error("Entrypoint failure: {0:?}")]
     Entrypoint(#[from] entrypoint::EntrypointError),
+    #[error("Parsing failure: {0:?}")]
+    Parsing(String),
 }

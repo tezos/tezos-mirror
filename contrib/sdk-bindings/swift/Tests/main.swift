@@ -11,5 +11,7 @@ XCTMain(
     testCase(TestKeys.allTests),
     testCase(TestForging.allTests),
     testCase(TestEntrypoints.allTests),
+    testCase(TestTypes.allTests),
+    testCase(TestMicheline.allTests),
   ]
 )

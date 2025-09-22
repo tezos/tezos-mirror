@@ -1535,6 +1535,7 @@ version = "0.1.0"
 dependencies = [
  "hex",
  "mir",
+ "num-bigint",
  "paste",
  "tezos-protocol",
  "tezos_crypto_rs",
