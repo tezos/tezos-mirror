@@ -98,7 +98,7 @@ let post_message ?ts ~slack_channel_id ~slack_bot_token data =
   in
   return thread_id
 
-module Tasks = struct
+module Prometheus = struct
   let endpoint_from_prometheus_query ~query =
     let fail ~uri_part =
       Test.fail
@@ -161,7 +161,9 @@ module Tasks = struct
       | Some x ->
           x |-> "value" |> as_list |> Fun.flip List.nth_opt 1
           |> Option.map as_float
+end
 
+module Tasks = struct
   let view_ratio_attested_over_published
       (`attested attested, `published published) =
     let open Format in
@@ -189,6 +191,7 @@ module Tasks = struct
         Some s
 
   let fetch_slot_info ~slot_index =
+    let open Prometheus in
     let query s =
       Format.sprintf
         "increase(tezt_total_%s_commitments_per_slot{slot_index=\"%d\"}[%dh])"
@@ -226,6 +229,7 @@ module Tasks = struct
       :: slots_info
 
   let fetch_dal_commitments_total_info () =
+    let open Prometheus in
     let query s =
       Format.sprintf
         {|increase(tezt_dal_commitments_total{kind="%s"}[%dh])|}
@@ -338,6 +342,7 @@ module Tasks = struct
       baker
 
   let fetch_baker_info ~tz1 ~origin =
+    let open Prometheus in
     let query =
       Format.sprintf
         "sum_over_time(tezt_dal_commitments_attested{attester=\"%s\"}[%dh])"
