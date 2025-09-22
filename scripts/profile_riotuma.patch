@@ -1,7 +1,7 @@
-From 37749ee521eb4ce6354cba3d364578b39f15d9dc Mon Sep 17 00:00:00 2001
+From c410097cca005f907cc5f5ca21831614b97d5cf6 Mon Sep 17 00:00:00 2001
 From: mattiasdrp <mattias@kojin.tech>
-Date: Wed, 2 Jul 2025 11:28:42 +0200
-Subject: [PATCH] Patch Riotuma
+Date: Mon, 22 Sep 2025 11:29:26 +0200
+Subject: [PATCH] Patch Riotuma and add v14/profiler.mli
 
 ---
  src/lib_protocol_environment/sigs/v14.in.ml   |  2 +
@@ -466,7 +466,7 @@ index db2bd663de..61812537b0 100644
    let balance_updates = slashing_balance_updates @ attesting_balance_updates in
    return (ctxt, balance_updates, deactivated_delegates)
 diff --git a/src/proto_022_PsRiotum/lib_protocol/dune b/src/proto_022_PsRiotum/lib_protocol/dune
-index 778f72b6d6..eb2155f2b0 100644
+index 4e11c3bfbb..44d77d8811 100644
 --- a/src/proto_022_PsRiotum/lib_protocol/dune
 +++ b/src/proto_022_PsRiotum/lib_protocol/dune
 @@ -23,6 +23,8 @@
@@ -479,7 +479,7 @@ index 778f72b6d6..eb2155f2b0 100644
   (flags
    (:standard)
 diff --git a/src/proto_022_PsRiotum/lib_protocol/init_storage.ml b/src/proto_022_PsRiotum/lib_protocol/init_storage.ml
-index 9256e603aa..d9c45ba573 100644
+index 9256e603aa..b40bdcdd46 100644
 --- a/src/proto_022_PsRiotum/lib_protocol/init_storage.ml
 +++ b/src/proto_022_PsRiotum/lib_protocol/init_storage.ml
 @@ -251,11 +251,19 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
@@ -689,4 +689,4 @@ index 9041c1f66f..d395af5f5a 100644
  let parse_view ~elab_conf ctxt ty view =
    parse_view ~unparse_code_rec ~elab_conf ctxt ty view
 --
-2.50.0
+2.51.0
