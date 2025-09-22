@@ -12,16 +12,17 @@ use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
 use crate::l2block::L2Block;
-use crate::storage::{self, object_path, receipt_path};
+use crate::storage;
 use crate::tick_model;
 use crate::transaction::{Transaction, Transactions, Transactions::EthTxs};
+use alloy_consensus::proofs::ordered_trie_root_with_encoder;
+use alloy_consensus::EMPTY_ROOT_HASH;
 use anyhow::Context;
 use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
 use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
 use tezos_ethereum::block::{BlockConstants, BlockFees, EthBlock};
-use tezos_ethereum::eth_gen::OwnedHash;
 use tezos_ethereum::rlp_helpers::*;
 use tezos_ethereum::transaction::{
     IndexedLog, TransactionHash, TransactionObject, TransactionReceipt,
@@ -31,7 +32,7 @@ use tezos_ethereum::Bloom;
 use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
-use tezos_smart_rollup_host::path::{concat, RefPath};
+use tezos_smart_rollup_host::path::RefPath;
 
 #[derive(Debug, PartialEq, Clone)]
 /// Container for all data needed during block computation
@@ -62,12 +63,12 @@ pub struct EthBlockInProgress {
     /// The base fee, is adjusted before and after the computation of
     /// the block
     pub base_fee_per_gas: U256,
-    /// Receipts root
-    pub previous_receipts_root: OwnedHash,
-    /// Transactions root
-    pub previous_transactions_root: OwnedHash,
-    // Unit of gas used to execute transactions
+    /// Unit of gas used to execute transactions
     pub cumulative_execution_gas: U256,
+    /// Cumulative receipts
+    pub cumulative_receipts: Vec<TransactionReceipt>,
+    /// Cumulative transactions objects
+    pub cumulative_tx_objects: Vec<TransactionObject>,
 }
 
 impl Encodable for EthBlockInProgress {
@@ -86,9 +87,9 @@ impl Encodable for EthBlockInProgress {
             logs_offset,
             timestamp,
             base_fee_per_gas,
-            previous_receipts_root,
-            previous_transactions_root,
             cumulative_execution_gas,
+            cumulative_receipts,
+            cumulative_tx_objects: cumulative_objects,
         } = self;
         stream.begin_list(15);
         stream.append(number);
@@ -103,9 +104,9 @@ impl Encodable for EthBlockInProgress {
         stream.append(logs_offset);
         append_timestamp(stream, *timestamp);
         stream.append(base_fee_per_gas);
-        stream.append(previous_receipts_root);
-        stream.append(previous_transactions_root);
         stream.append(cumulative_execution_gas);
+        append_receipts(stream, cumulative_receipts);
+        append_tx_objects(stream, cumulative_objects);
     }
 }
 
@@ -120,6 +121,20 @@ fn append_txs(stream: &mut rlp::RlpStream, valid_txs: &[[u8; TRANSACTION_HASH_SI
     stream.begin_list(valid_txs.len());
     valid_txs.iter().for_each(|tx| {
         stream.append_iter(*tx);
+    })
+}
+
+fn append_receipts(stream: &mut rlp::RlpStream, receipts: &[TransactionReceipt]) {
+    stream.begin_list(receipts.len());
+    receipts.iter().for_each(|receipt| {
+        stream.append(receipt);
+    })
+}
+
+fn append_tx_objects(stream: &mut rlp::RlpStream, objects: &[TransactionObject]) {
+    stream.begin_list(objects.len());
+    objects.iter().for_each(|object| {
+        stream.append(object);
     })
 }
 
@@ -146,12 +161,12 @@ impl Decodable for EthBlockInProgress {
         let logs_offset: u64 = decode_field(&next(&mut it)?, "logs_offset")?;
         let timestamp = decode_timestamp(&next(&mut it)?)?;
         let base_fee_per_gas = decode_field(&next(&mut it)?, "base_fee_per_gas")?;
-        let previous_receipts_root: OwnedHash =
-            decode_field(&next(&mut it)?, "previous_receipts_root")?;
-        let previous_transactions_root: OwnedHash =
-            decode_field(&next(&mut it)?, "previous_transactions_root")?;
         let cumulative_execution_gas: U256 =
             decode_field(&next(&mut it)?, "cumulative_execution_gas")?;
+        let cumulative_receipts: Vec<TransactionReceipt> =
+            decode_receipts(&next(&mut it)?)?;
+        let cumulative_tx_objects: Vec<TransactionObject> =
+            decode_tx_objects(&next(&mut it)?)?;
 
         let bip = Self {
             number,
@@ -167,9 +182,9 @@ impl Decodable for EthBlockInProgress {
             logs_offset,
             timestamp,
             base_fee_per_gas,
-            previous_receipts_root,
-            previous_transactions_root,
             cumulative_execution_gas,
+            cumulative_receipts,
+            cumulative_tx_objects,
         };
         Ok(bip)
     }
@@ -201,6 +216,34 @@ fn decode_queue(decoder: &rlp::Rlp<'_>) -> Result<VecDeque<Transaction>, Decoder
     Ok(queue)
 }
 
+fn decode_receipts(
+    decoder: &rlp::Rlp<'_>,
+) -> Result<Vec<TransactionReceipt>, DecoderError> {
+    if !decoder.is_list() {
+        return Err(DecoderError::RlpExpectedToBeList);
+    }
+    let mut receipts = Vec::with_capacity(decoder.item_count()?);
+    for item in decoder.iter() {
+        let receipt: TransactionReceipt = item.as_val()?;
+        receipts.push(receipt);
+    }
+    Ok(receipts)
+}
+
+fn decode_tx_objects(
+    decoder: &rlp::Rlp<'_>,
+) -> Result<Vec<TransactionObject>, DecoderError> {
+    if !decoder.is_list() {
+        return Err(DecoderError::RlpExpectedToBeList);
+    }
+    let mut objects = Vec::with_capacity(decoder.item_count()?);
+    for item in decoder.iter() {
+        let object: TransactionObject = item.as_val()?;
+        objects.push(object);
+    }
+    Ok(objects)
+}
+
 impl EthBlockInProgress {
     pub fn queue_length(&self) -> usize {
         self.tx_queue.len()
@@ -214,8 +257,6 @@ impl EthBlockInProgress {
         estimated_ticks_in_run: u64,
         timestamp: Timestamp,
         base_fee_per_gas: U256,
-        previous_receipts_root: OwnedHash,
-        previous_transactions_root: OwnedHash,
     ) -> Self {
         Self {
             number,
@@ -231,9 +272,9 @@ impl EthBlockInProgress {
             logs_offset: 0,
             timestamp,
             base_fee_per_gas,
-            previous_receipts_root,
-            previous_transactions_root,
             cumulative_execution_gas: U256::zero(),
+            cumulative_receipts: Vec::new(),
+            cumulative_tx_objects: Vec::new(),
         }
     }
 
@@ -243,8 +284,6 @@ impl EthBlockInProgress {
         number: U256,
         transactions: VecDeque<Transaction>,
         base_fee_per_gas: U256,
-        receipts_root: OwnedHash,
-        transactions_root: OwnedHash,
     ) -> EthBlockInProgress {
         Self::new_with_ticks(
             number,
@@ -253,8 +292,6 @@ impl EthBlockInProgress {
             0u64,
             Timestamp::from(0i64),
             base_fee_per_gas,
-            receipts_root,
-            transactions_root,
         )
     }
 
@@ -291,8 +328,6 @@ impl EthBlockInProgress {
         parent_hash: H256,
         tick_counter: u64,
         base_fee_per_gas: U256,
-        receipts_root: OwnedHash,
-        transactions_root: OwnedHash,
     ) -> EthBlockInProgress {
         // blueprint is turn into a ring to allow popping from the front
         let ring = match blueprint.transactions {
@@ -305,8 +340,6 @@ impl EthBlockInProgress {
             tick_counter,
             blueprint.timestamp,
             base_fee_per_gas,
-            receipts_root,
-            transactions_root,
         )
     }
 
@@ -372,9 +405,11 @@ impl EthBlockInProgress {
         // store info
         let receipt_size = storage::store_transaction_receipt(host, &receipt)
             .context("Failed to store the receipt")?;
-        let obj_size =
-            storage::store_transaction_object(host, &self.make_object(object_info))
-                .context("Failed to store the transaction object")?;
+        self.cumulative_receipts.push(receipt);
+        let tx_object = self.make_object(object_info);
+        let obj_size = storage::store_transaction_object(host, &tx_object)
+            .context("Failed to store the transaction object")?;
+        self.cumulative_tx_objects.push(tx_object);
 
         // account for registering ticks
         self.add_ticks(tick_model::ticks_of_register(
@@ -403,55 +438,29 @@ impl EthBlockInProgress {
         }
     }
 
-    const RECEIPTS: RefPath<'static> = RefPath::assert_from(b"/receipts");
-    const RECEIPTS_PREVIOUS_ROOT: RefPath<'static> =
-        RefPath::assert_from(b"/receipts/previous_root");
-
-    fn receipts_root(
-        &self,
-        host: &mut impl Runtime,
-        previous_receipts_root: &[u8],
-    ) -> anyhow::Result<Vec<u8>> {
+    fn receipts_root(&self) -> Vec<u8> {
         if self.valid_txs.is_empty() {
-            Ok(previous_receipts_root.to_vec())
+            EMPTY_ROOT_HASH.to_vec()
         } else {
-            for hash in &self.valid_txs {
-                let receipt_path = receipt_path(hash)?;
-                let new_receipt_path = concat(&Self::RECEIPTS, &receipt_path)?;
-                host.store_copy(&receipt_path, &new_receipt_path)?;
-            }
-            host.store_write(&Self::RECEIPTS_PREVIOUS_ROOT, previous_receipts_root, 0)?;
-            let receipts_root = Self::safe_store_get_hash(host, &Self::RECEIPTS)?;
-            host.store_delete(&Self::RECEIPTS)?;
-            Ok(receipts_root)
+            // Can't use `calculate_receipt_root` because it use `Encodable2718` which we can't use
+            // also because of `bytes::BufMut` which use floats
+            ordered_trie_root_with_encoder(&self.cumulative_receipts, |obj, buf| {
+                obj.encode_2718(buf)
+            })
+            .to_vec()
         }
     }
 
-    const OBJECTS: RefPath<'static> = RefPath::assert_from(b"/objects");
-    const OBJECTS_PREVIOUS_ROOT: RefPath<'static> =
-        RefPath::assert_from(b"/objects/previous_root");
-
-    fn transactions_root(
-        &self,
-        host: &mut impl Runtime,
-        previous_transactions_root: &[u8],
-    ) -> anyhow::Result<Vec<u8>> {
+    fn transactions_root(&self) -> Vec<u8> {
         if self.valid_txs.is_empty() {
-            Ok(previous_transactions_root.to_vec())
+            EMPTY_ROOT_HASH.to_vec()
         } else {
-            for hash in &self.valid_txs {
-                let object_path = object_path(hash)?;
-                let new_object_path = concat(&Self::OBJECTS, &object_path)?;
-                host.store_copy(&object_path, &new_object_path)?;
-            }
-            host.store_write(
-                &Self::OBJECTS_PREVIOUS_ROOT,
-                previous_transactions_root,
-                0,
-            )?;
-            let objects_root = Self::safe_store_get_hash(host, &Self::OBJECTS)?;
-            host.store_delete(&Self::OBJECTS)?;
-            Ok(objects_root)
+            // Can't use `calculate_transactions_root` because it use `Encodable2718` which we can't use
+            // also because of `bytes::BufMut` which use floats
+            ordered_trie_root_with_encoder(&self.cumulative_tx_objects, |obj, buf| {
+                obj.encode_2718(buf)
+            })
+            .to_vec()
         }
     }
 
@@ -462,9 +471,8 @@ impl EthBlockInProgress {
         block_constants: &BlockConstants,
     ) -> Result<L2Block, anyhow::Error> {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
-        let receipts_root = self.receipts_root(host, &self.previous_receipts_root)?;
-        let transactions_root =
-            self.transactions_root(host, &self.previous_transactions_root)?;
+        let receipts_root = self.receipts_root();
+        let transactions_root = self.transactions_root();
         let base_fee_per_gas = base_fee_per_gas(
             host,
             self.timestamp,
@@ -673,13 +681,13 @@ mod tests {
             logs_offset: 33,
             timestamp: Timestamp::from(0i64),
             base_fee_per_gas: U256::from(21000u64),
-            previous_receipts_root: vec![0; 32],
-            previous_transactions_root: vec![0; 32],
             cumulative_execution_gas: U256::from(1),
+            cumulative_receipts: vec![],
+            cumulative_tx_objects: vec![],
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f902a52af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a0050505050505050505050505050505050505050505050505050505050505050563b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000021880000000000000000825208a00000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000001";
+        let expected = "f902652af8e6f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f871a00808080808080808080808080808080808080808080808080808080808080808f84e01b84bf84908080880088034a00808080808080808080808080808080808080808080808080808080808080808a00808080808080808080808080808080808080808080808080808080808080808f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a0050505050505050505050505050505050505050505050505050505050505050563b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002188000000000000000082520801c0c0";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 
@@ -712,13 +720,13 @@ mod tests {
             logs_offset: 0,
             timestamp: Timestamp::from(0i64),
             base_fee_per_gas: U256::from(21000u64),
-            previous_receipts_root: vec![0; 32],
-            previous_transactions_root: vec![0; 32],
             cumulative_execution_gas: U256::from(1),
+            cumulative_receipts: vec![],
+            cumulative_tx_objects: vec![],
         };
 
         let encoded = bip.rlp_bytes();
-        let expected = "f9025c2af87cf83ca00101010101010101010101010101010101010101010101010101010101010101da02d8019401010101010101010101010101010101010101010180f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909e1a002020202020202020202020202020202020202020202020202020202020202020304a0050505050505050505050505050505050505050505050505050505050505050563b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080880000000000000000825208a00000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000001";
+        let expected = "f9021c2af87cf83ca00101010101010101010101010101010101010101010101010101010101010101da02d8019401010101010101010101010101010101010101010180f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909e1a002020202020202020202020202020202020202020202020202020202020202020304a0050505050505050505050505050505050505050505050505050505050505050563b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008088000000000000000082520801c0c0";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 
@@ -751,14 +759,14 @@ mod tests {
             logs_offset: 4,
             timestamp: Timestamp::from(0i64),
             base_fee_per_gas: U256::from(21000u64),
-            previous_receipts_root: vec![0; 32],
-            previous_transactions_root: vec![0; 32],
             cumulative_execution_gas: U256::from(1),
+            cumulative_receipts: vec![],
+            cumulative_tx_objects: vec![],
         };
 
         let encoded = bip.rlp_bytes();
         let expected =
-            "f902702af8b1f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a0050505050505050505050505050505050505050505050505050505050505050563b901000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004880000000000000000825208a00000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000001";
+            "f902302af8b1f871a00101010101010101010101010101010101010101010101010101010101010101f84e01b84bf84901010180018026a00101010101010101010101010101010101010101010101010101010101010101a00101010101010101010101010101010101010101010101010101010101010101f83ca00808080808080808080808080808080808080808080808080808080808080808da02d8089408080808080808080808080808080808080808080180f842a00202020202020202020202020202020202020202020202020202020202020202a00909090909090909090909090909090909090909090909090909090909090909c00304a0050505050505050505050505050505050505050505050505050505050505050563b90100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000488000000000000000082520801c0c0";
 
         pretty_assertions::assert_str_eq!(hex::encode(encoded), expected);
 

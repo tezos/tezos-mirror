@@ -242,8 +242,6 @@ pub fn eth_bip_from_blueprint<Host: Runtime>(
         header.hash,
         tick_counter.c,
         gas_price,
-        header.receipts_root,
-        header.transactions_root,
     );
 
     tezos_evm_logging::log!(host, tezos_evm_logging::Level::Debug, "bip: {bip:?}");
@@ -1845,8 +1843,6 @@ mod tests {
             U256::from(1),
             transactions,
             block_constants.block_fees.base_fee_per_gas(),
-            vec![0; 32],
-            vec![0; 32],
         );
         // run is almost full wrt gas consumption in the current run
         let limits = EvmLimits::default();
