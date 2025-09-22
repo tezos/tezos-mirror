@@ -166,6 +166,11 @@ let get_infos_per_level t ~level ~metadata =
             (PKH pkh, dal))
           committee_info
           metadata_committee
+    | "attestation" ->
+        let pkh = JSON.(contents |-> "metadata" |-> "delegate" |> as_string) in
+        let slot = JSON.(contents |-> "slot" |> as_int) in
+        let dal = if slot >= 512 then Out_of_committee else Without_DAL in
+        [(PKH pkh, dal)]
     | _ -> []
   in
   let* attestation_rights =
