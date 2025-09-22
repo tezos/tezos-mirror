@@ -25,7 +25,9 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_storage::{read_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
-use tezos_tezlink::lazy_storage_diff::{Alloc, Copy, StorageDiff, Update};
+use tezos_tezlink::lazy_storage_diff::{
+    Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
+};
 use typed_arena::Arena;
 
 pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
@@ -208,6 +210,25 @@ fn hash_key(key: TypedValue<'_>) -> Vec<u8> {
     let parser = Parser::new();
     let key_encoded = key.into_micheline_optimized_legacy(&parser.arena).encode();
     digest_256(&key_encoded)
+}
+
+/// Function to convert a BtreeMap that represent the lazy_storage_diff
+/// in a valid Tezos representation.
+pub fn convert_big_map_diff(
+    big_map_diff: BTreeMap<Zarith, StorageDiff>,
+) -> Option<LazyStorageDiffList> {
+    let mut list_diff = vec![];
+    // L1 receipts big_map diffs are in reverse order, this is mandatory for external tools that
+    // except such an order.
+    for (id, storage_diff) in big_map_diff.into_iter().rev() {
+        let diff = LazyStorageDiff::BigMap(BigMapDiff { id, storage_diff });
+        list_diff.push(diff);
+    }
+    if list_diff.is_empty() {
+        None
+    } else {
+        Some(LazyStorageDiffList { diff: list_diff })
+    }
 }
 
 impl<'a, Host: Runtime> LazyStorage<'a>
@@ -576,5 +597,50 @@ mod tests {
             Type::Int,
             expected_content,
         );
+    }
+
+    // L1 receipts big_map diffs are in reverse order, this is mandatory for external tools that
+    // except such an order.
+    #[test]
+    fn test_convert_big_map_diff_order() {
+        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat).encode();
+        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit).encode();
+        let alloc_0 = StorageDiff::Alloc(Alloc {
+            updates: vec![],
+            key_type: key_type.clone(),
+            value_type: value_type.clone(),
+        });
+        let alloc_5 = StorageDiff::Alloc(Alloc {
+            updates: vec![],
+            key_type: key_type.clone(),
+            value_type: value_type.clone(),
+        });
+        let alloc_4 = StorageDiff::Alloc(Alloc {
+            updates: vec![],
+            key_type: key_type.clone(),
+            value_type: value_type.clone(),
+        });
+        let mut map: BTreeMap<Zarith, StorageDiff> = BTreeMap::new();
+        map.insert(0u64.into(), alloc_0.clone());
+        map.insert(5u64.into(), alloc_5.clone());
+        map.insert(4u64.into(), alloc_4.clone());
+        let diff_list = convert_big_map_diff(map);
+        let expected = Some(LazyStorageDiffList {
+            diff: vec![
+                LazyStorageDiff::BigMap(BigMapDiff {
+                    id: 5u64.into(),
+                    storage_diff: alloc_5,
+                }),
+                LazyStorageDiff::BigMap(BigMapDiff {
+                    id: 4u64.into(),
+                    storage_diff: alloc_4,
+                }),
+                LazyStorageDiff::BigMap(BigMapDiff {
+                    id: 0u64.into(),
+                    storage_diff: alloc_0,
+                }),
+            ],
+        });
+        assert_eq!(diff_list, expected, "Receipt should be in reverse order");
     }
 }

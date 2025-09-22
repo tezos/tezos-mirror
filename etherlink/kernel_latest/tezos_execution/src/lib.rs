@@ -43,7 +43,7 @@ use tezos_tezlink::{
 };
 
 use crate::address::OriginationNonce;
-use crate::mir_ctx::Ctx;
+use crate::mir_ctx::{convert_big_map_diff, Ctx};
 
 extern crate alloc;
 pub mod account_storage;
@@ -457,8 +457,10 @@ fn transfer<'a, Host: Runtime>(
                 TransferError::FailedToExecuteInternalOperation(err.to_string())
             })?;
             log!(host, Debug, "Transfer operation succeeded");
+            let lazy_storage_diff = convert_big_map_diff(ctx.big_map_diff);
             Ok(TransferSuccess {
                 storage: Some(new_storage),
+                lazy_storage_diff,
                 ..receipt
             })
         }
