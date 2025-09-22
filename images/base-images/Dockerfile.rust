@@ -7,7 +7,10 @@
 # - building kernels, testing kernels and building the kernel SDK in the tezos/tezos CI
 # - building the EVM kernel distributed in the tezos/tezos Docker images.
 
-FROM debian:unstable
+ARG IMAGE=invalid
+# the image with proper version is set as ARG
+#hadolint ignore=DL3006
+FROM ${IMAGE}
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
@@ -38,13 +41,15 @@ WORKDIR /root
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
-    ca-certificates curl file \
+    ca-certificates file \
     build-essential \
     git \
-    autoconf automake autotools-dev libtool xutils-dev clang cmake \
+    gcc \
+    tzdata \
+    pkg-config autoconf automake autotools-dev libtool xutils-dev clang cmake \
     sccache \
     musl-tools \
-    wabt binutils-riscv64-unknown-elf gcc-riscv64-linux-gnu && \
+    wabt binutils-gold binutils-riscv64-unknown-elf gcc-riscv64-linux-gnu && \
     ln -s /usr/bin/riscv64-linux-gnu-gcc /usr/bin/riscv64-unknown-linux-musl-gcc && \
     ln -s /usr/bin/riscv64-unknown-elf-objdump /usr/local/bin/objdump && \
     rm -rf /var/lib/apt/lists/*
@@ -56,7 +61,7 @@ RUN curl https://sh.rustup.rs --silent --show-error --fail | \
 ENV PATH=/root/.cargo/bin:$PATH
 
 # install rust toolchains and compilation targets
-RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 1.80.1 1.84.1 1.86.0 nightly-2025-01-30 nightly-2023-12-15 && \
+RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 1.80.1 1.84.1 1.86.0 1.88.0 nightly-2025-01-30 nightly-2023-12-15 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
         rustup target add --toolchain="$tc" wasm32-unknown-unknown; \
         rustup target add --toolchain="$tc" riscv64gc-unknown-none-elf; \

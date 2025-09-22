@@ -205,7 +205,7 @@ oc.base-images.rust:
   variables:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: debian-rust
-    IMAGE_PATH: debian-rust
+    IMAGE_PATH: debian
     PLATFORM: ""
   parallel:
     matrix:

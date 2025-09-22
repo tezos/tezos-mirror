@@ -109,6 +109,7 @@ let jobs =
         ~__POS__
         ~name:"oc.base-images.rust"
         ~distribution:"debian-rust"
+        ~image_path:"debian"
         ~matrix:[("RELEASE", ["unstable"])]
         ~tags:tags_matrix
         "images/base-images/Dockerfile.rust"
