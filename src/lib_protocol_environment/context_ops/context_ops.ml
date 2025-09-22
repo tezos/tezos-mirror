@@ -1013,3 +1013,10 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
   | Duo_memory_index _ ->
       Fmt.failwith
         "An in memory context doesn't need to be checked for integrity"
+
+let is_tezedge (context : Environment_context.t) =
+  match context with
+  | Context {kind = Tezedge_context.Context; _}
+  | Context {kind = Duo_irmin_tezedge_context.Context; _} ->
+      true
+  | _ -> false
