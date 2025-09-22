@@ -56,6 +56,7 @@ val run :
   ?detach:bool ->
   ?network:string ->
   ?publish_ports:string * string * string * string ->
+  ?custom_docker_options:string list ->
   ?volumes:(string * string) list ->
   string ->
   string list ->

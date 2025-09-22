@@ -56,7 +56,7 @@ let network ~command ~network_name =
   Process.spawn ~color "docker" (["network"] @ [command] @ [network_name])
 
 let run ?runner ?(rm = false) ?name ?(detach = false) ?network ?publish_ports
-    ?volumes image args =
+    ?custom_docker_options ?volumes image args =
   let publish_ports =
     match publish_ports with
     | None -> []
@@ -96,6 +96,7 @@ let run ?runner ?(rm = false) ?name ?(detach = false) ?network ?publish_ports
     "docker"
     (["run"] @ detach @ rm @ name @ macos_platform_arg @ volumes @ network
    @ net_admin @ publish_ports
+    @ Option.value ~default:[] custom_docker_options
     @ [Format.asprintf "%s" image]
     @ args)
 
