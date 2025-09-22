@@ -1,0 +1,10 @@
+# Purpose: verify the storage syntax for big maps that are created at runtime.
+# Behavior on origination: can start with storage = None to delay big_map allocation.
+
+parameter unit ;
+storage (option (big_map string bytes)) ;
+code { DROP ;
+       EMPTY_BIG_MAP string bytes ;
+       SOME ;
+       NIL operation ;
+       PAIR }

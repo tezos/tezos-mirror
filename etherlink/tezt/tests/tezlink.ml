@@ -1031,6 +1031,94 @@ let test_tezlink_execution =
       ~error_msg:"Expected \"%R\" but got \"%L\"") ;
   unit
 
+let test_tezlink_bigmap_option =
+  let option_contract = Michelson_contracts.big_map_option () in
+  register_tezlink_test
+    ~title:"Test which syntax is used for big maps in contract storages"
+    ~tags:["syntax"; "big_map"; "option"]
+    ~bootstrap_contracts:[option_contract]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  (* In the L1, we actually get "Some 4" because the bootstrap contracts of Liquidity Baking use the big map indices from 0 to 3. *)
+  let expected_result = "Some {}" in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:(Tez.of_int 10)
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~receiver:option_contract.address
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* actual_result =
+    Client.contract_storage ~endpoint option_contract.address client
+  in
+  Check.(
+    (String.trim actual_result = String.trim expected_result)
+      string
+      ~error_msg:"Expected \"%R\" but got \"%L\"") ;
+  unit
+
+let test_tezlink_bigmap_counter =
+  let counter_contract = Michelson_contracts.big_map_counter () in
+  register_tezlink_test
+    ~title:"Test of tezlink big_map persistency"
+    ~tags:["persistency"; "big_map"; "counter"]
+    ~bootstrap_contracts:[counter_contract]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  (* This test verifies big_map persistence in storage.
+     It relies on the counter.tz invariant that a counter with a matching key
+     exists in the stored big_map. The contract is called twice to ensure
+     that the big_map is committed to durable storage between calls. *)
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:(Tez.of_int 10)
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~receiver:counter_contract.address
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* result_1 =
+    Client.contract_storage ~endpoint counter_contract.address client
+  in
+
+  Check.(
+    (String.trim result_1 =~ rex "Pair 1 .*")
+      ~error_msg:"Expected \"%R\" but got \"%L\"") ;
+
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:(Tez.of_int 10)
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~receiver:counter_contract.address
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* result_2 =
+    Client.contract_storage ~endpoint counter_contract.address client
+  in
+
+  Check.(
+    (String.trim result_2 =~ rex "Pair 2 .*")
+      ~error_msg:"Expected \"%R\" but got \"%L\"") ;
+  unit
+
 let test_tezlink_reveal_transfer_batch =
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
   register_tezlink_test
@@ -1584,6 +1672,8 @@ let () =
   test_tezlink_block_info [Alpha] ;
   test_tezlink_storage [Alpha] ;
   test_tezlink_execution [Alpha] ;
+  test_tezlink_bigmap_option [Alpha] ;
+  test_tezlink_bigmap_counter [Alpha] ;
   test_tezlink_reveal_transfer_batch [Alpha] ;
   test_tezlink_batch [Alpha] ;
   test_tezlink_long_batch [Alpha] ;
