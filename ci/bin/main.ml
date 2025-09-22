@@ -116,6 +116,8 @@ let () = Rollup_node.Release.register ()
 
 let () = Documentation.register ()
 
+let () = Etherlink.register ()
+
 (** {3 General pipelines} *)
 
 let () =
