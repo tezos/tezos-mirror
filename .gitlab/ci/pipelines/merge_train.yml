@@ -1596,6 +1596,45 @@ images.ubuntu-systemd:
       - "24.04"
       - "25.10"
 
+images.ci-release:
+  image: ${GCP_RELEASE_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - changes:
+    - images/base-images/Dockerfile.debian
+    - images/base-images/Dockerfile.debian-release
+    - images/scripts/install-gcloud-apt.sh
+    - images/scripts/install-release-cli.sh
+    - images/scripts/install_datadog_static.sh
+    - scripts/ci/build-base-images.sh
+    - scripts/kiss-fetch.sh
+    when: on_success
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-release
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: ci-release
+    IMAGE_PATH: debian:$RELEASE
+    PLATFORM: linux/amd64
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
+
 select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: build

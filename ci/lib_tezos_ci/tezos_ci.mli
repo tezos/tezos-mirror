@@ -546,8 +546,6 @@ module Images_external : sig
 
   val datadog_ci : Image.t
 
-  val ci_release : Image.t
-
   val hadolint : Image.t
 
   val semgrep_agent : Image.t
@@ -559,8 +557,6 @@ module Images : sig
   val docker : Image.t
 
   val datadog_ci : Image.t
-
-  val ci_release : Image.t
 
   val hadolint : Image.t
 
@@ -647,6 +643,8 @@ module Images : sig
     val homebrew : Image.t
 
     val rust_toolchain_trixie : Image.t
+
+    val ci_release : Image.t
   end
 end
 

@@ -38,7 +38,7 @@ let job_gitlab_release =
   CI.job
     "gitlab_release"
     ~__POS__
-    ~image:Tezos_ci.Images.ci_release
+    ~image:Tezos_ci.Images.Base_images.ci_release
     ~stage:Publish
     ~description:"Create a GitLab release for Grafazos."
     ~needs:[(Artifacts, job_build Build)]

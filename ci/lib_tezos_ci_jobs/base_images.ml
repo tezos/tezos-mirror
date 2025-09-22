@@ -125,6 +125,15 @@ module Files = struct
       "images/ci/datadog/package-lock.json";
     ]
     @ build_script
+
+  let ci_releases =
+    [
+      "scripts/kiss-fetch.sh";
+      "images/scripts/install-release-cli.sh";
+      "images/scripts/install_datadog_static.sh";
+      "images/scripts/install-gcloud-apt.sh";
+      "images/base-images/Dockerfile.debian-release";
+    ]
 end
 
 module Distribution = struct
@@ -191,7 +200,7 @@ let jobs ?start_job ?(changeset = false) () =
      *)
   let make_job_base_images ~__POS__ ?(matrix = []) ~image_name
       ?(base_name = Upstream image_name) ?(changes = Changeset.make [])
-      ?(compilation = Emulated) ?dependencies dockerfile =
+      ?(compilation = Emulated) ?(variables = []) ?dependencies dockerfile =
     let script =
       Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile
     in
@@ -235,6 +244,7 @@ let jobs ?start_job ?(changeset = false) () =
           | Pipeline_dep name -> base_dep_img_name name );
         ("PLATFORM", platform);
       ]
+      @ variables
     in
     job_docker_authenticated
       ~__POS__
@@ -352,6 +362,17 @@ let jobs ?start_job ?(changeset = false) () =
         ]
       ["scripts/ci/docker-merge-base-images.sh"]
   in
+  let job_ci_release_based_images =
+    make_job_base_images
+      ~__POS__
+      ~image_name:"ci-release"
+      ~base_name:(Upstream "debian")
+      ~matrix:[("RELEASE", ["trixie"])]
+      ~compilation:Amd64_only
+      ~changes:(Changeset.make Files.(ci_releases @ debian_base))
+      "images/base-images/Dockerfile.debian-release"
+  in
+
   (* debian-homebrew: based on [debian:trixie] *)
   let job_debian_homebrew_base_images =
     make_job_base_images
@@ -445,6 +466,7 @@ let jobs ?start_job ?(changeset = false) () =
     job_docker_ci_based_images;
     job_debian_systemd_base_images;
     job_ubuntu_systemd_base_images;
+    job_ci_release_based_images;
   ]
 
 let child_pipeline =
