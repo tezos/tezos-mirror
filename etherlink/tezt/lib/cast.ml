@@ -132,17 +132,18 @@ let call ?(args = []) signature ~endpoint ~address =
   spawn_command_and_read_string
     (("call" :: address :: signature :: args) @ ["--rpc-url"; endpoint])
 
-let wallet_sign_auth ~authorization ~private_key ~endpoint =
+let wallet_sign_auth ?nonce ~authorization ~private_key ~endpoint () =
   spawn_command_and_read_string
-    [
-      "wallet";
-      "sign-auth";
-      authorization;
-      "--private-key";
-      private_key;
-      "--rpc-url";
-      endpoint;
-    ]
+    ([
+       "wallet";
+       "sign-auth";
+       authorization;
+       "--private-key";
+       private_key;
+       "--rpc-url";
+       endpoint;
+     ]
+    @ Cli_arg.optional_arg "nonce" Int.to_string nonce)
 
 let raw_call ~endpoint ~address ~arg =
   spawn_command_and_read_string ["call"; address; arg; "--rpc-url"; endpoint]
