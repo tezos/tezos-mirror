@@ -49,6 +49,7 @@ module DAL = struct
     tezlink : bool option;
     slot_size : int option;
     number_of_slots : int option;
+    attestation_lag : int option;
     traps_fraction : Q.t option;
   }
 
@@ -104,6 +105,7 @@ module DAL = struct
              tezlink;
              slot_size;
              number_of_slots;
+             attestation_lag;
              traps_fraction;
            }
          ->
@@ -147,7 +149,7 @@ module DAL = struct
                 ppx_profiling_backends,
                 enable_network_health_monitoring,
                 tezlink ) ) ),
-          (slot_size, number_of_slots, traps_fraction) ))
+          (slot_size, number_of_slots, attestation_lag, traps_fraction) ))
       (fun ( ( ( ( blocks_history,
                    producer_key,
                    fundraiser,
@@ -188,7 +190,7 @@ module DAL = struct
                    ppx_profiling_backends,
                    enable_network_health_monitoring,
                    tezlink ) ) ),
-             (slot_size, number_of_slots, traps_fraction) )
+             (slot_size, number_of_slots, attestation_lag, traps_fraction) )
          ->
         {
           blocks_history;
@@ -233,6 +235,7 @@ module DAL = struct
           tezlink;
           slot_size;
           number_of_slots;
+          attestation_lag;
           traps_fraction;
         })
       (merge_objs
@@ -283,9 +286,10 @@ module DAL = struct
                   (dft "ppx_profiling_backends" (list string) [])
                   (opt "enable_network_health_monitoring" bool)
                   (opt "tezlink" bool))))
-         (obj3
+         (obj4
             (opt "slot_size" int31)
             (opt "number_of_slots" int31)
+            (opt "attestation_lag" int31)
             (opt "traps_fraction" q_encoding)))
 end
 

@@ -50,6 +50,7 @@ type configuration = {
   daily_logs_destination : string option;
   slot_size : int option;
   number_of_slots : int option;
+  attestation_lag : int option;
   traps_fraction : Q.t option;
 }
 
@@ -702,6 +703,10 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
             | Some number_of_slots ->
                 [(["dal_parametric"; "number_of_slots"], `Int number_of_slots)]
             | None -> [])
+          @ (match configuration.attestation_lag with
+            | Some attestation_lag ->
+                [(["dal_parametric"; "attestation_lag"], `Int attestation_lag)]
+            | None -> [])
           @
           match configuration.traps_fraction with
           | Some {num; den} ->
@@ -1269,6 +1274,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     in
     let slot_size = Cli.slot_size in
     let number_of_slots = Cli.number_of_slots in
+    let attestation_lag = Cli.attestation_lag in
     let traps_fraction = Cli.traps_fraction in
     let t =
       {
@@ -1305,6 +1311,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         daily_logs_destination;
         slot_size;
         number_of_slots;
+        attestation_lag;
         traps_fraction;
       }
     in
