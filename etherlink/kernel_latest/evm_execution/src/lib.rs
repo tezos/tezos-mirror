@@ -34,11 +34,11 @@ pub mod handler;
 pub mod precompiles;
 pub mod storage;
 pub mod tick_model_opcodes;
-pub mod trace;
-pub mod transaction;
-pub mod transaction_layer_data;
-pub mod utilities;
-pub mod withdrawal_counter;
+mod trace;
+mod transaction;
+mod transaction_layer_data;
+mod utilities;
+mod withdrawal_counter;
 
 pub use evm::Config;
 

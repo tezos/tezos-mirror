@@ -438,6 +438,7 @@ mod tests {
     use crate::storage::{
         read_transaction_receipt_status, store_chain_id, ENABLE_FA_BRIDGE,
     };
+    use alloy_primitives::keccak256;
     use evm_execution::fa_bridge::deposit::{ticket_hash, FaDeposit};
     use evm_execution::fa_bridge::test_utils::{
         convert_h160, convert_u256, dummy_ticket, kernel_wrapper, ticket_id, SolCall,
@@ -446,7 +447,6 @@ mod tests {
     use evm_execution::precompiles::{
         FA_BRIDGE_PRECOMPILE_ADDRESS, SYSTEM_ACCOUNT_ADDRESS,
     };
-    use evm_execution::utilities::{bigint_to_u256, keccak256_hash};
     use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
     use pretty_assertions::assert_eq;
     use primitive_types::{H160, U256};
@@ -595,12 +595,12 @@ mod tests {
             .unwrap()
             .to_bytes();
 
-        let tx_hash = keccak256_hash(&tx_payload);
+        let tx_hash = keccak256(&tx_payload);
 
         // encode as external message and submit to inbox
         let mut contents = Vec::new();
         contents.push(0x00); // simple tx tag
-        contents.extend_from_slice(tx_hash.as_bytes());
+        contents.extend_from_slice(tx_hash.as_slice());
         contents.extend_from_slice(&tx_payload);
 
         let message = ExternalMessageFrame::Targetted {
@@ -772,7 +772,8 @@ mod tests {
         // construct ticket
         let ticket = dummy_ticket();
         let ticket_hash = h256_to_alloy(&ticket_hash(&ticket).unwrap());
-        let amount = bigint_to_u256(ticket.amount()).unwrap();
+        let (_, bytes) = ticket.amount().to_bytes_le();
+        let amount = U256::from_little_endian(&bytes);
 
         let mut system = world_state_handler
             .get_or_create(
@@ -838,12 +839,12 @@ mod tests {
             .unwrap()
             .to_bytes();
 
-        let tx_hash = keccak256_hash(&tx_payload);
+        let tx_hash = keccak256(&tx_payload);
 
         // encode as external message and submit to inbox
         let mut contents = Vec::new();
         contents.push(0x00); // simple tx tag
-        contents.extend_from_slice(tx_hash.as_bytes());
+        contents.extend_from_slice(tx_hash.as_slice());
         contents.extend_from_slice(&tx_payload);
 
         let message = ExternalMessageFrame::Targetted {

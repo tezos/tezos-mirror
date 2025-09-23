@@ -30,8 +30,8 @@ use crate::{block_in_progress, tick_model};
 use anyhow::Context;
 use block_in_progress::EthBlockInProgress;
 use evm::Config;
-use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
+use revm_etherlink::inspectors::TracerInput;
 use revm_etherlink::storage::world_state_handler::{
     new_world_state_handler, WorldStateHandler,
 };
@@ -608,6 +608,7 @@ mod tests {
     use primitive_types::{H160, U256};
     use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
     use revm_etherlink::storage::world_state_handler::account_path;
+    use sha3::{Digest, Keccak256};
     use std::str::FromStr;
     use tezos_crypto_rs::hash::ChainId;
     use tezos_crypto_rs::hash::HashTrait;
@@ -2102,8 +2103,12 @@ mod tests {
         // - call `loop(300)`
         let create_transaction =
             create_and_sign_transaction(CREATE_LOOP_DATA, 0, 160_000, None, TEST_SK);
-        let loop_addr: H160 =
-            evm_execution::utilities::create_address_legacy(&sender, &0);
+        let loop_addr: H160 = {
+            let mut stream = rlp::RlpStream::new_list(2);
+            stream.append(&sender);
+            stream.append(&0u64);
+            H256::from_slice(Keccak256::digest(stream.out()).as_slice()).into()
+        };
         let loop_300_tx =
             create_and_sign_transaction(LOOP_300, 1, 230_000, Some(loop_addr), TEST_SK);
         let loop_300_tx2 =
@@ -2194,8 +2199,12 @@ mod tests {
         // - call `loop(300)`
         let create_transaction =
             create_and_sign_transaction(CREATE_LOOP_DATA, 0, 160_000, None, TEST_SK);
-        let loop_addr: H160 =
-            evm_execution::utilities::create_address_legacy(&sender, &0);
+        let loop_addr: H160 = {
+            let mut stream = rlp::RlpStream::new_list(2);
+            stream.append(&sender);
+            stream.append(&0u64);
+            H256::from_slice(Keccak256::digest(stream.out()).as_slice()).into()
+        };
 
         let loop_300_tx =
             create_and_sign_transaction(LOOP_300, 1, 230_000, Some(loop_addr), TEST_SK);

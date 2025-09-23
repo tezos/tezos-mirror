@@ -280,6 +280,8 @@ fn execute_transaction(
         env.tx.value,
         access_list
     );
+    let mut bytes = vec![0u8; 32];
+    transaction_value.to_little_endian(&mut bytes);
     run_transaction(
         host,
         spec_id,
@@ -291,9 +293,7 @@ fn execute_transaction(
         Bytes::from(call_data),
         gas_limit,
         u256_to_u128(env.tx.gas_price),
-        revm::primitives::U256::from_le_slice(
-            &(evm_execution::utilities::u256_to_le_bytes(transaction_value)),
-        ),
+        revm::primitives::U256::from_le_slice(&bytes),
         access_list,
         // TODO: add authorization list when Prague tests are enabled.
         None,

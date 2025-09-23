@@ -11,19 +11,18 @@ use evm::Config;
 use evm_execution::fa_bridge::deposit::{FaDeposit, FaDepositWithProxy};
 use evm_execution::handler::{FastWithdrawalInterface, RouterInterface};
 use evm_execution::precompiles::{FA_BRIDGE_PRECOMPILE_ADDRESS, SYSTEM_ACCOUNT_ADDRESS};
-use evm_execution::storage::tracer;
-use evm_execution::trace::TracerInput::CallTracer;
-use evm_execution::trace::{
-    get_tracer_configuration, CallTrace, CallTracerConfig, CallTracerInput,
-    StructLoggerInput, TracerInput,
-};
 use evm_execution::EthereumError;
-use primitive_types::{H160, H256, U256};
+use primitive_types::{H160, U256};
 use revm::{
     primitives::{Address, Bytes, Log, B256},
     state::AccountInfo,
 };
-use revm_etherlink::helpers::legacy::alloy_to_log;
+use revm_etherlink::inspectors::call_tracer::{
+    CallTrace, CallTracerConfig, CallTracerInput,
+};
+use revm_etherlink::inspectors::storage::store_call_trace;
+use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
+use revm_etherlink::inspectors::{get_tracer_configuration, TracerInput};
 use revm_etherlink::precompiles::constants::FA_DEPOSIT_EXECUTION_COST;
 use revm_etherlink::precompiles::send_outbox_message::Withdrawal;
 use revm_etherlink::storage::world_state_handler::{
@@ -372,6 +371,8 @@ pub fn revm_run_transaction<Host: Runtime>(
                 .into())
             }
         };
+    let mut bytes = vec![0u8; 32];
+    value.to_little_endian(&mut bytes);
     revm_etherlink::run_transaction(
         host,
         config_to_revm_specid(config),
@@ -392,9 +393,7 @@ pub fn revm_run_transaction<Host: Runtime>(
             )
             .into());
         }),
-        revm::primitives::U256::from_le_slice(
-            &(evm_execution::utilities::u256_to_le_bytes(value)),
-        ),
+        revm::primitives::U256::from_le_slice(&bytes),
         revm::context::transaction::AccessList::from(
             access_list
                 .into_iter()
@@ -443,6 +442,7 @@ pub fn revm_run_transaction<Host: Runtime>(
                     transaction_hash: transaction_hash.map(|hash| B256::from(hash.0)),
                 },
             ),
+            TracerInput::NoOp => revm_etherlink::inspectors::TracerInput::NoOp,
         }),
     )
     .map_err(|err| {
@@ -525,32 +525,29 @@ fn trace_deposit<Host: Runtime>(
     host: &mut Host,
     amount: U256,
     receiver: Option<H160>,
-    gas_used: u64,
     logs: &[Log],
     tracer_input: Option<TracerInput>,
 ) {
-    if let Some(CallTracer(CallTracerInput {
+    if let Some(TracerInput::CallTracer(CallTracerInput {
         transaction_hash,
         config: CallTracerConfig { with_logs, .. },
     })) = tracer_input
     {
         let mut call_trace = CallTrace::new_minimal_trace(
             "CALL".into(),
-            H160::zero(),
-            amount,
-            gas_used,
+            revm::primitives::Address::ZERO,
+            u256_to_alloy(&amount),
             vec![],
             0,
         );
 
-        call_trace.add_to(receiver);
+        call_trace.add_to(receiver.map(|a| h160_to_alloy(&a)));
 
         if with_logs {
-            let logs = logs.iter().map(alloy_to_log).collect();
-            call_trace.add_logs(Some(logs))
+            call_trace.add_logs(Some(logs.to_vec()));
         }
 
-        let _ = tracer::store_call_trace(host, call_trace, &transaction_hash);
+        let _ = store_call_trace(host, &call_trace, &transaction_hash);
     }
 }
 
@@ -577,7 +574,6 @@ fn apply_deposit<Host: Runtime>(
         host,
         transaction.value(),
         transaction.to(),
-        execution_outcome.result.gas_used(),
         execution_outcome.result.logs(),
         tracer_input,
     );
@@ -822,7 +818,8 @@ pub fn apply_transaction<Host: Runtime>(
     evm_configuration: &Config,
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
-    let tracer_input = get_tracer_configuration(H256(transaction.tx_hash), tracer_input);
+    let tracer_input =
+        get_tracer_configuration(B256::from_slice(&transaction.tx_hash), tracer_input);
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,
