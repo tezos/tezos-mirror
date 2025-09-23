@@ -440,6 +440,8 @@ module Plugin = struct
         return last_cells_ordered_by_insertion
 
     let slot_header_of_cell _cell = (* Not implemented for Quebec *) None
+
+    let proto_attestation_status _cell = (* Not implemented for Quebec *) None
   end
 
   module RPC = struct

@@ -128,6 +128,9 @@ module type T = sig
       (hash * cell * slot_index) list tzresult Lwt.t
 
     val slot_header_of_cell : cell -> slot_header option
+
+    val proto_attestation_status :
+      cell -> [`Attested | `Unattested | `Unpublished] option
   end
 
   module RPC : sig
