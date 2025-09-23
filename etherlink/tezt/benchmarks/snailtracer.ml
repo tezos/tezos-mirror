@@ -206,10 +206,6 @@ let encode_parameters width height =
 
 let test_snailtracer =
   let nb_accounts = Option.value parameters.accounts ~default:1 in
-  (match parameters.contracts with
-  | Some n when n <> 1 ->
-      Log.warn "Deploying only one contract, ignoring argument"
-  | _ -> ()) ;
   let width = parameters.width in
   let height = parameters.height in
   let accounts = Eth_account.accounts nb_accounts in
@@ -231,6 +227,10 @@ let test_snailtracer =
     ~maximum_gas_per_transaction:(1 lsl 50 |> Int64.of_int)
     ~tx_queue:{max_lifespan = 4; max_size = 4_000; tx_per_addr_limit = 1024}
   @@ fun {sequencer; _} _protocol ->
+  (match parameters.contracts with
+  | Some n when n <> 1 ->
+      Log.warn "Deploying only one contract, ignoring argument"
+  | _ -> ()) ;
   let* accounts = floodgate_accounts sequencer accounts in
   let rpc_node = sequencer in
   let endpoint = Evm_node.endpoint rpc_node |> Uri.of_string in
@@ -284,10 +284,6 @@ let test_snailtracer =
   stop_profile ()
 
 let test_full_image_raytracing =
-  (match parameters.contracts with
-  | Some n when n <> 1 ->
-      Log.warn "Deploying only one contract, ignoring argument"
-  | _ -> ()) ;
   let width = parameters.width in
   let height = parameters.height in
   let accounts = Eth_account.accounts 1 in
@@ -316,6 +312,10 @@ let test_full_image_raytracing =
     ~maximum_gas_per_transaction:(1 lsl 50 |> Int64.of_int)
     ~tx_queue:{max_lifespan = 4; max_size = 4_000; tx_per_addr_limit = 1024}
   @@ fun {sequencer; _} _protocol ->
+  (match parameters.contracts with
+  | Some n when n <> 1 ->
+      Log.warn "Deploying only one contract, ignoring argument"
+  | _ -> ()) ;
   let* sender = floodgate_account sequencer sender in
   let rpc_node = sequencer in
   let endpoint = Evm_node.endpoint rpc_node |> Uri.of_string in
