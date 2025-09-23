@@ -54,6 +54,14 @@ val open_process : string * string array -> Lwt_process.process Lwt.t
     @return A promise that resolves to a [Lwt_process.process_full] object. *)
 val open_process_full : string * string array -> Lwt_process.process_full Lwt.t
 
+(** [open_process_none (command, args)] starts the given command. The standard
+    input, standard output, and standard error are redirected to the ones of the
+    caller.
+
+    @param command A tuple containing the command name and its arguments.
+    @return A promise that resolves to a [Lwt_process.process_full] object. *)
+val open_process_none : string * string array -> Lwt_process.process_none Lwt.t
+
 (** {1 Managing Processes}
 
     These are helper functions that manage the lifecycle of a process. They
@@ -100,3 +108,13 @@ val with_process :
     @return The result of [f proc]. *)
 val with_process_full :
   string * string array -> (Lwt_process.process_full -> 'a Lwt.t) -> 'a Lwt.t
+
+(** [with_process_none cmd f] is a safe wrapper for [open_process_none]. It
+    starts a process, applies [f] to the process object, and guarantees
+    cleanup.
+
+    @param cmd The command and arguments to execute.
+    @param f A function to apply to the created process.
+    @return The result of [f proc]. *)
+val with_process_none :
+  string * string array -> (Lwt_process.process_none -> 'a Lwt.t) -> 'a Lwt.t

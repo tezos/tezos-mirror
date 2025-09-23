@@ -123,6 +123,25 @@ let open_process_out (p_name, args) : Lwt_process.process_out Lwt.t =
     method stdin = pin
   end
 
+let open_process_none (p_name, args) : Lwt_process.process_none Lwt.t =
+  let open Lwt_syntax in
+  let+ pid =
+    Lwt_domain.detach
+      (Lazy.force pool)
+      (fun () ->
+        Unix.create_process_env
+          p_name
+          args
+          (Unix.environment ())
+          Unix.stdin
+          Unix.stdout
+          Unix.stderr)
+      ()
+  in
+  object
+    inherit common pid []
+  end
+
 let with_process_gen backend cmd f =
   let open Lwt_syntax in
   let* proc = backend cmd in
@@ -139,3 +158,5 @@ let with_process_in cmd f = with_process_gen open_process_in cmd f
 let with_process_out cmd f = with_process_gen open_process_out cmd f
 
 let with_process_full cmd f = with_process_gen open_process_full cmd f
+
+let with_process_none cmd f = with_process_gen open_process_none cmd f
