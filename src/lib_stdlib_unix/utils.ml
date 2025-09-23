@@ -115,6 +115,18 @@ let copy_dir ?(perm = 0o755) ?progress src dst =
 
 let copy_file = copy_file ~count_progress:(fun _ -> ())
 
+let hardlink_dir ?(perm = 0o755) src dst =
+  create_dir ~perm dst ;
+  fold_files
+    src
+    (fun relative_path () ->
+      let src = Filename.concat src relative_path in
+      let dst = Filename.concat dst relative_path in
+      let dst_dir = Filename.dirname dst in
+      create_dir ~perm dst_dir ;
+      Unix.link src dst)
+    ()
+
 let rec retry ?max_delay ~delay ~factor ?tries ~is_error ~emit
     ?(msg = fun _ -> "") f x =
   let open Lwt.Syntax in
