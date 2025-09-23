@@ -188,7 +188,7 @@ end
 (** Access to underlying Irmin tree for components which cannot be abstract
    over the PVM durable storage backend type. *)
 module Wasm_internal : sig
-  val to_irmin : tree -> Irmin_context.tree
+  val to_irmin_exn : tree -> Irmin_context.tree
 
   val of_irmin : Irmin_context.tree -> tree
 end
