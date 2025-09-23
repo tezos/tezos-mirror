@@ -1881,6 +1881,7 @@ dependencies = [
  "smallvec",
  "strum 0.26.3",
  "strum_macros 0.26.4",
+ "tezos-smart-rollup-host",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror 1.0.69",
@@ -3271,6 +3272,7 @@ dependencies = [
  "tezos_data_encoding",
  "tezos_tezlink_latest",
  "thiserror 1.0.69",
+ "typed-arena",
 ]
 
 [[package]]

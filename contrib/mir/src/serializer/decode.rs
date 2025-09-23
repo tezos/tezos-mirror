@@ -24,7 +24,7 @@ use crate::{
 };
 
 /// Errors that can happen during deserialization.
-#[derive(PartialEq, Debug, Clone, Copy, thiserror::Error)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, thiserror::Error)]
 pub enum DecodeError {
     /// Trailing bytes present after decoding a value.
     #[error("trailing bytes after decoding the value")]

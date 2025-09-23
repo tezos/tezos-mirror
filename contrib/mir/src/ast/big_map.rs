@@ -8,22 +8,58 @@
 //! `big_map` typed representation and utilities for working with `big_map`s.
 
 use num_bigint::BigInt;
+use num_traits::One;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     fmt::Display,
     mem,
 };
+use tezos_data_encoding::enc::BinWriter;
+use tezos_data_encoding::nom::NomReader;
+use tezos_data_encoding::types::Zarith;
+use tezos_smart_rollup_host::{path::PathError, runtime::RuntimeError};
 use typed_arena::Arena;
 
 use super::{Micheline, Type, TypedValue};
+use crate::serializer::DecodeError;
+use crate::typechecker::TcError;
 
 /// Id of big map in the lazy storage.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BigMapId(pub BigInt);
+#[derive(BinWriter, NomReader, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BigMapId {
+    /// Value of the ID
+    pub value: Zarith,
+}
 
 impl Display for BigMapId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        let Zarith(ref int_value) = self.value;
+        write!(f, "{}", int_value)
+    }
+}
+
+impl From<i64> for BigMapId {
+    fn from(n: i64) -> Self {
+        BigMapId {
+            value: Zarith(BigInt::from(n)),
+        }
+    }
+}
+
+impl From<BigInt> for BigMapId {
+    fn from(n: BigInt) -> Self {
+        BigMapId { value: Zarith(n) }
+    }
+}
+
+impl BigMapId {
+    /// Get successor of the id
+    pub fn succ(&self) -> Self {
+        let Zarith(ref int_value) = self.value;
+        let result = int_value + BigInt::one();
+        BigMapId {
+            value: Zarith(result),
+        }
     }
 }
 
@@ -97,7 +133,7 @@ impl<'a> BigMap<'a> {
         &self,
         arena: &'a Arena<Micheline<'a>>,
         key: &TypedValue,
-        storage: &(impl LazyStorage<'a> + ?Sized),
+        storage: &mut (impl LazyStorage<'a> + ?Sized),
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
         Ok(match &self.content {
             BigMapContent::InMemory(m) => m.get(key).cloned(),
@@ -117,7 +153,7 @@ impl<'a> BigMap<'a> {
     pub fn mem(
         &self,
         key: &TypedValue,
-        storage: &(impl LazyStorage<'a> + ?Sized),
+        storage: &mut (impl LazyStorage<'a> + ?Sized),
     ) -> Result<bool, LazyStorageError> {
         Ok(match &self.content {
             BigMapContent::InMemory(m) => m.get(key).is_some(),
@@ -164,12 +200,24 @@ impl<'a> BigMap<'a> {
 /// Errors that can happen when working with lazy storage.
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub enum LazyStorageError {
-    /// Decoding from the internal representation failed.
-    #[error("decode failed {0}")]
-    DecodingError(String),
-    /// Some other error happened.
-    #[error("{0}")]
-    OtherError(String),
+    /// Error when computing path in storage
+    #[error("Error generating path: {0}")]
+    PathError(#[from] PathError),
+    /// Error when decoding value from storage
+    #[error("Error decoding stored value: {0}")]
+    DecodeError(#[from] DecodeError),
+    /// Runtime error while manipulating storage
+    #[error("Runtime error: {0}")]
+    RuntimeError(#[from] RuntimeError),
+    /// Typecheck error when returning value from storage
+    #[error("Error typechecking stored value: {0}")]
+    TcError(#[from] TcError),
+    /// Error when using nom_read to interact with the storage
+    #[error("Error nom_reading stored value: {0}")]
+    NomReadError(String),
+    /// Error when using bin_write to interact with the storage
+    #[error("Error bin_writing value to store: {0}")]
+    BinWriteError(String),
 }
 
 /// All the operations for working with the lazy storage.
@@ -198,7 +246,7 @@ pub trait LazyStorage<'a> {
     /// The specified big map id must point to a valid map in the lazy storage.
     /// Key type must match the type of key of the stored map.
     fn big_map_get(
-        &self,
+        &mut self,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key: &TypedValue,
@@ -209,7 +257,7 @@ pub trait LazyStorage<'a> {
     ///
     /// The specified big map id must point to a valid map in the lazy storage.
     /// Key type must match the type of key of the stored map.
-    fn big_map_mem(&self, id: &BigMapId, key: &TypedValue) -> Result<bool, LazyStorageError>;
+    fn big_map_mem(&mut self, id: &BigMapId, key: &TypedValue) -> Result<bool, LazyStorageError>;
 
     /// Add or remove a value in big map, accepts `Option` as value like in
     /// Michelson.
@@ -226,7 +274,8 @@ pub trait LazyStorage<'a> {
     /// Get key and value types of the map.
     ///
     /// This returns None if the map with such ID is not present in the storage.
-    fn big_map_get_type(&self, id: &BigMapId) -> Result<Option<(&Type, &Type)>, LazyStorageError>;
+    fn big_map_get_type(&mut self, id: &BigMapId)
+        -> Result<Option<(Type, Type)>, LazyStorageError>;
 
     /// Allocate a new empty big map.
     fn big_map_new(
@@ -296,7 +345,7 @@ impl<'a> MapInfo<'a> {
 /// Simple implementation for [LazyStorage].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InMemoryLazyStorage<'a> {
-    next_id: BigInt,
+    next_id: BigMapId,
     big_maps: BTreeMap<BigMapId, MapInfo<'a>>,
 }
 
@@ -314,14 +363,14 @@ impl<'a> InMemoryLazyStorage<'a> {
         let next_id = big_maps
             .keys()
             .max()
-            .map(|id| id.0.clone() + 1)
+            .map(|id| id.succ())
             .unwrap_or_else(|| 0.into());
         InMemoryLazyStorage { next_id, big_maps }
     }
 
     fn get_next_id(&mut self) -> BigMapId {
-        let id = BigMapId(self.next_id.clone());
-        self.next_id += 1;
+        let id = self.next_id.clone();
+        self.next_id = self.next_id.succ();
         id
     }
 }
@@ -348,7 +397,7 @@ impl<'a> InMemoryLazyStorage<'a> {
 
 impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
     fn big_map_get(
-        &self,
+        &mut self,
         _arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key: &TypedValue,
@@ -357,7 +406,7 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         Ok(info.map.get(key).cloned())
     }
 
-    fn big_map_mem(&self, id: &BigMapId, key: &TypedValue) -> Result<bool, LazyStorageError> {
+    fn big_map_mem(&mut self, id: &BigMapId, key: &TypedValue) -> Result<bool, LazyStorageError> {
         let info = self.access_big_map(id)?;
         Ok(info.map.contains_key(key))
     }
@@ -380,11 +429,14 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         Ok(())
     }
 
-    fn big_map_get_type(&self, id: &BigMapId) -> Result<Option<(&Type, &Type)>, LazyStorageError> {
+    fn big_map_get_type(
+        &mut self,
+        id: &BigMapId,
+    ) -> Result<Option<(Type, Type)>, LazyStorageError> {
         Ok(self
             .big_maps
             .get(id)
-            .map(|info| (&info.key_type, &info.value_type)))
+            .map(|info| (info.key_type.clone(), info.value_type.clone())))
     }
 
     fn big_map_new(
@@ -746,11 +798,11 @@ mod test_big_map_to_storage_update {
         };
         dump_big_map_updates(storage, &[], &mut [&mut map]).unwrap();
 
-        check_is_dumped_map(map, BigMapId(0.into()));
+        check_is_dumped_map(map, 0.into());
         assert_eq!(
             storage.big_maps,
             BTreeMap::from([(
-                BigMapId(0.into()),
+                0.into(),
                 MapInfo {
                     map: BTreeMap::from([
                         (TypedValue::int(1), TypedValue::int(1)),
@@ -789,11 +841,11 @@ mod test_big_map_to_storage_update {
         };
         dump_big_map_updates(storage, &[], &mut [&mut map]).unwrap();
 
-        check_is_dumped_map(map, BigMapId(0.into()));
+        check_is_dumped_map(map, 0.into());
         assert_eq!(
             storage.big_maps,
             BTreeMap::from([(
-                BigMapId(0.into()),
+                0.into(),
                 MapInfo {
                     map: BTreeMap::from([
                         (TypedValue::int(1), TypedValue::int(5)),
@@ -840,15 +892,15 @@ mod test_big_map_to_storage_update {
         };
         dump_big_map_updates(storage, &[], &mut [&mut map1_1, &mut map1_2, &mut map2]).unwrap();
 
-        check_is_dumped_map(map1_1, BigMapId(0.into()));
-        check_is_dumped_map(map1_2, BigMapId(2.into())); // newly created map
-        check_is_dumped_map(map2, BigMapId(1.into()));
+        check_is_dumped_map(map1_1, 0.into());
+        check_is_dumped_map(map1_2, 2.into()); // newly created map
+        check_is_dumped_map(map2, 1.into());
 
         assert_eq!(
             storage.big_maps,
             BTreeMap::from([
                 (
-                    BigMapId(0.into()),
+                    0.into(),
                     MapInfo {
                         map: BTreeMap::from([(TypedValue::int(11), TypedValue::int(11))]),
                         key_type: Type::Int,
@@ -856,7 +908,7 @@ mod test_big_map_to_storage_update {
                     }
                 ),
                 (
-                    BigMapId(1.into()),
+                    1.into(),
                     MapInfo {
                         map: BTreeMap::from([(TypedValue::int(2), TypedValue::int(2))]),
                         key_type: Type::Int,
@@ -864,7 +916,7 @@ mod test_big_map_to_storage_update {
                     }
                 ),
                 (
-                    BigMapId(2.into()),
+                    2.into(),
                     MapInfo {
                         map: BTreeMap::from([(TypedValue::int(12), TypedValue::int(12))]),
                         key_type: Type::Int,
@@ -900,7 +952,7 @@ mod test_big_map_to_storage_update {
         assert_eq!(
             storage.big_maps,
             BTreeMap::from([(
-                BigMapId(0.into()),
+                0.into(),
                 MapInfo {
                     map: BTreeMap::from([
                         (TypedValue::int(0), TypedValue::int(0)),

@@ -291,12 +291,11 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             Some(bm) => {
                 let mut a = BTreeMap::new();
                 for (idx, key_ty, val_ty, elts) in bm {
-                    let idx = BigMapId(
-                        irrefutable_match!(
+                    let idx: BigMapId = irrefutable_match!(
                         typecheck_value(&idx, &mut Ctx::default(), &Type::Int)?;
                         TypedValue::Int)
-                        .clone(),
-                    );
+                    .clone()
+                    .into();
                     let key_ty = parse_ty(&mut Ctx::default(), &key_ty)?;
                     let val_ty = parse_ty(&mut Ctx::default(), &val_ty)?;
                     let elts = match elts {

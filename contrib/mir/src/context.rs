@@ -8,18 +8,18 @@
 //! The "outer context" required for typechecking and interpreting Michelson.
 
 #![allow(clippy::type_complexity)]
-use crate::ast::big_map::{InMemoryLazyStorage, LazyStorage};
+use crate::ast::big_map::{BigMapId, InMemoryLazyStorage, LazyStorage, LazyStorageError};
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
+use crate::ast::{Micheline, Type, TypedValue};
 use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
 use tezos_crypto_rs::{hash::OperationHash, public_key_hash::PublicKeyHash};
+use typed_arena::Arena;
 
 #[allow(missing_docs)]
-pub trait CtxTrait<'a> {
-    type BigMapStorage: LazyStorage<'a>;
-
+pub trait CtxTrait<'a>: LazyStorage<'a> {
     fn gas(&mut self) -> &mut Gas;
 
     fn amount(&self) -> i64;
@@ -50,8 +50,6 @@ pub trait CtxTrait<'a> {
     fn total_voting_power(&self) -> BigUint;
 
     fn operation_group_hash(&self) -> [u8; 32];
-
-    fn big_map_storage(&mut self) -> &mut Self::BigMapStorage;
 
     fn origination_counter(&mut self) -> u32;
 
@@ -210,8 +208,6 @@ impl Default for Ctx<'_> {
 }
 
 impl<'a> CtxTrait<'a> for Ctx<'a> {
-    type BigMapStorage = InMemoryLazyStorage<'a>;
-
     fn gas(&mut self) -> &mut Gas {
         &mut self.gas
     }
@@ -271,10 +267,6 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
         self.operation_group_hash
     }
 
-    fn big_map_storage(&mut self) -> &mut Self::BigMapStorage {
-        &mut self.big_map_storage
-    }
-
     fn origination_counter(&mut self) -> u32 {
         self.origination_counter += 1;
         self.origination_counter
@@ -283,5 +275,52 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
     fn operation_counter(&mut self) -> u128 {
         self.operation_counter += 1;
         self.operation_counter
+    }
+}
+
+impl<'a> LazyStorage<'a> for Ctx<'a> {
+    fn big_map_get(
+        &mut self,
+        arena: &'a Arena<Micheline<'a>>,
+        id: &BigMapId,
+        key: &TypedValue,
+    ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
+        self.big_map_storage.big_map_get(arena, id, key)
+    }
+
+    fn big_map_mem(&mut self, id: &BigMapId, key: &TypedValue) -> Result<bool, LazyStorageError> {
+        self.big_map_storage.big_map_mem(id, key)
+    }
+
+    fn big_map_update(
+        &mut self,
+        id: &BigMapId,
+        key: TypedValue<'a>,
+        value: Option<TypedValue<'a>>,
+    ) -> Result<(), LazyStorageError> {
+        self.big_map_storage.big_map_update(id, key, value)
+    }
+
+    fn big_map_get_type(
+        &mut self,
+        id: &BigMapId,
+    ) -> Result<Option<(Type, Type)>, LazyStorageError> {
+        self.big_map_storage.big_map_get_type(id)
+    }
+
+    fn big_map_new(
+        &mut self,
+        key_type: &Type,
+        value_type: &Type,
+    ) -> Result<BigMapId, LazyStorageError> {
+        self.big_map_storage.big_map_new(key_type, value_type)
+    }
+
+    fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
+        self.big_map_storage.big_map_remove(id)
+    }
+
+    fn big_map_copy(&mut self, copied_id: &BigMapId) -> Result<BigMapId, LazyStorageError> {
+        self.big_map_storage.big_map_copy(copied_id)
     }
 }
