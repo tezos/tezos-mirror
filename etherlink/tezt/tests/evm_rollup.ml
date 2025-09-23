@@ -466,7 +466,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
               preimage_dir = Some preimages_dir;
               private_rpc_port;
               time_between_blocks;
-              sequencer = sequencer.alias;
+              sequencer_keys = [sequencer.alias];
               genesis_timestamp;
               max_blueprints_lag = None;
               max_blueprints_ahead;
@@ -4874,7 +4874,7 @@ let test_migrate_proxy_to_sequencer_future =
             Some (Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0");
           private_rpc_port = Some (Port.fresh ());
           time_between_blocks = Some Nothing;
-          sequencer = sequencer_key.alias;
+          sequencer_keys = [sequencer_key.alias];
           genesis_timestamp = None;
           max_blueprints_lag = None;
           max_blueprints_ahead = None;
@@ -5045,7 +5045,7 @@ let test_migrate_proxy_to_sequencer_past =
             Some (Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0");
           private_rpc_port = Some (Port.fresh ());
           time_between_blocks = Some Nothing;
-          sequencer = sequencer_key.alias;
+          sequencer_keys = [sequencer_key.alias];
           genesis_timestamp = None;
           max_blueprints_lag = None;
           max_blueprints_ahead = None;

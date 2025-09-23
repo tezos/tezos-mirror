@@ -362,7 +362,7 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
         preimage_dir = Some preimages_dir;
         private_rpc_port;
         time_between_blocks;
-        sequencer = account.alias;
+        sequencer_keys = [account.alias];
         genesis_timestamp = None;
         max_blueprints_lag = Some 300;
         max_blueprints_ahead = Some 2000;

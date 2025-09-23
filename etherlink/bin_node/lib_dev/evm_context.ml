@@ -25,7 +25,7 @@ type parameters = {
   data_dir : string;
   smart_rollup_address : string option;
   store_perm : Sqlite.perm;
-  signer : Signer.t option;
+  signer : Signer.map option;
   snapshot_url : string option;
   tx_container : Services_backend_sig.ex_tx_container;
 }
@@ -54,7 +54,7 @@ type t = {
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   store : Evm_store.t;
   session : session_state;
-  signer : Signer.t option;
+  signer : Signer.map option;
   legacy_block_storage : bool;
   tx_container : Services_backend_sig.ex_tx_container;
   execution_pool : Lwt_domain.pool;
@@ -1139,6 +1139,10 @@ module State = struct
         }
     in
 
+    let* sequencer =
+      Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
+    in
+    let*? signer = Signer.get_signer signer sequencer in
     return (chunks, sign ~signer chunks)
 
   let clear_head_delayed_inbox ctxt =
@@ -1724,11 +1728,11 @@ module State = struct
             let* evm_state =
               match signer with
               | Some signer ->
-                  let* sequencer = Signer.public_key signer in
+                  let*? pk, _ = Signer.first_lexicographic_signer signer in
                   Lwt_result.ok
                   @@ Evm_state.modify
                        ~key:Durable_storage_path.sequencer_key
-                       ~value:(Signature.Public_key.to_b58check sequencer)
+                       ~value:(Signature.Public_key.to_b58check pk)
                        evm_state
               | None -> return evm_state
             in
@@ -2549,6 +2553,17 @@ let apply_blueprint ?events timestamp payload delayed_transactions =
 
 let apply_chunks ~signer timestamp chunks delayed_transactions =
   let open Lwt_result_syntax in
+  let*! head = head_info () in
+  let* expected_sequencer =
+    match head.pending_sequencer_upgrade with
+    | Some {sequencer; timestamp = upgrade_timestamp; _}
+      when Time.Protocol.(timestamp >= upgrade_timestamp) ->
+        (* If we are this is the first block after the sequencer upgrade, the sequencer key in the state will still be the previous one. before applying the chunks, the sequencer key will change for the new one.
+In order to still be able to sign the chunks, we need to use the next sequencer key instead of the one in the state. *)
+        return sequencer
+    | _ -> Durable_storage.sequencer (State.read_from_state head.evm_state)
+  in
+  let*? signer = Signer.get_signer signer expected_sequencer in
   let blueprint_chunks = Sequencer_blueprint.sign ~signer ~chunks in
   let payload =
     let* blueprint_chunks in
@@ -2560,14 +2575,6 @@ let apply_chunks ~signer timestamp chunks delayed_transactions =
       ~chunks:blueprint_chunks
   in
   let* sequencer = Signer.public_key signer in
-  let*! head = head_info () in
-  let* expected_sequencer =
-    match head.pending_sequencer_upgrade with
-    | Some {sequencer; timestamp = upgrade_timestamp; _}
-      when Time.Protocol.(timestamp >= upgrade_timestamp) ->
-        return sequencer
-    | _ -> Durable_storage.sequencer (State.read_from_state head.evm_state)
-  in
   if Signature.Public_key.(sequencer = expected_sequencer) then
     let* confirmed_txs =
       worker_wait_for_request

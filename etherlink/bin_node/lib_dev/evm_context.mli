@@ -47,7 +47,7 @@ val start :
   data_dir:string ->
   ?smart_rollup_address:string ->
   store_perm:Sqlite.perm ->
-  ?signer:Signer.t ->
+  ?signer:Signer.map ->
   ?snapshot_url:string ->
   tx_container:_ Services_backend_sig.tx_container ->
   unit ->
@@ -104,7 +104,7 @@ val apply_blueprint :
     applying the [chunks] of a blueprint {e before} their signatures (computed
     by [signer]) are ready. *)
 val apply_chunks :
-  signer:Signer.t ->
+  signer:Signer.map ->
   Time.Protocol.t ->
   Sequencer_blueprint.unsigned_chunk list ->
   Evm_events.Delayed_transaction.t list ->

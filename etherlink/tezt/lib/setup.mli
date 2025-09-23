@@ -102,6 +102,7 @@ val register_test :
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
+  ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
   kernel:Kernel.t ->
   ?da_fee:Wei.t ->
@@ -154,6 +155,7 @@ val register_multichain_test :
   ?tez_bootstrap_accounts:Account.key list ->
   ?tez_bootstrap_contracts:Evm_node.tez_contract list ->
   ?sequencer:Account.key ->
+  ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
   kernel:Kernel.t ->
   ?da_fee:Wei.t ->
@@ -208,6 +210,7 @@ val register_test_for_kernels :
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
+  ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
   ?kernels:Kernel.t list ->
   ?da_fee:Wei.t ->
@@ -261,6 +264,7 @@ val setup_sequencer :
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
+  ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
   ?kernel:Uses.t ->
   ?da_fee:Wei.t ->
@@ -323,6 +327,7 @@ val register_all :
   ?eth_bootstrap_accounts:string list ->
   ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
+  ?additional_sequencer_keys:Account.key list ->
   ?sequencer_pool_address:string ->
   ?kernels:Kernel.t list ->
   ?da_fee:Wei.t ->

@@ -81,7 +81,7 @@ type mode =
       preimage_dir : string option;
       private_rpc_port : int option;
       time_between_blocks : time_between_blocks option;
-      sequencer : string;
+      sequencer_keys : string list;
       genesis_timestamp : Client.timestamp option;
       max_blueprints_lag : int option;
       max_blueprints_ahead : int option;
@@ -741,7 +741,7 @@ let mode_with_new_private_rpc (mode : mode) =
         preimage_dir;
         private_rpc_port = Some _;
         time_between_blocks;
-        sequencer;
+        sequencer_keys;
         genesis_timestamp;
         max_blueprints_lag;
         max_blueprints_ahead;
@@ -761,7 +761,7 @@ let mode_with_new_private_rpc (mode : mode) =
           preimage_dir;
           private_rpc_port = Some (Port.fresh ());
           time_between_blocks;
-          sequencer;
+          sequencer_keys;
           genesis_timestamp;
           max_blueprints_lag;
           max_blueprints_ahead;
@@ -1072,7 +1072,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           preimage_dir;
           private_rpc_port;
           time_between_blocks;
-          sequencer;
+          sequencer_keys;
           genesis_timestamp = _;
           max_blueprints_lag;
           max_blueprints_ahead;
@@ -1086,12 +1086,12 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           dal_slots;
           sequencer_sunset_sec;
         } ->
-        [
-          "--rollup-node-endpoint";
-          evm_node.persistent_state.endpoint;
-          "--sequencer-key";
-          sequencer;
-        ]
+        let sequencer_keys =
+          List.map (fun s -> ["--sequencer-key"; s]) sequencer_keys
+          |> List.flatten
+        in
+        sequencer_keys
+        @ ["--rollup-node-endpoint"; evm_node.persistent_state.endpoint]
         @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
         @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
         @ Cli_arg.optional_arg

@@ -491,8 +491,9 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?delayed_inbox_timeout ?delayed_inbox_min_levels ?max_number_of_chunks
     ?commitment_period ?challenge_window ?(sequencer = Constant.bootstrap1)
-    ?(kernel = Constant.WASM.evm_kernel) ?evm_version ?preimages_dir
-    ?maximum_allowed_ticks ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?(additional_sequencer_keys = []) ?(kernel = Constant.WASM.evm_kernel)
+    ?evm_version ?preimages_dir ?maximum_allowed_ticks
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
     ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
@@ -648,7 +649,6 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?periodic_snapshot_path
       ()
   in
-
   let sequencer_mode =
     Evm_node.Sequencer
       {
@@ -656,7 +656,10 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
         preimage_dir = Some preimages_dir;
         private_rpc_port;
         time_between_blocks;
-        sequencer = sequencer.alias;
+        sequencer_keys =
+          List.map
+            (fun (k : Account.key) -> k.alias)
+            (sequencer :: additional_sequencer_keys);
         genesis_timestamp;
         max_blueprints_lag;
         max_blueprints_ahead;
@@ -739,10 +742,10 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?commitment_period ?challenge_window
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?sequencer ?sequencer_pool_address ?kernel ?da_fee ?minimum_base_fee_per_gas
-    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
+    ?sequencer ?additional_sequencer_keys ?sequencer_pool_address ?kernel
+    ?da_fee ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
     ?drop_duplicate_when_injection ?blueprints_publisher_order_enabled
     ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
     ?websockets ?history_mode ?spawn_rpc ?periodic_snapshot_path ?signatory
@@ -783,6 +786,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?delayed_inbox_min_levels
       ?max_number_of_chunks
       ?sequencer
+      ?additional_sequencer_keys
       ?kernel
       ?preimages_dir
       ?maximum_allowed_ticks
@@ -815,11 +819,12 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?delayed_inbox_min_levels ?max_number_of_chunks
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?tez_bootstrap_contracts ?sequencer ?sequencer_pool_address ~kernel ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
-    ?commitment_period ?challenge_window ?(uses = uses) ?(additional_uses = [])
+    ?tez_bootstrap_contracts ?sequencer ?additional_sequencer_keys
+    ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
+    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
+    ?challenge_window ?(uses = uses) ?(additional_uses = [])
     ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ~enable_multichain ~l2_setups ?rpc_server ?websockets ?history_mode
@@ -874,6 +879,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?delayed_inbox_min_levels
         ?max_number_of_chunks
         ?sequencer
+        ?additional_sequencer_keys
         ~kernel:kernel_use
         ?preimages_dir
         ?maximum_allowed_ticks
@@ -936,14 +942,14 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?delayed_inbox_min_levels ?max_number_of_chunks
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?sequencer ?sequencer_pool_address ~kernel ?da_fee ?minimum_base_fee_per_gas
-    ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
-    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
-    ?challenge_window ?uses ?additional_uses ?rollup_history_mode ~enable_dal
-    ?dal_slots ~enable_multichain ?rpc_server ?websockets ?history_mode
-    ?tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
-    ?sequencer_sunset_sec body ~title ~tags protocols =
+    ?sequencer ?additional_sequencer_keys ?sequencer_pool_address ~kernel
+    ?da_fee ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
+    ?commitment_period ?challenge_window ?uses ?additional_uses
+    ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
+    ?websockets ?history_mode ?tx_queue ?spawn_rpc ?periodic_snapshot_path
+    ?signatory ?l2_setups ?sequencer_sunset_sec body ~title ~tags protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
   in
@@ -964,6 +970,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ~eth_bootstrap_accounts
     ~tez_bootstrap_accounts
     ?sequencer
+    ?additional_sequencer_keys
     ?sequencer_pool_address
     ~kernel
     ?da_fee
@@ -1004,14 +1011,15 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?delayed_inbox_min_levels ?max_number_of_chunks
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
-    ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
-    ?additional_uses ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
-    ?websockets ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode
-    ?tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
-    ?sequencer_sunset_sec ~title ~tags body protocols =
+    ?sequencer ?additional_sequencer_keys ?sequencer_pool_address
+    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
+    ?commitment_period ?challenge_window ?additional_uses ~enable_dal ?dal_slots
+    ~enable_multichain ?rpc_server ?websockets ?enable_fast_withdrawal
+    ?enable_fast_fa_withdrawal ?history_mode ?tx_queue ?spawn_rpc
+    ?periodic_snapshot_path ?signatory ?l2_setups ?sequencer_sunset_sec ~title
+    ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -1033,6 +1041,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ~eth_bootstrap_accounts
         ~tez_bootstrap_accounts
         ?sequencer
+        ?additional_sequencer_keys
         ?sequencer_pool_address
         ~kernel
         ?da_fee
@@ -1090,12 +1099,13 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
     ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?max_number_of_chunks ?eth_bootstrap_accounts
-    ?tez_bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
-    ?commitment_period ?challenge_window ?additional_uses ?rpc_server
-    ?websockets ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode
+    ?tez_bootstrap_accounts ?sequencer ?additional_sequencer_keys
+    ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
+    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
+    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
+    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
+    ?additional_uses ?rpc_server ?websockets ?enable_fast_withdrawal
+    ?enable_fast_fa_withdrawal ?history_mode
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration) ?tx_queue ?spawn_rpc
     ?periodic_snapshot_path ?signatory ?l2_setups ?sequencer_sunset_sec ~title
@@ -1140,6 +1150,7 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
             ?eth_bootstrap_accounts
             ?tez_bootstrap_accounts
             ?sequencer
+            ?additional_sequencer_keys
             ?sequencer_pool_address
             ~kernels
             ?da_fee

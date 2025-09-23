@@ -6,7 +6,7 @@
 (*****************************************************************************)
 
 type parameters = {
-  signer : Signer.t;
+  signer : Signer.map;
   smart_rollup_address : string;
   rollup_node_endpoint : Uri.t;
 }
@@ -19,7 +19,7 @@ module Types = struct
   type nonrec parameters = parameters
 
   type state = {
-    signer : Signer.t;
+    signer : Signer.map;
     smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
     rollup_node_endpoint : Uri.t;
   }
@@ -147,9 +147,17 @@ module Worker = struct
             ready_injections
         in
         let signals = List.map snd ready_injections in
+        let*! head_info = Evm_context.head_info () in
+        let* expected_sequencer =
+          Durable_storage.sequencer (fun path ->
+              let open Lwt_result_syntax in
+              let*! res = Evm_state.inspect head_info.evm_state path in
+              return res)
+        in
+        let*? signer = Signer.get_signer state.signer expected_sequencer in
         let* payload =
           Sequencer_signal.create
-            ~signer:state.signer
+            ~signer
             ~smart_rollup_address:state.smart_rollup_address
             ~slot_ids:signals
         in

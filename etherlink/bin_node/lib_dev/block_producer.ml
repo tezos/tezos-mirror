@@ -6,7 +6,7 @@
 (*****************************************************************************)
 
 type parameters = {
-  signer : Signer.t;
+  signer : Signer.map;
   maximum_number_of_chunks : int;
   tx_container : Services_backend_sig.ex_tx_container;
   sequencer_sunset_sec : int64;
@@ -61,7 +61,7 @@ module Types = struct
   type nonrec parameters = parameters
 
   type state = {
-    signer : Signer.t;
+    signer : Signer.map;
     maximum_number_of_chunks : int;
     tx_container : Services_backend_sig.ex_tx_container;
     sequencer_sunset_sec : int64;
@@ -402,10 +402,11 @@ let produce_block (state : Types.state) ~force ~timestamp
               timestamp >= upgrade_timestamp
           | None -> false
         in
+        let signer = state.signer in
         if is_going_to_upgrade_kernel then
           let* hashes =
             produce_block_with_transactions
-              ~signer:state.signer
+              ~signer
               ~timestamp
               ~transactions_and_objects:None
               ~delayed_hashes:[]
@@ -416,7 +417,7 @@ let produce_block (state : Types.state) ~force ~timestamp
           return (`Block_produced (Seq.length hashes))
         else
           produce_block_if_needed
-            ~signer:state.signer
+            ~signer
             ~timestamp
             ~force
             ~delayed_hashes

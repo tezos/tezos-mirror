@@ -175,7 +175,7 @@ let activate_tezlink chain_id =
   in
   return_unit
 
-let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
+let main ~data_dir ~cctxt ?(genesis_timestamp = Misc.now ())
     ~(configuration : Configuration.t) ?kernel ?sandbox_config () =
   let open Lwt_result_syntax in
   let open Configuration in
@@ -236,21 +236,8 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     Services_backend_sig.tx_container_module tx_container
   in
 
-  let* signer_opt =
-    match signer with
-    | Some signer -> return (Signer.first_signer signer)
-    | None ->
-        let*? keys = Configuration.sequencer_keys configuration in
-        let* signer = Signer.of_sequencer_keys configuration cctxt keys in
-        return (Signer.first_signer signer)
-  in
-  let* pk, signer =
-    match signer_opt with
-    | Some signer -> return signer
-    | None ->
-        failwith
-          "No signer found in the provided sequencer keys. Please provide at \
-           least one valid signer."
+  let* signer =
+    Signer.of_sequencer_keys configuration cctxt sequencer_config.sequencer
   in
   let* status, smart_rollup_address_typed =
     Evm_context.start
@@ -268,6 +255,7 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
   let* () =
     match sandbox_config with
     | Some {funded_addresses; disable_da_fees; kernel_verbosity; tezlink; _} ->
+        let*? pk, _ = Signer.first_lexicographic_signer signer in
         let* () = Evm_context.patch_sequencer_key pk in
         let new_balance =
           Ethereum_types.quantity_of_z Z.(of_int 10_000 * pow (of_int 10) 18)
@@ -428,6 +416,12 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
             timestamp = genesis_timestamp;
           }
       in
+      let* sequencer_pk =
+        Durable_storage.sequencer (fun path ->
+            let*! res = Evm_state.inspect head.evm_state path in
+            return res)
+      in
+      let*? signer = Signer.get_signer signer sequencer_pk in
       let* genesis_chunks = Sequencer_blueprint.sign ~signer ~chunks in
       let genesis_payload =
         Sequencer_blueprint.create_inbox_payload
