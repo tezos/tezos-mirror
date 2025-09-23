@@ -2601,6 +2601,7 @@ name = "revm-etherlink"
 version = "0.1.0"
 dependencies = [
  "alloy-sol-types",
+ "ethereum",
  "format_no_std",
  "hex",
  "nom",

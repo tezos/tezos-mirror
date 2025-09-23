@@ -33,6 +33,7 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
+pub mod helpers;
 pub mod inspectors;
 pub mod journal;
 pub mod layered_state;
@@ -40,7 +41,6 @@ pub mod precompiles;
 pub mod storage;
 
 mod database;
-mod helpers;
 
 pub use helpers::legacy::u256_to_alloy;
 
