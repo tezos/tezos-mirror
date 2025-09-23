@@ -69,19 +69,17 @@ contract FABridge is ReentrancySafe {
         _;
     }
 
-    /**
-     * @notice Queue a deposit into the ticket table with proxy information.
-     * @dev
-     *  - Increments the global counter and uses it as a deposit nonce.
-     *  - Registers the deposit.
-     * @param deposit The deposit data, including:
-     *   - `amount`: The deposit amount
-     *   - `receiver`: The target account that will receive funds
-     *   - `ticketHash`: The ticket hash identifying the deposit
-     *   - `proxy`: The proxy address through which the deposit is routed
-     *   - `inboxLevel`: The inbox level at which the deposit was submitted
-     *   - `inboxMsgId`: The inbox message identifier
-     */
+    /// @notice Queue a deposit into the ticket table with proxy information.
+    /// @dev
+    ///  - Increments the global counter and uses it as a deposit nonce.
+    ///  - Queues the deposit for later execution.
+    /// @param deposit Struct containing the deposit data:
+    ///   - `amount`      Amount of the deposit.
+    ///   - `receiver`    Address that will receive the deposited funds.
+    ///   - `ticketHash`  Hash identifying the deposit, computed as keccak256(L1 ticketer + content).
+    ///   - `proxy`       Proxy address through which the deposit is routed.
+    ///   - `inboxLevel`  Inbox level at which the deposit was submitted, directly correlated with L1 block levels.
+    ///   - `inboxMsgId`  Inbox message identifier.
     function queue(
         ITable.FaDepositWithProxy memory deposit
     ) external payable nonReentrant onlySystem {
@@ -108,18 +106,16 @@ contract FABridge is ReentrancySafe {
         );
     }
 
-    /**
-     * @notice Execute a deposit that does not require a proxy.
-     * @dev
-     *  - Used for direct deposits without a proxy address.
-     *  - Consumes deposit information and processes it accordingly.
-     * @param deposit The deposit data, including:
-     *   - `amount`: The deposit amount
-     *   - `receiver`: The target account that will receive funds
-     *   - `ticketHash`: The ticket hash identifying the deposit
-     *   - `inboxLevel`: The inbox level at which the deposit was submitted
-     *   - `inboxMsgId`: The inbox message identifier
-     */
+    /// @notice Executes a deposit that does not require a proxy.
+    /// @dev
+    ///  - Used for direct deposits without a proxy address.
+    ///  - Consumes and processes the deposit information.
+    /// @param deposit Struct containing the deposit data:
+    ///   - `amount`      Amount of the deposit.
+    ///   - `receiver`    Address that will receive the deposited funds.
+    ///   - `ticketHash`  Hash identifying the deposit, computed as keccak256(L1 ticketer + content).
+    ///   - `inboxLevel`  Inbox level at which the deposit was submitted, directly correlated with L1 block levels.
+    ///   - `inboxMsgId`  Inbox message identifier.
     function execute_without_proxy(
         FaDepositWithoutProxy memory deposit
     ) external payable nonReentrant onlySystem {
@@ -143,8 +139,13 @@ contract FABridge is ReentrancySafe {
         );
     }
 
-    /// @notice Claim a queued FA deposit identified by `depositId`.
-    /// @param depositId The identifier of the deposit to claim.
+    /// @notice Claims a previously queued FA deposit for later execution.
+    /// @dev
+    ///  - Consumes and processes a deposit that was registered via `queue`.
+    ///  - Can only be called once per depositId.
+    ///  - Ticket owner becomes L2 proxy most of the times.
+    ///  - When proxy fails fallback on the deposit receiver.
+    /// @param depositId Identifier of the queued deposit to claim.
     function claim(uint256 depositId) external payable nonReentrant {
         // Retrieve deposit
         bytes memory input = abi.encodeCall(ITable.find_deposit, (depositId));
@@ -207,12 +208,12 @@ contract FABridge is ReentrancySafe {
         require(removeSuccess, "Could not remove deposit");
     }
 
-    /// @notice Withdraw a specific amount of FA ticket.
-    /// @param ticketOwner The FA ticket owner.
-    /// @param routingInfo Routing information for the FA ticket transfer.
-    /// @param amount The amount of the FA ticket to withdraw.
-    /// @param ticketer The FA ticket issuer, encoded as `bytes22`.
-    /// @param content Metadata associated with the FA ticket used to build the outbox message.
+    /// @notice Withdraws a specific amount of FA tickets to L1.
+    /// @param ticketOwner   Address of the FA ticket owner (usually the L2 proxy).
+    /// @param routingInfo   Tuple containing the L1 receiver address and the L1 ticketer contract for routing.
+    /// @param amount        Amount of FA ticket balance to withdraw.
+    /// @param ticketer      L1 contract that issued the FA ticket, encoded as `bytes22`.
+    /// @param content       Metadata associated with the FA ticket, used to build the outbox message.
     function withdraw(
         address ticketOwner,
         bytes memory routingInfo,
@@ -279,14 +280,14 @@ contract FABridge is ReentrancySafe {
         require(proxySuccess, "Proxy withdraw failed");
     }
 
-    /// @notice Perform a fast withdrawal of FA ticket.
-    /// @param ticketOwner The FA ticket owner.
-    /// @param routingInfo Routing information for the FA ticket transfer.
-    /// @param amount The amount of FA the ticket to withdraw.
-    /// @param ticketer The ticket issuer, encoded as `bytes22`.
-    /// @param content Metadata associated with the ticket.
-    /// @param fastWithdrawalContract Address of the fast withdrawal lending contract to interact with.
-    /// @param payload Arbitrary payload data to send to the fast withdrawal contract.
+    /// @notice Performs a fast withdrawal of FA tickets to L1.
+    /// @param ticketOwner              Address of the FA ticket owner (usually the L2 proxy).
+    /// @param routingInfo              Tuple containing the L1 receiver address and the L1 ticketer contract for routing.
+    /// @param amount                   Amount of FA ticket balance to withdraw.
+    /// @param ticketer                 L1 contract that issued the FA ticket, encoded as `bytes22`.
+    /// @param content                  Metadata associated with the FA ticket, used to build the outbox message.
+    /// @param fastWithdrawalContract   Address of the L1 fast withdrawal lending contract to interact with.
+    /// @param payload                  Arbitrary payload data to forward to the fast withdrawal contract.
     function fa_fast_withdraw(
         address ticketOwner,
         bytes memory routingInfo,
