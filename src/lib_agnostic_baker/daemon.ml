@@ -455,19 +455,16 @@ module Make_daemon (Agent : AGENT) :
     in
     (* Monitoring voting periods through heads monitoring to avoid
        missing UAUs. *)
-    let* () =
-      Lwt.pick
-        [
-          (* We do not care if --keep-alive is provided, if the baker thread doesn't
+    let* (), () =
+      tzboth
+        (* We do not care if --keep-alive is provided, if the baker thread doesn't
              have the argument it'll abort the process anyway. *)
-          retry_on_disconnection
-            ~emit:(fun _ -> Lwt.return_unit)
-            node_addr
-            monitor_voting_periods;
-          baker_thread ~state;
-        ]
+        (retry_on_disconnection
+           ~emit:(fun _ -> Lwt.return_unit)
+           node_addr
+           monitor_voting_periods)
+        (baker_thread ~state)
     in
-    let*! () = Lwt_utils.never_ending () in
     return_unit
 end
 

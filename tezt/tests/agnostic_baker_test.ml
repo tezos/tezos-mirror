@@ -33,9 +33,21 @@ let wait_for_become_old_baker agnostic_baker =
   Agnostic_baker.wait_for agnostic_baker "become_old_agent.v0" (fun _json ->
       Some ())
 
+let wait_for_become_old_accuser accuser =
+  Lwt.pick
+    [
+      (let* () = Lwt_unix.sleep 60. in
+       Test.fail
+         "[wait_for_become_old_baker] has waited for 60 seconds, exiting");
+      Accuser.wait_for accuser "become_old_agent.v0" (fun _json -> Some ());
+    ]
+
 let wait_for_stopping_baker agnostic_baker =
   Agnostic_baker.wait_for agnostic_baker "stopping_agent.v0" (fun _json ->
       Some ())
+
+let wait_for_stopping_accuser accuser =
+  Accuser.wait_for accuser "stopping_agent.v0" (fun _json -> Some ())
 
 let remote_sign client =
   let* () = Client.forget_all_keys client in
@@ -66,11 +78,15 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
   let* () = if use_remote_signer then remote_sign client else unit in
   Log.info "Node %s initialized" (Node.name node) ;
   let baker = Agnostic_baker.create node client in
+  let accuser = Accuser.create node in
   let wait_for_active_protocol_waiting =
     wait_for_active_protocol_waiting baker
   in
   Log.info "Starting agnostic baker" ;
   let* () = Agnostic_baker.run baker in
+  Log.info "Starting agnostic accuser" ;
+  let* () = Accuser.run accuser in
+
   let* () = wait_for_active_protocol_waiting in
   let* () = Agnostic_baker.wait_for_ready baker in
   let* () =
@@ -84,10 +100,12 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
   Log.info "Baking at least %d blocks to trigger migration" migration_level ;
   let* _level = Node.wait_for_level node migration_level in
   let wait_for_become_old_baker = wait_for_become_old_baker baker in
+  let wait_for_become_old_accuser = wait_for_become_old_accuser accuser in
   Log.info
     "Check that the baking process for %s is not killed"
     (Protocol.tag migrate_from) ;
   let* () = wait_for_become_old_baker in
+  let* () = wait_for_become_old_accuser in
   (* Ensure that the block before migration is consistent *)
   Log.info "Checking migration block consistency" ;
   let* () =
@@ -114,15 +132,17 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
     (Protocol.tag migrate_from)
     Agnostic_baker.extra_levels_for_old_baker ;
   let wait_for_stopping_baker = wait_for_stopping_baker baker in
+  let wait_for_stopping_accuser = wait_for_stopping_accuser accuser in
   let* _level =
     Node.wait_for_level
       node
       (migration_level + Agnostic_baker.extra_levels_for_old_baker)
   in
-  let* () = wait_for_stopping_baker in
+  let* () = wait_for_stopping_baker and* () = wait_for_stopping_accuser in
   (* Test that we can still bake after migration *)
   let* _level = Node.wait_for_level node baked_blocks_after_migration in
-  let* () = Agnostic_baker.terminate baker in
+  let* () = Agnostic_baker.terminate baker
+  and* () = Accuser.terminate accuser in
   unit
 
 let migrate ~migrate_from ~migrate_to ~use_remote_signer =
@@ -150,7 +170,8 @@ let migrate ~migrate_from ~migrate_to ~use_remote_signer =
         Protocol.tag migrate_from;
         Protocol.tag migrate_to;
       ]
-    ~uses:([Constant.octez_agnostic_baker] @ remote_signer)
+    ~uses:
+      ([Constant.octez_agnostic_baker; Constant.octez_accuser] @ remote_signer)
   @@ fun () ->
   let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
   let consensus_rights_delay =
