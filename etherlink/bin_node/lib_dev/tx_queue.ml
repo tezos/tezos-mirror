@@ -621,93 +621,109 @@ struct
       let* rev_selected = aux validation_state [] in
       return @@ List.rev rev_selected
 
-    let inject state {next_nonce; payload; tx_object; callback} =
+    let pending_callback state ~tx_nonce ~addr ~tx_object ~caller_callback =
+     fun (reason : pending_variant) ->
+      let open Lwt_syntax in
+      let* res =
+        match reason with
+        | `Dropped ->
+            let* () =
+              Tx_queue_events.transaction_dropped
+                (Tx.hash_of_tx_object tx_object)
+            in
+            return
+            @@ Address_nonce.remove
+                 state.address_nonce
+                 ~addr
+                 ~nonce:tx_nonce
+                 ~rm:Tx.bitset_remove_nonce
+        | `Confirmed ->
+            let* () =
+              Tx_queue_events.transaction_confirmed
+                (Tx.hash_of_tx_object tx_object)
+            in
+            return
+            @@ Address_nonce.confirm_nonce
+                 state.address_nonce
+                 ~addr
+                 ~nonce:tx_nonce
+                 ~next:Tx.next_nonce
+      in
+      let* () =
+        match res with
+        | Ok () -> return_unit
+        | Error errs -> Tx_queue_events.callback_error errs
+      in
+      Transactions_per_addr.decrement
+        state.tx_per_address
+        (Tx.from_address_of_tx_object tx_object) ;
+      Transaction_objects.remove
+        state.tx_object
+        (Tx.hash_of_tx_object tx_object) ;
+      Lwt.dont_wait
+        (fun () -> caller_callback (reason :> all_variant))
+        (fun exn ->
+          Tx_queue_events.callback_error__dont_wait__use_with_care
+            [Error_monad.error_of_exn exn]) ;
+      Lwt.return_unit
+
+    let queue_callback state ~tx_nonce ~addr ~tx_object ~pending_callback
+        ~caller_callback =
+     fun (reason : queue_variant) ->
+      let open Lwt_syntax in
+      let* res =
+        match reason with
+        | `Accepted ->
+            Pending_transactions.add
+              state.pending
+              (Tx.hash_of_tx_object tx_object)
+              pending_callback ;
+            return_ok_unit
+        | `Refused ->
+            Transactions_per_addr.decrement
+              state.tx_per_address
+              (Tx.from_address_of_tx_object tx_object) ;
+            Transaction_objects.remove
+              state.tx_object
+              (Tx.hash_of_tx_object tx_object) ;
+            return
+            @@ Address_nonce.remove
+                 state.address_nonce
+                 ~addr
+                 ~nonce:tx_nonce
+                 ~rm:Tx.bitset_remove_nonce
+      in
+      let* () =
+        match res with
+        | Ok () -> return_unit
+        | Error errs -> Tx_queue_events.callback_error errs
+      in
+      Lwt.dont_wait
+        (fun () -> caller_callback (reason :> all_variant))
+        (fun exn ->
+          Tx_queue_events.callback_error__dont_wait__use_with_care
+            [Error_monad.error_of_exn exn]) ;
+      Lwt.return_unit
+
+    let inject state
+        {next_nonce; payload; tx_object; callback = caller_callback} =
       let open Lwt_result_syntax in
       Tx_watcher.notify (Tx.hash_of_tx_object tx_object) ;
       let addr =
         Tx.address_to_string (Tx.from_address_of_tx_object tx_object)
       in
       let tx_nonce = Tx.nonce_of_tx_object tx_object in
-      let pending_callback (reason : pending_variant) =
-        let open Lwt_syntax in
-        let* res =
-          match reason with
-          | `Dropped ->
-              let* () =
-                Tx_queue_events.transaction_dropped
-                  (Tx.hash_of_tx_object tx_object)
-              in
-              return
-              @@ Address_nonce.remove
-                   state.address_nonce
-                   ~addr
-                   ~nonce:tx_nonce
-                   ~rm:Tx.bitset_remove_nonce
-          | `Confirmed ->
-              let* () =
-                Tx_queue_events.transaction_confirmed
-                  (Tx.hash_of_tx_object tx_object)
-              in
-              return
-              @@ Address_nonce.confirm_nonce
-                   state.address_nonce
-                   ~addr
-                   ~nonce:tx_nonce
-                   ~next:Tx.next_nonce
-        in
-        let* () =
-          match res with
-          | Ok () -> return_unit
-          | Error errs -> Tx_queue_events.callback_error errs
-        in
-        Transactions_per_addr.decrement
-          state.tx_per_address
-          (Tx.from_address_of_tx_object tx_object) ;
-        Transaction_objects.remove
-          state.tx_object
-          (Tx.hash_of_tx_object tx_object) ;
-        Lwt.dont_wait
-          (fun () -> callback (reason :> all_variant))
-          (fun exn ->
-            Tx_queue_events.callback_error__dont_wait__use_with_care
-              [Error_monad.error_of_exn exn]) ;
-        Lwt.return_unit
+      let pending_callback =
+        pending_callback state ~tx_nonce ~addr ~tx_object ~caller_callback
       in
-      let queue_callback reason =
-        let open Lwt_syntax in
-        let* res =
-          match reason with
-          | `Accepted ->
-              Pending_transactions.add
-                state.pending
-                (Tx.hash_of_tx_object tx_object)
-                pending_callback ;
-              return_ok_unit
-          | `Refused ->
-              Transactions_per_addr.decrement
-                state.tx_per_address
-                (Tx.from_address_of_tx_object tx_object) ;
-              Transaction_objects.remove
-                state.tx_object
-                (Tx.hash_of_tx_object tx_object) ;
-              return
-              @@ Address_nonce.remove
-                   state.address_nonce
-                   ~addr
-                   ~nonce:tx_nonce
-                   ~rm:Tx.bitset_remove_nonce
-        in
-        let* () =
-          match res with
-          | Ok () -> return_unit
-          | Error errs -> Tx_queue_events.callback_error errs
-        in
-        Lwt.dont_wait
-          (fun () -> callback (reason :> all_variant))
-          (fun exn ->
-            Tx_queue_events.callback_error__dont_wait__use_with_care
-              [Error_monad.error_of_exn exn]) ;
-        Lwt.return_unit
+      let queue_callback =
+        queue_callback
+          state
+          ~tx_nonce
+          ~addr
+          ~tx_object
+          ~pending_callback
+          ~caller_callback
       in
       if Compare.Int.(Queue.length state.queue < state.config.max_size) then (
         (* Check number of txs by user in tx_queue. *)
