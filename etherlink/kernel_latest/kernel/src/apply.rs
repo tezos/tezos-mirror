@@ -101,7 +101,7 @@ impl Transaction {
 pub struct TransactionReceiptInfo {
     pub tx_hash: TransactionHash,
     pub index: u32,
-    pub execution_outcome: Option<ExecutionOutcome>,
+    pub execution_outcome: ExecutionOutcome,
     pub caller: H160,
     pub to: Option<H160>,
     pub effective_gas_price: U256,
@@ -134,7 +134,7 @@ pub struct TransactionObjectInfo {
 fn make_receipt_info(
     tx_hash: TransactionHash,
     index: u32,
-    execution_outcome: Option<ExecutionOutcome>,
+    execution_outcome: ExecutionOutcome,
     caller: H160,
     to: Option<H160>,
     effective_gas_price: U256,
@@ -289,7 +289,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
 
 pub struct TransactionResult {
     caller: H160,
-    execution_outcome: Option<ExecutionOutcome>,
+    execution_outcome: ExecutionOutcome,
     gas_used: U256,
     estimated_ticks_used: u64,
 }
@@ -335,7 +335,7 @@ pub fn revm_run_transaction<Host: Runtime>(
     authorization_list: Option<AuthorizationList>,
     config: &Config,
     tracer_input: Option<TracerInput>,
-) -> Result<Option<ExecutionOutcome>, anyhow::Error> {
+) -> Result<ExecutionOutcome, anyhow::Error> {
     // Disclaimer:
     // The following code is over-complicated because we maintain
     // two sets of primitives inside the kernel's codebase.
@@ -362,7 +362,7 @@ pub fn revm_run_transaction<Host: Runtime>(
                 .into())
             }
         };
-    match revm_etherlink::run_transaction(
+    revm_etherlink::run_transaction(
         host,
         config_to_revm_specid(config),
         block_constants,
@@ -436,15 +436,13 @@ pub fn revm_run_transaction<Host: Runtime>(
                 },
             ),
         }),
-    ) {
-        Ok(outcome) => Ok(Some(outcome)),
-        Err(err) => Err(Error::InvalidRunTransaction(
-            evm_execution::EthereumError::WrappedError(Cow::from(format!(
-                "REVM error {err:?}"
-            ))),
-        )
-        .into()),
-    }
+    )
+    .map_err(|err| {
+        Error::InvalidRunTransaction(evm_execution::EthereumError::WrappedError(
+            Cow::from(format!("REVM error {err:?}")),
+        ))
+        .into()
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -503,27 +501,13 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         }
     };
 
-    let (gas_used, estimated_ticks_used) = match &execution_outcome {
-        Some(execution_outcome) => {
-            log!(
-                host,
-                Benchmarking,
-                "Transaction status: OK_{}.",
-                execution_outcome.result.is_success()
-            );
-            (execution_outcome.result.gas_used().into(), 0)
-        }
-        None => {
-            log!(host, Benchmarking, "Transaction status: OK_UNKNOWN.");
-            (U256::zero(), 0)
-        }
-    };
+    let gas_used = execution_outcome.result.gas_used().into();
 
     let transaction_result = TransactionResult {
         caller,
         execution_outcome,
         gas_used,
-        estimated_ticks_used,
+        estimated_ticks_used: 0,
     };
 
     Ok(ExecutionResult::Valid(transaction_result))
@@ -589,7 +573,7 @@ fn apply_deposit<Host: Runtime>(
         caller: H160::zero(),
         gas_used: execution_outcome.result.gas_used().into(),
         estimated_ticks_used,
-        execution_outcome: Some(execution_outcome),
+        execution_outcome,
     }))
 }
 
@@ -696,27 +680,13 @@ fn apply_fa_deposit<Host: Runtime>(
         }
     };
 
-    let (gas_used, estimated_ticks_used) = match &execution_outcome {
-        Some(execution_outcome) => {
-            log!(
-                host,
-                Benchmarking,
-                "Transaction status: OK_{}.",
-                execution_outcome.result.is_success()
-            );
-            (execution_outcome.result.gas_used().into(), 0)
-        }
-        None => {
-            log!(host, Benchmarking, "Transaction status: OK_UNKNOWN.");
-            (U256::zero(), 0)
-        }
-    };
+    let gas_used = execution_outcome.result.gas_used().into();
 
     let transaction_result = TransactionResult {
         caller,
         execution_outcome,
         gas_used,
-        estimated_ticks_used,
+        estimated_ticks_used: 0,
     };
 
     Ok(ExecutionResult::Valid(transaction_result))
@@ -772,27 +742,30 @@ pub fn handle_transaction_result<Host: Runtime>(
         .content
         .fee_updates(&block_constants.block_fees, gas_used);
 
-    if let Some(outcome) = &mut execution_outcome {
-        log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
-        log!(
-            host,
-            Benchmarking,
-            "gas_used: {:?}",
-            outcome.result.gas_used()
-        );
-        log!(host, Benchmarking, "reason: {:?}", outcome.result);
-        for message in outcome.withdrawals.drain(..) {
-            match message {
-                Withdrawal::Standard(message) => {
-                    let outbox_message: OutboxMessage<RouterInterface> = message;
-                    let len = outbox_queue.queue_message(host, outbox_message)?;
-                    log!(host, Debug, "Length of the outbox queue: {}", len);
-                }
-                Withdrawal::Fast(message) => {
-                    let outbox_message: OutboxMessage<FastWithdrawalInterface> = message;
-                    let len = outbox_queue.queue_message(host, outbox_message)?;
-                    log!(host, Debug, "Length of the outbox queue: {}", len);
-                }
+    log!(
+        host,
+        Debug,
+        "Transaction executed, outcome: {:?}",
+        execution_outcome
+    );
+    log!(
+        host,
+        Benchmarking,
+        "gas_used: {:?}",
+        execution_outcome.result.gas_used()
+    );
+    log!(host, Benchmarking, "reason: {:?}", execution_outcome.result);
+    for message in execution_outcome.withdrawals.drain(..) {
+        match message {
+            Withdrawal::Standard(message) => {
+                let outbox_message: OutboxMessage<RouterInterface> = message;
+                let len = outbox_queue.queue_message(host, outbox_message)?;
+                log!(host, Debug, "Length of the outbox queue: {}", len);
+            }
+            Withdrawal::Fast(message) => {
+                let outbox_message: OutboxMessage<FastWithdrawalInterface> = message;
+                let len = outbox_queue.queue_message(host, outbox_message)?;
+                log!(host, Debug, "Length of the outbox queue: {}", len);
             }
         }
     }

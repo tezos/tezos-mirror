@@ -510,13 +510,13 @@ impl Evaluation {
             evm_configuration,
             tracer_input,
         ) {
-            Ok(Some(outcome)) if !self.with_da_fees => {
+            Ok(outcome) if !self.with_da_fees => {
                 let result: SimulationResult<CallResult, String> =
                     Result::Ok(outcome).into();
 
                 Ok(result)
             }
-            Ok(Some(outcome)) => {
+            Ok(outcome) => {
                 let outcome = simulation_add_gas_for_fees(
                     outcome.into(),
                     &constants.block_fees,
@@ -529,9 +529,6 @@ impl Evaluation {
 
                 Ok(result)
             }
-            Ok(None) => Ok(SimulationResult::Err(
-                "No outcome was produced when the transaction was ran".to_owned(),
-            )),
             Err(err) => Ok(SimulationResult::Err(err.to_string())),
         }
     }
