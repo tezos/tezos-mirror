@@ -5,7 +5,7 @@
 
 use crate::{custom, Error};
 use primitive_types::{H160, H256, U256 as PU256};
-use revm::primitives::{Address, U256};
+use revm::primitives::{Address, Log, U256};
 use rlp::{Decodable, Rlp, RlpDecodable, RlpEncodable};
 
 #[derive(Debug, Eq, PartialEq, Clone, RlpEncodable, RlpDecodable, Default)]
@@ -42,4 +42,17 @@ pub fn alloy_to_u256(value: &U256) -> PU256 {
 
 pub fn alloy_to_h160(value: &Address) -> H160 {
     H160::from_slice(value.as_slice())
+}
+
+pub fn alloy_to_log(value: &Log) -> ethereum::Log {
+    ethereum::Log {
+        address: H160(**value.address),
+        topics: value
+            .data
+            .topics()
+            .iter()
+            .map(|topic| H256(**topic))
+            .collect(),
+        data: value.data.data.to_vec(),
+    }
 }

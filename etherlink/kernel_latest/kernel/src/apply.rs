@@ -7,13 +7,10 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolCall};
-use ethereum::Log;
-use evm::{Config, ExitSucceed, Opcode};
+use evm::Config;
 use evm_execution::account_storage::{EthereumAccount, EthereumAccountStorage};
 use evm_execution::fa_bridge::deposit::{FaDeposit, FaDepositWithProxy};
-use evm_execution::handler::{
-    ExecutionOutcome, FastWithdrawalInterface, RouterInterface,
-};
+use evm_execution::handler::{FastWithdrawalInterface, RouterInterface};
 use evm_execution::precompiles::{FA_BRIDGE_PRECOMPILE_ADDRESS, SYSTEM_ACCOUNT_ADDRESS};
 use evm_execution::storage::tracer;
 use evm_execution::trace::TracerInput::CallTracer;
@@ -23,8 +20,11 @@ use evm_execution::trace::{
 };
 use evm_execution::utilities::alloy::h160_to_alloy;
 use primitive_types::{H160, H256, U256};
+use revm::primitives::Log;
+use revm_etherlink::helpers::legacy::alloy_to_log;
 use revm_etherlink::precompiles::constants::FA_DEPOSIT_EXECUTION_COST;
-use revm_etherlink::u256_to_alloy;
+use revm_etherlink::precompiles::send_outbox_message::Withdrawal;
+use revm_etherlink::{u256_to_alloy, ExecutionOutcome};
 use std::borrow::Cow;
 use tezos_ethereum::access_list::{AccessList, AccessListItem};
 use tezos_ethereum::block::{BlockConstants, BlockFees};
@@ -38,7 +38,7 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 
-use crate::bridge::{execute_deposit, Deposit};
+use crate::bridge::{execute_deposit, Deposit, DepositResult};
 use crate::chains::EvmLimits;
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
@@ -101,7 +101,7 @@ impl Transaction {
 pub struct TransactionReceiptInfo {
     pub tx_hash: TransactionHash,
     pub index: u32,
-    pub execution_outcome: Option<ExecutionOutcome>,
+    pub execution_outcome: ExecutionOutcome,
     pub caller: H160,
     pub to: Option<H160>,
     pub effective_gas_price: U256,
@@ -134,7 +134,7 @@ pub struct TransactionObjectInfo {
 fn make_receipt_info(
     tx_hash: TransactionHash,
     index: u32,
-    execution_outcome: Option<ExecutionOutcome>,
+    execution_outcome: ExecutionOutcome,
     caller: H160,
     to: Option<H160>,
     effective_gas_price: U256,
@@ -289,7 +289,7 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
 
 pub struct TransactionResult {
     caller: H160,
-    execution_outcome: Option<ExecutionOutcome>,
+    execution_outcome: ExecutionOutcome,
     gas_used: U256,
     estimated_ticks_used: u64,
 }
@@ -335,7 +335,7 @@ pub fn revm_run_transaction<Host: Runtime>(
     authorization_list: Option<AuthorizationList>,
     config: &Config,
     tracer_input: Option<TracerInput>,
-) -> Result<Option<ExecutionOutcome>, anyhow::Error> {
+) -> Result<ExecutionOutcome, anyhow::Error> {
     // Disclaimer:
     // The following code is over-complicated because we maintain
     // two sets of primitives inside the kernel's codebase.
@@ -362,7 +362,7 @@ pub fn revm_run_transaction<Host: Runtime>(
                 .into())
             }
         };
-    match revm_etherlink::run_transaction(
+    revm_etherlink::run_transaction(
         host,
         config_to_revm_specid(config),
         block_constants,
@@ -436,119 +436,13 @@ pub fn revm_run_transaction<Host: Runtime>(
                 },
             ),
         }),
-    ) {
-        Ok(outcome) => {
-            let gas_used = outcome.result.gas_used();
-            let logs = outcome
-                .result
-                .logs()
-                .iter()
-                .map(|revm::primitives::Log { address, data }| Log {
-                    address: H160(***address),
-                    topics: data.topics().iter().map(|topic| H256(**topic)).collect(),
-                    data: data.data.to_vec(),
-                })
-                .collect();
-            let result = match outcome.result {
-                revm::context::result::ExecutionResult::Success { output: revm::context::result::Output::Call(output), .. } => {
-                    evm_execution::handler::ExecutionResult::CallSucceeded(ExitSucceed::Returned, output.to_vec())
-                },
-                revm::context::result::ExecutionResult::Success { output: revm::context::result::Output::Create(bytecode,address), .. } => {
-                    evm_execution::handler::ExecutionResult::ContractDeployed(H160(**address.unwrap_or_default()), bytecode.to_vec())
-                },
-                revm::context::result::ExecutionResult::Revert { output, .. } => {
-                    evm_execution::handler::ExecutionResult::CallReverted(output.to_vec())
-                },
-                revm::context::result::ExecutionResult::Halt { reason, .. } => match reason {
-                    revm::context::result::HaltReason::OutOfGas(_) => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::OutOfGas)
-                    },
-                    revm::context::result::HaltReason::OpcodeNotFound => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("OpcodeNotFound")))
-                    },
-                    revm::context::result::HaltReason::InvalidFEOpcode => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::InvalidCode(Opcode(0xfe)))
-                    },
-                    revm::context::result::HaltReason::InvalidJump => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::InvalidJump)
-                    },
-                    revm::context::result::HaltReason::NotActivated => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("NotActivated")))
-                    },
-                    revm::context::result::HaltReason::StackUnderflow => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::StackUnderflow)
-                    },
-                    revm::context::result::HaltReason::StackOverflow => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::StackOverflow)
-                    },
-                    revm::context::result::HaltReason::OutOfOffset => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("OutOfOffset")))
-                    },
-                    revm::context::result::HaltReason::CreateCollision => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::CreateCollision)
-                    },
-                    revm::context::result::HaltReason::PrecompileError => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("PrecompileError")))
-                    },
-                    revm::context::result::HaltReason::NonceOverflow => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::MaxNonce)
-                    },
-                    revm::context::result::HaltReason::CreateContractSizeLimit => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::CreateContractLimit)
-                    },
-                    revm::context::result::HaltReason::CreateContractStartingWithEF => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::InvalidCode(Opcode(0xef)))
-                    },
-                    revm::context::result::HaltReason::CreateInitCodeSizeLimit => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("CreateInitCodeSizeLimit")))
-                    },
-                    revm::context::result::HaltReason::OverflowPayment => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("OverflowPayment")))
-                    },
-                    revm::context::result::HaltReason::StateChangeDuringStaticCall => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("StateChangeDuringStaticCall")))
-                    },
-                    revm::context::result::HaltReason::CallNotAllowedInsideStatic => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("CallNotAllowedInsideStatic")))
-                    },
-                    revm::context::result::HaltReason::OutOfFunds => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::OutOfFund)
-                    },
-                    revm::context::result::HaltReason::CallTooDeep => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::CallTooDeep)
-                    }
-                },
-            };
-            Ok(Some(ExecutionOutcome {
-                gas_used,
-                logs,
-                result,
-                withdrawals: outcome
-                    .withdrawals
-                    .into_iter()
-                    .map(|withdrawal| match withdrawal {
-                        revm_etherlink::precompiles::send_outbox_message::Withdrawal::Standard(
-                            outbox_message_full,
-                        ) => evm_execution::handler::Withdrawal::Standard(
-                            outbox_message_full,
-                        ),
-                        revm_etherlink::precompiles::send_outbox_message::Withdrawal::Fast(
-                            outbox_message_full,
-                        ) => {
-                            evm_execution::handler::Withdrawal::Fast(outbox_message_full)
-                        }
-                    })
-                    .collect(),
-                estimated_ticks_used: 0,
-            }))
-        }
-        Err(err) => Err(Error::InvalidRunTransaction(
-            evm_execution::EthereumError::WrappedError(Cow::from(format!(
-                "REVM error {err:?}"
-            ))),
-        )
-        .into()),
-    }
+    )
+    .map_err(|err| {
+        Error::InvalidRunTransaction(evm_execution::EthereumError::WrappedError(
+            Cow::from(format!("REVM error {err:?}")),
+        ))
+        .into()
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -607,30 +501,13 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         }
     };
 
-    let (gas_used, estimated_ticks_used) = match &execution_outcome {
-        Some(execution_outcome) => {
-            log!(
-                host,
-                Benchmarking,
-                "Transaction status: OK_{}.",
-                execution_outcome.is_success()
-            );
-            (
-                execution_outcome.gas_used.into(),
-                execution_outcome.estimated_ticks_used,
-            )
-        }
-        None => {
-            log!(host, Benchmarking, "Transaction status: OK_UNKNOWN.");
-            (U256::zero(), 0)
-        }
-    };
+    let gas_used = execution_outcome.result.gas_used().into();
 
     let transaction_result = TransactionResult {
         caller,
         execution_outcome,
         gas_used,
-        estimated_ticks_used,
+        estimated_ticks_used: 0,
     };
 
     Ok(ExecutionResult::Valid(transaction_result))
@@ -661,7 +538,8 @@ fn trace_deposit<Host: Runtime>(
         call_trace.add_to(receiver);
 
         if with_logs {
-            call_trace.add_logs(Some(logs.to_owned()))
+            let logs = logs.iter().map(alloy_to_log).collect();
+            call_trace.add_logs(Some(logs))
         }
 
         let _ = tracer::store_call_trace(host, call_trace, &transaction_hash);
@@ -676,24 +554,26 @@ fn apply_deposit<Host: Runtime>(
     tracer_input: Option<TracerInput>,
     evm_configuration: &Config,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
-    let execution_outcome =
-        execute_deposit(host, evm_account_storage, deposit, evm_configuration)
-            .map_err(Error::InvalidRunTransaction)?;
+    let DepositResult {
+        outcome: execution_outcome,
+        estimated_ticks_used,
+    } = execute_deposit(host, evm_account_storage, deposit, evm_configuration)
+        .map_err(Error::InvalidRunTransaction)?;
 
     trace_deposit(
         host,
         transaction.value(),
         transaction.to(),
-        execution_outcome.gas_used,
-        &execution_outcome.logs,
+        execution_outcome.result.gas_used(),
+        execution_outcome.result.logs(),
         tracer_input,
     );
 
     Ok(ExecutionResult::Valid(TransactionResult {
         caller: H160::zero(),
-        gas_used: execution_outcome.gas_used.into(),
-        estimated_ticks_used: execution_outcome.estimated_ticks_used,
-        execution_outcome: Some(execution_outcome),
+        gas_used: execution_outcome.result.gas_used().into(),
+        estimated_ticks_used,
+        execution_outcome,
     }))
 }
 
@@ -800,30 +680,13 @@ fn apply_fa_deposit<Host: Runtime>(
         }
     };
 
-    let (gas_used, estimated_ticks_used) = match &execution_outcome {
-        Some(execution_outcome) => {
-            log!(
-                host,
-                Benchmarking,
-                "Transaction status: OK_{}.",
-                execution_outcome.is_success()
-            );
-            (
-                execution_outcome.gas_used.into(),
-                execution_outcome.estimated_ticks_used,
-            )
-        }
-        None => {
-            log!(host, Benchmarking, "Transaction status: OK_UNKNOWN.");
-            (U256::zero(), 0)
-        }
-    };
+    let gas_used = execution_outcome.result.gas_used().into();
 
     let transaction_result = TransactionResult {
         caller,
         execution_outcome,
         gas_used,
-        estimated_ticks_used,
+        estimated_ticks_used: 0,
     };
 
     Ok(ExecutionResult::Valid(transaction_result))
@@ -879,22 +742,30 @@ pub fn handle_transaction_result<Host: Runtime>(
         .content
         .fee_updates(&block_constants.block_fees, gas_used);
 
-    if let Some(outcome) = &mut execution_outcome {
-        log!(host, Debug, "Transaction executed, outcome: {:?}", outcome);
-        log!(host, Benchmarking, "gas_used: {:?}", outcome.gas_used);
-        log!(host, Benchmarking, "reason: {:?}", outcome.result);
-        for message in outcome.withdrawals.drain(..) {
-            match message {
-                evm_execution::handler::Withdrawal::Standard(message) => {
-                    let outbox_message: OutboxMessage<RouterInterface> = message;
-                    let len = outbox_queue.queue_message(host, outbox_message)?;
-                    log!(host, Debug, "Length of the outbox queue: {}", len);
-                }
-                evm_execution::handler::Withdrawal::Fast(message) => {
-                    let outbox_message: OutboxMessage<FastWithdrawalInterface> = message;
-                    let len = outbox_queue.queue_message(host, outbox_message)?;
-                    log!(host, Debug, "Length of the outbox queue: {}", len);
-                }
+    log!(
+        host,
+        Debug,
+        "Transaction executed, outcome: {:?}",
+        execution_outcome
+    );
+    log!(
+        host,
+        Benchmarking,
+        "gas_used: {:?}",
+        execution_outcome.result.gas_used()
+    );
+    log!(host, Benchmarking, "reason: {:?}", execution_outcome.result);
+    for message in execution_outcome.withdrawals.drain(..) {
+        match message {
+            Withdrawal::Standard(message) => {
+                let outbox_message: OutboxMessage<RouterInterface> = message;
+                let len = outbox_queue.queue_message(host, outbox_message)?;
+                log!(host, Debug, "Length of the outbox queue: {}", len);
+            }
+            Withdrawal::Fast(message) => {
+                let outbox_message: OutboxMessage<FastWithdrawalInterface> = message;
+                let len = outbox_queue.queue_message(host, outbox_message)?;
+                log!(host, Debug, "Length of the outbox queue: {}", len);
             }
         }
     }

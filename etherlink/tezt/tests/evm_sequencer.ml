@@ -11751,7 +11751,7 @@ let test_filling_max_slots_cant_lead_to_out_of_memory =
       true
     with Not_found -> false
   in
-  let error_out_of_gas = "Error(OutOfGas)" in
+  let error_out_of_gas = "OutOfGas(Basic)" in
   if contains failure error_out_of_gas then unit
   else Test.fail "Test should fail with error: %s" error_out_of_gas
 

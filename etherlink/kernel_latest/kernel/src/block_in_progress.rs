@@ -20,6 +20,7 @@ use alloy_consensus::EMPTY_ROOT_HASH;
 use anyhow::Context;
 use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
 use primitive_types::{H160, H256, U256};
+use revm_etherlink::helpers::legacy::alloy_to_log;
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
 use tezos_ethereum::block::{BlockConstants, BlockFees, EthBlock};
@@ -371,17 +372,7 @@ impl EthBlockInProgress {
         host: &mut Host,
     ) -> Result<(), anyhow::Error> {
         // account for gas
-        let Some(gas_used) = receipt_info
-            .execution_outcome
-            .as_ref()
-            .map(|eo| eo.gas_used)
-        else {
-            anyhow::bail!(
-                "No execution outcome on valid transaction 0x{}",
-                hex::encode(transaction.tx_hash)
-            );
-        };
-        host.add_execution_gas(gas_used);
+        host.add_execution_gas(receipt_info.execution_outcome.result.gas_used());
 
         self.add_gas(receipt_info.overall_gas_used)?;
 
@@ -531,53 +522,37 @@ impl EthBlockInProgress {
             ..
         } = self;
 
-        match execution_outcome {
-            Some(outcome) => {
-                let is_success = outcome.is_success();
-                let contract_address = outcome.new_address();
-                let log_iter = outcome.logs.into_iter();
-                let logs: Vec<IndexedLog> = log_iter
-                    .enumerate()
-                    .map(|(i, log)| IndexedLog {
-                        log,
-                        index: i as u64 + logs_offset,
-                    })
-                    .collect();
-                self.logs_offset += logs.len() as u64;
-                TransactionReceipt {
-                    hash,
-                    index,
-                    block_number,
-                    from,
-                    to,
-                    cumulative_gas_used: cumulative_gas,
-                    effective_gas_price,
-                    gas_used: receipt_info.overall_gas_used,
-                    contract_address,
-                    logs_bloom: TransactionReceipt::logs_to_bloom(&logs),
-                    logs,
-                    type_,
-                    status: if is_success {
-                        TransactionStatus::Success
-                    } else {
-                        TransactionStatus::Failure
-                    },
-                }
-            }
-            None => TransactionReceipt {
-                hash,
-                index,
-                block_number,
-                from,
-                to,
-                cumulative_gas_used: cumulative_gas,
-                effective_gas_price,
-                gas_used: U256::zero(),
-                contract_address: None,
-                logs: vec![],
-                logs_bloom: Bloom::default(),
-                type_,
-                status: TransactionStatus::Failure,
+        let is_success = execution_outcome.result.is_success();
+        let contract_address = execution_outcome
+            .result
+            .created_address()
+            .map(|x| H160(*x.0));
+        let log_iter = execution_outcome.result.logs().iter().map(alloy_to_log);
+        let logs: Vec<IndexedLog> = log_iter
+            .enumerate()
+            .map(|(i, log)| IndexedLog {
+                log,
+                index: i as u64 + logs_offset,
+            })
+            .collect();
+        self.logs_offset += logs.len() as u64;
+        TransactionReceipt {
+            hash,
+            index,
+            block_number,
+            from,
+            to,
+            cumulative_gas_used: cumulative_gas,
+            effective_gas_price,
+            gas_used: receipt_info.overall_gas_used,
+            contract_address,
+            logs_bloom: TransactionReceipt::logs_to_bloom(&logs),
+            logs,
+            type_,
+            status: if is_success {
+                TransactionStatus::Success
+            } else {
+                TransactionStatus::Failure
             },
         }
     }
