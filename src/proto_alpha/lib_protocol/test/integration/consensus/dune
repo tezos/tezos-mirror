@@ -44,7 +44,8 @@
   test_aggregate
   test_dal_entrapment
   test_companion_key
-  test_scenario_attestation))
+  test_scenario_attestation
+  test_all_bakers_attest))
 
 (executable
  (name main)
