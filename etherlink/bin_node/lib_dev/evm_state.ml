@@ -194,7 +194,7 @@ let init_reboot_counter evm_state =
 
 let init ~kernel =
   let open Lwt_result_syntax in
-  let evm_state = Evm_node_state.PVMState.empty () in
+  let evm_state = Evm_node_state.PVMState.empty (module Irmin_context) () in
   let* evm_state =
     Wasm_debugger.start
       ~tree:(Evm_node_state.Wasm_internal.to_irmin evm_state)

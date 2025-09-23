@@ -102,7 +102,11 @@ let load ~pool ?network ?smart_rollup_address ~data_dir
   in
   let* index =
     Evm_node_state.(
-      load ~cache_size:100_000 Read_only (Evm_state.irmin_store_path ~data_dir))
+      load
+        (module Irmin_context)
+        ~cache_size:100_000
+        Read_only
+        (Evm_state.irmin_store_path ~data_dir))
   in
   let* smart_rollup_address =
     match smart_rollup_address with
