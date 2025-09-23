@@ -705,10 +705,9 @@ struct
             [Error_monad.error_of_exn exn]) ;
       Lwt.return_unit
 
-    let inject state
+    let add_tx_to_queue state
         {next_nonce; payload; tx_object; callback = caller_callback} =
       let open Lwt_result_syntax in
-      Tx_watcher.notify (Tx.hash_of_tx_object tx_object) ;
       let addr =
         Tx.address_to_string (Tx.from_address_of_tx_object tx_object)
       in
@@ -725,7 +724,32 @@ struct
           ~pending_callback
           ~caller_callback
       in
-      if Compare.Int.(Queue.length state.queue < state.config.max_size) then (
+      let*! () =
+        Tx_queue_events.add_transaction (Tx.hash_of_tx_object tx_object)
+      in
+      Transactions_per_addr.increment
+        state.tx_per_address
+        (Tx.from_address_of_tx_object tx_object) ;
+      Transaction_objects.add state.tx_object tx_object ;
+      let (Qty next_nonce) = next_nonce in
+      let*? () =
+        Address_nonce.add
+          state.address_nonce
+          ~addr
+          ~next_nonce
+          ~nonce:tx_nonce
+          ~add:Tx.bitset_add_nonce
+      in
+      Queue.add
+        {hash = Tx.hash_of_tx_object tx_object; payload; queue_callback}
+        state.queue ;
+      return_unit
+
+    let inject state
+        {next_nonce; payload; tx_object; callback = caller_callback} =
+      let open Lwt_result_syntax in
+      Tx_watcher.notify (Tx.hash_of_tx_object tx_object) ;
+      if Compare.Int.(Queue.length state.queue < state.config.max_size) then
         (* Check number of txs by user in tx_queue. *)
         let nb_txs_in_queue =
           Transactions_per_addr.find
@@ -747,26 +771,12 @@ struct
                  "Limit of transaction for a user was reached. Transaction is \
                   rejected.")
         | Some _ | None ->
-            let*! () =
-              Tx_queue_events.add_transaction (Tx.hash_of_tx_object tx_object)
+            let* () =
+              add_tx_to_queue
+                state
+                {next_nonce; payload; tx_object; callback = caller_callback}
             in
-            Transactions_per_addr.increment
-              state.tx_per_address
-              (Tx.from_address_of_tx_object tx_object) ;
-            Transaction_objects.add state.tx_object tx_object ;
-            let (Qty next_nonce) = next_nonce in
-            let*? () =
-              Address_nonce.add
-                state.address_nonce
-                ~addr
-                ~next_nonce
-                ~nonce:tx_nonce
-                ~add:Tx.bitset_add_nonce
-            in
-            Queue.add
-              {hash = Tx.hash_of_tx_object tx_object; payload; queue_callback}
-              state.queue ;
-            return (Ok ()))
+            return (Ok ())
       else
         return (Error "Transaction limit was reached. Transaction is rejected.")
 
