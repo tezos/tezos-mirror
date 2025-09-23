@@ -164,7 +164,7 @@ contract FABridge is ReentrancySafe {
             (deposit.receiver, deposit.amount, deposit.ticketHash)
         );
 
-        // Encode and send to the system forwarded to call
+        // Encode and send to the system forwarder to call
         bytes memory systemInput = abi.encodeCall(
             InternalForwarder.forward,
             (deposit.proxy, proxyCallData)
@@ -271,12 +271,24 @@ contract FABridge is ReentrancySafe {
             counter
         );
 
-        // Call proxy
+        // Encode proxy data
         bytes memory proxyData = abi.encodeCall(
             IProxy.withdraw,
             (msg.sender, amount, ticketHash)
         );
-        (bool proxySuccess, ) = ticketOwner.call(proxyData);
+
+        // Send proxy data to the system forwarder
+        bytes memory systemInput = abi.encodeCall(
+            InternalForwarder.forward,
+            (ticketOwner, proxyData)
+        );
+        (bool forwarderSuccess, bytes memory proxyReturn) = Constants
+            .system
+            .call(systemInput);
+        require(forwarderSuccess, "System forwarder failed");
+
+        // Decode proxy execution return
+        (bool proxySuccess, ) = abi.decode(proxyReturn, (bool, bytes));
         require(proxySuccess, "Proxy withdraw failed");
     }
 
@@ -357,12 +369,24 @@ contract FABridge is ReentrancySafe {
             payload
         );
 
-        // Call proxy
+        // Encode proxy data
         bytes memory proxyData = abi.encodeCall(
             IProxy.withdraw,
             (msg.sender, amount, ticketHash)
         );
-        (bool proxySuccess, ) = ticketOwner.call(proxyData);
+
+        // Send proxy data to the system forwarder
+        bytes memory systemInput = abi.encodeCall(
+            InternalForwarder.forward,
+            (ticketOwner, proxyData)
+        );
+        (bool forwarderSuccess, bytes memory proxyReturn) = Constants
+            .system
+            .call(systemInput);
+        require(forwarderSuccess, "System forwarder failed");
+
+        // Decode proxy execution return
+        (bool proxySuccess, ) = abi.decode(proxyReturn, (bool, bytes));
         require(proxySuccess, "Proxy withdraw failed");
     }
 }
