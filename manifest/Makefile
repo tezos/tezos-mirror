@@ -10,13 +10,13 @@ SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml \
        internals.ml \
        product_data_encoding.mli product_data_encoding.ml \
        product_websocket.mli product_websocket.ml \
+       product_lwt_domain.ml \
        product_prometheus.mli product_prometheus.ml \
        product_resto.mli product_resto.ml \
        product_efunc_core.mli product_efunc_core.ml \
        product_octez.mli product_octez.ml \
        product_client_libs.mli product_client_libs.ml \
        product_tooling.mli product_tooling.ml \
-       product_lwt_domain.ml \
        product_etherlink.mli product_etherlink.ml \
        product_teztale.ml \
        product_tezt_cloud_tests.ml \

@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Error_monad
+
 external cast_chan : 'a Lwt_io.channel -> unit Lwt_io.channel = "%identity"
 (* Transform a channel into a channel that only support closing. *)
 

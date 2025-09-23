@@ -13,6 +13,7 @@ open Internals
 open Product_data_encoding
 open Product_prometheus
 open Product_resto
+open Product_lwt_domain
 
 include Product (struct
   let name = "octez"
@@ -1523,6 +1524,7 @@ let octez_stdlib_unix =
         uri;
         progress;
         camlp_streams;
+        lwt_domain;
       ]
 
 let _octez_stdlib_unix_test =
