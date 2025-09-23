@@ -137,13 +137,7 @@ By default, the DAL node accepts P2P connections on port 11732, but you can chan
 In simple setups with a single DAL node, routing configuration is usually not necessary.
 However, if you are using a load balancer or running multiple DAL nodes, you may need to configure port forwarding on your router and the ports and addresses that the DAL nodes use.
 
-The ``--net-addr`` argument sets the address and port that the node listens for incoming connections on.
-For example, setting ``--net-addr 0.0.0.0:11733`` makes the node listen on port 11733 on all network interfaces.
-
-The ``--public-addr`` argument sets the address and port at which other nodes can reach the node, such as if you are using a load balancer, firewall rule, or router to forward traffic to the node from another port.
-The node does not actually bind to this port or listen on it.
-
-If you change the defaults with the ``--net-addr`` or ``--public-addr`` arguments, you must configure your firewall to permit incoming and outgoing TCP connections on the ports that you specify in the arguments.
+For more information, see :doc:`Routing <../user/routing>`.
 
 Storage
 ^^^^^^^

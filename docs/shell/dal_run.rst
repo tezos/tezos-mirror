@@ -59,13 +59,7 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
    By default, the DAL node accepts P2P connections on port 11732, but you can change the address and port that the node listens on by setting the ``--net-addr`` argument.
    In simple setups with a single DAL node, routing configuration is usually not necessary.
 
-   Depending on your network, you may need to adapt your firewall rules or set up network address translation (NAT) to direct external traffic to the DAL node.
-   For example, if you are running more than one DAL node, each node needs a unique socket (combination of IP address and port) to listen on.
-   In this case, use the ``--net-addr`` argument to set a different IP address and port for one of the nodes to listen on, as in ``--net-addr 0.0.0.0:11733`` to make the node listen on port 11733 on all network interfaces.
-   Then you must configure your firewall to permit incoming and outgoing TCP connections on port 11733.
-
-   If a firewall rule directs traffic from an external port that is different from the port that you set in the ``--net-addr`` argument, use the ``--public-addr`` argument to set the port from which the node can be reached by other nodes.
-   You may also need to set ``--public-addr`` if you are directing traffic from a load balancer to the DAL node.
+   For more information, see :doc:`Routing <../user/routing>`.
 
 #. Start the DAL node by running its ``run`` command, passing the directory that you set in the ``config init`` command if you changed the default.
    You can also pass any other parameters that you did not set in that command:
