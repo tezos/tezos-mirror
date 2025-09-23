@@ -621,6 +621,139 @@ struct
       let* rev_selected = aux validation_state [] in
       return @@ List.rev rev_selected
 
+    let inject state {next_nonce; payload; tx_object; callback} =
+      let open Lwt_result_syntax in
+      Tx_watcher.notify (Tx.hash_of_tx_object tx_object) ;
+      let addr =
+        Tx.address_to_string (Tx.from_address_of_tx_object tx_object)
+      in
+      let tx_nonce = Tx.nonce_of_tx_object tx_object in
+      let pending_callback (reason : pending_variant) =
+        let open Lwt_syntax in
+        let* res =
+          match reason with
+          | `Dropped ->
+              let* () =
+                Tx_queue_events.transaction_dropped
+                  (Tx.hash_of_tx_object tx_object)
+              in
+              return
+              @@ Address_nonce.remove
+                   state.address_nonce
+                   ~addr
+                   ~nonce:tx_nonce
+                   ~rm:Tx.bitset_remove_nonce
+          | `Confirmed ->
+              let* () =
+                Tx_queue_events.transaction_confirmed
+                  (Tx.hash_of_tx_object tx_object)
+              in
+              return
+              @@ Address_nonce.confirm_nonce
+                   state.address_nonce
+                   ~addr
+                   ~nonce:tx_nonce
+                   ~next:Tx.next_nonce
+        in
+        let* () =
+          match res with
+          | Ok () -> return_unit
+          | Error errs -> Tx_queue_events.callback_error errs
+        in
+        Transactions_per_addr.decrement
+          state.tx_per_address
+          (Tx.from_address_of_tx_object tx_object) ;
+        Transaction_objects.remove
+          state.tx_object
+          (Tx.hash_of_tx_object tx_object) ;
+        Lwt.dont_wait
+          (fun () -> callback (reason :> all_variant))
+          (fun exn ->
+            Tx_queue_events.callback_error__dont_wait__use_with_care
+              [Error_monad.error_of_exn exn]) ;
+        Lwt.return_unit
+      in
+      let queue_callback reason =
+        let open Lwt_syntax in
+        let* res =
+          match reason with
+          | `Accepted ->
+              Pending_transactions.add
+                state.pending
+                (Tx.hash_of_tx_object tx_object)
+                pending_callback ;
+              return_ok_unit
+          | `Refused ->
+              Transactions_per_addr.decrement
+                state.tx_per_address
+                (Tx.from_address_of_tx_object tx_object) ;
+              Transaction_objects.remove
+                state.tx_object
+                (Tx.hash_of_tx_object tx_object) ;
+              return
+              @@ Address_nonce.remove
+                   state.address_nonce
+                   ~addr
+                   ~nonce:tx_nonce
+                   ~rm:Tx.bitset_remove_nonce
+        in
+        let* () =
+          match res with
+          | Ok () -> return_unit
+          | Error errs -> Tx_queue_events.callback_error errs
+        in
+        Lwt.dont_wait
+          (fun () -> callback (reason :> all_variant))
+          (fun exn ->
+            Tx_queue_events.callback_error__dont_wait__use_with_care
+              [Error_monad.error_of_exn exn]) ;
+        Lwt.return_unit
+      in
+      if Compare.Int.(Queue.length state.queue < state.config.max_size) then (
+        (* Check number of txs by user in tx_queue. *)
+        let nb_txs_in_queue =
+          Transactions_per_addr.find
+            state.tx_per_address
+            (Tx.from_address_of_tx_object tx_object)
+        in
+        match nb_txs_in_queue with
+        | Some i when i >= state.config.tx_per_addr_limit ->
+            let*! () =
+              Tx_pool_events.txs_per_user_threshold_reached
+                ~address:
+                  (Ethereum_types.hex_to_string
+                     (Ethereum_types.Hex
+                        (Tx.address_to_string
+                           (Tx.from_address_of_tx_object tx_object))))
+            in
+            return
+              (Error
+                 "Limit of transaction for a user was reached. Transaction is \
+                  rejected.")
+        | Some _ | None ->
+            let*! () =
+              Tx_queue_events.add_transaction (Tx.hash_of_tx_object tx_object)
+            in
+            Transactions_per_addr.increment
+              state.tx_per_address
+              (Tx.from_address_of_tx_object tx_object) ;
+            Transaction_objects.add state.tx_object tx_object ;
+            let (Qty next_nonce) = next_nonce in
+            let*? () =
+              Address_nonce.add
+                state.address_nonce
+                ~addr
+                ~next_nonce
+                ~nonce:tx_nonce
+                ~add:Tx.bitset_add_nonce
+            in
+            Queue.add
+              {hash = Tx.hash_of_tx_object tx_object; payload; queue_callback}
+              state.queue ;
+            return (Ok ()))
+      else
+        return (Error "Transaction limit was reached. Transaction is rejected.")
+
     let on_request : type r request_error.
         worker ->
         (r, request_error) Request.t ->
@@ -629,144 +762,7 @@ struct
       let open Lwt_result_syntax in
       let state = Worker.state self in
       match request with
-      | Inject {next_nonce; payload; tx_object; callback} ->
-          protect @@ fun () ->
-          Tx_watcher.notify (Tx.hash_of_tx_object tx_object) ;
-          let addr =
-            Tx.address_to_string (Tx.from_address_of_tx_object tx_object)
-          in
-          let tx_nonce = Tx.nonce_of_tx_object tx_object in
-          let pending_callback (reason : pending_variant) =
-            let open Lwt_syntax in
-            let* res =
-              match reason with
-              | `Dropped ->
-                  let* () =
-                    Tx_queue_events.transaction_dropped
-                      (Tx.hash_of_tx_object tx_object)
-                  in
-                  return
-                  @@ Address_nonce.remove
-                       state.address_nonce
-                       ~addr
-                       ~nonce:tx_nonce
-                       ~rm:Tx.bitset_remove_nonce
-              | `Confirmed ->
-                  let* () =
-                    Tx_queue_events.transaction_confirmed
-                      (Tx.hash_of_tx_object tx_object)
-                  in
-                  return
-                  @@ Address_nonce.confirm_nonce
-                       state.address_nonce
-                       ~addr
-                       ~nonce:tx_nonce
-                       ~next:Tx.next_nonce
-            in
-            let* () =
-              match res with
-              | Ok () -> return_unit
-              | Error errs -> Tx_queue_events.callback_error errs
-            in
-            Transactions_per_addr.decrement
-              state.tx_per_address
-              (Tx.from_address_of_tx_object tx_object) ;
-            Transaction_objects.remove
-              state.tx_object
-              (Tx.hash_of_tx_object tx_object) ;
-            Lwt.dont_wait
-              (fun () -> callback (reason :> all_variant))
-              (fun exn ->
-                Tx_queue_events.callback_error__dont_wait__use_with_care
-                  [Error_monad.error_of_exn exn]) ;
-            Lwt.return_unit
-          in
-          let queue_callback reason =
-            let open Lwt_syntax in
-            let* res =
-              match reason with
-              | `Accepted ->
-                  Pending_transactions.add
-                    state.pending
-                    (Tx.hash_of_tx_object tx_object)
-                    pending_callback ;
-                  return_ok_unit
-              | `Refused ->
-                  Transactions_per_addr.decrement
-                    state.tx_per_address
-                    (Tx.from_address_of_tx_object tx_object) ;
-                  Transaction_objects.remove
-                    state.tx_object
-                    (Tx.hash_of_tx_object tx_object) ;
-                  return
-                  @@ Address_nonce.remove
-                       state.address_nonce
-                       ~addr
-                       ~nonce:tx_nonce
-                       ~rm:Tx.bitset_remove_nonce
-            in
-            let* () =
-              match res with
-              | Ok () -> return_unit
-              | Error errs -> Tx_queue_events.callback_error errs
-            in
-            Lwt.dont_wait
-              (fun () -> callback (reason :> all_variant))
-              (fun exn ->
-                Tx_queue_events.callback_error__dont_wait__use_with_care
-                  [Error_monad.error_of_exn exn]) ;
-            Lwt.return_unit
-          in
-          if Compare.Int.(Queue.length state.queue < state.config.max_size) then (
-            (* Check number of txs by user in tx_queue. *)
-            let nb_txs_in_queue =
-              Transactions_per_addr.find
-                state.tx_per_address
-                (Tx.from_address_of_tx_object tx_object)
-            in
-            match nb_txs_in_queue with
-            | Some i when i >= state.config.tx_per_addr_limit ->
-                let*! () =
-                  Tx_pool_events.txs_per_user_threshold_reached
-                    ~address:
-                      (Ethereum_types.hex_to_string
-                         (Ethereum_types.Hex
-                            (Tx.address_to_string
-                               (Tx.from_address_of_tx_object tx_object))))
-                in
-                return
-                  (Error
-                     "Limit of transaction for a user was reached. Transaction \
-                      is rejected.")
-            | Some _ | None ->
-                let*! () =
-                  Tx_queue_events.add_transaction
-                    (Tx.hash_of_tx_object tx_object)
-                in
-                Transactions_per_addr.increment
-                  state.tx_per_address
-                  (Tx.from_address_of_tx_object tx_object) ;
-                Transaction_objects.add state.tx_object tx_object ;
-                let (Qty next_nonce) = next_nonce in
-                let*? () =
-                  Address_nonce.add
-                    state.address_nonce
-                    ~addr
-                    ~next_nonce
-                    ~nonce:tx_nonce
-                    ~add:Tx.bitset_add_nonce
-                in
-                Queue.add
-                  {
-                    hash = Tx.hash_of_tx_object tx_object;
-                    payload;
-                    queue_callback;
-                  }
-                  state.queue ;
-                return (Ok ()))
-          else
-            return
-              (Error "Transaction limit was reached. Transaction is rejected.")
+      | Inject tx_info -> protect @@ fun () -> inject state tx_info
       | Find {txn_hash} ->
           protect @@ fun () ->
           return @@ Transaction_objects.find state.tx_object txn_hash
