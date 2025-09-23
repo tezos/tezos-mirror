@@ -58,6 +58,20 @@ module Skip_list_cells : sig
     slot_index:Types.slot_index ->
     Skip_list_cell.t option tzresult Lwt.t
 
+  (** [find_by_level ?conn store ~attested_level] retrieves the tuples (cell *
+      hash * slot_index) for the given attested level, if any. The results are
+      sorted in decreasing order w.r.t. slot indices. *)
+  val find_by_level :
+    ?conn:conn ->
+    t ->
+    attested_level:int32 ->
+    (Dal_proto_types.Skip_list_cell.t
+    * Dal_proto_types.Skip_list_hash.t
+    * Types.slot_index)
+    list
+    tzresult
+    Lwt.t
+
   (** [insert ?conn store ~attested_level values] inserts the given
       list of [values] associated to the given [attested_level] in the
       [store]. Any existing value is overridden. Uses the [conn] if
