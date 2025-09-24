@@ -133,36 +133,15 @@ let job_manuals =
     ~needs_legacy:
       (match executables_to_use with
       | `dynamic ->
-          (* The legacy build jobs are defined deep in code_verification.ml
-             and it is not easy to extract them.
-             For now, we thus define a dummy job with the same name,
-             since CIAO only cares about the name of the dependency.
-             Note that CIAO will still check that those dependencies are in the pipeline.
-             -
-             This trick only works for global pipelines that already have those jobs.
-             Scheduled pipelines registered by Cacio
-             (such as documentation.daily and documentation.update)
-             would need to include them with [~legacy_jobs].
-             Which would bring us back to the original issue which is that those jobs
-             are defined deep in code_verification.ml.
-             -
-             Fortunately, for this job (documentation.manuals), we can depend on
-             the job that builds static executables instead.
-             This job is already defined at toplevel as [Master_branch.job_static_x86_64].
-             So it is easy to include it with [~legacy_jobs].
-             -
-             However, the static build job is slower than the regular build jobs.
-             This is not an issue in scheduled pipelines, but for merge request pipelines,
-             being fast matters. Hence the dummy job trick, which works because
-             merge request pipelines already include the regular build jobs. *)
-          let dummy name =
-            Tezos_ci.job ~name ~stage:Tezos_ci.Stages.build ~__POS__ []
-          in
+          (* It's ok to assume Before_merging here because we only care about the job name. *)
           [
-            (Artifacts, dummy "oc.build_x86_64-released");
-            (Artifacts, dummy "oc.build_amd64-extra-dev");
-            (Artifacts, dummy "oc.build_amd64-extra-exp");
-            (Artifacts, dummy "oc.build_kernels");
+            ( Artifacts,
+              Code_verification.job_build_x86_64_release Before_merging );
+            ( Artifacts,
+              Code_verification.job_build_x86_64_extra_dev Before_merging );
+            ( Artifacts,
+              Code_verification.job_build_x86_64_extra_exp Before_merging );
+            (Artifacts, Code_verification.job_build_kernels Before_merging);
           ]
       | `static -> [(Artifacts, Master_branch.job_static_x86_64)])
     ~only_if_changed:Files.odoc
