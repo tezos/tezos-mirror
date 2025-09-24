@@ -67,6 +67,9 @@ pub enum ContractInterpretError<'a> {
     /// Failed during the interpretation of the script code.
     #[error("runtime failure while running the script: {0}")]
     InterpretError(InterpretError<'a>),
+    /// Failed during lazy storage manipulation
+    #[error(transparent)]
+    LazyStorageError(#[from] LazyStorageError),
 }
 
 impl<'a> From<InterpretError<'a>> for ContractInterpretError<'a> {
