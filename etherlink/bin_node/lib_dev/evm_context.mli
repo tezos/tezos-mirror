@@ -8,6 +8,8 @@
 
 type init_status = Loaded | Created
 
+type snapshot_source = Url_legacy of string
+
 type head = {
   current_block_hash : Ethereum_types.block_hash;
   finalized_number : Ethereum_types.quantity;
@@ -36,15 +38,15 @@ type error += Cannot_apply_blueprint of {local_state_level : Z.t}
     [Evm_ro_context] module. Clearly, [~store_perm:`Read_only] menas you want
     to use [Evm_ro_context] instead.
 
-    [snapshot_url] can be provided to automatically fetch and import the
-    snapshot if the [data_dir] was not initialized before. *)
+    [snapshot_source] can be provided to automatically fetch and import the
+    snapshot from a URL if the [data_dir] was not initialized before. *)
 val start :
   configuration:Configuration.t ->
   ?kernel_path:Pvm_types.kernel ->
   ?smart_rollup_address:string ->
   store_perm:Sqlite.perm ->
   ?signer:Signer.map ->
-  ?snapshot_url:string ->
+  ?snapshot_source:snapshot_source ->
   tx_container:_ Services_backend_sig.tx_container ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t

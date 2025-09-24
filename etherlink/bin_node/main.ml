@@ -3045,7 +3045,7 @@ let observer_command =
 let export_snapshot
     (data_dir, config_file, snapshot_file, compress_on_the_fly, uncompressed) =
   let open Lwt_result_syntax in
-  let open Evm_node_lib_dev.Snapshots in
+  let open Evm_node_lib_dev.Snapshots_legacy in
   let config_file = Configuration.config_filename ~data_dir ?config_file () in
   let* configuration =
     Configuration.Cli.create_or_read_config ~data_dir config_file
@@ -3098,7 +3098,7 @@ let import_snapshot_command =
     (fun (data_dir, force) snapshot_file () ->
       let open Lwt_result_syntax in
       let* _ =
-        Evm_node_lib_dev.Snapshots.import_from
+        Evm_node_lib_dev.Snapshots_legacy.import_from
           ~force
           ~data_dir:(Configuration.get_data_dir ~data_dir)
           ~snapshot_file
@@ -3116,7 +3116,7 @@ let snapshot_info_command =
     (fun () snapshot_file () ->
       let open Lwt_result_syntax in
       let open Evm_node_lib_dev in
-      let* header, compressed = Snapshots.info ~snapshot_file in
+      let* header, compressed = Snapshots_legacy.info ~snapshot_file in
       let rollup_address, current_level, legacy_block_storage, history_info =
         match header with
         | V0_legacy {rollup_address; current_level} ->

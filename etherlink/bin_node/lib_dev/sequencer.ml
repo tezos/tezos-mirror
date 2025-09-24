@@ -205,19 +205,22 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       in
       return_some sr1
   in
-  let*? snapshot_url =
+  let*? snapshot_source =
+    let open Result_syntax in
     match sandbox_config with
-    | Some {init_from_snapshot; network; _} ->
-        Option.map_e
-          (Snapshots.interpolate_snapshot_provider
-             ?rollup_address:
-               (Option.map
-                  Address.of_b58check_exn
-                  rollup_node_smart_rollup_address)
-             ?network
-             Configuration.(Rolling (gc_param_from_retention_period ~days:1)))
-          init_from_snapshot
-    | None -> Result.return_none
+    | None | Some {init_from_snapshot = None; _} -> return_none
+    | Some {init_from_snapshot = Some provider; network; _} ->
+        let+ url =
+          Snapshots.interpolate_snapshot_provider
+            ?rollup_address:
+              (Option.map
+                 Address.of_b58check_exn
+                 rollup_node_smart_rollup_address)
+            ?network
+            Configuration.(Rolling (gc_param_from_retention_period ~days:1))
+            provider
+        in
+        Some (Evm_context.Url_legacy url)
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7859
      For now we assume that there is a single L2 chain. We should
@@ -251,7 +254,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:Read_write
       ~signer
-      ?snapshot_url
+      ?snapshot_source
       ~tx_container
       ()
   in

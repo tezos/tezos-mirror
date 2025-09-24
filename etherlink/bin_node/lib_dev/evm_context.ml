@@ -10,6 +10,8 @@ open Evm_context_types
 
 type init_status = Loaded | Created
 
+type snapshot_source = Url_legacy of string
+
 type head = {
   current_block_hash : Ethereum_types.block_hash;
   finalized_number : Ethereum_types.quantity;
@@ -25,7 +27,7 @@ type parameters = {
   smart_rollup_address : string option;
   store_perm : Sqlite.perm;
   signer : Signer.map option;
-  snapshot_url : string option;
+  snapshot_source : snapshot_source option;
   tx_container : Services_backend_sig.ex_tx_container;
 }
 
@@ -361,7 +363,11 @@ module State = struct
           else path
         in
         let* _dest =
-          Snapshots.export ~snapshot_file ~compression:On_the_fly ~data_dir ()
+          Snapshots_legacy.export
+            ~snapshot_file
+            ~compression:On_the_fly
+            ~data_dir
+            ()
         in
         return_unit
     | None ->
@@ -1582,7 +1588,7 @@ module State = struct
     in
     return ({smart_rollup_address; history_mode} : Evm_store.metadata)
 
-  let irmin_load ?snapshot_url configuration =
+  let irmin_load ?snapshot_source configuration =
     let open Lwt_result_syntax in
     let open Configuration in
     let data_dir = configuration.data_dir in
@@ -1590,10 +1596,10 @@ module State = struct
       Lwt_utils_unix.dir_exists (Evm_state.irmin_store_path ~data_dir)
     in
     let* () =
-      match snapshot_url with
-      | Some snapshot_url when not store_already_exists -> (
+      match snapshot_source with
+      | Some (Url_legacy snapshot_url) when not store_already_exists -> (
           let* history_mode =
-            Snapshots.import_from
+            Snapshots_legacy.import_from
               ~force:true
               ?history_mode:configuration.history_mode
               ~data_dir
@@ -1622,7 +1628,7 @@ module State = struct
   let on_disk_kernel = function Pvm_types.On_disk _ -> true | _ -> false
 
   let init ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
-      ~store_perm ?signer ?snapshot_url
+      ~store_perm ?signer ?snapshot_source
       ~(tx_container : _ Services_backend_sig.tx_container) () =
     let open Lwt_result_syntax in
     let pool =
@@ -1636,7 +1642,7 @@ module State = struct
     in
     let preimages_dir = Configuration.preimages_path configuration in
     let*! () = Lwt_utils_unix.create_dir preimages_dir in
-    let* index = irmin_load ?snapshot_url configuration in
+    let* index = irmin_load ?snapshot_source configuration in
     let* store, context, next_blueprint_number, current_block_hash, init_status
         =
       load
@@ -2073,7 +2079,7 @@ module Handlers = struct
         smart_rollup_address : string option;
         store_perm;
         signer;
-        snapshot_url;
+        snapshot_source;
         tx_container = Ex_tx_container tx_container;
       } =
     let open Lwt_result_syntax in
@@ -2084,7 +2090,7 @@ module Handlers = struct
         ?smart_rollup_address
         ~store_perm
         ?signer
-        ?snapshot_url
+        ?snapshot_source
         ~tx_container
         ()
     in
@@ -2280,7 +2286,7 @@ let worker_wait_for_request req =
   return_ res
 
 let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
-    ~store_perm ?signer ?snapshot_url
+    ~store_perm ?signer ?snapshot_source
     ~(tx_container : _ Services_backend_sig.tx_container) () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir:configuration.data_dir in
@@ -2294,7 +2300,7 @@ let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
         smart_rollup_address;
         store_perm;
         signer;
-        snapshot_url;
+        snapshot_source;
         tx_container = Ex_tx_container tx_container;
       }
       (module Handlers)
