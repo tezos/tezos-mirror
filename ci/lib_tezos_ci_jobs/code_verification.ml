@@ -362,6 +362,21 @@ let job_build_kernels =
          ())
     ()
 
+(* The build_x86_64 jobs are split in two to keep the artifact size
+   under the 1GB hard limit set by GitLab. *)
+(* [job_build_x86_64_release] builds the released executables. *)
+let job_build_x86_64_release =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_released_binaries
+    ~__POS__
+    ~arch:Amd64
+    ~cpu:Very_high
+    ~storage:Ramfs
+    ~dependencies:(dependencies_needs_start pipeline_type)
+    ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
+    ~sccache_size:"2G"
+    ()
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
@@ -583,20 +598,7 @@ let jobs pipeline_type =
     @ mr_only_jobs
   in
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
-  (* The build_x86_64 jobs are split in two to keep the artifact size
-     under the 1GB hard limit set by GitLab. *)
-  (* [job_build_x86_64_release] builds the released executables. *)
-  let job_build_x86_64_release =
-    job_build_released_binaries
-      ~__POS__
-      ~arch:Amd64
-      ~cpu:Very_high
-      ~storage:Ramfs
-      ~dependencies:dependencies_needs_start
-      ~rules:(make_rules ~changes:changeset_octez_or_doc ())
-      ~sccache_size:"2G"
-      ()
-  in
+  let job_build_x86_64_release = job_build_x86_64_release pipeline_type in
   (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
      executables, as well as the tezt test suite used by the subsequent
      'tezt' jobs and TPS evaluation tool. *)
