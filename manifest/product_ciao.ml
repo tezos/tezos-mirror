@@ -110,7 +110,7 @@ let ci_rollup_node =
 
 let ci_etherlink =
   private_lib
-    "etherlink"
+    "etherlink_ci"
     ~opam:""
     ~path:"etherlink/ci"
     ~bisect_ppx:No
