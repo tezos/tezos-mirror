@@ -329,6 +329,16 @@ let job_start =
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
+(* Short-cut for jobs that have no dependencies except [job_start] on
+   [Before_merging] pipelines. These jobs must also depend on all
+   jobs in the stage [sanity], such that they do not run if this
+   stage does not succeed. Since some sanity jobs are conditional,
+   we make these dependencies optional. *)
+let dependencies_needs_start pipeline_type =
+  match pipeline_type with
+  | Before_merging | Merge_train -> Dependent [Job job_start]
+  | Schedule_extended_test -> Dependent []
+
 (* Use this function to define jobs that depend on the pipeline type.
    Without this function, you risk defining the same job multiple times
    for the same pipeline type. *)
@@ -572,16 +582,7 @@ let jobs pipeline_type =
     ]
     @ mr_only_jobs
   in
-  (* Short-cut for jobs that have no dependencies except [job_start] on
-     [Before_merging] pipelines. These jobs must also depend on all
-     jobs in the stage [sanity], such that they do not run if this
-     stage does not succeed. Since some sanity jobs are conditional,
-     we make these dependencies optional. *)
-  let dependencies_needs_start =
-    match pipeline_type with
-    | Before_merging | Merge_train -> Dependent [Job job_start]
-    | Schedule_extended_test -> Dependent []
-  in
+  let dependencies_needs_start = dependencies_needs_start pipeline_type in
   (* The build_x86_64 jobs are split in two to keep the artifact size
      under the 1GB hard limit set by GitLab. *)
   (* [job_build_x86_64_release] builds the released executables. *)
