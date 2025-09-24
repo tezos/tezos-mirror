@@ -136,14 +136,19 @@ let job_manuals =
           (* It's ok to assume Before_merging here because we only care about the job name. *)
           [
             ( Artifacts,
-              Code_verification.job_build_x86_64_release Before_merging );
+              Tezos_ci_jobs.Code_verification.job_build_x86_64_release
+                Before_merging );
             ( Artifacts,
-              Code_verification.job_build_x86_64_extra_dev Before_merging );
+              Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
+                Before_merging );
             ( Artifacts,
-              Code_verification.job_build_x86_64_extra_exp Before_merging );
-            (Artifacts, Code_verification.job_build_kernels Before_merging);
+              Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_exp
+                Before_merging );
+            ( Artifacts,
+              Tezos_ci_jobs.Code_verification.job_build_kernels Before_merging
+            );
           ]
-      | `static -> [(Artifacts, Master_branch.job_static_x86_64)])
+      | `static -> [(Artifacts, Tezos_ci_jobs.Master_branch.job_static_x86_64)])
     ~only_if_changed:Files.odoc
     ~force_if_label:["ci--docs"]
     ~artifacts:
@@ -272,7 +277,7 @@ let register () =
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for the documentation."
-    ~legacy_jobs:[Master_branch.job_static_x86_64]
+    ~legacy_jobs:[Tezos_ci_jobs.Master_branch.job_static_x86_64]
     [
       (Auto, job_rst_check);
       (Auto, job_install_python `ubuntu_noble `master);
@@ -286,6 +291,6 @@ let register () =
     ~description:
       "Generate and push the documentation to octez.com/docs without being \
        interrupted."
-    ~legacy_jobs:[Master_branch.job_static_x86_64]
+    ~legacy_jobs:[Tezos_ci_jobs.Master_branch.job_static_x86_64]
     [(Auto, job_publish)] ;
   ()

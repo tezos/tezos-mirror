@@ -134,7 +134,7 @@ let ci_documentation =
         ci_lib_gitlab_ci_main |> open_ ~m:"Base";
         ci_lib_tezos_ci;
         ci_lib_cacio;
-        ci_lib_tezos_ci_jobs |> open_;
+        ci_lib_tezos_ci_jobs;
       ]
     ~release_status:Unreleased
 

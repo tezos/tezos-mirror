@@ -10,5 +10,4 @@
   tezos_ci_jobs)
  (flags
   (:standard)
-  -open Gitlab_ci.Base
-  -open Tezos_ci_jobs))
+  -open Gitlab_ci.Base))
