@@ -634,7 +634,8 @@ let with_fresh_rollup ?(pvm_name = "arith") ?dal_node f tezos_node tezos_client
 let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
     ?bootstrap_profile ?history_mode ?(wait_ready = true) ?env
     ?disable_shard_validation ?(event_level = `Debug) ?slots_backup_uris
-    ?trust_slots_backup_uris ?disable_amplification ?ignore_pkhs tezos_node =
+    ?trust_slots_backup_uris ?disable_amplification ?ignore_pkhs
+    ?batching_time_interval tezos_node =
   let dal_node =
     Dal_node.create
       ?name
@@ -653,6 +654,7 @@ let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
       ?history_mode
       ?slots_backup_uris
       ?trust_slots_backup_uris
+      ?batching_time_interval
       dal_node
   in
   let* () = Dal_node.run ?env ~event_level dal_node ~wait_ready in
@@ -660,7 +662,8 @@ let make_dal_node ?name ?peers ?attester_profiles ?operator_profiles
 
 let with_dal_node ?peers ?attester_profiles ?operator_profiles
     ?bootstrap_profile ?history_mode ?wait_ready ?env ?disable_shard_validation
-    ?disable_amplification ?ignore_pkhs tezos_node f key =
+    ?disable_amplification ?ignore_pkhs ?batching_time_interval tezos_node f key
+    =
   let* dal_node =
     make_dal_node
       ?peers
@@ -673,6 +676,7 @@ let with_dal_node ?peers ?attester_profiles ?operator_profiles
       ?disable_shard_validation
       ?disable_amplification
       ?ignore_pkhs
+      ?batching_time_interval
       tezos_node
   in
   f key dal_node
@@ -729,7 +733,8 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?incentives_enable ?dal_rewards_weight ?activation_timestamp
     ?bootstrap_profile ?event_sections_levels ?operator_profiles ?history_mode
     ?prover ?l1_history_mode ?wait_ready ?env ?disable_shard_validation
-    ?disable_amplification ?ignore_pkhs variant scenario =
+    ?disable_amplification ?ignore_pkhs ?batching_time_interval variant scenario
+    =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
   test
@@ -777,6 +782,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ?disable_shard_validation
         ?disable_amplification
         ?ignore_pkhs
+        ?batching_time_interval
         node
       @@ fun _key dal_node ->
       scenario protocol parameters cryptobox node client dal_node)
@@ -789,7 +795,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ?minimal_block_delay ?delay_increment_per_round ?activation_timestamp
     ?bootstrap_profile ?operator_profiles ?smart_rollup_timeout_period_in_blocks
     ?(regression = true) ?prover ?attestation_threshold ?l1_history_mode variant
-    ?disable_amplification scenario =
+    ?disable_amplification ?batching_time_interval scenario =
   let description = "Testing DAL rollup and node with L1" in
   let tags = if List.mem team tags then tags else team :: tags in
   test
@@ -834,6 +840,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
         ?bootstrap_profile
         ?operator_profiles
         ?disable_amplification
+        ?batching_time_interval
         node
       @@ fun key dal_node ->
       ( with_fresh_rollup ~pvm_name ~dal_node
@@ -4069,16 +4076,16 @@ let test_dal_node_join_topic _protocol parameters _cryptobox _node _client
    sent by the first DAL node.
 *)
 let generic_gs_messages_exchange protocol parameters _cryptobox node client
-    dal_node1 ~mk_dal_node2 ~expect_app_notification ~is_first_slot_attestable =
+    ?batching_time_interval dal_node1 ~mk_dal_node2 ~expect_app_notification
+    ~is_first_slot_attestable =
   let* node2, dal_node2 = mk_dal_node2 protocol parameters in
-
   let* () =
-    Dal_common.Helpers.connect_nodes_via_p2p
-      ~init_config:true
-      dal_node1
+    Dal_node.init_config
+      ?batching_time_interval
+      ~peers:[Dal_node.listen_addr dal_node1]
       dal_node2
   in
-
+  let* () = Dal_common.Helpers.connect_nodes_via_p2p dal_node1 dal_node2 in
   let num_slots = parameters.Dal.Parameters.number_of_slots in
   let number_of_shards = parameters.Dal.Parameters.cryptobox.number_of_shards in
   let account1 = Constant.bootstrap1 in
@@ -4181,14 +4188,15 @@ let generic_gs_messages_exchange protocol parameters _cryptobox node client
           ~error_msg:"Expected %L attestable slots list flags, got %R") ;
       unit
 
-let test_dal_node_gs_valid_messages_exchange _protocol parameters _cryptobox
-    node client dal_node1 =
+let test_dal_node_gs_valid_messages_exchange ?batching_time_interval _protocol
+    parameters _cryptobox node client dal_node1 =
   generic_gs_messages_exchange
     _protocol
     parameters
     _cryptobox
     node
     client
+    ?batching_time_interval
     dal_node1
     ~mk_dal_node2:(fun _protocol _parameters ->
       let dal_node2 = Dal_node.create ~node () in
@@ -4217,8 +4225,8 @@ let make_invalid_dal_node node1 protocol parameters =
   let dal_node2 = Dal_node.create ~node:node2 () in
   return (Some node2, dal_node2)
 
-let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
-    node client dal_node1 =
+let test_dal_node_gs_invalid_messages_exchange ?batching_time_interval _protocol
+    parameters _cryptobox node client dal_node1 =
   (* Messages are invalid, so the app layer is not notified. *)
   let expect_app_notification = false in
   (* The first slot published by [generic_gs_messages_exchange] is not
@@ -4231,6 +4239,7 @@ let test_dal_node_gs_invalid_messages_exchange _protocol parameters _cryptobox
     _cryptobox
     node
     client
+    ?batching_time_interval
     dal_node1
     ~mk_dal_node2:(make_invalid_dal_node node)
     ~expect_app_notification
@@ -5232,8 +5241,8 @@ let dal_slots_retrievability =
 
     unit
 
-let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
-    dal_bootstrap =
+let test_attestation_through_p2p ~batching_time_interval _protocol
+    dal_parameters _cryptobox node client dal_bootstrap =
   (* In this test we have three DAL nodes:
      - a boostrap one to connect the other two (producer and attester),
      - a slot producer on slot 0,
@@ -5265,7 +5274,13 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   Log.info "Bootstrap DAL node is running" ;
 
   let producer = Dal_node.create ~name:"producer" ~node () in
-  let* () = Dal_node.init_config ~operator_profiles:[index] ~peers producer in
+  let* () =
+    Dal_node.init_config
+      ~batching_time_interval
+      ~operator_profiles:[index]
+      ~peers
+      producer
+  in
   let* () = Dal_node.run ~wait_ready:true producer in
   let* producer_peer_id = peer_id producer in
   let* () =
@@ -5281,7 +5296,13 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
     |> List.map (fun account -> account.Account.public_key_hash)
   in
   let attester = Dal_node.create ~name:"attester" ~node () in
-  let* () = Dal_node.init_config ~attester_profiles:all_pkhs ~peers attester in
+  let* () =
+    Dal_node.init_config
+      ~batching_time_interval
+      ~attester_profiles:all_pkhs
+      ~peers
+      attester
+  in
   let* () = Dal_node.run ~event_level:`Debug ~wait_ready:true attester in
   let* attester_peer_id = peer_id attester in
 
@@ -11362,18 +11383,38 @@ let register ~protocols =
     "GS join topic"
     test_dal_node_join_topic
     protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~tags:["gossipsub"]
-    ~operator_profiles:[0]
-    "GS valid messages exchange"
-    test_dal_node_gs_valid_messages_exchange
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~tags:["gossipsub"]
-    "GS invalid messages exchange"
-    ~operator_profiles:[0]
-    test_dal_node_gs_invalid_messages_exchange
-    protocols ;
+  List.iter
+    (fun batching_time_interval ->
+      scenario_with_layer1_and_dal_nodes
+        ~tags:["gossipsub"]
+        ~batching_time_interval
+        ~operator_profiles:[0]
+        (Format.sprintf
+           "GS valid messages exchange (with batching %s)"
+           batching_time_interval)
+        (test_dal_node_gs_valid_messages_exchange ~batching_time_interval)
+        protocols ;
+      scenario_with_layer1_and_dal_nodes
+        ~tags:["gossipsub"]
+        ~batching_time_interval
+        (Format.sprintf
+           "GS invalid messages exchange (with batching %s)"
+           batching_time_interval)
+        ~operator_profiles:[0]
+        (test_dal_node_gs_invalid_messages_exchange ~batching_time_interval)
+        protocols ;
+      scenario_with_layer1_and_dal_nodes
+        ~tags:["attestation"; "p2p"]
+        ~batching_time_interval
+        ~attestation_threshold:100
+        ~bootstrap_profile:true
+        ~l1_history_mode:Default_with_refutation
+        (Format.sprintf
+           "attestation through p2p (with batching %s)"
+           batching_time_interval)
+        (test_attestation_through_p2p ~batching_time_interval)
+        protocols)
+    ["disabled"; "100"; "20"] ;
   scenario_with_layer1_and_dal_nodes
     ~attestation_threshold:1
     ~l1_history_mode:Default_with_refutation
@@ -11423,14 +11464,6 @@ let register ~protocols =
     "operator profile"
     ~prover:false
     test_operator_profile
-    protocols ;
-  scenario_with_layer1_and_dal_nodes
-    ~tags:["attestation"; "p2p"]
-    ~attestation_threshold:100
-    ~bootstrap_profile:true
-    ~l1_history_mode:Default_with_refutation
-    "attestation through p2p"
-    test_attestation_through_p2p
     protocols ;
   History_rpcs.test_commitments_history_rpcs protocols ;
   scenario_with_layer1_and_dal_nodes

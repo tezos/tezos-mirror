@@ -127,7 +127,8 @@ let mk_trust_slots_backup_uris flag =
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(operator_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
-    ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false) dal_node =
+    ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
+    ?batching_time_interval dal_node =
   spawn_command dal_node @@ ["config"]
   @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
   @ [
@@ -162,6 +163,10 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
          String.concat "," (List.map string_of_int operator_profiles);
        ])
   @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
+  @ Option.fold
+      ~none:[]
+      ~some:(fun s -> ["--batching-time-interval"; s])
+      batching_time_interval
   @ mk_backup_uris_args slots_backup_uris
   @ mk_trust_slots_backup_uris trust_slots_backup_uris
   @
@@ -174,7 +179,8 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
 let spawn_config_update ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(operator_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
-    ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false) dal_node =
+    ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
+    ?batching_time_interval dal_node =
   spawn_command dal_node
   @@ ["config"; "update"; "--expected-pow"; string_of_float expected_pow]
   @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
@@ -193,6 +199,10 @@ let spawn_config_update ?(expected_pow = 0.) ?(peers = [])
          String.concat "," (List.map string_of_int operator_profiles);
        ])
   @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
+  @ Option.fold
+      ~none:[]
+      ~some:(fun s -> ["--batching-time-interval"; s])
+      batching_time_interval
   @ mk_backup_uris_args slots_backup_uris
   @ mk_trust_slots_backup_uris trust_slots_backup_uris
   @
@@ -214,7 +224,7 @@ end
 
 let init_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
     ?observer_profiles ?bootstrap_profile ?history_mode ?slots_backup_uris
-    ?trust_slots_backup_uris dal_node =
+    ?trust_slots_backup_uris ?batching_time_interval dal_node =
   let process =
     spawn_config_init
       ?expected_pow
@@ -226,13 +236,14 @@ let init_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
       ?history_mode
       ?slots_backup_uris
       ?trust_slots_backup_uris
+      ?batching_time_interval
       dal_node
   in
   Process.check process
 
 let update_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
     ?observer_profiles ?bootstrap_profile ?history_mode ?slots_backup_uris
-    ?trust_slots_backup_uris dal_node =
+    ?trust_slots_backup_uris ?batching_time_interval dal_node =
   let process =
     spawn_config_update
       ?expected_pow
@@ -244,6 +255,7 @@ let update_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
       ?history_mode
       ?slots_backup_uris
       ?trust_slots_backup_uris
+      ?batching_time_interval
       dal_node
   in
   Process.check process
