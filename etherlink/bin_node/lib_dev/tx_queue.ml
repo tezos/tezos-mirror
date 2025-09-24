@@ -708,6 +708,7 @@ struct
     let add_tx_to_queue state
         {next_nonce; payload; tx_object; callback = caller_callback} =
       let open Lwt_result_syntax in
+      Tx_watcher.notify (Tx.hash_of_tx_object tx_object) ;
       let addr =
         Tx.address_to_string (Tx.from_address_of_tx_object tx_object)
       in
@@ -748,7 +749,6 @@ struct
     let inject state
         {next_nonce; payload; tx_object; callback = caller_callback} =
       let open Lwt_result_syntax in
-      Tx_watcher.notify (Tx.hash_of_tx_object tx_object) ;
       if Compare.Int.(Queue.length state.queue < state.config.max_size) then
         (* Check number of txs by user in tx_queue. *)
         let nb_txs_in_queue =

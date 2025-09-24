@@ -11,6 +11,9 @@
 
 ### RPCs changes
 
+- Eth_subscribe newPendingTransactions is only for transaction that
+  are added to the tx_queue. (!19390)
+
 ### Monitoring changes
 
 ### Command-line interface changes
