@@ -25,6 +25,10 @@ impl Context {
         Ok(Self { path })
     }
 
+    pub fn path(&self) -> OwnedPath {
+        self.path.clone()
+    }
+
     #[cfg(test)]
     pub fn init_context() -> Self {
         let path = RefPath::assert_from(b"/tezlink/context");
