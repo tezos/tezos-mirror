@@ -90,7 +90,7 @@ let ci_grafazos =
 
 let ci_teztale =
   private_lib
-    "teztale"
+    "teztale_ci"
     ~opam:""
     ~path:"teztale/ci"
     ~bisect_ppx:No

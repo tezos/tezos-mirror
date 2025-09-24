@@ -110,7 +110,7 @@ let variables : variables =
 
 let () = Grafazos_ci.register ()
 
-let () = Teztale.register ()
+let () = Teztale_ci.register ()
 
 let () = Rollup_node.Release.register ()
 

@@ -8,7 +8,7 @@
   tezos_ci
   tezos_ci_jobs
   grafazos_ci
-  teztale
+  teztale_ci
   rollup_node
   sdk_bindings_ci
   etherlink_ci)
