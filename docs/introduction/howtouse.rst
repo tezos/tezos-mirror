@@ -485,19 +485,17 @@ In Tezos there are two kinds of accounts: *user accounts* (also called implicit 
   secret key and they run Michelson code each time they receive a
   transaction.
 
-Let's originate our first contract and call it *id*::
+In the following, we originate our first contract. 
+For this, let us consider the following ``id.tz`` contract:
 
-    octez-client originate contract id transferring 1 from alice \
-                 running ./michelson_test_scripts/attic/id.tz \
-                 --init '"hello"' --burn-cap 0.1
+  .. code-block:: michelson
+    
+    parameter string;
+    storage string;
+    code {CAR; NIL operation; PAIR};
 
-The initial balance is 1 tez, generously provided by user account
-*alice*. The contract stores a Michelson program ``id.tz``
-(found in file :src:`michelson_test_scripts/attic/id.tz`), with
-Michelson value ``"hello"`` as initial storage (the extra quotes are
-needed to avoid shell expansion). The parameter ``--burn-cap``
-specifies the maximal fee the user is willing to pay for this
-operation, while the actual fee is determined by the system.
+This contract is minimalistic: it updates a string in the storage with the new value passed as a parameter
+and generates no further operations.
 
 A Michelson contract is expressed as a pure function, mapping a pair
 ``(parameter, storage)`` to a pair ``(list_of_operations, storage)``.
@@ -507,18 +505,22 @@ be seen as an object with a single method taking one parameter (``parameter``), 
 The method updates the state (the storage), and submits operations as a side
 effect.
 
-For the sake of this example, here is the ``id.tz`` contract:
+This contract is available in the Tezos repository and can be retrieved with the following command::
 
-.. code-block:: michelson
+  wget https://gitlab.com/tezos/tezos/-/raw/master/michelson_test_scripts/attic/id.tz
 
-    parameter string;
-    storage string;
-    code {CAR; NIL operation; PAIR};
+We originate the contract and call it *id* by triggering an origination operation as follows::
 
-It specifies the types for the parameter and storage, and implements a
-function which updates the storage with the value passed as a parameter
-and returns this new storage together with an empty list of
-operations.
+    octez-client originate contract id transferring 1 from alice \
+                 running id.tz \
+                 --init '"hello"' --burn-cap 0.1
+
+The initial balance is 1 tez, generously provided by user account
+*alice*. The contract stores the Michelson program ``id.tz``, with
+Michelson value ``"hello"`` as initial storage (the extra quotes are
+needed to avoid shell expansion). The parameter ``--burn-cap``
+specifies the maximal fee the user is willing to pay for this
+operation, while the actual fee is determined by the system.
 
 
 Gas and Storage Costs
