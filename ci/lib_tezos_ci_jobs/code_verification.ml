@@ -392,6 +392,18 @@ let job_build_x86_64_extra_dev =
     "script-inputs/dev-executables"
   |> enable_dune_cache ~key:build_cache_key ~policy:Push
 
+let job_build_x86_64_extra_exp =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_dynamic_binaries
+    ~name:"oc.build_amd64-extra-exp"
+    ~__POS__
+    ~arch:Amd64
+    ~cpu:Very_high
+    ~dependencies:(dependencies_needs_start pipeline_type)
+    ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
+    "script-inputs/experimental-executables"
+  |> enable_dune_cache ~key:build_cache_key ~policy:Push
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
@@ -615,17 +627,7 @@ let jobs pipeline_type =
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
   let job_build_x86_64_release = job_build_x86_64_release pipeline_type in
   let job_build_x86_64_extra_dev = job_build_x86_64_extra_dev pipeline_type in
-  let job_build_x86_64_extra_exp =
-    job_build_dynamic_binaries
-      ~name:"oc.build_amd64-extra-exp"
-      ~__POS__
-      ~arch:Amd64
-      ~cpu:Very_high
-      ~dependencies:dependencies_needs_start
-      ~rules:(make_rules ~changes:changeset_octez_or_doc ())
-      "script-inputs/experimental-executables"
-    |> enable_dune_cache ~key:build_cache_key ~policy:Push
-  in
+  let job_build_x86_64_extra_exp = job_build_x86_64_extra_exp pipeline_type in
 
   let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:Yes () in
   let job_build_arm64_release : Tezos_ci.tezos_job =
