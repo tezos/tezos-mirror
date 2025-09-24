@@ -14,6 +14,8 @@ let default_chunk_size = {min = 256; avg = 1024; max = 4096}
 
 let chunk_size_arg {min; avg; max} = Format.sprintf "%d:%d:%d" min avg max
 
+let default_chunk_size_arg = chunk_size_arg default_chunk_size
+
 let metadata_filename = ".snapshot_metadata.json"
 
 let metadata_file dir = Filename.concat dir metadata_filename

@@ -16,6 +16,8 @@ type chunk_size = {
   max : int;  (** The maximum chunk size. *)
 }
 
+val default_chunk_size_arg : string
+
 (** [export ?desync_path ?chunk_size ?metadata ?metadata_encoding ?progress
     ~target_store ~index_file ~backup_items data_dir]
     exports the given [backup_items] from the [data_dir] to a desync store
