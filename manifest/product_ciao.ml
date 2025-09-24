@@ -81,7 +81,7 @@ let _release_page =
 
 let ci_grafazos =
   private_lib
-    "grafazos"
+    "grafazos_ci"
     ~opam:""
     ~path:"grafazos/ci"
     ~bisect_ppx:No

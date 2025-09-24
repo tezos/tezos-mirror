@@ -108,7 +108,7 @@ let variables : variables =
 
 (* This must be done before registering shared pipelines. *)
 
-let () = Grafazos.register ()
+let () = Grafazos_ci.register ()
 
 let () = Teztale.register ()
 

@@ -7,7 +7,7 @@
   gitlab_ci
   tezos_ci
   tezos_ci_jobs
-  grafazos
+  grafazos_ci
   teztale
   rollup_node
   sdk_bindings_ci
