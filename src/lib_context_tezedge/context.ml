@@ -185,6 +185,8 @@ let init ?patch_context dir =
   let index = Tezedge.index_init dir in
   {index; extra = {patch_context; base_path = dir}}
 
+let close index = Tezedge.index_close index.index
+
 let raw_commit ~time ?(message = "") context =
   Tezedge.commit context.context (Time.Protocol.to_seconds time) "Tezos" message
 

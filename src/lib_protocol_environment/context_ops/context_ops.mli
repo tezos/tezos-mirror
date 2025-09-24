@@ -216,3 +216,5 @@ val integrity_check :
   heads:string list option ->
   index ->
   unit Lwt.t
+
+val is_tezedge : t -> bool

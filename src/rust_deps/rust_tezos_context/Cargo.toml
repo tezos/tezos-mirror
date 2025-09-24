@@ -8,9 +8,18 @@ rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
 
 [dependencies]
 ocaml = "*"
-tezos_context = { git = "https://github.com/vch9/tezedge", branch = "octez-compatible"}
-tezos_context_api = { git = "https://github.com/vch9/tezedge", branch = "octez-compatible" }
-crypto = { git = "https://github.com/vch9/tezedge", branch = "octez-compatible" }
+tezos_context = { path = "./context" }
+tezos_context_api = { path = "./context-api" }
+tezos_crypto_rs = { path = "../../../sdk/rust/crypto/", default-features = false, features = [
+  "std",
+] }
+
+# edgekv = { path = "./edgekv" }
+# spsc = { path = "./spsc", package = "tezos_spsc" }
+# storage = { path = "./storage" }
+# tezos_timing = { path = "./timing", package = "tezos_timing" }
+# tezos_base = { path = "./tezos-base", package = "tezos_base" }
+# tezos_api = { path = "./tezos-api", package = "tezos_api" }
 
 [build-dependencies]
 ocaml-build = { version = "1.0.0", features = ["dune"] }

@@ -926,7 +926,8 @@ let close context_index =
   | Brassaia_memory_index index -> Brassaia_memory.close index
   | Duo_index index -> Duo_context.close index
   | Duo_memory_index index -> Duo_memory_context.close index
-  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> Lwt.return_unit (* FIXME *)
+  | Tezedge_index index -> Lwt.return @@ Tezedge.close index
+  | Duo_irmin_tezedge_index _index -> Lwt.return_unit (* FIXME *)
 
 let compute_testchain_chain_id (context : Environment_context.t) block_hash =
   match[@profiler.span_f
@@ -1013,3 +1014,10 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
   | Duo_memory_index _ ->
       Fmt.failwith
         "An in memory context doesn't need to be checked for integrity"
+
+let is_tezedge (context : Environment_context.t) =
+  match context with
+  | Context {kind = Tezedge_context.Context; _}
+  | Context {kind = Duo_irmin_tezedge_context.Context; _} ->
+      true
+  | _ -> false

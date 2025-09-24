@@ -12,8 +12,11 @@ pub mod blake2b;
 pub mod base58;
 #[cfg(feature = "bls")]
 pub mod bls;
+pub mod crypto_box;
 #[macro_use]
 pub mod hash;
+pub mod nonce;
+pub mod proof_of_work;
 pub mod public_key;
 pub mod public_key_hash;
 pub mod signature;

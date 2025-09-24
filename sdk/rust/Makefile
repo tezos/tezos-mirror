@@ -39,7 +39,7 @@ check: check-fmt check-native check-wasm check-riscv
 .PHONY: test
 test:
 	cargo test
-   
+
 .PHONY: clean
 clean:
 	cargo clean

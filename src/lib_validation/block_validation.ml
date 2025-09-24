@@ -1544,6 +1544,16 @@ let apply ?simulate ?cached_result ?(should_validate = true)
       predecessor_resulting_context_hash;
     } ~cache block_hash block_header operations =
   let open Lwt_result_syntax in
+  let*! predecessor_context =
+    if cache = `Force_load && Context_ops.is_tezedge predecessor_context then
+      (* If we need to reload the context because of cache issues, we noticed
+         that it was not enough to simply replay the operation with Tezedge.
+         When we use Tezedge we must re-checkout the predecessor context so it
+         reloads everything that's necessary. *)
+      let index = Context_ops.index predecessor_context in
+      Context_ops.checkout_exn index predecessor_resulting_context_hash
+    else Lwt.return predecessor_context
+  in
   let*! pred_protocol_hash = Context_ops.get_protocol predecessor_context in
   let* (module Proto) =
     Protocol_plugin.proto_with_validation_plugin ~block_hash pred_protocol_hash

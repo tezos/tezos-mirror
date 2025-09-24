@@ -15,8 +15,8 @@ ocaml-build = { version = "1.*", features = ["dune"] }
 hex = "*"
 ocaml = { version = "1.2.1" }
 wasmer = { path = "../../src/rust_deps/wasmer-3.3.0/lib/api", default-features = false, features = [
-    "cranelift",
-    "jit",
+  "cranelift",
+  "jit",
 ] }
 wasmer-compiler-cranelift = { path = "../../src/rust_deps/wasmer-3.3.0/lib/compiler-cranelift" }
 tezos_crypto_rs = { version = "0.6", git = "https://gitlab.com/tezos/tezos.git", rev = "bf6400411c8e74fbd75e2e9500df99993aa124b2", default-features = false }
