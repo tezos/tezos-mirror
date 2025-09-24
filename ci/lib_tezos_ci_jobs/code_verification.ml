@@ -338,6 +338,9 @@ let depending_on_pipeline_type :
      We just specialize its type to make it more clear what we are doing. *)
   Cacio.parameterize
 
+let build_cache_key =
+  "dune-build-cache-" ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id)
+
 let job_build_kernels =
   depending_on_pipeline_type @@ fun pipeline_type ->
   job_build_kernels
@@ -596,9 +599,6 @@ let jobs pipeline_type =
   (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
      executables, as well as the tezt test suite used by the subsequent
      'tezt' jobs and TPS evaluation tool. *)
-  let build_cache_key =
-    "dune-build-cache-" ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id)
-  in
   let job_build_x86_64_extra_dev =
     job_build_dynamic_binaries
       ~name:"oc.build_amd64-extra-dev"
