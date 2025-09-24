@@ -10,6 +10,9 @@ library Constants {
     address public constant burnAddress =
         0x000000000000000000000000000000000000dEaD;
 
+    address public constant feedDepositAddress =
+        0x000000000000000000000000000000000000FEeD;
+
     address public constant system = 0x0000000000000000000000000000000000000000;
 
     address public constant faWithdrawals =

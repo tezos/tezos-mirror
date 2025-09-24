@@ -10,20 +10,23 @@ use alloy_sol_types::{sol, SolCall};
 use evm::Config;
 use evm_execution::fa_bridge::deposit::{FaDeposit, FaDepositWithProxy};
 use evm_execution::handler::{FastWithdrawalInterface, RouterInterface};
-use evm_execution::precompiles::{FA_BRIDGE_PRECOMPILE_ADDRESS, SYSTEM_ACCOUNT_ADDRESS};
+use evm_execution::precompiles::FA_BRIDGE_PRECOMPILE_ADDRESS;
 use evm_execution::EthereumError;
 use primitive_types::{H160, U256};
 use revm::{
     primitives::{Address, Bytes, Log, B256},
     state::AccountInfo,
 };
+use revm_etherlink::helpers::legacy::alloy_to_h160;
 use revm_etherlink::inspectors::call_tracer::{
     CallTrace, CallTracerConfig, CallTracerInput,
 };
 use revm_etherlink::inspectors::storage::store_call_trace;
 use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
 use revm_etherlink::inspectors::{get_tracer_configuration, TracerInput};
-use revm_etherlink::precompiles::constants::FA_DEPOSIT_EXECUTION_COST;
+use revm_etherlink::precompiles::constants::{
+    FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
+};
 use revm_etherlink::precompiles::send_outbox_message::Withdrawal;
 use revm_etherlink::storage::world_state_handler::{
     account_path, StorageAccount, WorldStateHandler,
@@ -652,7 +655,9 @@ fn apply_fa_deposit<Host: Runtime>(
         ..*block_constants
     };
 
-    let caller = SYSTEM_ACCOUNT_ADDRESS;
+    // A specific address is allocated for queue call
+    // System address can only be used as caller for simulations
+    let caller = alloy_to_h160(&FEED_DEPOSIT_ADDR);
     let to = Some(FA_BRIDGE_PRECOMPILE_ADDRESS);
     let value = U256::zero();
     let gas_limit = FA_DEPOSIT_EXECUTION_COST;

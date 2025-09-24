@@ -61,9 +61,9 @@ contract FABridge is ReentrancySafe {
         uint256 inboxMsgId;
     }
 
-    modifier onlySystem() {
+    modifier onlyFeed() {
         require(
-            msg.sender == Constants.system,
+            msg.sender == Constants.feedDepositAddress,
             "InternalForwarder: unauthorized caller"
         );
         _;
@@ -71,6 +71,7 @@ contract FABridge is ReentrancySafe {
 
     /// @notice Queue a deposit into the ticket table with proxy information.
     /// @dev
+    ///  - Can only be called through the feed deposit address
     ///  - Increments the global counter and uses it as a deposit nonce.
     ///  - Queues the deposit for later execution.
     /// @param deposit Struct containing the deposit data:
@@ -82,7 +83,7 @@ contract FABridge is ReentrancySafe {
     ///   - `inboxMsgId`  Inbox message identifier.
     function queue(
         ITable.FaDepositWithProxy memory deposit
-    ) external payable nonReentrant onlySystem {
+    ) external payable onlyFeed nonReentrant {
         // Get and increment global counter
         uint256 counter = ICounter(Constants.globalCounter).get_and_increment();
 
@@ -108,6 +109,7 @@ contract FABridge is ReentrancySafe {
 
     /// @notice Executes a deposit that does not require a proxy.
     /// @dev
+    ///  - Can only be called through the feed deposit address
     ///  - Used for direct deposits without a proxy address.
     ///  - Consumes and processes the deposit information.
     /// @param deposit Struct containing the deposit data:
@@ -118,7 +120,7 @@ contract FABridge is ReentrancySafe {
     ///   - `inboxMsgId`  Inbox message identifier.
     function execute_without_proxy(
         FaDepositWithoutProxy memory deposit
-    ) external payable nonReentrant onlySystem {
+    ) external payable onlyFeed nonReentrant {
         // Increase ticket balance of receiver as there is no proxy
         bytes memory ticketData = abi.encodeCall(
             ITable.ticket_balance_add,
