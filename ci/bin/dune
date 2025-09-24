@@ -9,7 +9,7 @@
   tezos_ci_jobs
   grafazos_ci
   teztale_ci
-  rollup_node
+  rollup_node_ci
   sdk_bindings_ci
   etherlink_ci)
  (flags

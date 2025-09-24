@@ -100,7 +100,7 @@ let ci_teztale =
 
 let ci_rollup_node =
   private_lib
-    "rollup_node"
+    "rollup_node_ci"
     ~opam:""
     ~path:"rollup_node/ci"
     ~bisect_ppx:No

@@ -112,7 +112,7 @@ let () = Grafazos_ci.register ()
 
 let () = Teztale_ci.register ()
 
-let () = Rollup_node.Release.register ()
+let () = Rollup_node_ci.Release.register ()
 
 let () = Documentation.register ()
 
