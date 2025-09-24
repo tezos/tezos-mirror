@@ -123,6 +123,21 @@ let ci_etherlink =
       ]
     ~release_status:Unreleased
 
+let ci_documentation =
+  private_lib
+    "documentation_ci"
+    ~opam:""
+    ~path:"docs/ci"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        ci_lib_gitlab_ci_main |> open_ ~m:"Base";
+        ci_lib_tezos_ci;
+        ci_lib_cacio;
+        ci_lib_tezos_ci_jobs |> open_;
+      ]
+    ~release_status:Unreleased
+
 let _ci_bin_main =
   private_exe
     "main"
@@ -139,5 +154,6 @@ let _ci_bin_main =
         ci_rollup_node;
         ci_sdk_bindings;
         ci_etherlink;
+        ci_documentation;
       ]
     ~release_status:Unreleased
