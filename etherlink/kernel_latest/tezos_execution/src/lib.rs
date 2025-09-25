@@ -267,6 +267,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
                 let script = Script {
                     code: micheline_code.encode(),
                     storage: storage
+                        .clone()
                         .into_micheline_optimized_legacy(&parser.arena)
                         .encode(),
                 };
@@ -289,8 +290,8 @@ fn execute_internal_operations<'a, Host: Runtime>(
                         source_account,
                         sender_account,
                         &amount,
-                        &script,
-                        false, // We skip typechecking for internal operations since CREATE_CONTRACT already typechecks the script and the initial storage.
+                        &script.code,
+                        storage,
                     );
                     InternalOperationSum::Origination(InternalContentWithMetadata {
                         content: OriginationContent {
@@ -577,11 +578,10 @@ fn typecheck_code_and_storage<'a, Ctx: mir::context::CtxTrait<'a>>(
 fn handle_storage_with_big_maps<Host: Runtime>(
     host: &mut Host,
     context: &Context,
-    script: &Script,
+    mut storage: TypedValue<'_>,
 ) -> Result<(Vec<u8>, Option<LazyStorageDiffList>), OriginationError> {
     let parser = Parser::new();
     make_default_ctx!(ctx, host, context);
-    let mut storage = typecheck_code_and_storage(&mut ctx, &parser, script)?;
     let mut big_maps = vec![];
     storage.view_big_maps_mut(&mut big_maps);
 
@@ -610,27 +610,21 @@ fn originate_contract<Host: Runtime>(
     source_account: &TezlinkImplicitAccount,
     sender_account: &impl TezlinkAccount,
     initial_balance: &Narith,
-    script: &Script,
-    external: bool,
+    script_code: &[u8],
+    script_storage: TypedValue<'_>,
 ) -> Result<OriginationSuccess, OriginationError> {
     // If the origination is internal the big map are handled by the first transfer
     // The big_maps vector will be filled only if the origination is "external"
 
-    let mut script_storage = script.storage.clone();
-    let mut lazy_storage_diff = None;
-    if external {
-        let (new_storage, new_lazy_storage_diff) =
-            handle_storage_with_big_maps(host, context, script)?;
-        lazy_storage_diff = new_lazy_storage_diff;
-        script_storage = new_storage;
-    }
+    let (new_storage, lazy_storage_diff) =
+        handle_storage_with_big_maps(host, context, script_storage)?;
 
     // Set the storage of the contract
     let smart_contract = TezlinkOriginatedAccount::from_kt1(context, &contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
     let total_size = smart_contract
-        .init(host, &script.code, &script_storage)
+        .init(host, script_code, &new_storage)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
@@ -1026,16 +1020,23 @@ fn apply_operation<Host: Runtime>(
             ref script,
         }) => {
             let address = origination_nonce.generate_kt1();
-            let origination_result = originate_contract(
-                host,
-                context,
-                address,
-                source_account,
-                source_account,
-                balance,
-                script,
-                true,
-            );
+            let parser = Parser::new();
+            make_default_ctx!(ctx, host, context);
+            let typechecked_storage =
+                typecheck_code_and_storage(&mut ctx, &parser, script);
+            let origination_result = match typechecked_storage {
+                Ok(storage) => originate_contract(
+                    ctx.host,
+                    context,
+                    address,
+                    source_account,
+                    source_account,
+                    balance,
+                    &script.code,
+                    storage,
+                ),
+                Err(err) => Err(err),
+            };
             let manager_result = produce_operation_result(
                 balance_updates,
                 origination_result.map_err(|e| e.into()),
