@@ -9,7 +9,8 @@ use crate::bridge::Deposit;
 use crate::fees::tx_execution_gas_limit;
 
 use crate::tick_model::constants::BASE_GAS;
-use evm_execution::fa_bridge::{deposit::FaDeposit, FA_DEPOSIT_QUEUE_GAS_LIMIT};
+use revm_etherlink::helpers::legacy::FaDeposit;
+use revm_etherlink::precompiles::constants::FA_DEPOSIT_QUEUE_GAS_LIMIT;
 use revm_etherlink::Error;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::block::BlockFees;

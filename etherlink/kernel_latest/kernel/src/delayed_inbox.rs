@@ -9,7 +9,7 @@ use crate::{
     transaction::{Transaction, TransactionContent},
 };
 use anyhow::Result;
-use evm_execution::fa_bridge::deposit::FaDeposit;
+use revm_etherlink::helpers::legacy::FaDeposit;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::{
     rlp_helpers,

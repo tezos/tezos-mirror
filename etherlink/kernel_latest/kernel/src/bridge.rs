@@ -251,11 +251,16 @@ pub fn execute_deposit<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::SolEvent;
-    use evm_execution::fa_bridge::test_utils::create_fa_ticket;
+    use num_bigint::BigInt;
     use primitive_types::{H160, U256};
     use revm::primitives::hardfork::SpecId;
     use rlp::Decodable;
+    use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup::{
+        michelson::{ticket::FA2_1Ticket, MichelsonNat, MichelsonOption, MichelsonPair},
+        types::Contract,
+    };
     use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
 
     use crate::bridge::{DepositResult, DEPOSIT_EVENT_TOPIC};
@@ -280,6 +285,21 @@ mod tests {
             inbox_level: 3,
             inbox_msg_id: 4,
         }
+    }
+
+    pub fn create_fa_ticket(
+        ticketer: &str,
+        token_id: u64,
+        metadata: &[u8],
+        amount: BigInt,
+    ) -> FA2_1Ticket {
+        let creator =
+            Contract::Originated(ContractKt1Hash::from_base58_check(ticketer).unwrap());
+        let contents = MichelsonPair(
+            MichelsonNat::new(BigInt::from(token_id).into()).unwrap(),
+            MichelsonOption(Some(MichelsonBytes(metadata.to_vec()))),
+        );
+        FA2_1Ticket::new(creator, contents, amount).unwrap()
     }
 
     #[test]
