@@ -230,15 +230,18 @@ let push ~versions ~cloud
       ~name:"tezt_dal_commitments_attestable"
       (float_of_int value)
   in
-  let push_dal_attestation_sent ~labels value =
-    Cloud.push_metric
-      cloud
-      ~help:
-        "Did the baker sent a DAL attestation when they had the opportunity to"
-      ~typ:`Gauge
-      ~labels
-      ~name:"tezt_dal_attestation_sent"
-      (if value then 1. else 0.)
+  let push_dal_attestation_sent ~labels = function
+    | None -> ()
+    | Some value ->
+        Cloud.push_metric
+          cloud
+          ~help:
+            "Did the baker sent a DAL attestation when they had the \
+             opportunity to"
+          ~typ:`Gauge
+          ~labels
+          ~name:"tezt_dal_attestation_sent"
+          (if value then 1. else 0.)
   in
   let push_metric_out_attestation_sent ~labels () =
     Cloud.push_metric
@@ -546,23 +549,31 @@ let update_ratio_attested_commitments_per_baker ~first_level ~infos
                          attestable_slots;
                          attested_slots = Z.popcount attestation_bitset;
                          in_committee = true;
-                         attestation_with_dal = true;
+                         attestation_with_dal = Some true;
                        }
-                 (* The baker is out of the DAL committee and sent an attestation_with_dal. *)
+                 (* The baker is out of the DAL committee and sent an attestation. *)
                  | Out_of_committee ->
                      {
                        attestable_slots;
                        attested_slots = 0;
                        in_committee = false;
-                       attestation_with_dal = false;
+                       attestation_with_dal = None;
                      }
-                 (* The baker is in the DAL committee but sent either an attestation without DAL, or no attestations. *)
-                 | Without_DAL | Expected_to_DAL_attest ->
+                 (* The baker is in the DAL committee but sent an attestation without DAL. *)
+                 | Without_DAL ->
                      {
                        attestable_slots;
                        attested_slots = 0;
                        in_committee = true;
-                       attestation_with_dal = false;
+                       attestation_with_dal = Some false;
+                     }
+                 (* The baker is in the DAL committee but sent no attestations. *)
+                 | Expected_to_DAL_attest ->
+                     {
+                       attestable_slots;
+                       attested_slots = 0;
+                       in_committee = true;
+                       attestation_with_dal = None;
                      } ))
         |> Hashtbl.add_seq table ;
         table

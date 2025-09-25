@@ -29,7 +29,10 @@ type per_baker_dal_summary = {
   attestable_slots : int;
   attested_slots : int;
   in_committee : bool;
-  attestation_with_dal : bool;
+  (* [attestation_with_dal] is [None] if one is out of the DAL committee or did
+     not send any attestation.
+     Otherwise, it is [Some the_sent_attestation_is_"with_dal"]. *)
+  attestation_with_dal : bool option;
 }
 
 (** Initialize a whole fleet of bakers. *)
