@@ -39,7 +39,6 @@ ethereum.workspace = true
 ethbloom.workspace = true
 
 evm.workspace = true
-evm-execution.workspace = true
 revm.workspace = true
 revm-etherlink.workspace = true
 tezos-execution.workspace = true
@@ -78,21 +77,17 @@ proptest.workspace = true
 getrandom = { version = "=0.2.15", features = ["custom"] }
 
 pretty_assertions.workspace = true
-evm-execution = { workspace = true, features = [
-    "fa_bridge_testing",
-    "execution-test-utils",
-] }
 alloy-sol-types.workspace = true
 alloy-primitives.workspace = true
 
 [features]
 default = ["panic-hook"]
 panic-hook = []
-testing = ["proptest", "debug", "evm-execution/testing"]
+testing = ["proptest", "debug"]
 debug = ["tezos-evm-logging/debug"]
-benchmark = ["tezos-evm-logging/benchmark", "evm-execution/benchmark"]
+benchmark = ["tezos-evm-logging/benchmark"]
 benchmark-bypass-stage2 = ["benchmark"]
-benchmark-opcodes = ["benchmark", "evm-execution/benchmark-opcodes"]
+benchmark-opcodes = ["benchmark"]
 benchmark-full = ["benchmark", "debug", "benchmark-opcodes"]
 dummy-store-get-hash = ["tezos-evm-runtime/dummy-store-get-hash"]
 tracing = ["dep:tracing", "tezos-evm-logging/tracing", "tezos-evm-runtime/tracing", "revm-etherlink/tracing"]

@@ -35,10 +35,6 @@ else
 endif
 	@cargo build --profile release-with-debug --target wasm32-unknown-unknown ${EXCLUDE} ${FEATURES}
 
-.PHONY: build-evm-execution
-build-evm-execution:
-	@cargo build --target wasm32-unknown-unknown --release --package evm-execution-latest
-
 .PHONY: build-evm-evaluation
 build-evm-evaluation:
 ifdef EVM_EVALUATION_FEATURES

@@ -57,7 +57,7 @@ impl FaDeposit {
         inbox_msg_id: u32,
     ) -> Result<(Self, Option<PU256>), Error> {
         let amount = bigint_to_u256(ticket.amount()).map_err(|e| {
-            Error::Custom(format!("failed to convert ticket amount: {:?}", e))
+            Error::Custom(format!("failed to convert ticket amount: {e:?}"))
         })?;
         let (receiver, proxy, chain_id) = parse_l2_routing_info(routing_info)?;
         let ticket_hash = ticket_hash(&ticket)?;

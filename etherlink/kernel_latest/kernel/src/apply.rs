@@ -9,10 +9,7 @@
 use alloy_sol_types::{sol, SolCall};
 use primitive_types::{H160, U256};
 use revm::primitives::hardfork::SpecId;
-use revm::{
-    primitives::{Address, Bytes, Log, B256},
-    state::AccountInfo,
-};
+use revm::primitives::{Address, Bytes, Log, B256};
 use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
 use revm_etherlink::inspectors::call_tracer::{
     CallTrace, CallTracerConfig, CallTracerInput,

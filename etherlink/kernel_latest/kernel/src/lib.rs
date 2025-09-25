@@ -439,7 +439,8 @@ mod tests {
     use pretty_assertions::assert_eq;
     use primitive_types::{H160, U256};
     use revm_etherlink::helpers::legacy::{
-        alloy_to_h160, h160_to_alloy, h256_to_alloy, ticket_hash, u256_to_alloy, FaDeposit
+        alloy_to_h160, h160_to_alloy, h256_to_alloy, ticket_hash, u256_to_alloy,
+        FaDeposit,
     };
     use revm_etherlink::precompiles::constants::{FA_BRIDGE_SOL_ADDR, SYSTEM_SOL_ADDR};
     use revm_etherlink::precompiles::send_outbox_message::RouterInterface;
@@ -455,6 +456,7 @@ mod tests {
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
 
+    use alloy_sol_types::SolCall;
     use tezos_evm_runtime::runtime::Runtime;
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup::michelson::{
@@ -467,7 +469,6 @@ mod tests {
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used to put traits interface in the scope
     use tezos_smart_rollup_mock::TransferMetadata;
-    use alloy_sol_types::SolCall;
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
 
@@ -501,10 +502,7 @@ mod tests {
 
         (ticketer.try_into().unwrap(), content)
     }
-    sol!(
-        kernel_wrapper,
-        "tests/contracts/artifacts/MockFaBridgePrecompile.abi"
-    );
+    sol!(kernel_wrapper, "../revm/contracts/abi/fa_bridge.abi");
 
     #[test]
     fn load_block_fees_new() {

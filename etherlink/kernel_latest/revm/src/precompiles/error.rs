@@ -28,9 +28,12 @@ impl From<Error> for CustomPrecompileError {
         match error {
             Error::Runtime(runtime) => CustomPrecompileError::from(runtime),
             Error::Custom(message) => CustomPrecompileError::Revert(message),
-            other => {
-                CustomPrecompileError::Revert(format!("Precompile error: {other:?}"))
-            }
+            Error::FeesToGasOverflow => CustomPrecompileError::Revert(
+                "Fees to gas conversion overflow".to_string(),
+            ),
+            Error::GasToFeesUnderflow => CustomPrecompileError::Revert(
+                "Gas to fees conversion underflow".to_string(),
+            ),
         }
     }
 }

@@ -622,12 +622,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "const-decoder"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5241cd7938b1b415942e943ea96f615953d500b50347b505b0b507080bad5a6f"
-
-[[package]]
 name = "const-hex"
 version = "1.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1086,18 +1080,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "enum_dispatch"
-version = "0.3.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa18ce2bc66555b3218614519ac839ddb759a7d6720732f979ef8d13be147ecd"
-dependencies = [
- "once_cell",
- "proc-macro2",
- "quote",
- "syn 2.0.103",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1184,7 +1166,6 @@ name = "evm-evaluation"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "evm-execution-latest",
  "hex",
  "hex-literal",
  "primitive-types",
@@ -1203,47 +1184,6 @@ dependencies = [
  "tezos_ethereum_latest",
  "thiserror 1.0.69",
  "walkdir",
-]
-
-[[package]]
-name = "evm-execution-latest"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "alloy-sol-types",
- "aurora-engine-modexp",
- "const-decoder",
- "enum_dispatch",
- "evm",
- "hex",
- "libsecp256k1",
- "num-bigint",
- "num-traits",
- "pretty_assertions",
- "primitive-types",
- "proptest",
- "rand 0.8.5",
- "revm",
- "revm-etherlink",
- "ripemd",
- "rlp",
- "sha2 0.10.9",
- "sha3",
- "substrate-bn",
- "tezos-evm-logging-latest",
- "tezos-evm-runtime-latest",
- "tezos-indexable-storage-latest",
- "tezos-smart-rollup-core",
- "tezos-smart-rollup-debug",
- "tezos-smart-rollup-encoding",
- "tezos-smart-rollup-host",
- "tezos-smart-rollup-mock",
- "tezos-smart-rollup-storage",
- "tezos-storage-latest",
- "tezos_crypto_rs",
- "tezos_data_encoding",
- "tezos_ethereum_latest",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1277,7 +1217,6 @@ dependencies = [
  "ethbloom",
  "ethereum",
  "evm",
- "evm-execution-latest",
  "getrandom 0.2.15",
  "hex",
  "libsecp256k1",
@@ -1706,9 +1645,6 @@ name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
-dependencies = [
- "spin",
-]
 
 [[package]]
 name = "libc"
@@ -3039,12 +2975,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "359a2aa2309eed307acc397678f7fbb43989db6ee417a11752248fc98451e696"
 
 [[package]]
-name = "spin"
-version = "0.9.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
-
-[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3133,19 +3063,6 @@ dependencies = [
  "quote",
  "rustversion",
  "syn 2.0.103",
-]
-
-[[package]]
-name = "substrate-bn"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b5bbfa79abbae15dd642ea8176a21a635ff3c00059961d1ea27ad04e5b441c"
-dependencies = [
- "byteorder",
- "crunchy",
- "lazy_static",
- "rand 0.8.5",
- "rustc-hex",
 ]
 
 [[package]]
