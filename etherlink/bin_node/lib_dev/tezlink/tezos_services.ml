@@ -788,3 +788,15 @@ let raw_json_cycle :
       Storage_repr.Cycle.storage_cycle )
     Tezos_rpc.Service.t =
   import_service_with_arg Raw_services.cycle
+
+module Forge = struct
+  let operations :
+      ( [`POST],
+        tezlink_rpc_context,
+        tezlink_rpc_context,
+        unit,
+        Operation.shell_header * Alpha_context.packed_contents_list,
+        bytes )
+      Tezos_rpc.Service.t =
+    import_service Imported_protocol_plugin.RPC.Forge.S.operations
+end

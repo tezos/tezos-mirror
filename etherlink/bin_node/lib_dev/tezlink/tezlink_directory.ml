@@ -368,6 +368,17 @@ let build_block_static_directory ~l2_chain_id
          Lwt.return
          @@ Tezos_services.Adaptive_issuance_services.dummy_rewards level.cycle)
   |> register
+       ~service:Tezos_services.Forge.operations
+       ~impl:(fun {block; chain} () operation ->
+         let*? _chain = check_chain chain in
+         let*? _block = check_block block in
+         let bytes =
+           Data_encoding.Binary.to_bytes_exn
+             Alpha_context.Operation.unsigned_encoding
+             operation
+         in
+         return bytes)
+  |> register
      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
      (* We need a proper implementation *)
        ~service:Tezos_services.simulate_operation
