@@ -5,7 +5,6 @@
 
 //! Ethereum account state and storage
 
-use const_decoder::Decoder;
 use host::path::{concat, OwnedPath, Path, RefPath};
 use host::runtime::{RuntimeError, ValueType};
 use primitive_types::{H160, H256, U256};
@@ -18,12 +17,16 @@ use tezos_smart_rollup_storage::storage::Storage;
 use tezos_storage::error::Error as GenStorageError;
 use tezos_storage::{
     path_from_h256, read_h256_be_default, read_h256_be_opt, read_u256_le_default,
-    WORD_SIZE,
 };
 use thiserror::Error;
 
 use crate::utilities::alloy::alloy_to_u256;
 use crate::{code_storage, DurableStorageError};
+
+#[cfg(test)]
+use const_decoder::Decoder;
+#[cfg(test)]
+use tezos_storage::WORD_SIZE;
 
 /// All errors that may happen as result of using the Ethereum account
 /// interface.
@@ -187,10 +190,12 @@ const STORAGE_DEFAULT_VALUE: H256 = H256::zero();
 
 /// An account with no code - an "external" account, or an unused account has the zero
 /// hash as code hash.
+#[cfg(test)]
 const CODE_HASH_BYTES: [u8; WORD_SIZE] = Decoder::Hex
     .decode(b"c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470");
 
 /// The default hash for when there is no code - the hash of the empty string.
+#[cfg(test)]
 pub const CODE_HASH_DEFAULT: H256 = H256(CODE_HASH_BYTES);
 
 /// Turn an Ethereum address - a H160 - into a valid path
@@ -563,6 +568,7 @@ pub type EthereumAccountStorage = Storage<EthereumAccount>;
 
 /// Get the storage API for accessing the Ethereum World State and do transactions
 /// on it.
+#[cfg(test)]
 pub fn init_account_storage() -> Result<EthereumAccountStorage, AccountStorageError> {
     Storage::<EthereumAccount>::init(&EVM_ACCOUNTS_PATH)
         .map_err(AccountStorageError::from)

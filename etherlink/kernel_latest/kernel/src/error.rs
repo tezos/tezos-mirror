@@ -5,7 +5,6 @@
 //
 // SPDX-License-Identifier: MIT
 use core::str::Utf8Error;
-use evm_execution::account_storage::AccountStorageError;
 use evm_execution::{DurableStorageError, EthereumError};
 use primitive_types::U256;
 use rlp::DecoderError;
@@ -45,8 +44,6 @@ pub enum StorageError {
     Runtime(RuntimeError),
     #[error(transparent)]
     Storage(tezos_smart_rollup_storage::StorageError),
-    #[error(transparent)]
-    AccountStorage(AccountStorageError),
     #[error("Storage error: index out of bound")]
     IndexOutOfBounds,
     #[error("Storage error: failed to initialize an account")]
@@ -187,12 +184,6 @@ impl From<DurableStorageError> for Error {
 impl From<tezos_smart_rollup_storage::StorageError> for Error {
     fn from(e: tezos_smart_rollup_storage::StorageError) -> Self {
         Self::Storage(StorageError::Storage(e))
-    }
-}
-
-impl From<AccountStorageError> for Error {
-    fn from(e: AccountStorageError) -> Self {
-        Self::Storage(StorageError::AccountStorage(e))
     }
 }
 

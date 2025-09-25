@@ -4,15 +4,16 @@
 //
 // SPDX-License-Identifier: MIT
 
-use bytes::Bytes;
-use evm_execution::account_storage::EthereumAccount;
-
 use revm::context::result::EVMError;
-use revm::primitives::hardfork::SpecId;
+use revm::primitives::{hardfork::SpecId, keccak256, Address, Bytes, B256};
+use revm::state::AccountInfo;
+use revm_etherlink::helpers::legacy::{h256_to_alloy, u256_to_alloy};
 use revm_etherlink::precompiles::provider::EtherlinkPrecompiles;
-use revm_etherlink::storage::world_state_handler::new_world_state_handler;
-use revm_etherlink::Error;
-use revm_etherlink::{run_transaction, ExecutionOutcome};
+use revm_etherlink::storage::code::CodeStorage;
+use revm_etherlink::storage::world_state_handler::{
+    new_world_state_handler, StorageAccount,
+};
+use revm_etherlink::{run_transaction, Error, ExecutionOutcome};
 use tezos_ethereum::access_list::AccessList;
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
@@ -134,19 +135,35 @@ fn initialize_accounts(host: &mut EvalHost, unit: &TestUnit) {
         let h160_address: H160 = address.as_fixed_bytes().into();
         write_host!(host, "\nAccount is {}", h160_address);
         let mut account =
-            EthereumAccount::from_address(&address.as_fixed_bytes().into()).unwrap();
+            StorageAccount::from_address(&address.as_fixed_bytes().into()).unwrap();
         if info.nonce != 0 {
-            account.set_nonce(host, info.nonce).unwrap();
             write_host!(host, "Nonce is set for {} : {}", address, info.nonce);
         }
-        account.balance_add(host, info.balance).unwrap();
         write_host!(host, "Balance for {} was added : {}", address, info.balance);
+        let code_hash = keccak256(&info.code);
         if !info.code.is_empty() {
-            account.set_code(host, &info.code).unwrap();
+            CodeStorage::add(host, &info.code, Some(code_hash)).unwrap();
         }
+        account
+            .set_info(
+                host,
+                AccountInfo {
+                    nonce: info.nonce,
+                    balance: u256_to_alloy(&info.balance),
+                    code_hash,
+                    code: None,
+                },
+            )
+            .unwrap();
         write_host!(host, "Code was set for {}", address);
         for (index, value) in info.storage.iter() {
-            account.set_storage(host, index, value).unwrap();
+            account
+                .set_storage(
+                    host,
+                    &revm::primitives::U256::from_be_bytes(h256_to_alloy(index).0),
+                    &revm::primitives::U256::from_be_bytes(h256_to_alloy(value).0),
+                )
+                .unwrap();
         }
     }
 
@@ -205,7 +222,7 @@ fn execute_transaction(
     env: &mut Env,
     spec_id: SpecId,
     test: &Test,
-    data: Bytes,
+    data: bytes::Bytes,
     access_list: AccessList,
 ) -> Result<ExecutionOutcome, EVMError<Error>> {
     let gas_limit = *unit.transaction.gas_limit.get(test.indexes.gas).unwrap();
@@ -240,10 +257,10 @@ fn execute_transaction(
                      storage_keys,
                  }| {
                     revm::context::transaction::AccessListItem {
-                        address: revm::primitives::Address::from_slice(&address.0),
+                        address: Address::from_slice(&address.0),
                         storage_keys: storage_keys
                             .into_iter()
-                            .map(|key| revm::primitives::B256::from_slice(&key.0))
+                            .map(|key| B256::from_slice(&key.0))
                             .collect(),
                     }
                 },
@@ -271,7 +288,7 @@ fn execute_transaction(
         EtherlinkPrecompiles::new(),
         caller,
         address,
-        revm::primitives::Bytes::from(call_data),
+        Bytes::from(call_data),
         gas_limit,
         u256_to_u128(env.tx.gas_price),
         revm::primitives::U256::from_le_slice(

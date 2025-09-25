@@ -12,14 +12,13 @@ use crate::chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
+use crate::migration::legacy::{account_path, init_account_storage};
 use crate::storage::{
     read_chain_id, read_storage_version, store_backlog, store_dal_slots,
     store_storage_version, tweak_dal_activation, StorageVersion, DELAYED_BRIDGE,
     ENABLE_FA_BRIDGE, KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE,
     SEQUENCER_GOVERNANCE,
 };
-use evm_execution::account_storage::account_path;
-use evm_execution::account_storage::init_account_storage;
 use evm_execution::configuration::EVMVersion;
 use evm_execution::precompiles::SYSTEM_ACCOUNT_ADDRESS;
 use evm_execution::precompiles::WITHDRAWAL_ADDRESS;
@@ -82,7 +81,15 @@ mod legacy {
     // which were present at the time.
 
     use super::*;
+    use primitive_types::H160;
+    use revm::state::AccountInfo;
+    use revm_etherlink::{
+        helpers::legacy::{alloy_to_u256, u256_to_alloy},
+        storage::world_state_handler::StorageAccount,
+    };
+    use tezos_smart_rollup_storage::storage::Storage;
     use tezos_storage::error::Error as GenStorageError;
+    use thiserror::Error;
 
     pub fn read_next_blueprint_number<Host: Runtime>(
         host: &Host,
@@ -97,6 +104,139 @@ mod legacy {
             },
             Ok(block_number) => Ok(block_number.saturating_add(U256::one())),
         }
+    }
+
+    pub const EVM_ACCOUNTS_PATH: RefPath =
+        RefPath::assert_from(b"/evm/world_state/eth_accounts");
+
+    pub type EthereumAccountStorage = Storage<EthereumAccount>;
+
+    #[derive(Debug, PartialEq)]
+    pub struct EthereumAccount {
+        pub path: OwnedPath,
+    }
+
+    impl From<OwnedPath> for EthereumAccount {
+        fn from(path: OwnedPath) -> Self {
+            Self { path }
+        }
+    }
+
+    impl EthereumAccount {
+        /// Increment the **nonce** by one. It is technically possible for this operation to overflow,
+        /// but in practice this will not happen for a very long time. The nonce is a 256 bit unsigned
+        /// integer.
+        pub fn increment_nonce(
+            &mut self,
+            host: &mut impl Runtime,
+        ) -> Result<(), AccountStorageError> {
+            let mut old_info = self.info(host)?;
+
+            let new_value = old_info
+                .nonce
+                .checked_add(1)
+                .ok_or(AccountStorageError::NonceOverflow)?;
+            old_info.nonce = new_value;
+            self.set_info_without_code(host, old_info)
+        }
+
+        /// Get the **balance** of an account in Wei held by the account.
+        pub fn balance(
+            &self,
+            host: &mut impl Runtime,
+        ) -> Result<U256, AccountStorageError> {
+            let new_format_account = StorageAccount::from_path(self.path.clone());
+            Ok(alloy_to_u256(&new_format_account.info(host)?.balance))
+        }
+
+        /// Remove an amount in Wei from the balance of an account. If the account doesn't hold
+        /// enough funds, this will underflow, in which case the account is unaffected, but the
+        /// function call will return `Ok(false)`. In case the removal went without underflow,
+        /// ie the account held enough funds, the function returns `Ok(true)`.
+        pub fn balance_remove(
+            &mut self,
+            host: &mut impl Runtime,
+            amount: U256,
+        ) -> Result<bool, AccountStorageError> {
+            let mut old_info = self.info(host)?;
+            if let Some(new_value) = old_info.balance.checked_sub(u256_to_alloy(&amount))
+            {
+                old_info.balance = new_value;
+                self.set_info_without_code(host, old_info)?;
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        }
+
+        pub fn set_info_without_code(
+            &mut self,
+            host: &mut impl Runtime,
+            info: AccountInfo,
+        ) -> Result<(), AccountStorageError> {
+            let mut new_format_account = StorageAccount::from_path(self.path.clone());
+            new_format_account
+                .set_info_without_code(host, info)
+                .map_err(AccountStorageError::from)
+        }
+
+        pub fn info(
+            &self,
+            host: &mut impl Runtime,
+        ) -> Result<AccountInfo, AccountStorageError> {
+            let new_format_account = StorageAccount::from_path(self.path.clone());
+            new_format_account
+                .info(host)
+                .map_err(AccountStorageError::from)
+        }
+    }
+
+    #[derive(Error, Clone, Copy, Debug, Eq, PartialEq)]
+    pub enum DurableStorageError {
+        /// Some runtime error happened while using durable storage
+        #[error("Runtime error: {0:?}")]
+        RuntimeError(#[from] tezos_smart_rollup_host::runtime::RuntimeError),
+        /// Some error happened while constructing the path to some
+        /// resource.
+        #[error("Path error: {0:?}")]
+        PathError(#[from] tezos_smart_rollup_host::path::PathError),
+    }
+
+    /// All errors that may happen as result of using the Ethereum account
+    /// interface.
+    #[derive(Error, Eq, PartialEq, Clone, Debug)]
+    pub enum AccountStorageError {
+        #[error("Transaction storage API error: {0:?}")]
+        StorageError(tezos_smart_rollup_storage::StorageError),
+        #[error("REVM Storage error: {0}")]
+        REVMStorageError(revm_etherlink::Error),
+        /// Technically, the Ethereum account nonce can overflow if
+        /// an account does an incredible number of transactions.
+        #[error("Nonce overflow")]
+        NonceOverflow,
+    }
+
+    impl From<tezos_smart_rollup_storage::StorageError> for AccountStorageError {
+        fn from(error: tezos_smart_rollup_storage::StorageError) -> Self {
+            AccountStorageError::StorageError(error)
+        }
+    }
+
+    impl From<revm_etherlink::Error> for AccountStorageError {
+        fn from(error: revm_etherlink::Error) -> Self {
+            AccountStorageError::REVMStorageError(error)
+        }
+    }
+
+    pub fn init_account_storage() -> Result<EthereumAccountStorage, AccountStorageError> {
+        Storage::<EthereumAccount>::init(&EVM_ACCOUNTS_PATH)
+            .map_err(AccountStorageError::from)
+    }
+
+    /// Turn an Ethereum address - a H160 - into a valid path
+    pub fn account_path(address: &H160) -> Result<OwnedPath, DurableStorageError> {
+        let path_string = alloc::format!("/{}", hex::encode(address.to_fixed_bytes()));
+        OwnedPath::try_from(path_string).map_err(DurableStorageError::from)
     }
 }
 

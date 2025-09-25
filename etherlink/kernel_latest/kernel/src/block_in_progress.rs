@@ -18,9 +18,9 @@ use crate::transaction::{Transaction, Transactions, Transactions::EthTxs};
 use alloy_consensus::proofs::ordered_trie_root_with_encoder;
 use alloy_consensus::EMPTY_ROOT_HASH;
 use anyhow::Context;
-use evm_execution::account_storage::EVM_ACCOUNTS_PATH;
 use primitive_types::{H160, H256, U256};
 use revm_etherlink::helpers::legacy::alloy_to_log;
+use revm_etherlink::storage::world_state_handler::EVM_ACCOUNTS_PATH;
 use rlp::{Decodable, DecoderError, Encodable};
 use std::collections::VecDeque;
 use tezos_ethereum::block::{BlockConstants, BlockFees, EthBlock};
@@ -629,8 +629,8 @@ mod tests {
 
     fn dummy_tx_deposit(i: u8) -> Transaction {
         let deposit = Deposit {
-            amount: U256::from(i),
-            receiver: H160::from([i; 20]),
+            amount: i.into(),
+            receiver: H160([i; 20]),
             inbox_level: 1,
             inbox_msg_id: 0,
         };
