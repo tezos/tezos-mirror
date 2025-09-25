@@ -299,14 +299,17 @@ let batches_stats_tbl = Batches_stats.create 5
 
 let last_stat_level = ref None
 
-let update_batches_stats number_of_slots cryptobox batch_size head_level batch_l
-    duration =
+let update_batches_stats number_of_slots cryptobox batch_size head_level
+    batch_ll duration =
   let {Cryptobox.number_of_shards; _} = Cryptobox.parameters cryptobox in
   let shard_distribution = Array.init number_of_slots (fun _ -> 0) in
   List.iter
-    (fun ({slot_index; _}, elems) ->
-      shard_distribution.(slot_index) <- List.length elems)
-    batch_l ;
+    (fun l ->
+      List.iter
+        (fun ({slot_index; _}, elems) ->
+          shard_distribution.(slot_index) <- List.length elems)
+        l)
+    batch_ll ;
   let shard_percentage =
     float_of_int (Array.fold_left ( + ) 0 shard_distribution)
     /. (float_of_int number_of_shards *. float_of_int number_of_slots)
@@ -370,6 +373,22 @@ let may_finalize_batch_stats last_stat_level head_level =
             in
             last_stat_level := Some head_level
       else ()
+
+(* Utility function that splits the given [seq] into a list of [n] lists in a
+   round robin fashion, all sub-lists having roughly the same number of
+   elements. *)
+let round_robin_seq n seq =
+  let rec loop acc_full acc seq =
+    match seq () with
+    | Seq.Nil -> acc @ acc_full
+    | Seq.Cons (hd, tl) -> (
+        match acc with
+        | [] -> loop [] acc_full seq
+        | acc_hd :: acc_tl -> loop ((hd :: acc_hd) :: acc_full) acc_tl tl)
+  in
+  loop [] (Stdlib.List.init n (fun _ -> [])) seq
+
+exception Bee_task_worker_error of string
 
 let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
     =
@@ -499,16 +518,42 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
                   :: ({level; slot_index}, second_half)
                   :: remaining_to_treat))
     in
-    let batch_l = Batch_tbl.to_seq to_check_in_batch |> List.of_seq in
+    let domains = Tezos_bees.Task_worker.number_of_domains in
     let s = Unix.gettimeofday () in
-    treat_batch batch_l ;
+    (* Split the batches into [domains] sub-batches to feed each bee workers.
+       The load's distribution is likely to be slightly unbalanced. *)
+    let sub_batches =
+      round_robin_seq domains (Batch_tbl.to_seq to_check_in_batch)
+    in
+    let results =
+      Tezos_bees.Task_worker.launch_tasks_and_wait
+        "batch"
+        treat_batch
+        sub_batches
+    in
+    (* Ensure that all tasks are successful. *)
+    let () =
+      List.iter
+        (function
+          | Ok () -> ()
+          | Error (Tezos_bees.Task_worker.Closed (Some err)) ->
+              raise
+                (Bee_task_worker_error
+                   (Format.asprintf "%a" Error_monad.pp_print_trace err))
+          | Error (Tezos_bees.Task_worker.Closed None)
+          | Error (Tezos_bees.Task_worker.Request_error _) ->
+              raise (Bee_task_worker_error "Unknown task_worker error")
+          | Error (Tezos_bees.Task_worker.Any exn) ->
+              raise (Bee_task_worker_error (Printexc.to_string exn)))
+        results
+    in
     let duration = Unix.gettimeofday () -. s in
     update_batches_stats
       proto_parameters.number_of_slots
       cryptobox
       batch_size
       head_level
-      batch_l
+      sub_batches
       duration ;
     let () = may_finalize_batch_stats last_stat_level head_level in
     Array.to_list result
