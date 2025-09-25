@@ -89,4 +89,24 @@ let test_big_map_transfer =
       ("sender_stored_updated", "{Elt \"b\" 0x; Elt \"d\" 0x; }");
     ]
 
-let register ~protocols = test_big_map_transfer protocols
+let test_big_map_internal_origination =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"Test sending a big map during contract internal origination"
+    ~tags:[team; "client"; "michelson"; "big_map"; "origination"]
+    ~uses_node:false
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* address =
+    originate_contract
+      ~client
+      ~protocol
+      ~filename:"originator"
+      ~storage:"{Elt \"b\" 0x; Elt \"d\" 0x; }"
+  in
+  let* () = call_contract ~client ~address ~arg:"Unit" in
+  unit
+
+let register ~protocols =
+  test_big_map_transfer protocols ;
+  test_big_map_internal_origination protocols
