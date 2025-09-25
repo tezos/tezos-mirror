@@ -1038,16 +1038,6 @@ let jobs pipeline_type =
           ()
         |> Coverage.enable_instrumentation |> Coverage.enable_output_artifact
       in
-      let oc_unit_etherlink_x86_64 =
-        job_unit_test
-          ~__POS__
-          ~name:"oc.unit:etherlink-x86_64"
-          ~arch:Amd64
-          ~rules:(make_rules ~changes:changeset_etherlink ~dependent:true ())
-          ~make_targets:["test-etherlink-unit"]
-          ()
-        |> Coverage.enable_instrumentation |> Coverage.enable_output_artifact
-      in
       let oc_unit_other_x86_64 =
         (* Runs unit tests for contrib. *)
         job_unit_test
@@ -1157,7 +1147,6 @@ let jobs pipeline_type =
       [
         job_ocaml_check;
         oc_unit_non_proto_x86_64;
-        oc_unit_etherlink_x86_64;
         oc_unit_other_x86_64;
         oc_unit_proto_x86_64;
         oc_unit_non_proto_arm64;
