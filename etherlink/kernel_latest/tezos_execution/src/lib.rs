@@ -5,7 +5,7 @@
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
 use context::Context;
-use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
+use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens, TypedValue};
 use mir::{
     ast::{IntoMicheline, Micheline},
     context::CtxTrait,
@@ -553,6 +553,25 @@ fn transfer_external<Host: Runtime>(
     .map(Into::into)
 }
 
+/// This function typechecks both fields of a &Script: the code and the storage.
+/// It returns the typechecked storage.
+fn typecheck_code_and_storage<'a, Ctx: mir::context::CtxTrait<'a>>(
+    ctx: &mut Ctx,
+    parser: &'a Parser<'a>,
+    script: &Script,
+) -> Result<TypedValue<'a>, OriginationError> {
+    let contract_micheline = Micheline::decode_raw(&parser.arena, &script.code)
+        .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
+    let contract_typechecked = contract_micheline
+        .typecheck_script(ctx)
+        .map_err(|e| OriginationError::MirTypecheckingError(format!("Script : {e}")))?;
+    let storage_micheline = Micheline::decode_raw(&parser.arena, &script.storage)
+        .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
+    contract_typechecked
+        .typecheck_storage(ctx, &storage_micheline)
+        .map_err(|e| OriginationError::MirTypecheckingError(format!("Storage : {e}")))
+}
+
 // Values from src/proto_023_PtSeouLo/lib_parameters/default_parameters.ml.
 const ORIGINATION_SIZE: u64 = 257;
 const COST_PER_BYTES: u64 = 250;
@@ -574,19 +593,7 @@ fn originate_contract<Host: Runtime>(
     if typecheck {
         let parser = Parser::new();
         let mut ctx = mir::context::Ctx::default();
-        let contract_micheline = Micheline::decode_raw(&parser.arena, &script.code)
-            .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
-        let contract_typechecked =
-            contract_micheline.typecheck_script(&mut ctx).map_err(|e| {
-                OriginationError::MirTypecheckingError(format!("Script : {e}"))
-            })?;
-        let storage_micheline = Micheline::decode_raw(&parser.arena, &script.storage)
-            .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
-        contract_typechecked
-            .typecheck_storage(&mut ctx, &storage_micheline)
-            .map_err(|e| {
-                OriginationError::MirTypecheckingError(format!("Storage : {e}"))
-            })?;
+        typecheck_code_and_storage(&mut ctx, &parser, script)?;
     }
 
     // TODO: Handle lazy_storage diff, a lot of the origination is concerned
