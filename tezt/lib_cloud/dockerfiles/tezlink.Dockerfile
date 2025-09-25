@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y \
     postgresql \
     # to run commands as postgres user
     sudo \
-    # to clone Tzkt sources
+    # to clone Tzkt and faucet sources
     git \
     # to run the faucet application
     npm \
