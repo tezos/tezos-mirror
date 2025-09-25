@@ -98,7 +98,7 @@ let post_message ?ts ~slack_channel_id ~slack_bot_token data =
   in
   return thread_id
 
-module Tasks = struct
+module Prometheus = struct
   let endpoint_from_prometheus_query ~query =
     let fail ~uri_part =
       Test.fail
@@ -161,119 +161,9 @@ module Tasks = struct
       | Some x ->
           x |-> "value" |> as_list |> Fun.flip List.nth_opt 1
           |> Option.map as_float
+end
 
-  let view_ratio_attested_over_published
-      (`attested attested, `published published) =
-    let open Format in
-    match (attested, published) with
-    | Some 0., Some 0. -> None
-    | None, None -> None
-    | Some attested, Some 0. ->
-        let s = sprintf "`unk` (`%d`/`0`)" (Int.of_float attested) in
-        Some s
-    | Some attested, None ->
-        let s = sprintf "`unk` (`%d`/`?`)" (Int.of_float attested) in
-        Some s
-    | None, Some published ->
-        let s = sprintf "`unk` (`?`/`%d`)" (Int.of_float published) in
-        Some s
-    | Some attested, Some published ->
-        let ratio = attested /. published *. 100. in
-        let s =
-          sprintf
-            "`%s` (`%d/%d`)"
-            (sprintf "%.2f%%" ratio)
-            (Int.of_float attested)
-            (Int.of_float published)
-        in
-        Some s
-
-  let fetch_slot_info ~slot_index =
-    let query s =
-      Format.sprintf
-        "increase(tezt_total_%s_commitments_per_slot{slot_index=\"%d\"}[%dh])"
-        s
-        slot_index
-        report_interval
-    in
-    let decoder = decoder_prometheus_float in
-    let* attested =
-      fetch
-        ~origin:"fetch_slot_info.attested"
-        ~decoder
-        ~query:(query "attested")
-    in
-    let* published =
-      fetch
-        ~origin:"fetch_slot_info.published"
-        ~decoder
-        ~query:(query "published")
-    in
-    Lwt.return (`slot_index slot_index, `attested attested, `published published)
-
-  let view_slot_info slot_info =
-    let slots_info =
-      List.filter_map
-        (fun (`slot_index slot_index, attested, published) ->
-          view_ratio_attested_over_published (attested, published)
-          |> Option.map
-               (Format.sprintf ":black_small_square: `%02d` : %s" slot_index))
-        slot_info
-    in
-    if List.is_empty slots_info then []
-    else
-      "• Percentage of attested over published DAL commitments per slot:"
-      :: slots_info
-
-  let fetch_dal_commitments_total_info () =
-    let query s =
-      Format.sprintf
-        {|increase(tezt_dal_commitments_total{kind="%s"}[%dh])|}
-        s
-        report_interval
-    in
-    let decoder = decoder_prometheus_float in
-    let* attested =
-      fetch
-        ~origin:"fetch_dal_commitments_total.attested"
-        ~decoder
-        ~query:(query "attested")
-    in
-    let* published =
-      fetch
-        ~origin:"fetch_dal_commitments_total.published"
-        ~decoder
-        ~query:(query "published")
-    in
-    let ratio =
-      view_ratio_attested_over_published
-        (`attested attested, `published published)
-    in
-    let ratio_view =
-      (Format.sprintf
-         "• Percentage of attested over published DAL commitments: %s")
-        (Option.value ~default:"unk" ratio)
-    in
-    let slot_size =
-      126_944
-      (* TODO: do not hard-code this *)
-    in
-    let bandwidth =
-      Option.map
-        (fun x ->
-          Format.sprintf
-            "%.2f"
-            (x *. float_of_int slot_size
-            /. float_of_int (1024 * report_interval * 3600)))
-        attested
-    in
-    let bandwidth_view =
-      Format.sprintf
-        "• Bandwidth: %s KiB/s"
-        (Option.value ~default:"unk" bandwidth)
-    in
-    Lwt.return (ratio_view, bandwidth_view)
-
+module Baker_helpers = struct
   let pp_stake fmt stake_ratio =
     Format.fprintf fmt "%.2f%% stake" (stake_ratio *. 100.)
 
@@ -338,6 +228,7 @@ module Tasks = struct
       baker
 
   let fetch_baker_info ~tz1 ~origin =
+    let open Prometheus in
     let query =
       Format.sprintf
         "sum_over_time(tezt_dal_commitments_attested{attester=\"%s\"}[%dh])"
@@ -391,38 +282,174 @@ module Tasks = struct
   let get_bakers_with_staking_power endpoint cycle =
     RPC_core.call endpoint (RPC.get_stake_distribution ~cycle ())
 
+  let get_current_baker_infos =
+    (* [current_bakers] contains the current cycle as well as the list of baker
+       infos for all bakers.
+       When trying to update it, we first look if the cycle changed, and compute
+       the new one only if it did. *)
+    let current_cycle = ref (-1) in
+    let current_bakers = ref [] in
+    fun endpoint ->
+      let* cycle = get_current_cycle endpoint in
+      let* () =
+        if cycle = !current_cycle then unit
+        else
+          let* bakers = get_bakers_with_staking_power endpoint cycle in
+          let total_baking_power =
+            List.fold_left
+              (fun acc RPC.{baking_power; _} -> acc + baking_power)
+              0
+              bakers
+          in
+          let* bakers_info =
+            Lwt_list.filter_map_p
+              (fun RPC.{delegate; baking_power} ->
+                let* attest_infos =
+                  fetch_baker_info
+                    ~origin:(Format.sprintf "fetch_baker_info.%s" delegate)
+                    ~tz1:delegate
+                in
+                let stake_fraction =
+                  float_of_int baking_power /. float_of_int total_baking_power
+                in
+                Lwt.return_some
+                  {address = PKH delegate; attest_infos; stake_fraction})
+              bakers
+          in
+          current_cycle := cycle ;
+          current_bakers := bakers_info ;
+          unit
+      in
+      return !current_bakers
+end
+
+module Tasks = struct
+  let view_ratio_attested_over_published
+      (`attested attested, `published published) =
+    let open Format in
+    match (attested, published) with
+    | Some 0., Some 0. -> None
+    | None, None -> None
+    | Some attested, Some 0. ->
+        let s = sprintf "`unk` (`%d`/`0`)" (Int.of_float attested) in
+        Some s
+    | Some attested, None ->
+        let s = sprintf "`unk` (`%d`/`?`)" (Int.of_float attested) in
+        Some s
+    | None, Some published ->
+        let s = sprintf "`unk` (`?`/`%d`)" (Int.of_float published) in
+        Some s
+    | Some attested, Some published ->
+        let ratio = attested /. published *. 100. in
+        let s =
+          sprintf
+            "`%s` (`%d/%d`)"
+            (sprintf "%.2f%%" ratio)
+            (Int.of_float attested)
+            (Int.of_float published)
+        in
+        Some s
+
+  let fetch_slot_info ~slot_index =
+    let open Prometheus in
+    let query s =
+      Format.sprintf
+        "increase(tezt_total_%s_commitments_per_slot{slot_index=\"%d\"}[%dh])"
+        s
+        slot_index
+        report_interval
+    in
+    let decoder = decoder_prometheus_float in
+    let* attested =
+      fetch
+        ~origin:"fetch_slot_info.attested"
+        ~decoder
+        ~query:(query "attested")
+    in
+    let* published =
+      fetch
+        ~origin:"fetch_slot_info.published"
+        ~decoder
+        ~query:(query "published")
+    in
+    Lwt.return (`slot_index slot_index, `attested attested, `published published)
+
+  let view_slot_info slot_info =
+    let slots_info =
+      List.filter_map
+        (fun (`slot_index slot_index, attested, published) ->
+          view_ratio_attested_over_published (attested, published)
+          |> Option.map
+               (Format.sprintf ":black_small_square: `%02d` : %s" slot_index))
+        slot_info
+    in
+    if List.is_empty slots_info then []
+    else
+      "• Percentage of attested over published DAL commitments per slot:"
+      :: slots_info
+
+  let fetch_dal_commitments_total_info () =
+    let open Prometheus in
+    let query s =
+      Format.sprintf
+        {|increase(tezt_dal_commitments_total{kind="%s"}[%dh])|}
+        s
+        report_interval
+    in
+    let decoder = decoder_prometheus_float in
+    let* attested =
+      fetch
+        ~origin:"fetch_dal_commitments_total.attested"
+        ~decoder
+        ~query:(query "attested")
+    in
+    let* published =
+      fetch
+        ~origin:"fetch_dal_commitments_total.published"
+        ~decoder
+        ~query:(query "published")
+    in
+    let ratio =
+      view_ratio_attested_over_published
+        (`attested attested, `published published)
+    in
+    let ratio_view =
+      (Format.sprintf
+         "• Percentage of attested over published DAL commitments: %s")
+        (Option.value ~default:"unk" ratio)
+    in
+    let slot_size =
+      126_944
+      (* TODO: do not hard-code this *)
+    in
+    let bandwidth =
+      Option.map
+        (fun x ->
+          Format.sprintf
+            "%.2f"
+            (x *. float_of_int slot_size
+            /. float_of_int (1024 * report_interval * 3600)))
+        attested
+    in
+    let bandwidth_view =
+      Format.sprintf
+        "• Bandwidth: %s KiB/s"
+        (Option.value ~default:"unk" bandwidth)
+    in
+    Lwt.return (ratio_view, bandwidth_view)
+
   type classified_bakers = {
-    mute_bakers : baker_infos list;
-    muted_by_dal : baker_infos list;
-    dal_zero : baker_infos list;
-    dal_on : baker_infos list;
-    no_shards : baker_infos list;
-    dal_off : baker_infos list;
+    mute_bakers : Baker_helpers.baker_infos list;
+    muted_by_dal : Baker_helpers.baker_infos list;
+    dal_zero : Baker_helpers.baker_infos list;
+    dal_on : Baker_helpers.baker_infos list;
+    no_shards : Baker_helpers.baker_infos list;
+    dal_off : Baker_helpers.baker_infos list;
   }
 
   let fetch_bakers_info endpoint =
-    let* cycle = get_current_cycle endpoint in
-    let* bakers = get_bakers_with_staking_power endpoint cycle in
-    let total_baking_power =
-      List.fold_left
-        (fun acc RPC.{baking_power; _} -> acc + baking_power)
-        0
-        bakers
-    in
-    let* bakers_info =
-      Lwt_list.filter_map_p
-        (fun RPC.{delegate; baking_power} ->
-          let* attest_infos =
-            fetch_baker_info
-              ~origin:(Format.sprintf "fetch_baker_info.%s" delegate)
-              ~tz1:delegate
-          in
-          let stake_fraction =
-            float_of_int baking_power /. float_of_int total_baking_power
-          in
-          Lwt.return_some {address = PKH delegate; attest_infos; stake_fraction})
-        bakers
-    in
+    let open Baker_helpers in
+    let* bakers_info = get_current_baker_infos endpoint in
     let rec classify_bakers already_classified = function
       | [] -> already_classified
       | ({attest_infos; _} as baker) :: tl -> (
@@ -885,7 +912,7 @@ module Alert = struct
   type attestation_transition = Stopped_attesting | Restarted_attesting
 
   let report_attestation_transition ~slack_channel_id ~slack_bot_token ~network
-      ~level ~pkh ~transition ~attestation_percentage =
+      ~level ~baker ~transition ~attestation_percentage =
     let data =
       let header =
         Format.asprintf
@@ -900,8 +927,8 @@ module Alert = struct
                threshold. New attestation rate is %.2f%%.")
           (Network.to_string network)
           level
-          pp_delegate
-          pkh
+          Baker_helpers.pp_baker_light
+          baker
           attestation_percentage
       in
       Format_app.section [header] ()
@@ -929,7 +956,8 @@ module Alert = struct
              as 100% attestation rate. *)
           if cycle_position < 20 then unit
           else
-            let treat_delegate pkh =
+            let treat_delegate baker =
+              let (PKH pkh) = baker.Baker_helpers.address in
               let* infos =
                 RPC_core.call endpoint
                 @@ RPC.get_chain_block_context_delegate pkh
@@ -976,17 +1004,13 @@ module Alert = struct
                         ~slack_bot_token
                         ~network
                         ~level
-                        ~pkh
+                        ~baker
                         ~transition
                         ~attestation_percentage)
             in
             let refill_delegates_to_treat () =
-              let query_string = [("active", "true")] in
-              let* delegates =
-                RPC_core.call endpoint
-                @@ RPC.get_chain_block_context_delegates ~query_string ()
-              in
-              to_treat_delegates := delegates ;
+              let* bakers = Baker_helpers.get_current_baker_infos endpoint in
+              to_treat_delegates := bakers ;
               unit
             in
             (* To avoid spawning a high number of RPCs simultaneously, we treat 2 delegates at each level. *)
