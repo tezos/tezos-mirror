@@ -533,6 +533,8 @@ oc.build:static-x86_64-linux-binaries:
   - gcp_very_high_cpu_ramfs
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -584,6 +586,8 @@ oc.build:static-arm64-linux-binaries:
   - gcp_arm64
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -635,6 +639,8 @@ oc.build_x86_64-released:
   - gcp_very_high_cpu_ramfs
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -691,6 +697,8 @@ oc.build_amd64-extra-dev:
   - gcp_very_high_cpu
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -763,6 +771,8 @@ oc.build_amd64-extra-exp:
   - gcp_very_high_cpu
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1026,6 +1036,8 @@ opam:prepare:
   rules:
   - when: delayed
     start_in: 1 minute
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1800,6 +1812,8 @@ kaitai_checks:
   - gcp
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1873,6 +1887,8 @@ oc.check_lift_limits_patch:
   - gcp
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1914,6 +1930,8 @@ oc.python_check:
   - gcp
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1981,6 +1999,8 @@ oc.script:test-gen-genesis:
   - gcp
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2080,6 +2100,8 @@ oc.script:b58_prefix:
   - gcp
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2134,6 +2156,8 @@ oc:scripts:release_script_values:
   stage: test
   tags:
   - gcp
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2155,6 +2179,8 @@ mir_unit:
   - gcp
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2183,6 +2209,8 @@ mir_tzt:
   - gcp
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2211,6 +2239,8 @@ test_sdk_rust:
   - gcp
   rules:
   - when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
@@ -2248,6 +2278,8 @@ test_sdk_bindings:
   - gcp
   rules:
   - when: on_success
+  needs:
+  - oc.docker:rust-sdk-bindings:amd64
   dependencies:
   - oc.docker:rust-sdk-bindings:amd64
   timeout: 60 minutes
@@ -2535,6 +2567,8 @@ ocaml-check:
   - gcp_very_high_cpu
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -3010,6 +3044,7 @@ oc.install_opam_noble:
   - gcp
   rules:
   - when: always
+  needs: []
   dependencies: []
   allow_failure: true
   timeout: 2 hours
@@ -3033,6 +3068,7 @@ oc.compile_sources_doc_deps:
   - gcp_very_high_cpu
   rules:
   - when: always
+  needs: []
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -3061,6 +3097,7 @@ oc.compile_sources_doc:
   - gcp_very_high_cpu_ramfs
   rules:
   - when: always
+  needs: []
   dependencies: []
   timeout: 60 minutes
   interruptible: false

@@ -577,7 +577,7 @@ let jobs pipeline_type =
   let dependencies_needs_start =
     match pipeline_type with
     | Before_merging | Merge_train -> Dependent [Job job_start]
-    | Schedule_extended_test -> Staged []
+    | Schedule_extended_test -> Dependent []
   in
   (* The build_x86_64 jobs are split in two to keep the artifact size
      under the 1GB hard limit set by GitLab. *)
