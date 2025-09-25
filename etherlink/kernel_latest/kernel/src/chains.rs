@@ -19,8 +19,8 @@ use crate::{
     CHAIN_ID,
 };
 use anyhow::Context;
-use evm_execution::configuration::EVMVersion;
 use primitive_types::{H160, H256, U256};
+use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
 use rlp::{Decodable, Encodable};
 use std::{
@@ -74,7 +74,7 @@ impl From<String> for ChainFamily {
 pub struct EvmChainConfig {
     chain_id: U256,
     limits: EvmLimits,
-    evm_config: evm_execution::Config,
+    spec_id: SpecId,
 }
 
 #[derive(Debug)]
@@ -346,12 +346,12 @@ impl ChainConfigTrait for EvmChainConfig {
             self.chain_id,
             da_fee_per_byte,
             coinbase,
-            &self.evm_config,
+            &self.spec_id,
         )
     }
 
     fn start_simulation_mode(&self, host: &mut impl Runtime) -> anyhow::Result<()> {
-        start_simulation_mode(host, &self.evm_config)
+        start_simulation_mode(host, &self.spec_id)
     }
 
     fn storage_root_path(&self) -> RefPath {
@@ -360,15 +360,11 @@ impl ChainConfigTrait for EvmChainConfig {
 }
 
 impl EvmChainConfig {
-    pub fn create_config(
-        chain_id: U256,
-        limits: EvmLimits,
-        evm_config: evm_execution::Config,
-    ) -> Self {
+    pub fn create_config(chain_id: U256, limits: EvmLimits, spec_id: SpecId) -> Self {
         Self {
             chain_id,
             limits,
-            evm_config,
+            spec_id,
         }
     }
 
@@ -380,8 +376,8 @@ impl EvmChainConfig {
         &mut self.limits
     }
 
-    pub fn get_evm_config(&self) -> &evm_execution::Config {
-        &self.evm_config
+    pub fn get_spec_id(&self) -> &SpecId {
+        &self.spec_id
     }
 }
 
@@ -556,13 +552,9 @@ impl MichelsonChainConfig {
 }
 
 impl ChainConfig {
-    pub fn new_evm_config(
-        chain_id: U256,
-        limits: EvmLimits,
-        evm_config: evm_execution::Config,
-    ) -> Self {
+    pub fn new_evm_config(chain_id: U256, limits: EvmLimits, spec_id: SpecId) -> Self {
         ChainConfig::Evm(Box::new(EvmChainConfig::create_config(
-            chain_id, limits, evm_config,
+            chain_id, limits, spec_id,
         )))
     }
 
@@ -633,7 +625,7 @@ impl Default for EvmChainConfig {
         Self::create_config(
             U256::from(CHAIN_ID),
             EvmLimits::default(),
-            EVMVersion::to_config(&EVMVersion::default()),
+            SpecId::default(),
         )
     }
 }
@@ -643,7 +635,7 @@ pub fn test_evm_chain_config() -> EvmChainConfig {
     EvmChainConfig::create_config(
         U256::from(CHAIN_ID),
         EvmLimits::default(),
-        EVMVersion::current_test_config(),
+        SpecId::default(),
     )
 }
 

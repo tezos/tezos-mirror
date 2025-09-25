@@ -7,40 +7,52 @@
 //!
 //! We need to read and write Ethereum specific values such
 //! as addresses and values.
+#[cfg(test)]
 use crate::trace::TracerInput::{CallTracer, StructLogger};
-use account_storage::{AccountStorageError, EthereumAccountStorage};
+use account_storage::AccountStorageError;
+#[cfg(test)]
+use account_storage::EthereumAccountStorage;
 use alloc::borrow::Cow;
 use alloc::collections::TryReserveError;
-use configuration::EVMVersion;
+#[cfg(test)]
 use crypto::hash::{ContractKt1Hash, HashTrait};
 use evm::executor::stack::PrecompileFailure;
+#[cfg(test)]
 use handler::{EvmHandler, ExecutionOutcome, ExecutionResult};
-use host::{path::RefPath, runtime::RuntimeError};
-use primitive_types::{H160, H256, U256};
+#[cfg(test)]
+use host::path::RefPath;
+use primitive_types::U256;
+#[cfg(test)]
+use primitive_types::{H160, H256};
+#[cfg(test)]
 use tezos_ethereum::{access_list::AccessList, block::BlockConstants};
+#[cfg(test)]
 use tezos_evm_logging::{log, Level::*};
+#[cfg(test)]
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_storage::StorageError;
+#[cfg(test)]
 use tezos_storage::KT1_B58_SIZE;
 use thiserror::Error;
 
 mod access_record;
 
 mod account_storage;
-pub mod code_storage;
-pub mod configuration;
+mod code_storage;
+mod configuration;
 pub mod fa_bridge;
-pub mod handler;
-pub mod precompiles;
-pub mod storage;
-pub mod tick_model_opcodes;
+mod handler;
+mod precompiles;
+mod storage;
+mod tick_model_opcodes;
 mod trace;
 mod transaction;
 mod transaction_layer_data;
 mod utilities;
 mod withdrawal_counter;
 
-pub use evm::Config;
+#[cfg(test)]
+use evm::Config;
 
 extern crate alloc;
 extern crate tezos_crypto_rs as crypto;
@@ -48,9 +60,11 @@ extern crate tezos_smart_rollup_debug as debug;
 extern crate tezos_smart_rollup_host as host;
 
 use precompiles::PrecompileSet;
-use trace::{
-    CallTrace, CallTracerConfig, CallTracerInput, StructLoggerInput, TracerInput,
-};
+
+use trace::TracerInput;
+
+#[cfg(test)]
+use trace::{CallTrace, CallTracerConfig, CallTracerInput, StructLoggerInput};
 
 use crate::storage::tracer;
 
@@ -154,6 +168,7 @@ impl_wrap_error!(tezos_smart_rollup_host::runtime::RuntimeError);
 impl_wrap_error!(rlp::DecoderError);
 impl_wrap_error!(evm::ExitError);
 
+#[cfg(test)]
 fn trace_outcome<Host: Runtime>(
     handler: EvmHandler<Host>,
     is_success: bool,
@@ -169,6 +184,7 @@ fn trace_outcome<Host: Runtime>(
     Ok(())
 }
 
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn call_trace_outcome<Host: Runtime>(
     handler: EvmHandler<Host>,
@@ -223,6 +239,7 @@ fn call_trace_outcome<Host: Runtime>(
     Ok(())
 }
 
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn call_trace_error<Host: Runtime>(
     handler: EvmHandler<Host>,
@@ -267,7 +284,8 @@ fn call_trace_error<Host: Runtime>(
 // function is visible in the profiling results.
 #[cfg_attr(feature = "benchmark", inline(never))]
 #[allow(clippy::too_many_arguments)]
-pub fn run_transaction<'a, Host>(
+#[cfg(test)]
+fn run_transaction<'a, Host>(
     host: &'a mut Host,
     block: &'a BlockConstants,
     evm_account_storage: &'a mut EthereumAccountStorage,
@@ -415,11 +433,13 @@ where
         Ok(None)
     }
 }
-pub const NATIVE_TOKEN_TICKETER_PATH: RefPath =
+#[cfg(test)]
+const NATIVE_TOKEN_TICKETER_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/ticketer");
 
 /// Reads the ticketer address set by the installer, if any, encoded in b58.
-pub fn read_ticketer(host: &impl Runtime) -> Option<ContractKt1Hash> {
+#[cfg(test)]
+fn read_ticketer(host: &impl Runtime) -> Option<ContractKt1Hash> {
     let ticketer = host
         .store_read(&NATIVE_TOKEN_TICKETER_PATH, 0, KT1_B58_SIZE)
         .ok()?;
@@ -430,49 +450,30 @@ pub fn read_ticketer(host: &impl Runtime) -> Option<ContractKt1Hash> {
 
 // Path to the fast withdrawals feature flag. If there is nothing at this
 // path, fast withdrawals are not used.
-pub const ENABLE_FAST_WITHDRAWAL: RefPath =
+#[cfg(test)]
+const ENABLE_FAST_WITHDRAWAL: RefPath =
     RefPath::assert_from(b"/evm/world_state/feature_flags/enable_fast_withdrawal");
 
-pub fn fast_withdrawals_enabled<Host: Runtime>(host: &Host) -> bool {
+#[cfg(test)]
+fn fast_withdrawals_enabled<Host: Runtime>(host: &Host) -> bool {
     host.store_read(&ENABLE_FAST_WITHDRAWAL, 0, 1).is_ok()
-}
-
-// Path to the EVM version.
-const EVM_VERSION: RefPath = RefPath::assert_from(b"/evm/evm_version");
-
-pub fn store_evm_version(
-    host: &mut impl Runtime,
-    evm_version: &EVMVersion,
-) -> Result<(), RuntimeError> {
-    host.store_write(&EVM_VERSION, &evm_version.to_le_bytes(), 0)
-}
-
-pub fn read_evm_version(host: &mut impl Runtime) -> EVMVersion {
-    let evm_version = host.store_read_all(&EVM_VERSION);
-    match evm_version {
-        Ok(evm_version) => match evm_version.as_slice().try_into().ok() {
-            Some(evm_version) => EVMVersion::from_le_bytes(evm_version),
-            None => EVMVersion::default(),
-        },
-        Err(_) => {
-            let _ = store_evm_version(host, &EVMVersion::default());
-            EVMVersion::default()
-        }
-    }
 }
 
 // Path to the fast withdrawals of FA tokens feature flag. If there is nothing at this
 // path, fast withdrawals are not used.
-pub const ENABLE_FAST_FA_WITHDRAWAL: RefPath =
+#[cfg(test)]
+const ENABLE_FAST_FA_WITHDRAWAL: RefPath =
     RefPath::assert_from(b"/evm/world_state/feature_flags/enable_fast_fa_withdrawal");
 
-pub fn fast_fa_withdrawals_enabled<Host: Runtime>(host: &Host) -> bool {
+#[cfg(test)]
+fn fast_fa_withdrawals_enabled<Host: Runtime>(host: &Host) -> bool {
     host.store_read(&ENABLE_FAST_FA_WITHDRAWAL, 0, 1).is_ok()
 }
 
 #[cfg(test)]
 mod test {
     use crate::account_storage::EthereumAccount;
+    use crate::configuration::EVMVersion;
 
     use super::*;
     use account_storage::{

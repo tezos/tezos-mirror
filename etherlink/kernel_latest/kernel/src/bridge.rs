@@ -6,9 +6,11 @@
 //! Native token (TEZ) bridge primitives and helpers.
 
 use alloy_sol_types::SolEvent;
-use evm::Config;
 use primitive_types::{H160, H256, U256};
 use revm::context::result::{ExecutionResult, Output, SuccessReason};
+use revm::interpreter::gas::call_cost;
+use revm::interpreter::StateLoad;
+use revm::primitives::hardfork::SpecId;
 use revm::primitives::{Address, Bytes, Log, LogData, B256};
 use revm_etherlink::ExecutionOutcome;
 use revm_etherlink::{
@@ -213,7 +215,7 @@ pub fn execute_deposit<Host: Runtime>(
     host: &mut Host,
     world_state_handler: &mut WorldStateHandler,
     deposit: &Deposit,
-    config: &Config,
+    spec_id: &SpecId,
 ) -> Result<DepositResult, revm_etherlink::Error> {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
@@ -222,7 +224,7 @@ pub fn execute_deposit<Host: Runtime>(
         .get_or_create(host, &to_account_path)
         .map_err(|e| revm_etherlink::Error::Custom(e.to_string()))?;
     // TODO: estimate how emitting an event influenced tick consumption
-    let gas_used = config.gas_transaction_call;
+    let gas_used = call_cost(*spec_id, true, StateLoad::default());
 
     let result = match to_account.add_balance(host, u256_to_alloy(&deposit.amount)) {
         Ok(()) => ExecutionResult::Success {
@@ -255,9 +257,9 @@ pub fn execute_deposit<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::SolEvent;
-    use evm_execution::configuration::EVMVersion;
     use evm_execution::fa_bridge::test_utils::create_fa_ticket;
     use primitive_types::{H160, U256};
+    use revm::primitives::hardfork::SpecId;
     use revm_etherlink::storage::world_state_handler::new_world_state_handler;
     use rlp::Decodable;
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -365,7 +367,7 @@ mod tests {
             &mut host,
             &mut world_state_handler,
             &deposit,
-            &EVMVersion::current_test_config(),
+            &SpecId::default(),
         )
         .unwrap();
         let logs = outcome.result.logs();
@@ -394,7 +396,7 @@ mod tests {
             &mut host,
             &mut world_state_handler,
             &deposit,
-            &EVMVersion::current_test_config(),
+            &SpecId::default(),
         )
         .unwrap();
         assert!(outcome.result.is_success());
@@ -403,7 +405,7 @@ mod tests {
             &mut host,
             &mut world_state_handler,
             &deposit,
-            &EVMVersion::current_test_config(),
+            &SpecId::default(),
         )
         .unwrap();
         assert!(!outcome.result.is_success());

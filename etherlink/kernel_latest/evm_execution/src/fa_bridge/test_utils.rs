@@ -3,14 +3,17 @@
 //
 // SPDX-License-Identifier: MIT
 
+use alloy_sol_types::sol;
 pub use alloy_sol_types::SolCall;
-use alloy_sol_types::{sol, SolConstructor};
+#[cfg(test)]
+use alloy_sol_types::SolConstructor;
 use crypto::hash::ContractKt1Hash;
 use num_bigint::BigInt;
 use primitive_types::{H160, H256, U256};
 use tezos_data_encoding::enc::BinWriter;
+#[cfg(test)]
+use tezos_ethereum::access_list::empty_access_list;
 use tezos_ethereum::{
-    access_list::empty_access_list,
     block::{BlockConstants, BlockFees},
     Log,
 };
@@ -26,25 +29,28 @@ use tezos_storage::read_u256_le_default;
 
 use crate::{
     account_storage::{account_path, EthereumAccountStorage},
-    configuration::EVMVersion,
-    handler::{EvmHandler, ExecutionOutcome},
-    precompiles::{
-        self, precompile_set, FA_BRIDGE_PRECOMPILE_ADDRESS, SYSTEM_ACCOUNT_ADDRESS,
-    },
-    run_transaction,
-    transaction_layer_data::CallContext,
+    precompiles::SYSTEM_ACCOUNT_ADDRESS,
     utilities::keccak256_hash,
     withdrawal_counter::WITHDRAWAL_COUNTER_PATH,
 };
+#[cfg(test)]
+use crate::{
+    configuration::EVMVersion,
+    fa_bridge::FaWithdrawalKind,
+    handler::{EvmHandler, ExecutionOutcome},
+    precompiles::{self, precompile_set, FA_BRIDGE_PRECOMPILE_ADDRESS},
+    run_transaction,
+    transaction_layer_data::CallContext,
+};
 
 use super::{
-    claim_fa_deposit,
     deposit::{ticket_hash, FaDeposit},
-    execute_fa_withdrawal, queue_fa_deposit,
     ticket_table::{ticket_balance_path, TicketTable},
     withdrawal::FaWithdrawal,
 };
-use crate::fa_bridge::FaWithdrawalKind;
+
+#[cfg(test)]
+use super::{claim_fa_deposit, execute_fa_withdrawal, queue_fa_deposit};
 
 sol!(
     token_wrapper,
@@ -59,13 +65,16 @@ sol!(
     "tests/contracts/artifacts/ReentrancyTester.abi"
 );
 
+#[cfg(test)]
 const MOCK_WRAPPER_BYTECODE: &[u8] =
     include_bytes!("../../tests/contracts/artifacts/MockFaBridgeWrapper.bytecode");
 
+#[cfg(test)]
 const REENTRANCY_TESTER_BYTECODE: &[u8] =
     include_bytes!("../../tests/contracts/artifacts/ReentrancyTester.bytecode");
 
 /// Create a smart contract in the storage with the mocked token code
+#[cfg(test)]
 pub fn deploy_mock_wrapper(
     host: &mut MockKernelHost,
     evm_account_storage: &mut EthereumAccountStorage,
@@ -107,6 +116,7 @@ pub fn deploy_mock_wrapper(
 }
 
 /// Create a smart contract in the storage with the mocked token code
+#[cfg(test)]
 pub fn deploy_reentrancy_tester(
     host: &mut MockKernelHost,
     evm_account_storage: &mut EthereumAccountStorage,
@@ -152,6 +162,7 @@ pub fn deploy_reentrancy_tester(
 }
 
 /// Execute FA deposit
+#[cfg(test)]
 pub fn run_fa_deposit(
     host: &mut MockKernelHost,
     evm_account_storage: &mut EthereumAccountStorage,
@@ -424,6 +435,7 @@ pub fn dummy_fa_withdrawal(
 }
 
 /// Execute FA withdrawal directly without going through the precompile
+#[cfg(test)]
 pub fn fa_bridge_precompile_call_withdraw(
     host: &mut MockKernelHost,
     evm_account_storage: &mut EthereumAccountStorage,

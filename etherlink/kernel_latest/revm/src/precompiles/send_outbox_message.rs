@@ -80,7 +80,7 @@ sol! {
 }
 
 /// Withdrawal interface of the ticketer contract
-type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
+pub type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
 
 /// Interface of the default entrypoint of the fast withdrawal contract.
 ///
@@ -91,7 +91,7 @@ type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
 /// * withdrawer's address
 /// * generic payload
 /// * l2 caller's address
-type FastWithdrawalInterface = MichelsonPair<
+pub type FastWithdrawalInterface = MichelsonPair<
     MichelsonNat,
     MichelsonPair<
         FA2_1Ticket,

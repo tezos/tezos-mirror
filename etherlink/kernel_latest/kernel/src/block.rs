@@ -29,8 +29,8 @@ use crate::Configuration;
 use crate::{block_in_progress, tick_model};
 use anyhow::Context;
 use block_in_progress::EthBlockInProgress;
-use evm::Config;
 use primitive_types::{H160, H256, U256};
+use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
 use revm_etherlink::storage::world_state_handler::{
     new_world_state_handler, WorldStateHandler,
@@ -139,7 +139,7 @@ fn compute<Host: Runtime>(
     sequencer_pool_address: Option<H160>,
     limits: &EvmLimits,
     tracer_input: Option<TracerInput>,
-    evm_configuration: &Config,
+    spec_id: &SpecId,
 ) -> Result<BlockInProgressComputationResult, anyhow::Error> {
     log!(
         host,
@@ -181,7 +181,7 @@ fn compute<Host: Runtime>(
             world_state_handler,
             sequencer_pool_address,
             tracer_input,
-            evm_configuration,
+            spec_id,
             limits,
         )? {
             ExecutionResult::Valid(ExecutionInfo {
@@ -319,7 +319,7 @@ pub fn compute_bip<Host: Runtime>(
     chain_id: U256,
     da_fee_per_byte: U256,
     coinbase: H160,
-    evm_configuration: &Config,
+    spec_id: &SpecId,
 ) -> anyhow::Result<BlockComputationResult> {
     let mut world_state_handler =
         new_world_state_handler().context("Failed to initialize World State handler")?;
@@ -339,7 +339,7 @@ pub fn compute_bip<Host: Runtime>(
         sequencer_pool_address,
         limits,
         tracer_input,
-        evm_configuration,
+        spec_id,
     )?;
     match result {
         BlockInProgressComputationResult::RebootNeeded => {
@@ -604,7 +604,6 @@ mod tests {
     use crate::transaction::TransactionContent::EthereumDelayed;
     use crate::transaction::Transactions;
     use crate::{retrieve_block_fees, retrieve_chain_id};
-    use evm_execution::configuration::EVMVersion;
     use primitive_types::{H160, U256};
     use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
     use revm_etherlink::storage::world_state_handler::account_path;
@@ -842,12 +841,8 @@ mod tests {
     const DUMMY_BASE_FEE_PER_GAS: u64 = MINIMUM_BASE_FEE_PER_GAS;
     const DUMMY_DA_FEE: u64 = DA_FEE_PER_BYTE;
 
-    fn dummy_evm_config(evm_configuration: Config) -> EvmChainConfig {
-        EvmChainConfig::create_config(
-            DUMMY_CHAIN_ID,
-            EvmLimits::default(),
-            evm_configuration,
-        )
+    fn dummy_evm_config(spec_id: SpecId) -> EvmChainConfig {
+        EvmChainConfig::create_config(DUMMY_CHAIN_ID, EvmLimits::default(), spec_id)
     }
 
     fn dummy_tez_config() -> MichelsonChainConfig {
@@ -1035,7 +1030,7 @@ mod tests {
 
         produce(
             host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1414,7 +1409,7 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1459,7 +1454,7 @@ mod tests {
 
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1502,7 +1497,7 @@ mod tests {
 
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1584,7 +1579,7 @@ mod tests {
         // Produce block for blueprint containing transaction_0
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1593,7 +1588,7 @@ mod tests {
         // Produce block for blueprint containing transaction_1
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1651,7 +1646,7 @@ mod tests {
 
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1675,7 +1670,7 @@ mod tests {
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
         let mut host = MockKernelHost::default();
 
-        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
+        let chain_config = dummy_evm_config(SpecId::default());
 
         let mut world_state_handler = new_world_state_handler().unwrap();
 
@@ -1713,7 +1708,7 @@ mod tests {
 
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1746,7 +1741,7 @@ mod tests {
         )
         .unwrap();
 
-        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
+        let chain_config = dummy_evm_config(SpecId::default());
         let blocks_index = block_storage::internal_for_tests::init_blocks_index(
             &chain_config.storage_root_path(),
         )
@@ -1855,7 +1850,7 @@ mod tests {
             None,
             &EvmLimits::default(),
             None,
-            &EVMVersion::current_test_config(),
+            &SpecId::default(),
         )
         .expect("Should safely ask for a reboot");
 
@@ -1931,7 +1926,7 @@ mod tests {
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -1973,7 +1968,7 @@ mod tests {
     fn test_first_blocks() {
         let mut host = MockKernelHost::default();
 
-        let chain_config = dummy_evm_config(EVMVersion::current_test_config());
+        let chain_config = dummy_evm_config(SpecId::default());
         // first block should be 0
         let blueprint = almost_empty_blueprint();
         store_inbox_blueprint(&mut host, blueprint).expect("Should store a blueprint");
@@ -2124,7 +2119,7 @@ mod tests {
 
         host.reboot_left().expect("should be some reboot left");
 
-        let mut chain_config = dummy_evm_config(EVMVersion::current_test_config());
+        let mut chain_config = dummy_evm_config(SpecId::default());
         chain_config.limits_mut().maximum_gas_limit = 560_000;
         let mut configuration = dummy_configuration();
 
@@ -2221,7 +2216,7 @@ mod tests {
 
         store_blueprints::<_, EvmChainConfig>(&mut host, proposals);
 
-        let mut chain_config = dummy_evm_config(EVMVersion::current_test_config());
+        let mut chain_config = dummy_evm_config(SpecId::default());
         chain_config.limits_mut().maximum_gas_limit = 560_000;
         let mut configuration = dummy_configuration();
 
@@ -2324,7 +2319,7 @@ mod tests {
 
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
@@ -2405,7 +2400,7 @@ mod tests {
 
         produce(
             &mut host,
-            &dummy_evm_config(EVMVersion::current_test_config()),
+            &dummy_evm_config(SpecId::default()),
             &mut dummy_configuration(),
             None,
             None,
