@@ -40,6 +40,7 @@ datadog_pipeline_trace:
   stage: start
   tags:
   - gcp
+  needs: []
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
@@ -59,6 +60,7 @@ container_scanning:
   stage: test
   tags:
   - gcp
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:

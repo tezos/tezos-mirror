@@ -179,6 +179,7 @@ trigger:
     when: manual
     allow_failure: false
   - when: always
+  needs: []
   dependencies: []
   timeout: 10 minutes
   before_script:
@@ -468,6 +469,8 @@ oc.build_arm64-released:
     when: on_success
   - when: manual
     allow_failure: true
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -525,6 +528,8 @@ oc.build_arm64-extra-dev:
     when: on_success
   - when: manual
     allow_failure: true
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -589,6 +594,8 @@ oc.build_arm64-extra-exp:
     when: on_success
   - when: manual
     allow_failure: true
+  needs:
+  - oc.docker:ci:arm64
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -1175,6 +1182,8 @@ oc.build_kernels:
     - tzt_reference_test_suite/**/*
     - vendors/**/*.ml*
     when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
@@ -1250,6 +1259,8 @@ oc.tezt:fetch-records:
     - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   allow_failure: true
@@ -1284,6 +1295,8 @@ build_octez_source:
   rules:
   - when: manual
     allow_failure: true
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1356,6 +1369,8 @@ build-layer1-profiling:
     - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1432,6 +1447,8 @@ select_tezts:
     - tezt/**/*
     - tzt_reference_test_suite/**/*
     when: on_success
+  needs:
+  - oc.docker:ci:amd64
   dependencies:
   - oc.docker:ci:amd64
   allow_failure:

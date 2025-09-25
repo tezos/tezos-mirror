@@ -38,6 +38,7 @@ check_sdk_version:
   stage: start
   tags:
   - gcp
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:

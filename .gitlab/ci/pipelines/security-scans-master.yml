@@ -42,6 +42,7 @@ datadog_pipeline_trace:
   stage: start
   tags:
   - gcp
+  needs: []
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
