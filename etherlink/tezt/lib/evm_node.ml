@@ -1656,22 +1656,36 @@ let patch_state evm_node ~key ~value =
       let process = Process.spawn (Uses.path Constant.octez_evm_node) @@ args in
       Process.check process
 
+let snapshot_store () =
+  (* Use a single common snapshot store for all snapshots. *)
+  Temp.dir "snapshots_store"
+
+let snapshot_cmd desync args =
+  if not desync then ["snapshot"] @ args
+  else
+    ["experimental"; "snapshot"]
+    @ args
+    @ ["--snapshot-store"; snapshot_store ()]
+
 let export_snapshot =
   let cpt = ref 0 in
-  fun ?(compress_on_the_fly = false) evm_node ->
+  fun ?(compress_on_the_fly = false) ~desync evm_node ->
     incr cpt ;
     let dir = Tezt.Temp.dir "evm_snapshots" in
     let snapshot_file = (dir // "evm-snapshot-nb%r-%l.") ^ string_of_int !cpt in
     let args =
-      [
-        "snapshot";
-        "export";
-        "--data-dir";
-        data_dir evm_node;
-        "--snapshot-file";
-        snapshot_file;
-      ]
-      @ Cli_arg.optional_switch "compress-on-the-fly" compress_on_the_fly
+      snapshot_cmd
+        desync
+        ([
+           "export";
+           "--data-dir";
+           data_dir evm_node;
+           "--snapshot-file";
+           snapshot_file;
+         ]
+        @ Cli_arg.optional_switch
+            "compress-on-the-fly"
+            ((not desync) && compress_on_the_fly))
     in
     let process = spawn_command evm_node args in
     let parse process =
@@ -1682,16 +1696,18 @@ let export_snapshot =
     in
     Runnable.{value = process; run = parse}
 
-let import_snapshot ?(force = false) evm_node ~snapshot_file =
+let import_snapshot ?(force = false) ~desync evm_node ~snapshot_file =
   let args =
-    ["snapshot"; "import"; snapshot_file; "--data-dir"; data_dir evm_node]
-    @ Cli_arg.optional_switch "force" force
+    snapshot_cmd
+      desync
+      (["import"; snapshot_file; "--data-dir"; data_dir evm_node]
+      @ Cli_arg.optional_switch "force" force)
   in
   let process = spawn_command evm_node args in
   Runnable.{value = process; run = Process.check}
 
-let snapshot_info ~snapshot_file =
-  let cmd = ["snapshot"; "info"; snapshot_file] in
+let snapshot_info ~desync ~snapshot_file =
+  let cmd = snapshot_cmd desync ["info"; snapshot_file] in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
   Runnable.{value = process; run = Process.check_and_read_stdout}
 
