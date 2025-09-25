@@ -119,6 +119,7 @@ check: all
 	  echo "You should not edit generated dune and .opam files directly."; \
 	  echo "Edit manifest/main.ml instead."; \
 	  echo "Then run 'make -C manifest' and commit the difference."; \
+		git status; \
 	  exit 1 \
 	)
 
