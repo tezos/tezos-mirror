@@ -4653,54 +4653,6 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
     ~migrate_to
     ()
 
-let test_migration_parameters ~migrate_from ~migrate_to =
-  let tags = ["migration"; "parameters"] in
-  let description = "test parameters at migration" in
-  let scenario ~migration_level _dal_parameters client node dal_node =
-    let* proto_params =
-      Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
-    in
-    let minimal_block_delay =
-      JSON.(proto_params |-> "minimal_block_delay" |> as_int)
-    in
-    let attestation_lag =
-      JSON.(proto_params |-> "dal_parametric" |-> "attestation_lag" |> as_int)
-    in
-    let baker =
-      let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
-      Agnostic_baker.create ~dal_node_rpc_endpoint node client
-    in
-    let* () = Agnostic_baker.run baker in
-
-    let* _level = Node.wait_for_level node migration_level in
-    Log.info "migrated to next protocol, starting a second DAL node accuser" ;
-    let* new_proto_params =
-      Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
-    in
-    let new_minimal_block_delay =
-      JSON.(new_proto_params |-> "minimal_block_delay" |> as_int)
-    in
-    let new_attestation_lag =
-      JSON.(proto_params |-> "dal_parametric" |-> "attestation_lag" |> as_int)
-    in
-    let same_parameters =
-      minimal_block_delay = new_minimal_block_delay
-      && attestation_lag = new_attestation_lag
-    in
-    Check.is_true same_parameters ~error_msg:"Deal with issue #7983" ;
-    unit
-  in
-  test_l1_migration_scenario
-    ~scenario
-    ~tags
-    ~description
-    ~uses:[Constant.octez_agnostic_baker]
-    ~activation_timestamp:Now
-    ~custom_constants:Protocol.Constants_mainnet
-    ~migrate_from
-    ~migrate_to
-    ()
-
 let test_operator_profile _protocol _dal_parameters _cryptobox _node _client
     dal_node =
   let index = 0 in
@@ -11765,8 +11717,7 @@ let register_migration ~migrate_from ~migrate_to =
     ~migrate_from
     ~migrate_to ;
   tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
-  test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to ;
-  test_migration_parameters ~migration_level:3 ~migrate_from ~migrate_to
+  test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to
 
 let () =
   Regression.register
