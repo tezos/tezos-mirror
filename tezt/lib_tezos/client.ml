@@ -194,6 +194,16 @@ let mode_to_endpoint = function
 let string_of_endpoint ?hostname e =
   sf "%s://%s:%d%s" (scheme e) (address ?hostname e) (rpc_port e) (rpc_path e)
 
+let url_encoded_string_of_endpoint ?hostname e =
+  sf
+    "%s%s%s%s%d%s"
+    (scheme e)
+    "%3A%2F%2F"
+    (address ?hostname e)
+    "%3A"
+    (rpc_port e)
+    (rpc_path e)
+
 (* [?endpoint] can be used to override the default node stored in the client.
    Mockup nodes do not use [--endpoint] at all: RPCs are mocked up.
    Light mode needs a file (specified with [--sources] on the CLI)
