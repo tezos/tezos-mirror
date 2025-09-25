@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-#[cfg(test)]
 use evm::Config;
 
 #[derive(Default)]
@@ -12,7 +11,6 @@ pub enum EVMVersion {
 }
 
 impl EVMVersion {
-    #[cfg(test)]
     pub fn to_config(&self) -> Config {
         let config = match self {
             EVMVersion::Prague => Config::prague(),
@@ -35,7 +33,6 @@ impl EVMVersion {
         }
     }
 
-    #[cfg(test)]
     // Only to be used for test, to easily update all the unit tests with the
     // same configuration.
     // Code in production should read the feature flag to get the configuration.

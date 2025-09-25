@@ -28,6 +28,9 @@ impl From<Error> for CustomPrecompileError {
         match error {
             Error::Runtime(runtime) => CustomPrecompileError::from(runtime),
             Error::Custom(message) => CustomPrecompileError::Revert(message),
+            other => {
+                CustomPrecompileError::Revert(format!("Precompile error: {other:?}"))
+            }
         }
     }
 }

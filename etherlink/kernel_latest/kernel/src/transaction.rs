@@ -10,7 +10,7 @@ use crate::fees::tx_execution_gas_limit;
 
 use crate::tick_model::constants::BASE_GAS;
 use evm_execution::fa_bridge::{deposit::FaDeposit, FA_DEPOSIT_QUEUE_GAS_LIMIT};
-use evm_execution::EthereumError;
+use revm_etherlink::Error;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::rlp_helpers::{self, decode_field, decode_tx_hash, next};
@@ -144,7 +144,7 @@ impl Transaction {
         }
     }
 
-    pub fn execution_gas_limit(&self, fees: &BlockFees) -> Result<u64, EthereumError> {
+    pub fn execution_gas_limit(&self, fees: &BlockFees) -> Result<u64, Error> {
         match &self.content {
             TransactionContent::Deposit(_) => Ok(BASE_GAS),
             TransactionContent::Ethereum(e) => tx_execution_gas_limit(e, fees, false),

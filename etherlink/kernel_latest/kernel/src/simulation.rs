@@ -8,8 +8,6 @@
 // Module containing most Simulation related code, in one place, to be deleted
 // when the proxy node simulates directly
 
-use std::borrow::Cow;
-
 use crate::apply::revm_run_transaction;
 use crate::block_storage;
 use crate::chains::{ChainFamily, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
@@ -24,12 +22,12 @@ use crate::{error::Error, storage};
 
 use crate::{parsable, parsing, retrieve_chain_id};
 
-use evm_execution::EthereumError;
 use primitive_types::{H160, U256};
 use revm::primitives::hardfork::SpecId;
 use revm::{context::result::ExecutionResult as VMResult, primitives::Address};
 use revm_etherlink::{
-    helpers::legacy::u256_to_alloy, inspectors::TracerInput, ExecutionOutcome,
+    helpers::legacy::u256_to_alloy, inspectors::TracerInput, Error as RevmError,
+    ExecutionOutcome,
 };
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use tezos_ethereum::access_list::empty_access_list;
@@ -196,8 +194,8 @@ pub struct Evaluation {
     pub timestamp: Option<Timestamp>,
 }
 
-impl<T> From<EthereumError> for SimulationResult<T, String> {
-    fn from(err: EthereumError) -> Self {
+impl<T> From<RevmError> for SimulationResult<T, String> {
+    fn from(err: RevmError) -> Self {
         let msg = format!("The transaction failed: {err:?}.");
         Self::Err(msg)
     }
@@ -216,10 +214,8 @@ impl From<ExecutionOutcome> for SimulationOutcome {
     }
 }
 
-impl From<Result<SimulationOutcome, EthereumError>>
-    for SimulationResult<CallResult, String>
-{
-    fn from(result: Result<SimulationOutcome, EthereumError>) -> Self {
+impl From<Result<SimulationOutcome, RevmError>> for SimulationResult<CallResult, String> {
+    fn from(result: Result<SimulationOutcome, RevmError>) -> Self {
         match result {
             Ok(SimulationOutcome { outcome, .. }) => Ok(outcome).into(),
             Err(err) => err.into(),
@@ -227,10 +223,8 @@ impl From<Result<SimulationOutcome, EthereumError>>
     }
 }
 
-impl From<Result<ExecutionOutcome, EthereumError>>
-    for SimulationResult<CallResult, String>
-{
-    fn from(result: Result<ExecutionOutcome, EthereumError>) -> Self {
+impl From<Result<ExecutionOutcome, RevmError>> for SimulationResult<CallResult, String> {
+    fn from(result: Result<ExecutionOutcome, RevmError>) -> Self {
         match result {
             Ok(ExecutionOutcome { result, .. }) if result.is_success() => {
                 Self::Ok(SimulationResult::Ok(ExecutionResult {
@@ -426,9 +420,9 @@ impl Evaluation {
                     Fatal,
                     "Read a tezlink block when expecting an etherlink block"
                 );
-                return Err(Error::Simulation(EthereumError::WrappedError(Cow::from(
-                    "Should not have found a Tezlink block",
-                ))));
+                return Err(Error::Simulation(RevmError::Custom(
+                    "Should not have found a Tezlink block".to_string(),
+                )));
             }
             Err(_) => {
                 // Timestamp is taken from the simulation caller if provided.

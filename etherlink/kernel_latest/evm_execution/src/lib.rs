@@ -39,6 +39,7 @@ mod access_record;
 
 mod account_storage;
 mod code_storage;
+#[cfg(test)]
 mod configuration;
 pub mod fa_bridge;
 mod handler;
