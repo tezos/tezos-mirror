@@ -8,8 +8,8 @@ set -eu
 # you should manually delete any previously created package, otherwise it will
 # reupload the files inside the same package, creating duplicates
 
-# shellcheck source=./scripts/ci/octez-release.sh
-. ./scripts/ci/octez-release.sh
+# shellcheck source=./scripts/releases/octez-release.sh
+. ./scripts/releases/octez-release.sh
 
 # Checks if running in dry-mode
 for arg in "$@"; do

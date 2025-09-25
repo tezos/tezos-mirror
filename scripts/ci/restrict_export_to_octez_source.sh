@@ -6,8 +6,8 @@ set -eu
 # script-inputs/octez-source-content. It expects that paths in
 # octez-source-content do not have trailing slashes.
 
-# shellcheck source=./scripts/ci/octez-release.sh
-. ./scripts/ci/octez-release.sh
+# shellcheck source=./scripts/releases/octez-release.sh
+. ./scripts/releases/octez-release.sh
 
 # Adds export-ignore for each part of the repo that is not part of octez
 ignore="$(comm -2 -3 <(find . -maxdepth 1 | sed 's|^./||' | sort) <(sort "${octez_source_content}"))"

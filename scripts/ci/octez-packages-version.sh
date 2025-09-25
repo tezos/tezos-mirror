@@ -28,8 +28,8 @@ if [ "${CI_COMMIT_REF_NAME:-}" = "master" ]; then
 else
   # we might be interested in the tag even if the branch is not protected
   if [ -n "${CI_COMMIT_TAG:-}" ]; then
-    # shellcheck source=./scripts/ci/octez-release.sh
-    . ./scripts/ci/octez-release.sh
+    # shellcheck source=./scripts/releases/octez-release.sh
+    . ./scripts/releases/octez-release.sh
   fi
 
   if [ ! "${CI_COMMIT_REF_PROTECTED:-}" = "false" ]; then

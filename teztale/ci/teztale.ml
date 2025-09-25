@@ -109,15 +109,9 @@ let register () =
     ~description:"Daily tests to run for Teztale."
     [(Auto, job_build `test Amd64); (Auto, job_build `test Arm64)] ;
   CI.register_global_release_jobs
-    [
-      (Auto, job_gitlab_release);
-      (Manual, job_release_page `real `build_dependencies);
-    ] ;
+    [(Manual, job_release_page `real `build_dependencies)] ;
   CI.register_global_test_release_jobs
-    [
-      (Auto, job_gitlab_release);
-      (Manual, job_release_page `test `build_dependencies);
-    ] ;
+    [(Manual, job_release_page `test `build_dependencies)] ;
   CI.register_global_publish_release_page_jobs
     [
       ( Manual,

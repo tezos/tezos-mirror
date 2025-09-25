@@ -1264,6 +1264,9 @@ teztale.build-arm64:
   stage: build
   tags:
   - gcp_arm64
+  rules:
+  - when: manual
+    allow_failure: true
   needs:
   - oc.docker:ci:arm64
   dependencies:
@@ -1312,6 +1315,9 @@ teztale.build-x86_64:
   stage: build
   tags:
   - gcp_very_high_cpu_ramfs
+  rules:
+  - when: manual
+    allow_failure: true
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -1354,30 +1360,6 @@ teztale.build-x86_64:
     paths:
     - teztale-binaries/x86_64/octez-teztale-*
     when: on_success
-
-teztale.gitlab_release:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
-  stage: publish
-  tags:
-  - gcp_not_interruptible
-  needs:
-  - teztale.build-x86_64
-  - teztale.build-arm64
-  dependencies:
-  - teztale.build-x86_64
-  - teztale.build-arm64
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./teztale/scripts/releases/create_gitlab_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  retry: 0
 
 teztale.release_page:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1422,6 +1404,9 @@ grafazos.build:
   stage: build
   tags:
   - gcp
+  rules:
+  - when: manual
+    allow_failure: true
   needs:
   - oc.docker:jsonnet:amd64
   dependencies:
@@ -1445,28 +1430,6 @@ grafazos.build:
     paths:
     - grafazos/output/**/*.json
     when: on_success
-
-grafazos.gitlab_release:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
-  stage: publish
-  tags:
-  - gcp_not_interruptible
-  needs:
-  - grafazos.build
-  dependencies:
-  - grafazos.build
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./grafazos/scripts/releases/create_gitlab_release.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  retry: 0
 
 grafazos.release_page:
   image: ${ci_image_name}/build:${ci_image_tag}
