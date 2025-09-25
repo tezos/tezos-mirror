@@ -1044,8 +1044,7 @@ let test_tezlink_bigmap_option =
       Foreign_endpoint
         {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
-  (* In the L1, we actually get "Some 4" because the bootstrap contracts of Liquidity Baking use the big map indices from 0 to 3. *)
-  let expected_result = "Some 0" in
+  let expected_result = "Some 4" in
   let* () =
     Client.transfer
       ~endpoint

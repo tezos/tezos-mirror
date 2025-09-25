@@ -173,6 +173,12 @@ let activate_tezlink chain_id =
       ~value:"Michelson"
       ()
   in
+  let* () =
+    Evm_context.patch_state
+      ~key:(Format.sprintf "%s/next_id" Tezlink_durable_storage.Path.big_map)
+      ~value:(Data_encoding.Binary.to_string_exn Data_encoding.z @@ Z.of_int 4)
+      ()
+  in
   return_unit
 
 let main ~data_dir ~cctxt ?(genesis_timestamp = Misc.now ())

@@ -19,6 +19,8 @@ module Path = struct
 
   let accounts_index = "/tezlink/context/contracts/index"
 
+  let big_map = "/tezlink/context/big_map"
+
   let account contract =
     accounts_index ^ "/" ^ to_path Contract.encoding contract
 

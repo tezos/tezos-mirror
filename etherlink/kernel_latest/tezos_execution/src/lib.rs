@@ -807,7 +807,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 ) -> Result<Vec<OperationResultSum>, OperationError> {
     let mut safe_host = SafeStorage {
         host,
-        world_state: context::contracts::root(context).unwrap(),
+        world_state: context.path(),
     };
 
     safe_host.start()?;
