@@ -364,6 +364,50 @@ let check_attesters_attested node_ctxt committee slot_to_committee parameters
     in
     return_unit
 
+let process_commitments ctxt cctxt store proto_parameters block_level
+    (module Plugin : Dal_plugin.T) =
+  let open Lwt_result_syntax in
+  let* slot_headers =
+    (Plugin.get_published_slot_headers
+       ~block_level
+       cctxt [@profiler.record_s {verbosity = Notice} "slot_headers"])
+  in
+  let* () =
+    (Slot_manager.store_slot_headers
+       ~number_of_slots:proto_parameters.Types.number_of_slots
+       ~block_level
+       slot_headers
+       store [@profiler.record_s {verbosity = Notice} "store_slot_headers"])
+  in
+  (* If a slot header was posted to the L1 and we have the corresponding
+     data, post it to gossipsub.  Note that this is done independently
+     of the profile. *)
+  let level_committee ~level =
+    let* res =
+      (Node_context.fetch_committees
+         ctxt
+         ~level [@profiler.record_f {verbosity = Notice} "fetch_committee"])
+    in
+    return (Signature.Public_key_hash.Map.map fst res)
+  in
+  let slot_size = proto_parameters.cryptobox_parameters.slot_size in
+  let gs_worker = Node_context.get_gs_worker ctxt in
+  List.iter_es
+    (fun Dal_plugin.{slot_index; commitment; published_level} ->
+      let slot_id : Types.slot_id =
+        {slot_level = published_level; slot_index}
+      in
+      (Slot_manager.publish_slot_data
+         ctxt
+         ~level_committee
+         ~slot_size
+         gs_worker
+         proto_parameters
+         commitment
+         slot_id
+       [@profiler.aggregate_s {verbosity = Notice} "publish_slot_data"]))
+    slot_headers
+
 let process_block_data ctxt cctxt store proto_parameters block_level
     (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
@@ -385,47 +429,15 @@ let process_block_data ctxt cctxt store proto_parameters block_level
       [@profiler.record_s {verbosity = Notice} "store_skip_list_cells"]
     else return_unit
   in
-  let* slot_headers =
-    (Plugin.get_published_slot_headers
-       ~block_level
-       cctxt [@profiler.record_s {verbosity = Notice} "slot_headers"])
-  in
   let* () =
-    (Slot_manager.store_slot_headers
-       ~number_of_slots:proto_parameters.Types.number_of_slots
-       ~block_level
-       slot_headers
-       store [@profiler.record_s {verbosity = Notice} "store_slot_headers"])
-  in
-  let* () =
-    (* If a slot header was posted to the L1 and we have the corresponding
-       data, post it to gossipsub.  Note that this is done independently
-       of the profile. *)
-    let level_committee ~level =
-      let* res =
-        (Node_context.fetch_committees
-           ctxt
-           ~level [@profiler.record_f {verbosity = Notice} "fetch_committee"])
-      in
-      return (Signature.Public_key_hash.Map.map fst res)
-    in
-    let slot_size = proto_parameters.cryptobox_parameters.slot_size in
-    let gs_worker = Node_context.get_gs_worker ctxt in
-    List.iter_es
-      (fun Dal_plugin.{slot_index; commitment; published_level} ->
-        let slot_id : Types.slot_id =
-          {slot_level = published_level; slot_index}
-        in
-        (Slot_manager.publish_slot_data
-           ctxt
-           ~level_committee
-           ~slot_size
-           gs_worker
-           proto_parameters
-           commitment
-           slot_id
-         [@profiler.aggregate_s {verbosity = Notice} "publish_slot_data"]))
-      slot_headers
+    (process_commitments
+       ctxt
+       cctxt
+       store
+       proto_parameters
+       block_level
+       (module Plugin)
+     [@profiler.record_s {verbosity = Notice} "process_commitments"])
   in
   let*? dal_attestation =
     (Plugin.dal_attestation
