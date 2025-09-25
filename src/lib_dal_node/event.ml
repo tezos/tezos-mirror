@@ -540,6 +540,68 @@ open struct
       ("slot_index", Data_encoding.int31)
       ("validation_error", Data_encoding.string)
 
+  let batch_validation_stats =
+    declare_5
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"batch_validation_stats"
+      ~msg:
+        "Batch {batch_id} for level {level} of {elements} shards \
+         ({percentage}) verified in {validation_duration}s"
+      ~level:Info
+      ("batch_id", Data_encoding.int31)
+      ("level", Data_encoding.int32)
+      ("elements", Data_encoding.int31)
+      ("percentage", Data_encoding.float)
+      ~pp4:(fun fmt -> Format.fprintf fmt "%1f%%")
+      ("validation_duration", Data_encoding.float)
+      ~pp5:(fun fmt -> Format.fprintf fmt "%3f")
+
+  let pp_print_array_i ?(pp_sep = Format.pp_print_cut) pp_v ppf v =
+    let pp_print_iter ?(pp_sep = Format.pp_print_cut) iter pp_v ppf v =
+      let is_first = ref true in
+      let pp_v v =
+        if !is_first then is_first := false else pp_sep ppf () ;
+        pp_v ppf v
+      in
+      iter pp_v v
+    in
+    pp_print_iter ~pp_sep Array.iteri pp_v ppf v
+
+  let batch_validation_distribution_stats =
+    declare_3
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"batch_validation_distribution_stats"
+      ~msg:
+        "Shard distribution of batch {batch_id} for level {level}: \
+         {shard_distribution}"
+      ~level:Debug
+      ("batch_id", Data_encoding.int31)
+      ("level", Data_encoding.int32)
+      ("shard_distribution", Data_encoding.(array int31))
+      ~pp3:(fun fmt ->
+        Format.fprintf
+          fmt
+          "%a@."
+          (pp_print_array_i
+             ~pp_sep:(fun fmt () -> Format.fprintf fmt ",")
+             (fun fmt i shards -> Format.fprintf fmt "(%d:%d)" i shards)))
+
+  let batch_validation_completion_stats =
+    declare_4
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"batch_validation_completion_stats"
+      ~msg:
+        "Shards for level {level} of {total_shard_processed} elements treated \
+         with {total_batches_processed} batches in {validation_duration}s."
+      ~level:Info
+      ("level", Data_encoding.int32)
+      ("total_shard_processed", Data_encoding.int31)
+      ("total_batches_processed", Data_encoding.int31)
+      ("validation_duration", Data_encoding.float)
+
   let p2p_server_is_ready =
     declare_1
       ~section
@@ -1400,6 +1462,24 @@ let emit_dont_wait__batch_validation_error ~level ~slot_index ~validation_error
   emit__dont_wait__use_with_care
     batch_validation_error
     (level, slot_index, validation_error)
+
+let emit_dont_wait__batch_validation_stats ~batch_id ~head_level
+    ~number_of_shards ~shard_percentage ~duration =
+  emit__dont_wait__use_with_care
+    batch_validation_stats
+    (batch_id, head_level, number_of_shards, shard_percentage, duration)
+
+let emit_dont_wait__batch_validation_distribution_stats ~batch_id ~head_level
+    ~shard_distribution =
+  emit__dont_wait__use_with_care
+    batch_validation_distribution_stats
+    (batch_id, head_level, shard_distribution)
+
+let emit_dont_wait__batch_validation_completion_stats ~level
+    ~total_shard_processed ~total_batches_processed ~duration =
+  emit__dont_wait__use_with_care
+    batch_validation_completion_stats
+    (level, total_shard_processed, total_batches_processed, duration)
 
 let emit_p2p_server_is_ready ~point = emit p2p_server_is_ready point
 
