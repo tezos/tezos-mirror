@@ -769,12 +769,12 @@ Configuration commands:
 Snapshots commands:
 
   snapshot info <snapshot>
-    Display information about an EVM node snapshot file.
+    Display information about an EVM node legacy snapshot file.
     <snapshot>: Snapshot archive file, URL or stdin (when given `-`).
   
   snapshot export [--data-dir <data-dir>] [--config-file <path>]
       [-s --snapshot-file <path>] [--compress-on-the-fly] [--uncompressed]
-    Export a snapshot of the EVM node.
+    Export a legacy snapshot of the EVM node.
     --data-dir <data-dir>: The path to the EVM node data directory. Default
       is $HOME/.octez-evm-node.
       If set, defaults to the value of the environment variable
@@ -797,12 +797,74 @@ Snapshots commands:
     --uncompressed: Produce an uncompressed snapshot.
   
   snapshot import <snapshot> [--data-dir <data-dir>] [-f --force]
-    Import a snapshot of the EVM node.
+    Import a legacy snapshot of the EVM node.
     <snapshot>: Snapshot archive file, URL or stdin (when given `-`).
     --data-dir <data-dir>: The path to the EVM node data directory. Default
       is $HOME/.octez-evm-node.
       If set, defaults to the value of the environment variable
       `$EVM_NODE_DATA_DIR`.
+    -f --force: Allow importing snapshot in already populated data dir
+      (previous contents is removed first, even if the snapshot is
+      corrupted), or importing a legacy snapshot in an empty data dir.
+  
+  experimental snapshot info <snapshot> [--desync-path <path>]
+      [--snapshot-store <path|url>] [--index-dir <path|url>]
+      [--data-dir <data-dir>]
+    Display information about an EVM node desync snapshot file.
+    <snapshot>: Snapshot archive file, URL or stdin (when given `-`).
+    --desync-path <path>: Path to the desync executable. Will look in $PATH
+      by default.
+    --snapshot-store <path|url>: Snapshot store directory or URL
+    --index-dir <path|url>: Directory or URL at which the snapshot index
+      should be placed or read.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
+  
+  experimental snapshot export [--data-dir <data-dir>] [--config-file <path>]
+      [-s --snapshot-file <path>] [--index-dir <path|url>]
+      [--snapshot-store <path|url>] [--desync-path <path>]
+      [--chunk-size <min:avg:max>]
+    Export a desync snapshot of the EVM node.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
+    --config-file <path>: Path to a configuration file. Defaults to
+      `config.json` inside the data directory of the node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
+    -s --snapshot-file <path>: Path to the snapshot file to create, with
+      string interpolation. %r is replaced by the short form of the Smart
+      Rollup address, %R by the complete Smart Rollup address, %l by the
+      current head of the node, %h by the history mode used by the node, and
+      %% by %. Default is located in the current directory, and the filename
+      is based on the snapshot information.
+    --index-dir <path|url>: Directory or URL at which the snapshot index
+      should be placed or read.
+    --snapshot-store <path|url>: Snapshot store directory or URL
+    --desync-path <path>: Path to the desync executable. Will look in $PATH
+      by default.
+    --chunk-size <min:avg:max>: Chunk sizes to use for chunking snapshot.
+      Larger size will be faster at the cost of reduced
+      deduplication.
+      Defaults to `256:1024:4096`.
+  
+  experimental snapshot import <snapshot.caidx> [--data-dir <data-dir>]
+      [--index-dir <path|url>] [--snapshot-store <path|url>]
+      [--desync-path <path>] [-f --force]
+    Import a desync snapshot of the EVM node.
+    <snapshot.caidx>: Snapshot archive file, URL or stdin (when given `-`).
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
+    --index-dir <path|url>: Directory or URL at which the snapshot index
+      should be placed or read.
+    --snapshot-store <path|url>: Snapshot store directory or URL
+    --desync-path <path>: Path to the desync executable. Will look in $PATH
+      by default.
     -f --force: Allow importing snapshot in already populated data dir
       (previous contents is removed first, even if the snapshot is
       corrupted), or importing a legacy snapshot in an empty data dir.
