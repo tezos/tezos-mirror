@@ -129,6 +129,12 @@ let daemonize handlers =
    return_unit)
   |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
+module IntSet = Set.Make (struct
+  type t = int
+
+  let compare = compare
+end)
+
 let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     node_store node_ctxt amplificator ~verbose =
   let timing_table_size =
@@ -143,7 +149,8 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     let config = Node_context.get_config node_ctxt in
     config.disable_amplification
   in
-  let shards_handler shards =
+  let shards_out_handler shards =
+    (* Counting potentially emitted message is a good way to count the number of shards validated. *)
     let save_and_notify = Store.Shards.write_all shards in
     fun Types.Message.{share; _}
         Types.Message_id.{commitment; shard_index; level; slot_index; _}
@@ -156,9 +163,6 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
           [@profiler.aggregate_s
             {verbosity = Notice; profiler_module = Profiler} "save_and_notify"]
         in
-        let number_of_shards =
-          proto_parameters.cryptobox_parameters.number_of_shards
-        in
         (* Introduce a new store read at each received shard. Not sure it can be
           a problem, though *)
         let* number_of_already_stored_shards =
@@ -168,23 +172,53 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
            [@profiler.aggregate_s
              {verbosity = Notice; profiler_module = Profiler} "count_values"])
         in
-        let slot_metrics =
-          (Dal_metrics.update_timing_shard_received
-             (Node_context.get_cryptobox node_ctxt)
-             shards_timing_table
-             slot_id
-             ~number_of_already_stored_shards
-             ~number_of_shards
-           [@profiler.aggregate_f
-             {verbosity = Notice; profiler_module = Profiler}
-               "update_timing_shard_received"])
+        let update_metric_and_emit_event ?min_shards_to_reconstruct_slot
+            ~number_of_expected_shards () =
+          let open Lwt_syntax in
+          let updated, slot_metrics =
+            (Dal_metrics.update_timing_shard_validated
+               shards_timing_table
+               slot_id
+               ?min_shards_to_reconstruct_slot
+               ~number_of_already_stored_shards
+               ~number_of_expected_shards
+             [@profiler.aggregate_f
+               {verbosity = Notice; profiler_module = Profiler}
+                 "update_timing_shard_validated"])
+          in
+          let* () =
+            if updated then
+              Event.emit_validation_of_shard_update
+                ~level
+                ~slot_index
+                ~slot_metrics
+            else return_unit
+          in
+          return slot_metrics
         in
         match
           Profile_manager.get_profiles
           @@ Node_context.get_profile_ctxt node_ctxt
         with
         | Controller profile
-          when Controller_profiles.is_observed_slot slot_index profile -> (
+          when Controller_profiles.can_publish_on_slot_index slot_index profile
+          -> (
+            (* If one is an observer or an operator for current slot, then they expect all the shards. *)
+            let total_number_of_shards =
+              proto_parameters.cryptobox_parameters.number_of_shards
+            in
+            let min_shards_to_reconstruct_slot =
+              let redundancy_factor =
+                proto_parameters.cryptobox_parameters.redundancy_factor
+              in
+              total_number_of_shards / redundancy_factor
+            in
+            let*! slot_metrics =
+              update_metric_and_emit_event
+                ~min_shards_to_reconstruct_slot
+                ~number_of_expected_shards:total_number_of_shards
+                ()
+            in
             match amplificator with
             | None ->
                 let*! () =
@@ -203,16 +237,128 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
                 [@profiler.aggregate_s
                   {verbosity = Notice; profiler_module = Profiler}
                     "try_amplification"])
+        | Controller profile when Controller_profiles.has_attester profile ->
+            (* If one is not observing the slot but is an attester, then they
+               expect a number of shards depending of the committee draw. *)
+            let attesters = Controller_profiles.attesters profile in
+            let* committee =
+              let level =
+                Int32.add
+                  level
+                  (Int32.of_int (proto_parameters.Types.attestation_lag - 1))
+              in
+              Node_context.fetch_committees node_ctxt ~level
+            in
+            let number_of_expected_shards =
+              Signature.Public_key_hash.Set.fold
+                (fun pkh acc ->
+                  match Signature.Public_key_hash.Map.find pkh committee with
+                  | None -> acc
+                  | Some (shard_indices, _) -> acc + List.length shard_indices)
+                attesters
+                0
+            in
+            let*! _slot_metrics =
+              update_metric_and_emit_event ~number_of_expected_shards ()
+            in
+            return_unit
         | _ -> return_unit)
       [@profiler.aggregate_s
         {verbosity = Notice; profiler_module = Profiler} "shards_handler"])
+  in
+  let shards_in_handler still_to_receive_indices =
+   fun Types.Message_id.{level; slot_index; shard_index; _} from_peer ->
+    let open Lwt_result_syntax in
+    let*! () =
+      Event.emit_reception_of_shard_detailed
+        ~level
+        ~slot_index
+        ~shard_index
+        ~sender:from_peer
+    in
+    let slot_id : Types.slot_id = {slot_level = level; slot_index} in
+    let update_metric_and_emit_event if_no_shards_yet =
+      let still_to_receive_shards =
+        match
+          Dal_metrics.Slot_id_bounded_map.find_opt
+            still_to_receive_indices
+            slot_id
+        with
+        | None -> if_no_shards_yet ()
+        | Some l -> l
+      in
+      let last_expected_shard =
+        if IntSet.is_empty still_to_receive_shards then false
+        else
+          let new_set = IntSet.remove shard_index still_to_receive_shards in
+          Dal_metrics.Slot_id_bounded_map.replace
+            still_to_receive_indices
+            slot_id
+            new_set ;
+          IntSet.is_empty new_set
+      in
+      let updated, slot_metrics =
+        (Dal_metrics.update_timing_shard_received
+           shards_timing_table
+           slot_id
+           ~last_expected_shard
+         [@profiler.aggregate_f
+           {verbosity = Notice; profiler_module = Profiler}
+             "update_timing_shard_received"])
+      in
+      let*! () =
+        if updated then
+          Event.emit_reception_of_shard_update ~level ~slot_index ~slot_metrics
+        else Lwt.return_unit
+      in
+      return_unit
+    in
+    match[@profiler.aggregate_s
+           {verbosity = Notice; profiler_module = Profiler} "shards_handler"]
+      Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
+    with
+    | Controller profile
+      when Controller_profiles.can_publish_on_slot_index slot_index profile ->
+        (* If one is an observer or an operator for current slot, then they expect all the shards. *)
+        let total_number_of_shards =
+          proto_parameters.cryptobox_parameters.number_of_shards
+        in
+        update_metric_and_emit_event (fun () ->
+            IntSet.of_list (0 -- total_number_of_shards))
+    | Controller profile when Controller_profiles.has_attester profile ->
+        (* If one is not observing the slot but is an attester, then they
+               expect a number of shards depending of the committee draw. *)
+        let attesters = Controller_profiles.attesters profile in
+        let* committee =
+          let level =
+            Int32.add
+              level
+              (Int32.of_int (proto_parameters.Types.attestation_lag - 1))
+          in
+          Node_context.fetch_committees node_ctxt ~level
+        in
+        update_metric_and_emit_event (fun () ->
+            Signature.Public_key_hash.Set.fold
+              (fun pkh acc ->
+                match Signature.Public_key_hash.Map.find pkh committee with
+                | None -> acc
+                | Some (shard_indices, _) ->
+                    IntSet.union acc (IntSet.of_list shard_indices))
+              attesters
+              IntSet.empty)
+    | _ -> return_unit
+  in
+  let still_to_receive_indices =
+    Dal_metrics.Slot_id_bounded_map.create
+      (proto_parameters.number_of_slots * proto_parameters.attestation_lag)
   in
   Lwt.dont_wait
     (fun () ->
       Gossipsub.Transport_layer_hooks.activate
         gs_worker
         transport_layer
-        ~app_messages_callback:(shards_handler node_store)
+        ~app_out_callback:(shards_out_handler node_store)
+        ~app_in_callback:(shards_in_handler still_to_receive_indices)
         ~verbose)
     (fun exn ->
       "[dal_node] error in Daemon.connect_gossipsub_with_p2p: "

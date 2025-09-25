@@ -1175,6 +1175,52 @@ open struct
       ~level:Warning
       ("delegates", Data_encoding.list Signature.Public_key_hash.encoding)
       ~pp1:pp_pkh_list
+
+  let reception_of_shard_update =
+    declare_4
+      ~section:["dal"; "reception"]
+      ~prefix_name_with_section:true
+      ~name:"reception_of_shard_update"
+      ~msg:
+        "For level {level} and slot {slot_index} {position} shard has been \
+         received.\n\
+         {slot_metrics}"
+      ~level:Info
+      ("level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("position", Data_encoding.string)
+      ("slot_metrics", Dal_metrics.slot_metrics_encoding)
+      ~pp4:Dal_metrics.pp_slot_metrics_received
+
+  let validation_of_shard_update =
+    declare_4
+      ~section:["dal"; "attestation"]
+      ~prefix_name_with_section:true
+      ~name:"validation_of_shard_update"
+      ~msg:
+        "For level {level} and slot {slot_index} {position} shard(s) have been \
+         validated.\n\
+         {slot_metrics}"
+      ~level:Debug
+      ("level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("position", Data_encoding.string)
+      ("slot_metrics", Dal_metrics.slot_metrics_encoding)
+      ~pp4:Dal_metrics.pp_slot_metrics
+
+  let reception_of_shard_detailed =
+    declare_4
+      ~section:["dal_shards"; "reception"]
+      ~name:"reception_of_a_shard"
+      ~msg:
+        "For level {level} and slot {slot_index}, shard {shard_index} has been \
+         received from {sender}."
+      ~level:Debug
+      ("level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("shard_index", Data_encoding.int31)
+      ("sender", Types.Peer.encoding)
+      ~pp4:Types.Peer.pp
 end
 
 (* DAL node event emission functions *)
@@ -1498,3 +1544,28 @@ let emit_end_catchup () = emit end_catchup ()
 let emit_shard_validation_is_disabled () = emit shard_validation_is_disabled ()
 
 let emit_ignoring_pkhs ~pkhs = emit ignoring_pkhs pkhs
+
+let emit_reception_of_shard_update ~level ~slot_index ~slot_metrics =
+  let position =
+    Option.fold
+      ~none:"first"
+      ~some:(fun _ -> "last")
+      slot_metrics.Dal_metrics.duration_all_shards_received
+  in
+  emit reception_of_shard_update (level, slot_index, position, slot_metrics)
+
+let emit_validation_of_shard_update ~level ~slot_index ~slot_metrics =
+  let position =
+    Option.fold
+      ~none:"first"
+      ~some:(fun _ ->
+        Option.fold
+          ~none:"enough"
+          ~some:(fun _ -> "all")
+          slot_metrics.Dal_metrics.duration_all_shards_validated)
+      slot_metrics.Dal_metrics.duration_enough_shards_validated
+  in
+  emit validation_of_shard_update (level, slot_index, position, slot_metrics)
+
+let emit_reception_of_shard_detailed ~level ~slot_index ~shard_index ~sender =
+  emit reception_of_shard_detailed (level, slot_index, shard_index, sender)

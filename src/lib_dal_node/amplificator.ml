@@ -658,7 +658,7 @@ let try_amplification commitment slot_metrics slot_id amplificator =
       Store.Shards.count_values (Store.shards node_store) slot_id
     in
     let t = Unix.gettimeofday () in
-    let duration = t -. slot_metrics.Dal_metrics.time_first_shard in
+    let duration = t -. slot_metrics.Dal_metrics.time_first_shard_received in
     (* There is no point trying a reconstruction if we have not received
        enough shards.
        If we have received all the shards while waiting the random

@@ -490,12 +490,97 @@ module GS = struct
   let () = List.iter add_metric metrics
 end
 
-(* Stores metrics about reception of shards *)
+(* Stores metrics about reception and validation of shards *)
 type slot_metrics = {
-  time_first_shard : float;
-  duration_enough_shards : float option;
-  duration_all_shards : float option;
+  time_first_shard_received : float;
+  duration_all_shards_received : float option;
+  duration_first_shard_validated : float option;
+  duration_enough_shards_validated : float option;
+  duration_all_shards_validated : float option;
 }
+
+let slot_metrics_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           time_first_shard_received;
+           duration_all_shards_received;
+           duration_first_shard_validated;
+           duration_enough_shards_validated;
+           duration_all_shards_validated;
+         }
+       ->
+      ( time_first_shard_received,
+        duration_all_shards_received,
+        duration_first_shard_validated,
+        duration_enough_shards_validated,
+        duration_all_shards_validated ))
+    (fun ( time_first_shard_received,
+           duration_all_shards_received,
+           duration_first_shard_validated,
+           duration_enough_shards_validated,
+           duration_all_shards_validated )
+       ->
+      {
+        time_first_shard_received;
+        duration_all_shards_received;
+        duration_first_shard_validated;
+        duration_enough_shards_validated;
+        duration_all_shards_validated;
+      })
+    (obj5
+       (req "time_first_shard_received" float)
+       (opt "duration_all_shards_received" float)
+       (opt "duration_first_shard_validated" float)
+       (opt "duration_enough_shards_validated" float)
+       (opt "duration_all_shards_validated" float))
+
+let pp_slot_metrics fmt
+    {
+      time_first_shard_received;
+      duration_all_shards_received;
+      duration_first_shard_validated;
+      duration_enough_shards_validated;
+      duration_all_shards_validated;
+    } =
+  Format.fprintf
+    fmt
+    "{First shard received at: %f; %s; %s; %s; %s}"
+    time_first_shard_received
+    (Option.fold
+       ~none:"Some shards are still not received"
+       ~some:(fun dur ->
+         Format.sprintf "All shards were received in %f seconds" dur)
+       duration_all_shards_received)
+    (Option.fold
+       ~none:"First shard is still not validated"
+       ~some:(fun dur ->
+         Format.sprintf "First shard validation came in %f seconds" dur)
+       duration_first_shard_validated)
+    (Option.fold
+       ~none:"Not enough validated shards for reconstruction"
+       ~some:(fun dur ->
+         Format.sprintf
+           "Enough shards were validated for reconstruction after %f seconds"
+           dur)
+       duration_enough_shards_validated)
+    (Option.fold
+       ~none:"Some shards are still not validated"
+       ~some:(fun dur ->
+         Format.sprintf "All shards were validated in %f seconds" dur)
+       duration_all_shards_validated)
+
+let pp_slot_metrics_received fmt
+    {time_first_shard_received; duration_all_shards_received; _} =
+  Format.fprintf
+    fmt
+    "{First shard received at: %f; %s}"
+    time_first_shard_received
+    (Option.fold
+       ~none:"Some shards are still not received"
+       ~some:(fun dur ->
+         Format.sprintf "All shards were received in %f seconds" dur)
+       duration_all_shards_received)
 
 (* Bounded map, serving as cache to store shard reception timing values *)
 module Slot_id_bounded_map =
@@ -598,43 +683,88 @@ let collect_gossipsub_metrics gs_worker =
   Prometheus.CollectorRegistry.(register_pre_collect default) (fun () ->
       GS.Stats.collectors_callback gs_worker)
 
-let update_timing_shard_received cryptobox shards_timing_table slot_id
-    ~number_of_already_stored_shards ~number_of_shards =
+let update_timing_shard_received shards_timing_table ~last_expected_shard
+    slot_id =
   let now = Unix.gettimeofday () in
-  let timing =
+  let updated, timing =
     match Slot_id_bounded_map.find_opt shards_timing_table slot_id with
     | None ->
         (* Note: we expect the entry is None only on the first received shard,
            while lwt might actually process this code after the second or third
            shard. This should be rare and the delta between values is pretty
            minimal *)
-        {
-          time_first_shard = now;
-          duration_enough_shards = None;
-          duration_all_shards = None;
-        }
+        ( true,
+          {
+            time_first_shard_received = now;
+            duration_all_shards_received = None;
+            duration_first_shard_validated = None;
+            duration_enough_shards_validated = None;
+            duration_all_shards_validated = None;
+          } )
     | Some timing ->
-        let is_all_shard_received =
-          number_of_already_stored_shards = number_of_shards
-        in
-        if is_all_shard_received then (
-          let duration = now -. timing.time_first_shard in
-          update_amplification_all_shards_received_duration duration ;
-          {timing with duration_all_shards = Some duration})
-        else
-          let redundancy_factor =
-            Cryptobox.(parameters cryptobox).redundancy_factor
-          in
-          let is_enough_shard_received =
-            Option.is_none timing.duration_enough_shards
-            && number_of_already_stored_shards
-               >= number_of_shards / redundancy_factor
-          in
-          if is_enough_shard_received then (
-            let duration = now -. timing.time_first_shard in
-            update_amplification_enough_shards_received_duration duration ;
-            {timing with duration_enough_shards = Some duration})
-          else timing
+        if last_expected_shard then
+          let duration = now -. timing.time_first_shard_received in
+          (true, {timing with duration_all_shards_received = Some duration})
+        else (false, timing)
   in
   let () = Slot_id_bounded_map.replace shards_timing_table slot_id timing in
-  timing
+  (updated, timing)
+
+let update_timing_shard_validated shards_timing_table
+    ~number_of_already_stored_shards ~number_of_expected_shards
+    ?min_shards_to_reconstruct_slot slot_id =
+  let now = Unix.gettimeofday () in
+  let updated, timing =
+    match Slot_id_bounded_map.find_opt shards_timing_table slot_id with
+    | None ->
+        (* Note: we expect the entry to never be [None] since shards should be
+           received before being validated, while lwt might actually process
+           this code after first validation. This should be rare and happen only
+           if the delta between values is pretty minimal *)
+        ( true,
+          {
+            time_first_shard_received = now;
+            duration_all_shards_received = None;
+            duration_first_shard_validated = Some 0.;
+            duration_enough_shards_validated = None;
+            duration_all_shards_validated = None;
+          } )
+    | Some timing -> (
+        let time_origin = timing.time_first_shard_received in
+        let updated, timing =
+          match timing.duration_first_shard_validated with
+          | None ->
+              ( true,
+                {
+                  timing with
+                  duration_first_shard_validated = Some (now -. time_origin);
+                } )
+          | Some _ -> (false, timing)
+        in
+        let are_all_shard_validated =
+          number_of_already_stored_shards = number_of_expected_shards
+        in
+        if are_all_shard_validated then (
+          let duration = now -. time_origin in
+          if Option.is_some min_shards_to_reconstruct_slot then
+            update_amplification_all_shards_received_duration duration ;
+          (true, {timing with duration_all_shards_validated = Some duration}))
+        else
+          match min_shards_to_reconstruct_slot with
+          | None -> (updated, timing)
+          | Some min_shards_to_reconstruct_slot ->
+              let is_enough_shard_received =
+                Option.is_none timing.duration_enough_shards_validated
+                && number_of_already_stored_shards
+                   >= min_shards_to_reconstruct_slot
+              in
+              if is_enough_shard_received then (
+                let duration = now -. time_origin in
+                update_amplification_enough_shards_received_duration duration ;
+                ( true,
+                  {timing with duration_enough_shards_validated = Some duration}
+                ))
+              else (updated, timing))
+  in
+  let () = Slot_id_bounded_map.replace shards_timing_table slot_id timing in
+  (updated, timing)
