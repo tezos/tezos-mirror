@@ -29,6 +29,7 @@ depends: [
   "base-bigarray" {= "base"}
   "base-bytes" {= "base"}
   "base-domains" {= "base"}
+  "base-effects" {= "base"}
   "base-nnp" {= "base"}
   "base-threads" {= "base"}
   "base-unix" {= "base"}
@@ -52,7 +53,9 @@ depends: [
   "clap" {= "0.3.0"}
   "class_group_vdf" {= "0.0.5"}
   "cmdliner" {= "1.3.0"}
-  "cohttp" {= "5.3.1"}
+  "cohttp" {= "5.3.1~octez"}
+  "cohttp-lwt" {= "5.3.1~octez"}
+  "cohttp-lwt-unix" {= "5.3.1~octez"}
   "conduit" {= "8.0.0"}
   "conduit-lwt" {= "8.0.0"}
   "conduit-lwt-unix" {= "8.0.0"}
@@ -87,15 +90,15 @@ depends: [
   "dream" {= "1.0.0~alpha8-octez"}
   "dream-httpaf" {= "1.0.0~alpha4-octez"}
   "dream-pure" {= "1.0.0~alpha2"}
-  "dune" {= "3.19.1"}
-  "dune-build-info" {= "3.19.1"}
-  "dune-configurator" {= "3.19.1"}
-  "dune-private-libs" {= "3.19.1"}
-  "dune-site" {= "3.19.1"}
+  "dune" {= "3.20.0"}
+  "dune-build-info" {= "3.20.0"}
+  "dune-configurator" {= "3.20.0"}
+  "dune-private-libs" {= "3.20.0"}
+  "dune-site" {= "3.20.0"}
   "duration" {= "0.2.1"}
-  "dyn" {= "3.19.1"}
-  "eio" {= "1.2"}
-  "eio_main" {= "1.2"}
+  "dyn" {= "3.20.0"}
+  "eio" {= "1.3"}
+  "eio_main" {= "1.3"}
   "either" {= "1.0.0"}
   "eqaf" {= "0.10"}
   "ezgzip" {= "0.2.3"}
@@ -104,8 +107,11 @@ depends: [
   "faraday-lwt" {= "0.8.2"}
   "faraday-lwt-unix" {= "0.8.2"}
   "fix" {= "20250428"}
-  "fmt" {= "0.10.0"}
+  "fmt" {= "0.11.0"}
   "fpath" {= "0.7.3"}
+  "gluten" {= "0.5.2"}
+  "gluten-lwt" {= "0.5.2"}
+  "gluten-lwt-unix" {= "0.5.2"}
   "gmap" {= "0.3.0"}
   "graphql" {= "0.14.0"}
   "graphql-lwt" {= "0.14.0"}
@@ -120,13 +126,19 @@ depends: [
   "hidapi" {= "1.2.1"}
   "hidapi-lwt" {= "1.2.1"}
   "hmap" {= "0.8.1"}
+  "hpack" {= "0.13.0"}
+  "httpun" {= "0.1.0"}
+  "httpun-lwt" {= "0.1.0"}
+  "httpun-lwt-unix" {= "0.1.0"}
+  "httpun-types" {= "0.1.0"}
+  "httpun-ws" {= "0.2.0"}
   "index" {= "1.6.2"}
   "integers" {= "0.7.0"}
   "iomux" {= "0.3"}
-  "ipaddr" {= "5.6.0"}
-  "ipaddr-sexp" {= "5.6.0"}
+  "ipaddr" {= "5.6.1"}
+  "ipaddr-sexp" {= "5.6.1"}
   "jane-street-headers" {= "v0.16.0"}
-  "jingoo" {= "1.5.0"}
+  "jingoo" {= "1.5.1"}
   "jsonm" {= "1.0.2"}
   "jst-config" {= "v0.16.0"}
   "kdf" {= "1.0.0"}
@@ -147,7 +159,7 @@ depends: [
   "lwt_ppx" {= "5.9.1"}
   "lwt_react" {= "1.2.0"}
   "lwt_ssl" {= "1.2.0"}
-  "macaddr" {= "5.6.0"}
+  "macaddr" {= "5.6.1"}
   "magic-mime" {= "1.3.1"}
   "markup" {= "1.0.3"}
   "memtrace" {= "0.2.3"}
@@ -165,11 +177,12 @@ depends: [
   "mirage-crypto-rng-lwt" {= "1.2.0"}
   "mtime" {= "2.1.0"}
   "multicore-magic" {= "2.3.1"}
-  "multipart_form" {= "0.6.0"}
-  "multipart_form-lwt" {= "0.6.0"}
-  "num" {= "1.5-1"}
+  "multipart_form" {= "0.7.0"}
+  "multipart_form-lwt" {= "0.7.0"}
+  "num" {= "1.6"}
   "ocaml" {= "5.3.0"}
   "ocaml-base-compiler" {= "5.3.0"}
+  "ocaml-compiler" {= "5.3.0"}
   "ocaml-compiler-libs" {= "v0.17.0"}
   "ocaml-config" {= "3"}
   "ocaml-options-vanilla" {= "1"}
@@ -184,15 +197,15 @@ depends: [
   "ocp-ocamlres" {= "0.4"}
   "ocplib-endian" {= "1.2"}
   "ohex" {= "0.2.0"}
-  "opam-file-format" {= "2.1.6"}
+  "opam-file-format" {= "2.2.0"}
   "opentelemetry" {= "0.11.2"}
   "opentelemetry-lwt" {= "0.11.2"}
   "optint" {= "0.3.0"}
-  "ordering" {= "3.19.1"}
+  "ordering" {= "3.20.0"}
   "parsexp" {= "v0.16.0"}
   "pbrt" {= "3.1.1"}
   "pecu" {= "0.7"}
-  "postgresql" {= "5.1.3"}
+  "postgresql" {= "5.2.0"}
   "pp" {= "2.0.0"}
   "pprint" {= "20230830"}
   "ppx_assert" {= "v0.16.0"}
@@ -222,9 +235,9 @@ depends: [
   "ptime" {= "1.2.0"}
   "pure-splitmix" {= "0.3"}
   "pyml" {= "20250807"}
-  "qcheck-alcotest" {= "0.25"}
-  "qcheck-core" {= "0.25"}
-  "re" {= "1.12.0"}
+  "qcheck-alcotest" {= "0.26"}
+  "qcheck-core" {= "0.26"}
+  "re" {= "1.13.2"}
   "react" {= "1.2.2"}
   "repr" {= "0.7.0"}
   "result" {= "1.5"}
@@ -247,7 +260,7 @@ depends: [
   "stdio" {= "v0.16.0"}
   "stdlib-random" {= "1.2.0"}
   "stdlib-shims" {= "0.3.0"}
-  "stdune" {= "3.19.1"}
+  "stdune" {= "3.20.0"}
   "stringext" {= "1.6.0"}
   "tar" {= "2.6.0"}
   "tar-unix" {= "2.6.0"}
@@ -260,7 +273,7 @@ depends: [
   "time_now" {= "v0.16.0"}
   "tls" {= "2.0.1"}
   "tls-lwt" {= "2.0.1"}
-  "topkg" {= "1.0.8"}
+  "topkg" {= "1.1.0"}
   "trie" {= "1.0.0"}
   "uchar" {= "0.0.2"}
   "unstrctrd" {= "0.4"}
@@ -279,8 +292,6 @@ depends: [
 ]
 conflicts: [
   "checkseum" {= "0.5.0"}
-  "cohttp-lwt"
-  "cohttp-lwt-unix"
   "data-encoding"
   "hacl_x25519"
   "json_data_encoding"
@@ -307,6 +318,18 @@ pin-depends: [
   [
     "base.v0.16.4"
     "git+https://github.com/vch9/base.git#1d0cdedec2a8c63608d3c34531565903d5918ff6"
+  ]
+  [
+    "cohttp.5.3.1~octez"
+    "git+https://github.com/killian-delarue/ocaml-cohttp.git#96ba1b08df549367bc67aef7dda535819181b3c8"
+  ]
+  [
+    "cohttp-lwt.5.3.1~octez"
+    "git+https://github.com/killian-delarue/ocaml-cohttp.git#96ba1b08df549367bc67aef7dda535819181b3c8"
+  ]
+  [
+    "cohttp-lwt-unix.5.3.1~octez"
+    "git+https://github.com/killian-delarue/ocaml-cohttp.git#96ba1b08df549367bc67aef7dda535819181b3c8"
   ]
   [
     "dream.1.0.0~alpha8-octez"

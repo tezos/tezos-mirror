@@ -6,6 +6,9 @@ poetry.lock
 opam/virtual/octez-deps.opam.locked
 opam/virtual/dream-httpaf.opam.locked
 opam/virtual/dream.opam.locked
+opam/virtual/cohttp.opam.locked
+opam/virtual/cohttp-lwt.opam.locked
+opam/virtual/cohttp-lwt-unix.opam.locked
 images/common/install-nvm.sh
 scripts/install_dal_trusted_setup.sh
 scripts/version.sh

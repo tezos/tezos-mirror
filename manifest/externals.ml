@@ -85,7 +85,11 @@ let clap = external_lib "clap" V.(at_least "0.3.0")
 
 let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
-let cohttp = external_lib "cohttp" V.(at_least "5.3.1" && less_than "6.0.0")
+let cohttp = external_lib "cohttp" V.(exactly "5.3.1~octez")
+
+let cohttp_lwt = external_lib "cohttp-lwt" V.(exactly "5.3.1~octez")
+
+let cohttp_lwt_unix = external_lib "cohttp-lwt-unix" V.(exactly "5.3.1~octez")
 
 let conduit = external_lib "conduit-lwt" V.(at_least "7.1.0")
 

@@ -14,7 +14,7 @@ depends: [
   "base64" { >= "3.3.0" }
   "ocplib-endian"
   "conduit-lwt" { >= "7.1.0" }
-  "cohttp" { >= "5.3.1" & < "6.0.0" }
+  "cohttp" { = "5.3.1~octez" }
   "mirage-crypto-rng" { >= "1.0.0" }
   "octez-libs"
   "lwt_log"
