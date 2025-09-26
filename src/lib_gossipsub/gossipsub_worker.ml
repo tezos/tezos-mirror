@@ -270,9 +270,17 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           Some (value, t)
   end
 
-  type batch_state =
-    | Pending
-    | Accumulating of (GS.receive_message * Peer.Set.t) list
+  module ReceiveMsgMap = Map.Make (struct
+    type t = GS.receive_message
+
+    let compare (m1 : t) (m2 : t) =
+      Compare.or_else
+        (Compare.or_else (Topic.compare m1.topic m2.topic) (fun () ->
+             Message_id.compare m1.message_id m2.message_id))
+        (fun () -> Message.compare m1.message m2.message)
+  end)
+
+  type batch_state = Pending | Accumulating of Peer.Set.t ReceiveMsgMap.t
 
   (** The worker's state is made of the gossipsub automaton's state,
       and a stream of events to process. It also has two output streams to
@@ -779,7 +787,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     let current_batch = ref Pending in
     fun output time_interval events_stream ->
       match output with
-      | GS.To_include_in_batch content -> (
+      | GS.To_include_in_batch (msg, peers) -> (
           match !current_batch with
           | Pending ->
               let open Lwt_syntax in
@@ -787,15 +795,24 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
                   let* () = Lwt_unix.sleep (GS.Span.to_float_s time_interval) in
                   let batch =
                     match !current_batch with
-                    | Accumulating batch -> batch
+                    | Accumulating batch -> ReceiveMsgMap.bindings batch
                     | Pending -> []
                   in
                   current_batch := Pending ;
                   Stream.push (Process_batch batch) events_stream ;
                   return_unit) ;
-              current_batch := Accumulating [content]
+              let content_map = ReceiveMsgMap.singleton msg peers in
+              current_batch := Accumulating content_map
           | Accumulating prev_contents ->
-              current_batch := Accumulating (content :: prev_contents))
+              let new_contents =
+                ReceiveMsgMap.update
+                  msg
+                  (function
+                    | None -> Some peers
+                    | Some prev_peers -> Some (Peer.Set.inter peers prev_peers))
+                  prev_contents
+              in
+              current_batch := Accumulating new_contents)
       | _ -> ()
 
   (** Handling messages received from the P2P network. *)

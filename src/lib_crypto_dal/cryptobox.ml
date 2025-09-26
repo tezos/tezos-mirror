@@ -148,7 +148,9 @@ module Inner = struct
 
   type page = bytes
 
-  type share = Scalar.t array
+  module Share = Compare.Array (Scalar)
+
+  type share = Share.t
 
   type shard = {index : int; share : share}
 

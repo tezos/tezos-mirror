@@ -178,6 +178,16 @@ module Message = struct
       (obj2
          (req "share" Cryptobox.share_encoding)
          (req "shard_proof" Cryptobox.shard_proof_encoding))
+
+  module Cmp = struct
+    type nonrec t = t
+
+    let compare t1 t2 =
+      Compare.or_else (Cryptobox.Share.compare t1.share t2.share) (fun () ->
+          Cryptobox.Proof.compare t1.shard_proof t2.shard_proof)
+  end
+
+  include Compare.Make (Cmp)
 end
 
 module Peer = struct

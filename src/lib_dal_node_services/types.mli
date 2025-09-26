@@ -116,6 +116,8 @@ module Message : sig
   include PRINTABLE with type t := t
 
   include ENCODABLE with type t := t
+
+  include COMPARABLE with type t := t
 end
 
 (** A peer from the point of view of gossipsub. *)
