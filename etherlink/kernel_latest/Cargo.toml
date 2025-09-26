@@ -112,7 +112,7 @@ alloy-sol-types = { version = "1.3.0", default-features = false, features = [
 alloy-primitives = { version = "1.2.0", default-features = false }
 alloy-consensus = { version = "1.0.32", default-features = false }
 
-# mir without bls
+# mir without bls nor transfer of big maps
 mir = { path = "../../contrib/mir", default-features = false }
 typed-arena = "2"
 
