@@ -11,7 +11,7 @@ open Tezos_ci.Cache
 type homebrew_pipeline = Full | Release
 
 let jobs pipeline_type : tezos_job list =
-  let image = Images.Base_images.debian_bookworm in
+  let image = Images.Base_images.homebrew in
   let stage = Stages.build in
 
   (* this job creates a formula from a template
@@ -25,7 +25,6 @@ let jobs pipeline_type : tezos_job list =
       ~stage
       [
         "./scripts/ci/install-gsutil.sh";
-        "apt-get update && apt-get install -y git curl";
         "./scripts/packaging/homebrew_release.sh";
       ]
     |> enable_networked_cargo
@@ -44,20 +43,7 @@ let jobs pipeline_type : tezos_job list =
       ~stage
       ~dependencies:(Dependent [Job job_create_homebrew_formula])
       ~variables:[("DUNE_BUILD_JOBS", "-j 12")]
-      ~before_script:
-        [
-          "apt-get update && apt-get install -y git curl";
-          "./scripts/packaging/homebrew_install.sh";
-          "eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)";
-        ]
-      [
-        (* These packages are needed on Linux. For macOS, Homebrew will
-           make those available locally. *)
-        "apt-get install -y autoconf cmake g++ libev-dev libffi-dev libgmp-dev \
-         libprotobuf-dev libsqlite3-dev protobuf-compiler libhidapi-dev \
-         pkg-config zlib1g-dev libpq-dev";
-        "./scripts/packaging/test_homebrew_install.sh";
-      ]
+      ["./scripts/packaging/test_homebrew_install.sh"]
     |> enable_networked_cargo
   in
 
