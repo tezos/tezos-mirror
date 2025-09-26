@@ -1341,9 +1341,15 @@ let register (module Cli : Scenarios_cli.Layer1) =
   in
   Lwt.bind
     (Network.get_level (Node.as_rpc_endpoint t.bootstrap.node))
-    (let rec loop level =
+    (let rec loop with_producers level =
        let level = succ level in
-       let* () = produce_slot t level in
-       loop level
+       toplog "Loop at level %d" level ;
+       let* () =
+         if with_producers then
+           let* _ = Node.wait_for_level t.bootstrap.node level in
+           Lwt.return_unit
+         else produce_slot t level
+       in
+       loop with_producers level
      in
-     loop)
+     loop (List.compare_length_with t.producers 0 = 0))
