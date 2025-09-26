@@ -1008,10 +1008,15 @@ mod tests {
         account_storage::TezlinkOriginatedAccount, address::OriginationNonce,
         mir_ctx::BlockCtx, TezlinkImplicitAccount,
     };
-    use mir::ast::{Address, Entrypoint, IntoMicheline, Micheline, TypedValue};
+    use mir::ast::big_map::BigMapId;
+    use mir::ast::{Address, Entrypoint, IntoMicheline, Micheline, Type, TypedValue};
+    use mir::parser::Parser;
+    use mir::typechecker::typecheck_value;
     use num_traits::ops::checked::CheckedSub;
     use pretty_assertions::assert_eq;
     use primitive_types::H256;
+    use std::collections::BTreeMap;
+    use std::fs::read_to_string;
     use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait, SecretKeyEd25519};
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
@@ -1037,12 +1042,14 @@ mod tests {
     };
     use typed_arena::Arena;
 
-    use crate::COST_PER_BYTES;
+    use crate::gas::TezlinkOperationGas;
+    use crate::TcCtx;
     use crate::ORIGINATION_COST;
     use crate::{
         account_storage::{Manager, TezlinkAccount},
         context, validate_and_apply_operation, OperationError,
     };
+    use crate::{make_default_ctx, COST_PER_BYTES};
 
     macro_rules! block_ctx {
         () => {
@@ -4546,6 +4553,287 @@ mod tests {
             ),
             "Expected Successful Transfer operation result, got {:?}",
             receipts[0].receipt
+        );
+    }
+
+    const SCRIPTS_FOLDER: &str = "../../../michelson_test_scripts/big_maps/";
+
+    fn read_script(file: &str) -> String {
+        read_to_string(format!("{SCRIPTS_FOLDER}{file}"))
+            .unwrap_or_else(|_| panic!("Contract source code not found for {file}"))
+    }
+
+    fn transfer_big_map<'a>(
+        script_receiver: &str,
+        init_receiver: &str,
+        script_sender: &str,
+        init_sender: &str,
+        expected_sender_big_map: Option<BTreeMap<TypedValue<'a>, TypedValue<'a>>>,
+        expected_receiver_big_map: Option<BTreeMap<TypedValue<'a>, TypedValue<'a>>>,
+    ) {
+        let mut host = MockKernelHost::default();
+        let context = context::Context::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let tz1 = bootstrap1();
+
+        let sender_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeeded");
+        let receiver_addr = ContractKt1Hash::from_base58_check(CONTRACT_2)
+            .expect("ContractKt1Hash b58 conversion should have succeeded");
+        init_account(ctx.host, &tz1.pkh, 1000);
+        reveal_account(ctx.host, &tz1);
+
+        let parser = Parser::new();
+
+        let sender_contract = init_contract(
+            ctx.host,
+            &sender_addr,
+            script_sender,
+            &parser
+                .parse(init_sender)
+                .expect("Failed to parse sender storage"),
+            &0.into(),
+        );
+
+        let receiver_contract = init_contract(
+            ctx.host,
+            &receiver_addr,
+            script_receiver,
+            &parser
+                .parse(init_receiver)
+                .expect("Failed to parse receiver storage"),
+            &0.into(),
+        );
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            21040,
+            5,
+            tz1.clone(),
+            10.into(),
+            Contract::Originated(sender_addr.clone()),
+            Some(Parameter {
+                entrypoint: Entrypoint::default(),
+                value: Micheline::from(CONTRACT_2).encode(),
+            }),
+        );
+
+        let receipts = validate_and_apply_operation(
+            ctx.host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+            &block_ctx!(),
+            false,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        for r in receipts {
+            assert!(r.receipt.is_applied())
+        }
+
+        if let Some(expected_sender_big_map) = expected_sender_big_map {
+            let storage = sender_contract.storage(ctx.host).unwrap();
+            let mich_storage = Micheline::decode_raw(&parser.arena, &storage)
+                .expect("Coudln't decode storage.");
+            let big_map_id = typecheck_value(&mich_storage, &mut ctx, &Type::Int)
+                .expect("Storage has unexpected type");
+            match big_map_id {
+                TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
+                    &mut ctx,
+                    &parser.arena,
+                    &id.into(),
+                    Type::String,
+                    Type::Bytes,
+                    expected_sender_big_map,
+                ),
+                _ => panic!("ID should've been integer"),
+            };
+        }
+
+        if let Some(expected_receiver_big_map) = expected_receiver_big_map {
+            let storage = receiver_contract.storage(ctx.host).unwrap();
+            let mich_storage = Micheline::decode_raw(&parser.arena, &storage)
+                .expect("Coudln't decode storage.");
+            match mich_storage {
+                Micheline::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
+                    &mut ctx,
+                    &Arena::new(),
+                    &id.into(),
+                    Type::String,
+                    Type::Bytes,
+                    expected_receiver_big_map,
+                ),
+                _ => panic!("ID should've been integer"),
+            };
+        }
+    }
+
+    // Receiver in {drop, store, store_updated} and Sender in {fresh, stored, stored_updated}
+    #[test]
+    fn big_map_transfer_receiver_drop_sender_fresh() {
+        let script_receiver = read_script("receiver_drop.tz");
+        let script_sender = read_script("sender_fresh.tz");
+        transfer_big_map(&script_receiver, "Unit", &script_sender, "Unit", None, None);
+    }
+
+    #[test]
+    fn big_map_transfer_receiver_drop_sender_stored() {
+        let script_receiver = read_script("receiver_drop.tz");
+        let script_sender = read_script("sender_stored.tz");
+        transfer_big_map(
+            &script_receiver,
+            "Unit",
+            &script_sender,
+            "{Elt \"d\" 0x; }",
+            Some(BTreeMap::from([(
+                TypedValue::String("d".into()),
+                TypedValue::Bytes("".into()),
+            )])),
+            None,
+        );
+    }
+
+    #[test]
+    fn big_map_transfer_receiver_drop_sender_stored_updated() {
+        let script_receiver = read_script("receiver_drop.tz");
+        let script_sender = read_script("sender_stored_updated.tz");
+        transfer_big_map(
+            &script_receiver,
+            "Unit",
+            &script_sender,
+            "{Elt \"b\" 0x; Elt \"d\" 0x; }",
+            Some(BTreeMap::from([
+                (TypedValue::String("d".into()), TypedValue::Bytes("".into())),
+                (TypedValue::String("b".into()), TypedValue::Bytes("".into())),
+            ])),
+            None,
+        );
+    }
+
+    #[test]
+    fn big_map_transfer_receiver_store_sender_fresh() {
+        let script_receiver = read_script("receiver_store.tz");
+        let script_sender = read_script("sender_fresh.tz");
+        transfer_big_map(
+            &script_receiver,
+            "{}",
+            &script_sender,
+            "Unit",
+            None,
+            Some(BTreeMap::from([(
+                TypedValue::String("d".into()),
+                TypedValue::Bytes("".into()),
+            )])),
+        );
+    }
+
+    #[test]
+    fn big_map_transfer_receiver_store_sender_stored() {
+        let script_receiver = read_script("receiver_store.tz");
+        let script_sender = read_script("sender_stored.tz");
+        transfer_big_map(
+            &script_receiver,
+            "{}",
+            &script_sender,
+            "{Elt \"d\" 0x; }",
+            Some(BTreeMap::from([(
+                TypedValue::String("d".into()),
+                TypedValue::Bytes("".into()),
+            )])),
+            Some(BTreeMap::from([(
+                TypedValue::String("d".into()),
+                TypedValue::Bytes("".into()),
+            )])),
+        );
+    }
+
+    #[test]
+    fn big_map_transfer_receiver_store_sender_stored_updated() {
+        let script_receiver = read_script("receiver_store.tz");
+        let script_sender = read_script("sender_stored_updated.tz");
+        transfer_big_map(
+            &script_receiver,
+            "{}",
+            &script_sender,
+            "{Elt \"b\" 0x; Elt \"d\" 0x; }",
+            Some(BTreeMap::from([
+                (TypedValue::String("d".into()), TypedValue::Bytes("".into())),
+                (TypedValue::String("b".into()), TypedValue::Bytes("".into())),
+            ])),
+            Some(BTreeMap::from([
+                (TypedValue::String("d".into()), TypedValue::Bytes("".into())),
+                (
+                    TypedValue::String("a".into()),
+                    TypedValue::Bytes(vec![0u8, 16u8]),
+                ),
+            ])),
+        );
+    }
+
+    #[test]
+    fn big_map_transfer_receiver_store_updated_sender_fresh() {
+        let script_receiver = read_script("receiver_store_updated.tz");
+        let script_sender = read_script("sender_fresh.tz");
+        transfer_big_map(
+            &script_receiver,
+            "{}",
+            &script_sender,
+            "Unit",
+            None,
+            Some(BTreeMap::from([(
+                TypedValue::String("c".into()),
+                TypedValue::Bytes(vec![(16 + 1), (2 * 16 + 4)]),
+            )])),
+        );
+    }
+
+    #[test]
+    fn big_map_transfer_receiver_store_updated_sender_stored() {
+        let script_receiver = read_script("receiver_store_updated.tz");
+        let script_sender = read_script("sender_stored.tz");
+        transfer_big_map(
+            &script_receiver,
+            "{}",
+            &script_sender,
+            "{Elt \"d\" 0x; }",
+            Some(BTreeMap::from([(
+                TypedValue::String("d".into()),
+                TypedValue::Bytes("".into()),
+            )])),
+            Some(BTreeMap::from([(
+                TypedValue::String("c".into()),
+                TypedValue::Bytes(vec![(16 + 1), (2 * 16 + 4)]),
+            )])),
+        );
+    }
+
+    #[test]
+    fn big_map_transfer_receiver_store_updated_sender_stored_updated() {
+        let script_receiver = read_script("receiver_store_updated.tz");
+        let script_sender = read_script("sender_stored_updated.tz");
+        transfer_big_map(
+            &script_receiver,
+            "{}",
+            &script_sender,
+            "{Elt \"b\" 0x; Elt \"d\" 0x; }",
+            Some(BTreeMap::from([
+                (TypedValue::String("d".into()), TypedValue::Bytes("".into())),
+                (TypedValue::String("b".into()), TypedValue::Bytes("".into())),
+            ])),
+            Some(BTreeMap::from([
+                (
+                    TypedValue::String("c".into()),
+                    TypedValue::Bytes(vec![(16 + 1), (2 * 16 + 4)]),
+                ),
+                (
+                    TypedValue::String("a".into()),
+                    TypedValue::Bytes(vec![0u8, 16u8]),
+                ),
+            ])),
         );
     }
 }

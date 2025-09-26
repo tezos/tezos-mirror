@@ -2441,7 +2441,7 @@ fn get_nth_field_ref(mut m: u16, mut ty: &mut Type) -> Result<&mut Type, Type> {
 
 /// Typecheck a value. Assumes passed the type is valid, i.e. doesn't contain
 /// illegal types like `set operation` or `contract operation`.
-pub(crate) fn typecheck_value<'a>(
+pub fn typecheck_value<'a>(
     v: &Micheline<'a>,
     ctx: &mut impl TypecheckingCtx<'a>,
     t: &Type,

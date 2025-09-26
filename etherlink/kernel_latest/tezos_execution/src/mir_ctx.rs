@@ -626,7 +626,7 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use crate::gas::TezlinkOperationGas;
     use mir::ast::big_map::{
@@ -635,6 +635,7 @@ mod tests {
     use std::collections::BTreeMap;
     use tezos_evm_runtime::runtime::MockKernelHost;
 
+    #[macro_export]
     macro_rules! make_default_ctx {
         ($ctx:ident, $host: expr, $context: expr) => {
             let mut gas = TezlinkOperationGas::default();
@@ -658,7 +659,7 @@ mod tests {
         };
     }
 
-    fn assert_big_map_eq<'a, Host: Runtime>(
+    pub fn assert_big_map_eq<'a, Host: Runtime>(
         ctx: &mut TcCtx<'a, Host>,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
