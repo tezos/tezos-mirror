@@ -39,6 +39,22 @@ let predicate_from_args ?major ?minor ?rc () =
   | Some (Rc rc) -> (
       match version.rc with None -> false | Some version_rc -> version_rc = rc)
 
+(* [version_to_rss_item ~component version] converts a [version] of [component]
+   to an RSS item. *)
+let version_to_rss_item ~component version =
+  let version_str = Version.to_string version in
+  let title = sf "%s %s" (String.capitalize_ascii component.name) version_str in
+  let guid = sf "%s-%s" component.name version_str in
+  let description =
+    sf
+      "%s version %d.%d%s"
+      (String.capitalize_ascii component.name)
+      version.major
+      version.minor
+      (match version.rc with Some rc -> sf "-rc%d" rc | None -> "")
+  in
+  Rss.make_item ~title ~description ~guid
+
 let () =
   Clap.description
     "Manage versions.json files for Octez release pages stored in S3. This \
@@ -107,8 +123,22 @@ let () =
     Clap.case ~description:"Set version(s) as inactive " "set-inactive"
     @@ fun () -> `set_inactive
   in
+  let generate_rss =
+    Clap.case ~description:"Generate RSS feed for releases" "generate-rss"
+    @@ fun () -> `generate_rss
+  in
   let command =
-    Clap.subcommand [list_versions; add; set_latest; set_active; set_inactive]
+    Clap.subcommand
+      [list_versions; add; set_latest; set_active; set_inactive; generate_rss]
+  in
+  let base_url =
+    Clap.optional_string
+      ~long:"base-url"
+      ~description:
+        "Base URL for RSS feed links (used with generate-rss command). \
+         Defaults to: https://<S3_PATH>"
+      ~placeholder:"URL"
+      ()
   in
   Clap.close () ;
   match command with
@@ -171,3 +201,29 @@ let () =
       else (
         Format.printf "The following version(s) remain active:@." ;
         List.iter (fun v -> Format.printf "  - %s@." (to_string v)) still_active)
+  | `generate_rss ->
+      let component_name = "octez" in
+      let url = Option.value base_url ~default:("https://" ^ s3_path) in
+      let component =
+        {
+          name = component_name;
+          path = s3_path;
+          asset_path = (fun _ _ -> "");
+          (* [asset_path] is not used for RSS generation *)
+          url;
+        }
+      in
+      let title = String.capitalize_ascii component.name in
+      let description = sf "%s releases" component.name in
+      let lastBuildDate = Unix.time () |> Unix.gmtime in
+      let versions = Base.Version.load_from_storage ~path:component.path in
+      let items =
+        List.map
+          (fun version -> version_to_rss_item ~component version)
+          versions
+      in
+      let channel =
+        Rss.make_channel ~title ~description ~lastBuildDate ~items
+      in
+      Rss.generate_rss channel ;
+      Format.printf "Generated RSS feed: feed.xml@."

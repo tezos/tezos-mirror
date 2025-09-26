@@ -34,4 +34,4 @@
  (flags
   (:standard)
   -open Base_lib)
- (modules version_manager))
+ (modules version_manager rss))
