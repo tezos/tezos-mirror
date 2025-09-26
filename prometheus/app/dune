@@ -8,7 +8,7 @@
  (libraries
   octez-libs.prometheus
   lwt
-  octez-libs.cohttp-lwt
+  cohttp-lwt
   astring
   asetmap
   fmt
@@ -24,8 +24,8 @@
   octez-libs.prometheus
   octez-libs.prometheus-app
   cmdliner
-  octez-libs.cohttp-lwt
-  octez-libs.cohttp-lwt-unix
+  cohttp-lwt
+  cohttp-lwt-unix
   logs.fmt
   fmt.tty)
  (wrapped false)

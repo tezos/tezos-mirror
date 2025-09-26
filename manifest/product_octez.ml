@@ -13,7 +13,6 @@ open Internals
 open Product_data_encoding
 open Product_prometheus
 open Product_resto
-open Product_cohttp
 open Product_opentelemetry
 
 include Product (struct
@@ -43,7 +42,7 @@ include Product (struct
       "brassaia-eio/";
       "rust-toolchain";
     ]
-    @ Product_data_encoding.product_source @ Product_cohttp.product_source
+    @ Product_data_encoding.product_source
     @ Product_opentelemetry.product_source @ Product_prometheus.product_source
     @ Product_resto.product_source
 end)

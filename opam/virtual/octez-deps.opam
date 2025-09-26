@@ -35,6 +35,8 @@ depends: [
   "class_group_vdf" { >= "0.0.4" }
   "cmdliner" { >= "1.1.0" }
   "cohttp" { = "5.3.1~octez" }
+  "cohttp-lwt" { = "5.3.1~octez" }
+  "cohttp-lwt-unix" { = "5.3.1~octez" }
   "conduit-lwt" { >= "7.1.0" }
   "conduit-lwt-unix" { >= "7.1.0" }
   "conf-libev"

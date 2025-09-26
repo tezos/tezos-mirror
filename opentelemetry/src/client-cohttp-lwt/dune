@@ -7,8 +7,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   cohttp
-  octez-libs.cohttp-lwt
-  octez-libs.cohttp-lwt-unix
+  cohttp-lwt
+  cohttp-lwt-unix
   lwt_ppx
   mtime
   mtime.clock.os

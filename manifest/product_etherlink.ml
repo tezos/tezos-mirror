@@ -11,7 +11,6 @@
 open Manifest
 open Externals
 open Internals
-open Product_cohttp
 open Product_octez
 open Product_prometheus
 open Product_websocket
@@ -123,7 +122,7 @@ let wasm_runtime_callbacks =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_layer2_irmin_context |> open_;
-        Product_cohttp.cohttp_lwt_unix;
+        cohttp_lwt_unix;
         lwt_domain;
         opentelemetry_lwt;
       ]
