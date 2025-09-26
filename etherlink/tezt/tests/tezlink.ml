@@ -1644,6 +1644,59 @@ let test_tezlink_origination =
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   unit
 
+let test_tezlink_forge_operations =
+  register_tezlink_test
+    ~title:"Test of the forge/operations rpc"
+    ~tags:["rpc"; "forge"; "operations"]
+    ~additional_uses:[Constant.octez_codec]
+  @@ fun {sequencer; _} _protocol ->
+  (* call the forge/operations rpc and parse the result *)
+  let json_data =
+    JSON.parse
+      ~origin:"curl_forge_operations"
+      {|
+{
+  "branch": "BL5HqLzfzPd4b72LwoGtwgXYth26dvit8S8RW4tMkQgbzTWfzww",
+  "contents": [
+    {
+      "kind": "reveal",
+      "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+      "fee": "1",
+      "counter": "1",
+      "gas_limit": "100000",
+      "storage_limit": "100",
+      "public_key": "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+    },
+    {
+      "kind": "transaction",
+      "source": "tz1boqBV6XhVjXA2i5ysZ4megxZxa2EEgyxg",
+      "fee": "644",
+      "counter": "21893998",
+      "gas_limit": "2169",
+      "storage_limit": "0",
+      "amount": "100000",
+      "destination": "tz1boqBV6XhVjXA2i5ysZ4megxZxa2EEgyxg"
+    }
+  ]
+}
+|}
+  in
+  let rpc_forge_operations () =
+    let path = "/tezlink/chains/main/blocks/head/helpers/forge/operations" in
+    Curl.post_raw (Evm_node.endpoint sequencer ^ path) json_data |> Runnable.run
+  in
+  let* binary =
+    let name =
+      Protocol.encoding_prefix Michelson_contracts.tezlink_protocol
+      ^ ".operation.unsigned"
+    in
+    Codec.encode ~name (JSON.unannotate json_data)
+  in
+  let expected_res = sf "\"%s\"\n" binary in
+  let* res = rpc_forge_operations () in
+  Check.((res = expected_res) string ~error_msg:"Expected %R but got %L") ;
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -1682,4 +1735,5 @@ let () =
   test_tezlink_sandbox () ;
   test_tezlink_internal_operation [Alpha] ;
   test_tezlink_internal_receipts [Alpha] ;
-  test_tezlink_origination [Alpha]
+  test_tezlink_origination [Alpha] ;
+  test_tezlink_forge_operations [Alpha]
