@@ -647,6 +647,7 @@ let init_network ~peers (configuration : Scenarios_configuration.LAYER1.t) cloud
       let* () = Node.wait_for_ready node in
       let* () =
         Dal_node.Agent.run
+          ~wait_ready:false
           ~event_level:`Notice
           ~disable_shard_validation
           ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity

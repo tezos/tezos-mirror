@@ -651,7 +651,7 @@ module Dal_node = struct
         cloud
         agent
 
-    let run ?prometheus ?otel ?(memtrace = false) ?event_level
+    let run ?prometheus ?otel ?(memtrace = false) ?wait_ready ?event_level
         ?(disable_shard_validation = false) ?ignore_pkhs
         ~ppx_profiling_verbosity ~ppx_profiling_backends dal_node =
       let service_name = name dal_node in
@@ -670,7 +670,7 @@ module Dal_node = struct
           ~ppx_profiling_verbosity
           ~ppx_profiling_backends
       in
-      let* () = run ~env ?event_level dal_node in
+      let* () = run ?wait_ready ~env ?event_level dal_node in
       (* Update the state in the service manager *)
       let () =
         match Dal_node.pid dal_node with
