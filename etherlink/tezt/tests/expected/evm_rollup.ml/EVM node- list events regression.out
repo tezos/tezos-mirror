@@ -1381,6 +1381,14 @@ new_access_token:
     { /* new_access_token version 0 */
       "new_access_token.v0": any }
   
+no_default_snapshot_provider_for_braeburn:
+  description: the default snapshots provider for Etherlink Braeburn may not be available yet
+  level: warning
+  section: evm_node
+  json format:
+    { /* no_default_snapshot_provider_for_braeburn version 0 */
+      "no_default_snapshot_provider_for_braeburn.v0": any }
+  
 no_l1_latest_level:
   description: no l1 level processed, no EVM events catch up will occur
   level: warning

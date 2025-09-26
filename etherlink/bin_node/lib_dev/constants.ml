@@ -10,6 +10,7 @@ let supported_networks = Configuration.[Mainnet; Testnet]
 let network_name = function
   | Configuration.Mainnet -> "Mainnet"
   | Testnet -> "Testnet"
+  | Braeburn -> "Braeburn"
 
 let rollup_address network =
   Tezos_crypto.Hashed.Smart_rollup_address.of_b58check_exn
@@ -17,11 +18,13 @@ let rollup_address network =
   match network with
   | Configuration.Mainnet -> "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf"
   | Testnet -> "sr18wx6ezkeRjt1SZSeZ2UQzQN3Uc3YLMLqg"
+  | Braeburn -> "sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg"
 
 let network_of_address addr =
   match Tezos_crypto.Hashed.Smart_rollup_address.to_b58check addr with
   | "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf" -> Some Configuration.Mainnet
   | "sr18wx6ezkeRjt1SZSeZ2UQzQN3Uc3YLMLqg" -> Some Testnet
+  | "sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg" -> Some Braeburn
   | _ -> None
 
 type kernel = Bifrost | Calypso | Calypso2 | Dionysus | DionysusR1

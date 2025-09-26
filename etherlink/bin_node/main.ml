@@ -70,6 +70,16 @@ module Event = struct
       ~level:Warning
       ()
 
+  let no_default_snapshot_provider_braeburn =
+    declare_0
+      ~section
+      ~name:"no_default_snapshot_provider_for_braeburn"
+      ~msg:
+        "the default snapshots provider for Etherlink Braeburn may not be \
+         available yet"
+      ~level:Warning
+      ()
+
   let performance_profile =
     declare_1
       ~section
@@ -129,6 +139,7 @@ module Params = struct
     Tezos_clic.parameter (fun _ -> function
       | "mainnet" -> Lwt.return_ok Mainnet
       | "testnet" -> Lwt.return_ok Testnet
+      | "braeburn" -> Lwt.return_ok Braeburn
       | invalid_network ->
           failwith "'%s' is not a supported network" invalid_network)
 
@@ -555,8 +566,8 @@ let supported_network_arg ?why () =
     ~doc:
       Format.(
         asprintf
-          "The network the EVM node will be connecting to. Can be `mainnet` or \
-           `testnet`.%a"
+          "The network the EVM node will be connecting to. Can be `mainnet`, \
+           `testnet` or `braeburn`.%a"
           (pp_print_option (fun fmt why -> fprintf fmt " %s" why))
           why)
     Params.supported_network
@@ -583,6 +594,9 @@ let no_sync_arg =
     ~doc:"Disable tracking the head of the EVM node endpoint."
     ()
 
+let default_snapshot_provider =
+  "https://storage.googleapis.com/nl-sandboxes-etherlink--snapshots/etherlink-%n/%h/etherlink-%n-%h-latest.gz"
+
 let init_from_snapshot_arg =
   Tezos_clic.arg_or_switch
     ~long:"init-from-snapshot"
@@ -595,8 +609,7 @@ let init_from_snapshot_arg =
        complete Smart Rollup address, %n by the network (given by the argument \
        --network), %h by the history mode used by the node, and %% by %. Also \
        accepts a path to an existing snapshot."
-    ~default:
-      "https://storage.googleapis.com/nl-sandboxes-etherlink--snapshots/etherlink-%n/%h/etherlink-%n-%h-latest.gz"
+    ~default:default_snapshot_provider
     ~placeholder:"snapshot url or file path"
   @@ Params.string
 
@@ -1137,7 +1150,8 @@ let kernel_from_args network kernel =
     kernel
     (Option.bind network (function
       | Mainnet -> Some (In_memory Evm_node_supported_installers.mainnet)
-      | Testnet -> None))
+      | Testnet -> None
+      | Braeburn -> Some (In_memory Evm_node_supported_installers.braeburn)))
 
 let add_tezlink_to_node_configuration tezlink_chain_id configuration =
   let open Configuration in
@@ -1421,6 +1435,15 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
   let* () = websocket_checks config in
   let*! () = set_gc_parameters config in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
+  let*! () =
+    match (network, init_from_snapshot) with
+    | Some Braeburn, Some provider when provider = default_snapshot_provider ->
+        Internal_event.Simple.emit
+          Event.no_default_snapshot_provider_braeburn
+          ()
+    | _ -> Lwt.return_unit
+  in
+
   Evm_node_lib_dev.Observer.main
     ?network
     ~no_sync

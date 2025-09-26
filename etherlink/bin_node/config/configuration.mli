@@ -9,7 +9,7 @@
 open Evm_node_lib_dev_encoding
 
 (** A list of network officially supported by the EVM node. *)
-type supported_network = Mainnet | Testnet
+type supported_network = Mainnet | Testnet | Braeburn
 
 val pp_supported_network : Format.formatter -> supported_network -> unit
 
