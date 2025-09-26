@@ -41,7 +41,7 @@
  (libraries
   octez-libs.stdlib-unix
   octez-libs.base
-  octez-libs.cohttp-lwt-unix
+  cohttp-lwt-unix
   octez-libs.resto-cohttp-client
   octez-libs.rpc
   octez-libs.rpc-http-client)
@@ -58,7 +58,7 @@
  (libraries
   octez-libs.base
   octez-libs.stdlib-unix
-  octez-libs.cohttp-lwt-unix
+  cohttp-lwt-unix
   octez-libs.resto-cohttp-server
   octez-libs.resto-acl
   octez-libs.rpc

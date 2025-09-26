@@ -27,8 +27,8 @@ let opentelemetry_client_cohttp_lwt =
     ~deps:
       [
         cohttp;
-        Product_cohttp.cohttp_lwt;
-        Product_cohttp.cohttp_lwt_unix;
+        cohttp_lwt;
+        cohttp_lwt_unix;
         lwt_ppx;
         mtime;
         mtime_clock_os;

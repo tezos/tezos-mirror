@@ -82,10 +82,16 @@ export OPAMSWITCH="$tmp_opam_switch"
 # The default timeout (60 seconds) is often not enough.
 export OPAMSOLVERTIMEOUT="${OPAMSOLVERTIMEOUT:-600}"
 
-# Pin stdcompat to a commit that's compatible with OCaml 5.2.1
+# Pin dream to 1.0.0~alpha8-octez and dream-httpaf to 1.0.0~alpha4-octez
 echo "---- Pinning dream and dream-httpaf"
 opam pin add dream-httpaf.1.0.0~alpha4-octez https://github.com/lthms/dream.git#c29c883a8a314bdb5dc90db865797e32cd4f5eee -n -y
 opam pin add dream.1.0.0~alpha8-octez https://github.com/lthms/dream.git#c29c883a8a314bdb5dc90db865797e32cd4f5eee -n -y
+
+# Pin cohttp to 5.3.1-octez
+echo "---- Pinning cohttp"
+opam pin add cohttp.5.3.1~octez https://github.com/killian-delarue/ocaml-cohttp.git#96ba1b08df549367bc67aef7dda535819181b3c8 -n -y
+opam pin add cohttp-lwt.5.3.1~octez https://github.com/killian-delarue/ocaml-cohttp.git#96ba1b08df549367bc67aef7dda535819181b3c8 -n -y
+opam pin add cohttp-lwt-unix.5.3.1~octez https://github.com/killian-delarue/ocaml-cohttp.git#96ba1b08df549367bc67aef7dda535819181b3c8 -n -y
 
 # Pin base to a commit that's compatible with latest versions of Mac OS.
 #

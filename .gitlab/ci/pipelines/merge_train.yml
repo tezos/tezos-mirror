@@ -662,7 +662,6 @@ oc.build:static-x86_64-linux-binaries:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -741,7 +740,6 @@ oc.build:static-arm64-linux-binaries:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -824,7 +822,6 @@ oc.build_x86_64-released:
     - brassaia/**/*
     - brassaia/**/*.ml*
     - client-libs/**/*.ml*
-    - cohttp/**/*
     - data-encoding/**/*
     - data-encoding/**/*.ml*
     - docs/**/*
@@ -921,7 +918,6 @@ oc.build_amd64-extra-dev:
     - brassaia/**/*
     - brassaia/**/*.ml*
     - client-libs/**/*.ml*
-    - cohttp/**/*
     - data-encoding/**/*
     - data-encoding/**/*.ml*
     - docs/**/*
@@ -1034,7 +1030,6 @@ oc.build_amd64-extra-exp:
     - brassaia/**/*
     - brassaia/**/*.ml*
     - client-libs/**/*.ml*
-    - cohttp/**/*
     - data-encoding/**/*
     - data-encoding/**/*.ml*
     - docs/**/*
@@ -1147,7 +1142,6 @@ oc.build_kernels:
     - brassaia/**/*
     - brassaia/**/*.ml*
     - client-libs/**/*.ml*
-    - cohttp/**/*
     - data-encoding/**/*
     - data-encoding/**/*.ml*
     - docs/**/*
@@ -1238,7 +1232,6 @@ oc.tezt:fetch-records:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -1348,7 +1341,6 @@ build-layer1-profiling:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -1426,7 +1418,6 @@ select_tezts:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -1715,7 +1706,6 @@ oc.integration:compiler-rejections:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -1783,7 +1773,6 @@ oc.script:test-gen-genesis:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -1897,7 +1886,6 @@ oc.script:test_octez_release_versions:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -2512,7 +2500,6 @@ oc.unit:non-proto-x86_64:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -2605,7 +2592,6 @@ oc.unit:other-x86_64:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -2698,7 +2684,6 @@ oc.unit:proto-x86_64:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -2791,7 +2776,6 @@ oc.unit:non-proto-arm64:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -2873,7 +2857,6 @@ oc.unit:webassembly-x86_64:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -2926,7 +2909,6 @@ oc.unit:protocol_compiles:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -3176,7 +3158,6 @@ tezt:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -3275,7 +3256,6 @@ tezt-time-sensitive:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -3373,7 +3353,6 @@ tezt-slow:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -3469,7 +3448,6 @@ tezt-extra:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -3565,7 +3543,6 @@ tezt-flaky:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -3665,7 +3642,6 @@ tezt:static-binaries:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -3757,7 +3733,6 @@ tezt-riscv-slow-sequential:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project
@@ -3852,7 +3827,6 @@ oc.unified_coverage:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - cohttp/**/*
     - data-encoding/**/*
     - dune
     - dune-project

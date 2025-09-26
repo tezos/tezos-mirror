@@ -39,6 +39,14 @@ cp dream-httpaf.opam.locked 'opam-repository/packages/dream-httpaf/dream-httpaf.
 mkdir -p 'opam-repository/packages/dream/dream.1.0.0~alpha8-octez'
 cp dream.opam.locked 'opam-repository/packages/dream/dream.1.0.0~alpha8-octez/opam'
 
+echo "Add package: cohttp"
+mkdir -p 'opam-repository/packages/cohttp/cohttp.5.3.1~octez'
+cp cohttp.opam.locked 'opam-repository/packages/cohttp/cohttp.5.3.1~octez/opam'
+mkdir -p 'opam-repository/packages/cohttp-lwt/cohttp-lwt.5.3.1~octez'
+cp cohttp-lwt.opam.locked 'opam-repository/packages/cohttp-lwt/cohttp-lwt.5.3.1~octez/opam'
+mkdir -p 'opam-repository/packages/cohttp-lwt-unix/cohttp-lwt-unix.5.3.1~octez'
+cp cohttp-lwt-unix.opam.locked 'opam-repository/packages/cohttp-lwt-unix/cohttp-lwt-unix.5.3.1~octez/opam'
+
 echo "Add package: dummy-tezos"
 # This package adds some constraints to the solution found by the opam solver.
 dummy_pkg=octez-dummy

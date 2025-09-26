@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  octez-libs.cohttp-lwt-unix
+  cohttp-lwt-unix
   uri
   opentelemetry-lwt)
  (flags

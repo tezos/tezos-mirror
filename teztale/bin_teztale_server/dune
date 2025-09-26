@@ -12,7 +12,7 @@
   caqti-driver-postgresql
   caqti-driver-sqlite3
   caqti-lwt.unix
-  octez-libs.cohttp-lwt-unix
+  cohttp-lwt-unix
   ezgzip
   safepass
   octez-version.value

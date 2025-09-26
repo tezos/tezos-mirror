@@ -26,7 +26,7 @@
  (libraries
   octez-libs.resto
   octez-libs.resto-directory
-  octez-libs.cohttp-lwt)
+  cohttp-lwt)
  (modules media_type cors))
 
 (library
@@ -45,7 +45,7 @@
   octez-libs.resto-directory
   octez-libs.resto-acl
   octez-libs.resto-cohttp
-  octez-libs.cohttp-lwt-unix
+  cohttp-lwt-unix
   conduit-lwt-unix)
  (flags
   (:standard)

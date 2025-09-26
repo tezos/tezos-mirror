@@ -14,10 +14,11 @@ depends: [
   "base64" { >= "3.3.0" }
   "ocplib-endian"
   "conduit-lwt" { >= "7.1.0" }
-  "cohttp" { >= "5.3.1" & < "6.0.0" }
+  "cohttp" { = "5.3.1~octez" }
   "mirage-crypto-rng" { >= "1.0.0" }
-  "octez-libs"
+  "cohttp-lwt-unix" { = "5.3.1~octez" }
   "lwt_log"
+  "octez-libs"
   "octez-l2-libs"
   "octez-lwt-domain"
   "opentelemetry-lwt"
