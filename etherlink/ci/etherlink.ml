@@ -5,10 +5,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Files = struct
+  let sdks = ["src/kernel_sdk/**/*"; "sdk/rust/**/*"]
+
+  let rust_toolchain_image =
+    [
+      "images/rust-toolchain/**/*";
+      "images/create_image.sh";
+      "images/scripts/install_datadog_static.sh";
+      "scripts/version.sh";
+    ]
+
+  let lib_wasm_runtime_rust = ["src/lib_wasm_runtime/**/*.rs"]
+
+  let node = ["etherlink/**/*"]
+
+  let kernel = ["etherlink.mk"; "etherlink/**/*.rs"]
+
+  let all = sdks @ rust_toolchain_image @ lib_wasm_runtime_rust @ node @ kernel
+end
+
 module CI = Cacio.Make (struct
   let name = "etherlink"
 
-  let paths = ["etherlink/**/*"; "src/kernel_sdk/**/*"; "sdk/rust/**/*"]
+  let paths = Files.all
 end)
 
 let job_build_evm_node_static =
@@ -23,6 +43,7 @@ let job_build_evm_node_static =
     ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
     ?storage:(match arch with Arm64 -> Some Ramfs | Amd64 -> None)
     ~image:Tezos_ci.Images.CI.build
+    ~only_if_changed:Files.(node @ sdks)
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~name:"evm-binaries"
@@ -45,7 +66,7 @@ let job_lint_wasm_runtime =
     ~stage:Test
     ~description:"Run the linter on lib_wasm_runtime."
     ~image:Tezos_ci.Images.CI.build
-    ~only_if_changed:["src/lib_wasm_runtime/**/*.rs"]
+    ~only_if_changed:Files.lib_wasm_runtime_rust
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     [
@@ -62,6 +83,7 @@ let job_unit_tests =
     ~stage:Test
     ~description:"Etherlink unit tests."
     ~image:Tezos_ci.Images.CI.build
+    ~only_if_changed:Files.(node @ sdks)
     ~artifacts:
       ((* Note: the [~name] is actually overridden by the one computed
            by [Tezos_ci.Coverage.enable_output_artifact].
@@ -81,6 +103,22 @@ let job_unit_tests =
     ~retry:{max = 2; when_ = []}
     [". ./scripts/version.sh"; "eval $(opam env)"; "make test-etherlink-unit"]
 
+let job_test_kernel =
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "test_kernel"
+    ~__POS__
+    ~stage:Test
+    ~description:"Check and test the etherlink kernel."
+    ~image:Tezos_ci.Images.rust_toolchain
+    ~only_if_changed:Files.(rust_toolchain_image @ kernel @ sdks)
+    ~needs_legacy:
+      [(Job, Tezos_ci_jobs.Code_verification.job_build_kernels pipeline_type)]
+    ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    ["make -f etherlink.mk check"; "make -f etherlink.mk test"]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -88,14 +126,20 @@ let register () =
       (Manual, job_build_evm_node_static Arm64);
       (Auto, job_lint_wasm_runtime);
       (Auto, job_unit_tests);
+      (* We rely on the fact that [Tezos_ci_pipelines.Code_verification.job_build_kernels]
+         returns an equivalent job for [Before_merging] and [Merge_train]. *)
+      (Auto, job_test_kernel Before_merging);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for Etherlink."
+    ~legacy_jobs:
+      [Tezos_ci_jobs.Code_verification.job_build_kernels Schedule_extended_test]
     [
       (Auto, job_build_evm_node_static Amd64);
       (Auto, job_build_evm_node_static Arm64);
       (Auto, job_lint_wasm_runtime);
       (Auto, job_unit_tests);
+      (Auto, job_test_kernel Schedule_extended_test);
     ] ;
   ()

@@ -463,19 +463,6 @@ let changeset_test_kernels =
     @ make
         ["kernels.mk"; "src/kernel_*/**/*"; "src/riscv/**/*"; "sdk/rust/**/*"])
 
-let changeset_test_etherlink_kernel =
-  Changeset.(
-    changeset_base
-    @ changeset_images_rust_toolchain
-      (* Run if the [rust-toolchain] image is updated *)
-    @ make
-        [
-          "etherlink.mk";
-          "etherlink/**/*.rs";
-          "src/kernel_sdk/**/*";
-          "sdk/rust/**/*";
-        ])
-
 let changeset_test_etherlink_firehose =
   Changeset.(
     changeset_base @ changeset_images_rust_toolchain
