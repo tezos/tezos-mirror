@@ -68,9 +68,9 @@ docker buildx build --push \
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
-  --cache-from="type=registry,ref=${gcp_generic}" \
+  --cache-from="type=registry,ref=${gcp_generic}-cache" \
   --cache-from="type=registry,ref=${protected_gcp}" \
-  --cache-to="type=registry,ref=${gcp_generic}" \
+  --cache-to="type=registry,ref=${gcp_generic}-cache" \
   --secret "id=npm_token,src=/tmp/npm_token.txt" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --build-arg IMAGE="$IMAGE_PATH:$RELEASE" \
