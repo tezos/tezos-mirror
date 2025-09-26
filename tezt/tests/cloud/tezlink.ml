@@ -360,6 +360,15 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           ~url:(Client.string_of_endpoint tezlink_sandbox_endpoint)
       in
       let* () =
+        add_service
+          cloud
+          ~name:"Check Tezlink RPC endpoint"
+          ~url:
+            (sf
+               "%s/version"
+               (Client.string_of_endpoint tezlink_sandbox_endpoint))
+      in
+      let* () =
         if Cli.tzkt then
           let () = toplog "Starting TzKT" in
           let* tzkt_api =
@@ -374,6 +383,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               cloud
               ~name:"TzKT API"
               ~url:(Client.string_of_endpoint tzkt_api)
+          in
+          let* () =
+            add_service
+              cloud
+              ~name:"Check TzKT API"
+              ~url:(sf "%s/v1/head" (Client.string_of_endpoint tzkt_api))
           in
           let* () =
             add_service
