@@ -5,118 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let temp_dir = Filename.temp_dir "release_page" ""
-
-let sf = Printf.sprintf
-
-(* [get_field n line] returns the [n]th field of [line].
-   Fields are non-empty space-separated values. *)
-let get_field n line =
-  let fields =
-    String.split_on_char ' ' line
-    |> List.map String.trim
-    |> List.filter (( <> ) "")
-  in
-  if n >= 0 then List.nth_opt fields n
-  else List.nth_opt fields (List.length fields + n)
-
-(* Module to handle the storage (S3 bucket).
-   All used files are stored in temporary directoy. *)
-module Storage = struct
-  (* [get_path ~path ?target file] copies the [file] from [path] from the S3 bucket to
-     [temp_dir]/target. If [target] is not provided [file] is used instead.
-     Fails if the file does not exist. *)
-  let get_file ~path ?target file =
-    let target = Option.value ~default:file target in
-    Format.printf "Getting %s from %s@." file path ;
-    let command =
-      sf
-        "aws s3 cp \"s3://%s/%s\" \"%s\""
-        path
-        file
-        (Filename.concat temp_dir target)
-    in
-    match Sys.command command with
-    | 0 ->
-        Format.printf
-          "File %s stored in %s@."
-          file
-          (Filename.concat temp_dir target)
-    | _ -> failwith (sf "Unable to get %s in %s" file path)
-
-  (* [get_folder_content ~path] returns the list of files in [path]. *)
-  let get_folder_content ~path =
-    let command = sf "aws s3 ls \"s3://%s\" --recursive" path in
-    let ic = Unix.open_process_in command in
-    let result = ref [] in
-    (try
-       while true do
-         let line = input_line ic in
-         match get_field (-1) line with
-         | Some field -> result := field :: !result
-         | None -> ()
-       done
-     with End_of_file -> ()) ;
-    let _ = Unix.close_process_in ic in
-    !result
-end
-
-type asset_type = Binaries | Dashboards | Packages | Changelog
-
-let string_of_asset_type asset_type =
-  match asset_type with
-  | Binaries -> "Binaries"
-  | Dashboards -> "Dashboards"
-  | Packages -> "Packages"
-  | Changelog -> "Changelog"
-
-let asset_type_of_string_opt asset_type =
-  match String.lowercase_ascii asset_type with
-  | "binaries" -> Some Binaries
-  | "dashboards" -> Some Dashboards
-  | "packages" -> Some Packages
-  | "changelog" -> Some Changelog
-  | _ -> None
-
-type version = {
-  major : int;
-  minor : int;
-  rc : int option;
-  latest : bool;
-  announcement : string option;
-}
-
-type component = {
-  name : string;
-  path : string;
-  asset_path : version -> asset_type -> string;
-  url : string;
-}
-
-type section = {title : string; content : content}
-
-and content =
-  | Section of section
-  | Concat of content list
-  | Items of content list
-  | Link of {text : string; url : string}
-  | Text of string
-
-let section title content = Section {title; content}
-
-let link text url = Link {text; url}
-
-(* Defines a [Text text] but with a new line. *)
-let text_line text = Concat [Text text; Text "\n"]
-
-(* Defines a [Text text] but followed by an empty line. *)
-let text_empty_line text = Concat [Text text; Text "\n\n"]
-
-type page = section list
-
-type arch = X86_64 | Arm64
-
-let string_of_arch = function X86_64 -> "x86_64" | Arm64 -> "arm64"
+open Base
 
 (* [show_markdown content] returns a string that contains the
    markdown associated with [content]. *)
@@ -124,8 +13,8 @@ let show_markdown ?(level = 1) content =
   let buf = Buffer.create 0 in
   let pp string = Buffer.add_string buf string in
   let rec aux ~level = function
-    | Concat list -> List.iter (fun content -> aux ~level content) list
-    | Items list ->
+    | Content.Concat list -> List.iter (fun content -> aux ~level content) list
+    | Content.Items list ->
         (* List are preceeded by an empty line,
          and followed by an empty line. *)
         pp "\n" ;
@@ -136,9 +25,9 @@ let show_markdown ?(level = 1) content =
             pp "\n")
           list ;
         pp "\n\n"
-    | Link {text; url} -> pp @@ sf "[%s](%s)" text url
-    | Text text -> pp text
-    | Section {title; content} ->
+    | Content.Link {text; url} -> pp @@ sf "[%s](%s)" text url
+    | Content.Text text -> pp text
+    | Content.Section {title; content} ->
         pp @@ String.make level '#' ;
         pp " " ;
         pp title ;
@@ -151,9 +40,9 @@ let show_markdown ?(level = 1) content =
 
 (* [markdown_of_page page] returns a string that contains the
    markdown associated with the [page]. *)
-let markdown_of_page (page : page) =
+let markdown_of_page (page : Content.page) =
   List.fold_left
-    (fun acc section -> acc ^ show_markdown (Section section))
+    (fun acc section -> acc ^ show_markdown (Content.Section section))
     ""
     page
 
@@ -182,7 +71,7 @@ let get_versions ~component =
   let open JSON in
   try
     Storage.get_file ~path:component.path "versions.json" ;
-    parse_file (Filename.concat temp_dir "versions.json")
+    parse_file (Filename.concat Storage.temp_dir "versions.json")
     |> as_list
     |> List.map (fun version ->
            {
@@ -230,18 +119,20 @@ let get_assets ?arch ~component ~version ~asset () =
   Storage.get_folder_content ~path
 
 let make_links ?arch ~component assets =
+  let open Content in
   let assets_links =
     List.map
       (fun asset ->
         if Filename.basename asset = "sha256sums.txt" then
-          link
+          Content.link
             (Filename.basename asset)
             ("https://" ^ component.url ^ "/" ^ asset)
         else
           let checksum_path =
             match arch with
-            | Some arch -> Filename.concat temp_dir arch ^ "_sha256sums.txt"
-            | None -> Filename.concat temp_dir "sha256sums.txt"
+            | Some arch ->
+                Filename.concat Storage.temp_dir arch ^ "_sha256sums.txt"
+            | None -> Filename.concat Storage.temp_dir "sha256sums.txt"
           in
           let command =
             Format.asprintf
@@ -271,6 +162,7 @@ let make_links ?arch ~component assets =
    associated to its [version] of [component]. *)
 let asset_content ~component ~version = function
   | Binaries ->
+      let open Content in
       get_checksum_file ~arch:X86_64 ~component ~version ~asset:Binaries () ;
       get_checksum_file ~arch:Arm64 ~component ~version ~asset:Binaries () ;
       let binaries_x86 =
@@ -290,8 +182,9 @@ let asset_content ~component ~version = function
       get_checksum_file ~component ~version ~asset:Dashboards () ;
       let dashboards = get_assets ~component ~version ~asset:Dashboards () in
       let dashboards_links = make_links ~component dashboards in
-      section "Dashboards" dashboards_links
+      Content.section "Dashboards" dashboards_links
   | Packages ->
+      let open Content in
       Concat
         [
           section "Debian packages"
@@ -309,9 +202,9 @@ let asset_content ~component ~version = function
       match version.announcement with
       | None ->
           (* If no announcement is provided for [versions], we just return an empty string.*)
-          Text ""
+          Content.Text ""
       | Some announcement ->
-          text_empty_line
+          Content.text_empty_line
             (sf
                "Details and changelogs available in [the documentation](%s)"
                announcement))
@@ -341,7 +234,7 @@ let version_section ~component ~asset_types ~version =
           sf "%s %i.%i\n" (String.capitalize_ascii component.name) major minor
   in
   {
-    title;
+    Content.title;
     content = Concat (List.map (asset_content ~component ~version) asset_types);
   }
 
@@ -357,7 +250,7 @@ let generate_md ~component ~versions ~asset_types =
       (List.rev versions)
   in
   let md = markdown_of_page page in
-  let index = Filename.concat temp_dir "index.md" in
+  let index = Filename.concat Storage.temp_dir "index.md" in
   if Sys.file_exists index then
     Format.printf "Warning: %s already exists. It will be erased@." index ;
   let index_file = open_out index in
@@ -373,7 +266,7 @@ let generate_md ~component ~versions ~asset_types =
    a [path] is required as a metadata used for the
    assets. *)
 let generate_html ~template ~title ~path =
-  let index = Filename.concat temp_dir "index.md" in
+  let index = Filename.concat Storage.temp_dir "index.md" in
   let command =
     sf
       "pandoc %s -s --template=\"%s\" --metadata=title=\"%s\" \
