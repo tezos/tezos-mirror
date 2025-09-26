@@ -97,9 +97,7 @@ is on External RPC server.
 
 The Cohttp server monitors the health of the Unix connection. If EOF is
 received, RPC middleware is notified. Then it closes the connection towards the
-Client/Baker/Indexer. See Cohttp functions ``handle_request()`` in
-:src:`cohttp/cohttp-lwt/src/server.ml` and ``wait_eof_or_closed`` in
-:src:`cohttp/cohttp-lwt-unix/src/io.ml`.
+Client/Baker/Indexer. See Cohttp functions ``handle_request`` and  ``wait_eof_or_closed``.
 
 Cohttp uses Conduit library for low-level operation with connections. The Unix
 file descriptor of the connection is kept within Cohttp and is hidden for higher
