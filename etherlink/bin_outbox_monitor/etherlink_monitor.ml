@@ -809,12 +809,16 @@ let start db ~evm_node_endpoint ~rollup_node_endpoint ~l1_node_endpoint =
   let rollup_node_rpc = Rollup_node_rpc.make_ctxt ~rollup_node_endpoint in
   let l1_node_rpc = L1_execution.make_ctxt l1_node_endpoint in
   let run () =
-    let*! ws_client =
-      Websocket_client.connect
+    let ws_client =
+      Websocket_client.create
         ~monitoring:{ping_timeout = 60.; ping_interval = 10.}
+        ~keep_alive:false
+          (* We want a connection drop to retrigger a reconnection and a new
+             head subscription. *)
         Media_type.json
         evm_node_endpoint
     in
+    let* () = Websocket_client.connect ws_client in
     let* () = init_db_pointers db ws_client rollup_node_rpc in
     let* last_l2_head = Db.Pointers.L2_head.get db in
     let* last_levels = Db.Levels.last db in

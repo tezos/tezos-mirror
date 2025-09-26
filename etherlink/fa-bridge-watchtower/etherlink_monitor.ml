@@ -943,12 +943,16 @@ let start db ~config ~notify_ws_change ~first_block =
     ref (Services_backend_sig.Rpc (rpc_uri evm_node_endpoint))
   in
   let run () =
-    let*! ws_client =
-      Websocket_client.connect
+    let ws_client =
+      Websocket_client.create
         ~monitoring:{ping_timeout = 60.; ping_interval = 10.}
+        ~keep_alive:false
+          (* We want a connection drop to retrigger a reconnection and a new
+             head subscription. *)
         Media_type.json
         (ws_uri evm_node_endpoint)
     in
+    let* () = Websocket_client.connect ws_client in
     tx_queue_endpoint := Services_backend_sig.Websocket ws_client ;
     notify_ws_change ws_client ;
     let* () = init_db_pointers db ws_client config.rpc_timeout ~first_block in
