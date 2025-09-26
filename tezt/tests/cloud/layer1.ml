@@ -318,11 +318,20 @@ module Node = struct
     let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () =
       Lwt_list.iter_s
-        (fun {consensus; _} ->
-          Client.import_public_key
-            ~alias:consensus.public_key_hash
-            ~public_key:consensus.public_key
-            client)
+        (fun {consensus; companion = companion_opt; _} ->
+          let* () =
+            Client.import_public_key
+              ~alias:consensus.public_key_hash
+              ~public_key:consensus.public_key
+              client
+          in
+          match companion_opt with
+          | Some companion ->
+              Client.import_public_key
+                ~alias:companion.public_key_hash
+                ~public_key:companion.public_key
+                client
+          | None -> Lwt.return_unit)
         accounts
     in
     let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
@@ -458,8 +467,13 @@ let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
         ~env
         ~name
         ~delegates:
-          (List.map
-             (fun ({consensus; _} : baker_account) -> consensus.public_key_hash)
+          (List.fold_left
+             (fun acc ({consensus; companion; _} : baker_account) ->
+               match companion with
+               | Some companion ->
+                   companion.public_key_hash :: consensus.public_key_hash :: acc
+               | None -> consensus.public_key_hash :: acc)
+             []
              accounts)
         ?dal_node_rpc_endpoint
         ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
