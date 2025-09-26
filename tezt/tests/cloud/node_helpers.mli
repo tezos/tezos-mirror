@@ -19,6 +19,8 @@
 val yes_wallet : Agent.t -> Yes_wallet.t Lwt.t
 
 val isolated_config :
+  auto_synchronisation_threshold:bool ->
+  auto_connections:bool ->
   no_bootstrap_peers:bool ->
   peers:string list ->
   network:Network.t ->

@@ -26,16 +26,20 @@ let yes_wallet agent =
 
 (** We are running a private network with yes-crypto enabled.
     We don't want to connect with the real network. *)
-let isolated_config ~no_bootstrap_peers ~peers ~network ~delay =
+let isolated_config ~auto_synchronisation_threshold ~auto_connections
+    ~no_bootstrap_peers ~peers ~network ~delay =
   Node.
     [
-      Connections (min 100 (List.length peers));
-      Synchronisation_threshold (if List.length peers < 2 then 1 else 2);
       Network Network.(to_octez_network_options network);
       Expected_pow 0;
       Cors_origin "*";
       Storage_maintenance_delay (string_of_int delay);
     ]
+  @ (if auto_synchronisation_threshold then []
+     else
+       [Node.Synchronisation_threshold (if List.length peers < 2 then 1 else 2)])
+  @ (if auto_connections then []
+     else [Node.Connections (min 100 (List.length peers))])
   @ if no_bootstrap_peers then [No_bootstrap_peers] else []
 
 (** [--private-mode] is mainly useful for the bootstrap node

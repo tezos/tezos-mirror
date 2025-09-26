@@ -82,11 +82,13 @@ module Node = struct
     let* snapshot =
       ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
     in
+    let* version = get_snapshot_info_version node snapshot in
     let* () =
-      let* version = get_snapshot_info_version node snapshot in
       if version >= 9 then
         let config =
           Node_helpers.isolated_config
+            ~auto_synchronisation_threshold:false
+            ~auto_connections:true
             ~no_bootstrap_peers:true
             ~peers
             ~network
@@ -105,7 +107,6 @@ module Node = struct
             Network Network.(to_octez_network_options network);
             Expected_pow 26;
             Cors_origin "*";
-            Synchronisation_threshold 0;
           ]
         in
         let* () = Node.config_init node config in
@@ -113,7 +114,7 @@ module Node = struct
         let* () =
           (* When bootstrapping from the real network, we want to use the real time. *)
           let env = String_map.(add "FAKETIME" "+0" empty) in
-          run ~env node [Synchronisation_threshold 0]
+          run ~env node []
         in
         let* () = wait_for_ready node in
         let* _new_level = wait_next_level ~offset:2 node in
@@ -121,12 +122,30 @@ module Node = struct
         toplog "Reset node config for private a yes-crypto network" ;
         let config =
           Node_helpers.isolated_config
+            ~auto_synchronisation_threshold:true
+            ~auto_connections:true
             ~no_bootstrap_peers:true
             ~peers
             ~network
             ~delay:0
         in
         let* () = Node.config_reset node config in
+        let () =
+          let peers_file = sf "%s/peers.json" (Node.data_dir node) in
+          let runner = Node.runner node in
+          if Runner.Sys.file_exists ?runner peers_file then (
+            toplog (sf "Removing %s" peers_file) ;
+            Runner.Sys.remove ?runner peers_file)
+          else toplog (sf "%s Not found" peers_file)
+        in
+        let () =
+          let identity_file = sf "%s/identity.json" (Node.data_dir node) in
+          let runner = Node.runner node in
+          if Runner.Sys.file_exists ?runner identity_file then (
+            toplog (sf "Removing %s" identity_file) ;
+            Runner.Sys.remove ?runner identity_file)
+          else toplog (sf "%s Not found" identity_file)
+        in
         Lwt.return_unit
     in
     let* () =
@@ -136,12 +155,19 @@ module Node = struct
         ~migration_offset
         ~network
     in
-    let arguments = Node_helpers.isolated_args ~private_mode:false peers in
+    let arguments =
+      (if version >= 9 then
+         (* The auto synchronistaion threshold is set to false so that the
+             bootstrap node will be directly bootstraped *)
+         [Synchronisation_threshold 0]
+       else [ (* Synchronisation_threshold 0 *) ])
+      @ Node_helpers.isolated_args ~private_mode:false peers
+    in
     let* () =
       Node.Agent.run
         ~env:yes_crypto_env
         node
-        (Synchronisation_threshold 0 :: arguments)
+        arguments
         ~ppx_profiling_verbosity
         ~ppx_profiling_backends
     in
@@ -160,6 +186,8 @@ module Node = struct
     in
     let config =
       Node_helpers.isolated_config
+        ~auto_synchronisation_threshold:true
+        ~auto_connections:true
         ~no_bootstrap_peers:true
         ~peers
         ~network
@@ -186,7 +214,7 @@ module Node = struct
         ~ppx_profiling_verbosity
         ~ppx_profiling_backends
         node
-        (Synchronisation_threshold 0 :: arguments)
+        arguments
     in
     let* () = wait_for_ready node in
     (* As we are playing with dates in the past,
@@ -777,7 +805,10 @@ let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
     | Some _ -> (
         match rich_accounts with a :: l -> (Some a, l) | _ -> assert false)
   in
-  let peers = Node.point_str bootstrap_node :: peers in
+  let peers =
+    [Node.point_str bootstrap_node]
+    (* :: peers *)
+  in
   let* bakers =
     toplog "Initializing bakers" ;
     let* distribution =
@@ -1102,6 +1133,8 @@ let number_of_bakers ~snapshot ~(network : Network.t) =
     Node.config_init
       node
       (Node_helpers.isolated_config
+         ~auto_synchronisation_threshold:true
+         ~auto_connections:true
          ~no_bootstrap_peers:true
          ~peers:[]
          ~network
