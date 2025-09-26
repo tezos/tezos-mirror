@@ -580,48 +580,49 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                    "http://sandbox.tzkt.io/blocks?tzkt_api_url=%s"
                    (Client.url_encoded_string_of_endpoint tzkt_api))
           in
-          (* TODO: add a Cli.faucet and custom config options *)
-          let () = toplog "Starting faucet" in
-          let faucet_account = Constant.bootstrap1 in
-          let faucet_pkh = faucet_account.public_key_hash in
-          let faucet_private_key =
-            match Constant.bootstrap1.secret_key with
-            | Unencrypted key -> key
-            | _ -> assert false
-          in
-          let* faucet_api =
-            init_faucet_backend
-              ~agent:tezlink_sequencer_agent
-              ~tezlink_sandbox_endpoint
-              ~faucet_private_key
-          in
-          let* () =
-            add_service
-              cloud
-              ~name:"Faucet API"
-              ~url:(Client.string_of_endpoint faucet_api)
-          in
-          let* () =
-            add_service
-              cloud
-              ~name:"Check Faucet API"
-              ~url:(sf "%s/info" (Client.string_of_endpoint faucet_api))
-          in
-          let* faucet_frontend =
-            init_faucet_frontend
-              ~agent:tezlink_sequencer_agent
-              ~faucet_api
-              ~tezlink_sandbox_endpoint
-              ~faucet_pkh
-              ~tzkt_api
-          in
-          let* () =
-            add_service
-              cloud
-              ~name:"Faucet"
-              ~url:(Client.string_of_endpoint faucet_frontend)
-          in
-          unit
+          if Cli.faucet then
+            let () = toplog "Starting faucet" in
+            let faucet_account = Constant.bootstrap1 in
+            let faucet_pkh = faucet_account.public_key_hash in
+            let faucet_private_key =
+              match Constant.bootstrap1.secret_key with
+              | Unencrypted key -> key
+              | _ -> assert false
+            in
+            let* faucet_api =
+              init_faucet_backend
+                ~agent:tezlink_sequencer_agent
+                ~tezlink_sandbox_endpoint
+                ~faucet_private_key
+            in
+            let* () =
+              add_service
+                cloud
+                ~name:"Faucet API"
+                ~url:(Client.string_of_endpoint faucet_api)
+            in
+            let* () =
+              add_service
+                cloud
+                ~name:"Check Faucet API"
+                ~url:(sf "%s/info" (Client.string_of_endpoint faucet_api))
+            in
+            let* faucet_frontend =
+              init_faucet_frontend
+                ~agent:tezlink_sequencer_agent
+                ~faucet_api
+                ~tezlink_sandbox_endpoint
+                ~faucet_pkh
+                ~tzkt_api
+            in
+            let* () =
+              add_service
+                cloud
+                ~name:"Faucet"
+                ~url:(Client.string_of_endpoint faucet_frontend)
+            in
+            unit
+          else unit
         else unit
       in
       let () = toplog "Starting main loop" in

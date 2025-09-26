@@ -1097,6 +1097,8 @@ module type Tezlink = sig
 
   val tzkt : bool
 
+  val faucet : bool
+
   val verbose : bool
 
   val time_between_blocks : Tezos.Evm_node.time_between_blocks
@@ -1127,6 +1129,14 @@ module Tezlink () : Tezlink = struct
       ~long:"public-rpc-port"
       ~description:"Set the port number of the RPC server"
       ()
+
+  let faucet =
+    Clap.flag
+      ~section
+      ~set_long:"faucet"
+      ~unset_long:"no-faucet"
+      ~description:"Run a faucet (requires --tzkt)"
+      true
 
   let tzkt_api_port =
     Clap.optional_int
