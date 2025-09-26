@@ -838,48 +838,6 @@ let hardcoded_sig =
   in
   function Ed25519 -> ed | Secp256k1 -> secp | P256 -> p | Bls -> bls
 
-(* The following cache is a hack to work around a quadratic algorithm
-   in Tezos Mainnet protocols up to Edo. *)
-
-module type ENDORSEMENT_CACHE_MAKER = functor (H : Stdlib.Hashtbl.HashedType) ->
-  Aches.Vache.MAP with type key = H.t
-
-let make_endorsement_cache : (module ENDORSEMENT_CACHE_MAKER) =
-  match Sys.getenv_opt "TEZOS_DISABLE_ENDORSEMENT_SIGNATURE_CACHE" with
-  | Some _ -> (module Aches.Vache.EmptyMap)
-  | None ->
-      (module Aches.Vache.Map (Aches.Vache.FIFO_Sloppy) (Aches.Vache.Strong))
-
-module Endorsement_cache =
-  (val make_endorsement_cache)
-    (struct
-      type nonrec t = t
-
-      let equal = equal
-
-      let hash = Hashtbl.hash
-    end)
-
-let endorsement_cache = Endorsement_cache.create 300
-
-let check ?watermark public_key signature message =
-  match watermark with
-  | Some (Endorsement _) -> (
-      (* signature check cache only applies to endorsements *)
-      match Endorsement_cache.find_opt endorsement_cache signature with
-      | Some (key, msg) ->
-          (* we rely on this property : signature_1 = signature_2 => key_1 = key_2 /\ message_1 = message_2 *)
-          Public_key.equal public_key key && Bytes.equal msg message
-      | None ->
-          let res = check ?watermark public_key signature message in
-          if res then
-            Endorsement_cache.replace
-              endorsement_cache
-              signature
-              (public_key, message) ;
-          res)
-  | _ -> check ?watermark public_key signature message
-
 let fast_fake_sign ?watermark:_ (sk : Secret_key.t) _msg =
   let algo =
     match sk with
