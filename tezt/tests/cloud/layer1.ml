@@ -1189,11 +1189,21 @@ let register (module Cli : Scenarios_cli.Layer1) =
       (fun tag -> Agent.Configuration.Octez_release {tag})
       configuration.octez_release
   in
-  let default_vm_configuration ~name =
-    Agent.Configuration.make ?docker_image:default_docker_image ~name ()
+  let default_vm_configuration ?machine_type ~name () =
+    Agent.Configuration.make
+      ?machine_type
+      ?docker_image:default_docker_image
+      ~name
+      ()
   in
   let make_vm_conf ~name = function
-    | None -> default_vm_configuration ~name
+    | None ->
+        default_vm_configuration
+          ?machine_type:
+            (if String.equal name "bootstrap" then Some "n2-standard-8"
+             else None)
+          ~name
+          ()
     | Some {machine_type; docker_image; max_run_duration; binaries_path; os} ->
         let docker_image =
           match docker_image with
@@ -1202,7 +1212,9 @@ let register (module Cli : Scenarios_cli.Layer1) =
         in
         let os = Option.map Types.Os.of_string_exn os in
         Agent.Configuration.make
-          ?machine_type
+          ?machine_type:
+            (if String.equal name "bootstrap" then Some "n2-standard-8"
+             else machine_type)
           ?docker_image
           ~max_run_duration
           ?binaries_path
