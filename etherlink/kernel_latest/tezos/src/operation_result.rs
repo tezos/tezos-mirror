@@ -383,7 +383,7 @@ impl NomReader<'_> for Empty {
 // the one implemented in the kernel_sdk Contract. However, this type
 // cannot be an implicit account. Therefore, we created a new type that
 // only holds a KT1. The new type reuses the existing functions.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Originated {
     pub contract: ContractKt1Hash,
 }

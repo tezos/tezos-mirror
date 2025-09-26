@@ -4836,4 +4836,206 @@ mod tests {
             ])),
         );
     }
+
+    #[test]
+    fn big_map_transfer_with_creation() {
+        let mut host = MockKernelHost::default();
+        let context = context::Context::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let tz1 = bootstrap1();
+
+        let originator_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeeded");
+
+        let script_originator = read_script("originator.tz");
+
+        init_account(ctx.host, &tz1.pkh, 100_000_000);
+        reveal_account(ctx.host, &tz1);
+        let parser = Parser::new();
+
+        let originator_contract = init_contract(
+            ctx.host,
+            &originator_addr,
+            &script_originator,
+            &parser
+                .parse("{Elt \"b\" 0x; Elt \"d\" 0x; }")
+                .expect("Could not parse initial storage"),
+            &0.into(),
+        );
+
+        let operation = make_transfer_operation(
+            0,
+            1,
+            21040,
+            5,
+            tz1.clone(),
+            0.into(),
+            Contract::Originated(originator_addr),
+            None,
+        );
+
+        let receipts = validate_and_apply_operation(
+            ctx.host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+            &block_ctx!(),
+            false,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert!(receipts.len() == 1);
+
+        let receipt = receipts.first().unwrap();
+
+        let internal_operation_results = match &receipt.receipt {
+            OperationResultSum::Transfer(OperationResult {
+                internal_operation_results,
+                ..
+            }) => internal_operation_results.as_slice(),
+            _ => panic!("Failed to read originated contracts from receipt"),
+        };
+
+        let mut contracts: Vec<Originated> = vec![];
+        for ir in internal_operation_results {
+            let originated_contracts = match &ir {
+                InternalOperationSum::Origination(InternalContentWithMetadata {
+                    result:
+                        ContentResult::Applied(OriginationSuccess {
+                            originated_contracts,
+                            ..
+                        }),
+                    ..
+                }) => originated_contracts,
+                _ => &vec![],
+            };
+            contracts.extend_from_slice(originated_contracts);
+        }
+
+        assert!(contracts.len() == 3);
+
+        let Originated {
+            contract: created_addr_0,
+        } = &contracts[0];
+        let created_acount_0 =
+            TezlinkOriginatedAccount::from_kt1(ctx.context, created_addr_0)
+                .expect("Failed to retrieve generated account");
+
+        let Originated {
+            contract: created_addr_1,
+        } = &contracts[1];
+        let created_acount_1 =
+            TezlinkOriginatedAccount::from_kt1(ctx.context, created_addr_1)
+                .expect("Failed to retrieve generated account");
+
+        let Originated {
+            contract: created_addr_2,
+        } = &contracts[2];
+        let created_acount_2 =
+            TezlinkOriginatedAccount::from_kt1(ctx.context, created_addr_2)
+                .expect("Failed to retrieve generated account");
+
+        let storage_originator = originator_contract
+            .storage(ctx.host)
+            .expect("Failed to fetch storage for originator");
+        let mich_storage_originator =
+            Micheline::decode_raw(&parser.arena, &storage_originator)
+                .expect("Couldn't decode storage.");
+        let big_map_id_originator =
+            typecheck_value(&mich_storage_originator, &mut ctx, &Type::Int)
+                .expect("Storage has unexpected type");
+        match big_map_id_originator {
+            TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
+                &mut ctx,
+                &parser.arena,
+                &id.into(),
+                Type::String,
+                Type::Bytes,
+                BTreeMap::from([
+                    (TypedValue::String("d".into()), TypedValue::Bytes(vec![])),
+                    (TypedValue::String("b".into()), TypedValue::Bytes(vec![])),
+                ]),
+            ),
+            _ => panic!("ID should've been integer"),
+        }
+
+        println!("Originator OK");
+
+        let storage_0 = created_acount_0
+            .storage(ctx.host)
+            .expect("Failed to fetch storage for created account #0");
+        let mich_storage_0 = Micheline::decode_raw(&parser.arena, &storage_0)
+            .expect("Couldn't decode storage.");
+        let big_map_id_0 = typecheck_value(&mich_storage_0, &mut ctx, &Type::Int)
+            .expect("Storage has unexpected type");
+        match big_map_id_0 {
+            TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
+                &mut ctx,
+                &parser.arena,
+                &id.into(),
+                Type::String,
+                Type::Bytes,
+                BTreeMap::from([(
+                    TypedValue::String("d".into()),
+                    TypedValue::Bytes("".into()),
+                )]),
+            ),
+            _ => panic!("ID should've been integer"),
+        }
+
+        println!("Created_0 OK");
+
+        let storage_1 = created_acount_1
+            .storage(ctx.host)
+            .expect("Failed to fetch storage for created account #1");
+        let mich_storage_1 = Micheline::decode_raw(&parser.arena, &storage_1)
+            .expect("Coudln't decode storage.");
+        let big_map_id_1 = typecheck_value(&mich_storage_1, &mut ctx, &Type::Int)
+            .expect("Storage has unexpected type");
+        match big_map_id_1 {
+            TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
+                &mut ctx,
+                &parser.arena,
+                &id.into(),
+                Type::String,
+                Type::Bytes,
+                BTreeMap::from([
+                    (TypedValue::String("d".into()), TypedValue::Bytes(vec![])),
+                    (TypedValue::String("b".into()), TypedValue::Bytes(vec![])),
+                ]),
+            ),
+            _ => panic!("ID should've been integer"),
+        }
+
+        println!("Created_1 OK");
+
+        let storage_2 = created_acount_2
+            .storage(ctx.host)
+            .expect("Failed to fetch storage for created account #2");
+        let mich_storage_2 = Micheline::decode_raw(&parser.arena, &storage_2)
+            .expect("Coudln't decode storage.");
+        let big_map_id_2 = typecheck_value(&mich_storage_2, &mut ctx, &Type::Int)
+            .expect("Storage has unexpected type");
+        match big_map_id_2 {
+            TypedValue::Int(id) => crate::mir_ctx::tests::assert_big_map_eq(
+                &mut ctx,
+                &parser.arena,
+                &id.into(),
+                Type::String,
+                Type::Bytes,
+                BTreeMap::from([
+                    (TypedValue::String("d".into()), TypedValue::Bytes(vec![])),
+                    (
+                        TypedValue::String("a".into()),
+                        TypedValue::Bytes(vec![0u8, 16u8]),
+                    ),
+                ]),
+            ),
+            _ => panic!("ID should've been integer"),
+        }
+
+        println!("Created_2 OK");
+    }
 }
