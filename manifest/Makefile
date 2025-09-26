@@ -9,7 +9,6 @@ SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml \
        externals.ml \
        internals.ml \
        product_data_encoding.mli product_data_encoding.ml \
-       product_cohttp.mli product_cohttp.ml \
        product_websocket.mli product_websocket.ml \
        product_opentelemetry.mli product_opentelemetry.ml \
        product_prometheus.mli product_prometheus.ml \
