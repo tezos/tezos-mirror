@@ -357,6 +357,7 @@ module Node = struct
         ~migration_offset
         (agent, node, name)
     in
+    toplog "L1 node %s initialized" name ;
     let* client =
       (* [~local] is set to false since the client might be called from the localhost/orchestrator *)
       client ~local:false ~node agent
@@ -465,7 +466,8 @@ let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
   in
   let* dal_node =
     if configuration.without_dal then Lwt.return_none
-    else
+    else (
+      toplog "init_baker: Initialize dal node" ;
       let name = name ^ "-dal-node" in
       let* dal_node = Dal_node.Agent.create ~name cloud agent ~node in
       let attester_profiles =
@@ -485,7 +487,7 @@ let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           dal_node
       in
-      Lwt.return_some dal_node
+      Lwt.return_some dal_node)
   in
   let* baker =
     toplog "init_baker: Initialize agnostic baker" ;
@@ -631,7 +633,8 @@ let init_network ~peers (configuration : Scenarios_configuration.LAYER1.t) cloud
   in
   let* dal_node =
     if configuration.without_dal then Lwt.return_none
-    else
+    else (
+      toplog "init_network: Initialize the bootstrap dal-node" ;
       let disable_shard_validation = true in
       let* dal_node =
         Dal_node.Agent.create
@@ -654,7 +657,7 @@ let init_network ~peers (configuration : Scenarios_configuration.LAYER1.t) cloud
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           dal_node
       in
-      Lwt.return_some dal_node
+      Lwt.return_some dal_node)
   in
   toplog "init_network: Add a Teztale archiver" ;
   let* () =
@@ -1324,6 +1327,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
     Lwt_list.iter_p
       (fun (producer : Dal_node_helpers.producer) ->
         let index = producer.slot_index in
+        toplog "Producing DAL commitment for slot %d" index ;
         let content =
           Format.asprintf "%d:%d" level index
           |> Dal_common.Helpers.make_slot ~padding:false ~slot_size:131072
