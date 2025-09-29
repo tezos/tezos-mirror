@@ -34,7 +34,7 @@ pub struct BigMapId {
 impl Display for BigMapId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Zarith(ref int_value) = self.value;
-        write!(f, "{}", int_value)
+        write!(f, "{int_value}")
     }
 }
 
