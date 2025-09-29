@@ -317,7 +317,15 @@ end
   - considered faulty/malicious if it fake signs,
   - exploited by attackers if it fake-checks signatures.
 
-  This should be used for testing purposes only and/or with extreme care.*)
+  This should be used for testing purposes only and/or with extreme care.
+
+  Yes-cryptography comes in two flavors:
+    - Yes: uses the normal [sign] and [check] functions to simulate
+      cryptographic costs, but [check] always returns [true].
+    - Fast: return hardcoded signatures and skip any actual cryptographic checks.
+
+  In both modes, verification always succeeds. *)
+
 let yes_crypto_environment_variable =
   "TEZOS_USE_YES_CRYPTO_I_KNOW_WHAT_I_AM_DOING"
 
