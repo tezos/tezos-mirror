@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -24,7 +25,7 @@ use crate::{
             UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST,
         },
         error::CustomPrecompileError,
-        guard::OOG,
+        guard::out_of_gas,
     },
     storage::sequencer_key_change::SequencerKeyChange,
 };
@@ -71,7 +72,7 @@ where
     let mut gas = Gas::new(gas_limit);
 
     if !gas.record_cost(UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST) {
-        return Ok(OOG);
+        return Ok(out_of_gas(gas_limit));
     }
 
     let Ok(function_call) = ChangeSequencerKeyCalls::abi_decode(input) else {

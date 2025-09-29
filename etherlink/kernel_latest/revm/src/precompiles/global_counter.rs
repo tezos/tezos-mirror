@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -18,7 +19,7 @@ use crate::{
             GLOBAL_COUNTER_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
         },
         error::CustomPrecompileError,
-        guard::{guard, revert, OOG},
+        guard::{guard, out_of_gas, revert},
     },
 };
 
@@ -48,12 +49,12 @@ where
 
     let mut gas = Gas::new(gas_limit);
     if !gas.record_cost(GLOBAL_COUNTER_BASE_COST) {
-        return Ok(OOG);
+        return Ok(out_of_gas(gas_limit));
     }
 
     let interface = match GlobalCounter::GlobalCounterCalls::abi_decode(input) {
         Ok(data) => data,
-        Err(e) => return Ok(revert(e)),
+        Err(e) => return Ok(revert(e, gas)),
     };
 
     let counter = match interface {
