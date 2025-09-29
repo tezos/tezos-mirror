@@ -23,22 +23,47 @@ use revm::{
     primitives::{hardfork::SpecId, hash_map::HashMap, Address, Bytes, Log, B256, U256},
     Inspector,
 };
-use rlp::{Encodable, RlpStream};
+use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use std::ops::Range;
-use tezos_ethereum::Log as RlpLog;
+use tezos_ethereum::{
+    rlp_helpers::{check_list, decode_field, decode_option, next},
+    Log as RlpLog,
+};
 use tezos_evm_logging::{log, Level::Debug};
 use tezos_evm_runtime::runtime::Runtime;
 
-#[derive(Debug)]
+const CALL_TRACER_CONFIG_SIZE: usize = 3;
+
+#[derive(Debug, Clone, Copy)]
 pub struct CallTracerConfig {
     pub only_top_call: bool,
     pub with_logs: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct CallTracerInput {
     pub config: CallTracerConfig,
     pub transaction_hash: Option<B256>,
+}
+
+impl Decodable for CallTracerInput {
+    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
+        let mut it = decoder.iter();
+        check_list(decoder, CALL_TRACER_CONFIG_SIZE)?;
+
+        let transaction_hash: Option<primitive_types::H256> =
+            decode_option(&next(&mut it)?, "transaction_hash")?;
+        let only_top_call = decode_field(&next(&mut it)?, "only_top_call")?;
+        let with_logs = decode_field(&next(&mut it)?, "with_logs")?;
+
+        Ok(CallTracerInput {
+            transaction_hash: transaction_hash.map(|h| B256::from_slice(&h.0)),
+            config: CallTracerConfig {
+                only_top_call,
+                with_logs,
+            },
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -158,7 +183,7 @@ impl CallTrace {
         }
     }
 
-    fn add_logs(&mut self, logs: Option<Vec<Log>>) {
+    pub fn add_logs(&mut self, logs: Option<Vec<Log>>) {
         self.logs = logs;
     }
 

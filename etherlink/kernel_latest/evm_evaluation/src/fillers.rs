@@ -15,8 +15,8 @@ use crate::{write_host, write_out, DiffMap, ReportMap, ReportValue};
 use crate::models::TxPartIndices;
 
 use bytes::Bytes;
-use evm_execution::utilities::alloy::h160_to_alloy;
-use primitive_types::{H160, H256};
+use primitive_types::H256;
+use revm::primitives::Address;
 use revm::{primitives::U256, state::AccountInfo};
 use revm_etherlink::helpers::legacy::{h256_to_alloy, u256_to_alloy};
 use revm_etherlink::storage::code::CodeStorage;
@@ -251,8 +251,9 @@ fn check_durable_storage(
         } else {
             "0x".to_owned() + account
         };
-        let address = H160::from_str(&hex_address).expect("Expect valid hex digit(s).");
-        let account = StorageAccount::from_address(&h160_to_alloy(&address)).unwrap();
+        let address =
+            Address::from_str(&hex_address).expect("Expect valid hex digit(s).");
+        let account = StorageAccount::from_address(&address).unwrap();
         let mut invalid_state = false;
 
         // Enable checks when fields are available in the source filler file.

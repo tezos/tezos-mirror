@@ -34,9 +34,10 @@ use tezos_evm_runtime::runtime::Runtime;
 
 pub mod call_tracer;
 pub mod noop;
+pub mod storage;
 pub mod struct_logger;
 
-mod storage;
+pub const CALL_TRACER_CONFIG_PREFIX: u8 = 0x01;
 
 pub type EvmInspection<'a, Host> = Evm<
     EVMInnerContext<'a, Host>,
@@ -135,11 +136,21 @@ impl<Host: Runtime> InspectEvm for EtherlinkEvmInspector<'_, Host> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum TracerInput {
     NoOp,
     CallTracer(CallTracerInput),
     StructLogger(StructLoggerInput),
+}
+
+impl TracerInput {
+    pub fn tx_hash(&self) -> Option<B256> {
+        match self {
+            TracerInput::StructLogger(input) => input.transaction_hash,
+            TracerInput::CallTracer(input) => input.transaction_hash,
+            TracerInput::NoOp => None,
+        }
+    }
 }
 
 pub enum EtherlinkInspector {
@@ -369,5 +380,31 @@ where
                 )
             }
         }
+    }
+}
+
+pub fn get_tracer_configuration(
+    tx_hash_target: B256,
+    tracer_input: Option<TracerInput>,
+) -> Option<TracerInput> {
+    match tracer_input {
+        Some(tracer_input) => match tracer_input.tx_hash() {
+            None => {
+                // If there is no transaction hash, we still provide
+                // the configuration to trace all transactions
+                Some(tracer_input)
+            }
+            Some(input_hash) => {
+                // If there is a transaction hash in the input
+                // we only trace if the current transaction hash
+                // matches the transaction hash from the input
+                if input_hash == tx_hash_target {
+                    Some(tracer_input)
+                } else {
+                    None
+                }
+            }
+        },
+        None => None,
     }
 }

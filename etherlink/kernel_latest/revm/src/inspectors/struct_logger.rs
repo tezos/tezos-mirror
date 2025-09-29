@@ -21,7 +21,8 @@ use revm::{
     state::AccountInfo,
     Database, Inspector,
 };
-use rlp::{Encodable, RlpStream};
+use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
+use tezos_ethereum::rlp_helpers::{check_list, decode_field, decode_option, next};
 use tezos_evm_logging::{log, tracing::instrument, Level::Debug};
 use tezos_evm_runtime::runtime::Runtime;
 
@@ -32,13 +33,39 @@ use super::{
     StructStack,
 };
 
-#[derive(Debug)]
+const STRUCT_LOGGER_CONFIG_SIZE: usize = 5;
+
+#[derive(Debug, Clone, Copy)]
 pub struct StructLoggerInput {
     pub config: StructLoggerConfig,
     pub transaction_hash: Option<B256>,
 }
 
-#[derive(Debug)]
+impl Decodable for StructLoggerInput {
+    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
+        let mut it = decoder.iter();
+        check_list(decoder, STRUCT_LOGGER_CONFIG_SIZE)?;
+
+        let transaction_hash: Option<primitive_types::H256> =
+            decode_option(&next(&mut it)?, "transaction_hash")?;
+        let enable_memory = decode_field(&next(&mut it)?, "enable_memory")?;
+        let enable_return_data = decode_field(&next(&mut it)?, "enable_return_data")?;
+        let disable_stack = decode_field(&next(&mut it)?, "disable_stack")?;
+        let disable_storage = decode_field(&next(&mut it)?, "disable_storage")?;
+
+        Ok(StructLoggerInput {
+            transaction_hash: transaction_hash.map(|h| B256::from_slice(&h.0)),
+            config: StructLoggerConfig {
+                enable_return_data,
+                enable_memory,
+                disable_stack,
+                disable_storage,
+            },
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct StructLoggerConfig {
     pub enable_memory: bool,
     pub enable_return_data: bool,

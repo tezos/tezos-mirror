@@ -25,11 +25,12 @@ use crate::{error::Error, storage};
 use crate::{parsable, parsing, retrieve_chain_id};
 
 use evm::Config;
-use evm_execution::trace::TracerInput;
 use evm_execution::EthereumError;
 use primitive_types::{H160, U256};
 use revm::{context::result::ExecutionResult as VMResult, primitives::Address};
-use revm_etherlink::{helpers::legacy::u256_to_alloy, ExecutionOutcome};
+use revm_etherlink::{
+    helpers::legacy::u256_to_alloy, inspectors::TracerInput, ExecutionOutcome,
+};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use tezos_ethereum::access_list::empty_access_list;
 use tezos_ethereum::block::{BlockConstants, BlockFees};

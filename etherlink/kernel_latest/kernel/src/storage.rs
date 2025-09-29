@@ -11,11 +11,11 @@ use crate::event::Event;
 use crate::simulation::SimulationResult;
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use anyhow::Context;
-use evm_execution::trace::{
-    CallTracerInput, StructLoggerInput, TracerInput, CALL_TRACER_CONFIG_PREFIX,
-};
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
+use revm_etherlink::inspectors::call_tracer::CallTracerInput;
+use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
+use revm_etherlink::inspectors::{TracerInput, CALL_TRACER_CONFIG_PREFIX};
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;

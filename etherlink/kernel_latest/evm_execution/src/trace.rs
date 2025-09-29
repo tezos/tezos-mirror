@@ -23,8 +23,6 @@ use tezos_ethereum::{
 const STRUCT_LOGGER_CONFIG_SIZE: usize = 5;
 const CALL_TRACER_CONFIG_SIZE: usize = 3;
 
-pub const CALL_TRACER_CONFIG_PREFIX: u8 = 0x01;
-
 #[derive(Debug, Clone, Copy)]
 pub struct StructLoggerConfig {
     pub enable_memory: bool,
@@ -37,12 +35,6 @@ pub struct StructLoggerConfig {
 pub struct CallTracerConfig {
     pub only_top_call: bool,
     pub with_logs: bool,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum TracerConfig {
-    StructLogger(StructLoggerConfig),
-    CallTracer(CallTracerConfig),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -69,32 +61,6 @@ impl TracerInput {
             TracerInput::StructLogger(input) => input.transaction_hash,
             TracerInput::CallTracer(input) => input.transaction_hash,
         }
-    }
-}
-
-pub fn get_tracer_configuration(
-    tx_hash_target: H256,
-    tracer_input: Option<TracerInput>,
-) -> Option<TracerInput> {
-    match tracer_input {
-        Some(tracer_input) => match tracer_input.tx_hash() {
-            None => {
-                // If there is no transaction hash, we still provide
-                // the configuration to trace all transactions
-                Some(tracer_input)
-            }
-            Some(input_hash) => {
-                // If there is a transaction hash in the input
-                // we only trace if the current transaction hash
-                // matches the transaction hash from the input
-                if input_hash == tx_hash_target {
-                    Some(tracer_input)
-                } else {
-                    None
-                }
-            }
-        },
-        None => None,
     }
 }
 

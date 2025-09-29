@@ -19,8 +19,9 @@ use crate::{
     CHAIN_ID,
 };
 use anyhow::Context;
-use evm_execution::{configuration::EVMVersion, trace::TracerInput};
+use evm_execution::configuration::EVMVersion;
 use primitive_types::{H160, H256, U256};
+use revm_etherlink::inspectors::TracerInput;
 use rlp::{Decodable, Encodable};
 use std::{
     collections::VecDeque,
