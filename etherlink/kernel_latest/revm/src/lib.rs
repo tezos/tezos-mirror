@@ -346,7 +346,9 @@ pub fn run_transaction<'a, Host: Runtime>(
 
 #[cfg(test)]
 mod test {
-    use alloy_sol_types::{ContractError, Revert, RevertReason, SolEvent, SolInterface};
+    use alloy_sol_types::{
+        sol, ContractError, Revert, RevertReason, SolEvent, SolInterface,
+    };
     use alloy_sol_types::{SolCall, SolError};
     use nom::AsBytes;
     use primitive_types::H256;
@@ -373,6 +375,7 @@ mod test {
 
     use super::Error;
     use crate::helpers::storage::bytes_hash;
+    use crate::precompiles::constants::FEED_DEPOSIT_ADDR;
     use crate::storage::code::{CodeStorage, EVM_CODES_PATH};
     use crate::test::utilities::CreateAndRevert::{
         createAndRevertCall, CreateAndRevertCalls,
@@ -465,9 +468,40 @@ mod test {
                     });
                 }
             }
+        }
 
+        sol! {
             contract FAWithdrawal {
-                function claim(uint256 deposit_id) external payable;
+                struct SolFaDepositWithProxy {
+                    uint256 amount;
+                    address receiver;
+                    address proxy;
+                    uint256 ticket_hash;
+                    uint256 inbox_level;
+                    uint256 inbox_msg_id;
+                }
+
+                struct SolFaDepositWithoutProxy {
+                    uint256 amount;
+                    address receiver;
+                    uint256 ticket_hash;
+                    uint256 inbox_level;
+                    uint256 inbox_msg_id;
+                }
+
+                function claim(uint256 deposit_id);
+
+                function queue(SolFaDepositWithProxy memory deposit);
+
+                function execute_without_proxy(SolFaDepositWithoutProxy memory deposit);
+
+                function withdraw(
+                    address ticketOwner,
+                    bytes memory routingInfo,
+                    uint256 amount,
+                    bytes22 ticketer,
+                    bytes memory content
+                );
             }
         }
     }
@@ -1340,5 +1374,90 @@ mod test {
                 "Authorization list cannot be empty per EIP-7702.".to_owned()
             )))
         );
+    }
+
+    #[test]
+    fn deposit_and_claim_fa_with_empty_proxy() {
+        let mut host = MockKernelHost::default();
+        let mut world_state_handler = new_world_state_handler().unwrap();
+        let block_constants = block_constants_with_no_fees();
+
+        let proxy = Address::from(&[1u8; 20]);
+        let caller = Address::from(&[2u8; 20]);
+        let receiver = Address::from(&[3u8; 20]);
+
+        init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+
+        let deposit = FAWithdrawal::SolFaDepositWithProxy {
+            amount: U256::ONE,
+            receiver,
+            proxy,
+            inbox_level: U256::ZERO,
+            inbox_msg_id: U256::ZERO,
+            ticket_hash: Default::default(),
+        };
+
+        let outcome = run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            &mut world_state_handler,
+            EtherlinkPrecompiles::new(),
+            FEED_DEPOSIT_ADDR,
+            Some(FA_BRIDGE_SOL_ADDR),
+            FAWithdrawal::queueCall { deposit }.abi_encode().into(),
+            30_000_000,
+            0,
+            U256::ZERO,
+            AccessList(vec![]),
+            None,
+            None,
+        )
+        .unwrap();
+
+        assert!(outcome.result.is_success());
+
+        let outcome = run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            &mut world_state_handler,
+            EtherlinkPrecompiles::new(),
+            caller,
+            Some(FA_BRIDGE_SOL_ADDR),
+            FAWithdrawal::claimCall {
+                deposit_id: U256::ZERO,
+            }
+            .abi_encode()
+            .into(),
+            30_000_000,
+            0,
+            U256::ZERO,
+            AccessList(vec![]),
+            None,
+            None,
+        )
+        .unwrap();
+
+        sol! {
+            event Deposit(
+                uint256 indexed ticketHash,
+                address ticketOwner,
+                address receiver,
+                uint256 amount,
+                uint256 inboxLevel,
+                uint256 inboxMsgId
+            );
+        }
+
+        // 1. Proxy has no associated code (= EOA)
+        // 2. The call transfers value and succeeds
+        // 3. No fallback is triggered
+        // 4. Proxy is the ticket owner
+        let event_data = &outcome.result.logs().first().unwrap().data.data;
+        let (owner_, receiver_, _, _, _) = Deposit::abi_decode_data(event_data).unwrap();
+        assert!(owner_ == proxy);
+        assert!(receiver_ == receiver);
+        assert!(outcome.result.is_success());
     }
 }
