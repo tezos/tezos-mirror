@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -34,13 +35,13 @@ pub(crate) fn guard(
     Ok(())
 }
 
-pub(crate) fn revert<R>(reason: R) -> InterpreterResult
+pub(crate) fn revert<R>(reason: R, gas: Gas) -> InterpreterResult
 where
     R: Display,
 {
     InterpreterResult {
         result: InstructionResult::Revert,
-        gas: Gas::new(0),
+        gas,
         output: Bytes::copy_from_slice(reason.to_string().as_bytes()),
     }
 }

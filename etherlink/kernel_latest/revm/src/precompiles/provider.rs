@@ -6,7 +6,7 @@
 use revm::{
     context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
-    interpreter::{CallInput, InputsImpl, InterpreterResult},
+    interpreter::{CallInput, Gas, InputsImpl, InterpreterResult},
     primitives::Address,
 };
 
@@ -106,7 +106,9 @@ impl EtherlinkPrecompiles {
 
         let interpreter_result = match result {
             Ok(interpreter_result) => interpreter_result,
-            Err(CustomPrecompileError::Revert(reason)) => revert(reason),
+            Err(CustomPrecompileError::Revert(reason)) => {
+                revert(reason, Gas::new_spent(gas_limit))
+            }
             Err(CustomPrecompileError::Abort(runtime)) => {
                 return Err(Error::Runtime(runtime))
             }
