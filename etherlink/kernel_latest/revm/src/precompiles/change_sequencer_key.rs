@@ -57,6 +57,12 @@ where
     CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
     DB: DatabasePrecompileStateChanges,
 {
+    if Some(transfer.target_address) != transfer.bytecode_address {
+        return Err(CustomPrecompileError::Revert(
+            "DELEGATECALLs and CALLCODEs are not allowed".to_string(),
+        ));
+    }
+
     if transfer.target_address != CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS {
         return Err(CustomPrecompileError::Revert(String::from(
             "invalid transfer target address",
@@ -65,7 +71,7 @@ where
 
     if is_static {
         return Err(CustomPrecompileError::Revert(String::from(
-            "static calls are not allowed",
+            "STATICCALLs are not allowed",
         )));
     }
 
