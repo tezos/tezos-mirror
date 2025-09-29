@@ -73,7 +73,8 @@ let test_describe_endpoint =
   unit
 
 let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
-    ?(time_between_blocks = Evm_node.Nothing) scenario protocols =
+    ?(time_between_blocks = Evm_node.Nothing) ?additional_uses scenario
+    protocols =
   register_all
     ~__FILE__
     ~kernels:[Kernel.Latest]
@@ -91,6 +92,7 @@ let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
     ~use_multichain:Register_with_feature
     ~rpc_server:Evm_node.Resto
     ~time_between_blocks
+    ?additional_uses
     scenario
     protocols
 
