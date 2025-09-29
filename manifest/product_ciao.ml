@@ -71,13 +71,32 @@ let ci_lib_tezos_ci_jobs =
       ]
     ~release_status:Unreleased
 
+let _release_page_base_lib =
+  private_lib
+    "base_lib"
+    ~opam:""
+    ~path:"ci/bin_release_page"
+    ~release_status:Unreleased
+    ~modules:["base"]
+    ~deps:[unix; clap; tezt_json_lib]
+
 let _release_page =
   private_exe
     "release_page"
     ~opam:""
     ~path:"ci/bin_release_page"
     ~release_status:Unreleased
-    ~deps:[unix; clap; tezt_json_lib]
+    ~modules:["release_page"]
+    ~deps:[unix; clap; tezt_json_lib; _release_page_base_lib |> open_]
+
+let _version_manager =
+  private_exe
+    "version_manager"
+    ~opam:""
+    ~path:"ci/bin_release_page"
+    ~release_status:Unreleased
+    ~modules:["version_manager"]
+    ~deps:[unix; clap; tezt_json_lib; _release_page_base_lib |> open_]
 
 let ci_grafazos =
   private_lib
