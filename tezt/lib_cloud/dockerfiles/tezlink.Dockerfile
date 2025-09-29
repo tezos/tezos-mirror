@@ -6,7 +6,6 @@ FROM debian:sid AS base
 # lists after installing something" hadolint warnings. The apt-get
 # list will be deleted later.
 # hadolint ignore=DL3008,DL3009
-
 RUN apt-get update && apt-get install -y \
     # netbase is needed to handle transport services
     netbase \
@@ -38,8 +37,10 @@ RUN apt-get update && apt-get install -y \
     postgresql \
     # to run commands as postgres user
     sudo \
-    # to clone Tzkt sources
+    # to clone Tzkt and faucet sources
     git \
+    # to run the faucet application
+    npm \
     # DL3015: Use --no-install-recommends
     --no-install-recommends
 
