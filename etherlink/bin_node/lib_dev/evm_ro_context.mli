@@ -12,7 +12,7 @@ type t = {
   data_dir : string;
   store : Evm_store.t;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
-  index : Irmin_context.ro_index;
+  index : Evm_node_state.ro_index;
   finalized_view : bool;
   block_storage_sqlite3 : bool;
   execution_pool : Lwt_domain.pool;
@@ -77,7 +77,7 @@ val replay :
   ?log_file:string ->
   ?profile:Configuration.profile_mode ->
   ?alter_evm_state:
-    (Irmin_context.tree -> (Irmin_context.tree, tztrace) result Lwt.t) ->
+    (Evm_node_state.tree -> (Evm_node_state.tree, tztrace) result Lwt.t) ->
   Ethereum_types.quantity ->
   replay_result tzresult Lwt.t
 

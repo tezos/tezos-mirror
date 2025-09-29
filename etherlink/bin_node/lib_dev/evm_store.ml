@@ -209,7 +209,7 @@ module Q = struct
     custom
       ~encode:(fun hash ->
         Ok
-          (hash |> Irmin_context.context_hash_of_hash
+          (hash |> Evm_node_state.context_hash_of_hash
          |> Smart_rollup_context_hash.to_context_hash
          |> Context_hash.to_b58check))
       ~decode:(fun bytes ->
@@ -219,7 +219,7 @@ module Q = struct
           @@ Context_hash.of_b58check_opt bytes
         in
         hash |> Smart_rollup_context_hash.of_context_hash
-        |> Irmin_context.hash_of_context_hash)
+        |> Evm_node_state.hash_of_context_hash)
       string
 
   let root_hash =

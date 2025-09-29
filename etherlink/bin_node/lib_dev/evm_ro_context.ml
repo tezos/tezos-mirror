@@ -12,7 +12,7 @@ type t = {
   data_dir : string;
   store : Evm_store.t;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
-  index : Irmin_context.ro_index;
+  index : Evm_node_state.ro_index;
   finalized_view : bool;
   block_storage_sqlite3 : bool;
   execution_pool : Lwt_domain.pool;
@@ -21,9 +21,9 @@ type t = {
 
 let get_evm_state ctxt hash =
   let open Lwt_result_syntax in
-  Irmin_context.reload ctxt.index ;
-  let*! context = Irmin_context.checkout_exn ctxt.index hash in
-  let*! res = Irmin_context.PVMState.get context in
+  Evm_node_state.reload ctxt.index ;
+  let*! context = Evm_node_state.checkout_exn ctxt.index hash in
+  let*! res = Evm_node_state.PVMState.get context in
   return res
 
 let read state path =
@@ -101,7 +101,7 @@ let load ~pool ?network ?smart_rollup_address ~data_dir
       ()
   in
   let* index =
-    Irmin_context.(
+    Evm_node_state.(
       load ~cache_size:100_000 Read_only (Evm_state.irmin_store_path ~data_dir))
   in
   let* smart_rollup_address =

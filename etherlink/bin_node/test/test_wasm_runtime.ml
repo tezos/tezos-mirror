@@ -37,6 +37,7 @@ let test_wasm_runtime_id () =
            "../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm")
   in
   let tree = expect_ok "Should be able to create an initial state" tree in
+  let tree = Evm_node_state.Wasm_internal.to_irmin tree in
   Log.info "Run kernel_run" ;
   let* tree =
     Wasm_runtime.run
@@ -48,6 +49,7 @@ let test_wasm_runtime_id () =
       Tezos_crypto.Hashed.Smart_rollup_address.zero
       (`Inbox [])
   in
+  let tree = Evm_node_state.Wasm_internal.of_irmin tree in
   Log.info "Check state consistency" ;
   let* quantity =
     Etherlink_durable_storage.current_block_number (fun key ->
