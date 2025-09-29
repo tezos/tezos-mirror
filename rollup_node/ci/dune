@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name rollup_node)
+ (name rollup_node_ci)
  (libraries
   gitlab_ci
   tezos_ci

@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name etherlink)
+ (name etherlink_ci)
  (libraries
   gitlab_ci
   tezos_ci

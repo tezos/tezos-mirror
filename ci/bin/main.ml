@@ -108,15 +108,15 @@ let variables : variables =
 
 (* This must be done before registering shared pipelines. *)
 
-let () = Grafazos.register ()
+let () = Grafazos_ci.register ()
 
-let () = Teztale.register ()
+let () = Teztale_ci.register ()
 
-let () = Rollup_node.Release.register ()
+let () = Rollup_node_ci.register ()
 
 let () = Documentation.register ()
 
-let () = Etherlink.register ()
+let () = Etherlink_ci.register ()
 
 (** {3 General pipelines} *)
 

@@ -7,11 +7,11 @@
   gitlab_ci
   tezos_ci
   tezos_ci_jobs
-  grafazos
-  teztale
-  rollup_node
+  grafazos_ci
+  teztale_ci
+  rollup_node_ci
   sdk_bindings_ci
-  etherlink)
+  etherlink_ci)
  (flags
   (:standard)
   -open Gitlab_ci.Base

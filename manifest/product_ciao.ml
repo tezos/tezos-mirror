@@ -81,7 +81,7 @@ let _release_page =
 
 let ci_grafazos =
   private_lib
-    "grafazos"
+    "grafazos_ci"
     ~opam:""
     ~path:"grafazos/ci"
     ~bisect_ppx:No
@@ -90,7 +90,7 @@ let ci_grafazos =
 
 let ci_teztale =
   private_lib
-    "teztale"
+    "teztale_ci"
     ~opam:""
     ~path:"teztale/ci"
     ~bisect_ppx:No
@@ -100,7 +100,7 @@ let ci_teztale =
 
 let ci_rollup_node =
   private_lib
-    "rollup_node"
+    "rollup_node_ci"
     ~opam:""
     ~path:"rollup_node/ci"
     ~bisect_ppx:No
@@ -110,7 +110,7 @@ let ci_rollup_node =
 
 let ci_etherlink =
   private_lib
-    "etherlink"
+    "etherlink_ci"
     ~opam:""
     ~path:"etherlink/ci"
     ~bisect_ppx:No
