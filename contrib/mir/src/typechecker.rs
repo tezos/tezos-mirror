@@ -2404,10 +2404,8 @@ pub(crate) fn typecheck_value<'a>(
                 .map_err(|e| TcError::LazyStorageError(e.to_string()))?
                 .ok_or(TcError::BigMapNotFound(id.clone()))?;
 
-            let key_type = &key_type.clone();
-            let value_type = &value_type.clone();
-            ensure_ty_eq(ctx.gas(), key_type, tk)?;
-            ensure_ty_eq(ctx.gas(), value_type, tv)?;
+            ensure_ty_eq(ctx.gas(), &key_type, tk)?;
+            ensure_ty_eq(ctx.gas(), &value_type, tv)?;
 
             let overlay = if let Some(vs) = vs_opt {
                 typecheck_big_map(ctx, t, tk, tv, vs, diff)?
