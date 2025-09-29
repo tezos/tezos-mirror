@@ -5,7 +5,7 @@
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
 use context::Context;
-use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
+use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens, TypedValue};
 use mir::{
     ast::{IntoMicheline, Micheline},
     context::CtxTrait,
@@ -15,7 +15,8 @@ use mir::{
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
-use std::collections::HashMap;
+use primitive_types::H256;
+use std::collections::{BTreeMap, HashMap};
 use tezos_crypto_rs::{
     hash::{ChainId, ContractKt1Hash},
     PublicKeyWithHash,
@@ -25,6 +26,7 @@ use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, Timestamp};
 use tezos_tezlink::enc_wrappers::{BlockNumber, OperationHash};
+use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{Operation, OriginationContent, Script};
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, ApplyOperationError, ContentResult,
@@ -43,7 +45,7 @@ use tezos_tezlink::{
 };
 
 use crate::address::OriginationNonce;
-use crate::mir_ctx::Ctx;
+use crate::mir_ctx::{convert_big_map_diff, Ctx};
 
 extern crate alloc;
 pub mod account_storage;
@@ -265,6 +267,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
                 let script = Script {
                     code: micheline_code.encode(),
                     storage: storage
+                        .clone()
                         .into_micheline_optimized_legacy(&parser.arena)
                         .encode(),
                 };
@@ -287,8 +290,8 @@ fn execute_internal_operations<'a, Host: Runtime>(
                         source_account,
                         sender_account,
                         &amount,
-                        &script,
-                        false, // We skip typechecking for internal operations since CREATE_CONTRACT already typechecks the script and the initial storage.
+                        &script.code,
+                        storage,
                     );
                     InternalOperationSum::Origination(InternalContentWithMetadata {
                         content: OriginationContent {
@@ -422,6 +425,7 @@ fn transfer<'a, Host: Runtime>(
                 sender,
                 amount,
                 self_address,
+                big_map_diff: BTreeMap::new(),
                 balance,
                 operation_counter,
                 origination_nonce,
@@ -456,8 +460,10 @@ fn transfer<'a, Host: Runtime>(
                 TransferError::FailedToExecuteInternalOperation(err.to_string())
             })?;
             log!(host, Debug, "Transfer operation succeeded");
+            let lazy_storage_diff = convert_big_map_diff(ctx.big_map_diff);
             Ok(TransferSuccess {
                 storage: Some(new_storage),
+                lazy_storage_diff,
                 ..receipt
             })
         }
@@ -550,6 +556,45 @@ fn transfer_external<Host: Runtime>(
     .map(Into::into)
 }
 
+/// This function typechecks both fields of a &Script: the code and the storage.
+/// It returns the typechecked storage.
+fn typecheck_code_and_storage<'a, Ctx: mir::context::CtxTrait<'a>>(
+    ctx: &mut Ctx,
+    parser: &'a Parser<'a>,
+    script: &Script,
+) -> Result<TypedValue<'a>, OriginationError> {
+    let contract_micheline = Micheline::decode_raw(&parser.arena, &script.code)
+        .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
+    let contract_typechecked = contract_micheline
+        .typecheck_script(ctx)
+        .map_err(|e| OriginationError::MirTypecheckingError(format!("Script : {e}")))?;
+    let storage_micheline = Micheline::decode_raw(&parser.arena, &script.storage)
+        .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
+    contract_typechecked
+        .typecheck_storage(ctx, &storage_micheline)
+        .map_err(|e| OriginationError::MirTypecheckingError(format!("Storage : {e}")))
+}
+
+fn handle_storage_with_big_maps<Host: Runtime>(
+    host: &mut Host,
+    context: &Context,
+    mut storage: TypedValue<'_>,
+) -> Result<(Vec<u8>, Option<LazyStorageDiffList>), OriginationError> {
+    let parser = Parser::new();
+    make_default_ctx!(ctx, host, context);
+    let mut big_maps = vec![];
+    storage.view_big_maps_mut(&mut big_maps);
+
+    // Dump big_map allocation, starting with empty big_maps
+    mir::ast::big_map::dump_big_map_updates(&mut ctx, &[], &mut big_maps)
+        .map_err(|err| OriginationError::MirBigMapAllocation(err.to_string()))?;
+    let storage = storage
+        .into_micheline_optimized_legacy(&parser.arena)
+        .encode();
+    let lazy_storage_diff = convert_big_map_diff(ctx.big_map_diff);
+    Ok((storage, lazy_storage_diff))
+}
+
 // Values from src/proto_023_PtSeouLo/lib_parameters/default_parameters.ml.
 const ORIGINATION_SIZE: u64 = 257;
 const COST_PER_BYTES: u64 = 250;
@@ -565,35 +610,21 @@ fn originate_contract<Host: Runtime>(
     source_account: &TezlinkImplicitAccount,
     sender_account: &impl TezlinkAccount,
     initial_balance: &Narith,
-    script: &Script,
-    typecheck: bool,
+    script_code: &[u8],
+    script_storage: TypedValue<'_>,
 ) -> Result<OriginationSuccess, OriginationError> {
-    if typecheck {
-        let parser = Parser::new();
-        let mut ctx = mir::context::Ctx::default();
-        let contract_micheline = Micheline::decode_raw(&parser.arena, &script.code)
-            .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
-        let contract_typechecked =
-            contract_micheline.typecheck_script(&mut ctx).map_err(|e| {
-                OriginationError::MirTypecheckingError(format!("Script : {e}"))
-            })?;
-        let storage_micheline = Micheline::decode_raw(&parser.arena, &script.storage)
-            .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
-        contract_typechecked
-            .typecheck_storage(&mut ctx, &storage_micheline)
-            .map_err(|e| {
-                OriginationError::MirTypecheckingError(format!("Storage : {e}"))
-            })?;
-    }
+    // If the origination is internal the big map are handled by the first transfer
+    // The big_maps vector will be filled only if the origination is "external"
 
-    // TODO: Handle lazy_storage diff, a lot of the origination is concerned
+    let (new_storage, lazy_storage_diff) =
+        handle_storage_with_big_maps(host, context, script_storage)?;
 
     // Set the storage of the contract
     let smart_contract = TezlinkOriginatedAccount::from_kt1(context, &contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
     let total_size = smart_contract
-        .init(host, &script.code, &script.storage)
+        .init(host, script_code, &new_storage)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
@@ -641,7 +672,7 @@ fn originate_contract<Host: Runtime>(
         // participates in having the TzKT front-end not crash when originating.
         storage_size: total_size.clone().into(),
         paid_storage_size_diff: total_size.into(),
-        lazy_storage_diff: None,
+        lazy_storage_diff,
     };
     Ok(dummy_origination_sucess)
 }
@@ -989,16 +1020,23 @@ fn apply_operation<Host: Runtime>(
             ref script,
         }) => {
             let address = origination_nonce.generate_kt1();
-            let origination_result = originate_contract(
-                host,
-                context,
-                address,
-                source_account,
-                source_account,
-                balance,
-                script,
-                true,
-            );
+            let parser = Parser::new();
+            make_default_ctx!(ctx, host, context);
+            let typechecked_storage =
+                typecheck_code_and_storage(&mut ctx, &parser, script);
+            let origination_result = match typechecked_storage {
+                Ok(storage) => originate_contract(
+                    ctx.host,
+                    context,
+                    address,
+                    source_account,
+                    source_account,
+                    balance,
+                    &script.code,
+                    storage,
+                ),
+                Err(err) => Err(err),
+            };
             let manager_result = produce_operation_result(
                 balance_updates,
                 origination_result.map_err(|e| e.into()),

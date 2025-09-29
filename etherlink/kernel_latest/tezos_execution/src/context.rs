@@ -2,11 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use mir::{
-    ast::{big_map::BigMapId, IntoMicheline, TypedValue},
-    parser::Parser,
-};
-use tezos_crypto_rs::blake2b::digest_256;
+use mir::ast::big_map::BigMapId;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path, PathError, RefPath};
 
 // TODO: https://gitlab.com/tezos/tezos/-/issues/7867: add the missing paths
@@ -103,14 +99,8 @@ pub mod big_maps {
     pub fn value_path(
         context: &Context,
         id: &BigMapId,
-        key: &TypedValue,
+        key_hashed: &[u8],
     ) -> Result<OwnedPath, PathError> {
-        let parser = Parser::new();
-        let key_encoded = key
-            .clone()
-            .into_micheline_optimized_legacy(&parser.arena)
-            .encode();
-        let key_hashed = digest_256(&key_encoded);
         let key_hex = hex::encode(key_hashed);
         concat(
             &big_map_path(context, id)?,

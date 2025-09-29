@@ -159,6 +159,8 @@ pub enum OriginationError {
     CantInitContract,
     #[error("Can't originate an empty smart contract")]
     CantOriginateEmptyContract,
+    #[error("Mir failed to allocate big_map because {0}")]
+    MirBigMapAllocation(String),
     #[error("Mir failed to typecheck the contract with {0}")]
     MirTypecheckingError(String),
     #[error("Failed because of micheline decoding {0}")]

@@ -2,9 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::collections::BTreeMap;
+
 use crate::address::OriginationNonce;
 use crate::context::{big_maps::*, Context};
 use crate::get_contract_entrypoint;
+use mir::parser::Parser;
 use mir::{
     ast::{
         big_map::{BigMapId, LazyStorage, LazyStorageError},
@@ -14,11 +17,17 @@ use mir::{
     gas::Gas,
 };
 use num_bigint::BigUint;
+use primitive_types::H256;
+use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::ChainId;
+use tezos_data_encoding::types::Zarith;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_storage::{read_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
+use tezos_tezlink::lazy_storage_diff::{
+    Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
+};
 use typed_arena::Arena;
 
 pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
@@ -30,12 +39,43 @@ pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
     pub balance: i64,
     pub level: BlockNumber,
     pub now: Timestamp,
+    pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub chain_id: ChainId,
 
     pub source: PublicKeyHash,
     pub gas: Gas,
     pub operation_counter: OpCounter,
     pub origination_nonce: OrigNonce,
+}
+
+#[macro_export]
+macro_rules! make_default_ctx {
+    ($ctx:ident, $host: expr, $context: expr) => {
+        let mut gas = Gas::default();
+        let mut operation_counter = 0;
+        let mut origination_nonce =
+            OriginationNonce::initial(OperationHash(H256::zero()));
+        let mut $ctx = Ctx {
+            host: $host,
+            context: $context,
+            gas: &mut gas,
+            balance: 0,
+            amount: 0,
+            level: 0u32.into(),
+            now: 0i64.into(),
+            // default chain id NetXynUjJNZm7wi
+            chain_id: tezos_crypto_rs::hash::ChainId::try_from(vec![
+                0xf3, 0xd4, 0x85, 0x54,
+            ])
+            .unwrap(),
+            big_map_diff: BTreeMap::new(),
+            self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
+            sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
+            source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
+            operation_counter: &mut operation_counter,
+            origination_nonce: &mut origination_nonce,
+        };
+    };
 }
 
 impl<'a, Host: Runtime> CtxTrait<'a>
@@ -113,6 +153,84 @@ impl<'a, Host: Runtime> CtxTrait<'a>
     }
 }
 
+impl<Host: Runtime> Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce> {
+    /// Insert in the context a big_map diff that represents an allocation
+    fn big_map_diff_alloc(&mut self, id: Zarith, key_type: Vec<u8>, value_type: Vec<u8>) {
+        let allocation = StorageDiff::Alloc(Alloc {
+            updates: vec![],
+            key_type,
+            value_type,
+        });
+        self.big_map_diff.insert(id, allocation);
+    }
+
+    /// Insert in the context a big_map diff that represents an update
+    fn big_map_diff_update(
+        &mut self,
+        id: &Zarith,
+        key_hash: Vec<u8>,
+        key: Vec<u8>,
+        value: Option<Vec<u8>>,
+    ) {
+        let update = Update {
+            key_hash: H256::from_slice(&key_hash).into(),
+            key,
+            value,
+        };
+        match self.big_map_diff.get_mut(id) {
+            None => {
+                self.big_map_diff
+                    .insert(id.clone(), StorageDiff::Update(vec![update]));
+            }
+            Some(diff) => diff.push_update(update),
+        }
+    }
+
+    /// Insert in the context a big_map diff that represents a remove
+    fn big_map_diff_remove(&mut self, id: Zarith) {
+        self.big_map_diff.insert(id, StorageDiff::Remove);
+    }
+
+    /// Insert in the context a big_map diff that represents a copy
+    fn big_map_diff_copy(&mut self, id: Zarith, source: Zarith) {
+        self.big_map_diff.insert(
+            id,
+            StorageDiff::Copy(Copy {
+                source,
+                updates: vec![],
+            }),
+        );
+    }
+}
+
+/// Function to retrieve the hash of a TypedValue.
+/// Used to retrieve the path where a value is stored in the
+/// lazy storage.
+fn hash_key(key: TypedValue<'_>) -> Vec<u8> {
+    let parser = Parser::new();
+    let key_encoded = key.into_micheline_optimized_legacy(&parser.arena).encode();
+    digest_256(&key_encoded)
+}
+
+/// Function to convert a BtreeMap that represent the lazy_storage_diff
+/// in a valid Tezos representation.
+pub fn convert_big_map_diff(
+    big_map_diff: BTreeMap<Zarith, StorageDiff>,
+) -> Option<LazyStorageDiffList> {
+    let mut list_diff = vec![];
+    // L1 receipts big_map diffs are in reverse order, this is mandatory for external tools that
+    // except such an order.
+    for (id, storage_diff) in big_map_diff.into_iter().rev() {
+        let diff = LazyStorageDiff::BigMap(BigMapDiff { id, storage_diff });
+        list_diff.push(diff);
+    }
+    if list_diff.is_empty() {
+        None
+    } else {
+        Some(LazyStorageDiffList { diff: list_diff })
+    }
+}
+
 impl<'a, Host: Runtime> LazyStorage<'a>
     for Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce>
 {
@@ -122,7 +240,7 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
-        let value_path = value_path(self.context, id, key)?;
+        let value_path = value_path(self.context, id, &hash_key(key.clone()))?;
         if self.host.store_has(&value_path)?.is_none() {
             return Ok(None);
         }
@@ -141,7 +259,7 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<bool, LazyStorageError> {
-        let path = value_path(self.context, id, key)?;
+        let path = value_path(self.context, id, &hash_key(key.clone()))?;
         Ok(self.host.store_has(&path)?.is_some())
     }
 
@@ -151,18 +269,33 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         key: TypedValue<'a>,
         value: Option<TypedValue<'a>>,
     ) -> Result<(), LazyStorageError> {
-        let value_path = value_path(self.context, id, &key)?;
+        let parser = Parser::new();
+        let key_encoded = key.into_micheline_optimized_legacy(&parser.arena).encode();
+        let key_hashed = digest_256(&key_encoded);
+        let value_path = value_path(self.context, id, &key_hashed)?;
         match value {
             None => {
                 if self.host.store_has(&value_path)?.is_some() {
                     self.host.store_delete(&value_path)?;
                 }
+
+                // Write the update in the big_map_diff
+                self.big_map_diff_update(&id.value, key_hashed, key_encoded, None);
                 Ok(())
             }
             Some(v) => {
                 let arena = Arena::new();
                 let encoded = v.into_micheline_optimized_legacy(&arena).encode();
-                Ok(self.host.store_write_all(&value_path, &encoded)?)
+                self.host.store_write_all(&value_path, &encoded)?;
+
+                // Write the update in the big_map_diff
+                self.big_map_diff_update(
+                    &id.value,
+                    key_hashed,
+                    key_encoded,
+                    Some(encoded),
+                );
+                Ok(())
             }
         }
     }
@@ -210,6 +343,9 @@ impl<'a, Host: Runtime> LazyStorage<'a>
             .store_write_all(&key_type_path, &key_type_encoded)?;
         store_bin(&id.succ(), self.host, &next_id_path)
             .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+
+        // Write in the diff that there was an allocation
+        self.big_map_diff_alloc(id.value.clone(), key_type_encoded, value_type_encoded);
         Ok(id)
     }
 
@@ -222,12 +358,19 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         self.host.store_copy(&src_path, &dest_path)?;
         store_bin(&dest_id.succ(), self.host, &next_id_path)
             .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+
+        // Write in the diff that there was a copy
+        self.big_map_diff_copy(dest_id.value.clone(), id.value.clone());
         Ok(dest_id)
     }
 
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
         let big_map_path = big_map_path(self.context, id)?;
-        Ok(self.host.store_delete(&big_map_path)?)
+        self.host.store_delete(&big_map_path)?;
+
+        // Write in the diff that there was a remove
+        self.big_map_diff_remove(id.value.clone());
+        Ok(())
     }
 }
 
@@ -241,37 +384,6 @@ mod tests {
     use std::collections::BTreeMap;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_tezlink::enc_wrappers::OperationHash;
-
-    macro_rules! make_default_ctx {
-        ($ctx:ident) => {
-            let mut host = MockKernelHost::default();
-            let context = Context::init_context();
-            let mut gas = Gas::default();
-            let mut operation_counter = 0;
-            let mut origination_nonce =
-                OriginationNonce::initial(OperationHash(H256::zero()));
-
-            let mut $ctx = Ctx {
-                host: &mut host,
-                context: &context,
-                gas: &mut gas,
-                balance: 0,
-                amount: 0,
-                level: 0u32.into(),
-                now: 0i64.into(),
-                // default chain id NetXynUjJNZm7wi
-                chain_id: tezos_crypto_rs::hash::ChainId::try_from(vec![
-                    0xf3, 0xd4, 0x85, 0x54,
-                ])
-                .unwrap(),
-                self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
-                sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
-                source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
-                operation_counter: &mut operation_counter,
-                origination_nonce: &mut origination_nonce,
-            };
-        };
-    }
 
     #[track_caller]
     fn check_is_dumped_map(map: BigMap, id: BigMapId) {
@@ -316,7 +428,8 @@ mod tests {
 
     #[test]
     fn test_map_from_memory() {
-        make_default_ctx!(storage);
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &Context::init_context());
         let content = BTreeMap::from([
             (TypedValue::int(1), TypedValue::String("one".into())),
             (TypedValue::int(2), TypedValue::String("two".into())),
@@ -343,7 +456,8 @@ mod tests {
 
     #[test]
     fn test_map_updates_to_storage() {
-        make_default_ctx!(storage);
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &Context::init_context());
         let map_id = storage.big_map_new(&Type::Int, &Type::String).unwrap();
         storage
             .big_map_update(
@@ -395,7 +509,8 @@ mod tests {
 
     #[test]
     fn test_copy() {
-        make_default_ctx!(storage);
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &Context::init_context());
         let content = BTreeMap::from([
             (TypedValue::int(1), TypedValue::String("one".into())),
             (TypedValue::int(2), TypedValue::String("two".into())),
@@ -428,7 +543,8 @@ mod tests {
 
     #[test]
     fn test_remove_big_map() {
-        make_default_ctx!(storage);
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &Context::init_context());
         let map_id = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
         storage
             .big_map_update(&map_id, TypedValue::int(0), Some(TypedValue::int(0)))
@@ -439,7 +555,8 @@ mod tests {
 
     #[test]
     fn test_remove_with_dump() {
-        make_default_ctx!(storage);
+        let mut host = MockKernelHost::default();
+        make_default_ctx!(storage, &mut host, &Context::init_context());
         let map_id1 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
         storage
             .big_map_update(&map_id1, TypedValue::int(0), Some(TypedValue::int(0)))
@@ -480,5 +597,50 @@ mod tests {
             Type::Int,
             expected_content,
         );
+    }
+
+    // L1 receipts big_map diffs are in reverse order, this is mandatory for external tools that
+    // except such an order.
+    #[test]
+    fn test_convert_big_map_diff_order() {
+        let key_type = mir::ast::Micheline::prim0(mir::lexer::Prim::nat).encode();
+        let value_type = mir::ast::Micheline::prim0(mir::lexer::Prim::unit).encode();
+        let alloc_0 = StorageDiff::Alloc(Alloc {
+            updates: vec![],
+            key_type: key_type.clone(),
+            value_type: value_type.clone(),
+        });
+        let alloc_5 = StorageDiff::Alloc(Alloc {
+            updates: vec![],
+            key_type: key_type.clone(),
+            value_type: value_type.clone(),
+        });
+        let alloc_4 = StorageDiff::Alloc(Alloc {
+            updates: vec![],
+            key_type: key_type.clone(),
+            value_type: value_type.clone(),
+        });
+        let mut map: BTreeMap<Zarith, StorageDiff> = BTreeMap::new();
+        map.insert(0u64.into(), alloc_0.clone());
+        map.insert(5u64.into(), alloc_5.clone());
+        map.insert(4u64.into(), alloc_4.clone());
+        let diff_list = convert_big_map_diff(map);
+        let expected = Some(LazyStorageDiffList {
+            diff: vec![
+                LazyStorageDiff::BigMap(BigMapDiff {
+                    id: 5u64.into(),
+                    storage_diff: alloc_5,
+                }),
+                LazyStorageDiff::BigMap(BigMapDiff {
+                    id: 4u64.into(),
+                    storage_diff: alloc_4,
+                }),
+                LazyStorageDiff::BigMap(BigMapDiff {
+                    id: 0u64.into(),
+                    storage_diff: alloc_0,
+                }),
+            ],
+        });
+        assert_eq!(diff_list, expected, "Receipt should be in reverse order");
     }
 }
