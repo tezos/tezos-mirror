@@ -453,7 +453,7 @@ module Profile_handlers = struct
       assigned_shard_indexes
 
   let get_attestable_slots ctxt pkh attested_level () () =
-    let get_attestable_slots ~shard_indices store proto_parameters
+    let get_attestable_slots ~shard_indices store last_known_parameters
         ~attested_level =
       let open Lwt_result_syntax in
       let number_of_assigned_shards = List.length shard_indices in
@@ -464,28 +464,17 @@ module Profile_handlers = struct
              Correctly compute [published_level] in case of protocol changes, in
              particular a change of the value of [attestation_lag]. *)
           Int32.(
-            sub attested_level (of_int proto_parameters.Types.attestation_lag))
+            sub
+              attested_level
+              (of_int last_known_parameters.Types.attestation_lag))
         in
         if published_level < 1l then
           let slots =
-            Stdlib.List.init proto_parameters.number_of_slots (fun _ -> false)
+            Stdlib.List.init last_known_parameters.number_of_slots (fun _ ->
+                false)
           in
           return (Types.Attestable_slots {slots; published_level})
         else
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7291
-
-             Normally, for checking whether the incentives are enabled we would
-             use the (parameters at) [attested_level].  However, the attestation
-             level may be in the future and we may not have the plugin for
-             it. *)
-          let* proto_parameters =
-            Node_context.get_proto_parameters
-              ctxt
-              ~level:(`Level published_level)
-            |> Lwt.return
-            |> lwt_map_error (fun e -> `Other e)
-          in
-
           let shards_store = Store.shards store in
           let number_of_shards_stored slot_index =
             let slot_id : Types.slot_id =
@@ -500,12 +489,6 @@ module Profile_handlers = struct
             in
             (slot_id, number_stored_shards)
           in
-          let all_slot_indexes =
-            Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
-          in
-          let* number_of_stored_shards_per_slot =
-            List.map_es number_of_shards_stored all_slot_indexes
-          in
           let* published_level_parameters =
             Node_context.get_proto_parameters
               ctxt
@@ -513,17 +496,23 @@ module Profile_handlers = struct
             |> Lwt.return
             |> lwt_map_error (fun e -> `Other e)
           in
+          let all_slot_indexes =
+            Utils.Infix.(0 -- (published_level_parameters.number_of_slots - 1))
+          in
+          let* number_of_stored_shards_per_slot =
+            List.map_es number_of_shards_stored all_slot_indexes
+          in
           let* flags =
             List.map_es
               (fun (slot_id, num_stored) ->
                 let all_stored = num_stored = number_of_assigned_shards in
-                if not published_level_parameters.incentives_enable then
+                if not last_known_parameters.incentives_enable then
                   return all_stored
                 else if not all_stored then return false
                 else
                   is_slot_attestable_with_traps
                     shards_store
-                    published_level_parameters.traps_fraction
+                    last_known_parameters.traps_fraction
                     pkh
                     shard_indices
                     slot_id)
@@ -555,8 +544,8 @@ module Profile_handlers = struct
             ~level:attestation_level
           |> Errors.other_lwt_result
         in
-        let* proto_parameters =
-          Node_context.get_proto_parameters ctxt ~level:`Last_proto
+        let* attested_level_parameters =
+          Node_context.get_proto_parameters ctxt ~level:(`Level attested_level)
           |> Lwt.return
           |> lwt_map_error (fun e -> `Other e)
         in
@@ -564,7 +553,7 @@ module Profile_handlers = struct
         get_attestable_slots
           ~shard_indices
           store
-          proto_parameters
+          attested_level_parameters
           ~attested_level)
 end
 
