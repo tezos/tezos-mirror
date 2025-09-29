@@ -117,9 +117,11 @@ impl Type {
                 | TypeProperty::BigMapValue
                 | TypeProperty::Packable
                 | TypeProperty::Pushable => return invalid_type_prop(),
-                TypeProperty::Passable | TypeProperty::Storable | TypeProperty::Duplicable => {
-                    p.1.ensure_prop(gas, prop)?
-                }
+                #[cfg(feature = "allow_lazy_storage_transfer")]
+                TypeProperty::Passable => p.1.ensure_prop(gas, prop)?,
+                #[cfg(not(feature = "allow_lazy_storage_transfer"))]
+                TypeProperty::Passable => return invalid_type_prop(),
+                TypeProperty::Duplicable | TypeProperty::Storable => p.1.ensure_prop(gas, prop)?,
             },
             Contract(_) => match prop {
                 TypeProperty::Passable | TypeProperty::Packable | TypeProperty::Duplicable => (),

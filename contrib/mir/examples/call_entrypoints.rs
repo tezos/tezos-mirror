@@ -60,7 +60,7 @@ fn main() {
     let parser = Parser::new();
     let contract_micheline = parser.parse_top_level(SCRIPT).unwrap();
     let mut ctx = Ctx::default();
-    let contract_typechecked = contract_micheline.typecheck_script(&mut ctx).unwrap();
+    let contract_typechecked = contract_micheline.typecheck_script(&mut ctx, true).unwrap();
     run_contract(
         30.into(),
         20.into(),

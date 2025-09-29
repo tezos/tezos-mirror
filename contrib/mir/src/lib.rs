@@ -99,7 +99,7 @@
 //! let mut ctx = Ctx::default();
 //! // You can change various things about the context here, see [Ctx]
 //! // documentation.
-//! let contract_typechecked = contract_micheline.typecheck_script(&mut ctx).unwrap();
+//! let contract_typechecked = contract_micheline.typecheck_script(&mut ctx, true).unwrap();
 //! // We construct parameter and storage manually, but you'd probably
 //! // parse or deserialize them from some sort of input/storage, so we use
 //! // parser and decoder respectively.
@@ -367,7 +367,7 @@ mod tests {
         use Micheline as M;
         let interp_res = parse_contract_script(VOTE_SRC)
             .unwrap()
-            .typecheck_script(ctx)
+            .typecheck_script(ctx, true)
             .unwrap()
             .interpret(
                 ctx,
@@ -1063,7 +1063,7 @@ mod tests {
         let cs_mich =
             parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
                 .unwrap();
-        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        let cs = cs_mich.typecheck_script(&mut ctx, true).unwrap();
         let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(CreateContract {
@@ -1257,7 +1257,7 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
-            .typecheck_script(&mut ctx)
+            .typecheck_script(&mut ctx, true)
             .unwrap()
             .interpret(
                 &mut ctx,
@@ -1330,7 +1330,7 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
-            .typecheck_script(&mut ctx)
+            .typecheck_script(&mut ctx, true)
             .unwrap()
             .interpret(
                 &mut ctx,
@@ -1386,7 +1386,7 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
-            .typecheck_script(&mut ctx)
+            .typecheck_script(&mut ctx, true)
             .unwrap()
             .interpret(
                 &mut ctx,

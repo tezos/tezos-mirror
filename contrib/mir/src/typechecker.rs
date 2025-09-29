@@ -312,6 +312,7 @@ impl<'a> Micheline<'a> {
     pub fn typecheck_script(
         &self,
         ctx: &mut impl CtxTrait<'a>,
+        allow_lazy_storage_in_storage: bool,
     ) -> Result<ContractScript<'a>, TcError> {
         let seq = match self {
             // top-level allows one level of nesting
@@ -381,7 +382,17 @@ impl<'a> Micheline<'a> {
             .ok_or(TcError::MissingTopLevelElt(Prim::storage))?
             .parse_ty(ctx)?;
         parameter.ensure_prop(ctx.gas(), TypeProperty::Passable)?;
-        storage.ensure_prop(ctx.gas(), TypeProperty::Storable)?;
+        storage.ensure_prop(
+            ctx.gas(),
+            if allow_lazy_storage_in_storage {
+                TypeProperty::Storable
+            } else {
+                // Note: the only difference between BigMapValue and
+                // Storable is that the former always forbids lazy
+                // storage type (big maps and sapling states)
+                TypeProperty::BigMapValue
+            },
+        )?;
         let mut stack = tc_stk![Type::new_pair(parameter.clone(), storage.clone())];
         let code = typecheck_instruction(
             code.ok_or(TcError::MissingTopLevelElt(Prim::code))?,
@@ -2225,7 +2236,11 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(CREATE_CONTRACT, [cs], _), [.., new_storage, T::Mutez, T::Option(opt_keyhash)])
             if matches!(opt_keyhash.as_ref(), Type::KeyHash) =>
         {
-            let contract_script = cs.typecheck_script(ctx)?;
+            #[cfg(feature = "allow_lazy_storage_transfer")]
+            let allow_lazy_storage_in_storage = true;
+            #[cfg(not(feature = "allow_lazy_storage_transfer"))]
+            let allow_lazy_storage_in_storage = false;
+            let contract_script = cs.typecheck_script(ctx, allow_lazy_storage_in_storage)?;
             ensure_ty_eq(ctx.gas(), &contract_script.storage, new_storage)?;
             stack.drop_top(3);
             stack.push(Type::Address);
@@ -5965,7 +5980,7 @@ mod typecheck_tests {
                 "code FAILWITH"
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Passable,
                 Type::Operation
@@ -5983,7 +5998,7 @@ mod typecheck_tests {
                 "code FAILWITH"
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Storable,
                 Type::Operation
@@ -6001,7 +6016,7 @@ mod typecheck_tests {
                 "code FAILWITH;",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -6036,7 +6051,7 @@ mod typecheck_tests {
                 "code FAILWITH",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -6054,7 +6069,7 @@ mod typecheck_tests {
                 "code FAILWITH;",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -6072,7 +6087,7 @@ mod typecheck_tests {
                 "code { UNIT; FAILWITH };",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::BigMapValue,
                 Type::new_contract(Type::Unit)
@@ -6242,7 +6257,7 @@ mod typecheck_tests {
                 "code FAILWITH;",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Storable,
                 Type::new_contract(Type::Unit)
@@ -6276,7 +6291,7 @@ mod typecheck_tests {
                 "code FAILWITH;"
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Passable,
                 Type::Operation
@@ -6294,7 +6309,7 @@ mod typecheck_tests {
                 "code { CAR; NIL operation; PAIR };",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Ok(ContractScript {
                 parameter: Type::Unit,
                 storage: Type::Unit,
@@ -6319,7 +6334,7 @@ mod typecheck_tests {
                 r#"view "a" unit unit { CAR };"#,
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Ok(ContractScript {
                 parameter: Type::Unit,
                 storage: Type::Unit,
@@ -6352,7 +6367,7 @@ mod typecheck_tests {
                 r#"view "b" unit unit { CDR };"#,
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Ok(ContractScript {
                 parameter: Type::Unit,
                 storage: Type::Unit,
@@ -6395,7 +6410,7 @@ mod typecheck_tests {
                 r#"view "a" unit unit { CDR };"#,
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Err(TcError::DuplicatedView("a".into()))
         );
     }
@@ -6410,7 +6425,7 @@ mod typecheck_tests {
                 "code { DROP; UNIT; FAILWITH };",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Ok(ContractScript {
                 parameter: Type::new_contract(Type::Unit),
                 storage: Type::Unit,
@@ -6434,7 +6449,7 @@ mod typecheck_tests {
                 "code FAILWITH;",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Pushable,
                 Type::new_contract(Type::Unit)
@@ -6851,7 +6866,7 @@ mod typecheck_tests {
                 "code { DROP; SELF %foo; UNIT; FAILWITH };",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Ok(ContractScript {
                 parameter: Type::new_or(Type::Int, Type::Unit),
                 storage: Type::Unit,
@@ -6886,7 +6901,7 @@ mod typecheck_tests {
                 "code { DROP; SELF %qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq; UNIT; FAILWITH };",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Err(TcError::EntrypointError(ByteReprError::WrongFormat(
                 "entrypoint name must be at most 31 characters long, but it is 32 characters long"
                     .into()
@@ -6906,7 +6921,7 @@ mod typecheck_tests {
                 "code { DROP; SELF; UNIT; FAILWITH };",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx),
+            .typecheck_script(&mut ctx, true),
             Ok(ContractScript {
                 parameter: Type::new_or(Type::Int, Type::Unit),
                 storage: Type::Unit,
@@ -7005,7 +7020,7 @@ mod typecheck_tests {
         let go = |s| {
             parse_contract_script(s)
                 .unwrap()
-                .typecheck_script(&mut Ctx::default())
+                .typecheck_script(&mut Ctx::default(), true)
         };
 
         // duplicate
@@ -8509,7 +8524,7 @@ mod typecheck_tests {
         let cs_mich =
             parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
                 .unwrap();
-        let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        let cs = cs_mich.typecheck_script(&mut ctx, true).unwrap();
         assert_eq!(
             typecheck_instruction(
                 &parse(create_contract_src).unwrap(),
