@@ -19,6 +19,11 @@ protected_gcp="${GCP_PROTECTED_REGISTRY}/tezos/tezos/$DISTRIBUTION:$RELEASE"
 # if we specify a platform for both, we install qemu
 # If we specify a $PLATFORM on the wrong host arch, we'll get an error
 case "${PLATFORM:-}" in
+"linux/amd64")
+  # In case we only want to compile for one architecture.
+  # This is a native compilation as the default runner is amd64
+  : nop
+  ;;
 "linux/amd64,linux/arm64")
   # Cross-platform emulator collection
   # We cannot make this installation permanent inside the GitLab
