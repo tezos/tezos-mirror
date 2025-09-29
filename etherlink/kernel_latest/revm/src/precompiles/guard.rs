@@ -17,6 +17,11 @@ pub(crate) fn guard(
     transfer: &InputsImpl,
     is_static: bool,
 ) -> Result<(), CustomPrecompileError> {
+    if Some(transfer.target_address) != transfer.bytecode_address {
+        return Err(CustomPrecompileError::Revert(
+            "DELEGATECALLs and CALLCODEs are not allowed".to_string(),
+        ));
+    }
     if transfer.target_address != current {
         return Err(CustomPrecompileError::Revert(
             "invalid transfer target address".to_string(),
@@ -24,7 +29,7 @@ pub(crate) fn guard(
     }
     if is_static {
         return Err(CustomPrecompileError::Revert(
-            "invalid transfer target address".to_string(),
+            "STATICCALLs are not allowed".to_string(),
         ));
     }
     if !authorized.contains(&transfer.caller_address) {
