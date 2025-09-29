@@ -31,6 +31,7 @@ RUN apt-get update && \
     tzdata \
     pkg-config autoconf automake autotools-dev libtool xutils-dev clang cmake \
     sccache \
+    jq \
     musl-tools \
     wabt binutils-gold binutils-riscv64-unknown-elf gcc-riscv64-linux-gnu && \
     ln -s /usr/bin/riscv64-linux-gnu-gcc /usr/bin/riscv64-unknown-linux-musl-gcc && \

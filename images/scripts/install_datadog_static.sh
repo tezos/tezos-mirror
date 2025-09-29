@@ -4,18 +4,18 @@
 
 set -euo pipefail
 
-DATAGOG_RELEASE="v3.4.0"
+DATAGOG_RELEASE="v3.20.0"
 
 # Detect architecture
 ARCH=$(uname -m)
 case "$ARCH" in
 x86_64)
   PLATFORM="x64"
-  EXPECTED_SHA256="94de024fe9826e7a4023cfa3ad60f3cf08310ffb2c061c2703a025bbb2532c5f"
+  EXPECTED_SHA256="e238975dca030800c4c504f94f02faccc65d84e11356e8de34165a5e7041f352"
   ;;
 aarch64)
   PLATFORM="arm64"
-  EXPECTED_SHA256="b90082a9f0a363c17cb0945b4c26745c07d6756ff0239623b8074c5f35d65f45"
+  EXPECTED_SHA256="6a68bc884f1f2f19b4fc77a81dd08836f78bb6e558675836f8bf91574833affa"
   ;;
 *)
   echo "Unsupported architecture: $ARCH" >&2

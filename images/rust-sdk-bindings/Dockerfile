@@ -25,6 +25,7 @@ RUN apt-get update && \
     ca-certificates curl \
     build-essential \
     sccache \
+    jq \
     # Python requirements
     python3 python3-venv \
     pipx \
@@ -61,8 +62,7 @@ RUN python3 -m venv .venv && \
 
 # install maturin
 ARG MATURIN_VERSION=1.5.1
-RUN pipx ensurepath
-RUN pipx install maturin==${MATURIN_VERSION}
+RUN pipx ensurepath && pipx install maturin==${MATURIN_VERSION}
 
 ENV PATH="/root/.local/bin/:$PATH"
 

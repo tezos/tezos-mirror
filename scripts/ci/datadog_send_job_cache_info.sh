@@ -68,12 +68,20 @@ get_cache_size "$RUSTZCASH_DEPS_TARGET_DIR" "CACHE_RUSTZCASH_DEPS"
 get_cache_size "$ETHERLINK_WASM_RUNTIME_TARGET_DIR" "CACHE_ETHERLINK_WASM_RUNTIME"
 
 # Send info to Datadog
-
 if command -v datadog-ci > /dev/null 2>&1; then
   echo "Sending job-level info to Datadog"
   echo "CACHE_TAGS=$CACHE_TAGS"
   # FIXME LATER use "datadog-ci tag --level job --tags-file my_tags.json"
   eval "DATADOG_SITE=datadoghq.eu datadog-ci tag --level job ${CACHE_TAGS}"
+  if command -v sccache > /dev/null 2>&1 &&
+    sccache --show-stats > /dev/null 2>&1; then
+
+    # send sccache metrics to datadog
+    ./scripts/ci/datadog_sccache_metrics.sh
+
+  else
+    echo "sccache not running: no sscache metric sent to Datadog"
+  fi
 else
-  echo "'datadog-ci' not installed, no job info sent to Datadog"
+  echo "'datadog-ci' not installed. no job info sent to Datadog"
 fi
