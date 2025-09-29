@@ -106,13 +106,15 @@ Protocol parameters
 -------------------
 
 6s Block Time (MRs :gl:`!19045`, :gl:`!19473`)
-----------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Block time have been reduced from 8 seconds to 6 seconds. That is, a
-block can be produced with a delay of 6 seconds with respect to the
-previous block, if both blocks have round 0. This change comes with
-updating many related protocol parameters in order to match the
-reduced block time.
+Block time has been reduced from 8 seconds to 6 seconds on mainnet (on
+ghostnet, it remains unchanged at 4 seconds). That is, a block can be
+produced with a delay of 6 seconds with respect to the previous block,
+if the latter is at round 0.
+
+This reduced block time comes with the updates of multiple related
+protocol parameters:
 
 .. list-table:: Changes to protocol parameters
    :widths: 50 25 25
@@ -143,9 +145,9 @@ reduced block time.
      - ``1386666``
      - ``1040000``
 
-Smart rollup protocol parameters have been updated with regard to the
-reduction of block time ensuring the same duration as today. For
-example, the challenge window is two weeks.
+Smart rollup protocol parameters have also been updated accordingly,
+in order to preserve the same durations as in the previous
+protocol. For example, the challenge window is still two weeks.
 
 .. list-table:: Changes to smart rollup protocol parameters
    :widths: 50 25 25
@@ -167,11 +169,22 @@ example, the challenge window is two weeks.
      - ``75600``
      - ``100800``
 
-The ``smart_rollup_max_active_outbox_levels`` has not been updated,
-and the max allowed period of withdrawal has been reduced in
-consequence to ~10 days because the current storage implementation of
-the executed outbox message in the Layer 1 does not allow to update it
-safely.
+Note that the ``smart_rollup_max_active_outbox_levels`` has not been
+updated, because the current storage implementation of the executed
+outbox message in the Layer 1 does not allow for a safe update. As a
+consequence, the maximal allowed period of withdrawal has been reduced
+from ~14 days to ~10 days.
+
+
+Feature flags
+^^^^^^^^^^^^^
+
+- Replaced the feature-controlling parameter
+  ``all_bakers_attest_activation_level`` with
+  ``all_bakers_attest_activation_threshold``. This causes
+  all-bakers-attest to activate as soon as the ratio of bakers that
+  use a tz4 consensus keys exceeds the specified threshold, set to 50%
+  in protocol alpha. (MR :gl:`!19093`)
 
 
 Bug Fixes
@@ -197,5 +210,3 @@ Internal
 - Remove obsolete internal field related to Adaptive Issuance
   activation. (MR :gl:`!15789`)
 
-- Added internal field related to All Bakers Attest All Blocks
-  activation. (MR :gl:`!19093`)
