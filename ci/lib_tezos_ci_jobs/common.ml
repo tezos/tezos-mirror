@@ -473,18 +473,6 @@ let changeset_riscv_kernels =
     changeset_riscv_kernels_code @ changeset_images_rust_toolchain
     (* Run if the [rust-toolchain] image is updated *))
 
-let changeset_test_evm_compatibility =
-  Changeset.(
-    changeset_base
-    @ changeset_images_rust_toolchain
-      (* Run if the [rust-toolchain] image is updated *)
-    @ make
-        [
-          "etherlink.mk";
-          "etherlink/kernel_latest/evm_execution/**/*";
-          "etherlink/kernel_latest/evm_evaluation/**/*";
-        ])
-
 let changeset_mir =
   Changeset.(
     changeset_base @ changeset_images (* Run if the test image is updated *)

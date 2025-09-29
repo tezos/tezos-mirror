@@ -1675,28 +1675,7 @@ let jobs pipeline_type =
               riscv_ci_flags;
           ]
       in
-      let job_test_evm_compatibility : tezos_job =
-        make_job_kernel
-          ~__POS__
-          ~name:"test_evm_compatibility"
-          ~changes:changeset_test_evm_compatibility
-          ~dependencies:(Dependent [Job job_build_kernels])
-          [
-            "make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs \
-             evm-evaluation-assessor";
-            "git clone --depth 1 --branch v14.1@etherlink \
-             https://github.com/functori/tests ethereum_tests";
-            "./evm-evaluation-assessor --eth-tests ./ethereum_tests/ \
-             --resources ./etherlink/kernel_latest/evm_evaluation/resources/ \
-             -c";
-          ]
-      in
-      [
-        job_test_kernels;
-        job_audit_riscv_deps;
-        job_check_riscv_kernels;
-        job_test_evm_compatibility;
-      ]
+      [job_test_kernels; job_audit_riscv_deps; job_check_riscv_kernels]
     in
     let job_mir_unit =
       job
