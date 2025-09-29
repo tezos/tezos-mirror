@@ -45,6 +45,7 @@ RUN apt-get update && \
     build-essential \
     git \
     gcc \
+    jq \
     tzdata \
     pkg-config autoconf automake autotools-dev libtool xutils-dev clang cmake \
     sccache \

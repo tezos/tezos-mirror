@@ -1580,6 +1580,8 @@ module Images = struct
     let fedora_41 = make_img "fedora:41"
 
     let fedora_42 = make_img "fedora:42"
+
+    let rust_toolchain_unstable = make_img "debian-rust:unstable"
   end
 
   (* Internal images are built in the stage {!Stages.images}. *)
@@ -1624,6 +1626,8 @@ module Images = struct
           ("Build internal rust-toolchain images for "
           ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
+        ~variables:
+          [("IMAGE", Base_images.path_prefix ^ "/debian-rust:unstable")]
         ~artifacts:
           (artifacts
              ~reports:(reports ~dotenv:"rust_toolchain_image_tag.env" ())
