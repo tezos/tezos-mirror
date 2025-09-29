@@ -82,19 +82,25 @@ pub(crate) const SEND_OUTBOX_MESSAGE_BASE_COST: u64 = 500;
 
 // Rationale regarding the cost:
 // Covers the cost of 2 r/w access on cold keys.
-pub(crate) const TICKET_TABLE_BASE_COST: u64 = 5000;
+// In particular, worst case for a cold read 2100 + the worst case for
+// cold write 22100 (inserting a non zero value to a zero value).
+pub(crate) const TICKET_TABLE_BASE_COST: u64 = 24_200;
 
 // Rationale regarding the cost:
 // Covers the cost of 2 r/w access on cold keys.
-pub(crate) const GLOBAL_COUNTER_BASE_COST: u64 = 5000;
+// In particular, worst case for a cold read 2100 + the worst case for
+// cold write 22100 (inserting a non zero value to a zero value).
+pub(crate) const GLOBAL_COUNTER_BASE_COST: u64 = 24_200;
 
 // Rationale regarding the cost:
 // Covers the cost of 2 r/w access on cold keys.
-pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 5000;
+// In particular, worst case for a cold read 2100 + the worst case for
+// cold write 22100 (inserting a non zero value to a zero value).
+pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 24_200;
 
 // Rationale regarding the cost:
-// Consumed gas is ~47_000 for both queue execute_without_proxy entrypoints
-pub const FA_DEPOSIT_EXECUTION_COST: u64 = 50_000;
+// Consumed gas is ~81000 for both queue execute_without_proxy entrypoints
+pub const FA_DEPOSIT_EXECUTION_COST: u64 = 100_000;
 
 pub(crate) const SEQUENCER_UPGRADE_DELAY: u64 = 60 * 60 * 24; // 24 hours
 
