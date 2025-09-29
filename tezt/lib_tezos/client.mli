@@ -40,6 +40,10 @@ type ai_vote = On | Off | Pass
     argument (e.g., [http://127.0.0.1:5893]). *)
 val string_of_endpoint : ?hostname:bool -> endpoint -> string
 
+(** A string representation of an endpoint suitable to be used inside URLs
+    argument (e.g., [http%3A%2F%2F127.0.0.1%3A5893]). *)
+val url_encoded_string_of_endpoint : ?hostname:bool -> endpoint -> string
+
 (** Values that can be passed to the client's [--media-type] argument *)
 type media_type = Json | Binary | Any
 

@@ -43,6 +43,10 @@ let polling_period = function
       let in_ms = t *. 1000. |> int_of_float in
       in_ms / 2
 
+let build_endpoint ~runner port =
+  Client.Foreign_endpoint
+    (Endpoint.make ~host:(Runner.address runner) ~scheme:"http" ~port ())
+
 let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
     ~time_between_blocks =
   (* Set of functions helpful for Tzkt setup *)
@@ -204,7 +208,7 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
       ~port:api_port_arg
       ()
   in
-  unit
+  return (build_endpoint ~runner api_port)
 
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
     (rpc_port : int option) (verbose : bool)
@@ -308,6 +312,10 @@ let rec loop n =
   let* () = Lwt_unix.sleep 1. in
   loop n
 
+let add_service cloud ~name ~url =
+  let () = toplog "New service: %s: %s" name url in
+  Cloud.add_service cloud ~name ~url
+
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
   let name = "tezlink-sequencer" in
@@ -335,6 +343,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         Lwt.return agent
       in
       let* tezlink_sequencer_agent = next_agent ~name in
+      let () = toplog "Starting Tezlink sequencer" in
       let* tezlink_sandbox_endpoint =
         init_tezlink_sequencer
           cloud
@@ -345,13 +354,53 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           tezlink_sequencer_agent
       in
       let* () =
+        add_service
+          cloud
+          ~name:"Tezlink RPC endpoint"
+          ~url:(Client.string_of_endpoint tezlink_sandbox_endpoint)
+      in
+      let* () =
+        add_service
+          cloud
+          ~name:"Check Tezlink RPC endpoint"
+          ~url:
+            (sf
+               "%s/version"
+               (Client.string_of_endpoint tezlink_sandbox_endpoint))
+      in
+      let* () =
         if Cli.tzkt then
-          init_tzkt
-            ~tzkt_api_port:Cli.tzkt_api_port
-            ~agent:tezlink_sequencer_agent
-            ~tezlink_sandbox_endpoint
-            ~time_between_blocks:Cli.time_between_blocks
-        else return ()
+          let () = toplog "Starting TzKT" in
+          let* tzkt_api =
+            init_tzkt
+              ~tzkt_api_port:Cli.tzkt_api_port
+              ~agent:tezlink_sequencer_agent
+              ~tezlink_sandbox_endpoint
+              ~time_between_blocks:Cli.time_between_blocks
+          in
+          let* () =
+            add_service
+              cloud
+              ~name:"TzKT API"
+              ~url:(Client.string_of_endpoint tzkt_api)
+          in
+          let* () =
+            add_service
+              cloud
+              ~name:"Check TzKT API"
+              ~url:(sf "%s/v1/head" (Client.string_of_endpoint tzkt_api))
+          in
+          let* () =
+            add_service
+              cloud
+              ~name:"TzKT Explorer"
+              ~url:
+                (sf
+                   "http://sandbox.tzkt.io/blocks?tzkt_api_url=%s"
+                   (Client.url_encoded_string_of_endpoint tzkt_api))
+          in
+          unit
+        else unit
       in
       let () = toplog "Starting main loop" in
       loop 0)
