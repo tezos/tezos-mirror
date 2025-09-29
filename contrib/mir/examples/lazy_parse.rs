@@ -38,7 +38,7 @@ fn run_contract(parameter: Micheline, storage: Micheline) {
     // The contract is only lazily parsed once.
     let contract_micheline = contract();
     let mut ctx = Ctx::default();
-    let contract_typechecked = contract_micheline.typecheck_script(&mut ctx).unwrap();
+    let contract_typechecked = contract_micheline.typecheck_script(&mut ctx, true).unwrap();
 
     let (_, new_storage) = contract_typechecked
         .interpret(
