@@ -1,0 +1,8 @@
+# This contract stores the big map it receives as parameter, dropping
+# the previously-stored big map.  This contract is used to test
+# temporary big map ids which are generated when big maps are
+# transferred from one contract to another.  See also sender_*.tz and
+# the other receiver_*.tz.
+parameter (big_map string bytes);
+storage (big_map string bytes);
+code { CAR; NIL operation; PAIR }

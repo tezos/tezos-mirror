@@ -144,6 +144,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Companion_key.register ~protocols ;
   Contract_baker.register ~protocols ;
   Contract_big_map_to_self.register ~protocols ;
+  Contract_big_map_transfer.register ~protocols ;
   Contract_entrypoints.register ~protocols ;
   Contract_hash_fun.register ~protocols ;
   Contract_hash_with_origination.register ~protocols ;

@@ -1,0 +1,107 @@
+
+./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 1 --arg Unit
+Node is bootstrapped.
+Estimated gas: 3614.608 units (will add 100 for safety)
+Estimated storage: 1348 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000621
+    Expected counter: 2
+    Gas limit: 3715
+    Storage limit: 1368 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000621
+      payload fees(the block proposer) ....... +ꜩ0.000621
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      This transaction was successfully applied
+      Updated storage: 4
+      Updated big_maps:
+        New temp(1) of type (big_map string bytes)
+        Set temp(1)["d"] to 0x
+        Copy map(4) to temp(2)
+        Copy map(4) to temp(3)
+        Set temp(3)["a"] to 0x0010
+        Unset temp(3)["b"]
+      Storage size: 466 bytes
+      Consumed gas: 2096.011
+      Internal operations:
+        Internal Origination:
+          From: [CONTRACT_HASH]
+          Credit: ꜩ0
+          Script:
+            { parameter unit ;
+              storage (big_map string bytes) ;
+              code { CDR ; NIL operation ; PAIR } }
+            Initial storage: -1
+          No delegate for this contract
+          This origination was successfully applied
+          Originated contracts:
+            [CONTRACT_HASH]
+          Storage size: 145 bytes
+          Updated big_maps:
+            Copy temp(1) to map(5)
+          Paid storage size diff: 145 bytes
+          Consumed gas: 506.360
+          Balance updates:
+            [PUBLIC_KEY_HASH] ... -ꜩ0.03625
+            storage fees ........................... +ꜩ0.03625
+            [PUBLIC_KEY_HASH] ... -ꜩ0.06425
+            storage fees ........................... +ꜩ0.06425
+        Internal Origination:
+          From: [CONTRACT_HASH]
+          Credit: ꜩ0
+          Script:
+            { parameter unit ;
+              storage (big_map string bytes) ;
+              code { CDR ; NIL operation ; PAIR } }
+            Initial storage: -2
+          No delegate for this contract
+          This origination was successfully applied
+          Originated contracts:
+            [CONTRACT_HASH]
+          Storage size: 215 bytes
+          Updated big_maps:
+            Copy temp(2) to map(6)
+          Paid storage size diff: 215 bytes
+          Consumed gas: 506.360
+          Balance updates:
+            [PUBLIC_KEY_HASH] ... -ꜩ0.05375
+            storage fees ........................... +ꜩ0.05375
+            [PUBLIC_KEY_HASH] ... -ꜩ0.06425
+            storage fees ........................... +ꜩ0.06425
+        Internal Origination:
+          From: [CONTRACT_HASH]
+          Credit: ꜩ0
+          Script:
+            { parameter unit ;
+              storage (big_map string bytes) ;
+              code { CDR ; NIL operation ; PAIR } }
+            Initial storage: -3
+          No delegate for this contract
+          This origination was successfully applied
+          Originated contracts:
+            [CONTRACT_HASH]
+          Storage size: 217 bytes
+          Updated big_maps:
+            Copy temp(3) to map(7)
+          Paid storage size diff: 217 bytes
+          Consumed gas: 506.360
+          Balance updates:
+            [PUBLIC_KEY_HASH] ... -ꜩ0.05425
+            storage fees ........................... +ꜩ0.05425
+            [PUBLIC_KEY_HASH] ... -ꜩ0.06425
+            storage fees ........................... +ꜩ0.06425
+
+New contract [CONTRACT_HASH] originated.
+New contract [CONTRACT_HASH] originated.
+New contract [CONTRACT_HASH] originated.

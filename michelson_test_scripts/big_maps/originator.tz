@@ -1,0 +1,49 @@
+# This script originates three contracts with a big_map in their
+# initial storage using different ways to produce this initial
+# storage: The first call to CREATE_CONTRACT passes a freshly created
+# big map, the second one passes an exact copy of the big map of the
+# originator storage, and the third one passes a modified copy of the
+# originator storage.
+parameter unit ;
+storage (big_map string bytes) ;
+code
+  {
+    CDR;
+    NIL operation ;
+    EMPTY_BIG_MAP string bytes ;
+    PUSH (option bytes) (Some 0x); PUSH string "d"; UPDATE;
+    PUSH mutez 0 ;
+    NONE key_hash ;
+    CREATE_CONTRACT
+      { parameter unit ;
+        storage (big_map string bytes) ;
+        code { CDR ; NIL operation ; PAIR } } ;
+    SWAP ;
+    DROP ;
+    CONS ;
+    DUP 2 ;
+    PUSH mutez 0 ;
+    NONE key_hash ;
+    CREATE_CONTRACT
+      { parameter unit ;
+        storage (big_map string bytes) ;
+        code { CDR ; NIL operation ; PAIR } } ;
+    SWAP ;
+    DROP ;
+    CONS ;
+    DUP 2 ;
+    PUSH (option bytes) (Some 0x0010); PUSH string "a"; UPDATE;
+    PUSH (option bytes) None; PUSH string "b"; UPDATE;
+    PUSH mutez 0 ;
+    NONE key_hash ;
+    CREATE_CONTRACT
+      { parameter unit ;
+        storage (big_map string bytes) ;
+        code { CDR ; NIL operation ; PAIR } } ;
+    SWAP ;
+    DROP ;
+    CONS ;
+    # Reverse the list to get the operations in the order we created them
+    NIL operation; SWAP; ITER {CONS};
+    PAIR
+  }
