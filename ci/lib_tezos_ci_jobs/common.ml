@@ -463,15 +463,6 @@ let changeset_test_kernels =
     @ make
         ["kernels.mk"; "src/kernel_*/**/*"; "src/riscv/**/*"; "sdk/rust/**/*"])
 
-let changeset_test_etherlink_firehose =
-  Changeset.(
-    changeset_base @ changeset_images_rust_toolchain
-    @ make
-        [
-          "etherlink/firehose/**/*";
-          "etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*";
-        ])
-
 let changeset_riscv_kernels_code =
   Changeset.(
     changeset_base
