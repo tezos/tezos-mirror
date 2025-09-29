@@ -19,7 +19,7 @@ use crate::{
             GLOBAL_COUNTER_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
         },
         error::CustomPrecompileError,
-        guard::{guard, revert, OOG},
+        guard::{guard, out_of_gas, revert},
     },
 };
 
@@ -49,7 +49,7 @@ where
 
     let mut gas = Gas::new(gas_limit);
     if !gas.record_cost(GLOBAL_COUNTER_BASE_COST) {
-        return Ok(OOG);
+        return Ok(out_of_gas(gas_limit));
     }
 
     let interface = match GlobalCounter::GlobalCounterCalls::abi_decode(input) {

@@ -46,8 +46,10 @@ where
     }
 }
 
-pub(crate) const OOG: InterpreterResult = InterpreterResult {
-    result: InstructionResult::OutOfGas,
-    gas: Gas::new(0),
-    output: Bytes::new(),
-};
+pub(crate) fn out_of_gas(gas: u64) -> InterpreterResult {
+    InterpreterResult {
+        result: InstructionResult::OutOfGas,
+        gas: Gas::new_spent(gas),
+        output: Bytes::new(),
+    }
+}

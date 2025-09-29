@@ -36,7 +36,7 @@ use crate::{
             SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
         },
         error::CustomPrecompileError,
-        guard::{guard, OOG},
+        guard::{guard, out_of_gas},
     },
 };
 
@@ -474,7 +474,7 @@ where
 
     let mut gas = Gas::new(gas_limit);
     if !gas.record_cost(SEND_OUTBOX_MESSAGE_BASE_COST) {
-        return Ok(OOG);
+        return Ok(out_of_gas(gas_limit));
     }
 
     let output = send_outbox_methods(input, context)?;

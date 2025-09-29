@@ -22,7 +22,7 @@ use crate::{
             FA_BRIDGE_SOL_ADDR, TABLE_PRECOMPILE_ADDRESS, TICKET_TABLE_BASE_COST,
         },
         error::CustomPrecompileError,
-        guard::{guard, revert, OOG},
+        guard::{guard, out_of_gas, revert},
     },
 };
 
@@ -80,7 +80,7 @@ where
 
     let mut gas = Gas::new(gas_limit);
     if !gas.record_cost(TICKET_TABLE_BASE_COST) {
-        return Ok(OOG);
+        return Ok(out_of_gas(gas_limit));
     }
 
     let interface = match Table::TableCalls::abi_decode(input) {
