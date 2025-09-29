@@ -312,6 +312,7 @@ impl<'a> Micheline<'a> {
     pub fn typecheck_script(
         &self,
         ctx: &mut impl CtxTrait<'a>,
+        allow_lazy_storage_in_storage: bool,
     ) -> Result<ContractScript<'a>, TcError> {
         let seq = match self {
             // top-level allows one level of nesting
@@ -381,7 +382,17 @@ impl<'a> Micheline<'a> {
             .ok_or(TcError::MissingTopLevelElt(Prim::storage))?
             .parse_ty(ctx)?;
         parameter.ensure_prop(ctx.gas(), TypeProperty::Passable)?;
-        storage.ensure_prop(ctx.gas(), TypeProperty::Storable)?;
+        storage.ensure_prop(
+            ctx.gas(),
+            if allow_lazy_storage_in_storage {
+                TypeProperty::Storable
+            } else {
+                // Note: the only difference between BigMapValue and
+                // Storable is that the former always forbids lazy
+                // storage type (big maps and sapling states)
+                TypeProperty::BigMapValue
+            },
+        )?;
         let mut stack = tc_stk![Type::new_pair(parameter.clone(), storage.clone())];
         let code = typecheck_instruction(
             code.ok_or(TcError::MissingTopLevelElt(Prim::code))?,
@@ -2225,7 +2236,11 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(CREATE_CONTRACT, [cs], _), [.., new_storage, T::Mutez, T::Option(opt_keyhash)])
             if matches!(opt_keyhash.as_ref(), Type::KeyHash) =>
         {
-            let contract_script = cs.typecheck_script(ctx)?;
+            #[cfg(feature = "allow_lazy_storage_transfer")]
+            let allow_lazy_storage_in_storage = true;
+            #[cfg(not(feature = "allow_lazy_storage_transfer"))]
+            let allow_lazy_storage_in_storage = false;
+            let contract_script = cs.typecheck_script(ctx, allow_lazy_storage_in_storage)?;
             ensure_ty_eq(ctx.gas(), &contract_script.storage, new_storage)?;
             stack.drop_top(3);
             stack.push(Type::Address);

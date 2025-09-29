@@ -486,7 +486,7 @@ fn get_contract_entrypoint(
     // except the gas field which should be propagated here.
     // TODO (Linear issue L2-383): handle gas consumption here.
     let typechecked = micheline
-        .typecheck_script(&mut mir::context::Ctx::default())
+        .typecheck_script(&mut mir::context::Ctx::default(), true)
         .ok()?;
     let entrypoints_annotations = typechecked.annotations;
     // Cast  the entry_points_annotations to the expected type
@@ -565,8 +565,9 @@ fn typecheck_code_and_storage<'a, Ctx: mir::context::CtxTrait<'a>>(
 ) -> Result<TypedValue<'a>, OriginationError> {
     let contract_micheline = Micheline::decode_raw(&parser.arena, &script.code)
         .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
+    let allow_lazy_storage_in_storage = true;
     let contract_typechecked = contract_micheline
-        .typecheck_script(ctx)
+        .typecheck_script(ctx, allow_lazy_storage_in_storage)
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Script : {e}")))?;
     let storage_micheline = Micheline::decode_raw(&parser.arena, &script.storage)
         .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
@@ -807,7 +808,7 @@ fn execute_smart_contract<'a>(
 ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
     // Parse and typecheck the contract
     let contract_micheline = Micheline::decode_raw(&parser.arena, &code)?;
-    let contract_typechecked = contract_micheline.typecheck_script(ctx)?;
+    let contract_typechecked = contract_micheline.typecheck_script(ctx, true)?;
     let storage_micheline = Micheline::decode_raw(&parser.arena, &storage)?;
 
     // Execute the contract
