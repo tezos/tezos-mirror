@@ -20,6 +20,10 @@ val cleared : unit -> unit Lwt.t
     injected to the relay endpoint with a batch of [eth_sendRawTransaction]. *)
 val injecting_transactions : int -> unit Lwt.t
 
+(** [injecting_transactions_failed err] advertized that the node was not able
+    to inject some transactions and returned [err] instead. *)
+val injecting_transactions_failed : tztrace -> unit Lwt.t
+
 (** [add_transaction tx_hash] Advertises [tx_hash] was added to the tx
     queue. *)
 val add_transaction : Ethereum_types.hash -> unit Lwt.t

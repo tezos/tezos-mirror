@@ -238,8 +238,23 @@ struct
     let length s = S.length s
   end
 
+  module Inflight_transactions = struct
+    include Map.Make (String)
+
+    let of_seq s =
+      Seq.map (fun (h, txn) -> (Ethereum_types.hash_to_bytes h, txn)) s
+      |> of_seq
+
+    let find_opt h = find_opt (Ethereum_types.hash_to_bytes h)
+
+    let remove h = remove (Ethereum_types.hash_to_bytes h)
+
+    let merge = merge (fun _k before after -> Option.either after before)
+  end
+
   type state = {
     mutable queue : queue_request Queue.t;
+    mutable waiting_injection : queue_request Inflight_transactions.t;
     pending : Pending_transactions.t;
     tx_object : Transaction_objects.t;
     tx_per_address : Transactions_per_addr.t;
@@ -284,6 +299,11 @@ struct
         }
           -> (Ethereum_types.quantity, tztrace) t
       | Tick : {evm_node_endpoint : endpoint} -> (unit, tztrace) t
+      | Injection_confirmation : {
+          txn_hash : Ethereum_types.hash;
+          status : [`Accepted | `Refused];
+        }
+          -> (unit, tztrace) t
       | Clear : (unit, tztrace) t
       | Lock_transactions : (unit, tztrace) t
       | Unlock_transactions : (unit, tztrace) t
@@ -311,6 +331,7 @@ struct
       | Find _ -> "Find"
       | Nonce _ -> "Nonce"
       | Tick _ -> "Tick"
+      | Injection_confirmation _ -> "Injection_confirmation"
       | Clear -> "Clear"
       | Lock_transactions -> "Lock_transactions"
       | Unlock_transactions -> "Unlock_transactions"
@@ -353,6 +374,20 @@ struct
                (req "evm_node_endpoint" endpoint_encoding))
             (function
               | View (Tick {evm_node_endpoint}) -> Some ((), evm_node_endpoint)
+              | _ -> None)
+            (fun _ -> assert false);
+          case
+            Json_only
+            ~title:"Injection_confirmation"
+            (obj3
+               (req "request" (constant "injection_confirmation"))
+               (req "hash" Ethereum_types.hash_encoding)
+               (req
+                  "status"
+                  (string_enum [("accepted", `Accepted); ("refused", `Refused)])))
+            (function
+              | View (Injection_confirmation {txn_hash; status}) ->
+                  Some ((), txn_hash, status)
               | _ -> None)
             (fun _ -> assert false);
           case
@@ -438,6 +473,15 @@ struct
       | Inject {payload = Hex txn; _} -> fprintf fmt "Inject %s" txn
       | Find {txn_hash = Hash (Hex txn_hash)} -> fprintf fmt "Find %s" txn_hash
       | Tick _ -> fprintf fmt "Tick"
+      | Injection_confirmation {txn_hash; status} ->
+          fprintf
+            fmt
+            "Confirm %a was %s"
+            Ethereum_types.pp_hash
+            txn_hash
+            (match status with
+            | `Accepted -> "accepted"
+            | `Refused -> "refused")
       | Clear -> fprintf fmt "Clear"
       | Nonce {next_nonce = _; address} ->
           fprintf fmt "Nonce %s" (Tx.address_to_string address)
@@ -467,15 +511,16 @@ struct
 
     let uuid_seed = Random.get_state ()
 
-    let send_transactions_batch ~evm_node_endpoint ~keep_alive transactions =
+    let send_transactions_batch ~evm_node_endpoint ~keep_alive self transactions
+        =
       let open Lwt_result_syntax in
       let module M = Map.Make (String) in
       let module Srt = Rpc_encodings.Send_raw_transaction in
       if Seq.is_empty transactions then return_unit
       else
-        let rev_batch, callbacks =
+        let rev_batch, hashes =
           Seq.fold_left
-            (fun (rev_batch, callbacks) {hash; payload; queue_callback} ->
+            (fun (rev_batch, hashes) {hash; payload; _} ->
               Octez_telemetry.Trace.add_event (fun () ->
                   tx_queue_event
                     ~attrs:Telemetry.Attributes.[Transaction.hash hash]
@@ -496,7 +541,7 @@ struct
                   }
               in
 
-              (txn :: rev_batch, M.add req_id queue_callback callbacks))
+              (txn :: rev_batch, M.add req_id hash hashes))
             ([], M.empty)
             transactions
         in
@@ -530,28 +575,41 @@ struct
                 batch
         in
 
-        let* missed_callbacks =
+        let* missed_transactions =
           List.fold_left_es
-            (fun callbacks (response : Rpc_encodings.JSONRPC.response) ->
+            (fun hashes (response : Rpc_encodings.JSONRPC.response) ->
               match response with
               | {id = Some (Id_string req); value} -> (
-                  match (value, M.find_opt req callbacks) with
-                  | value, Some callback ->
+                  match (value, M.find_opt req hashes) with
+                  | value, Some txn_hash ->
                       let* () =
                         match value with
-                        | Ok _hash_encoded -> Lwt_result.ok (callback `Accepted)
+                        | Ok _hash_encoded ->
+                            let*! (_pushed : bool) =
+                              Worker.Queue.push_request
+                                self
+                                (Injection_confirmation
+                                   {txn_hash; status = `Accepted})
+                            in
+                            return_unit
                         | Error error ->
                             let*! () = Tx_queue_events.rpc_error error in
-                            Lwt_result.ok (callback `Refused)
+                            let*! (_pushed : bool) =
+                              Worker.Queue.push_request
+                                self
+                                (Injection_confirmation
+                                   {txn_hash; status = `Refused})
+                            in
+                            return_unit
                       in
-                      return (M.remove req callbacks)
-                  | _ -> return callbacks)
+                      return (M.remove req hashes)
+                  | _ -> return hashes)
               | _ -> failwith "Inconsistent response from the server")
-            callbacks
+            hashes
             responses
         in
 
-        assert (M.is_empty missed_callbacks) ;
+        assert (M.is_empty missed_transactions) ;
         return_unit
 
     (** clear values and keep the allocated space *)
@@ -565,7 +623,8 @@ struct
            config = _;
            keep_alive = _;
            locked = _;
-         } :
+           waiting_injection = _;
+         } as state :
           state) =
       (* full matching so when a new element is added to the state it's not
          forgotten to clear it. *)
@@ -574,6 +633,7 @@ struct
       String.Hashtbl.clear tx_per_address ;
       String.Hashtbl.clear address_nonce ;
       Queue.clear queue ;
+      state.waiting_injection <- Inflight_transactions.empty ;
       ()
 
     let lock_transactions state = state.locked <- true
@@ -818,6 +878,13 @@ struct
                 return (transactions_to_inject, remaining_transactions)
           in
 
+          state.waiting_injection <-
+            Inflight_transactions.merge
+              state.waiting_injection
+              (Inflight_transactions.of_seq
+                 (Seq.map
+                    (fun ({hash; _} as txn : queue_request) -> (hash, txn))
+                    transactions_to_inject)) ;
           state.queue <- Queue.of_seq remaining_transactions ;
           let txns =
             Pending_transactions.drop
@@ -830,14 +897,46 @@ struct
               txns
           in
 
-          let* () =
-            send_transactions_batch
-              ~keep_alive:state.keep_alive
-              ~evm_node_endpoint
-              transactions_to_inject
-          in
+          Lwt.dont_wait
+            (fun () ->
+              let open Lwt_syntax in
+              let* send_result =
+                protect @@ fun () ->
+                send_transactions_batch
+                  ~keep_alive:state.keep_alive
+                  ~evm_node_endpoint
+                  self
+                  transactions_to_inject
+              in
+              match send_result with
+              | Ok () -> return_unit
+              | Error error ->
+                  let* () =
+                    Tx_queue_events.injecting_transactions_failed error
+                  in
+                  (* Something went wrong, we confirm all transactions as refused *)
+                  Seq.S.iter
+                    (fun {hash; _} ->
+                      let* _pushed =
+                        Worker.Queue.push_request
+                          self
+                          (Injection_confirmation
+                             {txn_hash = hash; status = `Refused})
+                      in
+                      return_unit)
+                    transactions_to_inject)
+            ignore ;
 
           return_unit
+      | Injection_confirmation {txn_hash; status} -> (
+          match
+            Inflight_transactions.find_opt txn_hash state.waiting_injection
+          with
+          | Some {queue_callback; _} ->
+              state.waiting_injection <-
+                Inflight_transactions.remove txn_hash state.waiting_injection ;
+              Lwt_result.ok (queue_callback status)
+          | None -> return_unit)
       | Size_info ->
           protect @@ fun () ->
           return
@@ -957,6 +1056,7 @@ struct
       return
         {
           queue = Queue.create ();
+          waiting_injection = Inflight_transactions.empty;
           pending = Pending_transactions.empty ~start_size:(config.max_size / 4);
           (* start with /4 and let it grow if necessary to not allocate
              too much at start. *)

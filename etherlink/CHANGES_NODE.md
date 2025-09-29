@@ -11,8 +11,10 @@
 
 ### RPCs changes
 
-- Eth_subscribe newPendingTransactions is only for transaction that
+- `eth_subscribe newPendingTransactions` is only for transaction that
   are added to the tx_queue. (!19390)
+- Fixes high-latency responses in `eth_sendRawTransaction`,
+  `eth_getTransactionCount`, `eth_getTransactionByHash`. (!19433)
 
 ### Monitoring changes
 
