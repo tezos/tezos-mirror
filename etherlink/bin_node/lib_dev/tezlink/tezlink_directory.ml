@@ -10,6 +10,7 @@ open Tezos_services
 type error +=
   | Unsupported_chain_parameter of string
   | Unsupported_block_parameter of string
+  | Failed_operation_forging
 
 let () =
   register_error_kind
@@ -31,7 +32,16 @@ let () =
       Format.fprintf ppf "Unsupported block parameter %s" block)
     Data_encoding.(obj1 (req "block" string))
     (function Unsupported_block_parameter block -> Some block | _ -> None)
-    (fun block -> Unsupported_block_parameter block)
+    (fun block -> Unsupported_block_parameter block) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.failed_operation_forging"
+    ~title:"Operation forging RPC failed"
+    ~description:"An error occued in an operation forging RPC call."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Operation forging RPC failed")
+    Data_encoding.empty
+    (function Failed_operation_forging -> Some () | _ -> None)
+    (fun () -> Failed_operation_forging)
 
 let check_chain =
   let open Result_syntax in
@@ -372,10 +382,12 @@ let build_block_static_directory ~l2_chain_id
        ~impl:(fun {block; chain} () operation ->
          let*? _chain = check_chain chain in
          let*? _block = check_block block in
-         let bytes =
-           Data_encoding.Binary.to_bytes_exn
+         let*? bytes =
+           Data_encoding.Binary.to_bytes
              Alpha_context.Operation.unsigned_encoding
              operation
+           |> Result.map_error_e @@ fun _ ->
+              Result_syntax.tzfail Failed_operation_forging
          in
          return bytes)
   |> register
