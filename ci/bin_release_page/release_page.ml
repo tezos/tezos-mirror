@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 open Base
+open Base.Version
 
 (* [show_markdown content] returns a string that contains the
    markdown associated with [content]. *)
