@@ -21,7 +21,6 @@ Seoul.
 Smart Rollups
 -------------
 
-
 Data Availability Layer
 -----------------------
 
@@ -31,14 +30,15 @@ Adaptive Issuance
 Michelson
 ---------
 
-- A new instruction named ``INDEX_ADDRESS`` has been added, it
-  provides a unique identifier of type ``nat`` for values of type
-  ``address``, stored in the context. (MRs :gl:`!18866`, :gl:`!18943`)
+- Added a new instruction ``INDEX_ADDRESS``. It provides a unique
+  identifier of type ``nat`` for values of type ``address``, stored in
+  the context. (MRs :gl:`!18866`, :gl:`!18943`)
 
-- A new instruction named ``GET_ADDRESS_INDEX`` has been added, and returns the
-  unique identifier of type ``nat option`` for values of type ``address``, if
-  the address has already been indexed through ``INDEX_ADDRESS``. Returns
-  ``None`` otherwise. (MR :gl:`!18866`)
+- Added a new instruction ``GET_ADDRESS_INDEX``. It returns the unique
+  identifier of type ``nat option`` for values of type ``address``, if
+  the address has already been indexed through ``INDEX_ADDRESS``; it
+  returns ``None`` otherwise. (MR :gl:`!18866`)
+
 
 Gas improvements
 ----------------
@@ -46,39 +46,49 @@ Gas improvements
 Breaking Changes
 ----------------
 
-- Updated ``GET
-  /chains/<chain_id>/blocks/<block_id>/helpers/validators`` to group delegates by level.
-  The returned list contains one element for each queried level (by default, only the current level),
-  and contains four fields: the ``level`` itself, the ``consensus_threshold`` required for the current
-  level, the ``consensus_committee`` of the current level, and ``delegates`` which is the list
-  of validators for that level. Each element of this last
-  list contains the fields present in the previous version of this RPC: ``delegate``, "slots"
-  which have been renamed to ``rounds``, ``consensus_key``, and ``companion_key`` (optional).
-  Also include new fields for delegates, ``attesting_power``, with their attesting power
-  for the level, and ``attestation_slot``, their slot for the given level.
-  (MR :gl:`!18931`, :gl:`!18959`, :gl:`!18984`)
+- Updated RPC ``GET
+  /chains/<chain_id>/blocks/<block_id>/helpers/validators`` to group
+  delegates by level. The returned list contains one element for each
+  queried level (by default, only the current level), and contains
+  four fields: the ``level`` itself, the ``consensus_threshold``
+  required for the current level, the ``consensus_committee`` of the
+  current level, and ``delegates`` which is the list of validators for
+  that level. Each element of this last list contains the fields
+  present in the previous version of this RPC: ``delegate``, "slots"
+  which have been renamed to ``rounds``, ``consensus_key``, and
+  ``companion_key`` (optional).  Also include new fields for
+  delegates, ``attesting_power``, with their attesting power for the
+  level, and ``attestation_slot``, their slot for the given level.
+  (MRs :gl:`!18931`, :gl:`!18959`, :gl:`!18984`)
 
-- Updated ``GET /chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance``,
-  changing ``baking_reward_bonus_per_slot`` with ``baking_reward_bonus_per_block``, and
-  ``attesting_reward_per_slot`` with ``attesting_reward_per_block``. (MR :gl:`!18959`)
+- Updated RPC ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance``.
+  Output field ``baking_reward_bonus_per_slot`` has been replaced with
+  ``baking_reward_bonus_per_block``, and ``attesting_reward_per_slot``
+  with ``attesting_reward_per_block``. Their respective values are
+  consequently 7000 times as high as before (since there are 7000
+  slots per block). (MR :gl:`!18959`)
 
 
 RPC Changes
 -----------
 
-- Added ``GET /chains/<chain_id>/blocks/<block_id>/helpers/stake_info``,
-  which returns the staking power distribution for all the active delegates
+- Added a new RPC ``GET
+  /chains/<chain_id>/blocks/<block_id>/helpers/stake_info``. It
+  returns the baking power distribution for all the active delegates
   at the current cycle. (MR :gl:`!18019`)
-- Added ``GET
-  /chains/<chain_id>/blocks/<block_id>/context/destination/<destination>/index``
-  which returns the index of the given destination (e.g. tz1, Smart Rollup
-  addresses, etc.) or ``null`` if the destination has not been indexed by
-  the opcode ``INDEX_ADDRESS`` yet. (MR :gl:`!18944`)
-- Added ``GET
-  /chains/<chain_id>/blocks/<block_id>/helpers/tz4_staker_number_ratio?cycle=<cycle>``
-  which returns the portion of active delegates that sign with a BLS key.
+
+- Added a new RPC ``GET
+  /chains/<chain_id>/blocks/<block_id>/helpers/tz4_staker_number_ratio?cycle=<cycle>``.
+  It returns the portion of active delegates that sign with a BLS key.
   The ``cycle`` argument, if omitted, defaults to the current
   cycle. (MR :gl:`!19093`)
+
+- Added a new RPC ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/destination/<destination>/index``.
+  It returns the index of the given destination (e.g. tz1, Smart
+  Rollup addresses, etc.), or ``null`` if the destination has not been
+  indexed by the opcode ``INDEX_ADDRESS`` yet. (MR :gl:`!18944`)
 
 
 Blocks and block receipts
@@ -86,9 +96,9 @@ Blocks and block receipts
 
 - Removed obsolete field ``adaptive_issuance_vote`` from the block
   header, and fields ``adaptive_issuance_vote_ema`` and
-  ``adaptive_issuance_activation_cycle`` from the block metadata. The
-  adaptive issuance activation cycle (which is 748 on mainnet) can
-  still be queried via the RPC ``GET
+  ``adaptive_issuance_activation_cycle`` from the block metadata. Note
+  that the adaptive issuance activation cycle (which is 748 on
+  mainnet) can still be queried via the RPC ``GET
   /chains/<chain>/blocks/<block>/context/adaptive_issuance_launch_cycle``. (MR
   :gl:`!19215`)
 
@@ -96,13 +106,13 @@ Blocks and block receipts
 Operation receipts
 ------------------
 
-- Added ``address_registry_diff`` field in ``metadata`` for newly indexed
-  addresses from the opcode ``INDEX_ADDRESS`` in the operation. (MR
-  :gl:`!18870`)
+- Added a new field ``address_registry_diff`` to the operation
+  metadata. It contains the addresses that have been newly indexed
+  through the opcode ``INDEX_ADDRESS``. (MR :gl:`!18870`)
+
 
 Errors
 ------
-
 
 Protocol parameters
 -------------------
@@ -196,6 +206,7 @@ Bug Fixes
   needed. Previously backtracked gas costs for some cache calls are
   now properly accounted for, increasing by at most 2 units of gas per
   function call. (MR :gl:`!19134`)
+
 
 Minor Changes
 -------------
