@@ -24,7 +24,7 @@ docker_target="without-evm-artifacts"
 rust_toolchain_image_name="us-central1-docker.pkg.dev/nl-gitlab-runner/protected-registry/tezos/tezos/rust-toolchain"
 rust_toolchain_image_tag="master"
 commit_datetime=$(git show -s --pretty=format:%ci HEAD)
-commit_tag=$(git describe --tags --always)
+commit_tag="octez-v23.2"
 
 # usage and help
 usage() {
