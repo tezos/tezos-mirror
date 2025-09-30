@@ -632,10 +632,7 @@ let build_dir ~l2_chain_id ~add_operation backend =
                 validation. *)
            (_ : < async : bool ; chain : chain option >)
            (raw_operation : bytes)
-         ->
-         let open Lwt_result_syntax in
-         let*? op = raw_operation |> Tezos_types.Operation.decode in
-         add_operation op raw_operation)
+         -> add_operation raw_operation)
        ~convert_output:(fun hash ->
          hash |> Ethereum_types.hash_to_bytes |> Operation_hash.of_string_exn
          |> Result_syntax.return)

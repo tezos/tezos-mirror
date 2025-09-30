@@ -185,9 +185,10 @@ let start_public_server (type f) ~(mode : Configuration.mode)
         @@ Tezlink_directory.register_tezlink_services
              ~l2_chain_id
              (module Backend.Tezlink)
-             ~add_operation:(fun op raw ->
+             ~add_operation:(fun raw ->
                (* TODO: https://gitlab.com/tezos/tezos/-/issues/8007
                   Validate the operation and use the resulting "next_nonce" *)
+               let*? op = raw |> Tezos_types.Operation.decode in
                let next_nonce = Ethereum_types.Qty op.first_counter in
                let* hash_res =
                  Tx_container.add
