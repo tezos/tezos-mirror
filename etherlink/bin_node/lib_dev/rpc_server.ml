@@ -188,20 +188,33 @@ let start_public_server (type f) ~(mode : Configuration.mode)
              ~add_operation:(fun raw ->
                (* TODO: https://gitlab.com/tezos/tezos/-/issues/8007
                   Validate the operation and use the resulting "next_nonce" *)
-               let*? op = raw |> Tezos_types.Operation.decode in
-               let next_nonce = Ethereum_types.Qty op.first_counter in
-               let* hash_res =
-                 Tx_container.add
-                   ~next_nonce
-                   op
-                   ~raw_tx:(Ethereum_types.hex_of_bytes raw)
+               let raw_str = Bytes.to_string raw in
+               let raw_hex = Ethereum_types.hex_of_bytes raw in
+               let* res =
+                 Prevalidator.prevalidate_raw_transaction_tezlink raw_str
                in
-               let* hash =
-                 match hash_res with
-                 | Ok hash -> return hash
-                 | Error s -> failwith "%s" s
-               in
-               return hash)
+               match res with
+               | Error err ->
+                   let*! () =
+                     Tx_pool_events.invalid_transaction ~transaction:raw_hex
+                   in
+                   failwith
+                     "Prevalidation of operation %s failed with error: %s"
+                     raw_str
+                     err
+               | Ok {next_nonce; transaction_object} ->
+                   let* hash_res =
+                     Tx_container.add
+                       ~next_nonce
+                       transaction_object
+                       ~raw_tx:raw_hex
+                   in
+                   let* hash =
+                     match hash_res with
+                     | Ok hash -> return hash
+                     | Error s -> failwith "%s" s
+                   in
+                   return hash)
     | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server ->
         return @@ Evm_directory.empty config.experimental_features.rpc_server
   in
