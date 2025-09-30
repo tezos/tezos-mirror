@@ -715,44 +715,32 @@ let start (type state f) ?max_number_of_chunks
   worker := Starting starting_promise ;
   let*! start_result =
     protect @@ fun () ->
-    match chain_family with
-    | L2_types.EVM ->
-        let (module Backend_rpc : Services_backend_sig.S
-              with type Reader.state = state) =
-          state_backend
-        in
-        let* state = Backend_rpc.Reader.get_state () in
-        let* chain_id =
-          Durable_storage.chain_id (Backend_rpc.Reader.read state)
-        in
-        let* session =
-          Types.session_of_state
-            L2_types.(Ex_chain_family EVM)
-            state_backend
-            state
-        in
-        let* w =
-          Worker.launch
-            table
-            ()
-            {
-              chain_id;
-              mode;
-              max_number_of_chunks;
-              chain_family = Ex_chain_family EVM;
-              session;
-            }
-            (module Handlers)
-        in
-        worker := Started w ;
-        Lwt.wakeup starting_waker () ;
-        let*! () = Prevalidator_events.is_ready () in
-        return_unit
-    | Michelson ->
-        (* Tezlink does not use the prevalidator worker *)
-        worker := Not_started ;
-        Lwt.wakeup starting_waker () ;
-        return_unit
+    let (module Backend_rpc : Services_backend_sig.S
+          with type Reader.state = state) =
+      state_backend
+    in
+    let* state = Backend_rpc.Reader.get_state () in
+    let* chain_id = Durable_storage.chain_id (Backend_rpc.Reader.read state) in
+    let* session =
+      Types.session_of_state (Ex_chain_family chain_family) state_backend state
+    in
+    let* w =
+      Worker.launch
+        table
+        ()
+        {
+          chain_id;
+          mode;
+          max_number_of_chunks;
+          chain_family = Ex_chain_family chain_family;
+          session;
+        }
+        (module Handlers)
+    in
+    worker := Started w ;
+    Lwt.wakeup starting_waker () ;
+    let*! () = Prevalidator_events.is_ready () in
+    return_unit
   in
   match start_result with
   | Ok () -> return_unit
