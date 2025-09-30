@@ -697,13 +697,20 @@ module Handlers = struct
     ctxt.session <- session ;
     return_unit
 
-  let is_tezlink_tx_valid (type _state) _ctxt _session raw_transaction :
+  let is_tezlink_tx_valid (type state) _ctxt session raw_transaction :
       (Tezos_types.Operation.t prevalidation_result, string) result tzresult
       Lwt.t =
     let open Lwt_result_syntax in
-    (* TODO *)
-    let*? (op : Tezos_types.Operation.t) =
-      raw_transaction |> Bytes.of_string |> Tezos_types.Operation.decode
+    (* We build a `read` function from the session. It's the only part of the
+       backend we should rely on: the other helpers in the backend rely on the
+       internal state, not the state in the session. *)
+    let (module Backend_rpc : Services_backend_sig.S
+          with type Reader.state = state) =
+      session.state_backend
+    in
+    let read = Backend_rpc.Reader.read session.state in
+    let** op =
+      Tezlink_prevalidation.validate_tezlink_operation ~read raw_transaction
     in
     return (Ok {next_nonce = Qty op.first_counter; transaction_object = op})
 
