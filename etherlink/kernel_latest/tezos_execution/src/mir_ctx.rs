@@ -13,7 +13,7 @@ use mir::{
         big_map::{BigMapId, LazyStorage, LazyStorageError},
         AddressHash, IntoMicheline, Micheline, PublicKeyHash, Type, TypedValue,
     },
-    context::CtxTrait,
+    context::{CtxTrait, TypecheckingCtx},
     gas::Gas,
 };
 use num_bigint::BigUint;
@@ -78,6 +78,45 @@ macro_rules! make_default_ctx {
     };
 }
 
+impl<'a, Host: Runtime> TypecheckingCtx<'a>
+    for Ctx<&mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
+{
+    fn gas(&mut self) -> &mut mir::gas::Gas {
+        self.gas
+    }
+
+    fn lookup_contract(
+        &self,
+        address: &AddressHash,
+    ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
+        get_contract_entrypoint(self.host, self.context, address)
+    }
+
+    fn big_map_get_type(
+        &mut self,
+        id: &BigMapId,
+    ) -> Result<Option<(Type, Type)>, LazyStorageError> {
+        let big_map_path = big_map_path(self.context, id)?;
+        if self.host.store_has(&big_map_path)?.is_none() {
+            return Ok(None);
+        }
+
+        let arena = Arena::new();
+        let key_type_path = key_type_path(self.context, id)?;
+        let value_type_path = value_type_path(self.context, id)?;
+
+        let encoded_key_type = self.host.store_read_all(&key_type_path)?;
+        let key_type =
+            Micheline::decode_raw(&arena, &encoded_key_type)?.parse_ty(self)?;
+
+        let encoded_value_type = self.host.store_read_all(&value_type_path)?;
+        let value_type =
+            Micheline::decode_raw(&arena, &encoded_value_type)?.parse_ty(self)?;
+
+        Ok(Some((key_type, value_type)))
+    }
+}
+
 impl<'a, Host: Runtime> CtxTrait<'a>
     for Ctx<&mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
 {
@@ -99,10 +138,6 @@ impl<'a, Host: Runtime> CtxTrait<'a>
 
     fn balance(&self) -> i64 {
         self.balance
-    }
-
-    fn gas(&mut self) -> &mut mir::gas::Gas {
-        self.gas
     }
 
     fn level(&self) -> BigUint {
@@ -143,13 +178,6 @@ impl<'a, Host: Runtime> CtxTrait<'a>
         let c: &mut u128 = self.operation_counter;
         *c += 1;
         *c
-    }
-
-    fn lookup_contract(
-        &self,
-        address: &AddressHash,
-    ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
-        get_contract_entrypoint(self.host, self.context, address)
     }
 }
 
@@ -298,30 +326,6 @@ impl<'a, Host: Runtime> LazyStorage<'a>
                 Ok(())
             }
         }
-    }
-
-    fn big_map_get_type(
-        &mut self,
-        id: &BigMapId,
-    ) -> Result<Option<(Type, Type)>, LazyStorageError> {
-        let big_map_path = big_map_path(self.context, id)?;
-        if self.host.store_has(&big_map_path)?.is_none() {
-            return Ok(None);
-        }
-
-        let arena = Arena::new();
-        let key_type_path = key_type_path(self.context, id)?;
-        let value_type_path = value_type_path(self.context, id)?;
-
-        let encoded_key_type = self.host.store_read_all(&key_type_path)?;
-        let key_type =
-            Micheline::decode_raw(&arena, &encoded_key_type)?.parse_ty(self)?;
-
-        let encoded_value_type = self.host.store_read_all(&value_type_path)?;
-        let value_type =
-            Micheline::decode_raw(&arena, &encoded_value_type)?.parse_ty(self)?;
-
-        Ok(Some((key_type, value_type)))
     }
 
     fn big_map_new(

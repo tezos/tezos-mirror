@@ -1867,7 +1867,7 @@ mod interpreter_tests {
     use crate::ast::or::Or::Left;
     #[cfg(feature = "bls")]
     use crate::bls;
-    use crate::context::Ctx;
+    use crate::context::{Ctx, TypecheckingCtx};
     use crate::gas::Gas;
     use chrono::DateTime;
     use entrypoint::DEFAULT_EP_NAME;

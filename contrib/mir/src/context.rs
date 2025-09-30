@@ -19,9 +19,23 @@ use tezos_crypto_rs::{hash::OperationHash, public_key_hash::PublicKeyHash};
 use typed_arena::Arena;
 
 #[allow(missing_docs)]
-pub trait CtxTrait<'a>: LazyStorage<'a> {
+pub trait TypecheckingCtx<'a> {
     fn gas(&mut self) -> &mut Gas;
 
+    fn lookup_contract(
+        &self,
+        address: &AddressHash,
+    ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>>;
+
+    /// Get key and value types of the map.
+    ///
+    /// This returns None if the map with such ID is not present in the storage.
+    fn big_map_get_type(&mut self, id: &BigMapId)
+        -> Result<Option<(Type, Type)>, LazyStorageError>;
+}
+
+#[allow(missing_docs)]
+pub trait CtxTrait<'a>: TypecheckingCtx<'a> + LazyStorage<'a> {
     fn amount(&self) -> i64;
 
     fn balance(&self) -> i64;
@@ -37,11 +51,6 @@ pub trait CtxTrait<'a>: LazyStorage<'a> {
     fn chain_id(&self) -> tezos_crypto_rs::hash::ChainId;
 
     fn self_address(&self) -> AddressHash;
-
-    fn lookup_contract(
-        &self,
-        address: &AddressHash,
-    ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>>;
 
     fn voting_power(&self, pkh: &PublicKeyHash) -> BigUint;
 
@@ -207,11 +216,27 @@ impl Default for Ctx<'_> {
     }
 }
 
-impl<'a> CtxTrait<'a> for Ctx<'a> {
+impl<'a> TypecheckingCtx<'a> for Ctx<'a> {
     fn gas(&mut self) -> &mut Gas {
         &mut self.gas
     }
 
+    fn lookup_contract(
+        &self,
+        address: &AddressHash,
+    ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
+        (self.lookup_contract)(address)
+    }
+
+    fn big_map_get_type(
+        &mut self,
+        id: &BigMapId,
+    ) -> Result<Option<(Type, Type)>, LazyStorageError> {
+        self.big_map_storage.big_map_get_type(id)
+    }
+}
+
+impl<'a> CtxTrait<'a> for Ctx<'a> {
     fn amount(&self) -> i64 {
         self.amount
     }
@@ -242,13 +267,6 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
 
     fn self_address(&self) -> AddressHash {
         self.self_address.clone()
-    }
-
-    fn lookup_contract(
-        &self,
-        address: &AddressHash,
-    ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
-        (self.lookup_contract)(address)
     }
 
     fn voting_power(&self, pkh: &PublicKeyHash) -> BigUint {
@@ -299,13 +317,6 @@ impl<'a> LazyStorage<'a> for Ctx<'a> {
         value: Option<TypedValue<'a>>,
     ) -> Result<(), LazyStorageError> {
         self.big_map_storage.big_map_update(id, key, value)
-    }
-
-    fn big_map_get_type(
-        &mut self,
-        id: &BigMapId,
-    ) -> Result<Option<(Type, Type)>, LazyStorageError> {
-        self.big_map_storage.big_map_get_type(id)
     }
 
     fn big_map_new(
