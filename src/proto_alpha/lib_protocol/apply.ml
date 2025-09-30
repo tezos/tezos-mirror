@@ -2308,7 +2308,7 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
          to finalize anyway in this mode. *)
       let* ctxt, consensus_key =
         let level = Level.from_raw ctxt content.level in
-        Stake_distribution.slot_owner ctxt level content.slot
+        Stake_distribution.attestation_slot_owner ctxt level content.slot
       in
       return
         ( ctxt,
@@ -2363,7 +2363,7 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
          to finalize anyway in this mode. *)
       let* ctxt, consensus_key =
         let level = Level.from_raw ctxt consensus.level in
-        Stake_distribution.slot_owner ctxt level consensus.slot
+        Stake_distribution.attestation_slot_owner ctxt level consensus.slot
       in
       return
         ( ctxt,
@@ -2549,7 +2549,9 @@ let punish_double_consensus_operation ctxt ~operation_hash ~payload_producer
         Misbehaviour.{level; round; kind = Double_attesting}
   in
   let level = Level.from_raw ctxt misbehaviour.level in
-  let* ctxt, {delegate; _} = Stake_distribution.slot_owner ctxt level slot in
+  let* ctxt, {delegate; _} =
+    Stake_distribution.attestation_slot_owner ctxt level slot
+  in
   let* ctxt, contents_result =
     punish_double_signing
       ctxt
@@ -2662,7 +2664,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       in
       let level = Level.from_raw ctxt level in
       let* ctxt, consensus_pk =
-        Stake_distribution.slot_owner ctxt level consensus_slot
+        Stake_distribution.attestation_slot_owner ctxt level consensus_slot
       in
       let delegate = consensus_pk.delegate in
       let*! ctxt, _already_denounced =

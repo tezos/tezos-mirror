@@ -313,7 +313,8 @@ val init_stake_info_for_cycle :
     [init_stake_info_for_cycle] or [stake_info_for_cycle] was previously
     called for the same [cycle]. Otherwise, it is read "on-disk" with
     the [read] function and then cached in [ctxt] like
-    [init_stake_info_for_cycle]. *)
+    [init_stake_info_for_cycle].
+    The list follows a lexicographical order on the delegate pkh. *)
 val stake_info_for_cycle :
   read:(t -> (t * Int64.t * (consensus_pk * int64) list) tzresult Lwt.t) ->
   t ->

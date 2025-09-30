@@ -1964,7 +1964,7 @@ module Anonymous = struct
           List.fold_left_es
             (fun (ctxt, public_keys) slot ->
               let* ctxt, consensus_key =
-                Stake_distribution.slot_owner ctxt level slot
+                Stake_distribution.attestation_slot_owner ctxt level slot
               in
               match consensus_key.consensus_pk with
               | Bls pk -> return (ctxt, pk :: public_keys)
@@ -1998,7 +1998,7 @@ module Anonymous = struct
           List.fold_left_es
             (fun (ctxt, pks, weighted_pks) (slot, dal) ->
               let* ctxt, consensus_key =
-                Stake_distribution.slot_owner ctxt level slot
+                Stake_distribution.attestation_slot_owner ctxt level slot
               in
               match consensus_key.consensus_pk with
               | Bls consensus_pk -> (
@@ -2166,7 +2166,7 @@ module Anonymous = struct
       check_denunciation_age vi (`Consensus_denounciation kind) level.level
     in
     let* ctxt, consensus_key =
-      Stake_distribution.slot_owner vi.ctxt level slot
+      Stake_distribution.attestation_slot_owner vi.ctxt level slot
     in
     let delegate = consensus_key.delegate in
     let* already_slashed =
@@ -2442,7 +2442,7 @@ module Anonymous = struct
         let*? () = check_denunciation_age vi `Dal_denounciation level in
         let level = Level.from_raw vi.ctxt level in
         let* ctxt, consensus_key =
-          Stake_distribution.slot_owner vi.ctxt level consensus_slot
+          Stake_distribution.attestation_slot_owner vi.ctxt level consensus_slot
         in
         let delegate = consensus_key.delegate in
         let*! already_denounced =
@@ -2471,9 +2471,9 @@ module Anonymous = struct
                  shard_index = shard_with_proof.shard.index;
                })
         in
-        let* _ctxt, shard_owner =
-          let*? tb_slot = Slot.of_int shard_index in
-          Stake_distribution.slot_owner vi.ctxt level tb_slot
+        let* _ctxt, _, shard_owner =
+          let*? tb_round = Round.of_int shard_index in
+          Stake_distribution.baking_rights_owner vi.ctxt level ~round:tb_round
         in
         let*? () =
           error_unless

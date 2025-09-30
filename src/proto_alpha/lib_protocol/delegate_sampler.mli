@@ -42,7 +42,8 @@ type error += Invalid_slot of {level : Level_repr.t; slot : Slot_repr.t}
    freeze or initialize the protocol while stitching. RPCs can use this
    function to predict an approximation of long term future slot
    allocations. It shouldn't be used in the baker. *)
-val slot_owner :
+val attestation_slot_owner :
+  all_bakers_attest_enabled:bool ->
   Raw_context.t ->
   Level_repr.t ->
   Slot_repr.t ->

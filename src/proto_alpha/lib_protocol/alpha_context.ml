@@ -652,7 +652,15 @@ end
 module Stake_distribution = struct
   let baking_rights_owner = Delegate_sampler.baking_rights_owner
 
-  let slot_owner = Delegate_sampler.slot_owner
+  let attestation_slot_owner ctxt level slot =
+    let all_bakers_attest_enabled =
+      Consensus_parameters_storage.check_all_bakers_attest_at_level ctxt level
+    in
+    Delegate_sampler.attestation_slot_owner
+      ~all_bakers_attest_enabled
+      ctxt
+      level
+      slot
 
   let stake_info_for_cycle = Delegate_sampler.stake_info_for_cycle
 
