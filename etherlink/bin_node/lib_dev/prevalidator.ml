@@ -84,14 +84,18 @@ let is_prague_enabled ~storage_version = storage_version >= 37
 type mode = Minimal | Full
 
 module Types = struct
-  type 'a inner_session = {
-    state : 'a;
-    state_backend : (module Services_backend_sig.S with type Reader.state = 'a);
+  type etherlink_infos = {
     minimum_base_fee_per_gas : Z.t;
     base_fee_per_gas : Z.t;
     da_fee_per_bytes : Z.t;
     maximum_gas_per_transaction : Z.t;
+  }
+
+  type 'a inner_session = {
+    state : 'a;
+    state_backend : (module Services_backend_sig.S with type Reader.state = 'a);
     storage_version : int;
+    etherlink_infos : etherlink_infos;
   }
 
   type session = Session : 'a inner_session -> session
@@ -134,10 +138,13 @@ module Types = struct
            state;
            state_backend;
            storage_version;
-           base_fee_per_gas;
-           minimum_base_fee_per_gas;
-           da_fee_per_bytes;
-           maximum_gas_per_transaction;
+           etherlink_infos =
+             {
+               base_fee_per_gas;
+               minimum_base_fee_per_gas;
+               da_fee_per_bytes;
+               maximum_gas_per_transaction;
+             };
          })
 
   type parameters = {
@@ -256,14 +263,17 @@ let validate_gas_limit session (transaction : Transaction.transaction) :
     (* since Dionysus, the execution gas limit is always computed from the
        minimum base fee per gas *)
     Fees.execution_gas_limit
-      ~da_fee_per_byte:(Qty session.da_fee_per_bytes)
+      ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
       ~access_list:transaction.access_list
-      ~minimum_base_fee_per_gas:session.minimum_base_fee_per_gas
+      ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
       ~gas_limit:transaction.gas_limit
       transaction.data
   in
   if session.storage_version < 34 then
-    if Compare.Z.(execution_gas_limit <= session.maximum_gas_per_transaction)
+    if
+      Compare.Z.(
+        execution_gas_limit
+        <= session.etherlink_infos.maximum_gas_per_transaction)
     then return (Ok ())
     else
       return
@@ -272,7 +282,7 @@ let validate_gas_limit session (transaction : Transaction.transaction) :
               "Gas limit for execution is too high. Maximum limit is %a, \
                transaction has %a"
               Z.pp_print
-              session.maximum_gas_per_transaction
+              session.etherlink_infos.maximum_gas_per_transaction
               Z.pp_print
               execution_gas_limit))
   else return (Ok ())
@@ -462,8 +472,8 @@ let validate_minimum_gas_requirement ~session
   in
   let da_inclusion_fees =
     Fees.da_fees_gas_limit_overhead
-      ~da_fee_per_byte:(Qty session.da_fee_per_bytes)
-      ~minimum_base_fee_per_gas:session.minimum_base_fee_per_gas
+      ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
+      ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
       transaction.Transaction.data
   in
   let gas_limit = transaction.gas_limit in
@@ -522,7 +532,7 @@ let validate_balance_and_gas_with_backend (type state) ~caller session
   in
   let** _total_cost =
     validate_balance_and_max_fee_per_gas
-      ~base_fee_per_gas:(Qty session.base_fee_per_gas)
+      ~base_fee_per_gas:(Qty session.etherlink_infos.base_fee_per_gas)
       ~transaction
       ~from_balance
   in
