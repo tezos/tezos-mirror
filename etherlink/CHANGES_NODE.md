@@ -1,13 +1,18 @@
 # Changelog
 
-## Unreleased
+## Version 0.43 (2025-09-30)
 
-### Breaking changes
+This release of the EVM node fixes an issue with the tx queue which introduced
+latency in user requests for `eth_sendRawTransaction`,
+`eth_getTransactionCount`, `eth_getTransactionByHash`.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
 
 ### Configuration changes
 
-- Use correct sequencer key from config (you can
-  now define multiple and it will adapt) (!19267).
+- Use correct sequencer key from config (you can now define multiple and it will
+  adapt). (!19267)
 
 ### RPCs changes
 
@@ -16,22 +21,11 @@
 - Fixes high-latency responses in `eth_sendRawTransaction`,
   `eth_getTransactionCount`, `eth_getTransactionByHash`. (!19433)
 
-### Monitoring changes
 
 ### Command-line interface changes
 
-### Execution changes
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
+- Braeburn is now a supported network on the CLI command, through with argument
+`--network braeburn` where applicable.  (!19419)
 
 ## Version 0.42 (2025-09-22)
 
