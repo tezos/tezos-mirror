@@ -51,7 +51,7 @@ let () =
     (fun () -> Prague_not_enabled)
 
 module K = struct
-  (* Constants extracted from several EIPs. 
+  (* Constants extracted from several EIPs.
      For more details see:
      - https://eips.ethereum.org/EIPS/eip-7623
      - https://eips.ethereum.org/EIPS/eip-3860 *)
