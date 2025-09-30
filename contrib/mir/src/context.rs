@@ -34,6 +34,35 @@ pub trait TypecheckingCtx<'a> {
         -> Result<Option<(Type, Type)>, LazyStorageError>;
 }
 
+/// Typechecking context used to typecheck pushable values during the
+/// typechecking of the PUSH instruction. Since neither contracts nor
+/// big_maps are pushable, the lookup_contract and big_map_get_type
+/// methods have trivial implementations.
+pub struct PushableTypecheckingContext<'a> {
+    /// Gas counter
+    pub gas: &'a mut Gas,
+}
+
+impl<'a, 'b> TypecheckingCtx<'a> for PushableTypecheckingContext<'b> {
+    fn gas(&mut self) -> &mut Gas {
+        self.gas
+    }
+
+    fn lookup_contract(
+        &self,
+        _address: &AddressHash,
+    ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
+        None
+    }
+
+    fn big_map_get_type(
+        &mut self,
+        _id: &BigMapId,
+    ) -> Result<Option<(Type, Type)>, LazyStorageError> {
+        Ok(None)
+    }
+}
+
 #[allow(missing_docs)]
 pub trait CtxTrait<'a>: TypecheckingCtx<'a> + LazyStorage<'a> {
     fn amount(&self) -> i64;

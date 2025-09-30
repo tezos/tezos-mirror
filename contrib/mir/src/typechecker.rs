@@ -272,24 +272,24 @@ impl<'a> Micheline<'a> {
     /// in lambdas).
     pub fn typecheck_instruction(
         &self,
-        ctx: &mut impl TypecheckingCtx<'a>,
+        gas: &mut Gas,
         self_type: Option<&Micheline<'a>>,
         stack: &[Micheline<'a>],
     ) -> Result<Instruction<'a>, TcError> {
         let entrypoints = self_type
             .map(|ty| {
-                let (entrypoints, _, ty) = parse_parameter_ty_with_entrypoints(ctx.gas(), ty)?;
-                ty.ensure_prop(ctx.gas(), TypeProperty::Passable)?;
+                let (entrypoints, _, ty) = parse_parameter_ty_with_entrypoints(gas, ty)?;
+                ty.ensure_prop(gas, TypeProperty::Passable)?;
                 Ok::<_, TcError>(entrypoints)
             })
             .transpose()?;
 
         let TopIsLast(checked_stack) = stack
             .iter()
-            .map(|ty| parse_ty(ctx.gas(), ty))
+            .map(|ty| parse_ty(gas, ty))
             .collect::<Result<_, TcError>>()?;
         let mut opt_stack = FailingTypeStack::Ok(checked_stack);
-        typecheck_instruction(self, ctx, entrypoints.as_ref(), &mut opt_stack)
+        typecheck_instruction(self, gas, entrypoints.as_ref(), &mut opt_stack)
     }
 
     /// Parse `Micheline` as a type. Validates the type.
@@ -311,7 +311,7 @@ impl<'a> Micheline<'a> {
     /// TODO https://linear.app/tezos/issue/L2-376/type-check-views
     pub fn typecheck_script(
         &self,
-        ctx: &mut impl TypecheckingCtx<'a>,
+        gas: &mut Gas,
         allow_lazy_storage_in_storage: bool,
     ) -> Result<ContractScript<'a>, TcError> {
         let seq = match self {
@@ -350,8 +350,8 @@ impl<'a> Micheline<'a> {
                 ) if anns.is_empty() => {
                     // TODO: consume some gas
                     let name: String = name.into();
-                    let input_type = input_type.parse_ty(ctx.gas())?;
-                    let output_type = output_type.parse_ty(ctx.gas())?;
+                    let input_type = input_type.parse_ty(gas)?;
+                    let output_type = output_type.parse_ty(gas)?;
                     let previous_view = views.insert(
                         name.clone(),
                         View {
@@ -375,15 +375,15 @@ impl<'a> Micheline<'a> {
             }
         }
         let (entrypoints, anns, parameter) = parse_parameter_ty_with_entrypoints(
-            ctx.gas(),
+            gas,
             parameter_ty.ok_or(TcError::MissingTopLevelElt(Prim::parameter))?,
         )?;
         let storage = storage_ty
             .ok_or(TcError::MissingTopLevelElt(Prim::storage))?
-            .parse_ty(ctx.gas())?;
-        parameter.ensure_prop(ctx.gas(), TypeProperty::Passable)?;
+            .parse_ty(gas)?;
+        parameter.ensure_prop(gas, TypeProperty::Passable)?;
         storage.ensure_prop(
-            ctx.gas(),
+            gas,
             if allow_lazy_storage_in_storage {
                 TypeProperty::Storable
             } else {
@@ -396,12 +396,12 @@ impl<'a> Micheline<'a> {
         let mut stack = tc_stk![Type::new_pair(parameter.clone(), storage.clone())];
         let code = typecheck_instruction(
             code.ok_or(TcError::MissingTopLevelElt(Prim::code))?,
-            ctx,
+            gas,
             Some(&entrypoints),
             &mut stack,
         )?;
         unify_stacks(
-            ctx,
+            gas,
             &mut tc_stk![Type::new_pair(
                 Type::new_list(Type::Operation),
                 storage.clone()
@@ -650,12 +650,12 @@ fn parse_parameter_ty_with_entrypoints<'a>(
 /// has to be locally overridden during typechecking.
 fn typecheck<'a>(
     ast: &[Micheline<'a>],
-    ctx: &mut impl TypecheckingCtx<'a>,
+    gas: &mut Gas,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
 ) -> Result<Vec<Instruction<'a>>, TcError> {
     ast.iter()
-        .map(|i| typecheck_instruction(i, ctx, self_entrypoints, opt_stack))
+        .map(|i| typecheck_instruction(i, gas, self_entrypoints, opt_stack))
         .collect()
 }
 
@@ -678,7 +678,7 @@ macro_rules! nothing_to_none {
 /// has to be locally overridden during typechecking.
 pub(crate) fn typecheck_instruction<'a>(
     i: &Micheline<'a>,
-    ctx: &mut impl TypecheckingCtx<'a>,
+    gas: &mut Gas,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
 ) -> Result<Instruction<'a>, TcError> {
@@ -784,7 +784,7 @@ pub(crate) fn typecheck_instruction<'a>(
         };
     }
 
-    ctx.gas().consume(gas::tc_cost::INSTR_STEP)?;
+    gas.consume(gas::tc_cost::INSTR_STEP)?;
 
     use Micheline::*;
     use Prim::*;
@@ -1099,13 +1099,13 @@ pub(crate) fn typecheck_instruction<'a>(
             };
             let protected_height = opt_height.unwrap_or(1) as usize;
 
-            ctx.gas().consume(gas::tc_cost::dip_n(&opt_height)?)?;
+            gas.consume(gas::tc_cost::dip_n(&opt_height)?)?;
 
             ensure_stack_len(Prim::DIP, stack, protected_height)?;
             // Here we split off the protected portion of the stack, typecheck the code with the
             // remaining unprotected part, then append the protected portion back on top.
             let mut protected = stack.split_off(protected_height);
-            let nested = typecheck(nested, ctx, self_entrypoints, opt_stack)?;
+            let nested = typecheck(nested, gas, self_entrypoints, opt_stack)?;
             opt_stack
                 .access_mut(TcError::FailNotInTail)?
                 .append(&mut protected);
@@ -1119,7 +1119,7 @@ pub(crate) fn typecheck_instruction<'a>(
                 _ => unexpected_micheline!(),
             };
             let drop_height: usize = opt_height.unwrap_or(1) as usize;
-            ctx.gas().consume(gas::tc_cost::drop_n(&opt_height)?)?;
+            gas.consume(gas::tc_cost::drop_n(&opt_height)?)?;
             ensure_stack_len(Prim::DROP, stack, drop_height)?;
             stack.drop_top(drop_height);
             I::Drop(opt_height)
@@ -1136,7 +1136,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let dup_height: usize = opt_height.unwrap_or(1) as usize;
             ensure_stack_len(Prim::DUP, stack, dup_height)?;
             let ty = &stack[dup_height - 1];
-            ty.ensure_prop(ctx.gas(), TypeProperty::Duplicable)?;
+            ty.ensure_prop(gas, TypeProperty::Duplicable)?;
             stack.push(ty.clone());
             I::Dup(opt_height)
         }
@@ -1144,8 +1144,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(DIG, [Int(height)], _), ..) => {
             let dig_height = validate_u10(height)?;
             ensure_stack_len(Prim::DIG, stack, dig_height as usize)?;
-            ctx.gas()
-                .consume(gas::tc_cost::dig_n(dig_height as usize)?)?;
+            gas.consume(gas::tc_cost::dig_n(dig_height as usize)?)?;
             if dig_height > 0 {
                 let e = stack.remove(dig_height as usize);
                 stack.push(e);
@@ -1157,8 +1156,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(DUG, [Int(height)], _), ..) => {
             let dug_height = validate_u10(height)?;
-            ctx.gas()
-                .consume(gas::tc_cost::dug_n(dug_height as usize)?)?;
+            gas.consume(gas::tc_cost::dug_n(dug_height as usize)?)?;
             if dug_height > 0 {
                 ensure_stack_len(Prim::DUG, stack, dug_height as usize)?;
                 let e = pop!();
@@ -1223,10 +1221,10 @@ pub(crate) fn typecheck_instruction<'a>(
             // Clone the stack so that we have a copy to run one branch on.
             // We can run the other branch on the live stack.
             let mut f_opt_stack = opt_stack.clone();
-            let nested_t = typecheck(nested_t, ctx, self_entrypoints, opt_stack)?;
-            let nested_f = typecheck(nested_f, ctx, self_entrypoints, &mut f_opt_stack)?;
+            let nested_t = typecheck(nested_t, gas, self_entrypoints, opt_stack)?;
+            let nested_f = typecheck(nested_f, gas, self_entrypoints, &mut f_opt_stack)?;
             // If stacks unify after typecheck, all is good.
-            unify_stacks(ctx, opt_stack, f_opt_stack)?;
+            unify_stacks(gas, opt_stack, f_opt_stack)?;
             I::If(nested_t, nested_f)
         }
         (App(IF, [Seq(_), Seq(_)], _), [.., t]) => {
@@ -1242,10 +1240,10 @@ pub(crate) fn typecheck_instruction<'a>(
             let mut some_stack: TypeStack = stack.clone();
             some_stack.push(ty.as_ref().clone());
             let mut some_opt_stack = FailingTypeStack::Ok(some_stack);
-            let when_none = typecheck(when_none, ctx, self_entrypoints, opt_stack)?;
-            let when_some = typecheck(when_some, ctx, self_entrypoints, &mut some_opt_stack)?;
+            let when_none = typecheck(when_none, gas, self_entrypoints, opt_stack)?;
+            let when_some = typecheck(when_some, gas, self_entrypoints, &mut some_opt_stack)?;
             // If stacks unify, all is good
-            unify_stacks(ctx, opt_stack, some_opt_stack)?;
+            unify_stacks(gas, opt_stack, some_opt_stack)?;
             I::IfNone(when_none, when_some)
         }
         (App(IF_NONE, [Seq(_), Seq(_)], _), [.., t]) => {
@@ -1262,10 +1260,10 @@ pub(crate) fn typecheck_instruction<'a>(
             // push it to the cons stack
             cons_stack.push(ty.as_ref().clone());
             let mut cons_opt_stack = FailingTypeStack::Ok(cons_stack);
-            let when_cons = typecheck(when_cons, ctx, self_entrypoints, &mut cons_opt_stack)?;
-            let when_nil = typecheck(when_nil, ctx, self_entrypoints, opt_stack)?;
+            let when_cons = typecheck(when_cons, gas, self_entrypoints, &mut cons_opt_stack)?;
+            let when_nil = typecheck(when_nil, gas, self_entrypoints, opt_stack)?;
             // If stacks unify, all is good
-            unify_stacks(ctx, opt_stack, cons_opt_stack)?;
+            unify_stacks(gas, opt_stack, cons_opt_stack)?;
             I::IfCons(when_cons, when_nil)
         }
         (App(IF_CONS, [Seq(_), Seq(_)], _), [.., t]) => {
@@ -1282,10 +1280,10 @@ pub(crate) fn typecheck_instruction<'a>(
             stack.push(tl);
             right_stack.push(tr);
             let mut opt_right_stack = FailingTypeStack::Ok(right_stack);
-            let when_left = typecheck(when_left, ctx, self_entrypoints, opt_stack)?;
-            let when_right = typecheck(when_right, ctx, self_entrypoints, &mut opt_right_stack)?;
+            let when_left = typecheck(when_left, gas, self_entrypoints, opt_stack)?;
+            let when_right = typecheck(when_right, gas, self_entrypoints, &mut opt_right_stack)?;
             // If stacks unify, all is good
-            unify_stacks(ctx, opt_stack, opt_right_stack)?;
+            unify_stacks(gas, opt_stack, opt_right_stack)?;
             I::IfLeft(when_left, when_right)
         }
         (App(IF_LEFT, [Seq(_), Seq(_)], _), [.., t]) => {
@@ -1353,9 +1351,9 @@ pub(crate) fn typecheck_instruction<'a>(
             // Pop the bool off the top
             pop!();
             // Typecheck body with the current stack
-            let nested = typecheck(nested, ctx, self_entrypoints, opt_stack)?;
+            let nested = typecheck(nested, gas, self_entrypoints, opt_stack)?;
             // If the starting stack and result stack unify, all is good.
-            unify_stacks(ctx, opt_stack, opt_copy)?;
+            unify_stacks(gas, opt_stack, opt_copy)?;
             // pop the remaining bool off (if not failed)
             opt_stack.access_mut(()).ok().map(Stack::pop);
             I::Loop(nested)
@@ -1372,8 +1370,8 @@ pub(crate) fn typecheck_instruction<'a>(
             let (l_ty, r_ty) = pop!(T::Or).as_ref().clone();
             // loop body consumes left leaf and returns `or` again
             stack.push(l_ty);
-            let nested = typecheck(nested, ctx, self_entrypoints, opt_stack)?;
-            unify_stacks(ctx, opt_stack, opt_copy)?;
+            let nested = typecheck(nested, gas, self_entrypoints, opt_stack)?;
+            unify_stacks(gas, opt_stack, opt_copy)?;
             // the loop leaves the right leaf of `or` on the stack at the end
             // this FailNotInTail should be impossible to get
             opt_stack.access_mut(TcError::FailNotInTail)?[0] = r_ty;
@@ -1393,9 +1391,9 @@ pub(crate) fn typecheck_instruction<'a>(
             // push the element type to the top of the inner stack and typecheck
             inner_stack.push(ty.as_ref().clone());
             let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, ctx, self_entrypoints, &mut opt_inner_stack)?;
+            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack)?;
             // If the starting stack (sans list) and result stack unify, all is good.
-            unify_stacks(ctx, opt_stack, opt_inner_stack)?;
+            unify_stacks(gas, opt_stack, opt_inner_stack)?;
             I::Iter(overloads::Iter::List, nested)
         }
         (App(ITER, [Seq(nested)], _), [.., T::Set(..)]) => {
@@ -1406,9 +1404,9 @@ pub(crate) fn typecheck_instruction<'a>(
             // push the element type to the top of the inner stack and typecheck
             inner_stack.push(ty.as_ref().clone());
             let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, ctx, self_entrypoints, &mut opt_inner_stack)?;
+            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack)?;
             // If the starting stack (sans set) and result stack unify, all is good.
-            unify_stacks(ctx, opt_stack, opt_inner_stack)?;
+            unify_stacks(gas, opt_stack, opt_inner_stack)?;
             I::Iter(overloads::Iter::Set, nested)
         }
         (App(ITER, [Seq(nested)], _), [.., T::Map(..)]) => {
@@ -1419,9 +1417,9 @@ pub(crate) fn typecheck_instruction<'a>(
             // push the element type to the top of the inner stack and typecheck
             inner_stack.push(T::Pair(kty_vty_box));
             let mut opt_inner_stack = FailingTypeStack::Ok(inner_stack);
-            let nested = typecheck(nested, ctx, self_entrypoints, &mut opt_inner_stack)?;
+            let nested = typecheck(nested, gas, self_entrypoints, &mut opt_inner_stack)?;
             // If the starting stack (sans map) and result stack unify, all is good.
-            unify_stacks(ctx, opt_stack, opt_inner_stack)?;
+            unify_stacks(gas, opt_stack, opt_inner_stack)?;
             I::Iter(overloads::Iter::Map, nested)
         }
         (App(ITER, [Seq(_)], _), [.., _]) => no_overload!(ITER),
@@ -1434,7 +1432,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
             // Typecheck the nested instructions.
             let (nested_instrs, ty2) =
-                typecheck_map_block(nested_instrs, ty1, ctx, self_entrypoints, stack)?;
+                typecheck_map_block(nested_instrs, ty1, gas, self_entrypoints, stack)?;
 
             stack.push(Type::new_list(ty2));
             I::Map(overloads::Map::List, nested_instrs)
@@ -1445,7 +1443,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
             // Typecheck the nested instructions.
             let (nested_instrs, ty2) =
-                typecheck_map_block(nested_instrs, ty1, ctx, self_entrypoints, stack)?;
+                typecheck_map_block(nested_instrs, ty1, gas, self_entrypoints, stack)?;
 
             stack.push(Type::new_option(ty2));
             I::Map(overloads::Map::Option, nested_instrs)
@@ -1458,7 +1456,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let (nested_instrs, ty2) = typecheck_map_block(
                 nested_instrs,
                 T::new_pair(kty.clone(), ty1),
-                ctx,
+                gas,
                 self_entrypoints,
                 stack,
             )?;
@@ -1471,9 +1469,11 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(MAP, expect_args!(1 seq), _), _) => unexpected_micheline!(),
 
         (App(PUSH, [t, v], _), ..) => {
-            let t = parse_ty(ctx.gas(), t)?;
-            t.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
-            let v = typecheck_value(v, ctx, &t)?;
+            let t = parse_ty(gas, t)?;
+            t.ensure_prop(gas, TypeProperty::Pushable)?;
+            // contracts and big maps are not pushable so it's OK to typecheck values using default
+            let mut ctx = crate::context::PushableTypecheckingContext { gas };
+            let v = typecheck_value(v, &mut ctx, &t)?;
             stack.push(t);
             I::Push(v)
         }
@@ -1493,7 +1493,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // the type needs to be packable, but that's not quite correct, as
             // `contract _` is forbidden. The correct constraint is seemingly
             // "pushable", as "pushable" is just "packable" without `contract _`
-            ty.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
+            ty.ensure_prop(gas, TypeProperty::Pushable)?;
             // mark stack as failed
             *opt_stack = FailingTypeStack::Failed;
             I::Failwith(ty)
@@ -1549,7 +1549,7 @@ pub(crate) fn typecheck_instruction<'a>(
             if stack.len() < n as usize {
                 no_overload!(PAIR, len n as usize);
             }
-            ctx.gas().consume(tc_cost::pair_n(n as usize)?)?;
+            gas.consume(tc_cost::pair_n(n as usize)?)?;
             // unwrap is fine, n is non-zero.
             let res = stack
                 .drain_top(n as usize)
@@ -1574,7 +1574,7 @@ pub(crate) fn typecheck_instruction<'a>(
             if n < 2 {
                 return Err(TcError::PairN01(UNPAIR, n));
             }
-            ctx.gas().consume(tc_cost::unpair_n(n as usize)?)?;
+            gas.consume(tc_cost::unpair_n(n as usize)?)?;
             fn fill(n: u16, stack: &mut Stack<Type>, p: &Type) -> Result<(), TcError> {
                 if n == 0 {
                     stack.push(p.clone());
@@ -1607,14 +1607,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(SOME, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(NONE, [ty], _), _) => {
-            let ty = parse_ty(ctx.gas(), ty)?;
+            let ty = parse_ty(gas, ty)?;
             stack.push(T::new_option(ty));
             I::None
         }
         (App(NONE, expect_args!(1), _), _) => unexpected_micheline!(),
 
         (App(COMPARE, [], _), [.., u, t]) => {
-            ensure_ty_eq(ctx.gas(), t, u).map_err(|e| match e {
+            ensure_ty_eq(gas, t, u).map_err(|e| match e {
                 TcError::TypesNotEqual(e) => TcError::NoMatchingOverload {
                     instr: Prim::COMPARE,
                     stack: stack.clone(),
@@ -1622,7 +1622,7 @@ pub(crate) fn typecheck_instruction<'a>(
                 },
                 e => e,
             })?;
-            t.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
+            t.ensure_prop(gas, TypeProperty::Comparable)?;
             pop!();
             stack[0] = T::Int;
             I::Compare
@@ -1637,14 +1637,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(AMOUNT, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(NIL, [ty], _), ..) => {
-            let ty = parse_ty(ctx.gas(), ty)?;
+            let ty = parse_ty(gas, ty)?;
             stack.push(T::new_list(ty));
             I::Nil
         }
         (App(NIL, ..), _) => unexpected_micheline!(),
 
         (App(CONS, [], _), [.., T::List(ty1), ty2]) => {
-            ensure_ty_eq(ctx.gas(), ty1, ty2)?;
+            ensure_ty_eq(gas, ty1, ty2)?;
             pop!();
             I::Cons
         }
@@ -1675,27 +1675,27 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(CONCAT, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(EMPTY_SET, [ty], _), _) => {
-            let ty = parse_ty(ctx.gas(), ty)?;
-            ty.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
+            let ty = parse_ty(gas, ty)?;
+            ty.ensure_prop(gas, TypeProperty::Comparable)?;
             stack.push(T::new_set(ty));
             I::EmptySet
         }
         (App(EMPTY_SET, expect_args!(1), _), _) => unexpected_micheline!(),
 
         (App(EMPTY_MAP, [kty, vty], _), _) => {
-            let kty = parse_ty(ctx.gas(), kty)?;
-            kty.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
-            let vty = parse_ty(ctx.gas(), vty)?;
+            let kty = parse_ty(gas, kty)?;
+            kty.ensure_prop(gas, TypeProperty::Comparable)?;
+            let vty = parse_ty(gas, vty)?;
             stack.push(T::new_map(kty, vty));
             I::EmptyMap
         }
         (App(EMPTY_MAP, expect_args!(2), _), _) => unexpected_micheline!(),
 
         (App(EMPTY_BIG_MAP, [kty, vty], _), _) => {
-            let kty = parse_ty(ctx.gas(), kty)?;
-            kty.ensure_prop(ctx.gas(), TypeProperty::Comparable)?;
-            let vty = parse_ty(ctx.gas(), vty)?;
-            vty.ensure_prop(ctx.gas(), TypeProperty::BigMapValue)?;
+            let kty = parse_ty(gas, kty)?;
+            kty.ensure_prop(gas, TypeProperty::Comparable)?;
+            let vty = parse_ty(gas, vty)?;
+            vty.ensure_prop(gas, TypeProperty::BigMapValue)?;
             stack.push(T::new_big_map(kty.clone(), vty.clone()));
             I::EmptyBigMap(kty, vty)
         }
@@ -1704,21 +1704,21 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(MEM, [], _), [.., T::Set(..), _]) => {
             let ty_ = pop!();
             let ty = pop!(T::Set);
-            ensure_ty_eq(ctx.gas(), &ty, &ty_)?;
+            ensure_ty_eq(gas, &ty, &ty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Set)
         }
         (App(MEM, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::Map);
-            ensure_ty_eq(ctx.gas(), &map_tys.0, &kty_)?;
+            ensure_ty_eq(gas, &map_tys.0, &kty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::Map)
         }
         (App(MEM, [], _), [.., T::BigMap(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::BigMap);
-            ensure_ty_eq(ctx.gas(), &map_tys.0, &kty_)?;
+            ensure_ty_eq(gas, &map_tys.0, &kty_)?;
             stack.push(T::Bool);
             I::Mem(overloads::Mem::BigMap)
         }
@@ -1729,14 +1729,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GET, [], _), [.., T::Map(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::Map);
-            ensure_ty_eq(ctx.gas(), &map_tys.0, &kty_)?;
+            ensure_ty_eq(gas, &map_tys.0, &kty_)?;
             stack.push(T::new_option(map_tys.1.clone()));
             I::Get(overloads::Get::Map)
         }
         (App(GET, [], _), [.., T::BigMap(..), _]) => {
             let kty_ = pop!();
             let map_tys = pop!(T::BigMap);
-            ensure_ty_eq(ctx.gas(), &map_tys.0, &kty_)?;
+            ensure_ty_eq(gas, &map_tys.0, &kty_)?;
             stack.push(T::new_option(map_tys.1.clone()));
             I::Get(overloads::Get::BigMap)
         }
@@ -1748,7 +1748,7 @@ pub(crate) fn typecheck_instruction<'a>(
             // no_overload! below won't report the type on the top of the stack.
             let ty = &mut stack[0];
             let n = validate_u10(n)?;
-            ctx.gas().consume(tc_cost::get_n(n as usize)?)?;
+            gas.consume(tc_cost::get_n(n as usize)?)?;
             let res = match get_nth_field_ref(n, ty) {
                 Ok(res) => res,
                 Err(ty) => no_overload!(GET, NMOR::ExpectedPair(ty)),
@@ -1762,21 +1762,21 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(GET, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(UPDATE, [], _), [.., T::Set(ty), T::Bool, ty_]) => {
-            ensure_ty_eq(ctx.gas(), ty, ty_)?;
+            ensure_ty_eq(gas, ty, ty_)?;
             stack.drop_top(2);
             I::Update(overloads::Update::Set)
         }
         (App(UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(ctx.gas(), kty, kty_)?;
-            ensure_ty_eq(ctx.gas(), vty, vty_new)?;
+            ensure_ty_eq(gas, kty, kty_)?;
+            ensure_ty_eq(gas, vty, vty_new)?;
             stack.drop_top(2);
             I::Update(overloads::Update::Map)
         }
         (App(UPDATE, [], _), [.., T::BigMap(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(ctx.gas(), kty, kty_)?;
-            ensure_ty_eq(ctx.gas(), vty, vty_new)?;
+            ensure_ty_eq(gas, kty, kty_)?;
+            ensure_ty_eq(gas, vty, vty_new)?;
             stack.drop_top(2);
             I::Update(overloads::Update::BigMap)
         }
@@ -1803,15 +1803,15 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(GET_AND_UPDATE, [], _), [.., T::Map(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(ctx.gas(), kty, kty_)?;
-            ensure_ty_eq(ctx.gas(), vty, vty_new)?;
+            ensure_ty_eq(gas, kty, kty_)?;
+            ensure_ty_eq(gas, vty, vty_new)?;
             pop!();
             I::GetAndUpdate(overloads::GetAndUpdate::Map)
         }
         (App(GET_AND_UPDATE, [], _), [.., T::BigMap(m), T::Option(vty_new), kty_]) => {
             let (kty, vty) = m.as_ref();
-            ensure_ty_eq(ctx.gas(), kty, kty_)?;
-            ensure_ty_eq(ctx.gas(), vty, vty_new)?;
+            ensure_ty_eq(gas, kty, kty_)?;
+            ensure_ty_eq(gas, vty, vty_new)?;
             pop!();
             I::GetAndUpdate(overloads::GetAndUpdate::BigMap)
         }
@@ -1878,7 +1878,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(PACK, [], _), [.., _]) => {
             let t = pop!();
-            t.ensure_prop(ctx.gas(), TypeProperty::Packable)?;
+            t.ensure_prop(gas, TypeProperty::Packable)?;
             stack.push(T::Bytes);
             I::Pack
         }
@@ -1886,12 +1886,12 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(PACK, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(UNPACK, [ty], _), [.., T::Bytes]) => {
-            let ty = parse_ty(ctx.gas(), ty)?;
+            let ty = parse_ty(gas, ty)?;
             // NB: one would suppose the type needs to be packable, but that's
             // not quite correct, as `contract _` is forbidden. The correct
             // constraint is seemingly "pushable", as "pushable" is just
             // "packable" without `contract _`
-            ty.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
+            ty.ensure_prop(gas, TypeProperty::Pushable)?;
             stack[0] = T::new_option(ty.clone());
             I::Unpack(ty)
         }
@@ -1902,7 +1902,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(UNPACK, expect_args!(1), _), _) => unexpected_micheline!(),
 
         (App(TRANSFER_TOKENS, [], _), [.., T::Contract(ct), T::Mutez, arg_t]) => {
-            ensure_ty_eq(ctx.gas(), ct, arg_t)?;
+            ensure_ty_eq(gas, ct, arg_t)?;
             stack.drop_top(3);
             stack.push(T::Operation);
             I::TransferTokens
@@ -1945,7 +1945,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(LEFT, [ty_right], _), [.., _]) => {
             let ty_left = pop!();
-            let ty_right = parse_ty(ctx.gas(), ty_right)?;
+            let ty_right = parse_ty(gas, ty_right)?;
             stack.push(T::new_or(ty_left, ty_right));
             I::Left
         }
@@ -1954,7 +1954,7 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(RIGHT, [ty_left], _), [.., _]) => {
             let ty_right = pop!();
-            let ty_left = parse_ty(ctx.gas(), ty_left)?;
+            let ty_left = parse_ty(gas, ty_left)?;
             stack.push(T::new_or(ty_left, ty_right));
             I::Right
         }
@@ -1962,10 +1962,10 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(RIGHT, expect_args!(1), _), _) => unexpected_micheline!(),
 
         (App(prim @ (LAMBDA | LAMBDA_REC), [ty1, ty2, Seq(instrs)], _), ..) => {
-            let in_ty = parse_ty(ctx.gas(), ty1)?;
-            let out_ty = parse_ty(ctx.gas(), ty2)?;
+            let in_ty = parse_ty(gas, ty1)?;
+            let out_ty = parse_ty(gas, ty2)?;
             stack.push(Type::new_lambda(in_ty.clone(), out_ty.clone()));
-            let res = typecheck_lambda(instrs, ctx, in_ty, out_ty, matches!(prim, LAMBDA_REC))?;
+            let res = typecheck_lambda(instrs, gas, in_ty, out_ty, matches!(prim, LAMBDA_REC))?;
             I::Lambda(res)
         }
         (App(LAMBDA | LAMBDA_REC, expect_args!(3 last_seq), _), _) => unexpected_micheline!(),
@@ -1973,7 +1973,7 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(EXEC, [], _), [.., T::Lambda(_), _]) => {
             let ty = pop!();
             let lam_tys = pop!(T::Lambda);
-            ensure_ty_eq(ctx.gas(), &lam_tys.0, &ty)?;
+            ensure_ty_eq(gas, &lam_tys.0, &ty)?;
             stack.push(lam_tys.1.clone());
             I::Exec
         }
@@ -2004,7 +2004,7 @@ pub(crate) fn typecheck_instruction<'a>(
                     });
                 }
             };
-            ensure_ty_eq(ctx.gas(), &pair_ty.0, &ty)?;
+            ensure_ty_eq(gas, &pair_ty.0, &ty)?;
             stack.push(T::new_lambda(pair_ty.1.clone(), lam_ty.1.clone()));
             I::Apply { arg_ty: ty }
         }
@@ -2049,7 +2049,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let lt = irrefutable_match!(&tickets.0; Type::Ticket);
             let rt = irrefutable_match!(&tickets.1; Type::Ticket);
 
-            ensure_ty_eq(ctx.gas(), lt, rt)?;
+            ensure_ty_eq(gas, lt, rt)?;
             stack[0] = Type::new_option(tickets.0.clone());
             I::JoinTickets
         }
@@ -2096,7 +2096,7 @@ pub(crate) fn typecheck_instruction<'a>(
             }
             // if no entrypoint is specified, default is assumed
             let entrypoint = entrypoint.unwrap_or_default();
-            let t = parse_ty(ctx.gas(), t)?;
+            let t = parse_ty(gas, t)?;
             stack.push(T::new_option(T::new_contract(t.clone())));
             I::Contract(t, entrypoint)
         }
@@ -2172,14 +2172,14 @@ pub(crate) fn typecheck_instruction<'a>(
 
         (App(EMIT, [t], anns), [.., _]) => {
             let emit_val_type = pop!();
-            let emit_type_arg = parse_ty(ctx.gas(), t)?;
-            ensure_ty_eq(ctx.gas(), &emit_type_arg, &emit_val_type)?;
+            let emit_type_arg = parse_ty(gas, t)?;
+            ensure_ty_eq(gas, &emit_type_arg, &emit_val_type)?;
             // NB: the docs for the EMIT instruction
             // https://tezos.gitlab.io/michelson-reference/#instr-EMIT claim
             // the type needs to be packable, but that's not quite correct, as
             // `contract _` is forbidden. The correct constraint is seemingly
             // "pushable", as "pushable" is just "packable" without `contract _`
-            emit_val_type.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
+            emit_val_type.ensure_prop(gas, TypeProperty::Pushable)?;
             let opt_tag = anns.get_single_field_ann()?;
             if let Option::Some(t) = &opt_tag {
                 check_ep_name_len(t.as_str().as_bytes()).map_err(TcError::EntrypointError)?;
@@ -2192,7 +2192,7 @@ pub(crate) fn typecheck_instruction<'a>(
         }
         (App(EMIT, [], anns), [.., _]) => {
             let emit_val_type = pop!();
-            emit_val_type.ensure_prop(ctx.gas(), TypeProperty::Pushable)?;
+            emit_val_type.ensure_prop(gas, TypeProperty::Pushable)?;
             let opt_tag = anns.get_single_field_ann()?;
             if let Option::Some(t) = &opt_tag {
                 check_ep_name_len(t.as_str().as_bytes()).map_err(TcError::EntrypointError)?;
@@ -2237,8 +2237,8 @@ pub(crate) fn typecheck_instruction<'a>(
             let allow_lazy_storage_in_storage = true;
             #[cfg(not(feature = "allow_lazy_storage_transfer"))]
             let allow_lazy_storage_in_storage = false;
-            let contract_script = cs.typecheck_script(ctx, allow_lazy_storage_in_storage)?;
-            ensure_ty_eq(ctx.gas(), &contract_script.storage, new_storage)?;
+            let contract_script = cs.typecheck_script(gas, allow_lazy_storage_in_storage)?;
+            ensure_ty_eq(gas, &contract_script.storage, new_storage)?;
             stack.drop_top(3);
             stack.push(Type::Address);
             stack.push(Type::Operation);
@@ -2256,7 +2256,7 @@ pub(crate) fn typecheck_instruction<'a>(
             Err(TcError::TodoInstr(*prim))?
         }
 
-        (Seq(nested), _) => I::Seq(typecheck(nested, ctx, self_entrypoints, opt_stack)?),
+        (Seq(nested), _) => I::Seq(typecheck(nested, gas, self_entrypoints, opt_stack)?),
     })
 }
 
@@ -2525,7 +2525,7 @@ pub(crate) fn typecheck_value<'a>(
             let (in_ty, out_ty) = tys.as_ref();
             TV::Lambda(Closure::Lambda(typecheck_lambda(
                 instrs,
-                ctx,
+                ctx.gas(),
                 in_ty.clone(),
                 out_ty.clone(),
                 matches!(raw, V::App(Prim::Lambda_rec, ..)),
@@ -2598,7 +2598,7 @@ pub(crate) fn typecheck_value<'a>(
 
 fn typecheck_lambda<'a>(
     instrs: &'a [Micheline<'a>],
-    ctx: &mut impl TypecheckingCtx<'a>,
+    gas: &mut Gas,
     in_ty: Type,
     out_ty: Type,
     recursive: bool,
@@ -2609,8 +2609,8 @@ fn typecheck_lambda<'a>(
     } else {
         tc_stk![in_ty.clone()]
     };
-    let code = Rc::from(typecheck(instrs, ctx, None, stk)?);
-    unify_stacks(ctx, stk, tc_stk![out_ty.clone()])?;
+    let code = Rc::from(typecheck(instrs, gas, None, stk)?);
+    unify_stacks(gas, stk, tc_stk![out_ty.clone()])?;
     let micheline_code = Micheline::Seq(instrs);
     Ok(if recursive {
         Lambda::LambdaRec {
@@ -2636,7 +2636,7 @@ fn typecheck_lambda<'a>(
 fn typecheck_map_block<'a>(
     nested: &[Micheline<'a>],
     ty1: Type,
-    ctx: &mut impl TypecheckingCtx<'a>,
+    gas: &mut Gas,
     self_entrypoints: Option<&Entrypoints>,
     stack: &TypeStack,
 ) -> Result<(Vec<Instruction<'a>>, Type), TcError> {
@@ -2650,13 +2650,13 @@ fn typecheck_map_block<'a>(
 
     // Typecheck the nested instructions.
     let nested: Vec<Instruction<'a>> =
-        typecheck(nested, ctx, self_entrypoints, &mut opt_nested_stack)?;
+        typecheck(nested, gas, self_entrypoints, &mut opt_nested_stack)?;
 
     // Assert that the `opt_nested_stack` now has the type `ty2 : A`, for some `ty2`.
     // NB: the nested instruction block cannot fail, otherwise we cannot infer `ty2`.
     let nested_stack = opt_nested_stack.access_mut(TcError::MapBlockFail)?;
     let ty2 = nested_stack.pop().ok_or(TcError::MapBlockEmptyStack)?;
-    ensure_stacks_eq(ctx, stack, nested_stack)?;
+    ensure_stacks_eq(gas, stack, nested_stack)?;
     Ok((nested, ty2))
 }
 
@@ -2836,15 +2836,15 @@ fn ensure_stack_len(instr: Prim, stack: &TypeStack, l: usize) -> Result<(), TcEr
 /// instead.
 ///
 /// Failed stacks unify with anything.
-fn unify_stacks<'a>(
-    ctx: &mut impl TypecheckingCtx<'a>,
+fn unify_stacks(
+    gas: &mut Gas,
     dest: &mut FailingTypeStack,
     aux: FailingTypeStack,
 ) -> Result<(), TcError> {
     match &dest {
         FailingTypeStack::Ok(stack1) => {
             if let FailingTypeStack::Ok(stack2) = aux {
-                ensure_stacks_eq(ctx, stack1, &stack2)?;
+                ensure_stacks_eq(gas, stack1, &stack2)?;
             }
         }
         FailingTypeStack::Failed => {
@@ -2855,11 +2855,7 @@ fn unify_stacks<'a>(
     Ok(())
 }
 
-fn ensure_stacks_eq<'a>(
-    ctx: &mut impl TypecheckingCtx<'a>,
-    stack1: &TypeStack,
-    stack2: &TypeStack,
-) -> Result<(), TcError> {
+fn ensure_stacks_eq(gas: &mut Gas, stack1: &TypeStack, stack2: &TypeStack) -> Result<(), TcError> {
     if stack1.len() != stack2.len() {
         return Err(TcError::StacksNotEqual(
             stack1.clone(),
@@ -2868,7 +2864,7 @@ fn ensure_stacks_eq<'a>(
         ));
     }
     for (ty1, ty2) in stack1.iter().zip(stack2.iter()) {
-        ensure_ty_eq(ctx.gas(), ty1, ty2).map_err(|e| match e {
+        ensure_ty_eq(gas, ty1, ty2).map_err(|e| match e {
             TcError::TypesNotEqual(e) => {
                 TcError::StacksNotEqual(stack1.clone(), stack2.clone(), e.into())
             }
@@ -2894,7 +2890,7 @@ mod typecheck_tests {
     use crate::ast::michelson_address as addr;
     use crate::ast::michelson_address::entrypoint::DEFAULT_EP_NAME;
     use crate::ast::or::Or::{Left, Right};
-    use crate::context::{Ctx, TypecheckingCtx};
+    use crate::context::Ctx;
     use crate::gas::Gas;
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
@@ -2905,70 +2901,70 @@ mod typecheck_tests {
     /// hack to simplify syntax in tests
     fn typecheck_instruction<'a>(
         i: &Micheline<'a>,
-        ctx: &mut impl TypecheckingCtx<'a>,
+        gas: &mut Gas,
         opt_stack: &mut FailingTypeStack,
     ) -> Result<Instruction<'a>, TcError> {
-        super::typecheck_instruction(i, ctx, None, opt_stack)
+        super::typecheck_instruction(i, gas, None, opt_stack)
     }
 
     #[test]
     fn test_dup() {
         let mut stack = tc_stk![Type::Nat];
         let expected_stack = tc_stk![Type::Nat, Type::Nat];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("DUP 1").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("DUP 1").unwrap(), &mut gas, &mut stack),
             Ok(Dup(Some(1)))
         );
         assert_eq!(stack, expected_stack);
-        assert!(ctx.gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
     fn test_dup_n() {
         let mut stack = tc_stk![Type::Int, Type::Nat];
         let expected_stack = tc_stk![Type::Int, Type::Nat, Type::Int];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("DUP 2").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("DUP 2").unwrap(), &mut gas, &mut stack),
             Ok(Dup(Some(2)))
         );
         assert_eq!(stack, expected_stack);
-        assert!(ctx.gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
     fn test_swap() {
         let mut stack = tc_stk![Type::Nat, Type::Int];
         let expected_stack = tc_stk![Type::Int, Type::Nat];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("SWAP").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("SWAP").unwrap(), &mut gas, &mut stack),
             Ok(Swap)
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
     }
 
     #[test]
     fn test_abs() {
         let mut stack = tc_stk![Type::Int];
         let expected_stack = tc_stk![Type::Nat];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ABS").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ABS").unwrap(), &mut gas, &mut stack),
             Ok(Abs)
         );
         assert_eq!(stack, expected_stack);
-        assert!(ctx.gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
     fn test_abs_mismatch() {
         let mut stack = tc_stk![Type::Unit];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ABS").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ABS").unwrap(), &mut gas, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::ABS,
                 stack: stk![Type::Unit],
@@ -2986,21 +2982,21 @@ mod typecheck_tests {
     fn test_is_nat() {
         let mut stack = tc_stk![Type::Int];
         let expected_stack = tc_stk![Type::new_option(Type::Nat)];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ISNAT").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ISNAT").unwrap(), &mut gas, &mut stack),
             Ok(IsNat)
         );
         assert_eq!(stack, expected_stack);
-        assert!(ctx.gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
     fn test_is_nat_mismatch() {
         let mut stack = tc_stk![Type::Unit];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ISNAT").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ISNAT").unwrap(), &mut gas, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::ISNAT,
                 stack: stk![Type::Unit],
@@ -3020,13 +3016,13 @@ mod typecheck_tests {
         fn test(input: Type, overload: overloads::Int) {
             let mut stack = tc_stk![input];
             let expected_stack = tc_stk![Type::Int];
-            let mut ctx = Ctx::default();
+            let mut gas = Gas::default();
             assert_eq!(
-                typecheck_instruction(&parse("INT").unwrap(), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("INT").unwrap(), &mut gas, &mut stack),
                 Ok(Instruction::Int(overload)),
             );
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas.milligas() < Gas::default().milligas());
+            assert!(gas.milligas() < Gas::default().milligas());
         }
 
         macro_rules! test {
@@ -3051,9 +3047,9 @@ mod typecheck_tests {
         #[test]
         fn test_int_mismatch() {
             let mut stack = tc_stk![Type::String];
-            let mut ctx = Ctx::default();
+            let mut gas = Gas::default();
             assert_eq!(
-                typecheck_instruction(&parse("INT").unwrap(), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("INT").unwrap(), &mut gas, &mut stack),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::INT,
                     stack: stk![Type::String],
@@ -3070,13 +3066,13 @@ mod typecheck_tests {
         fn ok() {
             let mut stack = tc_stk![Type::Bytes];
             let expected_stack = tc_stk![Type::Nat];
-            let mut ctx = Ctx::default();
+            let mut gas = Gas::default();
             assert_eq!(
-                typecheck_instruction(&parse("NAT").unwrap(), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("NAT").unwrap(), &mut gas, &mut stack),
                 Ok(Instruction::Nat),
             );
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas.milligas() < Gas::default().milligas());
+            assert!(gas.milligas() < Gas::default().milligas());
         }
 
         #[test]
@@ -3087,9 +3083,9 @@ mod typecheck_tests {
         #[test]
         fn test_int_mismatch() {
             let mut stack = tc_stk![Type::String];
-            let mut ctx = Ctx::default();
+            let mut gas = Gas::default();
             assert_eq!(
-                typecheck_instruction(&parse("NAT").unwrap(), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("NAT").unwrap(), &mut gas, &mut stack),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::NAT,
                     stack: stk![Type::String],
@@ -3105,13 +3101,13 @@ mod typecheck_tests {
         fn test(input: Type, overload: overloads::Bytes) {
             let mut stack = tc_stk![input];
             let expected_stack = tc_stk![Type::Bytes];
-            let mut ctx = Ctx::default();
+            let mut gas = Gas::default();
             assert_eq!(
-                typecheck_instruction(&parse("BYTES").unwrap(), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("BYTES").unwrap(), &mut gas, &mut stack),
                 Ok(Instruction::Bytes(overload)),
             );
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas.milligas() < Gas::default().milligas());
+            assert!(gas.milligas() < Gas::default().milligas());
         }
 
         macro_rules! test {
@@ -3135,9 +3131,9 @@ mod typecheck_tests {
         #[test]
         fn test_int_mismatch() {
             let mut stack = tc_stk![Type::String];
-            let mut ctx = Ctx::default();
+            let mut gas = Gas::default();
             assert_eq!(
-                typecheck_instruction(&parse("BYTES").unwrap(), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("BYTES").unwrap(), &mut gas, &mut stack),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::BYTES,
                     stack: stk![Type::String],
@@ -3151,52 +3147,52 @@ mod typecheck_tests {
     fn test_drop() {
         let mut stack = tc_stk![Type::Nat];
         let expected_stack = tc_stk![];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("DROP").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("DROP").unwrap(), &mut gas, &mut stack),
             Ok(Drop(None))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
     }
 
     #[test]
     fn test_drop_n() {
         let mut stack = tc_stk![Type::Nat, Type::Int];
         let expected_stack = tc_stk![];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("DROP 2").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("DROP 2").unwrap(), &mut gas, &mut stack),
             Ok(Drop(Some(2)))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440 - 2 * 50);
+        assert_eq!(gas.milligas(), Gas::default().milligas() - 440 - 2 * 50);
     }
 
     #[test]
     fn test_push() {
         let mut stack = tc_stk![Type::Nat];
         let expected_stack = tc_stk![Type::Nat, Type::Int];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("PUSH int 1").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("PUSH int 1").unwrap(), &mut gas, &mut stack),
             Ok(Push(TypedValue::int(1)))
         );
         assert_eq!(stack, expected_stack);
-        assert!(ctx.gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
     fn test_dip() {
         let mut stack = tc_stk![Type::Int, Type::Bool];
         let expected_stack = tc_stk![Type::Int, Type::Nat, Type::Bool];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("DIP 1 {PUSH nat 6}").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("DIP 1 {PUSH nat 6}").unwrap(), &mut gas, &mut stack),
             Ok(Dip(Some(1), vec![Push(TypedValue::nat(6))]))
         );
         assert_eq!(stack, expected_stack);
-        assert!(ctx.gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas() < Gas::default().milligas());
     }
 
     mod sub_mutez {
@@ -3206,21 +3202,21 @@ mod typecheck_tests {
         fn ok() {
             let mut stack = tc_stk![Type::Mutez, Type::Mutez];
             let expected_stack = tc_stk![Type::new_option(Type::Mutez)];
-            let mut ctx = Ctx::default();
+            let mut gas = Gas::default();
             assert_eq!(
-                typecheck_instruction(&parse("SUB_MUTEZ").unwrap(), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("SUB_MUTEZ").unwrap(), &mut gas, &mut stack),
                 Ok(SubMutez)
             );
             assert_eq!(stack, expected_stack);
-            assert!(ctx.gas.milligas() < Gas::default().milligas());
+            assert!(gas.milligas() < Gas::default().milligas());
         }
 
         #[test]
         fn mismatch() {
             let mut stack = tc_stk![Type::Unit, Type::Mutez];
-            let mut ctx = Ctx::default();
+            let mut gas = Gas::default();
             assert_eq!(
-                typecheck_instruction(&parse("SUB_MUTEZ").unwrap(), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("SUB_MUTEZ").unwrap(), &mut gas, &mut stack),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::SUB_MUTEZ,
                     stack: stk![Type::Unit, Type::Mutez],
@@ -3239,39 +3235,39 @@ mod typecheck_tests {
     fn test_add_int_int() {
         let mut stack = tc_stk![Type::Int, Type::Int];
         let expected_stack = tc_stk![Type::Int];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut gas, &mut stack),
             Ok(Add(overloads::Add::IntInt))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
     }
 
     #[test]
     fn test_add_nat_nat() {
         let mut stack = tc_stk![Type::Nat, Type::Nat];
         let expected_stack = tc_stk![Type::Nat];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut gas, &mut stack),
             Ok(Add(overloads::Add::NatNat))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
     }
 
     #[test]
     fn test_add_mutez_mutez() {
         let mut stack = tc_stk![Type::Mutez, Type::Mutez];
         let expected_stack = tc_stk![Type::Mutez];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut gas, &mut stack),
             Ok(Add(overloads::Add::MutezMutez))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
     }
 
     #[test]
@@ -3292,11 +3288,11 @@ mod typecheck_tests {
                     (Prim::XOR, Type::Bytes) => Xor(overloads::Xor::Bytes),
                     _ => panic!("Bad test parameters"),
                 };
-                let mut ctx = Ctx::default();
+                let mut gas = Gas::default();
                 assert_eq!(
                     typecheck_instruction(
                         &Micheline::App(*prim, &[], NO_ANNS),
-                        &mut ctx,
+                        &mut gas,
                         &mut stack
                     ),
                     Ok(expected_instr)
@@ -3310,13 +3306,13 @@ mod typecheck_tests {
     fn test_and_int_nat() {
         let mut stack = tc_stk![Type::Nat, Type::Int];
         let expected_stack = tc_stk![Type::Nat];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("AND").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("AND").unwrap(), &mut gas, &mut stack),
             Ok(And(overloads::And::IntNat))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
     }
 
     #[test]
@@ -3337,9 +3333,9 @@ mod typecheck_tests {
     #[test]
     fn test_and_mismatch() {
         let mut stack = tc_stk![Type::String, Type::String];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("AND").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("AND").unwrap(), &mut gas, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::AND,
                 stack: stk![Type::String, Type::String],
@@ -3351,9 +3347,9 @@ mod typecheck_tests {
     #[test]
     fn test_or_mismatch() {
         let mut stack = tc_stk![Type::String, Type::String];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("OR").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("OR").unwrap(), &mut gas, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::OR,
                 stack: stk![Type::String, Type::String],
@@ -3365,9 +3361,9 @@ mod typecheck_tests {
     #[test]
     fn test_xor_mismatch() {
         let mut stack = tc_stk![Type::String, Type::String];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("XOR").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("XOR").unwrap(), &mut gas, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::XOR,
                 stack: stk![Type::String, Type::String],
@@ -3393,9 +3389,9 @@ mod typecheck_tests {
                 Type::Bytes => overloads::Not::Bytes,
                 _ => panic!("Bad test parameters"),
             };
-            let mut ctx = Ctx::default();
+            let mut gas = Gas::default();
             assert_eq!(
-                typecheck_instruction(&parse("NOT").unwrap(), &mut ctx, &mut stack),
+                typecheck_instruction(&parse("NOT").unwrap(), &mut gas, &mut stack),
                 Ok(Not(expected_overload))
             );
             assert_eq!(stack, expected_stack);
@@ -3410,9 +3406,9 @@ mod typecheck_tests {
     #[test]
     fn test_not_mismatch() {
         let mut stack = tc_stk![Type::String];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("NOT").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("NOT").unwrap(), &mut gas, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::NOT,
                 stack: stk![Type::String],
@@ -3425,66 +3421,66 @@ mod typecheck_tests {
     fn test_add_bls12_381_fr() {
         let mut stack = tc_stk![Type::Bls12381Fr, Type::Bls12381Fr];
         let expected_stack = tc_stk![Type::Bls12381Fr];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut gas, &mut stack),
             Ok(Add(overloads::Add::Bls12381Fr))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
     }
 
     #[test]
     fn test_add_bls12_381_g1() {
         let mut stack = tc_stk![Type::Bls12381G1, Type::Bls12381G1];
         let expected_stack = tc_stk![Type::Bls12381G1];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut gas, &mut stack),
             Ok(Add(overloads::Add::Bls12381G1))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
     }
 
     #[test]
     fn test_add_bls12_381_g2() {
         let mut stack = tc_stk![Type::Bls12381G2, Type::Bls12381G2];
         let expected_stack = tc_stk![Type::Bls12381G2];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut gas, &mut stack),
             Ok(Add(overloads::Add::Bls12381G2))
         );
         assert_eq!(stack, expected_stack);
-        assert_eq!(ctx.gas.milligas(), Gas::default().milligas() - 440);
+        assert_eq!(gas.milligas(), Gas::default().milligas() - 440);
     }
 
     #[test]
     fn test_loop() {
         let mut stack = tc_stk![Type::Int, Type::Bool];
         let expected_stack = tc_stk![Type::Int];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("LOOP {PUSH bool True}").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut stack
             ),
             Ok(Loop(vec![Push(TypedValue::Bool(true))]))
         );
         assert_eq!(stack, expected_stack);
-        assert!(ctx.gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
     fn test_loop_stacks_not_equal_length() {
         let mut stack = tc_stk![Type::Int, Type::Bool];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("LOOP {PUSH int 1; PUSH bool True}").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut stack
             )
             .unwrap_err(),
@@ -3499,11 +3495,11 @@ mod typecheck_tests {
     #[test]
     fn test_loop_stacks_not_equal_types() {
         let mut stack = tc_stk![Type::Int, Type::Bool];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("LOOP {DROP; PUSH bool False; PUSH bool True}").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut stack
             )
             .unwrap_err(),
@@ -3519,11 +3515,11 @@ mod typecheck_tests {
     fn test_loop_left() {
         let mut stack = tc_stk![Type::Int, Type::new_or(Type::Unit, Type::Nat)];
         let expected_stack = tc_stk![Type::Int, Type::Nat];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("LOOP_LEFT {DROP; PUSH (or unit nat) (Right 123)}").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut stack
             ),
             Ok(LoopLeft(vec![
@@ -3532,17 +3528,17 @@ mod typecheck_tests {
             ]))
         );
         assert_eq!(stack, expected_stack);
-        assert!(ctx.gas.milligas() < Gas::default().milligas());
+        assert!(gas.milligas() < Gas::default().milligas());
     }
 
     #[test]
     fn test_loop_left_stacks_not_equal_length() {
         let mut stack = tc_stk![Type::Int, Type::new_or(Type::Unit, Type::Nat)];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("LOOP_LEFT {PUSH (or unit nat) (Right 123)}").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut stack
             )
             .unwrap_err(),
@@ -3557,11 +3553,11 @@ mod typecheck_tests {
     #[test]
     fn test_loop_left_stacks_not_equal_types() {
         let mut stack = tc_stk![Type::Int, Type::new_or(Type::Unit, Type::Nat)];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("LOOP_LEFT {DROP; PUSH bool True}").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut stack
             )
             .unwrap_err(),
@@ -3585,9 +3581,9 @@ mod typecheck_tests {
     #[test]
     fn test_iter_list() {
         let mut stack = tc_stk![Type::new_list(Type::Int)];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ITER { DROP }").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ITER { DROP }").unwrap(), &mut gas, &mut stack),
             Ok(Iter(overloads::Iter::List, vec![Drop(None)]))
         );
         assert_eq!(stack, tc_stk![]);
@@ -3601,9 +3597,9 @@ mod typecheck_tests {
     #[test]
     fn test_iter_list_inner_mismatch() {
         let mut stack = tc_stk![Type::new_list(Type::Int)];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ITER { }").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ITER { }").unwrap(), &mut gas, &mut stack),
             Err(TcError::StacksNotEqual(
                 stk![],
                 stk![Type::Int],
@@ -3615,9 +3611,9 @@ mod typecheck_tests {
     #[test]
     fn test_iter_set() {
         let mut stack = tc_stk![Type::new_set(Type::Int)];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ITER { DROP }").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ITER { DROP }").unwrap(), &mut gas, &mut stack),
             Ok(Iter(overloads::Iter::Set, vec![Drop(None)]))
         );
         assert_eq!(stack, tc_stk![]);
@@ -3626,9 +3622,9 @@ mod typecheck_tests {
     #[test]
     fn test_iter_set_inner_mismatch() {
         let mut stack = tc_stk![Type::new_set(Type::Int)];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ITER { }").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ITER { }").unwrap(), &mut gas, &mut stack),
             Err(TcError::StacksNotEqual(
                 stk![],
                 stk![Type::Int],
@@ -3640,9 +3636,9 @@ mod typecheck_tests {
     #[test]
     fn test_iter_map() {
         let mut stack = tc_stk![Type::new_map(Type::Int, Type::Nat)];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ITER { CAR; DROP }").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ITER { CAR; DROP }").unwrap(), &mut gas, &mut stack),
             Ok(Iter(overloads::Iter::Map, vec![Car, Drop(None)]))
         );
         assert_eq!(stack, tc_stk![]);
@@ -3651,9 +3647,9 @@ mod typecheck_tests {
     #[test]
     fn test_iter_map_inner_mismatch() {
         let mut stack = tc_stk![Type::new_map(Type::Int, Type::Nat)];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ITER { }").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ITER { }").unwrap(), &mut gas, &mut stack),
             Err(TcError::StacksNotEqual(
                 stk![],
                 stk![Type::new_pair(Type::Int, Type::Nat)],
@@ -3665,9 +3661,9 @@ mod typecheck_tests {
     #[test]
     fn test_iter_arg_mismatch() {
         let mut stack = tc_stk![Type::String];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ITER { DROP }").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ITER { DROP }").unwrap(), &mut gas, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::ITER,
                 stack: stk![Type::String],
@@ -3679,9 +3675,9 @@ mod typecheck_tests {
     #[test]
     fn test_iter_fail() {
         let mut stack = tc_stk![Type::new_list(Type::Int)];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ITER { FAILWITH }").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ITER { FAILWITH }").unwrap(), &mut gas, &mut stack),
             Ok(Iter(overloads::Iter::List, vec![Failwith(Type::Int)]))
         );
         assert_eq!(stack, tc_stk![])
@@ -3694,7 +3690,7 @@ mod typecheck_tests {
             assert_eq!(
                 typecheck_instruction(
                     &parse("MAP { SOME }").unwrap(),
-                    &mut Ctx::default(),
+                    &mut Gas::default(),
                     &mut stack
                 ),
                 Ok(Map(expected_overload, vec![ISome]))
@@ -3726,7 +3722,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("MAP { DROP; }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![Type::new_list(Type::Int)]
             ),
             Err(TcError::MapBlockEmptyStack)
@@ -3740,7 +3736,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("MAP { DROP; DUP; }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Map(overloads::Map::List, vec![Drop(None), Dup(None)]))
@@ -3758,7 +3754,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("MAP { DIP { EQ }; }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![Type::Int, Type::new_list(Type::String)]
             ),
             Err(TcError::StacksNotEqual(
@@ -3775,7 +3771,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("MAP { FAILWITH; }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![Type::new_list(Type::Int)]
             ),
             Err(TcError::MapBlockFail)
@@ -3784,7 +3780,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("MAP { PUSH bool True; IF {FAILWITH} {FAILWITH}; }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![Type::new_list(Type::Int)]
             ),
             Err(TcError::MapBlockFail)
@@ -3795,7 +3791,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("MAP { PUSH bool True; IF {SOME} {FAILWITH}; }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Map(
@@ -3812,7 +3808,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("MAP { PUSH bool True; IF {FAILWITH} {SOME}; }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Map(
@@ -3834,9 +3830,9 @@ mod typecheck_tests {
     #[test]
     fn test_map_arg_mismatch() {
         let mut stack = tc_stk![Type::String];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("MAP { }").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("MAP { }").unwrap(), &mut gas, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::MAP,
                 stack: stk![Type::String],
@@ -3850,7 +3846,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("FAILWITH").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![Type::Int]
             ),
             Ok(Failwith(Type::Int))
@@ -3862,7 +3858,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("NEVER").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![Type::Never]
             ),
             Ok(Never)
@@ -3876,7 +3872,7 @@ mod typecheck_tests {
                 assert_eq!(
                     typecheck_instruction(
                         &parse($code).unwrap(),
-                        &mut Ctx::default(),
+                        &mut Gas::default(),
                         &mut tc_stk![]
                     ),
                     Err(TcError::FailNotInTail)
@@ -3891,7 +3887,7 @@ mod typecheck_tests {
             ($code:expr) => {
                 assert!(typecheck_instruction(
                     &parse($code).unwrap(),
-                    &mut Ctx::default(),
+                    &mut Gas::default(),
                     &mut tc_stk![]
                 )
                 .is_ok());
@@ -3918,7 +3914,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH string "foo""#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::String("foo".to_owned())))
@@ -3932,7 +3928,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH bls12_381_fr 100500"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::Bls12381Fr(bls::Fr::from_big_int(
@@ -3948,7 +3944,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH bls12_381_fr 0x01"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::Bls12381Fr(
@@ -3964,7 +3960,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH bls12_381_fr 0x000000000000000000000000000000000000000000000000000000000000000000"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidValueForType("Bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])".into(), Type::Bls12381Fr))
@@ -3978,7 +3974,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(&format!("PUSH bls12_381_g1 0x{hex_val}")).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::new_bls12381_g1(
@@ -3994,7 +3990,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(&format!("PUSH bls12_381_g1 0x{hex_val}")).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
@@ -4011,7 +4007,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(&format!("PUSH bls12_381_g1 0x{hex_val}")).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
@@ -4028,7 +4024,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(&format!("PUSH bls12_381_g2 0x{hex_val}")).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::new_bls12381_g2(
@@ -4044,7 +4040,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(&format!("PUSH bls12_381_g2 0x{hex_val}")).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
@@ -4061,7 +4057,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(&format!("PUSH bls12_381_g2 0x{hex_val}")).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
@@ -4077,7 +4073,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH unit Unit").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::Unit))
@@ -4089,7 +4085,7 @@ mod typecheck_tests {
     fn unit_instruction() {
         let mut stack = tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("UNIT").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("UNIT").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Unit)
         );
         assert_eq!(stack, tc_stk![Type::Unit]);
@@ -4101,7 +4097,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH (pair int nat bool) (Pair -5 3 False)").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::new_pair(
@@ -4124,7 +4120,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH (or int bool) (Left 1)").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::new_or(or::Or::Left(TypedValue::int(1)))))
@@ -4138,7 +4134,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH (or int bool) (Right False)").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::new_or(or::Or::Right(TypedValue::Bool(
@@ -4154,7 +4150,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH (option nat) (Some 3)").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::new_option(Some(TypedValue::nat(3)))))
@@ -4168,7 +4164,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH (option nat) None").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::new_option(None)))
@@ -4182,7 +4178,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("{ PUSH (pair int nat bool) (Pair -5 3 False); CAR }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Seq(vec![
@@ -4202,7 +4198,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("{ PUSH (pair int nat bool) (Pair -5 3 False); CDR }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Seq(vec![
@@ -4220,7 +4216,7 @@ mod typecheck_tests {
     fn car_fail() {
         let mut stack = tc_stk![Type::Unit];
         assert_eq!(
-            typecheck_instruction(&parse("CAR").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("CAR").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::CAR,
                 stack: stk![Type::Unit],
@@ -4233,7 +4229,7 @@ mod typecheck_tests {
     fn cdr_fail() {
         let mut stack = tc_stk![Type::Unit];
         assert_eq!(
-            typecheck_instruction(&parse("CDR").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("CDR").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::CDR,
                 stack: stk![Type::Unit],
@@ -4246,7 +4242,7 @@ mod typecheck_tests {
     fn pair() {
         let mut stack = tc_stk![Type::Int, Type::Nat]; // NB: nat is top
         assert_eq!(
-            typecheck_instruction(&parse("PAIR").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("PAIR").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Pair)
         );
         assert_eq!(stack, tc_stk![Type::new_pair(Type::Nat, Type::Int)]);
@@ -4256,7 +4252,7 @@ mod typecheck_tests {
     fn pair_n_3() {
         let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
         assert_eq!(
-            typecheck_instruction(&parse("PAIR 3").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("PAIR 3").unwrap(), &mut Gas::default(), &mut stack),
             Ok(PairN(3))
         );
         assert_eq!(
@@ -4272,7 +4268,7 @@ mod typecheck_tests {
     fn pair_n_4() {
         let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
         assert_eq!(
-            typecheck_instruction(&parse("PAIR 4").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("PAIR 4").unwrap(), &mut Gas::default(), &mut stack),
             Ok(PairN(4))
         );
         assert_eq!(
@@ -4288,7 +4284,7 @@ mod typecheck_tests {
     fn pair_n_neg() {
         let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
         assert_eq!(
-            typecheck_instruction(&parse("PAIR -1").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("PAIR -1").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::ExpectedU10((-1).into()))
         );
     }
@@ -4297,7 +4293,7 @@ mod typecheck_tests {
     fn pair_n_0() {
         let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
         assert_eq!(
-            typecheck_instruction(&parse("PAIR 0").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("PAIR 0").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::PairN01(Prim::PAIR, 0))
         );
     }
@@ -4306,7 +4302,7 @@ mod typecheck_tests {
     fn pair_n_1() {
         let mut stack = tc_stk![Type::String, Type::Unit, Type::Int, Type::Nat]; // NB: nat is top
         assert_eq!(
-            typecheck_instruction(&parse("PAIR 1").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("PAIR 1").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::PairN01(Prim::PAIR, 1))
         );
     }
@@ -4317,7 +4313,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PAIR 1024").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::ExpectedU10(1024.into()))
@@ -4328,7 +4324,7 @@ mod typecheck_tests {
     fn pair_n_too_short() {
         let mut stack = tc_stk![Type::Int, Type::Nat]; // NB: nat is top
         assert_eq!(
-            typecheck_instruction(&parse("PAIR 10").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("PAIR 10").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::PAIR,
                 stack: stk![Type::Int, Type::Nat],
@@ -4341,7 +4337,7 @@ mod typecheck_tests {
     fn unpair() {
         let mut stack = tc_stk![Type::new_pair(Type::Nat, Type::Int)];
         assert_eq!(
-            typecheck_instruction(&parse("UNPAIR").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("UNPAIR").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Unpair)
         );
         assert_eq!(stack, tc_stk![Type::Int, Type::Nat]);
@@ -4354,7 +4350,7 @@ mod typecheck_tests {
             Type::new_pair(Type::Int, Type::new_pair(Type::Unit, Type::String))
         )];
         assert_eq!(
-            typecheck_instruction(&parse("UNPAIR 3").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("UNPAIR 3").unwrap(), &mut Gas::default(), &mut stack),
             Ok(UnpairN(3))
         );
         assert_eq!(
@@ -4374,7 +4370,7 @@ mod typecheck_tests {
             Type::new_pair(Type::Int, Type::new_pair(Type::Unit, Type::String))
         )];
         assert_eq!(
-            typecheck_instruction(&parse("UNPAIR 4").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("UNPAIR 4").unwrap(), &mut Gas::default(), &mut stack),
             Ok(UnpairN(4))
         );
         assert_eq!(
@@ -4392,7 +4388,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("UNPAIR -1").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::ExpectedU10((-1).into()))
@@ -4406,7 +4402,7 @@ mod typecheck_tests {
             Type::new_pair(Type::Int, Type::new_pair(Type::Unit, Type::String))
         )];
         assert_eq!(
-            typecheck_instruction(&parse("UNPAIR 0").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("UNPAIR 0").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::PairN01(Prim::UNPAIR, 0))
         );
     }
@@ -4418,7 +4414,7 @@ mod typecheck_tests {
             Type::new_pair(Type::Int, Type::new_pair(Type::Unit, Type::String))
         )];
         assert_eq!(
-            typecheck_instruction(&parse("UNPAIR 1").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("UNPAIR 1").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::PairN01(Prim::UNPAIR, 1))
         );
     }
@@ -4432,7 +4428,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("UNPAIR 1024").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::ExpectedU10(1024.into()))
@@ -4443,7 +4439,7 @@ mod typecheck_tests {
     fn unpair_n_too_short() {
         let mut stack = tc_stk![]; // NB: nat is top
         assert_eq!(
-            typecheck_instruction(&parse("UNPAIR 2").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("UNPAIR 2").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::UNPAIR,
                 stack: stk![],
@@ -4458,7 +4454,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("{ PAIR; CAR }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Seq(vec![Pair, Car]))
@@ -4472,7 +4468,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("{ PAIR; CDR }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Seq(vec![Pair, Cdr]))
@@ -4486,7 +4482,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IF_NONE { PUSH int 5; } {}").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(IfNone(vec![Push(TypedValue::int(5))], vec![]))
@@ -4500,7 +4496,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IF_CONS { DROP 2 } {}").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(IfCons(vec![Drop(Some(2))], vec![]))
@@ -4515,7 +4511,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IF_CONS { DROP 2 } {}").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::NoMatchingOverload {
@@ -4532,7 +4528,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IF_CONS {} {}").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::StacksNotEqual(
@@ -4549,7 +4545,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IF_LEFT { GT } {}").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(IfLeft(vec![Gt], vec![]))
@@ -4568,7 +4564,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IF_LEFT {} {}").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(IfLeft(vec![], vec![]))
@@ -4582,7 +4578,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IF_LEFT {} {}").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::NoMatchingOverload {
@@ -4599,7 +4595,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IF_LEFT {} {}").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::StacksNotEqual(
@@ -4616,7 +4612,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IF_NONE { PUSH int 5; } {}").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::NoMatchingOverload {
@@ -4631,7 +4627,7 @@ mod typecheck_tests {
     fn some() {
         let mut stack = tc_stk![Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("SOME").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("SOME").unwrap(), &mut Gas::default(), &mut stack),
             Ok(ISome)
         );
         assert_eq!(stack, tc_stk![Type::new_option(Type::Int)]);
@@ -4641,7 +4637,7 @@ mod typecheck_tests {
     fn none() {
         let mut stack = tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("NONE int").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("NONE int").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Instruction::None)
         );
         assert_eq!(stack, tc_stk![Type::new_option(Type::Int)]);
@@ -4651,7 +4647,7 @@ mod typecheck_tests {
     fn compare_int() {
         let mut stack = tc_stk![Type::Int, Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("COMPARE").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("COMPARE").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Compare)
         );
         assert_eq!(stack, tc_stk![Type::Int]);
@@ -4661,7 +4657,7 @@ mod typecheck_tests {
     fn compare_int_fail() {
         let mut stack = tc_stk![Type::Int, Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("COMPARE").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("COMPARE").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::COMPARE,
                 stack: stk![Type::Int, Type::Nat],
@@ -4674,7 +4670,7 @@ mod typecheck_tests {
     fn amount() {
         let mut stack = tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("AMOUNT").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("AMOUNT").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Amount)
         );
         assert_eq!(stack, tc_stk![Type::Mutez]);
@@ -4686,7 +4682,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH (list int) { 1; 2; 3 }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::List(
@@ -4702,7 +4698,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH (list int) { 1; Unit; 3 }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
@@ -4716,7 +4712,7 @@ mod typecheck_tests {
     fn nil() {
         let mut stack = tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("NIL int").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("NIL int").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Nil)
         );
         assert_eq!(stack, tc_stk![Type::new_list(Type::Int)]);
@@ -4726,7 +4722,7 @@ mod typecheck_tests {
     fn cons() {
         let mut stack = tc_stk![Type::new_list(Type::Int), Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("CONS").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("CONS").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Cons)
         );
         assert_eq!(stack, tc_stk![Type::new_list(Type::Int)]);
@@ -4741,7 +4737,7 @@ mod typecheck_tests {
     fn cons_mismatch_elt() {
         let mut stack = tc_stk![Type::new_list(Type::Int), Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("CONS").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("CONS").unwrap(), &mut Gas::default(), &mut stack),
             Err(TypesNotEqual(Type::Int, Type::Nat).into())
         );
     }
@@ -4750,7 +4746,7 @@ mod typecheck_tests {
     fn cons_mismatch_list() {
         let mut stack = tc_stk![Type::String, Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("CONS").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("CONS").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::CONS,
                 stack: stk![Type::String, Type::Nat],
@@ -4765,7 +4761,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("NIL operation").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Nil)
@@ -4777,7 +4773,7 @@ mod typecheck_tests {
     fn failwith_operation() {
         let mut stack = tc_stk![Type::new_list(Type::Operation)];
         assert_eq!(
-            typecheck_instruction(&parse("FAILWITH").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("FAILWITH").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Pushable,
                 Type::Operation
@@ -4789,7 +4785,7 @@ mod typecheck_tests {
     fn never_wrong_type() {
         let mut stack = tc_stk![Type::Unit];
         assert_eq!(
-            typecheck_instruction(&parse("NEVER").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("NEVER").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::NEVER,
                 stack: stk![Type::Unit],
@@ -4805,7 +4801,7 @@ mod typecheck_tests {
     fn concat_two_strings() {
         let mut stack = tc_stk![Type::String, Type::String];
         assert_eq!(
-            typecheck_instruction(&parse("CONCAT").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("CONCAT").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Concat(overloads::Concat::TwoStrings))
         );
         assert_eq!(stack, tc_stk![Type::String]);
@@ -4815,7 +4811,7 @@ mod typecheck_tests {
     fn concat_list_of_strings() {
         let mut stack = tc_stk![Type::new_list(Type::String)];
         assert_eq!(
-            typecheck_instruction(&parse("CONCAT").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("CONCAT").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Concat(overloads::Concat::ListOfStrings))
         );
         assert_eq!(stack, tc_stk![Type::String]);
@@ -4827,7 +4823,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH (set int) { 1; 2 }"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::Set(BTreeSet::from([
@@ -4844,7 +4840,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH (set int) { 2; 1 }"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::ElementsNotSorted(Type::new_set(Type::Int)))
@@ -4857,7 +4853,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH (set (list int)) { }"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidTypeProperty(
@@ -4873,7 +4869,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH (set int) { "1"; 2 }"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
@@ -4889,7 +4885,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH (set int) { 1; 1 }"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::DuplicateElements(Type::new_set(Type::Int)))
@@ -4902,7 +4898,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH (map int string) { Elt 1 "foo"; Elt 2 "bar" }"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Push(TypedValue::Map(BTreeMap::from([
@@ -4919,7 +4915,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH (map int string) { Elt 2 "foo"; Elt 1 "bar" }"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::ElementsNotSorted(Type::new_map(
@@ -4936,7 +4932,7 @@ mod typecheck_tests {
             typecheck_instruction(
                 &parse(r#"PUSH (map (list int) string) { Elt { 2 } "foo"; Elt { 1 } "bar" }"#)
                     .unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidTypeProperty(
@@ -4952,7 +4948,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH (map (list int) string) { }"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidTypeProperty(
@@ -4968,7 +4964,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH (map int string) { Elt "1" "foo"; Elt 2 "bar" }"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidValueForType(
@@ -4984,7 +4980,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH (map int string) { Elt 1 "foo"; "bar" }"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidEltForMap(
@@ -5000,7 +4996,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(r#"PUSH (map int string) { Elt 1 "foo"; Elt 1 "bar" }"#).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::DuplicateElements(Type::new_map(
@@ -5016,7 +5012,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("EMPTY_SET int").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(EmptySet)
@@ -5030,7 +5026,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("EMPTY_BIG_MAP int unit").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(EmptyBigMap(Type::Int, Type::Unit))
@@ -5044,7 +5040,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("EMPTY_SET operation").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TcError::InvalidTypeProperty(
@@ -5058,7 +5054,7 @@ mod typecheck_tests {
     fn get_map() {
         let mut stack = tc_stk![Type::new_map(Type::Int, Type::String), Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("GET").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("GET").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Get(overloads::Get::Map))
         );
         assert_eq!(stack, tc_stk![Type::new_option(Type::String)]);
@@ -5068,7 +5064,7 @@ mod typecheck_tests {
     fn get_big_map() {
         let mut stack = tc_stk![Type::new_big_map(Type::Int, Type::String), Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("GET").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("GET").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Get(overloads::Get::BigMap))
         );
         assert_eq!(stack, tc_stk![Type::new_option(Type::String)]);
@@ -5078,7 +5074,7 @@ mod typecheck_tests {
     fn get_map_incomparable() {
         assert_eq!(
             parse("GET").unwrap().typecheck_instruction(
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 None,
                 &[
                     parse("map (list int) string").unwrap(),
@@ -5096,7 +5092,7 @@ mod typecheck_tests {
     fn get_map_wrong_type() {
         let mut stack = tc_stk![Type::new_map(Type::Int, Type::String), Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("GET").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("GET").unwrap(), &mut Gas::default(), &mut stack),
             Err(TypesNotEqual(Type::Int, Type::Nat).into()),
         );
     }
@@ -5110,7 +5106,7 @@ mod typecheck_tests {
             assert_eq!(
                 typecheck_instruction(
                     &parse(&format!("GET {n}")).unwrap(),
-                    &mut Ctx::default(),
+                    &mut Gas::default(),
                     &mut stack
                 ),
                 Ok(GetN(n))
@@ -5193,7 +5189,7 @@ mod typecheck_tests {
             );
             let mut stack = tc_stk![ty.clone()];
             assert_eq!(
-                typecheck_instruction(&parse("GET 7").unwrap(), &mut Ctx::default(), &mut stack),
+                typecheck_instruction(&parse("GET 7").unwrap(), &mut Gas::default(), &mut stack),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::GET,
                     stack: stk![ty],
@@ -5215,7 +5211,7 @@ mod typecheck_tests {
             );
             let mut stack = tc_stk![ty];
             assert_eq!(
-                typecheck_instruction(&parse("GET 1024").unwrap(), &mut Ctx::default(), &mut stack),
+                typecheck_instruction(&parse("GET 1024").unwrap(), &mut Gas::default(), &mut stack),
                 Err(TcError::ExpectedU10(1024.into()))
             );
         }
@@ -5230,7 +5226,7 @@ mod typecheck_tests {
             assert_eq!(
                 typecheck_instruction(
                     &parse(&format!("UPDATE {n}")).unwrap(),
-                    &mut Ctx::default(),
+                    &mut Gas::default(),
                     &mut stack
                 ),
                 Ok(UpdateN(n))
@@ -5286,7 +5282,7 @@ mod typecheck_tests {
 
             let mut stack = tc_stk![ty.clone(), Type::Unit];
             assert_eq!(
-                typecheck_instruction(&parse("UPDATE 5").unwrap(), &mut Ctx::default(), &mut stack),
+                typecheck_instruction(&parse("UPDATE 5").unwrap(), &mut Gas::default(), &mut stack),
                 Err(TcError::NoMatchingOverload {
                     instr: Prim::UPDATE,
                     stack: stk![ty, Type::Unit],
@@ -5308,7 +5304,7 @@ mod typecheck_tests {
             assert_eq!(
                 typecheck_instruction(
                     &parse("UPDATE 1024").unwrap(),
-                    &mut Ctx::default(),
+                    &mut Gas::default(),
                     &mut stack
                 ),
                 Err(TcError::ExpectedU10(1024.into()))
@@ -5320,7 +5316,7 @@ mod typecheck_tests {
     fn mem_map() {
         let mut stack = tc_stk![Type::new_map(Type::Int, Type::String), Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("MEM").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Mem(overloads::Mem::Map))
         );
         assert_eq!(stack, tc_stk![Type::Bool]);
@@ -5330,7 +5326,7 @@ mod typecheck_tests {
     fn mem_big_map() {
         let mut stack = tc_stk![Type::new_big_map(Type::Int, Type::String), Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("MEM").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Mem(overloads::Mem::BigMap))
         );
         assert_eq!(stack, tc_stk![Type::Bool]);
@@ -5340,7 +5336,7 @@ mod typecheck_tests {
     fn mem_map_incomparable() {
         assert_eq!(
             parse("MEM").unwrap().typecheck_instruction(
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 None,
                 &[
                     parse("map (list int) string").unwrap(),
@@ -5358,7 +5354,7 @@ mod typecheck_tests {
     fn mem_map_wrong_type() {
         let mut stack = tc_stk![Type::new_map(Type::Int, Type::String), Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("MEM").unwrap(), &mut Gas::default(), &mut stack),
             Err(TypesNotEqual(Type::Int, Type::Nat).into()),
         );
     }
@@ -5367,7 +5363,7 @@ mod typecheck_tests {
     fn mem_set() {
         let mut stack = tc_stk![Type::new_set(Type::Int), Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("MEM").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Mem(overloads::Mem::Set))
         );
         assert_eq!(stack, tc_stk![Type::Bool]);
@@ -5377,7 +5373,7 @@ mod typecheck_tests {
     fn mem_set_wrong_type() {
         let mut stack = tc_stk![Type::new_set(Type::Int), Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("MEM").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("MEM").unwrap(), &mut Gas::default(), &mut stack),
             Err(TypesNotEqual(Type::Int, Type::Nat).into()),
         );
     }
@@ -5386,7 +5382,7 @@ mod typecheck_tests {
     fn update_set() {
         let mut stack = tc_stk![Type::new_set(Type::Int), Type::Bool, Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Update(overloads::Update::Set))
         );
         assert_eq!(stack, tc_stk![Type::new_set(Type::Int)]);
@@ -5396,7 +5392,7 @@ mod typecheck_tests {
     fn update_set_wrong_ty() {
         let mut stack = tc_stk![Type::new_set(Type::Int), Type::Bool, Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Gas::default(), &mut stack),
             Err(TypesNotEqual(Type::Int, Type::Nat).into())
         );
     }
@@ -5405,7 +5401,7 @@ mod typecheck_tests {
     fn update_set_incomparable() {
         assert_eq!(
             parse("UPDATE").unwrap().typecheck_instruction(
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 None,
                 &[
                     parse("set (list int)").unwrap(),
@@ -5428,7 +5424,7 @@ mod typecheck_tests {
             Type::Int
         ];
         assert_eq!(
-            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Update(overloads::Update::Map))
         );
         assert_eq!(stack, tc_stk![Type::new_map(Type::Int, Type::String)]);
@@ -5442,7 +5438,7 @@ mod typecheck_tests {
             Type::Int
         ];
         assert_eq!(
-            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Update(overloads::Update::BigMap))
         );
         assert_eq!(stack, tc_stk![Type::new_big_map(Type::Int, Type::String)]);
@@ -5456,7 +5452,7 @@ mod typecheck_tests {
             Type::Int
         ];
         assert_eq!(
-            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("UPDATE").unwrap(), &mut Gas::default(), &mut stack),
             Err(TypesNotEqual(Type::String, Type::Nat).into())
         );
     }
@@ -5465,7 +5461,7 @@ mod typecheck_tests {
     fn update_map_incomparable() {
         assert_eq!(
             parse("UPDATE").unwrap().typecheck_instruction(
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 None,
                 &[
                     parse("map (list int) string").unwrap(),
@@ -5490,7 +5486,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("GET_AND_UPDATE").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(GetAndUpdate(overloads::GetAndUpdate::Map))
@@ -5514,7 +5510,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("GET_AND_UPDATE").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(GetAndUpdate(overloads::GetAndUpdate::BigMap))
@@ -5538,7 +5534,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("GET_AND_UPDATE").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Err(TypesNotEqual(Type::String, Type::Nat).into())
@@ -5549,7 +5545,7 @@ mod typecheck_tests {
     fn get_and_update_map_incomparable() {
         assert_eq!(
             parse("GET_AND_UPDATE").unwrap().typecheck_instruction(
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 None,
                 &[
                     parse("map (list int) string").unwrap(),
@@ -5574,7 +5570,7 @@ mod typecheck_tests {
         fn check(inp_ty: Type, expected_overload: overloads::Size) {
             let mut stack = tc_stk![inp_ty];
             assert_eq!(
-                typecheck_instruction(&parse("SIZE").unwrap(), &mut Ctx::default(), &mut stack),
+                typecheck_instruction(&parse("SIZE").unwrap(), &mut Gas::default(), &mut stack),
                 Ok(Size(expected_overload))
             );
             assert_eq!(stack, tc_stk![Type::Nat]);
@@ -5590,7 +5586,7 @@ mod typecheck_tests {
     fn size_wrong_ty() {
         let mut stack = tc_stk![Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("SIZE").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("SIZE").unwrap(), &mut Gas::default(), &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::SIZE,
                 stack: stk![Type::Int],
@@ -5610,7 +5606,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("{ { PAIR }; {{ CAR; }}; {}; {{{}}}; {{{{{DROP}}}}} }").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Seq(vec![
@@ -5628,7 +5624,7 @@ mod typecheck_tests {
     fn add_int_nat() {
         let mut stack = tc_stk![Type::Nat, Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("ADD").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Add(overloads::Add::IntNat))
         );
         assert_eq!(stack, tc_stk![Type::Int]);
@@ -5638,7 +5634,7 @@ mod typecheck_tests {
     fn add_nat_int() {
         let mut stack = tc_stk![Type::Int, Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("ADD").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Add(overloads::Add::NatInt))
         );
         assert_eq!(stack, tc_stk![Type::Int]);
@@ -5647,9 +5643,9 @@ mod typecheck_tests {
     #[track_caller]
     fn too_short_test(instr: &Micheline, prim: Prim, len: usize) {
         for n in 0..len {
-            let mut ctx = Ctx::default();
+            let mut gas = Gas::default();
             assert_eq!(
-                typecheck_instruction(instr, &mut ctx, &mut tc_stk![Type::Unit; n]),
+                typecheck_instruction(instr, &mut gas, &mut tc_stk![Type::Unit; n]),
                 Err(TcError::NoMatchingOverload {
                     instr: prim,
                     stack: stk![Type::Unit; n],
@@ -5667,9 +5663,9 @@ mod typecheck_tests {
     #[test]
     fn test_add_mismatch() {
         let mut stack = tc_stk![Type::String, Type::String];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("ADD").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("ADD").unwrap(), &mut gas, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::ADD,
                 stack: stk![Type::String, Type::String],
@@ -5681,9 +5677,9 @@ mod typecheck_tests {
     #[test]
     fn test_dup0() {
         let mut stack = tc_stk![];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("DUP 0").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("DUP 0").unwrap(), &mut gas, &mut stack),
             Err(TcError::Dup0)
         );
     }
@@ -5701,27 +5697,27 @@ mod typecheck_tests {
                     fn ok() {
                         let mut stack = tc_stk![Type::Int];
                         let expected_stack = tc_stk![Type::Bool];
-                        let mut ctx = Ctx::default();
+                        let mut gas = Gas::default();
                         assert_eq!(
                             typecheck_instruction(
                                 &parse(stringify!($op)).unwrap(),
-                                &mut ctx,
+                                &mut gas,
                                 &mut stack
                             ),
                             Ok($instr)
                         );
                         assert_eq!(stack, expected_stack);
-                        assert!(ctx.gas.milligas() < Gas::default().milligas());
+                        assert!(gas.milligas() < Gas::default().milligas());
                     }
 
                     #[test]
                     fn mismatch() {
                         let mut stack = tc_stk![Type::String];
-                        let mut ctx = Ctx::default();
+                        let mut gas = Gas::default();
                         assert_eq!(
                             typecheck_instruction(
                                 &parse(stringify!($op)).unwrap(),
-                                &mut ctx,
+                                &mut gas,
                                 &mut stack
                             ),
                             Err(TcError::NoMatchingOverload {
@@ -5751,9 +5747,9 @@ mod typecheck_tests {
     #[test]
     fn test_if_mismatch() {
         let mut stack = tc_stk![Type::String];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("IF {} {}").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("IF {} {}").unwrap(), &mut gas, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::IF,
                 stack: stk![Type::String],
@@ -5780,9 +5776,9 @@ mod typecheck_tests {
     #[test]
     fn test_loop_mismatch() {
         let mut stack = tc_stk![Type::String];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("LOOP {}").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("LOOP {}").unwrap(), &mut gas, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::LOOP,
                 stack: stk![Type::String],
@@ -5794,9 +5790,9 @@ mod typecheck_tests {
     #[test]
     fn test_unpair_mismatch() {
         let mut stack = tc_stk![Type::String];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("UNPAIR").unwrap(), &mut ctx, &mut stack),
+            typecheck_instruction(&parse("UNPAIR").unwrap(), &mut gas, &mut stack),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::UNPAIR,
                 stack: stk![Type::String],
@@ -5872,12 +5868,11 @@ mod typecheck_tests {
 
     #[test]
     fn test_compare_gas_exhaustion() {
-        let ctx = &mut Ctx::default();
-        ctx.gas = Gas::new(gas::tc_cost::INSTR_STEP);
+        let gas = &mut Gas::new(gas::tc_cost::INSTR_STEP);
         assert_eq!(
             typecheck_instruction(
                 &parse("COMPARE").unwrap(),
-                ctx,
+                gas,
                 &mut tc_stk![Type::Unit, Type::Unit]
             ),
             Err(TcError::OutOfGas(OutOfGas))
@@ -5886,11 +5881,11 @@ mod typecheck_tests {
 
     #[test]
     fn test_compare_incomparable() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("COMPARE").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut tc_stk![Type::Operation, Type::Operation]
             ),
             Err(TcError::InvalidTypeProperty(
@@ -5902,11 +5897,11 @@ mod typecheck_tests {
 
     #[test]
     fn test_get_mismatch() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("GET").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut tc_stk![Type::Unit, Type::Unit]
             ),
             Err(TcError::NoMatchingOverload {
@@ -5919,11 +5914,11 @@ mod typecheck_tests {
 
     #[test]
     fn test_mem_mismatch() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("MEM").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut tc_stk![Type::Unit, Type::Unit]
             ),
             Err(TcError::NoMatchingOverload {
@@ -5936,11 +5931,11 @@ mod typecheck_tests {
 
     #[test]
     fn test_update_mismatch() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("UPDATE").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut tc_stk![Type::Unit, Type::Unit, Type::Unit]
             ),
             Err(TcError::NoMatchingOverload {
@@ -5953,11 +5948,11 @@ mod typecheck_tests {
 
     #[test]
     fn test_push_operation_fail() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH operation Unit").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut tc_stk![]
             ),
             Err(TcError::InvalidTypeProperty(
@@ -5969,7 +5964,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_non_passable_parameter() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter operation;",
@@ -5977,7 +5972,7 @@ mod typecheck_tests {
                 "code FAILWITH"
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Passable,
                 Type::Operation
@@ -5987,7 +5982,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_non_storable_storage() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter nat;",
@@ -5995,7 +5990,7 @@ mod typecheck_tests {
                 "code FAILWITH"
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Storable,
                 Type::Operation
@@ -6005,7 +6000,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_invalid_map() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter (map (list unit) unit);",
@@ -6013,7 +6008,7 @@ mod typecheck_tests {
                 "code FAILWITH;",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -6040,7 +6035,7 @@ mod typecheck_tests {
     // Test that the comparability of map keys is also checked when the
     // map type appears nested inside the parameter type
     fn test_nested_invalid_map() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter (pair unit (option (map (list unit) unit)));",
@@ -6048,7 +6043,7 @@ mod typecheck_tests {
                 "code FAILWITH",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -6058,7 +6053,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_invalid_big_map_key_type() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter (big_map (list unit) unit);",
@@ -6066,7 +6061,7 @@ mod typecheck_tests {
                 "code FAILWITH;",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -6076,7 +6071,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_invalid_big_map_value_type() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter (big_map int (contract unit));",
@@ -6084,7 +6079,7 @@ mod typecheck_tests {
                 "code { UNIT; FAILWITH };",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::BigMapValue,
                 Type::new_contract(Type::Unit)
@@ -6246,7 +6241,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_contract_not_storable() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter unit;",
@@ -6254,7 +6249,7 @@ mod typecheck_tests {
                 "code FAILWITH;",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Storable,
                 Type::new_contract(Type::Unit)
@@ -6264,11 +6259,11 @@ mod typecheck_tests {
 
     #[test]
     fn test_contract_not_pushable() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH (contract unit) Unit").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut tc_stk![]
             ),
             Err(TcError::InvalidTypeProperty(
@@ -6280,7 +6275,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_contract_with_unpassable_arg() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter (contract operation);",
@@ -6288,7 +6283,7 @@ mod typecheck_tests {
                 "code FAILWITH;"
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Passable,
                 Type::Operation
@@ -6298,7 +6293,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_script_typechecking() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter unit;",
@@ -6306,7 +6301,7 @@ mod typecheck_tests {
                 "code { CAR; NIL operation; PAIR };",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Ok(ContractScript {
                 parameter: Type::Unit,
                 storage: Type::Unit,
@@ -6322,7 +6317,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_script_typechecking_with_views() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter unit;",
@@ -6331,7 +6326,7 @@ mod typecheck_tests {
                 r#"view "a" unit unit { CAR };"#,
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Ok(ContractScript {
                 parameter: Type::Unit,
                 storage: Type::Unit,
@@ -6354,7 +6349,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_script_typechecking_with_two_views() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter unit;",
@@ -6364,7 +6359,7 @@ mod typecheck_tests {
                 r#"view "b" unit unit { CDR };"#,
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Ok(ContractScript {
                 parameter: Type::Unit,
                 storage: Type::Unit,
@@ -6397,7 +6392,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_script_typechecking_with_duplicated_views() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter unit;",
@@ -6407,14 +6402,14 @@ mod typecheck_tests {
                 r#"view "a" unit unit { CDR };"#,
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Err(TcError::DuplicatedView("a".into()))
         );
     }
 
     #[test]
     fn test_contract_is_passable() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter (contract unit);",
@@ -6422,7 +6417,7 @@ mod typecheck_tests {
                 "code { DROP; UNIT; FAILWITH };",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Ok(ContractScript {
                 parameter: Type::new_contract(Type::Unit),
                 storage: Type::Unit,
@@ -6438,7 +6433,7 @@ mod typecheck_tests {
 
     #[test]
     fn test_fail_with_contract_should_fail() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter (contract unit);",
@@ -6446,7 +6441,7 @@ mod typecheck_tests {
                 "code FAILWITH;",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Pushable,
                 Type::new_contract(Type::Unit)
@@ -6462,7 +6457,7 @@ mod typecheck_tests {
             assert_eq!(
                 &typecheck_instruction(
                     &parse(&format!("PUSH address {lit}")).unwrap(),
-                    &mut Ctx::default(),
+                    &mut Gas::default(),
                     &mut tc_stk![],
                 ),
                 &exp
@@ -6470,7 +6465,7 @@ mod typecheck_tests {
             assert_eq!(
                 &typecheck_instruction(
                     &parse(&format!("PUSH address {bytes}")).unwrap(),
-                    &mut Ctx::default(),
+                    &mut Gas::default(),
                     &mut tc_stk![],
                 ),
                 &exp
@@ -6610,7 +6605,7 @@ mod typecheck_tests {
         assert_matches!(
             typecheck_instruction(
                 &parse("PUSH address \"tz1foobarfoobarfoobarfoobarfoobarfoo\"").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![],
             ),
             Err(TcError::ByteReprError(
@@ -6621,7 +6616,7 @@ mod typecheck_tests {
         assert_matches!(
             typecheck_instruction(
                 &parse("PUSH address \"tz9foobarfoobarfoobarfoobarfoobarfoo\"").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![],
             ),
             Err(TcError::ByteReprError(
@@ -6632,7 +6627,7 @@ mod typecheck_tests {
         assert_matches!(
             typecheck_instruction(
                 &parse("PUSH address \"tz\"").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![],
             ),
             Err(TcError::ByteReprError(
@@ -6643,7 +6638,7 @@ mod typecheck_tests {
         assert_matches!(
             typecheck_instruction(
                 &parse("PUSH address 0x0001fffe").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![],
             ),
             Err(TcError::ByteReprError(
@@ -6654,7 +6649,7 @@ mod typecheck_tests {
         assert_matches!(
         typecheck_instruction(
             &parse("PUSH address 0xff00fe0000000000000000000000000000000000000000").unwrap(),
-            &mut Ctx::default(),
+            &mut Gas::default(),
             &mut tc_stk![],
             ),
             Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(p))) if p == "0xff"
@@ -6662,7 +6657,7 @@ mod typecheck_tests {
         assert_matches!(
             typecheck_instruction(
                 &parse("PUSH address 0x00fffe0000000000000000000000000000000000000000").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![],
             ),
             Err(TcError::ByteReprError(
@@ -6673,7 +6668,7 @@ mod typecheck_tests {
         assert_matches!(
             typecheck_instruction(
                 &parse("PUSH address 0x00").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![],
             ),
             Err(TcError::ByteReprError(
@@ -6685,7 +6680,7 @@ mod typecheck_tests {
             typecheck_instruction(
                 &parse("PUSH address 0x011f2d825fdd9da219235510335e558520235f4f5401666f6f")
                     .unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![],
             ),
             Err(TcError::ByteReprError(
@@ -6696,7 +6691,7 @@ mod typecheck_tests {
         assert_matches!(
             typecheck_instruction(
                 &parse("PUSH address 0x03d601f22256d2ad1faec0c64374e527c6e62f2e5a666f6f").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![],
             ),
             Err(TcError::ByteReprError(
@@ -6717,7 +6712,7 @@ mod typecheck_tests {
         assert_eq!(
             &typecheck_instruction(
                 &parse(&format!("PUSH chain_id \"{lit}\"")).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![],
             ),
             &exp
@@ -6725,7 +6720,7 @@ mod typecheck_tests {
         assert_eq!(
             &typecheck_instruction(
                 &parse(&format!("PUSH chain_id 0x{bytes}")).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![],
             ),
             &exp
@@ -6733,7 +6728,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH chain_id \"foobar\"").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![],
             ),
             Err(TcError::ChainIdError(
@@ -6743,7 +6738,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH chain_id 0xbeef").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![],
             ),
             Err(TcError::ChainIdError(
@@ -6757,7 +6752,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("CHAIN_ID").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![]
             ),
             Ok(Instruction::ChainId)
@@ -6768,7 +6763,7 @@ mod typecheck_tests {
     fn pack_instr() {
         let stk = &mut tc_stk![Type::new_pair(Type::Int, Type::Unit)];
         assert_eq!(
-            super::typecheck_instruction(&parse("PACK").unwrap(), &mut Ctx::default(), None, stk),
+            super::typecheck_instruction(&parse("PACK").unwrap(), &mut Gas::default(), None, stk),
             Ok(Instruction::Pack)
         );
         assert_eq!(stk, &tc_stk![Type::Bytes]);
@@ -6779,7 +6774,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PACK").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut tc_stk![Type::Operation]
             ),
             Err(TcError::InvalidTypeProperty(
@@ -6795,7 +6790,7 @@ mod typecheck_tests {
         assert_eq!(
             super::typecheck_instruction(
                 &parse("SELF").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 Some(&[(Entrypoint::default(), Type::Nat)].into()),
                 stk
             ),
@@ -6810,7 +6805,7 @@ mod typecheck_tests {
         assert_eq!(
             super::typecheck_instruction(
                 &parse("SELF %foo").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 Some(
                     &[
                         (Entrypoint::default(), Type::Nat),
@@ -6831,7 +6826,7 @@ mod typecheck_tests {
         assert_eq!(
             super::typecheck_instruction(
                 &parse("SELF %bar").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 Some(&[(Entrypoint::default(), Type::Nat)].into()),
                 stk
             ),
@@ -6845,7 +6840,7 @@ mod typecheck_tests {
         assert_eq!(
             super::typecheck_instruction(
                 &parse("SELF %bar %baz").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 Some(&[(Entrypoint::default(), Type::Nat)].into()),
                 stk
             ),
@@ -6855,7 +6850,7 @@ mod typecheck_tests {
 
     #[test]
     fn self_instr_contract() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter (or (int %foo) (unit %default));",
@@ -6863,7 +6858,7 @@ mod typecheck_tests {
                 "code { DROP; SELF %foo; UNIT; FAILWITH };",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Ok(ContractScript {
                 parameter: Type::new_or(Type::Int, Type::Unit),
                 storage: Type::Unit,
@@ -6890,7 +6885,7 @@ mod typecheck_tests {
 
     #[test]
     fn self_instr_contract_overlong_ep() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter (or (int %qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq) (unit %default));",
@@ -6898,7 +6893,7 @@ mod typecheck_tests {
                 "code { DROP; SELF %qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq; UNIT; FAILWITH };",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Err(TcError::EntrypointError(ByteReprError::WrongFormat(
                 "entrypoint name must be at most 31 characters long, but it is 32 characters long"
                     .into()
@@ -6910,7 +6905,7 @@ mod typecheck_tests {
     fn self_instr_contract_overlong_field_ann() {
         // NB: overlong field annotations are OK, but they don't work as
         // entrypoints.
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             parse_contract_script(concat!(
                 "parameter (or (int %qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq) (unit %default));",
@@ -6918,7 +6913,7 @@ mod typecheck_tests {
                 "code { DROP; SELF; UNIT; FAILWITH };",
             ))
             .unwrap()
-            .typecheck_script(&mut ctx, true),
+            .typecheck_script(&mut gas, true),
             Ok(ContractScript {
                 parameter: Type::new_or(Type::Int, Type::Unit),
                 storage: Type::Unit,
@@ -6947,7 +6942,7 @@ mod typecheck_tests {
     fn address_instr() {
         let stk = &mut tc_stk![Type::new_contract(Type::Nat)];
         assert_eq!(
-            typecheck_instruction(&parse("ADDRESS").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("ADDRESS").unwrap(), &mut Gas::default(), stk),
             Ok(Instruction::Address)
         );
         assert_eq!(stk, &tc_stk![Type::Address]);
@@ -6960,11 +6955,11 @@ mod typecheck_tests {
 
     #[test]
     fn test_address_mismatch() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("ADDRESS").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut tc_stk![Type::Unit]
             ),
             Err(TcError::NoMatchingOverload {
@@ -6979,7 +6974,7 @@ mod typecheck_tests {
     fn left() {
         let mut stack = tc_stk![Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("LEFT nat").unwrap(), &mut Ctx::default(), &mut stack),
+            typecheck_instruction(&parse("LEFT nat").unwrap(), &mut Gas::default(), &mut stack),
             Ok(Instruction::Left)
         );
         assert_eq!(stack, tc_stk![Type::new_or(Type::Int, Type::Nat)]);
@@ -6996,7 +6991,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("RIGHT nat").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 &mut stack
             ),
             Ok(Instruction::Right)
@@ -7017,7 +7012,7 @@ mod typecheck_tests {
         let go = |s| {
             parse_contract_script(s)
                 .unwrap()
-                .typecheck_script(&mut Ctx::default(), true)
+                .typecheck_script(&mut Gas::default(), true)
         };
 
         // duplicate
@@ -7053,19 +7048,19 @@ mod typecheck_tests {
         assert_eq!(
             parse("DROP 1025")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::ExpectedU10(1025.into()))
         );
         assert_eq!(
             parse("DIP 1024 {}")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::ExpectedU10(1024.into()))
         );
         assert_eq!(
             parse("DUP 65536")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::ExpectedU10(65536.into()))
         );
     }
@@ -7075,7 +7070,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH bytes 0xdeadf00d")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Ok(Push(TypedValue::Bytes(hex::decode("deadf00d").unwrap())))
         );
     }
@@ -7085,7 +7080,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH key \"p2pk67K1dwkDFPB63RZU5H3SoMCvmJdKZDZszc7U4FiGKN2YypKdDCB\"")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Ok(Push(TypedValue::Key(
                 "p2pk67K1dwkDFPB63RZU5H3SoMCvmJdKZDZszc7U4FiGKN2YypKdDCB"
                     .try_into()
@@ -7097,7 +7092,7 @@ mod typecheck_tests {
                 "PUSH key 0x01022c380cd1ff286a0a1a7c3aad6e891d237fa82e2a7cdeec08ccb55e90fdef995f"
             )
             .unwrap()
-            .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            .typecheck_instruction(&mut Gas::default(), None, &[]),
             Ok(Push(TypedValue::Key(
                 "sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD"
                     .try_into()
@@ -7111,7 +7106,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH key_hash \"tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw\"")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Ok(Push(TypedValue::KeyHash(
                 "tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw".try_into().unwrap()
             )))
@@ -7119,7 +7114,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH key_hash 0x036342f30484dd46b6074373aa6ddca9dfb70083d6")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Ok(Push(TypedValue::KeyHash(
                 "tz4J46gb6DxDFYxkex8k9sKiYZwjuiaoNSqN".try_into().unwrap()
             )))
@@ -7131,7 +7126,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH signature \"p2sigRmXDp38VNVaEQH28LYukfLPn8QB5hPEberhvQrrUpRscDZJrrApbRh2u46PTVTwKXjxTLKNN9dyLhPQU6U6jWPGxe4d9v\"")
             .unwrap()
-            .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            .typecheck_instruction(&mut Gas::default(), None, &[]),
             Ok(Push(TypedValue::Signature(
                         "p2sigRmXDp38VNVaEQH28LYukfLPn8QB5hPEberhvQrrUpRscDZJrrApbRh2u46PTVTwKXjxTLKNN9dyLhPQU6U6jWPGxe4d9v"
                         .try_into()
@@ -7144,7 +7139,7 @@ mod typecheck_tests {
                 "PUSH signature 0x22222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222"
                 )
             .unwrap()
-            .typecheck_instruction(&mut Ctx::default(), None, &[]),
+            .typecheck_instruction(&mut Gas::default(), None, &[]),
             Ok(Push(TypedValue::Signature(
                         "sigSTJNiwaPuZXmU2FscxNy9scPjjwpbxpPD5rY1QRBbyb4gHXYU7jN9Wcbs9sE4GMzuiSSG5S2egeyJhUjW1uJEgw4AWAXj"
                         .try_into()
@@ -7157,7 +7152,7 @@ mod typecheck_tests {
     fn check_signature() {
         assert_eq!(
             parse("CHECK_SIGNATURE").unwrap().typecheck_instruction(
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 None,
                 &[
                     parse("bytes").unwrap(),
@@ -7173,7 +7168,7 @@ mod typecheck_tests {
     fn check_signature_wrong_type() {
         assert_eq!(
             parse("CHECK_SIGNATURE").unwrap().typecheck_instruction(
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 None,
                 &[
                     parse("bytes").unwrap(),
@@ -7198,7 +7193,7 @@ mod typecheck_tests {
     fn pairing_check() {
         assert_eq!(
             parse("PAIRING_CHECK").unwrap().typecheck_instruction(
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 None,
                 &[parse("list (pair bls12_381_g1 bls12_381_g2)").unwrap()]
             ),
@@ -7210,7 +7205,7 @@ mod typecheck_tests {
     fn pairing_check_wrong_type() {
         assert_eq!(
             parse("PAIRING_CHECK").unwrap().typecheck_instruction(
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 None,
                 &[parse("list (pair bls12_381_g1 bls12_381_g1)").unwrap()]
             ),
@@ -7247,7 +7242,7 @@ mod typecheck_tests {
             overload: overloads::Mul,
         ) {
             assert_eq!(
-                typecheck_instruction(&parse("MUL").unwrap(), &mut Ctx::default(), &mut stack),
+                typecheck_instruction(&parse("MUL").unwrap(), &mut Gas::default(), &mut stack),
                 Ok(Mul(overload))
             );
             assert_eq!(stack, expected_stack);
@@ -7295,7 +7290,7 @@ mod typecheck_tests {
         fn wrong_type() {
             assert_eq!(
                 parse("MUL").unwrap().typecheck_instruction(
-                    &mut Ctx::default(),
+                    &mut Gas::default(),
                     None,
                     &[parse("unit").unwrap(), parse("unit").unwrap()]
                 ),
@@ -7324,7 +7319,7 @@ mod typecheck_tests {
             overload: overloads::Neg,
         ) {
             assert_eq!(
-                typecheck_instruction(&parse("NEG").unwrap(), &mut Ctx::default(), &mut stack),
+                typecheck_instruction(&parse("NEG").unwrap(), &mut Gas::default(), &mut stack),
                 Ok(Neg(overload))
             );
             assert_eq!(stack, expected_stack)
@@ -7353,7 +7348,7 @@ mod typecheck_tests {
         fn wrong_type() {
             assert_eq!(
                 parse("NEG").unwrap().typecheck_instruction(
-                    &mut Ctx::default(),
+                    &mut Gas::default(),
                     None,
                     &[parse("unit").unwrap()]
                 ),
@@ -7375,13 +7370,13 @@ mod typecheck_tests {
     fn transfer_tokens() {
         let stk = &mut tc_stk![Type::new_contract(Type::Nat), Type::Mutez, Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Gas::default(), stk),
             Err(TypesNotEqual(Type::Nat, Type::Int).into())
         );
 
         let stk = &mut tc_stk![Type::new_contract(Type::Nat), Type::Int, Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::TRANSFER_TOKENS,
                 stack: stk![Type::new_contract(Type::Nat), Type::Int, Type::Nat],
@@ -7391,7 +7386,7 @@ mod typecheck_tests {
 
         let stk = &mut tc_stk![Type::Nat, Type::Mutez, Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::TRANSFER_TOKENS,
                 stack: stk![Type::Nat, Type::Mutez, Type::Nat],
@@ -7401,7 +7396,7 @@ mod typecheck_tests {
 
         let stk = &mut tc_stk![Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::TRANSFER_TOKENS,
                 stack: stk![Type::Nat],
@@ -7411,7 +7406,7 @@ mod typecheck_tests {
 
         let stk = &mut tc_stk![Type::new_contract(Type::Nat), Type::Mutez, Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("TRANSFER_TOKENS").unwrap(), &mut Gas::default(), stk),
             Ok(Instruction::TransferTokens)
         );
         assert_eq!(stk, &tc_stk![Type::Operation]);
@@ -7421,7 +7416,7 @@ mod typecheck_tests {
     fn set_delegate() {
         let stk = &mut tc_stk![Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("SET_DELEGATE").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("SET_DELEGATE").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::SET_DELEGATE,
                 stack: stk![Type::Nat],
@@ -7431,7 +7426,7 @@ mod typecheck_tests {
 
         let stk = &mut tc_stk![Type::new_option(Type::Nat)];
         assert_eq!(
-            typecheck_instruction(&parse("SET_DELEGATE").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("SET_DELEGATE").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::SET_DELEGATE,
                 stack: stk![Type::new_option(Type::Nat)],
@@ -7441,7 +7436,7 @@ mod typecheck_tests {
 
         let stk = &mut tc_stk![Type::new_option(Type::KeyHash)];
         assert_eq!(
-            typecheck_instruction(&parse("SET_DELEGATE").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("SET_DELEGATE").unwrap(), &mut Gas::default(), stk),
             Ok(Instruction::SetDelegate)
         );
         assert_eq!(stk, &tc_stk![Type::Operation]);
@@ -7451,7 +7446,7 @@ mod typecheck_tests {
     fn slice_string() {
         let stk = &mut tc_stk![Type::String, Type::Nat, Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("SLICE").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("SLICE").unwrap(), &mut Gas::default(), stk),
             Ok(Instruction::Slice(overloads::Slice::String))
         );
         assert_eq!(stk, &tc_stk![Type::new_option(Type::String)]);
@@ -7461,7 +7456,7 @@ mod typecheck_tests {
     fn slice_bytes() {
         let stk = &mut tc_stk![Type::Bytes, Type::Nat, Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("SLICE").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("SLICE").unwrap(), &mut Gas::default(), stk),
             Ok(Instruction::Slice(overloads::Slice::Bytes))
         );
         assert_eq!(stk, &tc_stk![Type::new_option(Type::Bytes)]);
@@ -7474,11 +7469,11 @@ mod typecheck_tests {
 
     #[test]
     fn slice_wrong_type() {
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
             typecheck_instruction(
                 &parse("SLICE").unwrap(),
-                &mut ctx,
+                &mut gas,
                 &mut tc_stk![Type::Bool, Type::Nat, Type::Nat]
             ),
             Err(TcError::NoMatchingOverload {
@@ -7494,7 +7489,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH (lambda unit unit) Unit")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::InvalidValueForType(
                 "App(Unit, [], [])".to_owned(),
                 Type::new_lambda(Type::Unit, Type::Unit)
@@ -7507,7 +7502,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH (lambda unit unit) { DROP ; UNIT }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Ok(Push(TypedValue::Lambda(Closure::Lambda(Lambda::Lambda {
                 micheline_code: parse("{DROP; UNIT}").unwrap(),
                 code: vec![Drop(None), Unit].into()
@@ -7516,7 +7511,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("LAMBDA unit unit { DROP ; UNIT }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Ok(Lambda(Lambda::Lambda {
                 micheline_code: parse("{DROP; UNIT}").unwrap(),
                 code: vec![Drop(None), Unit].into()
@@ -7529,7 +7524,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH (lambda unit int) { DROP ; UNIT }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::StacksNotEqual(
                 stk![Type::Unit],
                 stk![Type::Int],
@@ -7539,7 +7534,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("LAMBDA unit int { DROP ; UNIT }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::StacksNotEqual(
                 stk![Type::Unit],
                 stk![Type::Int],
@@ -7553,7 +7548,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH (lambda int unit) { IF { UNIT } { UNIT } }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::IF,
                 stack: stk![Type::Int],
@@ -7563,7 +7558,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("LAMBDA int unit { IF { UNIT } { UNIT } }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::IF,
                 stack: stk![Type::Int],
@@ -7577,13 +7572,13 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH (lambda unit unit) { SELF }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), Some(&parse("unit").unwrap()), &[]),
+                .typecheck_instruction(&mut Gas::default(), Some(&parse("unit").unwrap()), &[]),
             Err(TcError::SelfForbidden)
         );
         assert_eq!(
             parse("LAMBDA unit unit { SELF }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), Some(&parse("unit").unwrap()), &[]),
+                .typecheck_instruction(&mut Gas::default(), Some(&parse("unit").unwrap()), &[]),
             Err(TcError::SelfForbidden)
         );
     }
@@ -7593,13 +7588,13 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH (lambda unit unit) (Lambda_rec { SELF })")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), Some(&parse("unit").unwrap()), &[]),
+                .typecheck_instruction(&mut Gas::default(), Some(&parse("unit").unwrap()), &[]),
             Err(TcError::SelfForbidden)
         );
         assert_eq!(
             parse("LAMBDA_REC unit unit { SELF }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), Some(&parse("unit").unwrap()), &[]),
+                .typecheck_instruction(&mut Gas::default(), Some(&parse("unit").unwrap()), &[]),
             Err(TcError::SelfForbidden)
         );
     }
@@ -7609,7 +7604,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH (lambda unit unit) (Lambda_rec { SWAP ; DROP })")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Ok(Push(TypedValue::Lambda(Closure::Lambda(
                 Lambda::LambdaRec {
                     micheline_code: parse("{SWAP; DROP}").unwrap(),
@@ -7622,7 +7617,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("LAMBDA_REC unit unit { SWAP ; DROP }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Ok(Lambda(Lambda::LambdaRec {
                 micheline_code: parse("{SWAP; DROP}").unwrap(),
                 code: vec![Swap, Drop(None)].into(),
@@ -7637,7 +7632,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH (lambda unit unit) (Lambda_rec { DROP })")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::StacksNotEqual(
                 stk![Type::new_lambda(Type::Unit, Type::Unit)],
                 stk![Type::Unit],
@@ -7647,7 +7642,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("LAMBDA_REC unit unit { DROP }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::StacksNotEqual(
                 stk![Type::new_lambda(Type::Unit, Type::Unit)],
                 stk![Type::Unit],
@@ -7661,7 +7656,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("PUSH (lambda int unit) (Lambda_rec { IF { UNIT } { UNIT }; DIP { DROP } })")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::IF,
                 stack: stk![Type::new_lambda(Type::Int, Type::Unit), Type::Int],
@@ -7671,7 +7666,7 @@ mod typecheck_tests {
         assert_eq!(
             parse("LAMBDA_REC int unit { IF { UNIT } { UNIT }; DIP { DROP } }")
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[]),
+                .typecheck_instruction(&mut Gas::default(), None, &[]),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::IF,
                 stack: stk![Type::new_lambda(Type::Int, Type::Unit), Type::Int],
@@ -7738,7 +7733,7 @@ mod typecheck_tests {
     fn ticket() {
         let stk = &mut tc_stk![Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("TICKET").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("TICKET").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::TICKET,
                 stack: stk![Type::Nat],
@@ -7748,7 +7743,7 @@ mod typecheck_tests {
 
         let stk = &mut tc_stk![Type::Nat, Type::Unit];
         assert_eq!(
-            typecheck_instruction(&parse("TICKET").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("TICKET").unwrap(), &mut Gas::default(), stk),
             Ok(Instruction::Ticket(Type::Unit))
         );
         assert_eq!(
@@ -7761,7 +7756,7 @@ mod typecheck_tests {
     fn read_ticket() {
         let stk = &mut tc_stk![Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("READ_TICKET").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("READ_TICKET").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::READ_TICKET,
                 stack: stk![Type::Nat],
@@ -7771,9 +7766,9 @@ mod typecheck_tests {
 
         let test_ticket = Type::new_ticket(Type::Int);
         let stk = &mut tc_stk![test_ticket.clone()];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("READ_TICKET").unwrap(), &mut ctx, stk),
+            typecheck_instruction(&parse("READ_TICKET").unwrap(), &mut gas, stk),
             Ok(ReadTicket)
         );
         assert_eq!(
@@ -7789,7 +7784,7 @@ mod typecheck_tests {
     fn split_ticket() {
         let stk = &mut tc_stk![Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("SPLIT_TICKET").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("SPLIT_TICKET").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::SPLIT_TICKET,
                 stack: stk![Type::Nat],
@@ -7798,7 +7793,7 @@ mod typecheck_tests {
         );
         let stk = &mut tc_stk![Type::Nat, Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("SPLIT_TICKET").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("SPLIT_TICKET").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::SPLIT_TICKET,
                 stack: stk![Type::Nat, Type::Nat],
@@ -7810,7 +7805,7 @@ mod typecheck_tests {
             Type::new_ticket(Type::Unit)
         ];
         assert_eq!(
-            typecheck_instruction(&parse("SPLIT_TICKET").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("SPLIT_TICKET").unwrap(), &mut Gas::default(), stk),
             Ok(SplitTicket)
         );
         assert_eq!(
@@ -7826,7 +7821,7 @@ mod typecheck_tests {
     fn join_tickets() {
         let stk = &mut tc_stk![Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("JOIN_TICKETS").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("JOIN_TICKETS").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::JOIN_TICKETS,
                 stack: stk![Type::Nat],
@@ -7836,7 +7831,7 @@ mod typecheck_tests {
 
         let stk = &mut tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("JOIN_TICKETS").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("JOIN_TICKETS").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::JOIN_TICKETS,
                 stack: stk![],
@@ -7849,7 +7844,7 @@ mod typecheck_tests {
             Type::new_ticket(Type::Unit)
         )];
         assert_eq!(
-            typecheck_instruction(&parse("JOIN_TICKETS").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("JOIN_TICKETS").unwrap(), &mut Gas::default(), stk),
             Err(TcError::TypesNotEqual(TypesNotEqual(Type::Int, Type::Unit)))
         );
 
@@ -7858,7 +7853,7 @@ mod typecheck_tests {
             Type::new_ticket(Type::Unit)
         )];
         assert_eq!(
-            typecheck_instruction(&parse("JOIN_TICKETS").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("JOIN_TICKETS").unwrap(), &mut Gas::default(), stk),
             Ok(JoinTickets)
         );
 
@@ -7871,9 +7866,9 @@ mod typecheck_tests {
     #[test]
     fn hash_key() {
         let stk = &mut tc_stk![Type::Key];
-        let ctx = &mut Ctx::default();
+        let gas = &mut Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("HASH_KEY").unwrap(), ctx, stk),
+            typecheck_instruction(&parse("HASH_KEY").unwrap(), gas, stk),
             Ok(HashKey)
         )
     }
@@ -7881,9 +7876,9 @@ mod typecheck_tests {
     #[test]
     fn hash_key_bad_arg() {
         let stk = &mut tc_stk![Type::Bytes];
-        let ctx = &mut Ctx::default();
+        let gas = &mut Gas::default();
         assert_eq!(
-            typecheck_instruction(&parse("HASH_KEY").unwrap(), ctx, stk),
+            typecheck_instruction(&parse("HASH_KEY").unwrap(), gas, stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::HASH_KEY,
                 stack: stk![Type::Bytes],
@@ -7915,7 +7910,7 @@ mod typecheck_tests {
                         assert_eq!(
                             typecheck_instruction(
                                 &parse(stringify!($instr_prim)).unwrap(),
-                                &mut Ctx::default(),
+                                &mut Gas::default(),
                                 &mut stack,
                             ),
                             Ok($expected_instruction),
@@ -7938,7 +7933,7 @@ mod typecheck_tests {
                         assert_eq!(
                             typecheck_instruction(
                                 &parse(stringify!($instr_prim)).unwrap(),
-                                &mut Ctx::default(),
+                                &mut Gas::default(),
                                 &mut stack,
                             ),
                             Err(TcError::NoMatchingOverload {
@@ -7955,7 +7950,7 @@ mod typecheck_tests {
                             typecheck_instruction(
                                 // instruction with unit argument
                                 &parse(&format!("{} unit", stringify!($instr_prim))).unwrap(),
-                                &mut Ctx::default(),
+                                &mut Gas::default(),
                                 &mut tc_stk![],
                             ),
                             Err(TcError::UnexpectedMicheline(_)),
@@ -7975,7 +7970,7 @@ mod typecheck_tests {
     fn balance() {
         let stk = &mut tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("BALANCE").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("BALANCE").unwrap(), &mut Gas::default(), stk),
             Ok(Balance)
         );
 
@@ -7986,7 +7981,7 @@ mod typecheck_tests {
     fn contract() {
         let stk = &mut tc_stk![Type::Address];
         assert_eq!(
-            typecheck_instruction(&parse("CONTRACT int").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("CONTRACT int").unwrap(), &mut Gas::default(), stk),
             Ok(Contract(Type::Int, Entrypoint::default()))
         );
         assert_eq!(
@@ -7996,7 +7991,7 @@ mod typecheck_tests {
 
         let stk = &mut tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("CONTRACT int").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("CONTRACT int").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::CONTRACT,
                 stack: stk![],
@@ -8006,7 +8001,7 @@ mod typecheck_tests {
 
         let stk = &mut tc_stk![Type::Unit];
         assert_eq!(
-            typecheck_instruction(&parse("CONTRACT int").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("CONTRACT int").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::CONTRACT,
                 stack: stk![Type::Unit],
@@ -8019,7 +8014,7 @@ mod typecheck_tests {
     fn level() {
         let stk = &mut tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("LEVEL").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("LEVEL").unwrap(), &mut Gas::default(), stk),
             Ok(Level)
         );
 
@@ -8030,7 +8025,7 @@ mod typecheck_tests {
     fn min_block_time() {
         let stk = &mut tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("MIN_BLOCK_TIME").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("MIN_BLOCK_TIME").unwrap(), &mut Gas::default(), stk),
             Ok(MinBlockTime)
         );
 
@@ -8041,7 +8036,7 @@ mod typecheck_tests {
     fn self_address() {
         let stk = &mut tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("SELF_ADDRESS").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("SELF_ADDRESS").unwrap(), &mut Gas::default(), stk),
             Ok(SelfAddress)
         );
 
@@ -8052,7 +8047,7 @@ mod typecheck_tests {
     fn sender() {
         let stk = &mut tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("SENDER").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("SENDER").unwrap(), &mut Gas::default(), stk),
             Ok(Sender)
         );
 
@@ -8063,7 +8058,7 @@ mod typecheck_tests {
     fn source() {
         let stk = &mut tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("SOURCE").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("SOURCE").unwrap(), &mut Gas::default(), stk),
             Ok(Source)
         );
 
@@ -8076,7 +8071,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH timestamp 1571659294").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Ok(Push(TypedValue::timestamp(1571659294)))
@@ -8086,7 +8081,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH timestamp \"2019-10-21T12:01:34Z\"").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Ok(Push(TypedValue::timestamp(1571659294)))
@@ -8096,7 +8091,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH timestamp \"1571659294\"").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Ok(Push(TypedValue::timestamp(1571659294)))
@@ -8106,7 +8101,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH timestamp \"ABCD\"").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::InvalidValueForType(
@@ -8119,7 +8114,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("PUSH timestamp \"3.5\"").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::InvalidValueForType(
@@ -8135,7 +8130,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IMPLICIT_ACCOUNT").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Ok(ImplicitAccount)
@@ -8146,7 +8141,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IMPLICIT_ACCOUNT").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::NoMatchingOverload {
@@ -8160,7 +8155,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IMPLICIT_ACCOUNT").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::NoMatchingOverload {
@@ -8177,7 +8172,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IS_IMPLICIT_ACCOUNT").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Ok(IsImplicitAccount)
@@ -8188,7 +8183,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IS_IMPLICIT_ACCOUNT").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::NoMatchingOverload {
@@ -8202,7 +8197,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("IS_IMPLICIT_ACCOUNT").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::NoMatchingOverload {
@@ -8217,7 +8212,7 @@ mod typecheck_tests {
     fn now() {
         let stk = &mut tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("NOW").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("NOW").unwrap(), &mut Gas::default(), stk),
             Ok(Now)
         );
 
@@ -8228,7 +8223,7 @@ mod typecheck_tests {
     fn voting_power() {
         let stk = &mut tc_stk![Type::KeyHash];
         assert_eq!(
-            typecheck_instruction(&parse("VOTING_POWER").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("VOTING_POWER").unwrap(), &mut Gas::default(), stk),
             Ok(VotingPower)
         );
 
@@ -8236,7 +8231,7 @@ mod typecheck_tests {
 
         let stk = &mut tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("VOTING_POWER").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("VOTING_POWER").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::VOTING_POWER,
                 stack: stk![],
@@ -8246,7 +8241,7 @@ mod typecheck_tests {
 
         let stk = &mut tc_stk![Type::Unit];
         assert_eq!(
-            typecheck_instruction(&parse("VOTING_POWER").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("VOTING_POWER").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::VOTING_POWER,
                 stack: stk![Type::Unit],
@@ -8261,7 +8256,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("TOTAL_VOTING_POWER").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Ok(TotalVotingPower)
@@ -8274,7 +8269,7 @@ mod typecheck_tests {
     fn dig() {
         let stk = &mut tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String];
         assert_eq!(
-            typecheck_instruction(&parse("DIG 3").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("DIG 3").unwrap(), &mut Gas::default(), stk),
             Ok(Dig(3))
         );
 
@@ -8286,7 +8281,7 @@ mod typecheck_tests {
         // DIG 0
         let stk = &mut tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String];
         assert_eq!(
-            typecheck_instruction(&parse("DIG 0").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("DIG 0").unwrap(), &mut Gas::default(), stk),
             Ok(Dig(0))
         );
 
@@ -8298,7 +8293,7 @@ mod typecheck_tests {
         // DIG 1
         let stk = &mut tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String];
         assert_eq!(
-            typecheck_instruction(&parse("DIG 1").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("DIG 1").unwrap(), &mut Gas::default(), stk),
             Ok(Dig(1))
         );
 
@@ -8312,7 +8307,7 @@ mod typecheck_tests {
     fn dug() {
         let stk = &mut tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String];
         assert_eq!(
-            typecheck_instruction(&parse("DUG 2").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("DUG 2").unwrap(), &mut Gas::default(), stk),
             Ok(Dug(2))
         );
 
@@ -8324,7 +8319,7 @@ mod typecheck_tests {
         // DUG 0
         let stk = &mut tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String];
         assert_eq!(
-            typecheck_instruction(&parse("DUG 0").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("DUG 0").unwrap(), &mut Gas::default(), stk),
             Ok(Dug(0))
         );
 
@@ -8336,7 +8331,7 @@ mod typecheck_tests {
         // DUG 1
         let stk = &mut tc_stk![Type::Unit, Type::Int, Type::Nat, Type::String];
         assert_eq!(
-            typecheck_instruction(&parse("DUG 1").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("DUG 1").unwrap(), &mut Gas::default(), stk),
             Ok(Dug(1))
         );
 
@@ -8350,7 +8345,7 @@ mod typecheck_tests {
     fn unpack() {
         let stk = &mut tc_stk![Type::Bytes];
         assert_eq!(
-            typecheck_instruction(&parse("UNPACK int").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("UNPACK int").unwrap(), &mut Gas::default(), stk),
             Ok(Unpack(Type::Int))
         );
         assert_eq!(stk, &tc_stk![Type::new_option(Type::Int)]);
@@ -8362,7 +8357,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("UNPACK (contract unit)").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::InvalidTypeProperty(
@@ -8376,7 +8371,7 @@ mod typecheck_tests {
     fn unpack_bad_stack() {
         let stk = &mut tc_stk![Type::Unit];
         assert_eq!(
-            typecheck_instruction(&parse("UNPACK int").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("UNPACK int").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::UNPACK,
                 stack: stk![Type::Unit],
@@ -8396,7 +8391,7 @@ mod typecheck_tests {
 
         let stk = &mut tc_stk![Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("EMIT %mytag nat").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("EMIT %mytag nat").unwrap(), &mut Gas::default(), stk),
             Ok(Instruction::Emit {
                 tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
                 arg_ty: Right(parse("nat").unwrap())
@@ -8407,7 +8402,7 @@ mod typecheck_tests {
         // Instruction with tag only
         let stk = &mut tc_stk![Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("EMIT %mytag").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("EMIT %mytag").unwrap(), &mut Gas::default(), stk),
             Ok(Instruction::Emit {
                 tag: Some(FieldAnnotation::from_str_unchecked("mytag")),
                 arg_ty: Left(Type::Nat)
@@ -8417,7 +8412,7 @@ mod typecheck_tests {
         // Only pushable types can be emitted.
         let stk = &mut tc_stk![Type::Operation];
         assert_eq!(
-            typecheck_instruction(&parse("EMIT").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("EMIT").unwrap(), &mut Gas::default(), stk),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Pushable,
                 Type::Operation
@@ -8427,7 +8422,7 @@ mod typecheck_tests {
         // Only pushable types can be emitted with type explicitly provided.
         let stk = &mut tc_stk![Type::Operation];
         assert_eq!(
-            typecheck_instruction(&parse("EMIT operation").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("EMIT operation").unwrap(), &mut Gas::default(), stk),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Pushable,
                 Type::Operation
@@ -8437,7 +8432,7 @@ mod typecheck_tests {
         // Instruction with type arg only
         let stk = &mut tc_stk![Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("EMIT nat").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("EMIT nat").unwrap(), &mut Gas::default(), stk),
             Ok(Instruction::Emit {
                 tag: None,
                 arg_ty: Right(parse("nat").unwrap())
@@ -8447,7 +8442,7 @@ mod typecheck_tests {
         // Instruction with type no args
         let stk = &mut tc_stk![Type::Nat];
         assert_eq!(
-            typecheck_instruction(&parse("EMIT").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("EMIT").unwrap(), &mut Gas::default(), stk),
             Ok(Instruction::Emit {
                 tag: None,
                 arg_ty: Left(Type::Nat)
@@ -8457,14 +8452,14 @@ mod typecheck_tests {
         // Type from stack and from argument should be same.
         let stk = &mut tc_stk![Type::Int];
         assert_eq!(
-            typecheck_instruction(&parse("EMIT %mytag nat").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("EMIT %mytag nat").unwrap(), &mut Gas::default(), stk),
             Err(TcError::TypesNotEqual(TypesNotEqual(Type::Nat, Type::Int)))
         );
 
         // too short stack
         let stk = &mut tc_stk![];
         assert_eq!(
-            typecheck_instruction(&parse("EMIT %mytag nat").unwrap(), &mut Ctx::default(), stk),
+            typecheck_instruction(&parse("EMIT %mytag nat").unwrap(), &mut Gas::default(), stk),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::EMIT,
                 stack: stk![],
@@ -8477,7 +8472,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("EMIT %mytag nat nat").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::UnexpectedMicheline(
@@ -8490,7 +8485,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("EMIT %mytagmytagmytagmytagmytagmytagmytag").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::EntrypointError(ByteReprError::WrongFormat(
@@ -8503,7 +8498,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse("EMIT %mytagmytagmytagmytagmytagmytagmytag nat").unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::EntrypointError(ByteReprError::WrongFormat(
@@ -8516,16 +8511,16 @@ mod typecheck_tests {
     #[test]
     fn create_contract() {
         let stk = &mut tc_stk![Type::Unit, Type::Mutez, Type::new_option(Type::KeyHash)];
-        let mut ctx = Ctx::default();
+        let mut gas = Gas::default();
         let create_contract_src = "CREATE_CONTRACT { parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}";
         let cs_mich =
             parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
                 .unwrap();
-        let cs = cs_mich.typecheck_script(&mut ctx, true).unwrap();
+        let cs = cs_mich.typecheck_script(&mut gas, true).unwrap();
         assert_eq!(
             typecheck_instruction(
                 &parse(create_contract_src).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Ok(CreateContract(Rc::new(cs), &cs_mich))
@@ -8537,7 +8532,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(create_contract_src).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::NoMatchingOverload {
@@ -8551,7 +8546,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(create_contract_src).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::NoMatchingOverload {
@@ -8565,7 +8560,7 @@ mod typecheck_tests {
         assert_eq!(
             typecheck_instruction(
                 &parse(create_contract_src).unwrap(),
-                &mut Ctx::default(),
+                &mut Gas::default(),
                 stk
             ),
             Err(TcError::NoMatchingOverload {

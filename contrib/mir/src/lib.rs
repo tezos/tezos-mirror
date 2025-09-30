@@ -77,7 +77,7 @@
 //!
 //! ```
 //! use mir::ast::*;
-//! use mir::context::Ctx;
+//! use mir::context::{Ctx, TypecheckingCtx};
 //! use mir::parser::Parser;
 //! use typed_arena::Arena;
 //! let script = r#"
@@ -99,7 +99,7 @@
 //! let mut ctx = Ctx::default();
 //! // You can change various things about the context here, see [Ctx]
 //! // documentation.
-//! let contract_typechecked = contract_micheline.typecheck_script(&mut ctx, true).unwrap();
+//! let contract_typechecked = contract_micheline.typecheck_script(ctx.gas(), true).unwrap();
 //! // We construct parameter and storage manually, but you'd probably
 //! // parse or deserialize them from some sort of input/storage, so we use
 //! // parser and decoder respectively.
@@ -153,7 +153,7 @@ mod tests {
 
     use crate::ast::annotations::FieldAnnotation;
     use crate::ast::*;
-    use crate::context::Ctx;
+    use crate::context::{Ctx, TypecheckingCtx};
     use crate::gas::Gas;
 
     use crate::interpreter;
@@ -177,7 +177,7 @@ mod tests {
     fn interpret_test_expect_success() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let ast = ast
-            .typecheck_instruction(&mut Ctx::default(), None, &[parse("nat").unwrap()])
+            .typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()])
             .unwrap();
         let mut istack = stk![TypedValue::nat(10)];
         let temp = Arena::new();
@@ -192,7 +192,7 @@ mod tests {
         let ast = parse("{ PUSH mutez 100; PUSH mutez 500; ADD }").unwrap();
         let temp = Arena::new();
         let mut ctx = Ctx::default();
-        let ast = ast.typecheck_instruction(&mut ctx, None, &[]).unwrap();
+        let ast = ast.typecheck_instruction(ctx.gas(), None, &[]).unwrap();
         let mut istack = stk![];
         assert!(ast.interpret(&mut ctx, &temp, &mut istack).is_ok());
         assert_eq!(istack, stk![TypedValue::Mutez(600)]);
@@ -202,7 +202,7 @@ mod tests {
     fn interpret_test_gas_consumption() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let ast = ast
-            .typecheck_instruction(&mut Ctx::default(), None, &[parse("nat").unwrap()])
+            .typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()])
             .unwrap();
         let mut istack = stk![TypedValue::nat(5)];
         let temp = Arena::new();
@@ -217,7 +217,7 @@ mod tests {
     fn interpret_test_gas_out_of_gas() {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let ast = ast
-            .typecheck_instruction(&mut Ctx::default(), None, &[parse("nat").unwrap()])
+            .typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()])
             .unwrap();
         let mut istack = stk![TypedValue::nat(5)];
         let temp = Arena::new();
@@ -233,7 +233,7 @@ mod tests {
     fn interpret_test_macro_if_some() {
         let ast = parse(MACRO_IF_SOME_SRC).unwrap();
         let ast = ast
-            .typecheck_instruction(&mut Ctx::default(), None, &[parse("option nat").unwrap()])
+            .typecheck_instruction(&mut Gas::default(), None, &[parse("option nat").unwrap()])
             .unwrap();
         let mut istack = stk![TypedValue::new_option(Some(TypedValue::nat(5)))];
         let temp = Arena::new();
@@ -253,7 +253,7 @@ mod tests {
         let ast = parse(FIBONACCI_SRC).unwrap();
         let mut stack = tc_stk![Type::Nat];
         assert!(
-            typechecker::typecheck_instruction(&ast, &mut Ctx::default(), None, &mut stack).is_ok()
+            typechecker::typecheck_instruction(&ast, &mut Gas::default(), None, &mut stack).is_ok()
         );
         assert_eq!(stack, tc_stk![Type::Int])
     }
@@ -265,7 +265,7 @@ mod tests {
         let start_milligas = ctx.gas.milligas();
         report_gas(&mut ctx, |ctx| {
             assert!(ast
-                .typecheck_instruction(ctx, None, &[parse("nat").unwrap()])
+                .typecheck_instruction(ctx.gas(), None, &[parse("nat").unwrap()])
                 .is_ok());
         });
         assert_eq!(start_milligas - ctx.gas.milligas(), 12680);
@@ -274,10 +274,8 @@ mod tests {
     #[test]
     fn typecheck_out_of_gas() {
         let ast = parse(FIBONACCI_SRC).unwrap();
-        let ctx = &mut Ctx::default();
-        ctx.gas = Gas::new(1000);
         assert_eq!(
-            ast.typecheck_instruction(ctx, None, &[parse("nat").unwrap()]),
+            ast.typecheck_instruction(&mut Gas::new(1000), None, &[parse("nat").unwrap()]),
             Err(typechecker::TcError::OutOfGas(crate::gas::OutOfGas))
         );
     }
@@ -287,7 +285,7 @@ mod tests {
         use typechecker::{NoMatchingOverloadReason, TcError};
         let ast = parse(FIBONACCI_ILLTYPED_SRC).unwrap();
         assert_eq!(
-            ast.typecheck_instruction(&mut Ctx::default(), None, &[parse("nat").unwrap()]),
+            ast.typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()]),
             Err(TcError::NoMatchingOverload {
                 instr: crate::lexer::Prim::DUP,
                 stack: stk![Type::Int, Type::Int, Type::Int],
@@ -341,7 +339,7 @@ mod tests {
         assert_eq!(
             parse(FIBONACCI_MALFORMED_SRC)
                 .unwrap()
-                .typecheck_instruction(&mut Ctx::default(), None, &[parse("nat").unwrap()]),
+                .typecheck_instruction(&mut Gas::default(), None, &[parse("nat").unwrap()]),
             Err(typechecker::TcError::UnexpectedMicheline(format!(
                 "{:?}",
                 parse("DUP 4 GT").unwrap()
@@ -367,7 +365,7 @@ mod tests {
         use Micheline as M;
         let interp_res = parse_contract_script(VOTE_SRC)
             .unwrap()
-            .typecheck_script(ctx, true)
+            .typecheck_script(ctx.gas(), true)
             .unwrap()
             .interpret(
                 ctx,
@@ -405,7 +403,7 @@ mod tests {
         let ast = parse(instr).unwrap();
         let mut input_failing_type_stack = FailingTypeStack::Ok(input_type_stack);
         let ast =
-            typecheck_instruction(&ast, &mut ctx, None, &mut input_failing_type_stack).unwrap();
+            typecheck_instruction(&ast, ctx.gas(), None, &mut input_failing_type_stack).unwrap();
         assert_eq!(
             input_failing_type_stack,
             FailingTypeStack::Ok(output_type_stack)
@@ -1059,11 +1057,10 @@ mod tests {
     #[test]
     fn create_contract() {
         use tezos_crypto_rs::hash::OperationHash;
-        let mut ctx = Ctx::default();
         let cs_mich =
             parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
                 .unwrap();
-        let cs = cs_mich.typecheck_script(&mut ctx, true).unwrap();
+        let cs = cs_mich.typecheck_script(&mut Gas::default(), true).unwrap();
         let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(CreateContract {
@@ -1161,7 +1158,8 @@ mod tests {
 #[cfg(test)]
 mod multisig_tests {
     use crate::ast::*;
-    use crate::context::Ctx;
+    use crate::context::{Ctx, TypecheckingCtx};
+    use crate::gas::Gas;
     use crate::interpreter::{ContractInterpretError, InterpretError};
     use crate::lexer::Prim;
     use crate::parser::test_helpers::parse_contract_script;
@@ -1257,7 +1255,7 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
-            .typecheck_script(&mut ctx, true)
+            .typecheck_script(&mut Gas::default(), true)
             .unwrap()
             .interpret(
                 &mut ctx,
@@ -1330,7 +1328,7 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
-            .typecheck_script(&mut ctx, true)
+            .typecheck_script(ctx.gas(), true)
             .unwrap()
             .interpret(
                 &mut ctx,
@@ -1386,7 +1384,7 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
-            .typecheck_script(&mut ctx, true)
+            .typecheck_script(ctx.gas(), true)
             .unwrap()
             .interpret(
                 &mut ctx,
