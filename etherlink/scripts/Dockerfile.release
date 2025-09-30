@@ -1,0 +1,9 @@
+ARG BASE=alpine
+
+FROM $BASE 
+ARG TMPDIR
+COPY ${TMPDIR}/octez-evm-node /usr/local/bin/octez-evm-node
+RUN chmod +x /usr/local/bin/octez-evm-node
+RUN apk add which curl procps-ng
+
+ENTRYPOINT ["octez-evm-node"]
