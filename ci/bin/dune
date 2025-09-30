@@ -11,7 +11,8 @@
   teztale_ci
   rollup_node_ci
   sdk_bindings_ci
-  etherlink_ci)
+  etherlink_ci
+  documentation_ci)
  (flags
   (:standard)
   -open Gitlab_ci.Base

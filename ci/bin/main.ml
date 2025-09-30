@@ -114,7 +114,7 @@ let () = Teztale_ci.register ()
 
 let () = Rollup_node_ci.register ()
 
-let () = Documentation.register ()
+let () = Documentation_ci.register ()
 
 let () = Etherlink_ci.register ()
 

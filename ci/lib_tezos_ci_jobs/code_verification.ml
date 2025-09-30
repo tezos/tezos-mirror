@@ -329,6 +329,16 @@ let job_start =
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
 
+(* Short-cut for jobs that have no dependencies except [job_start] on
+   [Before_merging] pipelines. These jobs must also depend on all
+   jobs in the stage [sanity], such that they do not run if this
+   stage does not succeed. Since some sanity jobs are conditional,
+   we make these dependencies optional. *)
+let dependencies_needs_start pipeline_type =
+  match pipeline_type with
+  | Before_merging | Merge_train -> Dependent [Job job_start]
+  | Schedule_extended_test -> Dependent []
+
 (* Use this function to define jobs that depend on the pipeline type.
    Without this function, you risk defining the same job multiple times
    for the same pipeline type. *)
@@ -337,6 +347,9 @@ let depending_on_pipeline_type :
   (* Same as [Cacio.parameterize]: this is just a memoization function.
      We just specialize its type to make it more clear what we are doing. *)
   Cacio.parameterize
+
+let build_cache_key =
+  "dune-build-cache-" ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id)
 
 let job_build_kernels =
   depending_on_pipeline_type @@ fun pipeline_type ->
@@ -348,6 +361,48 @@ let job_build_kernels =
          ~dependent:true
          ())
     ()
+
+(* The build_x86_64 jobs are split in two to keep the artifact size
+   under the 1GB hard limit set by GitLab. *)
+(* [job_build_x86_64_release] builds the released executables. *)
+let job_build_x86_64_release =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_released_binaries
+    ~__POS__
+    ~arch:Amd64
+    ~cpu:Very_high
+    ~storage:Ramfs
+    ~dependencies:(dependencies_needs_start pipeline_type)
+    ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
+    ~sccache_size:"2G"
+    ()
+
+(* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
+   executables, as well as the tezt test suite used by the subsequent
+   'tezt' jobs and TPS evaluation tool. *)
+let job_build_x86_64_extra_dev =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_dynamic_binaries
+    ~name:"oc.build_amd64-extra-dev"
+    ~__POS__
+    ~arch:Amd64
+    ~cpu:Very_high
+    ~dependencies:(dependencies_needs_start pipeline_type)
+    ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
+    "script-inputs/dev-executables"
+  |> enable_dune_cache ~key:build_cache_key ~policy:Push
+
+let job_build_x86_64_extra_exp =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_dynamic_binaries
+    ~name:"oc.build_amd64-extra-exp"
+    ~__POS__
+    ~arch:Amd64
+    ~cpu:Very_high
+    ~dependencies:(dependencies_needs_start pipeline_type)
+    ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
+    "script-inputs/experimental-executables"
+  |> enable_dune_cache ~key:build_cache_key ~policy:Push
 
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
@@ -569,58 +624,10 @@ let jobs pipeline_type =
     ]
     @ mr_only_jobs
   in
-  (* Short-cut for jobs that have no dependencies except [job_start] on
-     [Before_merging] pipelines. These jobs must also depend on all
-     jobs in the stage [sanity], such that they do not run if this
-     stage does not succeed. Since some sanity jobs are conditional,
-     we make these dependencies optional. *)
-  let dependencies_needs_start =
-    match pipeline_type with
-    | Before_merging | Merge_train -> Dependent [Job job_start]
-    | Schedule_extended_test -> Dependent []
-  in
-  (* The build_x86_64 jobs are split in two to keep the artifact size
-     under the 1GB hard limit set by GitLab. *)
-  (* [job_build_x86_64_release] builds the released executables. *)
-  let job_build_x86_64_release =
-    job_build_released_binaries
-      ~__POS__
-      ~arch:Amd64
-      ~cpu:Very_high
-      ~storage:Ramfs
-      ~dependencies:dependencies_needs_start
-      ~rules:(make_rules ~changes:changeset_octez_or_doc ())
-      ~sccache_size:"2G"
-      ()
-  in
-  (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
-     executables, as well as the tezt test suite used by the subsequent
-     'tezt' jobs and TPS evaluation tool. *)
-  let build_cache_key =
-    "dune-build-cache-" ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id)
-  in
-  let job_build_x86_64_extra_dev =
-    job_build_dynamic_binaries
-      ~name:"oc.build_amd64-extra-dev"
-      ~__POS__
-      ~arch:Amd64
-      ~cpu:Very_high
-      ~dependencies:dependencies_needs_start
-      ~rules:(make_rules ~changes:changeset_octez_or_doc ())
-      "script-inputs/dev-executables"
-    |> enable_dune_cache ~key:build_cache_key ~policy:Push
-  in
-  let job_build_x86_64_extra_exp =
-    job_build_dynamic_binaries
-      ~name:"oc.build_amd64-extra-exp"
-      ~__POS__
-      ~arch:Amd64
-      ~cpu:Very_high
-      ~dependencies:dependencies_needs_start
-      ~rules:(make_rules ~changes:changeset_octez_or_doc ())
-      "script-inputs/experimental-executables"
-    |> enable_dune_cache ~key:build_cache_key ~policy:Push
-  in
+  let dependencies_needs_start = dependencies_needs_start pipeline_type in
+  let job_build_x86_64_release = job_build_x86_64_release pipeline_type in
+  let job_build_x86_64_extra_dev = job_build_x86_64_extra_dev pipeline_type in
+  let job_build_x86_64_extra_exp = job_build_x86_64_extra_exp pipeline_type in
 
   let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:Yes () in
   let job_build_arm64_release : Tezos_ci.tezos_job =
