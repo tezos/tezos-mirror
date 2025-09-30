@@ -114,11 +114,11 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a>
 
         let encoded_key_type = self.host.store_read_all(&key_type_path)?;
         let key_type =
-            Micheline::decode_raw(&arena, &encoded_key_type)?.parse_ty(self)?;
+            Micheline::decode_raw(&arena, &encoded_key_type)?.parse_ty(self.gas())?;
 
         let encoded_value_type = self.host.store_read_all(&value_type_path)?;
         let value_type =
-            Micheline::decode_raw(&arena, &encoded_value_type)?.parse_ty(self)?;
+            Micheline::decode_raw(&arena, &encoded_value_type)?.parse_ty(self.gas())?;
 
         Ok(Some((key_type, value_type)))
     }
