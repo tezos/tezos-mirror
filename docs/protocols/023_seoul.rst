@@ -75,14 +75,14 @@ Operations
 
 - The ``Reveal`` operation has a new optional ``proof`` field, which
   is required if (and only if) the manager key is a :ref:`tz4 (BLS
-  key)<tz4_accounts>`. This results in an increase of gas cost
+  key)<tz4_accounts>`, and a new boolean field, required for any kind of address to mark
+  the presence of the optional ``proof`` field. This results in an increase of gas cost
   per reveal of a tz4 public key. (MR :gl:`!18095`)
 
 .. warning::
 
    Introduction of this new optional field might still lead to breaking changes
-   for tool providers see :doc:`breaking changes
-   <../introduction/breaking_changes>`.
+   for tool providers see :ref:`breaking changes <operation_encodings_s>`.
 
 - The optional ``proof`` field of the ``Update_consensus_key``
   operation is now required if (and only if) the new consensus key is

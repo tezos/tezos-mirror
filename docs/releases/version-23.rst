@@ -53,8 +53,7 @@ See https://forum.tezosagora.org/t/heads-up-native-multisig-accounts-in-protocol
 
 .. warning::
 
-   Introduction of this feature needed some breaking changes for tool providers see :doc:`breaking
-   changes <../introduction/breaking_changes>`.
+   Introduction of this feature needed some breaking changes for tool providers see :ref:`breaking changes <operation_encodings_s>`.
 
 .. _snapshot_v23:
 
