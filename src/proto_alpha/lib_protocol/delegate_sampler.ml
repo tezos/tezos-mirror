@@ -25,6 +25,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Invalid_slot of {level : Level_repr.t; slot : Slot_repr.t}
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"validate.invalid_slot"
+    ~title:"Invalid slot"
+    ~description:"The provided slot is not valid."
+    ~pp:(fun ppf (level, slot) ->
+      Format.fprintf
+        ppf
+        "Cannot provide the delegate for slot %a at level %a."
+        Slot_repr.pp
+        slot
+        Level_repr.pp
+        level)
+    Data_encoding.(
+      obj2 (req "level" Level_repr.encoding) (req "slot" Slot_repr.encoding))
+    (function Invalid_slot {level; slot} -> Some (level, slot) | _ -> None)
+    (fun (level, slot) -> Invalid_slot {level; slot})
+
 module Delegate_sampler_state = struct
   module Cache_client = struct
     type cached_value = Delegate_consensus_key.pk Sampler.t

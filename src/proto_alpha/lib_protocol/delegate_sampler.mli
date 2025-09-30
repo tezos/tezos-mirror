@@ -34,6 +34,8 @@
    This module is responsible for maintaining the table
    {!Storage.Delegate_sampler_state}. *)
 
+type error += Invalid_slot of {level : Level_repr.t; slot : Slot_repr.t}
+
 (** Participation slots potentially associated to accounts. The
    accounts that didn't place a deposit will be excluded from this
    list. This function should only be used to compute the deposits to
