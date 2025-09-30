@@ -33,7 +33,7 @@ use crate::ast::michelson_address::AddressHash;
 use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
-use crate::context::CtxTrait;
+use crate::context::TypecheckingCtx;
 use crate::gas::OutOfGas;
 use crate::gas::{self, tc_cost, Gas};
 use crate::irrefutable_match::irrefutable_match;
@@ -256,7 +256,7 @@ impl<'a> Micheline<'a> {
     /// Validates the type.
     pub fn typecheck_value(
         &self,
-        ctx: &mut impl CtxTrait<'a>,
+        ctx: &mut impl TypecheckingCtx<'a>,
         value_type: &Micheline<'a>,
     ) -> Result<TypedValue<'a>, TcError> {
         let ty = parse_ty(ctx, value_type)?;
@@ -272,7 +272,7 @@ impl<'a> Micheline<'a> {
     /// in lambdas).
     pub fn typecheck_instruction(
         &self,
-        ctx: &mut impl CtxTrait<'a>,
+        ctx: &mut impl TypecheckingCtx<'a>,
         self_type: Option<&Micheline<'a>>,
         stack: &[Micheline<'a>],
     ) -> Result<Instruction<'a>, TcError> {
@@ -293,13 +293,13 @@ impl<'a> Micheline<'a> {
     }
 
     /// Parse `Micheline` as a type. Validates the type.
-    pub fn parse_ty(&self, ctx: &mut impl CtxTrait<'a>) -> Result<Type, TcError> {
+    pub fn parse_ty(&self, ctx: &mut impl TypecheckingCtx<'a>) -> Result<Type, TcError> {
         parse_ty(ctx, self)
     }
 
     /// Interpreting `Micheline` as a contract parameter type, collect its
     /// entrypoints into [Entrypoints].
-    pub fn get_entrypoints(&self, ctx: &mut impl CtxTrait<'a>) -> Result<Entrypoints, TcError> {
+    pub fn get_entrypoints(&self, ctx: &mut impl TypecheckingCtx<'a>) -> Result<Entrypoints, TcError> {
         let (entrypoints, _, _) = parse_parameter_ty_with_entrypoints(ctx, self)?;
         Ok(entrypoints)
     }
@@ -311,7 +311,7 @@ impl<'a> Micheline<'a> {
     /// TODO https://linear.app/tezos/issue/L2-376/type-check-views
     pub fn typecheck_script(
         &self,
-        ctx: &mut impl CtxTrait<'a>,
+        ctx: &mut impl TypecheckingCtx<'a>,
         allow_lazy_storage_in_storage: bool,
     ) -> Result<ContractScript<'a>, TcError> {
         let seq = match self {
@@ -419,13 +419,13 @@ impl<'a> Micheline<'a> {
 }
 
 pub(crate) fn parse_ty<'a>(
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
     ty: &Micheline<'a>,
 ) -> Result<Type, TcError> {
     parse_ty_with_entrypoints(ctx, ty, None, &mut HashMap::new(), Vec::new())
 }
 
-fn parse_ty_with_entrypoints<'a, Ctx: CtxTrait<'a>>(
+fn parse_ty_with_entrypoints<'a, Ctx: TypecheckingCtx<'a>>(
     ctx: &mut Ctx,
     ty: &Micheline<'a>,
     mut entrypoints: Option<&mut Entrypoints>,
@@ -435,7 +435,7 @@ fn parse_ty_with_entrypoints<'a, Ctx: CtxTrait<'a>>(
     use Micheline::*;
     use Prim::*;
     ctx.gas().consume(gas::tc_cost::PARSE_TYPE_STEP)?;
-    fn make_pair<'a, Ctx: CtxTrait<'a>>(
+    fn make_pair<'a, Ctx: TypecheckingCtx<'a>>(
         ctx: &mut Ctx,
         args: (&Micheline<'a>, &Micheline<'a>, &[Micheline<'a>]),
         // NB: the tuple models a slice of at least 2 elements
@@ -615,7 +615,7 @@ fn parse_ty_with_entrypoints<'a, Ctx: CtxTrait<'a>>(
 
 #[allow(clippy::type_complexity)]
 fn parse_parameter_ty_with_entrypoints<'a>(
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
     parameter_ty: &Micheline<'a>,
 ) -> Result<
     (
@@ -653,7 +653,7 @@ fn parse_parameter_ty_with_entrypoints<'a>(
 /// has to be locally overridden during typechecking.
 fn typecheck<'a>(
     ast: &[Micheline<'a>],
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
 ) -> Result<Vec<Instruction<'a>>, TcError> {
@@ -681,7 +681,7 @@ macro_rules! nothing_to_none {
 /// has to be locally overridden during typechecking.
 pub(crate) fn typecheck_instruction<'a>(
     i: &Micheline<'a>,
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
     self_entrypoints: Option<&Entrypoints>,
     opt_stack: &mut FailingTypeStack,
 ) -> Result<Instruction<'a>, TcError> {
@@ -2264,7 +2264,7 @@ pub(crate) fn typecheck_instruction<'a>(
 }
 
 pub(crate) fn typecheck_contract_address<'a>(
-    _ctx: &mut impl CtxTrait<'a>,
+    _ctx: &mut impl TypecheckingCtx<'a>,
     address: Address,
     ep: Entrypoint,
     typ: &Type,
@@ -2341,7 +2341,7 @@ fn get_nth_field_ref(mut m: u16, mut ty: &mut Type) -> Result<&mut Type, Type> {
 /// illegal types like `set operation` or `contract operation`.
 pub(crate) fn typecheck_value<'a>(
     v: &Micheline<'a>,
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
     t: &Type,
 ) -> Result<TypedValue<'a>, TcError> {
     use Micheline as V;
@@ -2601,7 +2601,7 @@ pub(crate) fn typecheck_value<'a>(
 
 fn typecheck_lambda<'a>(
     instrs: &'a [Micheline<'a>],
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
     in_ty: Type,
     out_ty: Type,
     recursive: bool,
@@ -2639,7 +2639,7 @@ fn typecheck_lambda<'a>(
 fn typecheck_map_block<'a>(
     nested: &[Micheline<'a>],
     ty1: Type,
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
     self_entrypoints: Option<&Entrypoints>,
     stack: &TypeStack,
 ) -> Result<(Vec<Instruction<'a>>, Type), TcError> {
@@ -2672,7 +2672,7 @@ fn validate_u10(n: &BigInt) -> Result<u16, TcError> {
 }
 
 fn typecheck_set<'a>(
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
     set_ty: &Type,
     elem_ty: &Type,
     vs: &[Micheline<'a>],
@@ -2707,7 +2707,7 @@ fn typecheck_set<'a>(
 }
 
 fn typecheck_map<'a>(
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
     map_ty: &Type,
     key_type: &Type,
     value_type: &Type,
@@ -2755,7 +2755,7 @@ fn typecheck_map<'a>(
 }
 
 fn typecheck_big_map<'a>(
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
     map_ty: &Type,
     key_type: &Type,
     value_type: &Type,
@@ -2840,7 +2840,7 @@ fn ensure_stack_len(instr: Prim, stack: &TypeStack, l: usize) -> Result<(), TcEr
 ///
 /// Failed stacks unify with anything.
 fn unify_stacks<'a>(
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
     dest: &mut FailingTypeStack,
     aux: FailingTypeStack,
 ) -> Result<(), TcError> {
@@ -2859,7 +2859,7 @@ fn unify_stacks<'a>(
 }
 
 fn ensure_stacks_eq<'a>(
-    ctx: &mut impl CtxTrait<'a>,
+    ctx: &mut impl TypecheckingCtx<'a>,
     stack1: &TypeStack,
     stack2: &TypeStack,
 ) -> Result<(), TcError> {
@@ -2897,7 +2897,7 @@ mod typecheck_tests {
     use crate::ast::michelson_address as addr;
     use crate::ast::michelson_address::entrypoint::DEFAULT_EP_NAME;
     use crate::ast::or::Or::{Left, Right};
-    use crate::context::{Ctx, CtxTrait};
+    use crate::context::{Ctx, TypecheckingCtx};
     use crate::gas::Gas;
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
@@ -2908,7 +2908,7 @@ mod typecheck_tests {
     /// hack to simplify syntax in tests
     fn typecheck_instruction<'a>(
         i: &Micheline<'a>,
-        ctx: &mut impl CtxTrait<'a>,
+        ctx: &mut impl TypecheckingCtx<'a>,
         opt_stack: &mut FailingTypeStack,
     ) -> Result<Instruction<'a>, TcError> {
         super::typecheck_instruction(i, ctx, None, opt_stack)
