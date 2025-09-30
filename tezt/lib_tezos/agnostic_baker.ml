@@ -244,8 +244,8 @@ let run_args agnostic_baker =
   @ dal_node_timeout_percentage @ state_recorder @ node_version_check_bypass
   @ node_version_allowed @ keep_alive
 
-let run ?env ?event_level ?event_sections_levels ?(extra_arguments = [])
-    (agnostic_baker : t) =
+let raw ?env ?event_level ?event_sections_levels ~arguments (agnostic_baker : t)
+    =
   (match agnostic_baker.status with
   | Not_running -> ()
   | Running _ ->
@@ -255,17 +255,42 @@ let run ?env ?event_level ?event_sections_levels ?(extra_arguments = [])
     trigger_ready agnostic_baker None ;
     unit
   in
+  Log.info
+    "Starting baker %s with args: %s"
+    agnostic_baker.name
+    (String.concat " " arguments) ;
   run
     ?env
     ?event_level
     ?event_sections_levels
     agnostic_baker
     {ready = false}
-    (run_args agnostic_baker @ extra_arguments)
+    arguments
     ~on_terminate
     ?runner:agnostic_baker.persistent_state.runner
 
-let spawn_run ?env (agnostic_baker : t) =
+let run ?env ?event_level ?event_sections_levels ?(extra_arguments = [])
+    (agnostic_baker : t) =
+  raw
+    ?env
+    ?event_level
+    ?event_sections_levels
+    ~arguments:(run_args agnostic_baker @ extra_arguments)
+    agnostic_baker
+
+let raw ~arguments (agnostic_baker : t) = raw agnostic_baker ~arguments
+
+let spawn_raw ~arguments (agnostic_baker : t) =
+  (match agnostic_baker.status with
+  | Not_running -> ()
+  | Running _ ->
+      Test.fail "agnostic_baker %s is already running" agnostic_baker.name) ;
+  Process.spawn
+    ?runner:agnostic_baker.persistent_state.runner
+    agnostic_baker.path
+    arguments
+
+let spawn_run ?env ?(extra_arguments = []) (agnostic_baker : t) =
   (match agnostic_baker.status with
   | Not_running -> ()
   | Running _ ->
@@ -274,7 +299,7 @@ let spawn_run ?env (agnostic_baker : t) =
     ?env
     ?runner:agnostic_baker.persistent_state.runner
     agnostic_baker.path
-    (run_args agnostic_baker)
+    (run_args agnostic_baker @ extra_arguments)
 
 let check_event ?where agnostic_baker name promise =
   let* result = promise in
