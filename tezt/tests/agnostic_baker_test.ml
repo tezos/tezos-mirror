@@ -290,7 +290,49 @@ let test_keep_alive =
   and* () = wait_period_status in
   unit
 
-let register ~protocols = test_keep_alive protocols
+let test_cli =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Agnostic baker CLI"
+    ~tags:[team; "sandbox"; "agnostic"; "baker"; "cli"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  let* node, client = Client.init_with_protocol `Client ~protocol () in
+  let baker = Agnostic_baker.create node client in
+  let check_process_error expected_err p =
+    let* err = Process.check_and_read_stderr ~expect_failure:true p in
+    Check.(err =~ rex expected_err) ~error_msg:"Expected error %R but got %L" ;
+    unit
+  in
+
+  let arguments =
+    [
+      "--endpoint";
+      Node.rpc_endpoint node;
+      "--base-dir";
+      Client.base_dir client;
+      "run";
+      "with";
+      "local";
+      "node";
+      Node.data_dir node;
+    ]
+  in
+  let p = Agnostic_baker.spawn_raw ~arguments baker in
+  let* () = check_process_error ".*Missing liquidity baking toggle vote.*" p in
+
+  let arguments = arguments @ ["--liquidity-baking-toggle-vote"; "pass"] in
+  let p = Agnostic_baker.spawn_raw ~arguments baker in
+  let* () = check_process_error "Please connect a running DAL node using" p in
+
+  let arguments = arguments @ ["--without-dal"] in
+  let* () = Agnostic_baker.wait_for_ready baker
+  and* () = Agnostic_baker.raw ~arguments baker in
+  unit
+
+let register ~protocols =
+  test_keep_alive protocols ;
+  test_cli protocols
 
 let register_migration ~migrate_from ~migrate_to =
   migrate ~migrate_from ~migrate_to ~use_remote_signer:false ;
