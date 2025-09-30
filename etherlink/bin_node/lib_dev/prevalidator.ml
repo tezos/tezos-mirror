@@ -91,6 +91,14 @@ module Types = struct
     maximum_gas_per_transaction : Z.t;
   }
 
+  let etherlink_infos_default =
+    {
+      minimum_base_fee_per_gas = Z.zero;
+      base_fee_per_gas = Z.zero;
+      da_fee_per_bytes = Z.zero;
+      maximum_gas_per_transaction = Z.zero;
+    }
+
   type 'a inner_session = {
     state : 'a;
     state_backend : (module Services_backend_sig.S with type Reader.state = 'a);
@@ -100,7 +108,7 @@ module Types = struct
 
   type session = Session : 'a inner_session -> session
 
-  let session_of_state (type state) _chain_family state_backend state =
+  let etherlink_infos_of_state (type state) state_backend state =
     let open Lwt_result_syntax in
     let (module Backend_rpc : Services_backend_sig.S
           with type Reader.state = state) =
@@ -129,23 +137,37 @@ module Types = struct
       Etherlink_durable_storage.maximum_gas_per_transaction
         (Backend_rpc.Reader.read state)
     in
+    return
+      {
+        base_fee_per_gas;
+        minimum_base_fee_per_gas;
+        da_fee_per_bytes;
+        maximum_gas_per_transaction;
+      }
+
+  let session_of_state (type state) chain_family state_backend state =
+    let open Lwt_result_syntax in
+    let (module Backend_rpc : Services_backend_sig.S
+          with type Reader.state = state) =
+      state_backend
+    in
     let* storage_version =
       Durable_storage.storage_version (Backend_rpc.Reader.read state)
     in
-    return
-      (Session
-         {
-           state;
-           state_backend;
-           storage_version;
-           etherlink_infos =
+    match chain_family with
+    | L2_types.Ex_chain_family EVM ->
+        let* etherlink_infos = etherlink_infos_of_state state_backend state in
+        return
+          (Session {state; state_backend; storage_version; etherlink_infos})
+    | L2_types.Ex_chain_family Michelson ->
+        return
+          (Session
              {
-               base_fee_per_gas;
-               minimum_base_fee_per_gas;
-               da_fee_per_bytes;
-               maximum_gas_per_transaction;
-             };
-         })
+               state;
+               state_backend;
+               storage_version;
+               etherlink_infos = etherlink_infos_default;
+             })
 
   type parameters = {
     mode : mode;
