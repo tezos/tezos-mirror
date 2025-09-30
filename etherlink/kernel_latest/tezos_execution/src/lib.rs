@@ -45,7 +45,7 @@ use tezos_tezlink::{
 };
 
 use crate::address::OriginationNonce;
-use crate::mir_ctx::{convert_big_map_diff, Ctx};
+use crate::mir_ctx::{convert_big_map_diff, Ctx, TcCtx};
 
 extern crate alloc;
 pub mod account_storage;
@@ -418,9 +418,7 @@ fn transfer<'a, Host: Runtime>(
                 .storage(host)
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
             let mut ctx = Ctx {
-                host,
-                context,
-                gas,
+                tc_ctx: TcCtx { host, context, gas },
                 source: source_account.pkh().clone(),
                 sender,
                 amount,
@@ -436,8 +434,8 @@ fn transfer<'a, Host: Runtime>(
             let (internal_operations, new_storage) = execute_smart_contract(
                 code, storage, entrypoint, param, parser, &mut ctx,
             )?;
-            let host = ctx.host;
-            let gas = ctx.gas;
+            let host = ctx.tc_ctx.host;
+            let gas = ctx.tc_ctx.gas;
             dest_account
                 .set_storage(host, &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
@@ -1027,7 +1025,7 @@ fn apply_operation<Host: Runtime>(
                 typecheck_code_and_storage(&mut ctx, &parser, script);
             let origination_result = match typechecked_storage {
                 Ok(storage) => originate_contract(
-                    ctx.host,
+                    ctx.host(),
                     context,
                     address,
                     source_account,

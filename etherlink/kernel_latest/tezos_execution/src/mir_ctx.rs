@@ -30,9 +30,15 @@ use tezos_tezlink::lazy_storage_diff::{
 };
 use typed_arena::Arena;
 
-pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
+pub struct TcCtx<Host, Context, Gas> {
     pub host: Host,
     pub context: Context,
+    pub gas: Gas,
+}
+
+pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
+    pub tc_ctx: TcCtx<Host, Context, Gas>,
+
     pub sender: AddressHash,
     pub amount: i64,
     pub self_address: AddressHash,
@@ -43,7 +49,6 @@ pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
     pub chain_id: ChainId,
 
     pub source: PublicKeyHash,
-    pub gas: Gas,
     pub operation_counter: OpCounter,
     pub origination_nonce: OrigNonce,
 }
@@ -56,9 +61,11 @@ macro_rules! make_default_ctx {
         let mut origination_nonce =
             OriginationNonce::initial(OperationHash(H256::zero()));
         let mut $ctx = Ctx {
-            host: $host,
-            context: $context,
-            gas: &mut gas,
+            tc_ctx: TcCtx {
+                host: $host,
+                context: $context,
+                gas: &mut gas,
+            },
             balance: 0,
             amount: 0,
             level: 0u32.into(),
@@ -79,7 +86,7 @@ macro_rules! make_default_ctx {
 }
 
 impl<'a, Host: Runtime> TypecheckingCtx<'a>
-    for Ctx<&mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
+    for TcCtx<&mut Host, &Context, &mut mir::gas::Gas>
 {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.gas
@@ -114,6 +121,28 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a>
             Micheline::decode_raw(&arena, &encoded_value_type)?.parse_ty(self)?;
 
         Ok(Some((key_type, value_type)))
+    }
+}
+
+impl<'a, Host: Runtime> TypecheckingCtx<'a>
+    for Ctx<&mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
+{
+    fn gas(&mut self) -> &mut mir::gas::Gas {
+        self.tc_ctx.gas()
+    }
+
+    fn lookup_contract(
+        &self,
+        address: &AddressHash,
+    ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
+        self.tc_ctx.lookup_contract(address)
+    }
+
+    fn big_map_get_type(
+        &mut self,
+        id: &BigMapId,
+    ) -> Result<Option<(Type, Type)>, LazyStorageError> {
+        self.tc_ctx.big_map_get_type(id)
     }
 }
 
@@ -182,6 +211,14 @@ impl<'a, Host: Runtime> CtxTrait<'a>
 }
 
 impl<Host: Runtime> Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce> {
+    pub fn host(&mut self) -> &mut Host {
+        self.tc_ctx.host
+    }
+
+    pub fn context(&self) -> &Context {
+        self.tc_ctx.context
+    }
+
     /// Insert in the context a big_map diff that represents an allocation
     fn big_map_diff_alloc(&mut self, id: Zarith, key_type: Vec<u8>, value_type: Vec<u8>) {
         let allocation = StorageDiff::Alloc(Alloc {
@@ -268,16 +305,16 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
-        let value_path = value_path(self.context, id, &hash_key(key.clone()))?;
-        if self.host.store_has(&value_path)?.is_none() {
+        let value_path = value_path(self.context(), id, &hash_key(key.clone()))?;
+        if self.host().store_has(&value_path)?.is_none() {
             return Ok(None);
         }
 
-        let value_type_path = value_type_path(self.context, id)?;
-        let encoded_value_type = self.host.store_read_all(&value_type_path)?;
+        let value_type_path = value_type_path(self.context(), id)?;
+        let encoded_value_type = self.host().store_read_all(&value_type_path)?;
         let value_type = Micheline::decode_raw(arena, &encoded_value_type)?;
 
-        let encoded_value = self.host.store_read_all(&value_path)?;
+        let encoded_value = self.host().store_read_all(&value_path)?;
         let value = Micheline::decode_raw(arena, &encoded_value)?;
         Ok(Some(value.typecheck_value(self, &value_type)?))
     }
@@ -287,8 +324,8 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<bool, LazyStorageError> {
-        let path = value_path(self.context, id, &hash_key(key.clone()))?;
-        Ok(self.host.store_has(&path)?.is_some())
+        let path = value_path(self.context(), id, &hash_key(key.clone()))?;
+        Ok(self.host().store_has(&path)?.is_some())
     }
 
     fn big_map_update(
@@ -300,11 +337,11 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         let parser = Parser::new();
         let key_encoded = key.into_micheline_optimized_legacy(&parser.arena).encode();
         let key_hashed = digest_256(&key_encoded);
-        let value_path = value_path(self.context, id, &key_hashed)?;
+        let value_path = value_path(self.context(), id, &key_hashed)?;
         match value {
             None => {
-                if self.host.store_has(&value_path)?.is_some() {
-                    self.host.store_delete(&value_path)?;
+                if self.host().store_has(&value_path)?.is_some() {
+                    self.host().store_delete(&value_path)?;
                 }
 
                 // Write the update in the big_map_diff
@@ -314,7 +351,7 @@ impl<'a, Host: Runtime> LazyStorage<'a>
             Some(v) => {
                 let arena = Arena::new();
                 let encoded = v.into_micheline_optimized_legacy(&arena).encode();
-                self.host.store_write_all(&value_path, &encoded)?;
+                self.host().store_write_all(&value_path, &encoded)?;
 
                 // Write the update in the big_map_diff
                 self.big_map_diff_update(
@@ -334,18 +371,18 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         value_type: &Type,
     ) -> Result<BigMapId, LazyStorageError> {
         let arena = Arena::new();
-        let next_id_path = next_id_path(self.context)?;
-        let id: BigMapId = read_nom_value(self.host, &next_id_path).unwrap_or(0.into());
-        let key_type_path = key_type_path(self.context, &id)?;
-        let value_type_path = value_type_path(self.context, &id)?;
+        let next_id_path = next_id_path(self.context())?;
+        let id: BigMapId = read_nom_value(self.host(), &next_id_path).unwrap_or(0.into());
+        let key_type_path = key_type_path(self.context(), &id)?;
+        let value_type_path = value_type_path(self.context(), &id)?;
         let key_type_encoded = key_type.into_micheline_optimized_legacy(&arena).encode();
         let value_type_encoded =
             value_type.into_micheline_optimized_legacy(&arena).encode();
-        self.host
+        self.host()
             .store_write_all(&value_type_path, &value_type_encoded)?;
-        self.host
+        self.host()
             .store_write_all(&key_type_path, &key_type_encoded)?;
-        store_bin(&id.succ(), self.host, &next_id_path)
+        store_bin(&id.succ(), self.host(), &next_id_path)
             .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
 
         // Write in the diff that there was an allocation
@@ -354,13 +391,13 @@ impl<'a, Host: Runtime> LazyStorage<'a>
     }
 
     fn big_map_copy(&mut self, id: &BigMapId) -> Result<BigMapId, LazyStorageError> {
-        let src_path = big_map_path(self.context, id)?;
-        let next_id_path = next_id_path(self.context)?;
-        let dest_id: BigMapId = read_nom_value(self.host, &next_id_path)
+        let src_path = big_map_path(self.context(), id)?;
+        let next_id_path = next_id_path(self.context())?;
+        let dest_id: BigMapId = read_nom_value(self.host(), &next_id_path)
             .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
-        let dest_path = big_map_path(self.context, &dest_id)?;
-        self.host.store_copy(&src_path, &dest_path)?;
-        store_bin(&dest_id.succ(), self.host, &next_id_path)
+        let dest_path = big_map_path(self.context(), &dest_id)?;
+        self.host().store_copy(&src_path, &dest_path)?;
+        store_bin(&dest_id.succ(), self.host(), &next_id_path)
             .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
 
         // Write in the diff that there was a copy
@@ -369,8 +406,8 @@ impl<'a, Host: Runtime> LazyStorage<'a>
     }
 
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
-        let big_map_path = big_map_path(self.context, id)?;
-        self.host.store_delete(&big_map_path)?;
+        let big_map_path = big_map_path(self.context(), id)?;
+        self.host().store_delete(&big_map_path)?;
 
         // Write in the diff that there was a remove
         self.big_map_diff_remove(id.value.clone());
@@ -415,9 +452,9 @@ mod tests {
         assert_eq!(stored_key_type, key_type);
         assert_eq!(stored_value_type, value_type);
 
-        let big_map_path = big_map_path(ctx.context, id).unwrap();
+        let big_map_path = big_map_path(ctx.context(), id).unwrap();
         let nb_passed_keys = content.len();
-        let nb_stored_keys = ctx.host.store_count_subkeys(&big_map_path).unwrap();
+        let nb_stored_keys = ctx.host().store_count_subkeys(&big_map_path).unwrap();
         // The big_map storage contains the key_type and value_type subkeys followed by the other keys corresponding to values
         assert_eq!(nb_passed_keys + 2, nb_stored_keys.try_into().unwrap());
 
