@@ -30,8 +30,8 @@ Michelson
 ---------
 
 - A new instruction named ``INDEX_ADDRESS`` has been added, it
-  provides a unique identifier of type ``nat`` for values
-  of type ``address``, stored in the context. (MR :gl:`!18866`)
+  provides a unique identifier of type ``nat`` for values of type
+  ``address``, stored in the context. (MRs :gl:`!18866`, :gl:`!18943`)
 
 - A new instruction named ``GET_ADDRESS_INDEX`` has been added, and returns the
   unique identifier of type ``nat option`` for values of type ``address``, if
@@ -202,11 +202,15 @@ Internal
 --------
 
 - When activating this protocol directly from Genesis (so only in
-  tests and on some test networks), baking rights of bootstrap
-  accounts for the first few cycles are now computed with Adaptive
-  Issuance enabled, meaning that delegated tez are already weighted
-  less than staked tez. (MR :gl:`!16945`)
+  tests and on some test networks):
 
-- Remove obsolete internal field related to Adaptive Issuance
-  activation. (MR :gl:`!15789`)
+  + Baking rights of bootstrap accounts for the first few cycles are
+    now computed with Adaptive Issuance enabled, meaning that
+    delegated tez are already weighted less than staked tez. (MR
+    :gl:`!16945`)
 
+  + Fixed registration of bootstrap accounts with an initial consensus
+    key. (MR :gl:`!19314`)
+
+- Removed dead code related to Adaptive Issuance activation, EMA, and
+  per-block vote. (MRs :gl:`!15789`, :gl:`!19215`)
