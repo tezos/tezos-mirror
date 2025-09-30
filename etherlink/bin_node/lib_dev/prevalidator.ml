@@ -96,7 +96,7 @@ module Types = struct
 
   type session = Session : 'a inner_session -> session
 
-  let session_of_state (type state) state_backend state =
+  let session_of_state (type state) _chain_family state_backend state =
     let open Lwt_result_syntax in
     let (module Backend_rpc : Services_backend_sig.S
           with type Reader.state = state) =
@@ -143,6 +143,7 @@ module Types = struct
   type parameters = {
     mode : mode;
     chain_id : L2_types.chain_id;
+    chain_family : L2_types.ex_chain_family;
     max_number_of_chunks : int option;
     session : session;
   }
@@ -150,6 +151,7 @@ module Types = struct
   type state = {
     mode : mode;
     chain_id : L2_types.chain_id;
+    chain_family : L2_types.ex_chain_family;
     max_number_of_chunks : int option;
     mutable session : session;
   }
@@ -588,9 +590,12 @@ module Handlers = struct
   type launch_error = tztrace
 
   let on_launch _self ()
-      ({chain_id; mode; max_number_of_chunks; session} : Types.parameters) =
+      ({chain_id; mode; max_number_of_chunks; chain_family; session} :
+        Types.parameters) =
     let open Lwt_result_syntax in
-    return ({chain_id; mode; max_number_of_chunks; session} : Types.state)
+    return
+      ({chain_id; mode; max_number_of_chunks; chain_family; session}
+        : Types.state)
 
   let is_tx_valid (type state) ctxt session raw_transaction :
       (prevalidation_result, string) result tzresult Lwt.t =
@@ -616,7 +621,9 @@ module Handlers = struct
       session.state_backend
     in
     let* state = Backend_rpc.Reader.get_state () in
-    let* session = Types.session_of_state session.state_backend state in
+    let* session =
+      Types.session_of_state ctxt.chain_family session.state_backend state
+    in
     ctxt.session <- session ;
     return_unit
 
@@ -686,12 +693,23 @@ let start (type state f) ?max_number_of_chunks
         let* chain_id =
           Durable_storage.chain_id (Backend_rpc.Reader.read state)
         in
-        let* session = Types.session_of_state state_backend state in
+        let* session =
+          Types.session_of_state
+            L2_types.(Ex_chain_family EVM)
+            state_backend
+            state
+        in
         let* w =
           Worker.launch
             table
             ()
-            {chain_id; mode; max_number_of_chunks; session}
+            {
+              chain_id;
+              mode;
+              max_number_of_chunks;
+              chain_family = Ex_chain_family EVM;
+              session;
+            }
             (module Handlers)
         in
         worker := Started w ;
