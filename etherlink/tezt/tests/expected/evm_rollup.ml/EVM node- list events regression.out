@@ -2156,6 +2156,14 @@ tx_queue_injecting_transaction:
     { /* tx_queue_injecting_transaction version 0 */
       "tx_queue_injecting_transaction.v0": integer ∈ [-2^30, 2^30] }
   
+tx_queue_injecting_transactions_failed:
+  description: injecting transactions failed: {error}
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_injecting_transactions_failed version 0 */
+      "tx_queue_injecting_transactions_failed.v0": any }
+  
 tx_queue_is_ready:
   description: tx queue is ready
   level: notice
@@ -2804,6 +2812,14 @@ tx_queue_callback_error:
   json format:
     { /* tx_queue_callback_error version 0 */
       "tx_queue_callback_error.v0": any }
+  
+tx_queue_injecting_transactions_failed:
+  description: injecting transactions failed: {error}
+  level: error
+  section: evm_node.dev.tx_queue
+  json format:
+    { /* tx_queue_injecting_transactions_failed version 0 */
+      "tx_queue_injecting_transactions_failed.v0": any }
   
 tx_queue_missing_tx_object:
   description: transaction {tx_hash} has no associated object

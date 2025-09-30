@@ -41,6 +41,14 @@ let injecting_transactions =
     ~level:Info
     ("n", Data_encoding.int31)
 
+let injecting_transactions_failed =
+  declare_1
+    ~section
+    ~name:"tx_queue_injecting_transactions_failed"
+    ~msg:"injecting transactions failed: {error}"
+    ~level:Error
+    ("error", Events.trace_encoding)
+
 let rpc_error =
   declare_2
     ~section
@@ -102,6 +110,8 @@ let shutdown () = emit shutdown ()
 let cleared () = emit cleared ()
 
 let injecting_transactions n = emit injecting_transactions n
+
+let injecting_transactions_failed err = emit injecting_transactions_failed err
 
 let add_transaction tx = emit add_transaction tx
 
