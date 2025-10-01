@@ -602,12 +602,3 @@ let wait_n_cycles_f (n_cycles : t -> int) =
   let open Lwt_result_syntax in
   let n_cycles n = return @@ n_cycles n in
   wait_n_cycles_f_es n_cycles
-
-let wait_tolerated_inactivity_period ?(cycle_offset = 0) name =
-  wait_n_cycles_f_es (fun (block, state) ->
-      let open Lwt_result_syntax in
-      let account = State.find_account name state in
-      let* tolerated_inactivity_period =
-        Scenario_activity.tolerated_inactivity_period ~block ~state account
-      in
-      return @@ (tolerated_inactivity_period + cycle_offset))

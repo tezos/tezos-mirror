@@ -331,11 +331,7 @@ let test_slash_timing =
      stake to get unforbidden, see the comment in
      Protocol.Forbidden_delegates_storage.should_unforbid. *)
   --> stake "delegate" Half
-  (* With [tolerated_inactivity_period] = 1 and
-     [consensus_rights_delay] = 1, [delegate] is deactivated in the
-     end of cycle 2, before computing the consensus rights for cycle
-     4, so [delegate] has no slots during cycle 4 *)
-  --> list_map_branched [0; 2; 3; 4] (fun i ->
+  --> list_map_branched [0; 1; 2; 3; 4] (fun i ->
           let i = Protocol.Constants_repr.slashing_delay + i in
           Tag (string_of_int i ^ " cycles lag") --> wait_n_cycles i)
   --> double_bake "delegate"
