@@ -120,9 +120,7 @@ module Contract = struct
     let open Lwt_result_syntax in
     let*! is_registered = registered c delegate in
     if is_registered then
-      let* c, is_inactive =
-        Delegate_activation_storage.is_inactive c delegate
-      in
+      let* is_inactive = Delegate_activation_storage.is_inactive c delegate in
       let* () = fail_unless is_inactive Active_delegate in
       Stake_storage.set_active c delegate
     else

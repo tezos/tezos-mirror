@@ -155,6 +155,10 @@ val direct_ticket_spending_enable : Raw_context.t -> bool
 
 val allow_tz4_delegate_enable : Raw_context.t -> bool
 
+(** Temporary value to be removed when discriminated inactivity tolerance is
+    implemented *)
+val tolerated_inactivity_period : Raw_context.t -> int
+
 (** Tolerated period of inactivity, in cycles, before a delegate is
     deactivated *)
 val tolerated_inactivity_period_high : Raw_context.t -> int

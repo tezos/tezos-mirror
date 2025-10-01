@@ -1013,6 +1013,8 @@ module Constants : sig
 
   val delegate_parameters_activation_delay : context -> int
 
+  val tolerated_inactivity_period : context -> int
+
   val slashable_deposits_period : context -> int
 
   (** See {!Constants_storage.unstake_finalization_delay}. *)
@@ -2421,15 +2423,14 @@ module Delegate : sig
 
   val registered : context -> public_key_hash -> bool Lwt.t
 
-  val deactivated :
-    context -> public_key_hash -> (context * bool) tzresult Lwt.t
+  val deactivated : context -> public_key_hash -> bool tzresult Lwt.t
 
   (** See {!Forbidden_delegates_storage.is_forbidden}. *)
   val is_forbidden_delegate : t -> public_key_hash -> bool
 
   (** See {!Delegate_activation_storage.last_cycle_before_deactivation}. *)
   val last_cycle_before_deactivation :
-    context -> public_key_hash -> (context * Cycle.t) tzresult Lwt.t
+    context -> public_key_hash -> Cycle.t tzresult Lwt.t
 
   module Consensus_key : sig
     val check_not_tz4 :
