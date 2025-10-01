@@ -929,6 +929,7 @@ module Constants : sig
       consensus_rights_delay : int;
       blocks_preservation_cycles : int;
       delegate_parameters_activation_delay : int;
+      tolerated_inactivity_period : int;
       tolerated_inactivity_period_high : int;
       tolerated_inactivity_period_low : int;
       tolerated_inactivity_period_threshold : int;

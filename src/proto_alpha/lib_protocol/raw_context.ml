@@ -1346,6 +1346,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  consensus_rights_delay;
                  blocks_preservation_cycles;
                  delegate_parameters_activation_delay;
+                 tolerated_inactivity_period;
                  tolerated_inactivity_period_high;
                  tolerated_inactivity_period_low;
                  tolerated_inactivity_period_threshold;
@@ -1400,6 +1401,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             Constants_parametric_repr.consensus_rights_delay;
             blocks_preservation_cycles;
             delegate_parameters_activation_delay;
+            tolerated_inactivity_period;
             tolerated_inactivity_period_high;
             tolerated_inactivity_period_low;
             tolerated_inactivity_period_threshold;
@@ -1782,6 +1784,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             Constants_parametric_repr.consensus_rights_delay;
             blocks_preservation_cycles;
             delegate_parameters_activation_delay;
+            tolerated_inactivity_period;
             tolerated_inactivity_period_high;
             tolerated_inactivity_period_low;
             tolerated_inactivity_period_threshold = 10;

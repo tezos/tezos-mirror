@@ -286,6 +286,8 @@ let constants_mainnet : Constants.Parametric.t =
        [minimal_stake]).
 
        Last updated in protocol T. *)
+    (* to be removed *)
+    tolerated_inactivity_period = 2;
     tolerated_inactivity_period_high = 12;
     tolerated_inactivity_period_low = 1;
     (* threshold is in per thousand *)
