@@ -36,7 +36,7 @@ This sequence of operations was run:
     { "expected_assigned_shards_per_slot": 204,
       "delegate_attested_dal_slots": 0, "delegate_attestable_dal_slots": 0,
       "expected_dal_rewards": "106080", "sufficient_dal_participation": true,
-      "denounced": false }, "grace_period": 2,
+      "denounced": false }, "grace_period": 3,
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
@@ -77,7 +77,7 @@ This sequence of operations was run:
     { "expected_assigned_shards_per_slot": 204,
       "delegate_attested_dal_slots": 0, "delegate_attestable_dal_slots": 0,
       "expected_dal_rewards": "106080", "sufficient_dal_participation": true,
-      "denounced": false }, "grace_period": 2,
+      "denounced": false }, "grace_period": 3,
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
@@ -121,7 +121,7 @@ This sequence of operations was run:
     { "expected_assigned_shards_per_slot": 204,
       "delegate_attested_dal_slots": 0, "delegate_attestable_dal_slots": 0,
       "expected_dal_rewards": "106080", "sufficient_dal_participation": true,
-      "denounced": false }, "grace_period": 2,
+      "denounced": false }, "grace_period": 3,
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
@@ -163,7 +163,7 @@ This sequence of operations was run:
     { "expected_assigned_shards_per_slot": 204,
       "delegate_attested_dal_slots": 0, "delegate_attestable_dal_slots": 0,
       "expected_dal_rewards": "106080", "sufficient_dal_participation": true,
-      "denounced": false }, "grace_period": 2,
+      "denounced": false }, "grace_period": 3,
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
@@ -254,7 +254,7 @@ This sequence of operations was run:
     { "expected_assigned_shards_per_slot": 204,
       "delegate_attested_dal_slots": 0, "delegate_attestable_dal_slots": 0,
       "expected_dal_rewards": "2652", "sufficient_dal_participation": true,
-      "denounced": false }, "grace_period": 3,
+      "denounced": false }, "grace_period": 4,
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
