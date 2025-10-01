@@ -260,9 +260,6 @@ type t = {
   blocks_preservation_cycles : int;
   delegate_parameters_activation_delay : int;
   tolerated_inactivity_period : int;
-  tolerated_inactivity_period_high : int;
-  tolerated_inactivity_period_low : int;
-  tolerated_inactivity_period_threshold : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   nonce_revelation_threshold : int32;
@@ -570,10 +567,7 @@ let encoding =
       ( ( ( c.consensus_rights_delay,
             c.blocks_preservation_cycles,
             c.delegate_parameters_activation_delay,
-            c.tolerated_inactivity_period,
-            c.tolerated_inactivity_period_high,
-            c.tolerated_inactivity_period_low,
-            c.tolerated_inactivity_period_threshold ),
+            c.tolerated_inactivity_period ),
           ( c.blocks_per_cycle,
             c.blocks_per_commitment,
             c.nonce_revelation_threshold,
@@ -619,10 +613,7 @@ let encoding =
     (fun ( ( ( consensus_rights_delay,
                blocks_preservation_cycles,
                delegate_parameters_activation_delay,
-               tolerated_inactivity_period,
-               tolerated_inactivity_period_high,
-               tolerated_inactivity_period_low,
-               tolerated_inactivity_period_threshold ),
+               tolerated_inactivity_period ),
              ( blocks_per_cycle,
                blocks_per_commitment,
                nonce_revelation_threshold,
@@ -671,9 +662,6 @@ let encoding =
         blocks_preservation_cycles;
         delegate_parameters_activation_delay;
         tolerated_inactivity_period;
-        tolerated_inactivity_period_high;
-        tolerated_inactivity_period_low;
-        tolerated_inactivity_period_threshold;
         blocks_per_cycle;
         blocks_per_commitment;
         nonce_revelation_threshold;
@@ -719,14 +707,11 @@ let encoding =
       })
     (merge_objs
        (merge_objs
-          (obj7
+          (obj4
              (req "consensus_rights_delay" uint8)
              (req "blocks_preservation_cycles" uint8)
              (req "delegate_parameters_activation_delay" uint8)
-             (req "tolerated_inactivity_period" uint8)
-             (req "tolerated_inactivity_period_high" uint8)
-             (req "tolerated_inactivity_period_low" uint8)
-             (req "tolerated_inactivity_period_threshold" uint8))
+             (req "tolerated_inactivity_period" uint8))
           (obj8
              (req "blocks_per_cycle" int32)
              (req "blocks_per_commitment" int32)

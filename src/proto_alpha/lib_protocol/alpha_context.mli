@@ -930,9 +930,6 @@ module Constants : sig
       blocks_preservation_cycles : int;
       delegate_parameters_activation_delay : int;
       tolerated_inactivity_period : int;
-      tolerated_inactivity_period_high : int;
-      tolerated_inactivity_period_low : int;
-      tolerated_inactivity_period_threshold : int;
       blocks_per_cycle : int32;
       blocks_per_commitment : int32;
       nonce_revelation_threshold : int32;

@@ -45,23 +45,10 @@ let adaptive_issuance_activation_delay c =
   let constants = Raw_context.constants c in
   1 + constants.consensus_rights_delay + Constants_repr.slashing_delay + 1
 
-(** Tolerated inactivity periods for delegates before being deactivated. *)
-let tolerated_inactivity_period_high c =
-  let constants = Raw_context.constants c in
-  constants.tolerated_inactivity_period_high
-
-let tolerated_inactivity_period_low c =
-  let constants = Raw_context.constants c in
-  constants.tolerated_inactivity_period_low
-
-(* temporary, to introduce new constants incrementally  *)
+(** Tolerated inactivity period for delegates before being deactivated. *)
 let tolerated_inactivity_period c =
   let constants = Raw_context.constants c in
   constants.tolerated_inactivity_period
-
-let tolerated_inactivity_period_threshold c =
-  let constants = Raw_context.constants c in
-  constants.tolerated_inactivity_period_threshold
 
 (** Number of cycles during which a misbehavior of the delegate will induce a
     slashing of the funds that are currently in its frozen deposits. *)
