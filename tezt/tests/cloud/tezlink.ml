@@ -392,7 +392,7 @@ let init_faucet_frontend ~faucet_api ~agent ~tezlink_sandbox_endpoint
            ()))
 
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
-    (rpc_port : int option) (verbose : bool)
+    ?(rpc_port : int option) (verbose : bool)
     (time_between_blocks : Evm_node.time_between_blocks) agent =
   let chain_id = 1 in
   let () = toplog "Initializing the tezlink scenario" in
@@ -520,12 +520,16 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             else Test.fail ~__LOC__ "Agent not found: %s" name
         | Some agent -> agent
       in
+      let public_rpc_port =
+        match Cli.public_rpc_port with
+        | None -> Agent.next_available_port tezlink_sequencer_agent
+        | Some port -> port
+      in
       let () = toplog "Starting Tezlink sequencer" in
       let* tezlink_sandbox_endpoint =
         init_tezlink_sequencer
           cloud
           name
-          Cli.public_rpc_port
           Cli.verbose
           Cli.time_between_blocks
           tezlink_sequencer_agent
@@ -540,7 +544,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           tezlink_sequencer_agent
           ~site:"tezlink"
           ~server_name:"localhost"
-          ~port:(Agent.next_available_port tezlink_sequencer_agent)
+          ~port:public_rpc_port
           ~location:"/"
           ~proxy_pass
       in
