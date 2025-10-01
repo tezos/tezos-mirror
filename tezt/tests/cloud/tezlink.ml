@@ -531,6 +531,20 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           tezlink_sequencer_agent
       in
       let* () =
+        let proxy_pass =
+          (* The trailing / is mandatory, otherwise the reverse proxy won't be
+             able to serve services with a path. *)
+          Client.string_of_endpoint tezlink_sandbox_endpoint ^ "/"
+        in
+        Nginx_reverse_proxy.init_simple
+          tezlink_sequencer_agent
+          ~site:"tezlink"
+          ~server_name:"localhost"
+          ~port:(Agent.next_available_port tezlink_sequencer_agent)
+          ~location:"/"
+          ~proxy_pass
+      in
+      let* () =
         add_service
           cloud
           ~name:"Tezlink RPC endpoint"

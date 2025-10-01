@@ -99,3 +99,34 @@ let init ~agent ~site config =
         *)
       let _process = Process.spawn ?runner "nginx" ["-g"; "daemon on;"] in
       unit
+
+(* Returns an NginX configuration corresponding to:
+server {
+  listen 0.0.0.0:<port>;
+  server_name <server_name>;
+
+  location <location> {
+    proxy_pass <proxy_pass>;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+  }
+}
+*)
+let make_simple_config ~server_name ~port ~location ~proxy_pass =
+  Context_block
+    ( "server",
+      [
+        Directive (sf "listen 0.0.0.0:%d" port);
+        Directive (sf "server_name %s" server_name);
+        Context_block
+          ( sf "location %s" location,
+            [
+              Directive (sf "proxy_pass %s" proxy_pass);
+              Directive "proxy_set_header Host $host";
+              Directive "proxy_set_header X-Real-IP $remote_addr";
+            ] );
+      ] )
+
+let init_simple agent ~site ~server_name ~port ~location ~proxy_pass =
+  let config = make_simple_config ~server_name ~port ~location ~proxy_pass in
+  init ~agent ~site config
