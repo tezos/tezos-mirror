@@ -398,7 +398,7 @@ It is even possible to register both a consensus key and a companion key, with t
 
    octez-client register key <manager_key> as delegate --consensus-key <consensus_key> --companion-key <companion_key>
 
-Mind (re)starting the baker and pass the new companion key alias alongside the consensus and/or the delegate's key (the latter is needed only until the new keys become effective)::
+Please do (re)start the baker and provide the the new companion key alias alongside the consensus and/or the delegate's key on the command line (the latter is still needed until the new keys become active)::
 
    octez-baker run with local node ~/.tezos-node <consensus_key> <companion_key> <delegate_key_alias> --liquidity-baking-toggle-vote pass
 

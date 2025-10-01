@@ -33,8 +33,7 @@ Most of the changes in the encodings of existing operations are either purely ad
   format <../shell/p2p_api>` may experience some issues. For example, the ``reveal``
   operation has a new boolean field to mark the presence of the optional ``proof`` for
   tz4 revelation.
-  Users of such tools should check with their tool provider that their
-  versions are updated for protocol S, and upgrade them if needed.
+  Users of such tools should check that they are operating versions compatible with the changes introduced by the Seoul protocol, and upgrade them if needed.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~

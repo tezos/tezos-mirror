@@ -60,6 +60,9 @@ Breaking Changes
   addresses will also have to provide such a proof before sending
   other operations. This does not change anything about the revelation
   of new addresses, or non-tz4 addresses. (MR :gl:`!18078`)
+  However, to handle any address it is recommended to update all the tools producing or
+  processing reveal operations to a Seoul-compatible version
+  (see :ref:`breaking changes <operation_encodings_s>`).
 
 - ``../context/contracts/<pkh>`` result now contains, when called on an implicit
   account, a boolean field ``revealed`` that tells if the public key of the
@@ -74,9 +77,11 @@ Operations
   :gl:`!15244`, :gl:`!17485`)
 
 - The ``Reveal`` operation has a new optional ``proof`` field, which
-  is required if (and only if) the manager key is a :ref:`tz4 (BLS
-  key)<tz4_accounts>`, and a new boolean field, required for any kind of address to mark
-  the presence of the optional ``proof`` field. This results in an increase of gas cost
+  is only present if the manager key is a :ref:`tz4 (BLS
+  key) <tz4_accounts>`. This change requires updating all the tools producing or
+  processing reveal operations to a Seoul-compatible version
+  (see :ref:`breaking changes <operation_encodings_s>`).
+  This change also results in an increase of gas cost
   per reveal of a tz4 public key. (MR :gl:`!18095`)
 
 .. warning::
