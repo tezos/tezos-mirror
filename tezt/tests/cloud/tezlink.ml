@@ -548,20 +548,26 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           ~location:"/"
           ~proxy_pass
       in
+      let tezlink_proxy_endpoint =
+        match tezlink_sandbox_endpoint with
+        | Node _ ->
+            failwith "Tezlink end-point should not be a full-fledged node."
+        | Foreign_endpoint {host; scheme; port = _; path = _} ->
+            Client.Foreign_endpoint
+              (Endpoint.make ~host ~scheme ~port:public_rpc_port ())
+      in
       let* () =
         add_service
           cloud
           ~name:"Tezlink RPC endpoint"
-          ~url:(Client.string_of_endpoint tezlink_sandbox_endpoint)
+          ~url:(Client.string_of_endpoint tezlink_proxy_endpoint)
       in
       let* () =
         add_service
           cloud
           ~name:"Check Tezlink RPC endpoint"
           ~url:
-            (sf
-               "%s/version"
-               (Client.string_of_endpoint tezlink_sandbox_endpoint))
+            (sf "%s/version" (Client.string_of_endpoint tezlink_proxy_endpoint))
       in
       let* () =
         if Cli.tzkt then
