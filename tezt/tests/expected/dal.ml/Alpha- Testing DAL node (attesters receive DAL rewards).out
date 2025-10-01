@@ -138,9 +138,9 @@ GET http://[HOST]:[PORT]/chains/main/blocks/head/context/issuance/expected_issua
 
 GET http://[HOST]:[PORT]/chains/main/blocks/head~1/context/delegates/[PUBLIC_KEY_HASH]/dal_participation
 200 OK
-{"expected_assigned_shards_per_slot":409,"delegate_attested_dal_slots":0,"delegate_attestable_dal_slots":6,"expected_dal_rewards":"212680","sufficient_dal_participation":false,"denounced":false}
+{"expected_assigned_shards_per_slot":409,"delegate_attested_dal_slots":0,"delegate_attestable_dal_slots":5,"expected_dal_rewards":"212680","sufficient_dal_participation":false,"denounced":false}
 
 GET http://[HOST]:[PORT]/chains/main/blocks/head~1/context/delegates/[PUBLIC_KEY_HASH]/dal_participation
 200 OK
-{"expected_assigned_shards_per_slot":409,"delegate_attested_dal_slots":6,"delegate_attestable_dal_slots":6,"expected_dal_rewards":"212680","sufficient_dal_participation":true,"denounced":false}
+{"expected_assigned_shards_per_slot":409,"delegate_attested_dal_slots":5,"delegate_attestable_dal_slots":5,"expected_dal_rewards":"212680","sufficient_dal_participation":true,"denounced":false}
 

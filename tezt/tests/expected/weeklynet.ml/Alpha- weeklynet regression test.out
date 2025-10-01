@@ -30,7 +30,7 @@
   "cache_sampler_state_cycles": 5,
   "dal_parametric":
     { "feature_enable": true, "incentives_enable": false,
-      "number_of_slots": 32, "attestation_lag": 8,
+      "number_of_slots": 32, "attestation_lag": 5,
       "attestation_threshold": 66,
       "minimal_participation_ratio":
         { "numerator": "16", "denominator": "25" },
