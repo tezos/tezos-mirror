@@ -1021,7 +1021,43 @@ let update_cycle_eras ctxt level ~prev_blocks_per_cycle ~new_blocks_per_cycle
   in
   set_cycle_eras ctxt new_cycle_eras
 
-type delays = {
+type block_time_delays = {
+  minimal_block_delay : Period_repr.t;
+  max_operations_time_to_live : int;
+  delay_increment_per_round : Period_repr.t;
+  hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
+  sc_rollup : Constants_parametric_repr.sc_rollup;
+}
+
+let update_block_time_related_constants
+    ~(previous_blocktime_delays : block_time_delays) : block_time_delays =
+  let old = previous_blocktime_delays in
+  (* changing [minimal_block_delay] from 8s to 6s *)
+  let divide_period p =
+    Period_repr.of_seconds_exn
+      Int64.(div (mul (Period_repr.to_seconds p) 3L) 4L)
+  in
+  let minimal_block_delay = divide_period old.minimal_block_delay in
+  let delay_increment_per_round = divide_period old.delay_increment_per_round in
+  let hard_gas_limit_per_block =
+    (* for 6s block time, hard_gas_limit_per_block = hard_gas_limit_per_operation *)
+    Gas_limit_repr.Arith.(integral_of_int_exn 1_040_000)
+  in
+  let max_operations_time_to_live = 4 * old.max_operations_time_to_live / 3 in
+  let sc_rollup =
+    Constants_parametric_repr.update_sc_rollup_parameter_with_block_time
+      6
+      old.sc_rollup
+  in
+  {
+    minimal_block_delay;
+    max_operations_time_to_live;
+    delay_increment_per_round;
+    hard_gas_limit_per_block;
+    sc_rollup;
+  }
+
+type cycle_duration_delays = {
   blocks_per_cycle : int32;
   delegate_parameters_activation_delay : int;
   cycles_per_voting_period : int32;
@@ -1033,7 +1069,7 @@ type delays = {
 
 let new_constants_four_hours_cycles ~preserve_duration_in_days
     ~previous_minimal_block_delay ~minimal_block_delay
-    ~(previous_delays : delays) : delays =
+    ~(previous_delays : cycle_duration_delays) : cycle_duration_delays =
   let previous_minimal_block_delay_sec =
     Period_repr.to_seconds previous_minimal_block_delay
   in
@@ -1662,6 +1698,31 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
              blocks_per_cycle = 10800l *)
           Compare.Int32.(c.blocks_per_cycle = 10800l)
         in
+        (* Part 1: update constants related to the block time with 6s block time *)
+        let {
+          minimal_block_delay;
+          max_operations_time_to_live;
+          delay_increment_per_round;
+          hard_gas_limit_per_block;
+          sc_rollup;
+        } =
+          let previous_blocktime_delays =
+            {
+              minimal_block_delay;
+              max_operations_time_to_live;
+              delay_increment_per_round;
+              hard_gas_limit_per_block;
+              sc_rollup;
+            }
+          in
+          if
+            is_new_constants
+            && Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 8L)
+          then update_block_time_related_constants ~previous_blocktime_delays
+          else previous_blocktime_delays
+        in
+
+        (* Part 2: update constants related to the cycle duration with 4h cycle *)
         let {
           blocks_per_cycle;
           delegate_parameters_activation_delay;
@@ -1688,14 +1749,17 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                [delegate_parameters_activation_delay],
                [tolerated_inactivity_period] protocol constants on
                mainnet *)
-            let preserve_duration_in_days =
+            let is_mainnet =
               Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 8L)
             in
-            (* [minimal_block_delay] is the same for proto S and T *)
+            (* [previous_minimal_block_delay] is used to preserve
+               duration for the [cycles_per_voting_period],
+               [delegate_parameters_activation_delay],
+               [tolerated_inactivity_period] protocol constants *)
             new_constants_four_hours_cycles
-              ~preserve_duration_in_days
+              ~preserve_duration_in_days:is_mainnet
               ~previous_minimal_block_delay:c.minimal_block_delay
-              ~minimal_block_delay:c.minimal_block_delay
+              ~minimal_block_delay
               ~previous_delays
           else previous_delays
         in

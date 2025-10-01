@@ -203,7 +203,7 @@ Proof-of-stake parameters
    * - Parameter name
      - Parameter value
    * - ``BLOCKS_PER_CYCLE``
-     - 1800 blocks
+     - 2400 blocks
    * - ``CONSENSUS_RIGHTS_DELAY``
      - 1 cycle
    * - ``MINIMAL_STAKE``

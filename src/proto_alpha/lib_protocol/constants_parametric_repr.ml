@@ -792,10 +792,52 @@ let update_sc_rollup_parameter ratio_i32 c =
   {
     (* Constants expressed in number of blocks *)
     challenge_window_in_blocks = ratio_int c.challenge_window_in_blocks;
-    max_active_outbox_levels = ratio_i32 c.max_active_outbox_levels;
+    max_active_outbox_levels = c.max_active_outbox_levels;
     commitment_period_in_blocks = ratio_int c.commitment_period_in_blocks;
     max_lookahead_in_blocks = ratio_i32 c.max_lookahead_in_blocks;
     timeout_period_in_blocks = ratio_int c.timeout_period_in_blocks;
+    (* Other constants *)
+    max_outbox_messages_per_level = c.max_outbox_messages_per_level;
+    arith_pvm_enable = c.arith_pvm_enable;
+    origination_size = c.origination_size;
+    stake_amount = c.stake_amount;
+    number_of_sections_in_dissection = c.number_of_sections_in_dissection;
+    max_number_of_stored_cemented_commitments =
+      c.max_number_of_stored_cemented_commitments;
+    max_number_of_parallel_games = c.max_number_of_parallel_games;
+    reveal_activation_level = c.reveal_activation_level;
+    private_enable = c.private_enable;
+    riscv_pvm_enable = c.riscv_pvm_enable;
+  }
+
+let update_sc_rollup_parameter_with_block_time block_time c =
+  (* For comments, see [make_sc_rollup_parameter] from
+     [lib_parameters/default_parameters.ml] *)
+  let seconds_in_a_day = 60 * 60 * 24 in
+  let seconds_in_a_week = seconds_in_a_day * 7 in
+  let commitment_period_in_blocks = 60 * 15 / block_time in
+  let challenge_window_in_blocks = seconds_in_a_week * 2 / block_time in
+
+  (* Here we don't update the value so there is no need for such
+     migration, but it reduces the time a user has to execute a outbox
+     message.
+
+     For a new network it should be ~ 2 weeks, so `seconds_in_a_week *
+     2 / block_time`. *)
+  let max_active_outbox_levels = c.max_active_outbox_levels in
+  let timeout_period_in_blocks = seconds_in_a_week / block_time in
+  let max_lookahead_in_blocks =
+    let seconds_in_a_month = Int32.of_int (seconds_in_a_day * 30) in
+    let block_time = Int32.of_int block_time in
+    Int32.div seconds_in_a_month block_time
+  in
+  {
+    (* Constants expressed in number of blocks *)
+    challenge_window_in_blocks;
+    max_active_outbox_levels;
+    commitment_period_in_blocks;
+    max_lookahead_in_blocks;
+    timeout_period_in_blocks;
     (* Other constants *)
     max_outbox_messages_per_level = c.max_outbox_messages_per_level;
     arith_pvm_enable = c.arith_pvm_enable;
