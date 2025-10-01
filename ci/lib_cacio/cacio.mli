@@ -245,6 +245,7 @@ module type COMPONENT_API = sig
     ?test_coverage:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
+    ?timeout:Gitlab_ci.Types.time_interval ->
     ?image_dependencies:Tezos_ci.Image.t list ->
     ?services:Gitlab_ci.Types.service list ->
     string ->

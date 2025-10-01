@@ -92,6 +92,7 @@ type job = {
   test_coverage : bool;
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
   retry : Gitlab_ci.Types.retry option;
+  timeout : Gitlab_ci.Types.time_interval option;
   image_dependencies : Tezos_ci.Image.t list;
   services : Gitlab_ci.Types.service list option;
 }
@@ -376,6 +377,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     test_coverage;
                     allow_failure;
                     retry;
+                    timeout;
                     image_dependencies;
                     services;
                   };
@@ -515,6 +517,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                    else (* Cannot be interruptible. *)
                      Some false)
                 ?retry
+                ?timeout
                 ?variables
                 ?artifacts
                 ?allow_failure
@@ -582,6 +585,7 @@ module type COMPONENT_API = sig
     ?test_coverage:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
+    ?timeout:Gitlab_ci.Types.time_interval ->
     ?image_dependencies:Tezos_ci.Image.t list ->
     ?services:Gitlab_ci.Types.service list ->
     string ->
@@ -626,8 +630,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
       ?(needs_legacy = []) ?parallel ?variables ?artifacts
       ?(cargo_cache = false) ?(cargo_target_caches = false) ?sccache ?dune_cache
-      ?(test_coverage = false) ?allow_failure ?retry ?(image_dependencies = [])
-      ?services name script =
+      ?(test_coverage = false) ?allow_failure ?retry ?timeout
+      ?(image_dependencies = []) ?services name script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -672,6 +676,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       test_coverage;
       allow_failure;
       retry;
+      timeout;
       image_dependencies;
       services;
     }
