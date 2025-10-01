@@ -131,20 +131,6 @@ Protocol parameters
   ``consensus_rights_delay + slashing_delay + 2 = 1 + 1 + 2 = 4``
   cycles are needed. (MR :gl:`!18783`)
 
-- Replaced the ``tolerated_inactivity_period`` protocol constant with
-  three new protocol constants: ``tolerated_inactivity_period_low``,
-  ``tolerated_inactivity_period_high`` and
-  ``tolerated_inactivity_period_threshold``. The tolerated inactivity
-  period now depends on the delegate's stake ratio over the total
-  active stake. If the ratio is greater than the
-  ``tolerated_inactivity_period_threshold = 10`` (expressed in 'per
-  thousand'), we apply a low tolerance
-  ``tolerated_inactivity_period_low = 1``. Otherwise, we apply a high
-  tolerance ``tolerated_inactivity_period_high = 12``. If the stake is
-  unknown, we apply a low tolerance (e.g., after the delegate's
-  registration, reactivation, or decreasing its stake below
-  ``minimal_stake``). (MR :gl:`!17582`)
-
 
 6s Block Time (MR :gl:`!19045`)
 ---------------------------------
