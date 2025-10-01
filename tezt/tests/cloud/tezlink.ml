@@ -513,17 +513,13 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       Clap.close () ;
       let () = toplog "Creating the agents" in
       let agents = Cloud.agents cloud in
-      let next_agent ~name =
-        let agent =
-          match List.find_opt (fun agent -> Agent.name agent = name) agents with
-          | None ->
-              if Cli.proxy_localhost then List.hd agents
-              else Test.fail ~__LOC__ "Agent not found: %s" name
-          | Some agent -> agent
-        in
-        Lwt.return agent
+      let tezlink_sequencer_agent =
+        match List.find_opt (fun agent -> Agent.name agent = name) agents with
+        | None ->
+            if Cli.proxy_localhost then List.hd agents
+            else Test.fail ~__LOC__ "Agent not found: %s" name
+        | Some agent -> agent
       in
-      let* tezlink_sequencer_agent = next_agent ~name in
       let () = toplog "Starting Tezlink sequencer" in
       let* tezlink_sandbox_endpoint =
         init_tezlink_sequencer
