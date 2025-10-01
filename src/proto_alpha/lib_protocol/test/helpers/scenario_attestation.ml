@@ -12,12 +12,8 @@ open Log_helpers
 open Scenario_base
 open Protocol
 
-let update_activity name block state : State.t tzresult Lwt.t =
-  Scenario_activity.update_activity
-    ~block
-    ~state
-    (Block.cycle_of_next_block block)
-    name
+let update_activity name block state : State.t =
+  Scenario_activity.update_activity name state (Block.cycle_of_next_block block)
 
 type kind = Preattestation | Attestation
 
@@ -274,7 +270,7 @@ let attest_with ?dal_content (delegate_name : string) : (t, t) scenarios =
         (* Fails to produce an attestation if the delegate has no slot for the block *)
         let* op = Op.attestation ?dal_content ~manager_pkh:delegate.pkh block in
         (* Update the activity of the delegate *)
-        let* state = update_activity delegate_name block state in
+        let state = update_activity delegate_name block state in
         let state = State.add_pending_operations [op] state in
         (* Check metadata *)
         let state =
@@ -326,7 +322,7 @@ let attest_aggreg_with ?(delegates_with_dal = ([] : (string * Z.t) list))
                 else failwith "Cannot aggregate with non-BLS key"
               in
               (* Update the activity of the committee *)
-              let* state = update_activity delegate_name block state in
+              let state = update_activity delegate_name block state in
               let* attesting_slot =
                 Op.get_attesting_slot_of_delegate
                   ~manager_pkh:delegate.pkh
@@ -410,7 +406,7 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
           let delegate_name, _ =
             State.find_account_from_pkh manager_pkh state
           in
-          let* state = update_activity delegate_name block state in
+          let state = update_activity delegate_name block state in
           if
             state.constants.aggregate_attestation
             && Signature.Public_key_hash.is_bls consensus_pkh
@@ -503,7 +499,7 @@ let preattest_with ?payload_round (delegate_name : string) :
         (* Fails to produce an attestation if the delegate has no slot for the block *)
         let* op = Op.preattestation ~manager_pkh:delegate.pkh fake_block in
         (* Update the activity of the delegate *)
-        let* state =
+        let state =
           update_activity delegate_name (Incremental.predecessor incr) state
         in
         (* Check metadata *)
@@ -549,7 +545,7 @@ let preattest_aggreg_with ?payload_round (delegates : string list) :
                 else failwith "Cannot aggregate non-BLS preattestation"
               in
               (* Update the activity of the committee *)
-              let* state =
+              let state =
                 update_activity
                   delegate_name
                   (Incremental.predecessor incr)
@@ -633,7 +629,7 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
           let delegate_name, _ =
             State.find_account_from_pkh manager_pkh state
           in
-          let* state =
+          let state =
             update_activity delegate_name (Incremental.predecessor incr) state
           in
           if

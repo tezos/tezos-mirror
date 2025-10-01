@@ -152,8 +152,8 @@ let check_misc _full_metadata (block, state) : unit tzresult Lwt.t =
             if not (Block.last_block_of_cycle block) then current_cycle
             else Cycle.succ current_cycle
           in
-          let* deactivated =
-            Scenario_activity.is_inactive ~block ~state ctxt_cycle account
+          let deactivated =
+            Scenario_activity.is_inactive state.constants ctxt_cycle account
           in
           let*! r3 =
             Assert.equal_bool ~loc:__LOC__ deactivated deactivated_rpc
@@ -332,12 +332,11 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
   let baker = Incremental.delegate i in
   let baker_name, _ = State.find_account_from_pkh baker.pkh state in
   (* Update baker activity *)
-  let* state =
+  let state =
     Scenario_activity.update_activity
-      ~block
-      ~state
-      (Block.current_cycle block)
       baker_name
+      state
+      (Block.current_cycle block)
   in
   let* () = check_ai_launch_cycle_is_zero ~loc:__LOC__ block in
   let* state = State.apply_rewards ~baker:baker_name block state in
