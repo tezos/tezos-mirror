@@ -2088,18 +2088,7 @@ let test_consensus_rights_delay_shortening () =
 
 let test_tolerated_inactivity_period () =
   (* Given that [grace_period] for the current scenario is equal to 4
-     cycles, we check a protocol migration near that cycle.
-
-     In proto T, we update the Delegate_last_cycle_before_deactivation
-     table with the actual last activity cycle without doing a
-     stitching during the protocol migration. It means that the
-     [grace_period] is off by:
-
-     - 2 cycles for the delegates with the last activity in the last
-     cycle or last but one cycle of proto S
-
-     - 1 cycle for the delegates with the last activity in the first
-     cycle of proto T *)
+     cycles, we check a protocol migration near that cycle *)
   let migrate_from = Option.get Protocol.(previous_protocol Alpha) in
   let migrate_to = Protocol.Alpha in
 
@@ -2185,71 +2174,27 @@ let test_tolerated_inactivity_period () =
                 delegates_array.(target_cycle).alias )
             else ([], default_baker)
           in
-
-          (* Migration at the end of C3:
-             - D0, D1, D2 are deactivated at the end of C4 -> C6
-             - D3 is deactivated at the end of C5 -> C7
-             -------------------------[proto migration]
-             - D4 is deactivated at the end of C6 -> C7
-             - D5 is deactivated at the end of C7
-             - D6 is deactivated at the end of C8
-             - D7 is deactivated at the end of C9
-
-             Migration at the end of C4:
-             - D0, D1, D2 are deactivated at the end of C4
-             - D3 is deactivated at the end of C5 -> C7
-             - D4 is deactivated at the end of C6 -> C8
-             -------------------------[proto migration]
-             - D5 is deactivated at the end of C7 -> C8
-             - D6 is deactivated at the end of C8
-             - D7 is deactivated at the end of C9
-
-             Migration at the end of C5:
-             - D0, D1, D2 are deactivated at the end of C4
-             - D3 is deactivated at the end of C5
-             - D4 is deactivated at the end of C6 -> C8
-             - D5 is deactivated at the end of C7 -> C9
-             -------------------------[proto migration]
-             - D6 is deactivated at the end of C8 -> C9
-             - D7 is deactivated at the end of C9
-          *)
           let expected_list =
             match target_cycle with
             | 3 | 4 -> all_activated
             | 5 ->
-                let is_deactivated i =
-                  if i <= 2 then migration_cycle >= 5 else false
-                in
-                List.init 8 is_deactivated
+                (* D0, D1, D2 are deactivated at the end of C4 *)
+                List.init 8 (fun i -> if i <= 2 then true else false)
             | 6 ->
-                let is_deactivated i =
-                  if i <= 2 then migration_cycle >= 5
-                  else if i = 3 then migration_cycle >= 6
-                  else false
-                in
-                List.init 8 is_deactivated
+                (* D3 is deactivated at the end of C5 *)
+                List.init 8 (fun i -> if i <= 3 then true else false)
             | 7 ->
-                let is_deactivated i =
-                  if i <= 2 then true
-                  else if i = 3 then migration_cycle >= 6
-                  else false
-                in
-                List.init 8 is_deactivated
+                (* D4 is deactivated at the end of C6 *)
+                List.init 8 (fun i -> if i <= 4 then true else false)
             | 8 ->
-                let is_deactivated i =
-                  if i <= 3 then true
-                  else if i = 4 || i = 5 then migration_cycle = 4
-                  else false
-                in
-                List.init 8 is_deactivated
+                (* D5 is deactivated at the end of C7 *)
+                List.init 8 (fun i -> if i <= 5 then true else false)
             | 9 ->
-                let is_deactivated i =
-                  if i = 5 || i = 6 then migration_cycle <= 5
-                  else if i = 7 then false
-                  else true
-                in
-                List.init 8 is_deactivated
-            | 10 -> all_deactivated
+                (* D6 is deactivated at the end of C8 *)
+                List.init 8 (fun i -> if i <= 6 then true else false)
+            | 10 ->
+                (* D7 is deactivated at the end of C9 *)
+                all_deactivated
             | _ -> failwith "unexpected input"
           in
           (* [default_baker] must be always active *)
