@@ -205,16 +205,20 @@ let deploy_contracts ~rpc_node infos ~sequencer accounts contract nb =
   in
   wait_for_application sequencer deploys
 
-let call infos contract gas_limit sender ?nonce ~name abi params =
+let call infos contract gas_limit sender ?nonce ?value ?name abi params =
   let confirmed, waker = Lwt.task () in
-  let data = Efunc_core.Evm.encode ~name abi params in
+  let data =
+    match name with
+    | None -> None
+    | Some name -> Some (Efunc_core.Evm.encode ~name abi params)
+  in
   let* () =
     Tx_queue.transfer
       ~gas_limit
       ~infos
       ~to_:(Efunc_core.Private.a contract)
-      ~data
-      ~value:Z.zero
+      ?data
+      ?value
       ~from:sender
       ?nonce
       ()
