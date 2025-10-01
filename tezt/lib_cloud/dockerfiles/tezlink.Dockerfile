@@ -41,6 +41,9 @@ RUN apt-get update && apt-get install -y \
     git \
     # to run the faucet application
     npm \
+    # to generate SSL certificates
+    certbot \
+    python3-certbot-nginx \
     # DL3015: Use --no-install-recommends
     --no-install-recommends
 
