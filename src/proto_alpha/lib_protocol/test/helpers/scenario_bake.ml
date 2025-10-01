@@ -369,6 +369,7 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
       check_finalized_current_block = [];
       previous_metadata = Some metadata;
       grandparent = previous_block;
+      grandgrandparent = state.grandparent;
     }
   in
   return (block, state)

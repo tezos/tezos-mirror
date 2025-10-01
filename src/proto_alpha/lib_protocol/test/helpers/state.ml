@@ -50,6 +50,7 @@ type t = {
   previous_metadata : Block.full_metadata option;
   operation_mode : operation_mode;
   grandparent : Block.t;
+  grandgrandparent : Block.t;
 }
 
 (** Expected number of cycles before staking parameters get applied *)
