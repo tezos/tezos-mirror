@@ -419,7 +419,7 @@ let inc_confirm_gas_needed () =
 let record_blueprint_chunks_sent_on_dal chunks =
   Counter.inc
     Blueprint_chunk_sent.on_dal
-    (Float.of_int (List.length chunks))
+    (Float.of_int (Sequencer_blueprint.nb_chunks chunks))
     "record_blueprint_chunks_sent_on_dal"
 
 let record_blueprint_chunks_sent_on_inbox chunks =

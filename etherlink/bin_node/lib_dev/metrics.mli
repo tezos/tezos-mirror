@@ -63,7 +63,8 @@ val record_signals_sent : (int * int32) list -> unit
     one more time, because the previous simulation did not return enough gas. *)
 val inc_confirm_gas_needed : unit -> unit
 
-val record_blueprint_chunks_sent_on_dal : Sequencer_blueprint.t list -> unit
+val record_blueprint_chunks_sent_on_dal :
+  Sequencer_blueprint.chunked_blueprint -> unit
 
 val record_blueprint_chunks_sent_on_inbox : Blueprint_types.chunk list -> unit
 

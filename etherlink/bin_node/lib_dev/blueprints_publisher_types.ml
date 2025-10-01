@@ -8,7 +8,7 @@
 module Request = struct
   type payload =
     | Blueprint of {
-        chunks : Sequencer_blueprint.t list;
+        chunks : Sequencer_blueprint.chunked_blueprint;
         inbox_payload : Blueprint_types.payload;
       }
     | Inbox of Blueprint_types.payload
@@ -37,9 +37,7 @@ module Request = struct
           (Tag 0)
           ~title:"Blueprint"
           (obj2
-             (req
-                "chunks"
-                (list (dynamic_size Sequencer_blueprint.chunk_encoding)))
+             (req "chunks" Sequencer_blueprint.chunked_blueprint_encoding)
              (req "inbox_payload" (list external_encoding)))
           (function
             | Blueprint {chunks; inbox_payload} -> Some (chunks, inbox_payload)

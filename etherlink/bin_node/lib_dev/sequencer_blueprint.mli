@@ -5,6 +5,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error +=
+  | Not_a_blueprint
+  | Bad_chunk_index of {expected : int; actual : int}
+  | Bad_nb_chunks of {expected : int; actual : int; chunk_index : int}
+
 type unsigned_chunk = private {
   value : bytes;
   number : Ethereum_types.quantity;
@@ -12,44 +17,59 @@ type unsigned_chunk = private {
   chunk_index : int;
 }
 
-(* A signed blueprint chunk *)
-type t
+type chunked_blueprint
 
-(** [unsafe_drop_signature chunk] gives back the content of [chunk]
-    {e without checking if its signature is valid}.  See {!check_signature} if
-    you want to get the unsigned content iff the signature is correct. *)
-val unsafe_drop_signature : t -> unsigned_chunk
+(** [nb_chunks blueprint] computes in constant time the number of
+    chunks of [blueprint]. *)
+val nb_chunks : chunked_blueprint -> int
 
-(** [check_signature pubkey chunk] will return the (unsigned) chunk content in
-    the case that it was indeed signed for [pubkey]. Otherwise it returns an
-    error. See {!unsafe_drop_signature} if you want to skip the signature
+(* Invariants:
+   - the nb_chunks field of each unsigned chunk is the length of the list,
+   - the chunk_index field of the ith chunk of the list is i.
+*)
+type unsigned_chunked_blueprint = private unsigned_chunk list
+
+(** [unsafe_drop_signatures chunks] gives back the content of [chunks]
+    {e without checking if their signatures are valid}.  See
+    {!check_signatures} if you want to get the unsigned content iff the
+    signature is correct. *)
+val unsafe_drop_signatures : chunked_blueprint -> unsigned_chunked_blueprint
+
+(** [check_signatures pubkey chunks] will return the (unsigned) chunk content in
+    the case that they were indeed signed for [pubkey]. Otherwise it returns an
+    error. See {!unsafe_drop_signatures} if you want to skip the signature
     verification and just get the unsigned content. *)
-val check_signature : Signature.public_key -> t -> unsigned_chunk tzresult
+val check_signatures :
+  Signature.public_key ->
+  chunked_blueprint ->
+  unsigned_chunked_blueprint tzresult
 
-val unsigned_chunk_encoding : unsigned_chunk Data_encoding.t
+val unsigned_chunked_blueprint_encoding :
+  unsigned_chunked_blueprint Data_encoding.t
 
-val chunk_encoding : t Data_encoding.t
+val chunked_blueprint_encoding : chunked_blueprint Data_encoding.t
 
-(** [chunk_to_rlp chunk] encodes a chunk into its RLP format. *)
-val chunk_to_rlp : t -> Rlp.item
-
-(** [chunk_of_external_message msg] attempts to decode [msg] as a blueprint
-    chunk. *)
-val chunk_of_external_message : [`External of string] -> t tzresult
+(** [chunks_of_external_messages payload] attempts to decode payload as a chunked blueprint. *)
+val chunks_of_external_messages :
+  Blueprint_types.payload -> chunked_blueprint tzresult
 
 (** [sign ~signer ~chunks] serializes and signs a list of chunks. *)
 val sign :
-  signer:Signer.t -> chunks:unsigned_chunk list -> t list tzresult Lwt.t
+  signer:Signer.t ->
+  chunks:unsigned_chunked_blueprint ->
+  chunked_blueprint tzresult Lwt.t
 
 (** [create_inbox_payload ~smart_rollup_address ~chunks] encodes the chunks into
     message(s) that can be read from the inbox by the kernel. *)
 val create_inbox_payload :
-  smart_rollup_address:string -> chunks:t list -> Blueprint_types.payload
+  smart_rollup_address:string ->
+  chunks:chunked_blueprint ->
+  Blueprint_types.payload
 
 (** [create_dal_payloads chunks] encodes the chunks into messages that
     can be read from DAL slots by the kernel. The chunks are prefixed
     by a tag. *)
-val create_dal_payloads : t list -> string list
+val create_dal_payloads : chunked_blueprint -> string list
 
 (** [maximum_usable_size_in_blueprint chunks_count] returns the available space
     for transactions in a blueprint composed of [chunks_count] chunks. *)
@@ -70,7 +90,9 @@ type kernel_blueprint = {
     [kernel_blueprint] whose number is [number] and splits the result into
     chunks small enough to fit in inbox messages. *)
 val make_blueprint_chunks :
-  number:Ethereum_types.quantity -> kernel_blueprint -> unsigned_chunk list
+  number:Ethereum_types.quantity ->
+  kernel_blueprint ->
+  unsigned_chunked_blueprint
 
 (** [kernel_blueprint_parent_hash_of_payload sequencer bytes]
     partially decodes fields of a {!kernel_blueprint} and return the
@@ -79,6 +101,6 @@ val make_blueprint_chunks :
 val kernel_blueprint_parent_hash_of_payload :
   Signature.public_key ->
   Blueprint_types.payload ->
-  Ethereum_types.block_hash option
+  Ethereum_types.block_hash option tzresult
 
-type error += Not_a_blueprint
+val to_rlp : Blueprint_types.payload -> Rlp.item tzresult

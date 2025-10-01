@@ -106,9 +106,9 @@ val apply_blueprint :
 val apply_chunks :
   signer:Signer.map ->
   Time.Protocol.t ->
-  Sequencer_blueprint.unsigned_chunk list ->
+  Sequencer_blueprint.unsigned_chunked_blueprint ->
   Evm_events.Delayed_transaction.t list ->
-  (Sequencer_blueprint.t list
+  (Sequencer_blueprint.chunked_blueprint
   * Blueprint_types.payload
   * Ethereum_types.hash Seq.t)
   tzresult

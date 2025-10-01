@@ -118,7 +118,7 @@ val apply_unsigned_chunks :
   config:Wasm_debugger.config ->
   native_execution_policy:Configuration.native_execution_policy ->
   t ->
-  Sequencer_blueprint.unsigned_chunk list ->
+  Sequencer_blueprint.unsigned_chunked_blueprint ->
   apply_result tzresult Lwt.t
 
 (** [flag_local_exec evm_state] adds a flag telling the kernel it is executed

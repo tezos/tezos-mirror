@@ -521,14 +521,11 @@ let replay ctxt ?(log_file = "replay") ?profile
         Lwt.return_unit)
     @@ fun () ->
     let*? chunks =
-      List.map_e
-        (fun chunk ->
-          let open Result_syntax in
-          let+ chunk = Sequencer_blueprint.chunk_of_external_message chunk in
-          (* We are replaying, so we can assume the signature is correct *)
-          Sequencer_blueprint.unsafe_drop_signature chunk)
+      Sequencer_blueprint.chunks_of_external_messages
         blueprint.blueprint.payload
     in
+    (* We are replaying, so we can assume the signatures are correct *)
+    let chunks = Sequencer_blueprint.unsafe_drop_signatures chunks in
     Evm_state.apply_unsigned_chunks
       ~pool:ctxt.execution_pool
       ~log_file

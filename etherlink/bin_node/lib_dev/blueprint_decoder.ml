@@ -40,12 +40,5 @@ let from_rlp =
 
 let transactions payload =
   let open Result_syntax in
-  let* bytes =
-    List.map_e
-      (fun chunk ->
-        let+ chunk = Sequencer_blueprint.chunk_of_external_message chunk in
-        (Sequencer_blueprint.unsafe_drop_signature chunk).value)
-      payload
-  in
-  let* rlp_content = Rlp.decode Bytes.(concat Bytes.empty bytes) in
+  let* rlp_content = Sequencer_blueprint.to_rlp payload in
   from_rlp rlp_content

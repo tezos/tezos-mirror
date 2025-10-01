@@ -17,7 +17,7 @@ module Request = struct
     | Apply_blueprint : {
         events : Evm_events.t list option;
         timestamp : Time.Protocol.t;
-        chunks : Sequencer_blueprint.unsigned_chunk list;
+        chunks : Sequencer_blueprint.unsigned_chunked_blueprint;
         payload : Blueprint_types.payload tzresult Lwt.t;
         delayed_transactions : Evm_events.Delayed_transaction.t list;
       }
@@ -81,7 +81,9 @@ module Request = struct
              (req "request" (constant "apply_blueprint"))
              (opt "events" (list Evm_events.encoding))
              (req "timestamp" Time.Protocol.encoding)
-             (req "chunks" (list Sequencer_blueprint.unsigned_chunk_encoding))
+             (req
+                "chunks"
+                Sequencer_blueprint.unsigned_chunked_blueprint_encoding)
              (req
                 "delayed_transactions"
                 (list Evm_events.Delayed_transaction.encoding)))
