@@ -548,13 +548,16 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           ~location:"/"
           ~proxy_pass
       in
-      let tezlink_proxy_endpoint =
+      let tezlink_proxy_endpoint, ip =
         match tezlink_sandbox_endpoint with
         | Node _ ->
             failwith "Tezlink end-point should not be a full-fledged node."
         | Foreign_endpoint {host; scheme; port = _; path = _} ->
-            Client.Foreign_endpoint
-              (Endpoint.make ~host ~scheme ~port:public_rpc_port ())
+            let endpoint =
+              Client.Foreign_endpoint
+                (Endpoint.make ~host ~scheme ~port:public_rpc_port ())
+            in
+            (endpoint, host)
       in
       let* () =
         add_service
@@ -644,6 +647,15 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             unit
           else unit
         else unit
+      in
+      let dns_name = "node" in
+      let* () =
+        (* Binds a name to the machine. Overwrites the previous bond to name,
+           if any. Creates the subdomain if it does not exist. *)
+        Tezt_cloud.Gcloud.DNS.add_subdomain
+          ~zone:"tezlink-nomadic-labs-com"
+          ~name:dns_name
+          ~value:ip
       in
       let () = toplog "Starting main loop" in
       loop 0)
