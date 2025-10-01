@@ -626,13 +626,28 @@ end
 module Make (Component : COMPONENT) : COMPONENT_API = struct
   let default_only_if_changed = Tezos_ci.Changeset.make Component.paths
 
+  (* Users of Cacio just specify a [string] for the [name];
+     we don't want them to provide a [string option].
+     But in this module, we want the type-checker to force us to check
+     whether the name is empty (for the [Shared] module). *)
+  module Component = struct
+    include Component
+
+    let name = if name = "" then None else Some name
+  end
+
+  let make_name name =
+    match Component.name with
+    | None -> name
+    | Some component -> component ^ "." ^ name
+
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
       ?(needs_legacy = []) ?parallel ?variables ?artifacts
       ?(cargo_cache = false) ?(cargo_target_caches = false) ?sccache ?dune_cache
       ?(test_coverage = false) ?allow_failure ?retry ?timeout
       ?(image_dependencies = []) ?services name script =
-    let name = Component.name ^ "." ^ name in
+    let name = make_name name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
       if compare_stages dep.stage stage > 0 then
@@ -709,8 +724,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     let jobs = convert_jobs ~with_condition:false jobs in
     Tezos_ci.Hooks.master := jobs @ !Tezos_ci.Hooks.master
 
-  let full_pipeline_name name = sf "%s.%s" Component.name name
-
   (* Helper for other functions below, that is not exposed to users of this module.
      It is responsible for:
      - prefixing the name of the pipeline with the name of the component;
@@ -720,7 +733,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     Tezos_ci.Pipeline.register
       ~description
       ~jobs:(Tezos_ci.job_datadog_pipeline_trace :: jobs)
-      (full_pipeline_name name)
+      (make_name name)
       rules
 
   let register_scheduled_pipeline ~description ?(legacy_jobs = []) name jobs =
@@ -736,7 +749,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         )
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
-          scheduled && var "TZ_SCHEDULE_KIND" == str (full_pipeline_name name)))
+          scheduled && var "TZ_SCHEDULE_KIND" == str (make_name name)))
 
   let register_global_release_jobs jobs =
     let jobs = convert_jobs ~with_condition:false jobs in
@@ -766,32 +779,45 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
      as it makes sure that it is registered with [Hooks.release_tags] only once. *)
   let get_release_tag_rex =
     let tag = ref None in
-    fun () ->
+    fun component_name ->
       match !tag with
       | Some tag -> tag
       | None ->
           let result =
-            "/^" ^ String.lowercase_ascii Component.name ^ "-v\\d+\\.\\d+$/"
+            "/^" ^ String.lowercase_ascii component_name ^ "-v\\d+\\.\\d+$/"
           in
           tag := Some result ;
           Tezos_ci.Hooks.release_tags := result :: !Tezos_ci.Hooks.release_tags ;
           result
+
+  (* Wrap a function with this function to make sure
+     the component is an actual component, not [Shared]. *)
+  let component_must_not_be_shared name f =
+    match Component.name with
+    | None -> failwith (name ^ ": not implemented for the Shared component")
+    | Some name -> f name
 
   (* Wrap a function with this function to make sure it is called only once. *)
   let only_once name f =
     let already_called = ref false in
     fun x ->
       if !already_called then
-        error __POS__ "component %s called %s twice" Component.name name ;
+        error
+          __POS__
+          "component %s called %s twice"
+          (match Component.name with None -> "Shared" | Some name -> name)
+          name ;
       already_called := true ;
       f x
 
   let register_dedicated_release_pipeline =
     only_once "register_dedicated_release_pipeline" @@ fun jobs ->
-    let release_tag_rex = get_release_tag_rex () in
+    component_must_not_be_shared "register_dedicated_release_pipeline"
+    @@ fun component_name ->
+    let release_tag_rex = get_release_tag_rex component_name in
     register_pipeline
       "release"
-      ~description:(sf "Release %s." Component.name)
+      ~description:(sf "Release %s." component_name)
       ~jobs:(convert_jobs ~with_condition:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
@@ -799,12 +825,21 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   let register_dedicated_test_release_pipeline =
     only_once "register_dedicated_test_release_pipeline" @@ fun jobs ->
-    let release_tag_rex = get_release_tag_rex () in
+    component_must_not_be_shared "register_dedicated_release_pipeline"
+    @@ fun component_name ->
+    let release_tag_rex = get_release_tag_rex component_name in
     register_pipeline
       "test_release"
-      ~description:(sf "Release %s (test)." Component.name)
+      ~description:(sf "Release %s (test)." component_name)
       ~jobs:(convert_jobs ~with_condition:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           not_on_tezos_namespace && push && has_tag_match release_tag_rex))
 end
+
+module Shared = Make (struct
+  (* The empty name causes common jobs to not be prefixed by a component name. *)
+  let name = ""
+
+  let paths = []
+end)

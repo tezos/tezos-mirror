@@ -322,7 +322,9 @@ module type COMPONENT_API = sig
       This pipeline is for releasing this component separately.
       It runs in [tezos/tezos].
 
-      This function must be called only once per component. *)
+      This function must be called only once per component.
+
+      Not implemented for the [Shared] component. *)
   val register_dedicated_release_pipeline : (trigger * job) list -> unit
 
   (** Register jobs to be included in the test release pipeline of the current component.
@@ -330,12 +332,20 @@ module type COMPONENT_API = sig
       This pipeline is for testing the release of this component separately.
       It runs in [tezos/tezos].
 
-      This function must be called only once per component. *)
+      This function must be called only once per component.
+
+      Not implemented for the [Shared] component. *)
   val register_dedicated_test_release_pipeline : (trigger * job) list -> unit
 end
 
 (** The main functor of Cacio. *)
 module Make (_ : COMPONENT) : COMPONENT_API
+
+(** An instance of [Make] for jobs with no component.
+
+    Only use this if you have a good reason, as jobs should usually belong to components.
+    Add a comment next to your job definitions to justify this reason. *)
+module Shared : COMPONENT_API
 
 (** {2 Future work} *)
 
