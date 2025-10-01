@@ -235,6 +235,7 @@ module type COMPONENT_API = sig
     ?force_if_label:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
+    ?parallel:Gitlab_ci.Types.parallel ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cargo_cache:bool ->

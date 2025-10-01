@@ -80,6 +80,7 @@ type job = {
   image : Tezos_ci.Image.t;
   needs : (need * job) list;
   needs_legacy : (need * Tezos_ci.tezos_job) list;
+  parallel : Gitlab_ci.Types.parallel option;
   only_if : condition;
   variables : Gitlab_ci.Types.variables option;
   script : string list;
@@ -363,6 +364,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     image;
                     needs;
                     needs_legacy;
+                    parallel;
                     only_if = _;
                     variables;
                     script;
@@ -502,6 +504,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 ~image
                 ~image_dependencies
                 ~dependencies:(Dependent dependencies)
+                ?parallel
                 ?rules
                 ?services
                 ~interruptible:(interruptible_stage && interruptible_pipeline)
@@ -569,6 +572,7 @@ module type COMPONENT_API = sig
     ?force_if_label:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
+    ?parallel:Gitlab_ci.Types.parallel ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cargo_cache:bool ->
@@ -620,8 +624,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
-      ?(needs_legacy = []) ?variables ?artifacts ?(cargo_cache = false)
-      ?(cargo_target_caches = false) ?sccache ?dune_cache
+      ?(needs_legacy = []) ?parallel ?variables ?artifacts
+      ?(cargo_cache = false) ?(cargo_target_caches = false) ?sccache ?dune_cache
       ?(test_coverage = false) ?allow_failure ?retry ?(image_dependencies = [])
       ?services name script =
     let name = Component.name ^ "." ^ name in
@@ -649,6 +653,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       image;
       needs;
       needs_legacy;
+      parallel;
       only_if =
         {
           changed =
