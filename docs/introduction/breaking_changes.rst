@@ -51,6 +51,9 @@ aggregate whose committee includes this slot.
 The receipts for these operations have also been reworked, see :ref:`seoul_receipts_changes`.
 
 All existing tz4 addresses are being unrevealed when protocol S is adopted, and they must provide a proof of possession to be revealed again, see :ref:`seoul_breaking_changes`.
+This proof may be generated using the client command::
+
+	octez-client create bls proof for <alias>
 
 Attestations
 ------------
