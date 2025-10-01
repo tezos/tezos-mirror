@@ -463,12 +463,111 @@ let test_activation_threshold_with_deactivated_baker =
   --> check_all_bakers_attested --> check_all_bakers_preattested --> next_block
   --> check_all_bakers_attested --> check_all_bakers_preattested
 
+let test_activation_level level =
+  let big = 800_000_000_000_000L in
+  (* 800M tez *)
+  let small =
+    Tez_helpers.to_mutez Default_parameters.constants_mainnet.minimal_stake
+    |> Int64.mul 2L
+    (* 12000 tez (2 rolls) *)
+  in
+  init_constants ()
+  (* set consensus_committee_size very low to make small bakers very unlikely
+     to have any slots before abaab, making observation easier.
+     It should still be higher than the number of DAL slots. *)
+  --> set S.consensus_committee_size 20
+  (* this requires the number of DAL shards to be reduced *)
+  --> set S.Dal.Cryptobox_parameters.number_of_shards 10
+  (* set threshold size to 0, making attestations not mandatory *)
+  --> set S.consensus_threshold_size 0
+  (* set a reasonable, human friendly number of blocks per cycle *)
+  --> set S.blocks_per_cycle 10l
+  (* set inactivity period to very high values, so that
+     bakers never get deactivated *)
+  --> set S.tolerated_inactivity_period 99
+  (* Begin test: setup different profiles
+     6 bakers, 2 big, 4 small. *)
+  --> begin_test
+        ~force_attest_all:true
+        ~force_preattest_all:true
+        ~abaab_activation_levels:[Some level]
+        ~bootstrap_info_list:
+          [
+            make "big_1" ~algo:Not_Bls ~balance:big;
+            make "big_2" ~algo:Bls ~balance:big;
+            make "small_1" ~algo:Not_Bls ~balance:small;
+            make
+              "small_2"
+              ~algo:Not_Bls
+              ~consensus_key:(Some Bls)
+              ~balance:small;
+            make "small_3" ~algo:Bls ~balance:small;
+            make
+              "small_4"
+              ~algo:Bls
+              ~consensus_key:(Some Not_Bls)
+              ~balance:small;
+          ]
+        []
+  (* sanity check *)
+  --> check_abaab_activation_level ~loc:__LOC__ (Some (Int32.of_int level))
+  --> set_baked_round ~payload_round:0 1
+  (* next two blocks because cannot attest genesis *)
+  --> next_block
+  --> next_block
+  (* Total stake: N = 1_600_048_000 tez * 11/20
+     Probability that a given small staker has a slot (out of the 20 available slots):
+         1 - (1 - 12000/N) ^ 20 = p
+     Probability that all three small bakers have a slot for the given block at the same
+     time: p^4 = 5.10^-16 *)
+  --> assert_failure
+        ~loc:__LOC__
+        ~expected_error:(fun _ _ -> Lwt_result.return ())
+        check_all_bakers_attested
+  --> assert_failure
+        ~loc:__LOC__
+        ~expected_error:(fun _ _ -> Lwt_result.return ())
+        check_all_bakers_preattested
+  (* Bake until almost the activation level *)
+  --> exec (bake_until (`Level (level - 1)))
+  --> assert_failure
+        ~loc:__LOC__
+        ~expected_error:(fun _ _ -> Lwt_result.return ())
+        check_all_bakers_attested
+  --> assert_failure
+        ~loc:__LOC__
+        ~expected_error:(fun _ _ -> Lwt_result.return ())
+        check_all_bakers_preattested
+  (* Next level: activation level. All bakers can preattest, but attestations
+     are for the predecessor, which is not under abaab. *)
+  --> next_block
+  --> assert_failure
+        ~loc:__LOC__
+        ~expected_error:(fun _ _ -> Lwt_result.return ())
+        check_all_bakers_attested
+  --> check_all_bakers_preattested
+  (* Next level: abaab is fully activated *)
+  --> next_block
+  --> check_all_bakers_attested --> check_all_bakers_preattested
+  (* We bake a bit, at least a cycle *)
+  --> loop
+        12
+        (next_block --> check_all_bakers_attested
+       --> check_all_bakers_preattested)
+
+let test_activation_level =
+  fold_tag_f
+    test_activation_level
+    (fun level -> Format.asprintf "level %d" level)
+    [8; 9; 10; 11; 12]
+
 let tests =
   tests_of_scenarios
   @@ [
        ("Test abaab activation threshold", test_activation_threshold);
        ( "Test abaab activation threshold when a non BLS baker gets deactivated",
          test_activation_threshold_with_deactivated_baker );
+       ("Test abaab activation level", test_activation_level);
      ]
 
 let () =
