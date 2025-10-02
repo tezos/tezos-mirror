@@ -80,6 +80,7 @@ type job = {
   image : Tezos_ci.Image.t;
   needs : (need * job) list;
   needs_legacy : (need * Tezos_ci.tezos_job) list;
+  parallel : Gitlab_ci.Types.parallel option;
   only_if : condition;
   variables : Gitlab_ci.Types.variables option;
   script : string list;
@@ -91,6 +92,7 @@ type job = {
   test_coverage : bool;
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
   retry : Gitlab_ci.Types.retry option;
+  timeout : Gitlab_ci.Types.time_interval option;
   image_dependencies : Tezos_ci.Image.t list;
   services : Gitlab_ci.Types.service list option;
 }
@@ -363,6 +365,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     image;
                     needs;
                     needs_legacy;
+                    parallel;
                     only_if = _;
                     variables;
                     script;
@@ -374,6 +377,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     test_coverage;
                     allow_failure;
                     retry;
+                    timeout;
                     image_dependencies;
                     services;
                   };
@@ -502,6 +506,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 ~image
                 ~image_dependencies
                 ~dependencies:(Dependent dependencies)
+                ?parallel
                 ?rules
                 ?services
                 ~interruptible:(interruptible_stage && interruptible_pipeline)
@@ -512,6 +517,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                    else (* Cannot be interruptible. *)
                      Some false)
                 ?retry
+                ?timeout
                 ?variables
                 ?artifacts
                 ?allow_failure
@@ -569,6 +575,7 @@ module type COMPONENT_API = sig
     ?force_if_label:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
+    ?parallel:Gitlab_ci.Types.parallel ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cargo_cache:bool ->
@@ -578,6 +585,7 @@ module type COMPONENT_API = sig
     ?test_coverage:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
+    ?timeout:Gitlab_ci.Types.time_interval ->
     ?image_dependencies:Tezos_ci.Image.t list ->
     ?services:Gitlab_ci.Types.service list ->
     string ->
@@ -620,10 +628,10 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
-      ?(needs_legacy = []) ?variables ?artifacts ?(cargo_cache = false)
-      ?(cargo_target_caches = false) ?sccache ?dune_cache
-      ?(test_coverage = false) ?allow_failure ?retry ?(image_dependencies = [])
-      ?services name script =
+      ?(needs_legacy = []) ?parallel ?variables ?artifacts
+      ?(cargo_cache = false) ?(cargo_target_caches = false) ?sccache ?dune_cache
+      ?(test_coverage = false) ?allow_failure ?retry ?timeout
+      ?(image_dependencies = []) ?services name script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -649,6 +657,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       image;
       needs;
       needs_legacy;
+      parallel;
       only_if =
         {
           changed =
@@ -667,6 +676,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       test_coverage;
       allow_failure;
       retry;
+      timeout;
       image_dependencies;
       services;
     }
