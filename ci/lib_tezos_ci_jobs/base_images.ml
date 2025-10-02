@@ -39,23 +39,34 @@ type compilation =
    repesctively, with -amd64 or -arm64 *)
 
 let jobs =
-  let make_job_base_images ~__POS__ ~name ~matrix ~distribution ?image_path
+  (* This function can build docker images both in an emulated environment using
+     qemu or natively. The advantage of choosing emulated vs native depends on
+     the build time associated with the image. Small images are more efficiently
+     built in an emulated environment, while larger images are better build
+     natively.
+
+     [name] is the name of the job.
+
+     [matrix] is a parallel/matrix gitlab construct. Here we use it with the RELEASE
+     variable to build multiple images for the same distribution, but different releases.
+
+     [image_name] is the name of the final docker image.
+
+     [base_name] is the name of the image upon the newly created image is FROM.
+
+     [compilation] determines the type of the image.
+     If [compilation] parameter is either set to [Emulated] or omitted then we
+     build for two different architectures using qemu. This handles both build
+     and merging the manifest of the images.
+
+     If [compilation] is either [ Amd64_only ] or [ Arm64_only ] we build the
+     images natively, but the arm64 image is going to be suffixed with "-arm64".
+
+     If [compilation] is set to [Native] we build for both architectures using
+     a native runner. In this case we also must add a merge manifest job.
+     *)
+  let make_job_base_images ~__POS__ ~name ~matrix ~image_name ?base_name
       ?(changes = Changeset.make []) ?(compilation = Emulated) dockerfile =
-    (* This function can build docker images both in a emulated environment using
-       qemu or natively. The advantage of choosing emulated vs native depends on
-       the build time associated to the image. Small images are more efficiently
-       built in an emulated environment, while larger images are better build
-       natively.
-
-       if [compilation] parameter is either set to [Emulated] or omitted then we build for two different
-       architectures using qemu. This handles both build and merging the
-       manifest of the images.
-
-       If [compilation] is either [ Amd64_only ] or [ Arm64_only ] we build the
-       images natively, but the arm64 image is going to be postix with "-arm64".
-
-       If [compilation] is set to [Native] we build for both architectures using
-       a native runner. In this case we also must add a merge manifest job.*)
     let script =
       Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile
     in
@@ -70,10 +81,10 @@ let jobs =
     let emulated = tags = [] in
     let variables =
       [
-        ("DISTRIBUTION", distribution);
+        ("DISTRIBUTION", image_name);
         ( "IMAGE_PATH",
-          if Option.is_none image_path then distribution
-          else Option.get image_path );
+          if Option.is_none base_name then image_name else Option.get base_name
+        );
         ("PLATFORM", platform);
       ]
     in
@@ -96,7 +107,7 @@ let jobs =
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.debian"
-      ~distribution:"debian"
+      ~image_name:"debian"
       ~matrix:debian_matrix
       ~changes
       "images/base-images/Dockerfile.debian"
@@ -106,7 +117,7 @@ let jobs =
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.ubuntu"
-      ~distribution:"ubuntu"
+      ~image_name:"ubuntu"
       ~matrix:ubuntu_matrix
       ~changes
       "images/base-images/Dockerfile.debian"
@@ -116,7 +127,7 @@ let jobs =
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.fedora"
-      ~distribution:"fedora"
+      ~image_name:"fedora"
       ~matrix:fedora_matrix
       ~changes
       "images/base-images/Dockerfile.rpm"
@@ -126,8 +137,8 @@ let jobs =
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.rockylinux"
-      ~distribution:"rockylinux"
-      ~image_path:"rockylinux/rockylinux"
+      ~image_name:"rockylinux"
+      ~base_name:"rockylinux/rockylinux"
       ~matrix:rockylinux_matrix
       ~changes
       "images/base-images/Dockerfile.rpm"
@@ -137,8 +148,8 @@ let jobs =
       make_job_base_images
         ~__POS__
         ~name:"oc.base-images.rust"
-        ~distribution:"debian-rust"
-        ~image_path:"debian"
+        ~image_name:"debian-rust"
+        ~base_name:"debian"
         ~matrix:[("RELEASE", ["unstable"])]
         ~compilation:Native
         "images/base-images/Dockerfile.rust"
