@@ -89,13 +89,24 @@ else
   echo "No tag found. No asset will be added to the release page."
 fi
 
-echo "Building release page"
+echo "Building older releases page (inactive versions only)"
+dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
+  --title 'Octez older releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
+  "${BUCKET_PATH:-}" --filter-active inactive changelog binaries packages
+
+# Rename the second page to older_releases.html
+mv index.html older_releases.html
+
+# Generate the main page again (active versions) to create index.html
+echo "Generating main release page for index.html"
 dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
   --title 'Octez releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
-  "${BUCKET_PATH:-}" changelog binaries packages
+  "${BUCKET_PATH:-}" --filter-active active changelog binaries packages
 
 echo "Syncing html files to remote s3 bucket"
-if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH}/" --cache-control "max-age=30, must-revalidate" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"; then
+if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH}/" --cache-control "max-age=30, must-revalidate" --region "${REGION}" &&
+  aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}" &&
+  aws s3 cp "./older_releases.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"; then
   echo "Deployment successful!"
 else
   echo "Deployment failed. Please check the configuration and try again."
