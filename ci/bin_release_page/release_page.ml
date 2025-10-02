@@ -8,6 +8,8 @@
 open Base
 open Base.Version
 
+type active_filter = Active | Inactive | All
+
 (* [show_markdown content] returns a string that contains the
    markdown associated with [content]. *)
 let show_markdown ?(level = 1) content =
@@ -242,18 +244,41 @@ let version_section ~component ~asset_types ~version =
     content = Concat (List.map (asset_content ~component ~version) asset_types);
   }
 
-(* [generate_md ~component ~versions ~asset_types] generates a markdown file
+(* [generate_md ~component ~versions ~asset_types ~filter_active] generates a markdown file
    corresponding to a release page for the [versions] of [component] containing
    all the assets of [asset_types].
 
    This markdown is stored in [temp_dir/release_page]. *)
-let generate_md ~component ~versions ~asset_types =
+let generate_md ~component ~versions ~asset_types ~filter_active =
   let page =
     List.map
       (fun version -> version_section ~component ~asset_types ~version)
       (List.rev versions)
   in
-  let md = markdown_of_page page in
+  let header_note =
+    match filter_active with
+    | Some Active ->
+        [
+          {
+            Content.title = "";
+            content =
+              Content.text_line
+                "Looking for older releases? Visit our [older releases \
+                 page](older_releases.html).\n";
+          };
+        ]
+    | Some Inactive ->
+        [
+          {
+            Content.title = "";
+            content =
+              Content.text_line "Return to [current releases](index.html).\n";
+          };
+        ]
+    | _ -> []
+  in
+  let full_page = header_note @ page in
+  let md = markdown_of_page full_page in
   let index = Filename.concat Storage.temp_dir "index.md" in
   if Sys.file_exists index then
     Format.printf "Warning: %s already exists. It will be erased@." index ;
@@ -360,6 +385,23 @@ let () =
       ~placeholder:"URL"
       bucket
   in
+  let filter_active =
+    Clap.optional
+      ~long:"filter-active"
+      ~description:
+        "Filter versions by active status.\n\
+         Possible values are:\n\
+         - \"active\": Show only active versions (adds banner link to older \
+         releases)\n\
+         - \"inactive\": Show only inactive versions (adds banner link to \
+         current releases)\n\
+         - \"all\" or omitted: Show all versions"
+      ~placeholder:"FILTER"
+      (Clap.enum
+         "filter-active"
+         [("active", Active); ("inactive", Inactive); ("all", All)])
+      ()
+  in
   let asset_types =
     Clap.(
       list
@@ -416,6 +458,16 @@ let () =
       url;
     }
   in
-  let versions = get_versions ~component in
-  generate_md ~component ~versions ~asset_types ;
+  let all_versions = get_versions ~component in
+  let versions =
+    match filter_active with
+    | Some Active -> List.filter (fun v -> v.active) all_versions
+    | Some Inactive -> List.filter (fun v -> not v.active) all_versions
+    | Some All -> all_versions
+    | None ->
+        Format.printf
+          "Warning: no [--filter-active] argument. No filter will be applied." ;
+        all_versions
+  in
+  generate_md ~component ~versions ~asset_types ~filter_active ;
   generate_html ~template:"./docs/release_page/template.html" ~title ~path
