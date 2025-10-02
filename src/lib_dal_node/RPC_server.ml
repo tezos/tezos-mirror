@@ -546,6 +546,12 @@ module Profile_handlers = struct
           store
           last_known_parameters
           ~attested_level)
+
+  let monitor_attestable_slots ctxt pkh () () =
+    let Resto_directory.Answer.{next; shutdown} =
+      Node_context.Attestable_slots.subscribe ctxt ~pkh
+    in
+    Tezos_rpc.Answer.return_stream {next; shutdown}
 end
 
 let version ctxt () () =
@@ -751,6 +757,10 @@ let register :
        Tezos_rpc.Directory.opt_register2
        Services.get_attestable_slots
        (Profile_handlers.get_attestable_slots ctxt)
+  |> add_service
+       Tezos_rpc.Directory.gen_register1
+       Services.monitor_attestable_slots
+       (Profile_handlers.monitor_attestable_slots ctxt)
   |> add_service
        Tezos_rpc.Directory.register1
        Services.get_traps
