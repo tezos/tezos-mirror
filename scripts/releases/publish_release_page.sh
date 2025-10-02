@@ -45,15 +45,35 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
       ${gitlab_release_rc_version:+--rc "${gitlab_release_rc_version}"} \
       --announcement "${announcement}"
 
-    # Mark as latest only if not an RC
+    # Set as latest only if not an RC
     if [ -z "${gitlab_release_rc_version}" ]; then
-      echo "Marking version as latest..."
+      echo "Setting version as latest..."
       dune exec ./ci/bin_release_page/version_manager.exe -- \
         --path "${S3_BUCKET}${BUCKET_PATH}" \
         set-latest \
         --major "${gitlab_release_major_version}" \
         --minor "${gitlab_release_minor_version}"
     fi
+
+    # Active versions logic
+    if [ -z "${gitlab_release_rc_version}" ] && [ "${gitlab_release_minor_version}" = "0" ]; then
+
+      echo "Major release (${gitlab_release_major_version}.0), set all previous versions as not active..."
+
+      prev_major=$((gitlab_release_major_version - 1))
+      if [ "$prev_major" -ge 0 ]; then
+        dune exec ./ci/bin_release_page/version_manager.exe -- \
+          --path "${S3_BUCKET}${BUCKET_PATH}" \
+          set-inactive \
+          --major "${prev_major}" || true
+      fi
+    fi
+
+    echo "Set versions ${gitlab_release_major_version} as active..."
+    dune exec ./ci/bin_release_page/version_manager.exe -- \
+      --path "${S3_BUCKET}${BUCKET_PATH}" \
+      set-active \
+      --major "${gitlab_release_major_version}"
 
     # Upload binaries to S3 bucket
     echo "Uploading binaries..."
