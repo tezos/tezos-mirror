@@ -168,7 +168,7 @@ let gossipsub_app_messages_validation ctxt cryptobox ~head_level
         sub head_level message_id.Types.Message_id.level
         > of_int (proto_parameters.Types.attestation_lag + slack))
     then
-      (* 2. Nodes don't care about messages whose ids are too old.  Gossipsub
+      (* 2. Nodes don't care about messages whose ids are too old. Gossipsub
          should only be used for the dissemination of fresh data. Old data could
          be retrieved using another method. *)
       `Outdated
@@ -207,7 +207,7 @@ let gossipsub_app_messages_validation ctxt cryptobox ~head_level
                message) ;
           res
       | other ->
-          (* 4. In the case the message id is not Valid. *)
+          (* 4. In the case the message_id is not valid. *)
           other
 
 type batch_identifier = {level : int32; slot_index : int}

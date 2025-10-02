@@ -61,10 +61,10 @@ let remove_slots_and_shards ~slot_size (store : Store.t)
   in
   return_unit
 
-(* This function removes from the store slot data (slots, their shards, and
+(* This function removes, from the Store, slot data (slots, their shards, and
    their status) for commitments published at level exactly
-   {!Node_context.level_to_gc ~current_level}. It also removes skip list
-   cells attested at that level. *)
+   {!Node_context.level_to_gc ~current_level}. It also removes skip list cells
+   attested at that level. *)
 let remove_old_level_stored_data proto_parameters ctxt current_level =
   let open Lwt_syntax in
   let store = Node_context.get_store ctxt in
