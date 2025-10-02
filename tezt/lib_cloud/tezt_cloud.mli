@@ -284,6 +284,10 @@ module Tezt_cloud_cli : sig
     ?scenario_config:string * Data_encoding.Json.t ->
     unit ->
     Data_encoding.Json.t
+
+  val localhost : bool
+
+  val proxy : bool
 end
 
 module Artifact_helpers : sig
@@ -304,3 +308,11 @@ end
    requirements related to cloud scenarios. Some tags can be given for all the
    registered jobs. *)
 val register : tags:string list -> unit
+
+module Gcloud : sig
+  module DNS : sig
+    (** [add_subdomain ~zone ~name ~value] adds a dns entry for the domain name
+    [~name], associated to the value [~value]. The value being an ip *)
+    val add_subdomain : zone:string -> name:string -> value:string -> unit Lwt.t
+  end
+end

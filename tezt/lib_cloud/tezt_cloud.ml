@@ -318,6 +318,10 @@ module Tezt_cloud_cli = struct
   let faketime = Cli.faketime
 
   let to_json_config = Cli.to_json_config
+
+  let localhost = Cli.localhost
+
+  let proxy = Cli.proxy
 end
 
 module Artifact_helpers = struct
@@ -356,3 +360,5 @@ module Artifact_helpers = struct
           (artifacts_dir // "configuration.json")
           ~contents:full_configuration_string
 end
+
+module Gcloud = Gcloud
