@@ -2,6 +2,7 @@
 
 # Run Tezt for the CI.
 
+TEZT_EXE=tezt/tests/main.exe
 SEND_JUNIT=no
 WITH_SELECT_TEZTS=unknown
 
@@ -10,6 +11,10 @@ usage() {
 Usage: tezt.sh SCRIPT_ARGUMENTS -- TEZT_ARGUMENTS
 
 SCRIPT_ARGUMENTS
+
+    --tezt-exe PATH
+        Location of the Tezt executable relative to _build/default/.
+        Defaults to 'tezt/tests/main.exe'.
 
     --send-junit PATH
         If specified, JUnit file PATH is sent to DataDog.
@@ -28,6 +33,11 @@ EOF
 
 while true; do
   case "$1" in
+  "--tezt-exe")
+    shift
+    TEZT_EXE="$1"
+    shift
+    ;;
   "--send-junit")
     shift
     SEND_JUNIT="$1"
@@ -83,11 +93,11 @@ if [ "$WITH_SELECT_TEZTS" = yes ]; then
     exit 1
   fi
 
-  _build/default/tezt/tests/main.exe "$(cat selected_tezts.tsl)" "$@"
+  _build/default/"$TEZT_EXE" "$(cat selected_tezts.tsl)" "$@"
   TEZT_EXIT_CODE="$?"
 else
   echo "Test selection is disabled."
-  _build/default/tezt/tests/main.exe "$@"
+  _build/default/"$TEZT_EXE" "$@"
   TEZT_EXIT_CODE="$?"
 fi
 
