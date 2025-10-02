@@ -1093,6 +1093,8 @@ module Constants : sig
 
   val dal_number_of_shards : context -> int
 
+  val dal_attestation_lag : context -> int
+
   val sc_rollup_arith_pvm_enable : context -> bool
 
   val sc_rollup_riscv_pvm_enable : context -> bool
