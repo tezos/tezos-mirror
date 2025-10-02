@@ -3104,9 +3104,9 @@ tezt:
     --with-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
     --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
     ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
-    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
-    5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
+    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
     --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
@@ -3130,7 +3130,7 @@ tezt:
     - selected_tezts.tsv
     - tezt.log
     - tezt-*.log
-    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - tezt-results.json
     - $JUNIT
     - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
@@ -3202,9 +3202,9 @@ tezt-time-sensitive:
     --with-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
     --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
     ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/time-sensitive
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
-    5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
+    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
     --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
@@ -3228,7 +3228,7 @@ tezt-time-sensitive:
     - selected_tezts.tsv
     - tezt.log
     - tezt-*.log
-    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - tezt-results.json
     - $JUNIT
     - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
@@ -3300,8 +3300,8 @@ tezt-slow:
     --with-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
     --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak
     'dd_tags[memory.peak]' --from-record tezt/records/slow --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
-    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
-    --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky'
+    --record tezt-results.json --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+    --record-mem-peak --mem-warn 5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky'
     --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive' --junit-tag 'dd_tags[tezt-tag.slow]=slow'
     --junit-tag 'dd_tags[tezt-tag.extra]=extra' --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure'
     --junit-tag 'dd_tags[tezt-tag.layer1]=layer1' --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2'
@@ -3323,7 +3323,7 @@ tezt-slow:
     - selected_tezts.tsv
     - tezt.log
     - tezt-*.log
-    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - tezt-results.json
     - $JUNIT
     reports:
       junit: $JUNIT
@@ -3395,9 +3395,9 @@ tezt-extra:
     --with-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
     --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
     ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/extra
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
-    5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
+    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
     --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
@@ -3418,7 +3418,7 @@ tezt-extra:
     - selected_tezts.tsv
     - tezt.log
     - tezt-*.log
-    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - tezt-results.json
     - $JUNIT
     reports:
       junit: $JUNIT
@@ -3491,9 +3491,9 @@ tezt-flaky:
     --with-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
     --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
     ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/flaky
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
-    5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
+    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
     --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
@@ -3517,7 +3517,7 @@ tezt-flaky:
     - selected_tezts.tsv
     - tezt.log
     - tezt-*.log
-    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - tezt-results.json
     - $JUNIT
     - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
@@ -3586,9 +3586,9 @@ tezt-static-binaries:
     --with-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
     --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
     ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/static-binaries
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
-    5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
+    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
     --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
@@ -3610,7 +3610,7 @@ tezt-static-binaries:
     - selected_tezts.tsv
     - tezt.log
     - tezt-*.log
-    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - tezt-results.json
     - $JUNIT
     reports:
       junit: $JUNIT
@@ -3678,9 +3678,9 @@ tezt-riscv-slow-sequential:
     --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
     --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak
     'dd_tags[memory.peak]' --from-record tezt/records/riscv-slow-sequential --job
-    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
-    5_000_000_000 --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
+    ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000
+    --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
     --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
@@ -3701,7 +3701,7 @@ tezt-riscv-slow-sequential:
     - selected_tezts.tsv
     - tezt.log
     - tezt-*.log
-    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - tezt-results.json
     - $JUNIT
     reports:
       junit: $JUNIT

@@ -38,23 +38,23 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~variant
         "selected_tezts.tsv";
         "tezt.log";
         "tezt-*.log";
-        "tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json";
+        "tezt-results.json";
         "$JUNIT";
       ]
-      (* The record artifacts [tezt-results-$CI_NODE_INDEX.json]
-           should be stored for as long as a given commit on master is
-           expected to be HEAD in order to support auto-balancing. At
-           the time of writing, we have approximately 6 merges per day,
-           so 1 day should more than enough. However, we set it to 3
-           days to keep records over the weekend. The tezt artifacts
-           (including records and coverage) take up roughly 2MB /
-           job. Total artifact storage becomes [N*P*T*W] where [N] is
-           the days of retention (7 atm), [P] the number of pipelines
-           per day (~200 atm), [T] the number of Tezt jobs per pipeline
-           (100) and [W] the artifact size per tezt job (2MB). This
-           makes 280GB which is ~4% of our
-           {{:https://gitlab.com/tezos/tezos/-/artifacts}total artifact
-           usage}. *)
+      (* The record artifacts [tezt-results.json]
+         should be stored for as long as a given commit on master is
+         expected to be HEAD in order to support auto-balancing. At
+         the time of writing, we have approximately 6 merges per day,
+         so 1 day should more than enough. However, we set it to 3
+         days to keep records over the weekend. The tezt artifacts
+         (including records and coverage) take up roughly 2MB /
+         job. Total artifact storage becomes [N*P*T*W] where [N] is
+         the days of retention (7 atm), [P] the number of pipelines
+         per day (~200 atm), [T] the number of Tezt jobs per pipeline
+         (100) and [W] the artifact size per tezt job (2MB). This
+         makes 280GB which is ~4% of our
+         {{:https://gitlab.com/tezos/tezos/-/artifacts}total artifact
+         usage}. *)
       ~expire_in:(Duration (Days 7))
       ~when_:Always
   in
@@ -170,9 +170,9 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~variant
          'dd_tags[memory.peak]' --from-record tezt/records"
       ^ (if variant = "" then "" else "/" ^ variant)
       ^ " --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
-         tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
-         ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn \
-         5_000_000_000" ^ keep_going_opt ^ junit_tags;
+         tezt-results.json --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} \
+         --record-mem-peak --mem-warn 5_000_000_000" ^ keep_going_opt
+      ^ junit_tags;
     ]
 
 (** Tezt tag selector string.
