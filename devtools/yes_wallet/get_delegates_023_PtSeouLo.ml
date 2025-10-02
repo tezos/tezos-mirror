@@ -130,13 +130,19 @@ module Get_delegates = struct
     let deactivated ctxt pkh =
       deactivated ctxt pkh |> Lwt.map Environment.wrap_tzresult
 
-    let consensus_key ctxt pkh : Signature.public_key tzresult Lwt.t =
+    let consensus_keys ctxt pkh :
+        (Signature.public_key * Signature.public_key list) tzresult Lwt.t =
       let open Lwt_result_syntax in
       let* {consensus_pk; _} =
         Alpha_context.Delegate.Consensus_key.active_pubkey ctxt pkh
         |> Lwt.map Environment.wrap_tzresult
       in
-      return consensus_pk
+      let* pending_updates =
+        Alpha_context.Delegate.Consensus_key.pending_updates ctxt pkh
+        |> Lwt.map Environment.wrap_tzresult
+        |> Lwt_result.map (List.map (fun (_, _, pk) -> pk))
+      in
+      return (consensus_pk, pending_updates)
 
     let companion_key ctxt pkh =
       let open Lwt_result_syntax in

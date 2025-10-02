@@ -265,7 +265,7 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
           |> Lwt_result.map P.Signature.To_latest.public_key
         in
         let* consensus_key =
-          let* cpk = P.Delegate.consensus_key ctxt pkh in
+          let* cpk, _ = P.Delegate.consensus_keys ctxt pkh in
           if
             Tezos_crypto.Signature.Public_key.equal
               pk
