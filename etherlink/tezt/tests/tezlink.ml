@@ -2799,6 +2799,114 @@ let test_delayed_deposit_is_included =
     ~error_msg:"Expected a 1000 tez on bootstrap1" ;
   unit
 
+let originate_contract ~sequencer ~client ~endpoint ~protocol ~filename ~storage
+    =
+  let* _alias, address =
+    Client.originate_contract_at
+      ~amount:Tez.zero
+      ~src:"bootstrap1"
+      ~init:storage
+      ~burn_cap:Tez.one
+      ~force:true
+      ~endpoint
+      client
+      ["big_maps"; filename]
+      protocol
+  in
+  let*@ _ = Rpc.produce_block sequencer in
+  return address
+
+let call_contract ~sequencer ~client ~endpoint ~address ~arg =
+  let transfer () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:Tez.zero
+        (* We need to wait for inclusion so that
+           octez-client receipt is complete with
+           lazy_storage_updates related to big_maps *)
+      ~wait:"0"
+      ~giver:"bootstrap1"
+      ~receiver:address
+      ~arg
+      ~hooks:Tezos_regression.hooks
+      ~endpoint
+      client
+  in
+  wait_for_application
+    ~time_between_blocks:1.
+    ~produce_block:(fun () -> produce_block sequencer)
+    transfer
+
+let test_big_map_transfer =
+  register_tezlink_regression_test
+    ~title:"Test of the big_map transfers"
+    ~tags:["big_map"; "compatibility"; "operations"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} protocol ->
+  let*@ _ = produce_block sequencer in
+  let*@ _ = produce_block sequencer in
+  let*@ _ = produce_block sequencer in
+
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+
+  (* This code comes from tezt/tests/contract_big_map_transfer.ml *)
+  let* () =
+    Lwt_list.iter_s
+      (fun (sender_filename, sender_storage) ->
+        Lwt_list.iter_s
+          (fun (receiver_filename, receiver_storage) ->
+            let () =
+              Regression.capture
+                (sf
+                   "Test transferring big map from %S to %S"
+                   sender_filename
+                   receiver_filename)
+            in
+            let* receiver =
+              originate_contract
+                ~sequencer
+                ~client
+                ~endpoint
+                ~protocol
+                ~filename:receiver_filename
+                ~storage:receiver_storage
+            in
+            let* sender =
+              originate_contract
+                ~sequencer
+                ~client
+                ~endpoint
+                ~protocol
+                ~filename:sender_filename
+                ~storage:sender_storage
+            in
+            let* () =
+              call_contract
+                ~sequencer
+                ~client
+                ~endpoint
+                ~address:sender
+                ~arg:(sf "%S" receiver)
+            in
+            unit)
+          [
+            ("receiver_drop", "Unit");
+            ("receiver_store", "{}");
+            ("receiver_store_updated", "{}");
+          ])
+      [
+        ("sender_fresh", "Unit");
+        ("sender_stored", "{Elt \"d\" 0x; }");
+        ("sender_stored_updated", "{Elt \"b\" 0x; Elt \"d\" 0x; }");
+      ]
+  in
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -2846,4 +2954,5 @@ let () =
   test_tezlink_forge_operations [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;
   test_node_catchup_on_multichain [Alpha] ;
-  test_delayed_deposit_is_included [Alpha]
+  test_delayed_deposit_is_included [Alpha] ;
+  test_big_map_transfer [Alpha]
