@@ -120,9 +120,12 @@ RUN opam init --disable-sandboxing --no-setup --yes \
  && opam clean
 
 # Add opam cache
+# [depext=false] prevents opam to search for system dependencies.
+# All build and runtime dependencies needed by opam
 RUN opam admin cache \
  && opam update \
- && opam clean
+ && opam clean \
+ && opam option depext=false
 
 USER root
 RUN /tmp/kiss-logs.sh /tmp/kiss.log \
