@@ -11,8 +11,8 @@ Usage: tezt.sh SCRIPT_ARGUMENTS -- TEZT_ARGUMENTS
 
 SCRIPT_ARGUMENTS
 
-    --send-junit
-        If specified, JUnit files are sent to Datadog.
+    --send-junit PATH
+        If specified, JUnit file PATH is sent to DataDog.
 
     --with-select-tezts, --without-select-tezts (must specify one or the other)
         Whether selected_tezts.tsl is expected to exist or not.
@@ -30,7 +30,8 @@ while true; do
   case "$1" in
   "--send-junit")
     shift
-    SEND_JUNIT=yes
+    SEND_JUNIT="$1"
+    shift
     ;;
   "--with-select-tezts")
     shift
@@ -96,18 +97,16 @@ if [ $TEZT_EXIT_CODE -eq 3 ]; then
   exit 0
 fi
 
-if [ "$SEND_JUNIT" = "yes" ]; then
+if [ -f "$SEND_JUNIT" ]; then
   if [ -n "$DATADOG_API_KEY" ]; then
-    if [ -f "$JUNIT" ]; then
-      echo "Uploading JUNIT=$JUNIT to Datadog..."
-      DD_ENV=ci DATADOG_SITE=datadoghq.eu datadog-ci junit upload --service octez "$JUNIT"
-      echo "datadog-cli exit code: $?"
-    else
-      echo "JUNIT=$JUNIT does not exist, will not try to send it to Datadog."
-    fi
+    echo "Uploading JUnit file $SEND_JUNIT to Datadog..."
+    DD_ENV=ci DATADOG_SITE=datadoghq.eu datadog-ci junit upload --service octez "$SEND_JUNIT"
+    echo "datadog-cli exit code: $?"
   else
-    echo "DATADOG_API_KEY is not set, will not try to send JUNIT=$JUNIT."
+    echo "DATADOG_API_KEY is not set, will not try to send JUnit file $SEND_JUNIT."
   fi
+else
+  echo "JUnit file $SEND_JUNIT does not exist, will not try to send it to Datadog."
 fi
 
 exit "$TEZT_EXIT_CODE"

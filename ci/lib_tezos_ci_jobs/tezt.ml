@@ -162,7 +162,7 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~variant
            - --mem-warn causes Tezt to warn if a test uses more than the specified
              amount of memory (in bytes). We set the threshold to 5 GB. *)
       "./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh \
-       --send-junit " ^ with_or_without_select_tezts
+       --send-junit ${JUNIT} " ^ with_or_without_select_tezts
       ^ " -- \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
          --global-timeout 1800"
       ^ (if disable_test_timeout then "" else " --test-timeout 540")

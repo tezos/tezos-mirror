@@ -91,7 +91,7 @@ tezt:
   - ./scripts/ci/tezt.sh --without-select-tezts -- "${TESTS}" --from-record tezt/records
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
+    ${JUNIT} --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
     tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
     fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
@@ -157,7 +157,7 @@ tezt-time-sensitive:
   - ./scripts/ci/tezt.sh --without-select-tezts -- "${TESTS}" --from-record tezt/records/time-sensitive
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
+    ${JUNIT} --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
     tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
     fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/time-sensitive
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
@@ -222,7 +222,7 @@ tezt-slow:
   - ./scripts/ci/tezt.sh --without-select-tezts -- "${TESTS}" --from-record tezt/records/slow
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
+    ${JUNIT} --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
     tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT}
     --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/slow --job
     ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
@@ -289,7 +289,7 @@ tezt-extra:
   - ./scripts/ci/tezt.sh --without-select-tezts -- "${TESTS}" --from-record tezt/records/extra
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
+    ${JUNIT} --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
     tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
     fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/extra
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
@@ -356,7 +356,7 @@ tezt-flaky:
   - ./scripts/ci/tezt.sh --without-select-tezts -- "${TESTS}" --from-record tezt/records/flaky
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
+    ${JUNIT} --without-select-tezts -- "${TESTS}" --color --log-buffer-size 5000 --log-file
     tezt.log --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files
     fail --junit ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records/flaky
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results.json --job-count
