@@ -163,6 +163,7 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
           [@profiler.aggregate_s
             {verbosity = Notice; profiler_module = Profiler} "save_and_notify"]
         in
+        let* () = Node_context.Attestable_slots.may_notify node_ctxt ~slot_id in
         (* Introduce a new store read at each received shard. Not sure it can be
           a problem, though *)
         let* number_of_already_stored_shards =

@@ -755,6 +755,7 @@ let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
         Store.Shards.write_all (Store.shards node_store) slot_id shards
         |> Errors.to_tzresult
       in
+      let* () = Node_context.Attestable_slots.may_notify ctxt ~slot_id in
       let* () =
         Store.Slots.add_slot ~slot_size (Store.slots node_store) slot slot_id
         |> Errors.to_tzresult
