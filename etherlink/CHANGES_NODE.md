@@ -12,6 +12,9 @@
 
 ### Command-line interface changes
 
+- The `download kernel` command now allows to download the upcoming kernel
+ebisu by its alias. (!19461)
+
 ### Execution changes
 
 ### Storage changes
