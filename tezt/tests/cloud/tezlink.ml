@@ -648,14 +648,17 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           else unit
         else unit
       in
-      let dns_name = "node" in
       let* () =
+        match Cli.dns_name with
+        | Some dns_name when Tezt_cloud.Tezt_cloud_cli.(proxy || not localhost)
+          ->
         (* Binds a name to the machine. Overwrites the previous bond to name,
            if any. Creates the subdomain if it does not exist. *)
         Tezt_cloud.Gcloud.DNS.add_subdomain
           ~zone:"tezlink-nomadic-labs-com"
           ~name:dns_name
           ~value:ip
+        | Some _ | None -> unit
       in
       let () = toplog "Starting main loop" in
       loop 0)
