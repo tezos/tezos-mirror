@@ -653,12 +653,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | Some dns_name when Tezt_cloud.Tezt_cloud_cli.(proxy || not localhost)
           ->
             let* () =
-            (* Binds a name to the machine. Overwrites the previous bond to name,
-               if any. Creates the subdomain if it does not exist. *)
-            Tezt_cloud.Gcloud.DNS.add_subdomain
-              ~zone:"tezlink-nomadic-labs-com"
-              ~name:dns_name
-              ~value:ip
+              (* Binds a name to the machine. Overwrites the previous bond to
+                 name, if any. Creates the subdomain if it does not exist. *)
+              Tezt_cloud.Gcloud.DNS.add_subdomain
+                ~zone:"tezlink-nomadic-labs-com"
+                ~name:dns_name
+                ~value:ip
             in
             let full_name = sf "%s.tezlink.nomadic-labs.com" dns_name in
             let* ssl = Ssl.generate tezlink_sequencer_agent full_name in
