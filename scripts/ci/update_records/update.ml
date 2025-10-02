@@ -1,3 +1,10 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2025 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
 open Tezt
 open Base
 open Tezt_gitlab
@@ -23,12 +30,23 @@ let project = Sys.getenv_opt "PROJECT" |> Option.value ~default:"tezos/tezos"
 let default_branch =
   Sys.getenv_opt "DEFAULT_BRANCH" |> Option.value ~default:"master"
 
-let fetch_record records_directory (uri, index, variant) =
-  let local_filename = string_of_int index ^ ".json" in
+let fetch_record records_directory
+    (uri, {Tezt_job_name.component; index; variant}) =
+  let local_filename =
+    string_of_int (Option.value index ~default:1) ^ ".json"
+  in
   let local_dir =
-    match variant with
-    | None -> records_directory
-    | Some variant -> records_directory // variant
+    (* Note: there is an issue where if both a job named "x.tezt"
+       and a job named "tezt-x" exist, for the same "x",
+       the files will end up in the same directory.
+       So we need to make sure that no component has a name that is equal
+       to a Tezt job variant. *)
+    let dir =
+      match component with
+      | None -> records_directory
+      | Some component -> records_directory // component
+    in
+    match variant with None -> dir | Some variant -> dir // variant
   in
   let local = local_dir // local_filename in
   if not @@ Sys.file_exists local_dir then Sys.mkdir local_dir 0o755 ;
@@ -55,36 +73,20 @@ let remove_existing_records records_directory new_records =
   in
   Array.iter remove_if_looks_like_an_old_record (Sys.readdir records_directory)
 
-let parse_tezt_job_name =
-  let with_no_variant = rex "^tezt (\\d+)/\\d+$" in
-  let with_variant = rex "^tezt-([a-zA-Z0-9-_]*) (\\d+)/\\d+$" in
-  let with_variant_no_index = rex "^tezt-([a-zA-Z0-9-_]*)$" in
-  fun name ->
-    match name =~* with_no_variant with
-    | Some index -> Some (None, int_of_string index)
-    | None -> (
-        match name =~** with_variant with
-        | Some (variant, index) -> Some (Some variant, int_of_string index)
-        | None -> (
-            match name =~* with_variant_no_index with
-            | Some variant -> Some (Some variant, 1)
-            | None -> None))
-
 let fetch_pipeline_records_from_jobs records_directory pipeline =
   Log.info "Fetching records from tezt executions in %d in %s" pipeline project ;
   let* jobs = Gitlab.(project_pipeline_jobs ~project ~pipeline () |> get_all) in
   let get_record job =
     let job_id = JSON.(job |-> "id" |> as_int) in
     let name = JSON.(job |-> "name" |> as_string) in
-    match parse_tezt_job_name name with
+    match Tezt_job_name.parse_ (Lexing.from_string name) with
     | None -> None
-    | Some (variant, index) ->
+    | Some tezt_job_name ->
         let artifact_path = "tezt-results.json" in
         Log.info "Will fetch %s from job #%d (%s)" artifact_path job_id name ;
         Some
           ( Gitlab.project_job_artifact ~project ~job_id ~artifact_path (),
-            index,
-            variant )
+            tezt_job_name )
   in
   let records = List.filter_map get_record jobs in
   Log.info "Found %d Tezt jobs." (List.length records) ;
