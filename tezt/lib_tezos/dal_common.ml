@@ -68,10 +68,10 @@ module Parameters = struct
       attestation_threshold;
     }
 
-  let from_client client =
+  let from_client ?block client =
     let* json =
       Client.RPC.call_via_endpoint client
-      @@ RPC.get_chain_block_context_constants ()
+      @@ RPC.get_chain_block_context_constants ?block ()
     in
     from_protocol_parameters json |> return
 

@@ -40,7 +40,7 @@ module Parameters : sig
 
   val from_protocol_parameters : JSON.t -> t
 
-  val from_client : Client.t -> t Lwt.t
+  val from_client : ?block:string -> Client.t -> t Lwt.t
 
   val from_endpoint : Endpoint.t -> t Lwt.t
 
