@@ -135,18 +135,22 @@ let cli_from_type =
   Clap.typ ~name:"from" ~dummy:Last_merged_pipeline ~parse ~show
 
 let cli_from =
-  Clap.default
+  Clap.list
     cli_from_type
     ~section
     ~long:"from"
     ~placeholder:"PIPELINE"
     ~description:
-      "The ID of the pipeline to fetch records from. Can also be \
+      "Pipelines to fetch records from. PIPELINE can be a pipeline identifier, \
        'last-merged-pipeline' (last pipeline for the last merge commit of the \
        default branch), 'last-scheduled:NAME' (last scheduled pipeline with \
        name containing '[NAME]'), or 'last-successful-scheduled:NAME' (last \
-       successful scheduled pipeline with name containing '[NAME]')."
-    Last_merged_pipeline
+       successful scheduled pipeline with name containing '[NAME]'). If no \
+       --from is specified, the script defaults to 'last-merged-pipeline'."
+    ()
+
+let cli_from =
+  match cli_from with [] -> [Last_merged_pipeline] | _ :: _ -> cli_from
 
 let cli_dry_run =
   Clap.flag
@@ -166,8 +170,8 @@ let () =
      as well as [Background.start] etc. *)
   ( Test.register ~__FILE__ ~title:"update Tezt test records" ~tags:["update"]
   @@ fun () ->
-    let* pipeline_id =
-      match cli_from with
+    let* pipeline_ids =
+      Fun.flip Lwt_list.map_p cli_from @@ function
       | Pipeline pipeline_id -> return pipeline_id
       | Last_merged_pipeline ->
           Gitlab_util.get_last_merged_pipeline ~project ~default_branch ()
@@ -188,8 +192,12 @@ let () =
     in
     Log.info "Records will be stored in %s" records_directory ;
     let* new_records =
-      fetch_pipeline_records_from_jobs records_directory pipeline_id
+      Fun.flip
+        Lwt_list.map_p
+        pipeline_ids
+        (fetch_pipeline_records_from_jobs records_directory)
     in
+    let new_records = List.flatten new_records in
     if not cli_dry_run then
       remove_existing_records
         records_directory
