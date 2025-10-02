@@ -136,8 +136,9 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~variant
            since it will contain e.g. '&&' which we want to interpreted as TSL and not shell
            syntax. *)
       "./scripts/ci/tezt.sh " ^ with_or_without_select_tezts
-      ^ " \"${TESTS}\" --from-record tezt/records --job \
-         ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > \
+      ^ " \"${TESTS}\" --from-record tezt/records"
+      ^ (if variant = "" then "" else "/" ^ variant)
+      ^ " --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > \
          selected_tezts.tsv";
       (* For Tezt tests, there are multiple timeouts:
            - --global-timeout is the internal timeout of Tezt, which only works if tests
@@ -166,8 +167,9 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~variant
          --global-timeout 1800"
       ^ (if disable_test_timeout then "" else " --test-timeout 540")
       ^ " --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak \
-         'dd_tags[memory.peak]' --from-record tezt/records --job \
-         ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
+         'dd_tags[memory.peak]' --from-record tezt/records"
+      ^ (if variant = "" then "" else "/" ^ variant)
+      ^ " --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
          tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
          ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn \
          5_000_000_000" ^ keep_going_opt ^ junit_tags;
