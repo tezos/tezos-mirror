@@ -202,25 +202,6 @@ let add_contract_delegated_stake ctxt contract amount =
   | None -> return ctxt
   | Some delegate -> add_delegated_stake ctxt delegate amount
 
-let cleanup_values_for_protocol_t ctxt ~previous_consensus_rights_delay
-    ~consensus_rights_delay ~new_cycle =
-  let open Lwt_result_syntax in
-  assert (
-    Compare.Int.(consensus_rights_delay <= previous_consensus_rights_delay)) ;
-  if Compare.Int.(consensus_rights_delay = previous_consensus_rights_delay) then
-    return ctxt
-  else
-    let start_cycle = Cycle_repr.add new_cycle (consensus_rights_delay + 1) in
-    let end_cycle = Cycle_repr.add new_cycle previous_consensus_rights_delay in
-    List.fold_left_es
-      (fun ctxt cycle_to_clear ->
-        let*! ctxt =
-          Storage.Stake.Total_active_stake.remove ctxt cycle_to_clear
-        in
-        Selected_distribution_for_cycle.remove ctxt cycle_to_clear)
-      ctxt
-      Cycle_repr.(start_cycle ---> end_cycle)
-
 module For_RPC = struct
   let get_staking_balance ctxt delegate =
     let open Lwt_result_syntax in

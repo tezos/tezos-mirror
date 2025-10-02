@@ -68,13 +68,6 @@ module Delegate_sampler_state = struct
     let id = identifier_of_cycle cycle in
     let*? ctxt = Cache.update ctxt id None in
     Storage.Delegate_sampler_state.remove_existing ctxt cycle
-
-  let remove ctxt cycle =
-    let open Lwt_result_syntax in
-    let id = identifier_of_cycle cycle in
-    let*? ctxt = Cache.update ctxt id None in
-    let*! ctxt = Storage.Delegate_sampler_state.remove ctxt cycle in
-    return ctxt
 end
 
 module Random = struct
@@ -348,21 +341,6 @@ let attesting_power ~all_bakers_attest_enabled ctxt level =
         return (ctxt, map))
       (ctxt, Signature.Public_key_hash.Map.empty)
       slots
-
-let cleanup_values_for_protocol_t ctxt ~previous_consensus_rights_delay
-    ~consensus_rights_delay ~new_cycle =
-  let open Lwt_result_syntax in
-  assert (
-    Compare.Int.(consensus_rights_delay <= previous_consensus_rights_delay)) ;
-  if Compare.Int.(consensus_rights_delay = previous_consensus_rights_delay) then
-    return ctxt
-  else
-    let start_cycle = Cycle_repr.add new_cycle (consensus_rights_delay + 1) in
-    let end_cycle = Cycle_repr.add new_cycle previous_consensus_rights_delay in
-    List.fold_left_es
-      Delegate_sampler_state.remove
-      ctxt
-      Cycle_repr.(start_cycle ---> end_cycle)
 
 module For_RPC = struct
   let delegate_current_baking_power ctxt delegate =

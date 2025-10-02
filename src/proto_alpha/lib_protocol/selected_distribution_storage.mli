@@ -28,8 +28,6 @@ module Selected_distribution_for_cycle : sig
 
   val remove_existing :
     Raw_context.t -> Cycle_repr.cycle -> Raw_context.t tzresult Lwt.t
-
-  val remove : Raw_context.t -> Cycle_repr.cycle -> Raw_context.t tzresult Lwt.t
 end
 
 val set_selected_distribution_for_cycle :

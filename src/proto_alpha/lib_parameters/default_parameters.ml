@@ -238,8 +238,8 @@ let constants_mainnet : Constants.Parametric.t =
        [n+1+consensus_rights_delay] are sampled based on the current
        baking power of bakers.
 
-       Last updated in protocol T. *)
-    consensus_rights_delay = 1;
+       Last updated in protocol P. *)
+    consensus_rights_delay = 2;
     blocks_preservation_cycles = 1;
     (* [delegate_parameters_activation_delay] is the number of full
        cycles after which submitted delegate parameters are actually
@@ -456,6 +456,7 @@ let constants_sandbox =
         };
     issuance_weights;
     blocks_preservation_cycles = 1;
+    consensus_rights_delay = 2;
     delegate_parameters_activation_delay = 2;
     blocks_per_cycle = 8l;
     blocks_per_commitment = 4l;
@@ -494,6 +495,7 @@ let constants_test =
             };
         };
     issuance_weights;
+    consensus_rights_delay = 2;
     delegate_parameters_activation_delay = 3;
     blocks_preservation_cycles = 1;
     blocks_per_cycle = 12l;

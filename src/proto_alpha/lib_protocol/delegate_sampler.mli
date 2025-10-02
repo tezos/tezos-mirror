@@ -108,13 +108,6 @@ val attesting_power :
   Level_repr.t ->
   (Raw_context.t * int64 Signature.Public_key_hash.Map.t) tzresult Lwt.t
 
-val cleanup_values_for_protocol_t :
-  Raw_context.t ->
-  previous_consensus_rights_delay:int ->
-  consensus_rights_delay:int ->
-  new_cycle:Cycle_repr.t ->
-  Raw_context.t tzresult Lwt.t
-
 module For_RPC : sig
   (** The baking power for a given delegate computed from its current
     stake. *)

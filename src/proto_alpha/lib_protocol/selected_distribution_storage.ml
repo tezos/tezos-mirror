@@ -62,15 +62,6 @@ module Selected_distribution_for_cycle = struct
     let id = identifier_of_cycle cycle in
     let*? ctxt = Cache.update ctxt id None in
     Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
-
-  let remove ctxt cycle =
-    let open Lwt_result_syntax in
-    let id = identifier_of_cycle cycle in
-    let*? ctxt = Cache.update ctxt id None in
-    let*! ctxt =
-      Storage.Stake.Selected_distribution_for_cycle.remove ctxt cycle
-    in
-    return ctxt
 end
 
 let set_selected_distribution_for_cycle ctxt cycle stakes total_stake =
