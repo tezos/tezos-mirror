@@ -94,23 +94,41 @@ let fetch_pipeline_records_from_jobs records_directory pipeline =
 type from =
   | Pipeline of int
   | Last_merged_pipeline
-  | Last_schedule_extended_test
-  | Last_successful_schedule_extended_test
+  | Last_scheduled of string
+  | Last_successful_scheduled of string
 
 let cli_from_type =
+  let delete_prefix ~prefix str =
+    if String.starts_with ~prefix str then
+      let str_len = String.length str in
+      let prefix_len = String.length prefix in
+      Some (String.sub str prefix_len (str_len - prefix_len))
+    else None
+  in
   let parse = function
     | "last-merged-pipeline" -> Some Last_merged_pipeline
-    | "last-schedule-extended-test" -> Some Last_schedule_extended_test
+    | "last-schedule-extended-test" ->
+        (* Deprecated, use last-scheduled:schedule_extended_test instead. *)
+        Some (Last_scheduled "schedule_extended_test")
     | "last-successful-schedule-extended-test" ->
-        Some Last_successful_schedule_extended_test
-    | s -> Option.map (fun x -> Pipeline x) (int_of_string_opt s)
+        (* Deprecated, use last-successful-scheduled:schedule_extended_test instead. *)
+        Some (Last_successful_scheduled "schedule_extended_test")
+    | s -> (
+        match int_of_string_opt s with
+        | Some id -> Some (Pipeline id)
+        | None -> (
+            match delete_prefix ~prefix:"last-scheduled:" s with
+            | Some name -> Some (Last_scheduled name)
+            | None -> (
+                match delete_prefix ~prefix:"last-successful-scheduled:" s with
+                | Some name -> Some (Last_successful_scheduled name)
+                | None -> None)))
   in
   let show = function
     | Pipeline id -> string_of_int id
     | Last_merged_pipeline -> "last-merged-pipeline"
-    | Last_schedule_extended_test -> "last-schedule-extended-test"
-    | Last_successful_schedule_extended_test ->
-        "last-successful-schedule-extended-test"
+    | Last_scheduled name -> "last-scheduled:" ^ name
+    | Last_successful_scheduled name -> "last-successful-scheduled:" ^ name
   in
   Clap.typ ~name:"from" ~dummy:Last_merged_pipeline ~parse ~show
 
@@ -121,9 +139,11 @@ let cli_from =
     ~long:"from"
     ~placeholder:"PIPELINE"
     ~description:
-      "The ID of the pipeline to fetch records from. Also accepts \
-       'last-merged-pipeline', which denotes the last pipeline for the latest \
-       merge commit on the default branch."
+      "The ID of the pipeline to fetch records from. Can also be \
+       'last-merged-pipeline' (last pipeline for the last merge commit of the \
+       default branch), 'last-scheduled:NAME' (last scheduled pipeline with \
+       name containing '[NAME]'), or 'last-successful-scheduled:NAME' (last \
+       successful scheduled pipeline with name containing '[NAME]')."
     Last_merged_pipeline
 
 let cli_dry_run =
@@ -137,7 +157,7 @@ let cli_dry_run =
        --keep-temp."
     false
 
-let schedule_extended_test_rex = rex "^\\[schedule_extended_test\\] "
+let pipeline_name_rex name = rex ("^\\[" ^ name ^ "\\] ")
 
 let () =
   (* Register a test to benefit from error handling of Test.run,
@@ -149,16 +169,16 @@ let () =
       | Pipeline pipeline_id -> return pipeline_id
       | Last_merged_pipeline ->
           Gitlab_util.get_last_merged_pipeline ~project ~default_branch ()
-      | Last_schedule_extended_test ->
+      | Last_scheduled name ->
           Gitlab_util.get_last_schedule_pipeline
             ~project
-            ~matching:schedule_extended_test_rex
+            ~matching:(pipeline_name_rex name)
             ()
-      | Last_successful_schedule_extended_test ->
+      | Last_successful_scheduled name ->
           Gitlab_util.get_last_schedule_pipeline
             ~status:"success"
             ~project
-            ~matching:schedule_extended_test_rex
+            ~matching:(pipeline_name_rex name)
             ()
     in
     let records_directory =
