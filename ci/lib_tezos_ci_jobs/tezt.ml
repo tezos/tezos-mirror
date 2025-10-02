@@ -136,7 +136,7 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~variant
            since it will contain e.g. '&&' which we want to interpreted as TSL and not shell
            syntax. *)
       "./scripts/ci/tezt.sh " ^ with_or_without_select_tezts
-      ^ " \"${TESTS}\" --from-record tezt/records"
+      ^ " -- \"${TESTS}\" --from-record tezt/records"
       ^ (if variant = "" then "" else "/" ^ variant)
       ^ " --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > \
          selected_tezts.tsv";
@@ -163,7 +163,7 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~variant
              amount of memory (in bytes). We set the threshold to 5 GB. *)
       "./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh \
        --send-junit " ^ with_or_without_select_tezts
-      ^ " \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
+      ^ " -- \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
          --global-timeout 1800"
       ^ (if disable_test_timeout then "" else " --test-timeout 540")
       ^ " --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak \
