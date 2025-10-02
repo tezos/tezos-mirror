@@ -14,9 +14,9 @@ open Tezos_ci
       by {!job_select_tezts} as [~job_select_tezts]. Then the
       constructed tezt job will only run the tezts selected by the
       selection job. *)
-let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~name
+let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~variant
     ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
-    ?(tezt_parallel = 1) ?(tezt_variant = "")
+    ?(tezt_parallel = 1)
     ?(before_script =
       Common.before_script ~source_version:true ~eval_opam:false []) ?timeout
     ?(disable_test_timeout = false) ?job_select_tezts ~dependencies
@@ -24,7 +24,7 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~name
   let variables =
     [
       ("JUNIT", "tezt-junit.xml");
-      ("TEZT_VARIANT", tezt_variant);
+      ("TEZT_VARIANT", if variant = "" then "" else "-" ^ variant);
       ("TESTS", Tezt_core.TSL.show tezt_tests);
       ("TEZT_RETRY", string_of_int tezt_retry);
       ("TEZT_PARALLEL", string_of_int tezt_parallel);
@@ -112,7 +112,7 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~name
     ?timeout
     ~__POS__
     ~image:Images.CI.e2etest
-    ~name
+    ~name:(if variant = "" then "tezt" else "tezt-" ^ variant)
     ?parallel
     ~tag
     ~stage:Stages.test

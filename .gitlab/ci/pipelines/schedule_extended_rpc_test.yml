@@ -172,7 +172,7 @@ tezt-time-sensitive:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
-    TEZT_VARIANT: -time_sensitive
+    TEZT_VARIANT: -time-sensitive
     TESTS: time_sensitive && /ci_disabled && /slow && /extra && /cloud
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "1"
