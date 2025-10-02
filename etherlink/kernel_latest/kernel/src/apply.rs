@@ -7,12 +7,10 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolCall};
-use evm::Config;
 use evm_execution::fa_bridge::deposit::{FaDeposit, FaDepositWithProxy};
-use evm_execution::handler::{FastWithdrawalInterface, RouterInterface};
-use evm_execution::precompiles::FA_BRIDGE_PRECOMPILE_ADDRESS;
 use evm_execution::EthereumError;
 use primitive_types::{H160, U256};
+use revm::primitives::hardfork::SpecId;
 use revm::{
     primitives::{Address, Bytes, Log, B256},
     state::AccountInfo,
@@ -25,9 +23,11 @@ use revm_etherlink::inspectors::storage::store_call_trace;
 use revm_etherlink::inspectors::struct_logger::StructLoggerInput;
 use revm_etherlink::inspectors::{get_tracer_configuration, TracerInput};
 use revm_etherlink::precompiles::constants::{
-    FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
+    FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_EXECUTION_COST, FEED_DEPOSIT_ADDR,
 };
-use revm_etherlink::precompiles::send_outbox_message::Withdrawal;
+use revm_etherlink::precompiles::send_outbox_message::{
+    FastWithdrawalInterface, RouterInterface, Withdrawal,
+};
 use revm_etherlink::storage::world_state_handler::{
     account_path, StorageAccount, WorldStateHandler,
 };
@@ -63,7 +63,7 @@ impl Transaction {
         match &self.content {
             TransactionContent::Deposit(Deposit { receiver, .. }) => Some(*receiver),
             TransactionContent::FaDeposit(FaDeposit { .. }) => {
-                Some(FA_BRIDGE_PRECOMPILE_ADDRESS)
+                Some(alloy_to_h160(&FA_BRIDGE_SOL_ADDR))
             }
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => transaction.to,
@@ -319,19 +319,6 @@ fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &[u8
     }
 }
 
-fn config_to_revm_specid(config: &Config) -> revm::primitives::hardfork::SpecId {
-    // This is a hack-ish way to derive the spec id from Sputnik's
-    // configuration. The last case is the very first EVM version
-    // that we supported (:= Shanghai).
-    if config.is_prague {
-        revm::primitives::hardfork::SpecId::PRAGUE
-    } else if config.selfdestruct_deprecated {
-        revm::primitives::hardfork::SpecId::CANCUN
-    } else {
-        revm::primitives::hardfork::SpecId::SHANGHAI
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
 pub fn revm_run_transaction<Host: Runtime>(
@@ -345,7 +332,7 @@ pub fn revm_run_transaction<Host: Runtime>(
     effective_gas_price: U256,
     access_list: AccessList,
     authorization_list: Option<AuthorizationList>,
-    config: &Config,
+    spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, anyhow::Error> {
     // Disclaimer:
@@ -378,7 +365,7 @@ pub fn revm_run_transaction<Host: Runtime>(
     value.to_little_endian(&mut bytes);
     revm_etherlink::run_transaction(
         host,
-        config_to_revm_specid(config),
+        *spec_id,
         block_constants,
         &mut world_state_handler,
         revm_etherlink::precompiles::provider::EtherlinkPrecompiles::new(),
@@ -465,7 +452,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     transaction: &EthereumTransactionCommon,
     is_delayed: bool,
     tracer_input: Option<TracerInput>,
-    evm_configuration: &Config,
+    spec_id: &SpecId,
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<TransactionResult>, anyhow::Error> {
     let effective_gas_price = block_constants.base_fee_per_gas();
@@ -500,7 +487,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         effective_gas_price,
         transaction.access_list.clone(),
         transaction.authorization_list.clone(),
-        evm_configuration,
+        spec_id,
         tracer_input,
     ) {
         Ok(outcome) => outcome,
@@ -560,18 +547,16 @@ fn apply_deposit<Host: Runtime>(
     deposit: &Deposit,
     transaction: &Transaction,
     tracer_input: Option<TracerInput>,
-    evm_configuration: &Config,
+    spec_id: &SpecId,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
     let DepositResult {
         outcome: execution_outcome,
         estimated_ticks_used,
-    } = execute_deposit(host, world_state_handler, deposit, evm_configuration).map_err(
-        |e| {
-            Error::InvalidRunTransaction(EthereumError::WrappedError(Cow::Owned(
-                e.to_string(),
-            )))
-        },
-    )?;
+    } = execute_deposit(host, world_state_handler, deposit, spec_id).map_err(|e| {
+        Error::InvalidRunTransaction(EthereumError::WrappedError(Cow::Owned(
+            e.to_string(),
+        )))
+    })?;
 
     trace_deposit(
         host,
@@ -646,7 +631,7 @@ fn apply_fa_deposit<Host: Runtime>(
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
     tracer_input: Option<TracerInput>,
-    evm_configuration: &Config,
+    spec_id: &SpecId,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
     // Fees are set to zero, this is an internal call from the system address to the FA bridge solidity contract.
     // We do not require the system address to pay for the execution cost.
@@ -658,7 +643,7 @@ fn apply_fa_deposit<Host: Runtime>(
     // A specific address is allocated for queue call
     // System address can only be used as caller for simulations
     let caller = alloy_to_h160(&FEED_DEPOSIT_ADDR);
-    let to = Some(FA_BRIDGE_PRECOMPILE_ADDRESS);
+    let to = Some(alloy_to_h160(&FA_BRIDGE_SOL_ADDR));
     let value = U256::zero();
     let gas_limit = FA_DEPOSIT_EXECUTION_COST;
     let call_data = match fa_deposit.to_fa_deposit_with_proxy() {
@@ -683,7 +668,7 @@ fn apply_fa_deposit<Host: Runtime>(
         effective_gas_price,
         Vec::new(),
         None,
-        evm_configuration,
+        spec_id,
         tracer_input,
     ) {
         Ok(outcome) => outcome,
@@ -820,7 +805,7 @@ pub fn apply_transaction<Host: Runtime>(
     world_state_handler: &mut WorldStateHandler,
     sequencer_pool_address: Option<H160>,
     tracer_input: Option<TracerInput>,
-    evm_configuration: &Config,
+    spec_id: &SpecId,
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
     let tracer_input =
@@ -833,7 +818,7 @@ pub fn apply_transaction<Host: Runtime>(
             tx,
             false,
             tracer_input,
-            evm_configuration,
+            spec_id,
             limits,
         )?,
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
@@ -843,7 +828,7 @@ pub fn apply_transaction<Host: Runtime>(
             tx,
             true,
             tracer_input,
-            evm_configuration,
+            spec_id,
             limits,
         )?,
         TransactionContent::Deposit(deposit) => {
@@ -854,18 +839,12 @@ pub fn apply_transaction<Host: Runtime>(
                 deposit,
                 transaction,
                 tracer_input,
-                evm_configuration,
+                spec_id,
             )?
         }
         TransactionContent::FaDeposit(fa_deposit) => {
             log!(host, Benchmarking, "Transaction type: FA_DEPOSIT");
-            apply_fa_deposit(
-                host,
-                fa_deposit,
-                block_constants,
-                tracer_input,
-                evm_configuration,
-            )?
+            apply_fa_deposit(host, fa_deposit, block_constants, tracer_input, spec_id)?
         }
     };
 

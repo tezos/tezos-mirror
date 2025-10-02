@@ -12,21 +12,20 @@ use crate::chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
-use crate::migration::legacy::{account_path, init_account_storage};
+use crate::migration::legacy::{
+    account_path, init_account_storage, ENABLE_FAST_FA_WITHDRAWAL,
+    ENABLE_FAST_WITHDRAWAL, NATIVE_TOKEN_TICKETER_PATH, SYSTEM_ACCOUNT_ADDRESS,
+    WITHDRAWAL_ADDRESS,
+};
 use crate::storage::{
     read_chain_id, read_storage_version, store_backlog, store_dal_slots,
     store_storage_version, tweak_dal_activation, StorageVersion, DELAYED_BRIDGE,
     ENABLE_FA_BRIDGE, KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE,
     SEQUENCER_GOVERNANCE,
 };
-use evm_execution::configuration::EVMVersion;
-use evm_execution::precompiles::SYSTEM_ACCOUNT_ADDRESS;
-use evm_execution::precompiles::WITHDRAWAL_ADDRESS;
-use evm_execution::{
-    store_evm_version, ENABLE_FAST_FA_WITHDRAWAL, ENABLE_FAST_WITHDRAWAL,
-    NATIVE_TOKEN_TICKETER_PATH,
-};
 use primitive_types::U256;
+use revm_etherlink::storage::block::BLOCKS_STORED;
+use revm_etherlink::storage::version::{store_evm_version, EVMVersion};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::storage::path::RefPath;
@@ -105,6 +104,24 @@ mod legacy {
             Ok(block_number) => Ok(block_number.saturating_add(U256::one())),
         }
     }
+
+    // System (zero) account address, owns ticket table and withdrawal counter
+    pub const SYSTEM_ACCOUNT_ADDRESS: H160 = H160::zero();
+
+    // Prefixed by 'ff' to make sure we will not conflict with any
+    // upcoming Ethereum upgrades.
+    pub const WITHDRAWAL_ADDRESS: H160 = H160([
+        0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+    ]);
+
+    pub const ENABLE_FAST_WITHDRAWAL: RefPath =
+        RefPath::assert_from(b"/evm/world_state/feature_flags/enable_fast_withdrawal");
+
+    pub const NATIVE_TOKEN_TICKETER_PATH: RefPath =
+        RefPath::assert_from(b"/evm/world_state/ticketer");
+
+    pub const ENABLE_FAST_FA_WITHDRAWAL: RefPath =
+        RefPath::assert_from(b"/evm/world_state/feature_flags/enable_fast_fa_withdrawal");
 
     pub const EVM_ACCOUNTS_PATH: RefPath =
         RefPath::assert_from(b"/evm/world_state/eth_accounts");
@@ -303,10 +320,7 @@ fn migrate_to<Host: Runtime>(
                 host,
                 &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
             )?;
-            let to_clean = U256::min(
-                current_number + 1,
-                evm_execution::storage::blocks::BLOCKS_STORED.into(),
-            );
+            let to_clean = U256::min(current_number + 1, BLOCKS_STORED.into());
             for i in 0..to_clean.as_usize() {
                 let number = current_number - i;
                 let path: Vec<u8> =

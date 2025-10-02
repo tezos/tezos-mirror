@@ -177,6 +177,7 @@ impl ExecutionOutcome {
 type CallOutcome = (ExitReason, Vec<u8>);
 
 // Will be used to check precondition before executing a call or a create
+#[allow(clippy::enum_variant_names)]
 pub enum Precondition {
     PassPrecondition,
     PreconditionErr(ExitReason),

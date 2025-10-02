@@ -11,34 +11,50 @@
 //! provided by SputnikVM, as we require the Host type and object
 //! for writing to the log.
 
+#[cfg(test)]
 use std::vec;
 
+#[cfg(test)]
 mod blake2;
+#[cfg(test)]
 mod ecdsa;
+#[cfg(test)]
 mod fa_bridge;
+#[cfg(test)]
 mod hash;
+#[cfg(test)]
 mod identity;
+#[cfg(test)]
 mod modexp;
 pub(crate) mod reentrancy_guard;
-mod revert;
+#[cfg(test)]
 mod withdrawal;
+#[cfg(test)]
 mod zero_knowledge;
 
 use crate::handler::{EvmHandler, Withdrawal};
 use crate::EthereumError;
 use alloc::collections::btree_map::BTreeMap;
+#[cfg(test)]
 use blake2::blake2f_precompile;
+#[cfg(test)]
 use ecdsa::ecrecover_precompile;
-use evm::executor::stack::PrecompileFailure;
-use evm::{Context, ExitReason, Handler, Transfer};
+#[cfg(test)]
+use evm::{executor::stack::PrecompileFailure, Handler};
+use evm::{Context, ExitReason, Transfer};
+#[cfg(test)]
 use fa_bridge::fa_bridge_precompile;
+#[cfg(test)]
 use hash::{ripemd160_precompile, sha256_precompile};
+#[cfg(test)]
 use identity::identity_precompile;
+#[cfg(test)]
 use modexp::modexp_precompile;
 use primitive_types::H160;
-use revert::revert_precompile;
 use tezos_evm_runtime::runtime::Runtime;
+#[cfg(test)]
 use withdrawal::withdrawal_precompile;
+#[cfg(test)]
 use zero_knowledge::{ecadd_precompile, ecmul_precompile, ecpairing_precompile};
 
 /// FA bridge precompile address
@@ -132,9 +148,11 @@ impl<Host: Runtime> PrecompileSet<Host> for PrecompileBTreeMap<Host> {
     }
 }
 
+#[cfg(test)]
 type PrecompileWithoutGasDrainFn<Host> =
     fn(_: &mut EvmHandler<Host>, _: &[u8]) -> Result<PrecompileOutcome, EthereumError>;
 
+#[cfg(test)]
 pub fn call_precompile_with_gas_draining<Host: Runtime>(
     handler: &mut EvmHandler<Host>,
     input: &[u8],
@@ -166,6 +184,7 @@ pub const WITHDRAWAL_ADDRESS: H160 = H160([
 // This precompile is part of EIP-4844 which we don't support
 // on Etherlink, as they are related to blobs.
 // See: https://eips.ethereum.org/EIPS/eip-4844#point-evaluation-precompile
+#[cfg(test)]
 fn kzg_point_evaluation<Host: Runtime>(
     _handler: &mut EvmHandler<Host>,
     _input: &[u8],
@@ -178,6 +197,7 @@ fn kzg_point_evaluation<Host: Runtime>(
     }))
 }
 
+#[cfg(test)]
 pub fn evm_precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
     BTreeMap::from([
         (
@@ -224,6 +244,7 @@ pub fn evm_precompile_set<Host: Runtime>() -> PrecompileBTreeMap<Host> {
 }
 
 /// Factory function for generating the precompileset that the EVM kernel uses.
+#[cfg(test)]
 pub fn precompile_set<Host: Runtime>(
     enable_fa_withdrawals: bool,
 ) -> PrecompileBTreeMap<Host> {
@@ -243,23 +264,7 @@ pub fn precompile_set<Host: Runtime>(
     precompiles
 }
 
-pub fn precompile_set_with_revert_withdrawals<Host: Runtime>(
-    enable_fa_withdrawals: bool,
-) -> PrecompileBTreeMap<Host> {
-    let mut precompiles = evm_precompile_set();
-
-    precompiles.insert(WITHDRAWAL_ADDRESS, revert_precompile as PrecompileFn<Host>);
-
-    if enable_fa_withdrawals {
-        precompiles.insert(
-            FA_BRIDGE_PRECOMPILE_ADDRESS,
-            revert_precompile as PrecompileFn<Host>,
-        );
-    }
-
-    precompiles
-}
-
+#[cfg(test)]
 mod tick_model {
     pub fn ticks_of_sha256(data_size: usize) -> u64 {
         let size = data_size as u64;

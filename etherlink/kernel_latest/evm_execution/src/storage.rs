@@ -22,11 +22,15 @@ pub mod tracer {
 
     const EVM_TRACE: RefPath = RefPath::assert_from(b"/evm/trace");
 
+    #[cfg(test)]
     const GAS: RefPath = RefPath::assert_from(b"/gas");
+    #[cfg(test)]
     const FAILED: RefPath = RefPath::assert_from(b"/failed");
+    #[cfg(test)]
     const RETURN_VALUE: RefPath = RefPath::assert_from(b"/return_value");
     const STRUCT_LOGS: RefPath = RefPath::assert_from(b"/struct_logs");
 
+    #[allow(clippy::enum_variant_names)]
     #[derive(Eq, Error, Debug, PartialEq)]
     pub enum Error {
         #[error("Error from the indexable storage while tracing: {0}")]
@@ -53,6 +57,7 @@ pub mod tracer {
         concat(&trace_tx_path, field).map_err(Error::PathError)
     }
 
+    #[cfg(test)]
     pub fn store_trace_gas<Host: Runtime>(
         host: &mut Host,
         gas: u64,
@@ -63,6 +68,7 @@ pub mod tracer {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn store_trace_failed<Host: Runtime>(
         host: &mut Host,
         is_success: bool,
@@ -74,6 +80,7 @@ pub mod tracer {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn store_return_value<Host: Runtime>(
         host: &mut Host,
         value: &[u8],
@@ -139,11 +146,6 @@ pub mod blocks {
         #[error("Path error: {0:?}")]
         PathError(host::path::PathError),
 
-        /// Passed block number is not sequential
-        /// comparing to stored current block number
-        #[error("Non sequential block levels. Current: {0}, new one: {1}")]
-        NonSequentialBlockLevels(U256, U256),
-
         /// Some blockhash in storage has wrong number of bytes
         #[error("Malformed blockhash. Number of bytes: {0}")]
         MalformedBlockHash(usize),
@@ -185,23 +187,5 @@ pub mod blocks {
             format!("/evm/world_state/indexes/blocks/{block_number}").into();
         let owned_path = OwnedPath::try_from(path)?;
         Ok(owned_path)
-    }
-
-    /// Test utilities for block storage
-    pub mod test_utils {
-        use crypto::hash::BlockHash;
-        use std::iter::Map;
-        use std::ops::RangeFrom;
-
-        type BlockIter = Map<RangeFrom<i32>, fn(i32) -> BlockHash>;
-
-        /// Helper function for generation infinite iterator of blocks
-        pub fn blocks_iter() -> BlockIter {
-            (1_i32..).map(|level| {
-                let level_bytes: Vec<u8> = Vec::from(level.to_be_bytes());
-                BlockHash::try_from(level_bytes.repeat(8))
-                    .expect("Hash expected to be valid")
-            })
-        }
     }
 }

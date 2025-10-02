@@ -443,17 +443,17 @@ mod tests {
     use evm_execution::fa_bridge::test_utils::{
         convert_h160, convert_u256, dummy_ticket, kernel_wrapper, ticket_id, SolCall,
     };
-    use evm_execution::handler::RouterInterface;
-    use evm_execution::precompiles::{
-        FA_BRIDGE_PRECOMPILE_ADDRESS, SYSTEM_ACCOUNT_ADDRESS,
-    };
-    use evm_execution::NATIVE_TOKEN_TICKETER_PATH;
     use pretty_assertions::assert_eq;
     use primitive_types::{H160, U256};
-    use revm_etherlink::helpers::legacy::{h160_to_alloy, h256_to_alloy, u256_to_alloy};
+    use revm_etherlink::helpers::legacy::{
+        alloy_to_h160, h160_to_alloy, h256_to_alloy, u256_to_alloy,
+    };
+    use revm_etherlink::precompiles::constants::{FA_BRIDGE_SOL_ADDR, SYSTEM_SOL_ADDR};
+    use revm_etherlink::precompiles::send_outbox_message::RouterInterface;
     use revm_etherlink::storage::world_state_handler::{
         account_path, new_world_state_handler, WorldStateHandler,
     };
+    use revm_etherlink::storage::NATIVE_TOKEN_TICKETER_PATH;
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_data_encoding::nom::NomReader;
     use tezos_ethereum::block::BlockFees;
@@ -776,10 +776,7 @@ mod tests {
         let amount = U256::from_little_endian(&bytes);
 
         let mut system = world_state_handler
-            .get_or_create(
-                &mock_host,
-                &account_path(&h160_to_alloy(&SYSTEM_ACCOUNT_ADDRESS)).unwrap(),
-            )
+            .get_or_create(&mock_host, &account_path(&SYSTEM_SOL_ADDR).unwrap())
             .unwrap();
 
         // patch ticket table
@@ -814,7 +811,7 @@ mod tests {
 
         // create and sign precompile call
         let gas_price = U256::from(40000000000u64);
-        let to = FA_BRIDGE_PRECOMPILE_ADDRESS;
+        let to = alloy_to_h160(&FA_BRIDGE_SOL_ADDR);
         let tx = EthereumTransactionCommon::new(
             TransactionType::Legacy,
             Some(U256::from(1337)),

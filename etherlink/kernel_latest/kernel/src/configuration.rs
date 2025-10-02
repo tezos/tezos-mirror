@@ -17,8 +17,8 @@ use crate::{
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
-use evm_execution::{configuration::fetch_evm_configuration, read_ticketer};
 use primitive_types::U256;
+use revm_etherlink::storage::{read_ticketer, version::read_evm_version};
 use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, HashTrait};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
@@ -194,8 +194,8 @@ fn fetch_evm_chain_configuration<Host: Runtime>(
     chain_id: U256,
 ) -> ChainConfig {
     let evm_limits = fetch_evm_limits(host);
-    let evm_configuration = fetch_evm_configuration(host);
-    ChainConfig::new_evm_config(chain_id, evm_limits, evm_configuration)
+    let spec_id = read_evm_version(host).into();
+    ChainConfig::new_evm_config(chain_id, evm_limits, spec_id)
 }
 
 fn fetch_michelson_chain_configuration<Host: Runtime>(

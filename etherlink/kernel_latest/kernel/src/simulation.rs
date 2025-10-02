@@ -24,9 +24,9 @@ use crate::{error::Error, storage};
 
 use crate::{parsable, parsing, retrieve_chain_id};
 
-use evm::Config;
 use evm_execution::EthereumError;
 use primitive_types::{H160, U256};
+use revm::primitives::hardfork::SpecId;
 use revm::{context::result::ExecutionResult as VMResult, primitives::Address};
 use revm_etherlink::{
     helpers::legacy::u256_to_alloy, inspectors::TracerInput, ExecutionOutcome,
@@ -384,7 +384,7 @@ impl Evaluation {
         &self,
         host: &mut Host,
         tracer_input: Option<TracerInput>,
-        evm_configuration: &Config,
+        spec_id: &SpecId,
     ) -> Result<SimulationResult<CallResult, String>, Error> {
         let chain_id = retrieve_chain_id(host)?;
         let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
@@ -508,7 +508,7 @@ impl Evaluation {
             // TODO: Replace this by the decoded access lists if any.
             empty_access_list(),
             None,
-            evm_configuration,
+            spec_id,
             tracer_input,
         ) {
             Ok(outcome) if !self.with_da_fees => {
@@ -662,14 +662,14 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
 
 pub fn start_simulation_mode<Host: Runtime>(
     host: &mut Host,
-    evm_configuration: &Config,
+    spec_id: &SpecId,
 ) -> Result<(), anyhow::Error> {
     log!(host, Debug, "Starting simulation mode ");
     let simulation = parse_inbox(host)?;
     match simulation {
         Message::Evaluation(simulation) => {
             let tracer_input = read_tracer_input(host)?;
-            let outcome = simulation.run(host, tracer_input, evm_configuration)?;
+            let outcome = simulation.run(host, tracer_input, spec_id)?;
             storage::store_simulation_result(host, outcome)
         }
     }
@@ -678,7 +678,6 @@ pub fn start_simulation_mode<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use alloy_primitives::hex::FromHex;
-    use evm_execution::configuration::EVMVersion;
     use primitive_types::H256;
     use revm::primitives::Address;
     use revm_etherlink::{
@@ -840,7 +839,7 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, &EVMVersion::current_test_config());
+        let outcome = evaluation.run(&mut host, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
@@ -866,7 +865,7 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, &EVMVersion::current_test_config());
+        let outcome = evaluation.run(&mut host, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
@@ -898,7 +897,7 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome = evaluation.run(&mut host, None, &EVMVersion::current_test_config());
+        let outcome = evaluation.run(&mut host, None, &SpecId::default());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
