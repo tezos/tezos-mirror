@@ -130,11 +130,12 @@ module Version = struct
     minor : int;
     rc : int option;
     latest : bool;
+    active : bool;
     announcement : string option;
   }
 
-  let make ~major ~minor ?rc ~latest ?announcement () =
-    {major; minor; rc; latest; announcement}
+  let make ~major ~minor ?rc ~latest ~active ?announcement () =
+    {major; minor; rc; latest; active; announcement}
 
   let to_string {major; minor; rc; _} =
     match rc with
@@ -150,6 +151,7 @@ module Version = struct
         minor = json |-> "minor" |> as_int;
         rc = json |-> "rc" |> as_int_opt;
         latest = json |-> "latest" |> as_bool_opt |> Option.value ~default:false;
+        active = json |-> "active" |> as_bool_opt |> Option.value ~default:false;
         announcement = json |-> "announcement" |> as_string_opt;
       }
     with
@@ -160,12 +162,13 @@ module Version = struct
           (sf "Unexpected error parsing version: %s" (Printexc.to_string exn))
 
   (* [to_json version] converts a version record to a JSON object. *)
-  let to_json {major; minor; rc; latest; announcement} : JSON.u =
+  let to_json {major; minor; rc; latest; active; announcement} : JSON.u =
     `O
       ([
          ("major", `Float (Int.to_float major));
          ("minor", `Float (Int.to_float minor));
          ("latest", `Bool latest);
+         ("active", `Bool active);
        ]
       @ (match rc with
         | None -> []
@@ -212,7 +215,7 @@ module Version = struct
       failwith (sf "Version %s already exists" (to_string new_version))
     else versions @ [new_version]
 
-  (* [set_latest target_version versions] sets a specific version as latest, unmarking all others. *)
+  (* [set_latest target_version versions] sets a specific version as latest, unset all others. *)
   let set_latest target_version versions =
     List.map
       (fun version ->
@@ -227,6 +230,24 @@ module Version = struct
   (* [find_latest versions] finds the latest version in the list. *)
   let find_latest versions =
     List.find_opt (fun version -> version.latest) versions
+
+  (* [set_active predicate versions] sets all versions where predicate returns true as active. *)
+  let set_active predicate versions =
+    List.map
+      (fun version ->
+        if predicate version then {version with active = true} else version)
+      versions
+
+  (* [set_inactive predicate versions] sets all versions where predicate returns true as inactive. *)
+  let set_inactive predicate versions =
+    List.map
+      (fun version ->
+        if predicate version then {version with active = false} else version)
+      versions
+
+  (* [find_active versions] finds all active versions in the list. *)
+  let find_active versions =
+    List.filter (fun version -> version.active) versions
 
   (* [load_from_storage ~path] loads versions.json from a storage path. *)
   let load_from_storage ~path =

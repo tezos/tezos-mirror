@@ -83,6 +83,9 @@ let get_versions ~component =
                version |-> "latest" |> as_bool_opt
                |> Option.value ~default:false;
              announcement = version |-> "announcement" |> as_string_opt;
+             active =
+               version |-> "active" |> as_bool_opt
+               |> Option.value ~default:false;
            })
   with Error error ->
     failwith
