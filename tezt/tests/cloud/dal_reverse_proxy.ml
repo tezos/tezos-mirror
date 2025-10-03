@@ -43,44 +43,40 @@ let rec pp_config out = function
            pp_config)
         l
 
-let generate_nginx_config ~port out ~default_endpoint
+let generate_nginx_config ~port ~default_endpoint
     (producers : (int * string) Seq.t) =
-  Format.fprintf
-    out
-    "@[<v 0>%a@]@."
-    pp_config
-    (Context_block
-       ( "server",
-         [
-           Directive (sf "listen 0.0.0.0:%d" port);
-           (* When fetching data about a slot the RPC are of the
+  Context_block
+    ( "server",
+      [
+        Directive (sf "listen 0.0.0.0:%d" port);
+        (* When fetching data about a slot the RPC are of the
               form (GET /levels/<level>/slots/<slot_index>/...); we
               direct the request to a DAL node subscribed to the
               topics of the queried slot index. *)
-           Context_block
-             ( "location /levels/",
-               producers
-               |> Seq.map (fun (slot_index, endpoint) ->
-                      Context_block
-                        ( sf "location ~ ^/levels/[0-9]+?/slots/%d/" slot_index,
-                          [Directive (sf "proxy_pass %s" endpoint)] ))
-               |> List.of_seq );
-           (* When posting a DAL slot, the format of the RPC is POST
+        Context_block
+          ( "location /levels/",
+            producers
+            |> Seq.map (fun (slot_index, endpoint) ->
+                   Context_block
+                     ( sf "location ~ ^/levels/[0-9]+?/slots/%d/" slot_index,
+                       [Directive (sf "proxy_pass %s" endpoint)] ))
+            |> List.of_seq );
+        (* When posting a DAL slot, the format of the RPC is POST
               /slots/?slot_index=<slot_index>. In this case too we
               redirect the request to a DAL node subscribed to the
               topics of the queried slot index. *)
-           Context_block
-             ( "location /slots",
-               producers
-               |> Seq.map (fun (slot_index, endpoint) ->
-                      Context_block
-                        ( sf "if ($query_string ~ \"slot_index=%d\")" slot_index,
-                          [Directive (sf "proxy_pass %s" endpoint)] ))
-               |> List.of_seq );
-           (* Other queries can be answered by any DAL node. *)
-           Context_block
-             ("location /", [Directive (sf "proxy_pass %s" default_endpoint)]);
-         ] ))
+        Context_block
+          ( "location /slots",
+            producers
+            |> Seq.map (fun (slot_index, endpoint) ->
+                   Context_block
+                     ( sf "if ($query_string ~ \"slot_index=%d\")" slot_index,
+                       [Directive (sf "proxy_pass %s" endpoint)] ))
+            |> List.of_seq );
+        (* Other queries can be answered by any DAL node. *)
+        Context_block
+          ("location /", [Directive (sf "proxy_pass %s" default_endpoint)]);
+      ] )
 
 let init_reverse_proxy ~agent ~port ~default_endpoint ~index
     (proxified_dal_nodes : (int * string) Seq.t) =
@@ -94,9 +90,9 @@ let init_reverse_proxy ~agent ~port ~default_endpoint ~index
   let config_ppf = Format.formatter_of_out_channel out_chan in
   Format.fprintf
     config_ppf
-    "%a"
-    (generate_nginx_config ~default_endpoint ~port)
-    proxified_dal_nodes ;
+    "@[<v 0>%a@]@."
+    pp_config
+    (generate_nginx_config ~default_endpoint ~port proxified_dal_nodes) ;
   close_out out_chan ;
 
   (* Upload the configuration file. *)
