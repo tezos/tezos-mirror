@@ -44,6 +44,8 @@ RUN apt-get update && apt-get install -y \
     # to generate SSL certificates
     certbot \
     python3-certbot-nginx \
+    # to build Umami
+    nodejs \
     # DL3015: Use --no-install-recommends
     --no-install-recommends
 
@@ -81,6 +83,12 @@ RUN sed -i 's/#PermitUserEnvironment no/PermitUserEnvironment yes/' /etc/ssh/ssh
 # We run the ssh server but not as a daemon on the port 30000
 CMD ["-D", "-p", "30000", "-e"]
 ENTRYPOINT ["/usr/sbin/sshd"]
+
+# Build Umami
+RUN git clone https://github.com/trilitech/umami-v2 /tmp/umami-v2
+WORKDIR /tmp/umami-v2
+RUN npm install -g yarn pnpm turbo
+RUN pnpm install
 
 FROM base AS full
 # Path where binaries should be stored on the docker container
