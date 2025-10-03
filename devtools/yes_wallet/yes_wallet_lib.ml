@@ -260,12 +260,15 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
       ~order:`Sorted
       ~init:(Ok ([], P.Tez.zero))
       ~f:(fun pkh acc ->
-        let* pk = P.Delegate.pubkey ctxt pkh in
+        let* pk =
+          P.Delegate.pubkey ctxt pkh
+          |> Lwt_result.map P.Signature.To_latest.public_key
+        in
         let* consensus_key =
           let* cpk = P.Delegate.consensus_key ctxt pkh in
           if
             Tezos_crypto.Signature.Public_key.equal
-              (P.Signature.To_latest.public_key pk)
+              pk
               (P.Signature.To_latest.public_key cpk)
           then return_none
           else
@@ -302,7 +305,7 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
             * P.Tez.t
             * P.Tez.t =
           ( P.Signature.To_latest.public_key_hash pkh,
-            P.Signature.To_latest.public_key pk,
+            pk,
             consensus_key,
             companion_key,
             staking_balance,
