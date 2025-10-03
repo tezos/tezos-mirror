@@ -88,6 +88,10 @@ module Faucet_frontend_process = struct
       ]
 end
 
+let port_of_option agent = function
+  | None -> Agent.next_available_port agent
+  | Some port -> port
+
 let polling_period = function
   | Evm_node.Nothing -> 500
   | Time_between_blocks t ->
@@ -188,11 +192,7 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
   (* Get available port for the API and indexer.
      (or given port for the API). *)
   let indexer_port = Agent.next_available_port agent in
-  let api_port =
-    match tzkt_api_port with
-    | None -> Agent.next_available_port agent
-    | Some api_port -> api_port
-  in
+  let api_port = port_of_option agent tzkt_api_port in
   (* Print a log for the tezt-cloud user to retrieve the port of the indexer or API *)
   let () = toplog "Tzkt indexer will be available at port %d" indexer_port in
   let () = toplog "Tzkt API will be available at port %d" api_port in
@@ -521,9 +521,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | Some agent -> agent
       in
       let public_rpc_port =
-        match Cli.public_rpc_port with
-        | None -> Agent.next_available_port tezlink_sequencer_agent
-        | Some port -> port
+        port_of_option tezlink_sequencer_agent Cli.public_rpc_port
       in
       let dns_domain =
         match Tezt_cloud.Tezt_cloud_cli.dns_domains with
