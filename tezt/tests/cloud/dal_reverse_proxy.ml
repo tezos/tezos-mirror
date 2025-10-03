@@ -78,7 +78,7 @@ let generate_nginx_config ~port ~default_endpoint
           ("location /", [Directive (sf "proxy_pass %s" default_endpoint)]);
       ] )
 
-let init_reverse_proxy ~agent ~port ~default_endpoint ~index
+let init_reverse_proxy ~agent ~port ~default_endpoint ~site ~index
     (proxified_dal_nodes : (int * string) Seq.t) =
   (* A NGINX reverse proxy which balances load between producer DAL
      nodes based on the requested slot index. *)
@@ -98,8 +98,7 @@ let init_reverse_proxy ~agent ~port ~default_endpoint ~index
   (* Upload the configuration file. *)
   let* (_ : string) =
     Agent.copy
-      ~destination:
-        (Format.sprintf "/etc/nginx/sites-available/reverse_proxy_%d" index)
+      ~destination:(Format.sprintf "/etc/nginx/sites-available/%s" site)
       ~source:config_filename
       agent
   in
@@ -117,8 +116,8 @@ let init_reverse_proxy ~agent ~port ~default_endpoint ~index
       "ln"
       [
         "-s";
-        Format.sprintf "/etc/nginx/sites-available/reverse_proxy_%d" index;
-        Format.sprintf "/etc/nginx/sites-enabled/reverse_proxy_%d" index;
+        Format.sprintf "/etc/nginx/sites-available/%s" site;
+        Format.sprintf "/etc/nginx/sites-enabled/%s" site;
       ]
     |> Process.check
   in
@@ -206,6 +205,7 @@ let init_dal_reverse_proxy_observers ~external_rpc ~network ~snapshot
       ~agent
       ~port
       ~default_endpoint
+      ~site:(sf "reverse_proxy_%d" index)
       ~index
       (List.to_seq dal_slots_and_nodes)
   in
