@@ -78,14 +78,14 @@ let generate_nginx_config ~port ~default_endpoint
           ("location /", [Directive (sf "proxy_pass %s" default_endpoint)]);
       ] )
 
-let init_reverse_proxy ~agent ~port ~default_endpoint ~site ~index
+let init_reverse_proxy ~agent ~port ~default_endpoint ~site
     (proxified_dal_nodes : (int * string) Seq.t) =
   (* A NGINX reverse proxy which balances load between producer DAL
      nodes based on the requested slot index. *)
   let runner = Agent.runner agent in
   let () = toplog "Launching reverse proxy" in
   let () = toplog "Generating nginx reverse proxy config" in
-  let config_filename = Format.sprintf "nginx_reverse_proxy_config_%d" index in
+  let config_filename = Format.sprintf "nginx_config_%s" site in
   let out_chan = Stdlib.open_out config_filename in
   let config_ppf = Format.formatter_of_out_channel out_chan in
   Format.fprintf
@@ -206,7 +206,6 @@ let init_dal_reverse_proxy_observers ~external_rpc ~network ~snapshot
       ~port
       ~default_endpoint
       ~site:(sf "reverse_proxy_%d" index)
-      ~index
       (List.to_seq dal_slots_and_nodes)
   in
   (* In order to pass the reverse proxy to the various Tezt helpers we
