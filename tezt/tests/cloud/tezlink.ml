@@ -579,12 +579,23 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           ~url:
             (sf "%s/version" (Client.string_of_endpoint tezlink_proxy_endpoint))
       in
-      let* () =
+      let* tzkt_api_info_opt =
         if Cli.tzkt then
           let () = toplog "Starting TzKT" in
+          let proxy_tzkt_api_port, internal_tzkt_api_port =
+            match dns_domain with
+            | None ->
+                (* No DNS so no proxy, so we must use the public API port. *)
+                (None, Cli.tzkt_api_port)
+            | Some _ ->
+                (* We let the system choose a fresh internal API node port.
+                   Note that it will be publicy exposed, it's just that we don't
+                   need to share this one. *)
+                (Cli.tzkt_api_port, None)
+          in
           let* tzkt_api =
             init_tzkt
-              ~tzkt_api_port:Cli.tzkt_api_port
+              ~tzkt_api_port:internal_tzkt_api_port
               ~agent:tezlink_sequencer_agent
               ~tezlink_sandbox_endpoint
               ~time_between_blocks:Cli.time_between_blocks
@@ -652,8 +663,8 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~url:(Client.string_of_endpoint faucet_frontend)
             else unit
           in
-          unit
-        else unit
+          some (tzkt_api, proxy_tzkt_api_port)
+        else none
       in
       let* () =
         match dns_domain with
@@ -674,10 +685,28 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                   ~certificate:ssl.certificate
                   ~certificate_key:ssl.key
               in
+              let tzkt_nginx_config =
+                match tzkt_api_info_opt with
+                | None -> []
+                | Some (endpoint, port) ->
+                    let port = port_of_option tezlink_sequencer_agent port in
+                    let proxy_pass =
+                      (* The trailing / is mandatory, otherwise the reverse proxy
+                         won't be able to serve services with a path. *)
+                      Client.string_of_endpoint endpoint ^ "/"
+                    in
+                    Nginx_reverse_proxy.simple_ssl_node
+                      ~server_name:full_name
+                      ~port
+                      ~location:"/"
+                      ~proxy_pass
+                      ~certificate:ssl.certificate
+                      ~certificate_key:ssl.key
+              in
               Nginx_reverse_proxy.init
                 ~agent:tezlink_sequencer_agent
                 ~site:"tezlink"
-                rpc_nginx_node
+                (rpc_nginx_node @ tzkt_nginx_config)
             in
             let () =
               toplog "SSL certificate: %s, SSL key: %s" ssl.certificate ssl.key
