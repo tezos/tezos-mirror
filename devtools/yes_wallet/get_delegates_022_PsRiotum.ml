@@ -134,9 +134,7 @@ module Get_delegates = struct
       in
       return (consensus_pk, pending_updates)
 
-    let companion_key _ctxt _pkh =
-      let open Lwt_result_syntax in
-      return_none
+    let companion_keys _ctxt _pkh = Lwt_result.return (None, [])
   end
 
   let prepare_context ctxt ~level ~predecessor_timestamp ~timestamp =

@@ -279,7 +279,7 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
             return_some (cpkh, P.Signature.To_latest.public_key cpk)
         in
         let* companion_key =
-          let* pk_opt = P.Delegate.companion_key ctxt pkh in
+          let* pk_opt, _ = P.Delegate.companion_keys ctxt pkh in
           match pk_opt with
           | None -> return_none
           | Some pk ->
