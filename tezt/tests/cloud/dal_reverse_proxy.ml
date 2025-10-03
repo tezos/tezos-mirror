@@ -6,7 +6,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Agent_kind
 open Scenarios_helpers
 open Tezos
 open Yes_crypto
@@ -83,14 +82,11 @@ let generate_nginx_config ~port out ~default_endpoint
              ("location /", [Directive (sf "proxy_pass %s" default_endpoint)]);
          ] ))
 
-let init_reverse_proxy cloud ~next_agent ~default_endpoint ~index
+let init_reverse_proxy ~agent ~port ~default_endpoint ~index
     (proxified_dal_nodes : (int * string) Seq.t) =
   (* A NGINX reverse proxy which balances load between producer DAL
      nodes based on the requested slot index. *)
-  let name = name_of Reverse_proxy in
-  let* agent = next_agent ~name in
   let runner = Agent.runner agent in
-  let port = Agent.next_available_port agent in
   let () = toplog "Launching reverse proxy" in
   let () = toplog "Generating nginx reverse proxy config" in
   let config_filename = Format.sprintf "nginx_reverse_proxy_config_%d" index in
@@ -135,39 +131,20 @@ let init_reverse_proxy cloud ~next_agent ~default_endpoint ~index
   let* () = Process.spawn ?runner "nginx" ["-t"] |> Process.check in
 
   (* Start the NginX service *)
-  let* () =
-    (* If the service can be stopped (i.e. the command doesn't fail), we
-       probably are in a SysV system. Nginx will run as a service natively.
-       Otherwise, we need to start it manually. *)
-    let* service_cmd =
-      Process.spawn ?runner "service" ["nginx"; "stop"] |> Process.wait
-    in
-    match Process.validate_status service_cmd with
-    | Ok () ->
-        Process.spawn ?runner "service" ["nginx"; "start"] |> Process.check
-    | Error _ ->
-        (* Runs the process as a daemon, and don't bind the process, otherwise
+  (* If the service can be stopped (i.e. the command doesn't fail), we
+     probably are in a SysV system. Nginx will run as a service
+     natively.  Otherwise, we need to start it manually. *)
+  let* service_cmd =
+    Process.spawn ?runner "service" ["nginx"; "stop"] |> Process.wait
+  in
+  match Process.validate_status service_cmd with
+  | Ok () -> Process.spawn ?runner "service" ["nginx"; "start"] |> Process.check
+  | Error _ ->
+      (* Runs the process as a daemon, and don't bind the process, otherwise
            Tezt will wait for it to finish.
         *)
-        let _process = Process.spawn ?runner "nginx" ["-g"; "daemon on;"] in
-        unit
-  in
-  (* In order to pass the reverse proxy to the various Tezt helpers we
-     need to pretend to be a DAL node. The simplest way to do so is to
-     call Dal_node.Agent.create_from_endpoint with the appropriate
-     rpc_port and never call Dal_node.run on the result.
-
-     Since the DAL node never runs, it does not call it's L1 endpoint. *)
-  let l1_node_endpoint = Endpoint.make ~host:"" ~scheme:"" ~port:0 () in
-  let* dal_node =
-    Dal_node.Agent.create_from_endpoint
-      ~name:(Format.sprintf "reverse-proxy-dal-node-%d" index)
-      ~rpc_port:port
-      cloud
-      agent
-      ~l1_node_endpoint
-  in
-  return dal_node
+      let _process = Process.spawn ?runner "nginx" ["-g"; "daemon on;"] in
+      unit
 
 let init_dal_reverse_proxy_observers ~external_rpc ~network ~snapshot
     ~ppx_profiling_verbosity ~ppx_profiling_backends ~memtrace ~simulate_network
@@ -225,9 +202,30 @@ let init_dal_reverse_proxy_observers ~external_rpc ~network ~snapshot
         let _, first_observer_endpoint = List.hd dal_slots_and_nodes in
         first_observer_endpoint
   in
-  init_reverse_proxy
-    cloud
-    ~next_agent
-    ~default_endpoint
-    ~index
-    (List.to_seq dal_slots_and_nodes)
+  let name = Agent_kind.(name_of Reverse_proxy) in
+  let* agent = next_agent ~name in
+  let port = Agent.next_available_port agent in
+  let* () =
+    init_reverse_proxy
+      ~agent
+      ~port
+      ~default_endpoint
+      ~index
+      (List.to_seq dal_slots_and_nodes)
+  in
+  (* In order to pass the reverse proxy to the various Tezt helpers we
+     need to pretend to be a DAL node. The simplest way to do so is to
+     call Dal_node.Agent.create_from_endpoint with the appropriate
+     rpc_port and never call Dal_node.run on the result.
+
+     Since the DAL node never runs, it does not call it's L1 endpoint. *)
+  let l1_node_endpoint = Endpoint.make ~host:"" ~scheme:"" ~port:0 () in
+  let* dal_node =
+    Dal_node.Agent.create_from_endpoint
+      ~name:(Format.sprintf "reverse-proxy-dal-node-%d" index)
+      ~rpc_port:port
+      cloud
+      agent
+      ~l1_node_endpoint
+  in
+  return dal_node
