@@ -111,6 +111,10 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- The DAL node now starts propagating shards one level after the inclusion of the 
+  corresponding published slot header operation (i.e., when the operation is finalized),
+  instead of two levels after, when the block is finalized. (MR :gl:`!19366`)
+
 - **Breaking change** Enforced stricter validation for the JSON configuration
   file. Previously, the parser would silently ignore any content that appeared
   after the first valid JSON object. Now, any extraneous data will cause the
