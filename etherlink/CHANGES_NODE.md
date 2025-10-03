@@ -17,6 +17,9 @@ ebisu by its alias. (!19461)
 
 ### Execution changes
 
+* Caps the number of native threads used by the node to prevent runtime errors.
+  (!19479)
+
 ### Storage changes
 
 ### Documentation changes
