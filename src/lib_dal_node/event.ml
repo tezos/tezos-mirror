@@ -1221,6 +1221,17 @@ open struct
       ("shard_index", Data_encoding.int31)
       ("sender", Types.Peer.encoding)
       ~pp4:Types.Peer.pp
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/8064 *)
+  let skip_attesting_shards =
+    declare_1
+      ~section:["dal_shards"; "skip"]
+      ~name:"skip_attesting_shards"
+      ~msg:
+        "Skip attested level {level} due to change in attestation lag at \
+         migration level."
+      ~level:Warning
+      ("level", Data_encoding.int32)
 end
 
 (* DAL node event emission functions *)
@@ -1569,3 +1580,5 @@ let emit_validation_of_shard_update ~level ~slot_index ~slot_metrics =
 
 let emit_reception_of_shard_detailed ~level ~slot_index ~shard_index ~sender =
   emit reception_of_shard_detailed (level, slot_index, shard_index, sender)
+
+let emit_skip_attesting_shards ~level = emit skip_attesting_shards level

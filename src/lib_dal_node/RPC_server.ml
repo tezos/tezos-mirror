@@ -564,6 +564,8 @@ module Profile_handlers = struct
         should_drop_due_to_migration last_known_parameters
       in
       if should_drop_due_to_migration then
+        let*! () = Event.emit_skip_attesting_shards ~level:attested_level in
+
         let slots =
           Stdlib.List.init last_known_parameters.number_of_slots (fun _ ->
               false)
