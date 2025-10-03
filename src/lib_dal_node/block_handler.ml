@@ -129,8 +129,9 @@ let remove_unattested_slots_and_shards proto_parameters ctxt ~published_level
         remove_slots_and_shards ~slot_size store slot_id)
     (0 -- (number_of_slots - 1))
 
-(* Here [block_level] is the level of the currently processed block, that is,
-   when the DAL node is up-to-date, the L1 head level minus 2. *)
+(* Here [block_level] is the same as in [new_finalized_payload_level]. When the
+   DAL node is up-to-date and the current L1 head is at level L, we call this
+   function with [block_level = L - 1]. *)
 let may_update_topics ctxt proto_parameters ~block_level =
   let open Lwt_result_syntax in
   (* If a slot is published in a block at some level [n], it is important to
@@ -140,18 +141,17 @@ let may_update_topics ctxt proto_parameters ~block_level =
      get new peers for these (possibly new) topics, this must be done in
      advance.
 
-     We do it [attestation_lag] levels in advance. This means the node has the
+     We do it [attestation_lag + 1] levels in advance. This means the node has the
      current "block time" (so 5-10 seconds) to prepare. This should be
      sufficient.
 
      Note that this does not affect processing messages for levels before [n +
-     attestation_lag], because the node does not unsubscribe, and message
+     attestation_lag - 1], because the node does not unsubscribe, and message
      validation does not depend on the subscribed topics. *)
   let+ committee =
     let level =
-      Int32.add
-        block_level
-        (Int32.of_int proto_parameters.Types.attestation_lag)
+      Int32.(
+        succ @@ add block_level (of_int proto_parameters.Types.attestation_lag))
     in
     Node_context.fetch_committees ctxt ~level
   in
@@ -408,7 +408,7 @@ let process_commitments ctxt cctxt store proto_parameters block_level
        [@profiler.aggregate_s {verbosity = Notice} "publish_slot_data"]))
     slot_headers
 
-let process_block_data ctxt cctxt store proto_parameters block_level
+let process_finalized_block_data ctxt cctxt store proto_parameters block_level
     (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
   let* block_info =
@@ -428,16 +428,6 @@ let process_block_data ctxt cctxt store proto_parameters block_level
         (module Plugin : Dal_plugin.T)
       [@profiler.record_s {verbosity = Notice} "store_skip_list_cells"]
     else return_unit
-  in
-  let* () =
-    (process_commitments
-       ctxt
-       cctxt
-       store
-       proto_parameters
-       block_level
-       (module Plugin)
-     [@profiler.record_s {verbosity = Notice} "process_commitments"])
   in
   let*? dal_attestation =
     (Plugin.dal_attestation
@@ -517,17 +507,16 @@ let process_block ctxt cctxt l1_crawler proto_parameters finalized_shell_header
   in
   let* () =
     if proto_parameters.Types.feature_enable then
-      let* () = may_update_topics ctxt proto_parameters ~block_level in
       if Node_context.is_bootstrap_node ctxt then return_unit
       else
-        process_block_data
+        process_finalized_block_data
           ctxt
           cctxt
           store
           proto_parameters
           block_level
           (module Plugin)
-        [@profiler.record_s {verbosity = Notice} "process_block_data"]
+        [@profiler.record_s {verbosity = Notice} "process_finalized_block_data"]
     else return_unit
   in
   let*? block_round = Plugin.get_round finalized_shell_header.fitness in
@@ -579,12 +568,36 @@ let rec try_process_block ~retries ctxt cctxt l1_crawler proto_parameters
         finalized_block_hash
   | _ -> return res
 
+(** [new_finalized_payload_level ctxt cctxt block_level] processes a new finalized
+    payload level. It performs only slot (header) publication tasks: store
+    published DAL slot headers and publish shards to Gossipsub. It does NOT run
+    slot attestation tasks (like cleanup or skip-list updates). *)
+let new_finalized_payload_level ctxt cctxt block_level =
+  let open Lwt_result_syntax in
+  if Int32.equal block_level 1l then return_unit
+  else
+    let*? (module Plugin), proto_parameters =
+      Node_context.get_plugin_and_parameters_for_level ctxt ~level:block_level
+    in
+    let store = Node_context.get_store ctxt in
+    let* () =
+      if proto_parameters.Types.feature_enable then
+        may_update_topics ctxt proto_parameters ~block_level
+      else return_unit
+    in
+    (process_commitments
+       ctxt
+       cctxt
+       store
+       proto_parameters
+       block_level
+       (module Plugin)
+     [@profiler.record_s {verbosity = Notice} "process_commitments"])
+
 (* Process a finalized head and store *finalized* published slot headers
    indexed by block hash. A slot header is considered finalized when it is in
    a block with at least two other blocks on top of it, as guaranteed by
-   Tenderbake. Note that this means that shard propagation is delayed by two
-   levels with respect to the publication level of the corresponding slot
-   header. However, plugin registration is based on the latest L1 head not
+   Tenderbake. However, plugin registration is based on the latest L1 head not
    on the finalized block. This ensures new plugins are registered
    immediately after migration, rather than waiting for finalization. *)
 let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
@@ -600,6 +613,11 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
     in
     Node_context.may_add_plugin ctxt cctxt ~proto_level ~block_level
   in
+
+  (* If L = HEAD~2, then HEAD~1 is payload final. *)
+  let finalized_payload_level = Int32.succ level in
+  let* () = new_finalized_payload_level ctxt cctxt finalized_payload_level in
+
   let*? proto_parameters =
     Node_context.get_proto_parameters ctxt ~level:(`Level level)
   in
