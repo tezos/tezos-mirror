@@ -95,13 +95,14 @@ let init_reverse_proxy ~agent ~port ~default_endpoint ~site
     (generate_nginx_config ~default_endpoint ~port proxified_dal_nodes) ;
   close_out out_chan ;
 
-  (* Upload the configuration file. *)
+  (* Upload and delete the configuration file. *)
   let* (_ : string) =
     Agent.copy
       ~destination:(Format.sprintf "/etc/nginx/sites-available/%s" site)
       ~source:config_filename
       agent
   in
+  let* () = Process.spawn "rm" [config_filename] |> Process.check in
 
   (* Disable the default configuration *)
   let* () =
