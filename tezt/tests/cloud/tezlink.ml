@@ -525,28 +525,26 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | None -> Agent.next_available_port tezlink_sequencer_agent
         | Some port -> port
       in
+      let internal_port =
+        match Cli.dns_name with
+        | None ->
+            (* No DNS so no proxy, so we must use the public RPC port. *)
+            Some public_rpc_port
+        | Some _ ->
+            (* We let the system choose a fresh internal RPC node port.
+               Note that it will be publicy exposed, it's just that we don't need
+               to share this one. *)
+            None
+      in
       let () = toplog "Starting Tezlink sequencer" in
       let* tezlink_sandbox_endpoint =
         init_tezlink_sequencer
           cloud
           name
+          ?rpc_port:internal_port
           Cli.verbose
           Cli.time_between_blocks
           tezlink_sequencer_agent
-      in
-      let* () =
-        let proxy_pass =
-          (* The trailing / is mandatory, otherwise the reverse proxy won't be
-             able to serve services with a path. *)
-          Client.string_of_endpoint tezlink_sandbox_endpoint ^ "/"
-        in
-        Nginx_reverse_proxy.init_simple
-          tezlink_sequencer_agent
-          ~site:"tezlink"
-          ~server_name:"localhost"
-          ~port:public_rpc_port
-          ~location:"/"
-          ~proxy_pass
       in
       let tezlink_proxy_endpoint, ip =
         match tezlink_sandbox_endpoint with
@@ -662,6 +660,20 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             in
             let full_name = sf "%s.tezlink.nomadic-labs.com" dns_name in
             let* ssl = Ssl.generate tezlink_sequencer_agent full_name in
+            let* () =
+              let proxy_pass =
+                (* The trailing / is mandatory, otherwise the reverse proxy
+                   won't be able to serve services with a path. *)
+                Client.string_of_endpoint tezlink_sandbox_endpoint ^ "/"
+              in
+              Nginx_reverse_proxy.init_simple
+                tezlink_sequencer_agent
+                ~site:"tezlink"
+                ~server_name:"localhost"
+                ~port:public_rpc_port
+                ~location:"/"
+                ~proxy_pass
+            in
             let () =
               toplog "SSL certificate: %s, SSL key: %s" ssl.certificate ssl.key
             in
