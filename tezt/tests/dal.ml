@@ -8751,31 +8751,6 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
   Log.info "Bake blocks up to level %d" (published_level - 1) ;
   let* () = bake_for ~count:(published_level - 1 - level) client in
 
-  let* level = Client.level client in
-  Log.info
-    "Current level is %d, publish a slot for level %d"
-    level
-    published_level ;
-  let* _ =
-    Helpers.publish_and_store_slot
-      client
-      producer
-      Constant.bootstrap2
-      ~index:slot_index
-    @@ Helpers.make_slot ~slot_size "SLOTDATA"
-  in
-  let* () = bake_for client in
-  let* manager_ops =
-    Node.RPC.call node
-    @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:3 ()
-  in
-  Check.(
-    (JSON.as_list manager_ops |> List.length <> 0)
-      int
-      ~error_msg:
-        "Expected the commitment to be published, but no manager operation was \
-         included.") ;
-
   let* id_attester = peer_id attester in
   let* id_producer = peer_id producer in
   let check_graft_promises =
@@ -8802,12 +8777,32 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
       ~published_level
       ~slot_index
   in
-
+  let* level = Client.level client in
   Log.info
-    "Bake another block, so that the attester node fetches the DAL committee \
-     for level %d and changes topics"
-    first_level_in_committee ;
+    "Current level is %d, publish a slot for level %d"
+    level
+    published_level ;
+  let* _ =
+    Helpers.publish_and_store_slot
+      client
+      producer
+      Constant.bootstrap2
+      ~index:slot_index
+    @@ Helpers.make_slot ~slot_size "SLOTDATA"
+  in
   let* () = bake_for client in
+  (* At this point the attester node fetches the DAL committee for level
+     [first_level_in_committee] and changes topics. *)
+  let* manager_ops =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:3 ()
+  in
+  Check.(
+    (JSON.as_list manager_ops |> List.length <> 0)
+      int
+      ~error_msg:
+        "Expected the commitment to be published, but no manager operation was \
+         included.") ;
 
   Log.info "Waiting for grafting of the attester - producer connection" ;
   (* This is important because the attester and the producer should connect and
@@ -8823,7 +8818,7 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
   let* () = wait_for_shards_promises in
 
   Log.info "Bake blocks up to level %d" (first_level_in_committee - 1) ;
-  let* () = bake_for ~count:(lag - 4) client in
+  let* () = bake_for ~count:(lag - 3) client in
   let* level = Client.level client in
   Log.info "Current level is %d" level ;
   Check.(
@@ -11159,6 +11154,191 @@ let test_ignore_topics_wrong_env _protocol _parameters _cryptobox _node _client
             variable to ignore topics %s was not set.*"
            Dal_node.ignore_topics_environment_variable)
 
+let wait_for_branch_switch node level =
+  let filter json =
+    match JSON.(json |-> "level" |> as_int_opt) with
+    | Some l when l = level -> Some ()
+    | Some _ -> None
+    | None -> None
+  in
+  Node.wait_for node "branch_switch.v0" filter
+
+let baker_at_round_n ?level round client : string Lwt.t =
+  let* json =
+    Client.RPC.call client @@ RPC.get_chain_block_helper_baking_rights ?level ()
+  in
+  match JSON.(json |=> round |-> "delegate" |> as_string_opt) with
+  | Some delegate_id -> return delegate_id
+  | None ->
+      Test.fail
+        "Could not find the baker at round %d for level %s"
+        round
+        (match level with None -> "head" | Some level -> string_of_int level)
+
+(* Simulate a fork at level n where two competing blocks exist:
+   - n
+     - [node1]: A1 (round 0, no DAL commitment)
+     - [node2]: A2 (round 1, with DAL commitment)
+   Then, build one more block on top of A2:
+   - n+1
+     - [node2]: B (on top of A2)
+   After reconnecting the nodes, node1 switches to the A2 -> B branch (due to
+   higher fitness).
+   Then, test that shards are propagated after one level is baked on top of 
+   the block which included the commitment publication, at (n+1). *)
+let test_dal_one_level_reorg protocol dal_parameters _cryptobox node1 client1
+    dal_bootstrap =
+  (* Helpers / Constants *)
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let slot_index = 0 in
+
+  (* Spin up a second L1 node and connect it *)
+  let nodes_args = Node.[Synchronisation_threshold 0; Connections 1] in
+  let* node2, client2 =
+    Client.init_with_protocol ~protocol ~nodes_args `Client ()
+  in
+  let* () =
+    Client.Admin.connect_address ~endpoint:(Node node1) ~peer:node2 client1
+  in
+
+  (* DAL Bootstrap *)
+  let* () = check_profiles ~__LOC__ dal_bootstrap ~expected:Dal_RPC.Bootstrap in
+  Log.info "Bootstrap DAL node is running" ;
+  let peers = [Dal_node.listen_addr dal_bootstrap] in
+
+  (* DAL Producer on [node1] *)
+  let producer = Dal_node.create ~name:"producer" ~node:node1 () in
+  let* () =
+    Dal_node.init_config ~operator_profiles:[slot_index] ~peers producer
+  in
+  let* () = Dal_node.run ~wait_ready:true producer in
+  let* () =
+    check_profiles
+      ~__LOC__
+      producer
+      ~expected:Dal_RPC.(Controller [Operator slot_index])
+  in
+  Log.info "Slot producer DAL node is running" ;
+
+  (* DAL Attester on [node1] *)
+  let* proto_params =
+    Node.RPC.call node1 @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_rights_delay =
+    JSON.(proto_params |-> "consensus_rights_delay" |> as_int)
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let* balance =
+    Client.get_balance_for ~account:Constant.bootstrap1.alias client1
+  in
+  let amount = Tez.(balance - one) in
+  let* new_account = Client.gen_and_show_keys client1 in
+  let* () =
+    Client.transfer
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:new_account.alias
+      ~amount
+      ~burn_cap:Tez.one
+      client1
+  in
+  let* () = bake_for client1 in
+  let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client1 in
+  let* () = bake_for client1 in
+  let* () = Client.register_key new_account.alias client1 in
+  let* () = bake_for client1 in
+  let* () = Client.stake ~staker:new_account.alias Tez.(amount /! 2L) client1 in
+  let attester = Dal_node.create ~name:"attester" ~node:node1 () in
+  let* () =
+    Dal_node.init_config
+      ~attester_profiles:[new_account.public_key_hash]
+      ~peers
+      attester
+  in
+  let* () = Dal_node.run ~event_level:`Debug attester in
+  let client1 = Client.with_dal_node client1 ~dal_node:attester in
+
+  (* Compute the DAL attestation level for publication *)
+  let num_cycles = 1 + consensus_rights_delay in
+  let* level = Client.level client1 in
+  let lag = dal_parameters.attestation_lag in
+  let attestation_level = (num_cycles * blocks_per_cycle) + 1 in
+  let published_level = attestation_level + 1 - lag in
+  Log.info "Bake blocks up to level %d" (published_level - 1) ;
+  let* () = bake_for ~count:(published_level - 1 - level) client1 in
+  let* current_level = Client.level client1 in
+  Log.info
+    "current_level = %d; published_level = %d; attestation_level = %d"
+    current_level
+    published_level
+    attestation_level ;
+
+  (* Align node2 to current level, then disconnect to fork *)
+  let* _ = Node.wait_for_level node2 current_level in
+  let* node2_id = Node.wait_for_identity node2 in
+  let* () =
+    Client.Admin.kick_peer ~endpoint:(Node node1) ~peer:node2_id client1
+  in
+
+  (* Branch 1 on node1: bake A1 at round 0 (lower fitness) *)
+  let* baker_low_round = baker_at_round_n ~level:published_level 0 client1 in
+  let* () = bake_for ~delegates:(`For [baker_low_round]) client1 in
+  Log.info "node1 baked A1 at (level = %d, round = 0)" published_level ;
+
+  (* Branch 2 on node2: bake A2 with commitment at round 1, then B *)
+  let* _ =
+    Helpers.publish_and_store_slot
+      client2
+      producer
+      Constant.bootstrap2
+      ~index:slot_index
+    @@ Helpers.make_slot ~slot_size "REORG-SLOTDATA"
+  in
+  let* baker_high_round = baker_at_round_n ~level:published_level 1 client2 in
+  let* () = bake_for ~delegates:(`For [baker_high_round]) client2 in
+  Log.info "node1 baked A2 at (level = %d, round = 1)" published_level ;
+  let* manager_ops =
+    Node.RPC.call node2
+    @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:3 ()
+  in
+  Check.(
+    (JSON.as_list manager_ops |> List.length <> 0)
+      int
+      ~error_msg:
+        "Expected the commitment to be published, but no manager operation was \
+         included.") ;
+  let* assigned_shard_indexes =
+    Dal_RPC.(
+      call attester
+      @@ get_assigned_shard_indices
+           ~level:attestation_level
+           ~pkh:new_account.public_key_hash)
+  in
+  let wait_for_shards_promises =
+    wait_for_shards_promises
+      ~dal_node:attester
+      ~storage_profile:`Cache_only
+      ~shards:assigned_shard_indexes
+      ~published_level
+      ~slot_index
+  in
+  let* () = bake_for client2 in
+  Log.info "node2 baked B at level = %d" (published_level + 1) ;
+
+  (* Reconnect & wait for node1 to switch to node2’s higher-fitness branch *)
+  let wait_switch = wait_for_branch_switch node1 published_level in
+  let* () =
+    Client.Admin.connect_address ~endpoint:(Node node1) ~peer:node2 client1
+  in
+  let* () = wait_switch in
+  Log.info "node1 switched to branch with round = 1 at level %d" published_level ;
+
+  let* _ = Node.wait_for_level node1 (published_level + 1) in
+  Log.info "node1 synchronised with node2" ;
+  Log.info "Waiting for attester to receive its assigned shards" ;
+  let* () = wait_for_shards_promises in
+
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -11491,6 +11671,13 @@ let register ~protocols =
     ~number_of_slots:1
     "new attester attests"
     test_new_attester_attests
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~bootstrap_profile:true
+    ~l1_history_mode:Default_with_refutation
+    ~number_of_slots:1
+    "publish slot in one level reorganisation"
+    test_dal_one_level_reorg
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~number_of_slots:1
