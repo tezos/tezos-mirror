@@ -666,13 +666,19 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                    won't be able to serve services with a path. *)
                 Client.string_of_endpoint tezlink_sandbox_endpoint ^ "/"
               in
-              Nginx_reverse_proxy.init_simple
-                tezlink_sequencer_agent
+              let rpc_nginx_node =
+                Nginx_reverse_proxy.simple_ssl_node
+                  ~server_name:full_name
+                  ~port:public_rpc_port
+                  ~location:"/"
+                  ~proxy_pass
+                  ~certificate:ssl.certificate
+                  ~certificate_key:ssl.key
+              in
+              Nginx_reverse_proxy.init
+                ~agent:tezlink_sequencer_agent
                 ~site:"tezlink"
-                ~server_name:"localhost"
-                ~port:public_rpc_port
-                ~location:"/"
-                ~proxy_pass
+                rpc_nginx_node
             in
             let () =
               toplog "SSL certificate: %s, SSL key: %s" ssl.certificate ssl.key
