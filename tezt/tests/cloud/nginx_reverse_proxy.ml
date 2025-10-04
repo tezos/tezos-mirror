@@ -114,21 +114,21 @@ server {
 }
 *)
 let make_simple_config ~server_name ~port ~location ~proxy_pass =
-[
-  Context_block
-    ( "server",
-      [
-        Directive (sf "listen 0.0.0.0:%d" port);
-        Directive (sf "server_name %s" server_name);
-        Context_block
-          ( sf "location %s" location,
-            [
-              Directive (sf "proxy_pass %s" proxy_pass);
-              Directive "proxy_set_header Host $host";
-              Directive "proxy_set_header X-Real-IP $remote_addr";
-            ] );
-      ] );
-]
+  [
+    Context_block
+      ( "server",
+        [
+          Directive (sf "listen 0.0.0.0:%d" port);
+          Directive (sf "server_name %s" server_name);
+          Context_block
+            ( sf "location %s" location,
+              [
+                Directive (sf "proxy_pass %s" proxy_pass);
+                Directive "proxy_set_header Host $host";
+                Directive "proxy_set_header X-Real-IP $remote_addr";
+              ] );
+        ] );
+  ]
 
 let init_simple agent ~site ~server_name ~port ~location ~proxy_pass =
   let config = make_simple_config ~server_name ~port ~location ~proxy_pass in
@@ -151,20 +151,20 @@ server {
 *)
 let simple_ssl_node ~server_name ~port ~location ~proxy_pass ~certificate
     ~certificate_key =
-[
-  Context_block
-    ( "server",
-      [
-        Directive (sf "listen 0.0.0.0:%d ssl" port);
-        Directive (sf "server_name %s" server_name);
-        Directive (sf "ssl_certificate %s" certificate);
-        Directive (sf "ssl_certificate_key %s" certificate_key);
-        Context_block
-          ( sf "location %s" location,
-            [
-              Directive (sf "proxy_pass %s" proxy_pass);
-              Directive "proxy_set_header Host $host";
-              Directive "proxy_set_header X-Real-IP $remote_addr";
-            ] );
-      ] );
-]
+  [
+    Context_block
+      ( "server",
+        [
+          Directive (sf "listen 0.0.0.0:%d ssl" port);
+          Directive (sf "server_name %s" server_name);
+          Directive (sf "ssl_certificate %s" certificate);
+          Directive (sf "ssl_certificate_key %s" certificate_key);
+          Context_block
+            ( sf "location %s" location,
+              [
+                Directive (sf "proxy_pass %s" proxy_pass);
+                Directive "proxy_set_header Host $host";
+                Directive "proxy_set_header X-Real-IP $remote_addr";
+              ] );
+        ] );
+  ]
