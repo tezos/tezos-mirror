@@ -424,20 +424,23 @@ let () =
             ~aliases
             ~other_accounts_pkh
         in
-        let consensus_keys_count =
-          List.length
-            (List.filter
-               (fun (_, _, _, ck) -> Option.is_some ck)
-               yes_alias_list)
+        let all_keys_count, consensus_keys_count, companion_keys_count =
+          let consensus_key_re =
+            Re.Str.regexp "^baker_[0-9]+_consensus_key_[0-9]+$"
+          in
+          let companion_key_re =
+            Re.Str.regexp "^baker_[0-9]+_companion_key_[0-9]+$"
+          in
+          List.fold_left
+            (fun (all, consensus, companion) (alias, _, _, _) ->
+              if Re.Str.string_match consensus_key_re alias 0 then
+                (succ all, succ consensus, companion)
+              else if Re.Str.string_match companion_key_re alias 0 then
+                (succ all, consensus, succ companion)
+              else (succ all, consensus, companion))
+            (0, 0, 0)
+            yes_alias_list
         in
-        let companion_keys_count =
-          List.length
-            (List.filter
-               (fun (alias, _, _, _) ->
-                 String.ends_with ~suffix:"companion_key" alias)
-               yes_alias_list)
-        in
-        let all_keys_count = List.length yes_alias_list in
         let delegate_keys_count =
           all_keys_count - consensus_keys_count - companion_keys_count
         in
