@@ -10322,9 +10322,9 @@ let test_attester_did_not_attest (protocol : Protocol.t)
     not_attested_by_bootstrap2 ;
   unit
 
-(* [test_duplicate_denunciations] publishes a commitment for slot [0].
-   The test then injects a DAL trapped attestation at level [2] and
-   after baking [attestation_lag] blocks, it attempts to:
+(* [test_duplicate_denunciations] publishes a commitment for slot [0].  After
+   baking [attestation_lag] blocks, the test then injects a DAL trapped
+   attestation. Then it attempts to:
 
    - inject a first denunciation that is expected to succeed,
 
@@ -10339,12 +10339,21 @@ let test_attester_did_not_attest (protocol : Protocol.t)
 let test_duplicate_denunciations protocol dal_parameters cryptobox node client
     _bootstrap_key =
   let slot_index = 0 in
-  Log.info "Bake two blocks" ;
-  let* () = bake_for ~count:2 client in
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let attestation_lag = dal_parameters.Dal.Parameters.attestation_lag in
+  assert (attestation_lag <= blocks_per_cycle) ;
+  let blocks_to_bake = 2 + blocks_per_cycle - attestation_lag in
+  Log.info
+    "Bake %d blocks so that the attestation level is in cycle 1"
+    blocks_to_bake ;
+  let* () = bake_for ~count:blocks_to_bake client in
   let accused = Constant.bootstrap2 in
   let* current_level = Node.get_level node in
   let* shards_with_proofs =
-    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let slot_size = dal_parameters.cryptobox.slot_size in
     let slot = Cryptobox.Internal_for_tests.generate_slot ~slot_size in
     let commitment, proof, shards_with_proofs =
       Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
@@ -10360,7 +10369,7 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
     in
     return shards_with_proofs
   in
-  let* () = bake_for ~count:dal_parameters.attestation_lag client in
+  let* () = bake_for ~count:attestation_lag client in
   let* current_level = Node.get_level node in
   Log.info "Injecting an attestation at level %d" current_level ;
   let availability = Slots [slot_index] in
@@ -10432,10 +10441,6 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
       client
       ~error:Operation.already_dal_denounced
   in
-  let* proto_params =
-    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
-  in
-  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   let* () = bake_for ~count:blocks_per_cycle client in
   let* current_level = Node.get_level node in
   Log.info
