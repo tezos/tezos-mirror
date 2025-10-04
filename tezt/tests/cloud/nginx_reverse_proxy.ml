@@ -25,21 +25,22 @@ open Scenarios_helpers
     - it overrides the "reverse_proxy" NgninX site if there is some.
   *)
 
-(* An NginX configuration file is made of directives inside
-   potentially nested context blocks. *)
-type config = Directive of string | Context_block of string * config list
+(* An NginX node is made of directives inside potentially nested context blocks.
+*)
+type node = Directive of string | Context_block of string * node list
 
-let rec pp_config out = function
+type config = node list
+
+let rec pp_node out = function
   | Directive s -> Format.fprintf out "%s;" s
   | Context_block (head, l) ->
-      Format.fprintf
-        out
-        "@[<v 2>%s {@;%a@]@;}"
-        head
-        (Format.pp_print_list
-           ~pp_sep:(fun out () -> Format.fprintf out "@;")
-           pp_config)
-        l
+      Format.fprintf out "@[<v 2>%s {@;%a@]@;}" head pp_config l
+
+and pp_config config =
+  Format.pp_print_list
+    ~pp_sep:(fun out () -> Format.fprintf out "@;")
+    pp_node
+    config
 
 let init ~agent ~site config =
   (* A NGINX reverse proxy which balances load between producer DAL
@@ -113,6 +114,7 @@ server {
 }
 *)
 let make_simple_config ~server_name ~port ~location ~proxy_pass =
+[
   Context_block
     ( "server",
       [
@@ -125,7 +127,8 @@ let make_simple_config ~server_name ~port ~location ~proxy_pass =
               Directive "proxy_set_header Host $host";
               Directive "proxy_set_header X-Real-IP $remote_addr";
             ] );
-      ] )
+      ] );
+]
 
 let init_simple agent ~site ~server_name ~port ~location ~proxy_pass =
   let config = make_simple_config ~server_name ~port ~location ~proxy_pass in
@@ -148,6 +151,7 @@ server {
 *)
 let simple_ssl_node ~server_name ~port ~location ~proxy_pass ~certificate
     ~certificate_key =
+[
   Context_block
     ( "server",
       [
@@ -162,4 +166,5 @@ let simple_ssl_node ~server_name ~port ~location ~proxy_pass ~certificate
               Directive "proxy_set_header Host $host";
               Directive "proxy_set_header X-Real-IP $remote_addr";
             ] );
-      ] )
+      ] );
+]

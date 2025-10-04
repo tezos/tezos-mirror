@@ -13,6 +13,7 @@ open Yes_crypto
 let generate_nginx_config ~port ~default_endpoint
     (producers : (int * string) Seq.t) =
   let open Nginx_reverse_proxy in
+[
   Context_block
     ( "server",
       [
@@ -44,7 +45,8 @@ let generate_nginx_config ~port ~default_endpoint
         (* Other queries can be answered by any DAL node. *)
         Context_block
           ("location /", [Directive (sf "proxy_pass %s" default_endpoint)]);
-      ] )
+      ] );
+]
 
 let init_dal_reverse_proxy_observers ~external_rpc ~network ~snapshot
     ~ppx_profiling_verbosity ~ppx_profiling_backends ~memtrace ~simulate_network
