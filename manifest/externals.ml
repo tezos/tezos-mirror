@@ -286,6 +286,8 @@ let aches_lwt = external_lib "aches-lwt" V.(at_least "1.1.0")
 
 let safepass = external_lib "safepass" V.True
 
+let saturn = external_lib "saturn" V.(at_least "0.5.0")
+
 let secp256k1_internal =
   let version = V.(at_least "0.4.0") in
   external_lib "secp256k1-internal" version

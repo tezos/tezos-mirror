@@ -9,7 +9,8 @@
   octez-libs.base
   octez-libs.stdlib-unix
   octez-libs.octez-profiler.backends
-  octez-libs.octez-profiler.complex_backends)
+  octez-libs.octez-profiler.complex_backends
+  saturn)
  (preprocess (pps octez-libs.ppx_profiler))
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
