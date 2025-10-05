@@ -47,7 +47,7 @@ let init_reverse_proxy ~agent ~site config =
   let runner = Agent.runner agent in
   let () = toplog "Launching reverse proxy" in
   let () = toplog "Generating nginx reverse proxy config" in
-  let config_filename = Format.sprintf "nginx_config_%s" site in
+  let config_filename = Tezt.Temp.file (sf "nginx_config_%s" site) in
   let out_chan = Stdlib.open_out config_filename in
   let config_ppf = Format.formatter_of_out_channel out_chan in
   Format.fprintf config_ppf "@[<v 0>%a@]@." pp_config config ;
