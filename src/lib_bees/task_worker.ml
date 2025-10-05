@@ -76,12 +76,12 @@ type 'a message_error = 'a Worker.message_error =
   | Any of exn
 
 (* This is a conservative limit that aims to fit all machines, without
-   overloading it.*)
+   overloading it. *)
 let default_max_domains = max (min (Domain.recommended_domain_count () / 2) 8) 1
 
 let number_of_domains = default_max_domains
 
-let worker =
+let make_worker () =
   let table = Worker.create_table Queue in
   Eio.Lazy.from_fun ~cancel:`Protect @@ fun () ->
   match
@@ -95,9 +95,29 @@ let worker =
   | Ok w -> w
   | Error _ -> assert false
 
+let worker_lock = Eio.Mutex.create ()
+
+let worker = ref (make_worker ())
+
+let with_worker_state f =
+  Eio.Mutex.lock worker_lock ;
+  Fun.protect ~finally:(fun () -> Eio.Mutex.unlock worker_lock) f
+
+(* [get_worker] returns a worker instance, creating it if it doesn't exist.
+   Access is protected by a mutex to prevent race conditions from multiple
+   domains. *)
+let get_worker () =
+  with_worker_state (fun () ->
+      try Eio.Lazy.force !worker
+      with exn ->
+        (* If forcing fails, reset the lazy so that the next call will try
+           to recreate the worker.  *)
+        worker := make_worker () ;
+        raise exn)
+
 let launch_task_and_wait name on_request ?on_completion param =
   let r = Request.Task {name; on_request; param; on_completion} in
-  Worker.Queue.push_request_and_wait_eio (Eio.Lazy.force worker) r
+  Worker.Queue.push_request_and_wait_eio (get_worker ()) r
 
 let launch_tasks_and_wait ?(max_fibers = max_int) name func ?on_completion args
     =
@@ -109,4 +129,4 @@ let launch_tasks_and_wait ?(max_fibers = max_int) name func ?on_completion args
 
 let launch_task name on_request ?on_completion param =
   let r = Request.Task {name; on_request; param; on_completion} in
-  Worker.Queue.push_request_eio (Eio.Lazy.force worker) r
+  Worker.Queue.push_request_eio (get_worker ()) r
