@@ -166,6 +166,21 @@ let get_worker () =
         worker := make_worker () ;
         raise exn)
 
+let shutdown () =
+  with_worker_state (fun () ->
+      try
+        let w = Eio.Lazy.force !worker in
+        Hive.async_lwt (fun () -> Events.(emit shutdown_enter ())) ;
+        Fun.protect
+          ~finally:(fun () ->
+            Hive.async_lwt (fun () -> Events.(emit shutdown_exit ())))
+          (fun () ->
+            Worker.shutdown_eio w ;
+            worker := make_worker ())
+      with _ ->
+        (* If forcing fails or wasn't built yet, just reset the lazy. *)
+        worker := make_worker ())
+
 let launch_task_and_wait name on_request ?on_completion param =
   let r = Request.Task {name; on_request; param; on_completion} in
   Worker.Queue.push_request_and_wait_eio (get_worker ()) r
