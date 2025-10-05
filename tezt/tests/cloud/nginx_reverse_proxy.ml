@@ -41,7 +41,7 @@ let rec pp_config out = function
            pp_config)
         l
 
-let init_reverse_proxy ~agent ~site config =
+let init ~agent ~site config =
   (* A NGINX reverse proxy which balances load between producer DAL
      nodes based on the requested slot index. *)
   let runner = Agent.runner agent in

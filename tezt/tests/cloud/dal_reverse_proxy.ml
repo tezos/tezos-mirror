@@ -106,7 +106,7 @@ let init_dal_reverse_proxy_observers ~external_rpc ~network ~snapshot
   let* agent = next_agent ~name in
   let port = Agent.next_available_port agent in
   let* () =
-    Nginx_reverse_proxy.init_reverse_proxy
+    Nginx_reverse_proxy.init
       ~agent
       ~site:(sf "reverse_proxy_%d" index)
       (generate_nginx_config
