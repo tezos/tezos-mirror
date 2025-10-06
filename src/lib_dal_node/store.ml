@@ -454,13 +454,10 @@ module Shards = struct
         in
         return_some store
     in
-    let storage_period =
-      Profile_manager.get_attested_data_default_store_period
-        profile_ctxt
-        proto_parameters
+    let cache_size =
+      Profile_manager.get_memory_cache_size profile_ctxt proto_parameters
     in
-    let memory_cache_size = storage_period * proto_parameters.number_of_slots in
-    let cache = Cache.init memory_cache_size in
+    let cache = Cache.init cache_size in
     return {disk; cache}
 
   (* Select the backend to use for reads / counts. *)
