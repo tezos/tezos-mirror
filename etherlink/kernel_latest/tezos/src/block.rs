@@ -102,7 +102,7 @@ mod tests {
         let receipt = vec![OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
             result: crate::operation_result::ContentResult::Applied(RevealSuccess {
-                consumed_gas: 0u64.into(),
+                consumed_milligas: 0u64.into(),
             }),
             internal_operation_results: vec![],
         })];
