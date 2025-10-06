@@ -19,6 +19,7 @@ type parameters = {
   spp : int;
   width : int;
   height : int;
+  swap_hops : int;
 }
 
 let parameters =
@@ -110,6 +111,14 @@ let parameters =
         "Height of image for SnailTracer. Higher values will use more gas."
       48
   in
+  let swap_hops =
+    Clap.default_int
+      ~section
+      ~long:"swap-hops"
+      ~placeholder:"nb"
+      ~description:"Number of hops to do in swap path."
+      1
+  in
   {
     profiling;
     time_between_blocks;
@@ -120,6 +129,7 @@ let parameters =
     spp;
     width;
     height;
+    swap_hops;
   }
 
 let ( let+? ) x f =

@@ -8,6 +8,7 @@
 
 let () =
   Evm_node_capacity.register () ;
-  Snailtracer.register ()
+  Snailtracer.register () ;
+  Uniswap.register ()
 
 let () = Test.run ()
