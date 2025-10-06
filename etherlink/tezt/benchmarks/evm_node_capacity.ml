@@ -20,9 +20,18 @@ type env = {
   nb_contracts : int;
 }
 
-let deposit_one {infos; gas_limit; _} ?nonce value account contract =
+let deposit_one {infos; gas_limit; rpc_node; _} ?nonce value account contract =
   let* _ =
-    call infos contract gas_limit account ?nonce ~value:(Z.of_int value) [] []
+    call
+      infos
+      rpc_node
+      contract
+      ~gas_limit
+      account
+      ?nonce
+      ~value:(Z.of_int value)
+      []
+      []
   in
   unit
 
@@ -121,13 +130,14 @@ let transfer_gas_limit {accounts; infos; rpc_node; _} contract =
   in
   return gas_limit
 
-let account_step infos gas_limit contract ~nonce (sender : Account.t) value
-    (dest : Account.t) =
+let account_step infos rpc_node ?gas_limit contract ~nonce (sender : Account.t)
+    value (dest : Account.t) =
   let* _ =
     call
       infos
+      rpc_node
       contract
-      gas_limit
+      ?gas_limit
       sender
       ~nonce
       ~name:"transfer"
@@ -136,7 +146,8 @@ let account_step infos gas_limit contract ~nonce (sender : Account.t) value
   in
   unit
 
-let sender_step {infos; gas_limit; accounts; _} erc20s iteration sender_index =
+let sender_step {infos; rpc_node; gas_limit; accounts; _} erc20s iteration
+    sender_index =
   let sender = accounts.(sender_index mod Array.length accounts) in
   let dest_index =
     (sender_index + (7 * (iteration + 1))) mod Array.length accounts
@@ -148,7 +159,8 @@ let sender_step {infos; gas_limit; accounts; _} erc20s iteration sender_index =
       let nonce = Z.add nonce (Z.of_int i) in
       account_step
         infos
-        gas_limit
+        rpc_node
+        ~gas_limit
         contract
         ~nonce
         sender

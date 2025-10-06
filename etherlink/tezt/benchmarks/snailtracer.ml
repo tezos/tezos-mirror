@@ -179,12 +179,13 @@ let ray_trace_scanlines ({width; height; _} as env) sender =
     speedup ;
   unit
 
-let call_one {infos; gas_limit; contract; spp; _} sender =
+let call_one {infos; rpc_node; gas_limit; contract; spp; _} sender =
   let* _ =
     call
       infos
+      rpc_node
       contract
-      gas_limit
+      ~gas_limit
       sender
       ~name:"Benchmark"
       [`uint 8]
