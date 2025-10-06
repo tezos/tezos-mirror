@@ -6,6 +6,7 @@ use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
 use context::Context;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens, TypedValue};
+use mir::context::TypecheckingCtx;
 use mir::{
     ast::{IntoMicheline, Micheline},
     context::CtxTrait,
@@ -45,6 +46,7 @@ extern crate alloc;
 pub mod account_storage;
 mod address;
 pub mod context;
+mod gas;
 pub mod mir_ctx;
 mod validate;
 
@@ -484,7 +486,7 @@ fn typecheck_code_and_storage<'a, Host: Runtime>(
         .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
     let allow_lazy_storage_in_storage = true;
     let contract_typechecked = contract_micheline
-        .typecheck_script(ctx.gas, allow_lazy_storage_in_storage)
+        .typecheck_script(ctx.gas(), allow_lazy_storage_in_storage)
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Script : {e}")))?;
     let storage_micheline = Micheline::decode_raw(&parser.arena, &script.storage)
         .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
@@ -861,7 +863,7 @@ fn apply_operation<Host: Runtime>(
     let mut tc_ctx = TcCtx {
         host,
         context,
-        gas: &mut mir::gas::Gas::default(),
+        gas: &mut gas::TezlinkOperationGas::default(),
         big_map_diff: &mut BTreeMap::new(),
     };
     let parser = Parser::new();

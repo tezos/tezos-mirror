@@ -17,7 +17,6 @@ use mir::{
         AddressHash, IntoMicheline, Micheline, PublicKeyHash, Type, TypedValue,
     },
     context::{CtxTrait, TypecheckingCtx},
-    gas::Gas,
 };
 use num_bigint::BigUint;
 use primitive_types::H256;
@@ -37,7 +36,7 @@ use typed_arena::Arena;
 pub struct TcCtx<'operation, Host: Runtime> {
     pub host: &'operation mut Host,
     pub context: &'operation Context,
-    pub gas: &'operation mut Gas,
+    pub gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: &'operation mut BTreeMap<Zarith, StorageDiff>,
 }
 
@@ -115,7 +114,7 @@ impl ExecCtx {
 
 impl<'a, Host: Runtime> TypecheckingCtx<'a> for TcCtx<'a, Host> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
-        self.gas
+        &mut self.gas.current_gas
     }
 
     fn lookup_contract(
@@ -480,6 +479,7 @@ impl<'a, Host: Runtime> LazyStorage<'a> for Ctx<'_, 'a, Host> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gas::TezlinkOperationGas;
     use mir::ast::big_map::{
         dump_big_map_updates, BigMap, BigMapContent, BigMapFromLazyStorage,
     };
@@ -490,7 +490,7 @@ mod tests {
 
     macro_rules! make_default_ctx {
         ($ctx:ident, $host: expr, $context: expr) => {
-            let mut gas = Gas::default();
+            let mut gas = TezlinkOperationGas::default();
             let mut operation_counter = 0;
             let mut origination_nonce =
                 OriginationNonce::initial(OperationHash(H256::zero()));
