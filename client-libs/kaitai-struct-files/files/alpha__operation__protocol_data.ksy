@@ -2062,15 +2062,9 @@ enums:
     252: zk_rollup_update
     255: signature_prefix
   alpha__per_block_votes_tag:
-    0: case_0
-    1: case_1
-    2: case_2
-    4: case_4
-    5: case_5
-    6: case_6
-    8: case_8
-    9: case_9
-    10: case_10
+    0: per_block_vote_on
+    1: per_block_vote_off
+    2: per_block_vote_pass
   bls_signature_prefix_tag:
     3: bls_prefix
   bool:
