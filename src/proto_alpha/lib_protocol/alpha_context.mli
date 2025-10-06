@@ -3098,6 +3098,17 @@ module Dal : sig
   module Slots_history : sig
     type t
 
+    type attestation_lag_kind = Legacy
+
+    val attestation_lag_value : attestation_lag_kind -> int
+
+    val legacy_attestation_lag : int
+
+    type cell_id = {
+      header_id : Slot.Header.id;
+      attestation_lag : attestation_lag_kind;
+    }
+
     type cell_content = private
       | Unpublished of Slot.Header.id
       | Published of {

@@ -335,6 +335,34 @@ module History = struct
   (* History is represented via a skip list. The content of the cell
      is the hash of a merkle proof. *)
 
+  type attestation_lag_kind = Legacy
+
+  (** The legacy attestation lag used by mainnet, ghostnet and shadownet *)
+  let legacy_attestation_lag = 8
+
+  let attestation_lag_value = function Legacy -> legacy_attestation_lag
+
+  let attestation_lag_kind_equal lag1 lag2 =
+    match (lag1, lag2) with Legacy, Legacy -> true
+
+  let pp_attestation_lag_kind fmt = function
+    | Legacy -> Format.fprintf fmt "Legacy:%d" legacy_attestation_lag
+
+  type cell_id = {header_id : Header.id; attestation_lag : attestation_lag_kind}
+
+  let _cell_id_equal cid1 cid2 =
+    attestation_lag_kind_equal cid1.attestation_lag cid2.attestation_lag
+    && Header.slot_id_equal cid1.header_id cid2.header_id
+
+  let _pp_cell_id fmt {header_id; attestation_lag} =
+    Format.fprintf
+      fmt
+      "{slot_id:%a, lag:%a}"
+      Header.pp_id
+      header_id
+      pp_attestation_lag_kind
+      attestation_lag
+
   module Content_prefix = struct
     let (_prefix : string) = "dash1"
 
