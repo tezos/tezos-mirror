@@ -82,10 +82,18 @@ module Node = struct
     let* snapshot =
       ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
     in
+    let* version = get_snapshot_info_version node snapshot in
     let* () =
-      let* version = get_snapshot_info_version node snapshot in
       if version >= 9 then
-        let config = Node_helpers.isolated_config ~peers ~network ~delay:0 in
+        let config =
+          Node_helpers.isolated_config
+            ~auto_synchronisation_threshold:false
+            ~auto_connections:true
+            ~no_bootstrap_peers:true
+            ~peers
+            ~network
+            ~delay:0
+        in
         let* () = Node.config_init node config in
         let* () =
           import_snapshot ~env:yes_crypto_env ~no_check:true ~name node snapshot
@@ -99,7 +107,6 @@ module Node = struct
             Network Network.(to_octez_network_options network);
             Expected_pow 26;
             Cors_origin "*";
-            Synchronisation_threshold 0;
           ]
         in
         let* () = Node.config_init node config in
@@ -107,14 +114,38 @@ module Node = struct
         let* () =
           (* When bootstrapping from the real network, we want to use the real time. *)
           let env = String_map.(add "FAKETIME" "+0" empty) in
-          run ~env node [Synchronisation_threshold 0]
+          run ~env node []
         in
         let* () = wait_for_ready node in
         let* _new_level = wait_next_level ~offset:2 node in
         let* () = terminate node in
         toplog "Reset node config for private a yes-crypto network" ;
-        let config = Node_helpers.isolated_config ~peers ~network ~delay:0 in
+        let config =
+          Node_helpers.isolated_config
+            ~auto_synchronisation_threshold:true
+            ~auto_connections:true
+            ~no_bootstrap_peers:true
+            ~peers
+            ~network
+            ~delay:0
+        in
         let* () = Node.config_reset node config in
+        let () =
+          let peers_file = sf "%s/peers.json" (Node.data_dir node) in
+          let runner = Node.runner node in
+          if Runner.Sys.file_exists ?runner peers_file then (
+            toplog (sf "Removing %s" peers_file) ;
+            Runner.Sys.remove ?runner peers_file)
+          else toplog (sf "%s Not found" peers_file)
+        in
+        let () =
+          let identity_file = sf "%s/identity.json" (Node.data_dir node) in
+          let runner = Node.runner node in
+          if Runner.Sys.file_exists ?runner identity_file then (
+            toplog (sf "Removing %s" identity_file) ;
+            Runner.Sys.remove ?runner identity_file)
+          else toplog (sf "%s Not found" identity_file)
+        in
         Lwt.return_unit
     in
     let* () =
@@ -124,12 +155,19 @@ module Node = struct
         ~migration_offset
         ~network
     in
-    let arguments = Node_helpers.isolated_args peers in
+    let arguments =
+      (if version >= 9 then
+         (* The auto synchronistaion threshold is set to false so that the
+             bootstrap node will be directly bootstraped *)
+         [Synchronisation_threshold 0]
+       else [ (* Synchronisation_threshold 0 *) ])
+      @ Node_helpers.isolated_args ~private_mode:false peers
+    in
     let* () =
       Node.Agent.run
         ~env:yes_crypto_env
         node
-        (Synchronisation_threshold 0 :: arguments)
+        arguments
         ~ppx_profiling_verbosity
         ~ppx_profiling_backends
     in
@@ -146,7 +184,15 @@ module Node = struct
     let* snapshot =
       ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
     in
-    let config = Node_helpers.isolated_config ~peers ~network ~delay in
+    let config =
+      Node_helpers.isolated_config
+        ~auto_synchronisation_threshold:true
+        ~auto_connections:true
+        ~no_bootstrap_peers:true
+        ~peers
+        ~network
+        ~delay
+    in
     let* () = Node.config_init node config in
     let* () =
       Node_helpers.may_add_migration_offset_to_config
@@ -158,7 +204,7 @@ module Node = struct
     let* () =
       import_snapshot ~env:yes_crypto_env ~no_check:true ~name node snapshot
     in
-    let arguments = Node_helpers.isolated_args peers in
+    let arguments = Node_helpers.isolated_args ~private_mode:false peers in
     let synchronisation_waiter =
       Node.wait_for_synchronisation ~statuses:["synced"; "stuck"] node
     in
@@ -168,7 +214,7 @@ module Node = struct
         ~ppx_profiling_verbosity
         ~ppx_profiling_backends
         node
-        (Synchronisation_threshold 0 :: arguments)
+        arguments
     in
     let* () = wait_for_ready node in
     (* As we are playing with dates in the past,
@@ -311,6 +357,7 @@ module Node = struct
         ~migration_offset
         (agent, node, name)
     in
+    toplog "L1 node %s initialized" name ;
     let* client =
       (* [~local] is set to false since the client might be called from the localhost/orchestrator *)
       client ~local:false ~node agent
@@ -419,7 +466,8 @@ let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
   in
   let* dal_node =
     if configuration.without_dal then Lwt.return_none
-    else
+    else (
+      toplog "init_baker: Initialize dal node" ;
       let name = name ^ "-dal-node" in
       let* dal_node = Dal_node.Agent.create ~name cloud agent ~node in
       let attester_profiles =
@@ -439,7 +487,7 @@ let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           dal_node
       in
-      Lwt.return_some dal_node
+      Lwt.return_some dal_node)
   in
   let* baker =
     toplog "init_baker: Initialize agnostic baker" ;
@@ -585,7 +633,8 @@ let init_network ~peers (configuration : Scenarios_configuration.LAYER1.t) cloud
   in
   let* dal_node =
     if configuration.without_dal then Lwt.return_none
-    else
+    else (
+      toplog "init_network: Initialize the bootstrap dal-node" ;
       let disable_shard_validation = true in
       let* dal_node =
         Dal_node.Agent.create
@@ -601,13 +650,14 @@ let init_network ~peers (configuration : Scenarios_configuration.LAYER1.t) cloud
       let* () = Node.wait_for_ready node in
       let* () =
         Dal_node.Agent.run
+          ~wait_ready:false
           ~event_level:`Notice
           ~disable_shard_validation
           ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           dal_node
       in
-      Lwt.return_some dal_node
+      Lwt.return_some dal_node)
   in
   toplog "init_network: Add a Teztale archiver" ;
   let* () =
@@ -733,7 +783,7 @@ let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
     create_node agent cloud
   in
   let create_nodes fmt =
-    Lwt_list.filter_map_s
+    Lwt_list.filter_map_p
       (fun agent ->
         if match_agent_name fmt agent then
           create_node agent cloud |> Lwt.map Option.some
@@ -759,7 +809,10 @@ let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
     | Some _ -> (
         match rich_accounts with a :: l -> (Some a, l) | _ -> assert false)
   in
-  let peers = Node.point_str bootstrap_node :: peers in
+  let peers =
+    [Node.point_str bootstrap_node]
+    (* :: peers *)
+  in
   let* bakers =
     toplog "Initializing bakers" ;
     let* distribution =
@@ -1083,10 +1136,18 @@ let number_of_bakers ~snapshot ~(network : Network.t) =
   let* () =
     Node.config_init
       node
-      (Node_helpers.isolated_config ~peers:[] ~network ~delay:0)
+      (Node_helpers.isolated_config
+         ~auto_synchronisation_threshold:true
+         ~auto_connections:true
+         ~no_bootstrap_peers:true
+         ~peers:[]
+         ~network
+         ~delay:0)
   in
-  let* () = Node.snapshot_import ~no_check:true node snapshot in
-  let* () = Node.run node (Node_helpers.isolated_args []) in
+  let* () =
+    Node.snapshot_import ~env:yes_crypto_env ~no_check:true node snapshot
+  in
+  let* () = Node.run node (Node_helpers.isolated_args ~private_mode:false []) in
   let* () = Node.wait_for_ready node in
   let* n =
     RPC.get_chain_block_context_delegates ~query_string:[("active", "true")] ()
@@ -1131,11 +1192,21 @@ let register (module Cli : Scenarios_cli.Layer1) =
       (fun tag -> Agent.Configuration.Octez_release {tag})
       configuration.octez_release
   in
-  let default_vm_configuration ~name =
-    Agent.Configuration.make ?docker_image:default_docker_image ~name ()
+  let default_vm_configuration ?machine_type ~name () =
+    Agent.Configuration.make
+      ?machine_type
+      ?docker_image:default_docker_image
+      ~name
+      ()
   in
   let make_vm_conf ~name = function
-    | None -> default_vm_configuration ~name
+    | None ->
+        default_vm_configuration
+          ?machine_type:
+            (if String.equal name "bootstrap" then Some "n2-standard-8"
+             else None)
+          ~name
+          ()
     | Some {machine_type; docker_image; max_run_duration; binaries_path; os} ->
         let docker_image =
           match docker_image with
@@ -1144,7 +1215,9 @@ let register (module Cli : Scenarios_cli.Layer1) =
         in
         let os = Option.map Types.Os.of_string_exn os in
         Agent.Configuration.make
-          ?machine_type
+          ?machine_type:
+            (if String.equal name "bootstrap" then Some "n2-standard-8"
+             else machine_type)
           ?docker_image
           ~max_run_duration
           ?binaries_path
@@ -1254,6 +1327,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
     Lwt_list.iter_p
       (fun (producer : Dal_node_helpers.producer) ->
         let index = producer.slot_index in
+        toplog "Producing DAL commitment for slot %d" index ;
         let content =
           Format.asprintf "%d:%d" level index
           |> Dal_common.Helpers.make_slot ~padding:false ~slot_size:131072
@@ -1283,9 +1357,15 @@ let register (module Cli : Scenarios_cli.Layer1) =
   in
   Lwt.bind
     (Network.get_level (Node.as_rpc_endpoint t.bootstrap.node))
-    (let rec loop level =
+    (let rec loop with_producers level =
        let level = succ level in
-       let* () = produce_slot t level in
-       loop level
+       toplog "Loop at level %d" level ;
+       let* () =
+         if with_producers then
+           let* _ = Node.wait_for_level t.bootstrap.node level in
+           Lwt.return_unit
+         else produce_slot t level
+       in
+       loop with_producers level
      in
-     loop)
+     loop (List.compare_length_with t.producers 0 = 0))

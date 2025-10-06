@@ -26,30 +26,34 @@ let yes_wallet agent =
 
 (** We are running a private network with yes-crypto enabled.
     We don't want to connect with the real network. *)
-let isolated_config ~peers ~network ~delay =
+let isolated_config ~auto_synchronisation_threshold ~auto_connections
+    ~no_bootstrap_peers ~peers ~network ~delay =
   Node.
     [
-      No_bootstrap_peers;
-      Connections (List.length peers);
-      Synchronisation_threshold (if List.length peers < 2 then 1 else 2);
       Network Network.(to_octez_network_options network);
       Expected_pow 0;
       Cors_origin "*";
       Storage_maintenance_delay (string_of_int delay);
     ]
+  @ (if auto_synchronisation_threshold then []
+     else
+       [Node.Synchronisation_threshold (if List.length peers < 2 then 1 else 2)])
+  @ (if auto_connections then []
+     else [Node.Connections (min 100 (List.length peers))])
+  @ if no_bootstrap_peers then [No_bootstrap_peers] else []
 
 (** [--private-mode] is mainly useful for the bootstrap node
     because it is used first to bootstrap a node with real network peers
     before being disconnected.
     For the other node, it's an extra security but their ip/identity should
     not be advertised to the external world anyway. *)
-let isolated_args peers =
+let isolated_args ~private_mode peers =
   Node.(
-    Private_mode
-    :: List.fold_left
-         (fun acc peer -> Peer peer :: acc)
-         [Allow_yes_crypto; Force_history_mode_switch]
-         peers)
+    List.fold_left
+      (fun acc peer -> Peer peer :: acc)
+      ([Allow_yes_crypto; Force_history_mode_switch]
+      @ if private_mode then [Private_mode] else [])
+      peers)
 
 let may_add_migration_offset_to_config node snapshot ~migration_offset ~network
     =

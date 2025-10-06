@@ -19,9 +19,15 @@
 val yes_wallet : Agent.t -> Yes_wallet.t Lwt.t
 
 val isolated_config :
-  peers:string list -> network:Network.t -> delay:int -> Node.argument list
+  auto_synchronisation_threshold:bool ->
+  auto_connections:bool ->
+  no_bootstrap_peers:bool ->
+  peers:string list ->
+  network:Network.t ->
+  delay:int ->
+  Node.argument list
 
-val isolated_args : string list -> Node.argument list
+val isolated_args : private_mode:bool -> string list -> Node.argument list
 
 (** Initialize an L1 node for the given configuration.
 
