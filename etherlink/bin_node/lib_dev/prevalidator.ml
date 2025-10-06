@@ -200,17 +200,16 @@ module Name = struct
   let equal () () = true
 end
 
-type prevalidation_result = {
-  next_nonce : quantity;
-  transaction_object : Transaction_object.t;
-}
+type 'a prevalidation_result = {next_nonce : quantity; transaction_object : 'a}
 
 module Request = struct
   type (_, _) t =
     | Prevalidate_raw_transaction : {
         raw_transaction : string;
       }
-        -> ((prevalidation_result, string) result, tztrace) t
+        -> ( (Transaction_object.t prevalidation_result, string) result,
+             tztrace )
+           t
     | Refresh_state : (unit, tztrace) t
 
   let name : type a err. (a, err) t -> string = function
@@ -645,7 +644,8 @@ module Handlers = struct
         : Types.state)
 
   let is_tx_valid (type state) ctxt session raw_transaction :
-      (prevalidation_result, string) result tzresult Lwt.t =
+      (Transaction_object.t prevalidation_result, string) result tzresult Lwt.t
+      =
     let open Lwt_result_syntax in
     let (module Backend_rpc : Services_backend_sig.S
           with type Reader.state = state) =
