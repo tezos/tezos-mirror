@@ -284,7 +284,7 @@ module Node = struct
                  companion_keys,
                  rich_account :: rich_accounts )
            else
-             match alias =~* rex "(\\w+)_consensus_key" with
+             match alias =~* rex "(\\w+)_consensus_key_0" with
              | Some consensus_key_alias ->
                  (* if the alias match "baker_n_consensus_key" *)
                  let* consensus_account = get_account alias in
@@ -297,7 +297,7 @@ module Node = struct
                      companion_keys,
                      rich_accounts )
              | None -> (
-                 match alias =~* rex "(\\w+)_companion_key" with
+                 match alias =~* rex "(\\w+)_companion_key_0" with
                  | Some companion_key_alias ->
                      (* if the alias match "baker_n_companion_key" *)
                      let* consensus_account = get_account alias in
@@ -310,7 +310,7 @@ module Node = struct
                            companion_keys,
                          rich_accounts )
                  | None ->
-                     if alias =~ rex "baker_" then
+                     if alias =~ rex "^baker_[0-9]+$" then
                        (* otherwise, if the alias match "baker_n" *)
                        let* delegate_account = get_account alias in
                        return
