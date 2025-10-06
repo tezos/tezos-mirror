@@ -94,7 +94,7 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
    and the third debian packages artifacts *)
-let jobs pipeline_type =
+let jobs ?(limit_dune_build_jobs = false) pipeline_type =
   let variables ?(kind = "build") add =
     ("FLAVOUR", kind)
     :: ( "DEP_IMAGE",
@@ -183,7 +183,12 @@ let jobs pipeline_type =
       ~name
       ~image:build_debian_packages_image
       ~stage:Stages.build
-      ~variables:(variables [("DISTRIBUTION", distribution)])
+      ~variables:
+        (variables
+           (("DISTRIBUTION", distribution)
+           ::
+           (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
+           ))
       ~parallel:(Matrix matrix)
       ~dependencies
       ?timeout
