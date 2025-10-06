@@ -724,7 +724,7 @@ module Anonymous = struct
              ("kind", Ezjsonm.string "dal_entrapment_evidence");
              ("attestation", attestation);
            ]
-          @ (if Protocol.(number protocol > number R022) then
+          @ (if Protocol.(number protocol > 22) then
                [("consensus_slot", json_of_int consensus_slot)]
              else [])
           @ [
