@@ -210,32 +210,38 @@ fn validate_individual_operation<Host: Runtime>(
     Ok((new_balance, vec![src_delta, block_fees]))
 }
 
-pub struct ValidationInfo {
+pub struct ValidatedOperation {
+    pub balance_updates: Vec<BalanceUpdate>,
+    pub content: ManagerOperation<OperationContent>,
+}
+
+pub struct ValidatedBatch {
     pub source_account: TezlinkImplicitAccount,
-    pub balance_updates: Vec<Vec<BalanceUpdate>>,
-    pub validated_operations: Vec<ManagerOperation<OperationContent>>,
+    pub validated_operations: Vec<ValidatedOperation>,
 }
 
 pub fn execute_validation<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     operation: tezos_tezlink::operation::Operation,
-) -> Result<ValidationInfo, ValidityError> {
-    let unvalidated_operation = operation
+) -> Result<ValidatedBatch, ValidityError> {
+    let mut validated_operations = Vec::new();
+    let unvalidated_operation: Vec<ManagerOperation<OperationContent>> = operation
         .content
         .clone()
         .into_iter()
         .map(Into::into)
         .collect();
+
     let (pk, source_account) = validate_source(host, context, &unvalidated_operation)?;
     match operation.verify_signature(&pk) {
         Ok(true) => log!(host, Debug, "Validation: OK - Signature is valid."),
         _ => return Err(ValidityError::InvalidSignature),
     }
-    let mut balance_updates = vec![];
-    for c in &unvalidated_operation {
-        let (new_source_balance, op_balance_updates) =
-            validate_individual_operation(host, &source_account, c)?;
+
+    for content in unvalidated_operation {
+        let (new_source_balance, balance_updates) =
+            validate_individual_operation(host, &source_account, &content)?;
 
         source_account
             .set_balance(host, &new_source_balance)
@@ -245,11 +251,13 @@ pub fn execute_validation<Host: Runtime>(
             .increment_counter(host)
             .map_err(|_| ValidityError::FailedToIncrementCounter)?;
 
-        balance_updates.push(op_balance_updates);
+        validated_operations.push(ValidatedOperation {
+            balance_updates,
+            content,
+        });
     }
-    Ok(ValidationInfo {
+    Ok(ValidatedBatch {
         source_account,
-        balance_updates,
-        validated_operations: unvalidated_operation,
+        validated_operations,
     })
 }
