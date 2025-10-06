@@ -25,9 +25,17 @@ open Agent_kind
 
 type baker_account = {
   delegate : Account.key;
-  consensus : Account.key;
-  companion : Account.key option;
+  consensus : Account.key list;
+  companion : Account.key list;
 }
+
+(* Public key hashes of a delegate consensus and companion keys *)
+let baking_keys delegate =
+  let pkhs_of_account_list =
+    List.map (fun account -> account.Account.public_key_hash)
+  in
+  pkhs_of_account_list delegate.consensus
+  @ pkhs_of_account_list delegate.companion
 
 let wait_next_level ?(offset = 1) node =
   Lwt.bind
@@ -270,6 +278,13 @@ module Node = struct
     let* delegates, consensus_keys, companion_keys, rich_account_opt =
       let* known_addresses = Client.list_known_addresses client in
       let get_account alias = Client.show_address ~alias client in
+      let cons key value map =
+        String_map.update
+          key
+          (function
+            | None -> Some [value] | Some values -> Some (value :: values))
+          map
+      in
       (Lwt_list.fold_left_s
          (fun
            ((delegates, consensus_keys, companion_keys, rich_accounts) as acc)
@@ -284,27 +299,24 @@ module Node = struct
                  companion_keys,
                  rich_account :: rich_accounts )
            else
-             match alias =~* rex "(\\w+)_consensus_key_0" with
+             match alias =~* rex "(\\w+)_consensus_key_[0-9]+" with
              | Some consensus_key_alias ->
                  (* if the alias match "baker_n_consensus_key" *)
                  let* consensus_account = get_account alias in
                  return
                    ( delegates,
-                     String_map.add
-                       consensus_key_alias
-                       consensus_account
-                       consensus_keys,
+                     cons consensus_key_alias consensus_account consensus_keys,
                      companion_keys,
                      rich_accounts )
              | None -> (
-                 match alias =~* rex "(\\w+)_companion_key_0" with
+                 match alias =~* rex "(\\w+)_companion_key_[0-9]+" with
                  | Some companion_key_alias ->
                      (* if the alias match "baker_n_companion_key" *)
                      let* consensus_account = get_account alias in
                      return
                        ( delegates,
                          consensus_keys,
-                         String_map.add
+                         cons
                            companion_key_alias
                            consensus_account
                            companion_keys,
@@ -329,9 +341,11 @@ module Node = struct
         (fun alias delegate ->
           let consensus =
             String_map.find_opt alias consensus_keys
-            |> Option.value ~default:delegate
+            |> Option.value ~default:[] |> List.cons delegate
           in
-          let companion = String_map.find_opt alias companion_keys in
+          let companion =
+            String_map.find_opt alias companion_keys |> Option.value ~default:[]
+          in
           {delegate; consensus; companion})
         delegates
     in
@@ -364,21 +378,17 @@ module Node = struct
     in
     let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () =
-      Lwt_list.iter_s
-        (fun {consensus; companion = companion_opt; _} ->
-          let* () =
+      let client_import_pks =
+        Lwt_list.iter_s (fun (account : Account.key) ->
             Client.import_public_key
-              ~alias:consensus.public_key_hash
-              ~public_key:consensus.public_key
-              client
-          in
-          match companion_opt with
-          | Some companion ->
-              Client.import_public_key
-                ~alias:companion.public_key_hash
-                ~public_key:companion.public_key
-                client
-          | None -> Lwt.return_unit)
+              ~alias:account.public_key_hash
+              ~public_key:account.public_key
+              client)
+      in
+      Lwt_list.iter_s
+        (fun account ->
+          let* () = client_import_pks account.consensus in
+          client_import_pks account.companion)
         accounts
     in
     let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
@@ -514,15 +524,7 @@ let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
       Agnostic_baker.Agent.init
         ~env
         ~name
-        ~delegates:
-          (List.fold_left
-             (fun acc ({consensus; companion; _} : baker_account) ->
-               match companion with
-               | Some companion ->
-                   companion.public_key_hash :: consensus.public_key_hash :: acc
-               | None -> consensus.public_key_hash :: acc)
-             []
-             accounts)
+        ~delegates:(List.concat_map baking_keys accounts)
         ?dal_node_rpc_endpoint
         ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
         ~ppx_profiling_backends:configuration.ppx_profiling_backends
