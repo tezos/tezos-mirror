@@ -2,12 +2,16 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_data_encoding::types::Narith;
+use tezos_crypto_rs::PublicKeySignatureVerifier;
+use tezos_data_encoding::{enc::BinError, types::Narith};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_tezlink::{
-    operation::{ManagerOperation, OperationContent, RevealContent},
+    operation::{
+        serialize_unsigned_operation, ManagerOperation, Operation, OperationContent,
+        RevealContent,
+    },
     operation_result::{CounterError, ValidityError},
 };
 
@@ -220,6 +224,19 @@ pub struct ValidatedBatch {
     pub validated_operations: Vec<ValidatedOperation>,
 }
 
+pub fn verify_signature(operation: Operation, pk: &PublicKey) -> Result<bool, BinError> {
+    let serialized_unsigned_operation =
+        serialize_unsigned_operation(&operation.branch, &operation.content)?;
+    let signature = &operation.signature.into();
+    // The verify_signature function never returns false. If the verification
+    // is incorrect the function will return an Error and it's up to us to
+    // transform that into a `false` boolean if we want.
+    let check = pk
+        .verify_signature(signature, &serialized_unsigned_operation)
+        .unwrap_or(false);
+    Ok(check)
+}
+
 pub fn execute_validation<Host: Runtime>(
     host: &mut Host,
     context: &Context,
@@ -234,7 +251,7 @@ pub fn execute_validation<Host: Runtime>(
         .collect();
 
     let (pk, source_account) = validate_source(host, context, &unvalidated_operation)?;
-    match operation.verify_signature(&pk) {
+    match verify_signature(operation, &pk) {
         Ok(true) => log!(host, Debug, "Validation: OK - Signature is valid."),
         _ => return Err(ValidityError::InvalidSignature),
     }
