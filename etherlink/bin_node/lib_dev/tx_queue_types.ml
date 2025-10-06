@@ -32,8 +32,6 @@ module type L2_transaction = sig
 
   val nonce_of_tx_object : legacy -> nonce
 
-  val transaction_object_from_legacy : legacy -> t
-
   module AddressMap : Map.S with type key = address
 
   val make_txpool :
@@ -45,7 +43,7 @@ end
 module Eth_transaction_object :
   L2_transaction
     with type t = Transaction_object.t
-     and type legacy = Ethereum_types.legacy_transaction_object
+     and type legacy = Transaction_object.t
      and type address = Ethereum_types.address
      and module AddressMap = Ethereum_types.AddressMap
      and type nonce = Ethereum_types.quantity = struct
@@ -53,7 +51,7 @@ module Eth_transaction_object :
 
   type t = Transaction_object.t
 
-  type legacy = legacy_transaction_object
+  type legacy = Transaction_object.t
 
   type nonrec address = address
 
@@ -61,12 +59,12 @@ module Eth_transaction_object :
 
   let address_encoding = address_encoding
 
-  let hash_of_tx_object (tx_object : legacy_transaction_object) = tx_object.hash
+  let hash_of_tx_object (tx_object : legacy) = Transaction_object.hash tx_object
 
   let address_to_string (Address (Hex s)) = s
 
-  let from_address_of_tx_object (tx_object : legacy_transaction_object) =
-    tx_object.from
+  let from_address_of_tx_object (tx_object : legacy) =
+    Transaction_object.sender tx_object
 
   let bitset_add_nonce bitset (Qty nonce) = Nonce_bitset.add bitset ~nonce
 
@@ -76,15 +74,17 @@ module Eth_transaction_object :
 
   let nonce_to_z_opt (Qty nonce) = Some nonce
 
-  let nonce_of_tx_object (tx_object : legacy_transaction_object) =
-    tx_object.nonce
-
-  let transaction_object_from_legacy =
-    Transaction_object.from_store_transaction_object
+  let nonce_of_tx_object (tx_object : legacy) =
+    Transaction_object.nonce tx_object
 
   module AddressMap = AddressMap
 
-  let make_txpool ~pending ~queued = {pending; queued}
+  (* TODO *)
+  let make_txpool ~pending:_ ~queued:_ =
+    {
+      pending = Ethereum_types.AddressMap.empty;
+      queued = Ethereum_types.AddressMap.empty;
+    }
 end
 
 type tezlink_batch_nonces = {first : Z.t; length : int}
@@ -126,8 +126,6 @@ module Tezlink_operation :
 
   let nonce_of_tx_object (op : Tezos_types.Operation.t) =
     {first = op.first_counter; length = op.length}
-
-  let transaction_object_from_legacy op = op
 
   module AddressMap = Map.Make (Signature.Public_key_hash)
 

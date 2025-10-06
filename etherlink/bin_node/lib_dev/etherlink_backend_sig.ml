@@ -35,7 +35,7 @@ module type S = sig
   val inject_transactions :
     timestamp:Time.Protocol.t ->
     smart_rollup_address:string ->
-    transactions:(string * Ethereum_types.legacy_transaction_object) list ->
+    transactions:(string * Transaction_object.t) list ->
     Ethereum_types.hash list tzresult Lwt.t
 
   (** [base_fee_per_gas ()] returns base fee defined by the rollup. *)

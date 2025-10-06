@@ -69,9 +69,7 @@ module Tx_queue = struct
     let (Ethereum_types.Qty nonce as qnonce) = ctx.nonce in
     let txn = Craft.transfer ctx ~nonce ?to_ ~value ~data () in
     let tx_raw = Ethereum_types.hex_to_bytes txn in
-    let hash = Ethereum_types.hash_raw_tx tx_raw in
-    let**? tx = Transaction.decode tx_raw in
-    let**? tx_object = Transaction.to_transaction_object ~hash tx in
+    let*? tx_object = Transaction_object.decode tx_raw in
     let+ res = Tx_container.add tx_object ~raw_tx:txn ~next_nonce:qnonce in
     match res with
     | Ok _hash ->

@@ -305,7 +305,7 @@ module Produce_proposal :
 
 module Inject_transaction :
   METHOD
-    with type input = Ethereum_types.legacy_transaction_object * string
+    with type input = Transaction_object.t * string
      and type output = Ethereum_types.hash
 
 module Inject_tezlink_operation :

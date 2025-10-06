@@ -18,7 +18,7 @@ val send_raw_transaction :
 val inject_transaction :
   keep_alive:bool ->
   base:Uri.t ->
-  tx_object:Ethereum_types.legacy_transaction_object ->
+  tx_object:Transaction_object.t ->
   raw_tx:string ->
   (Ethereum_types.hash, string) result tzresult Lwt.t
 

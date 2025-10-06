@@ -830,13 +830,11 @@ end
 module Inject_transaction = struct
   open Ethereum_types
 
-  type input = Ethereum_types.legacy_transaction_object * string
+  type input = Transaction_object.t * string
 
   type output = hash
 
-  let input_encoding =
-    Data_encoding.(
-      tup2 Ethereum_types.legacy_transaction_object_encoding string)
+  let input_encoding = Data_encoding.(tup2 Transaction_object.encoding string)
 
   let output_encoding = hash_encoding
 

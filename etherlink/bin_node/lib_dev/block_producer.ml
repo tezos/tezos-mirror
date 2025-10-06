@@ -188,7 +188,7 @@ let produce_block_with_transactions ~signer ~timestamp ~transactions_and_objects
 
 type _ transaction_object_list =
   | Evm_tx_objects :
-      (string * Ethereum_types.legacy_transaction_object) list
+      (string * Transaction_object.t) list
       -> L2_types.evm_chain_family transaction_object_list
   | Michelson_tx_objects :
       (string * Tezos_types.Operation.t) list
@@ -206,8 +206,7 @@ let produce_block_with_transactions (type f)
       in
       produce_block_with_transactions
         ~transactions_and_objects
-        ~hash_of_tx_object:
-          Tx_queue_types.Eth_transaction_object.hash_of_tx_object
+        ~hash_of_tx_object:Transaction_object.hash
   | Michelson_tx_container (module Tx_container) ->
       let transactions_and_objects =
         match transactions_and_objects with
@@ -219,7 +218,7 @@ let produce_block_with_transactions (type f)
         ~hash_of_tx_object:Tx_queue_types.Tezlink_operation.hash_of_tx_object
 
 let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
-    =
+    (tx_object : Transaction_object.t) =
   let open Lwt_result_syntax in
   let new_size = current_size + String.length raw_tx in
   if new_size > maximum_cumulative_size then return `Stop
@@ -232,7 +231,7 @@ let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
     match validation_state_res with
     | Ok validation_state -> return (`Keep (new_size, validation_state))
     | Error msg ->
-        let hash = Transaction_object.hash transaction in
+        let hash = Transaction_object.hash tx_object in
         let*! () = Block_producer_events.transaction_rejected hash msg in
         return `Drop
 
