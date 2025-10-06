@@ -357,12 +357,9 @@ module Shards = struct
   let init ~profile_ctxt ~proto_parameters node_store_dir shard_store_dir =
     let open Lwt_result_syntax in
     if Profile_manager.is_attester_only_profile profile_ctxt then
-      let storage_period =
-        Profile_manager.get_attested_data_default_store_period
-          profile_ctxt
-          proto_parameters
+      let cache_size =
+        Profile_manager.get_memory_cache_size profile_ctxt proto_parameters
       in
-      let cache_size = storage_period * proto_parameters.number_of_slots in
       let cache = Cache.init cache_size in
       return (Cache cache)
     else
