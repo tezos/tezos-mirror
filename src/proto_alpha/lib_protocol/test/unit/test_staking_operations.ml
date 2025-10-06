@@ -423,7 +423,7 @@ let () =
 (* Finn POC: creates 2 stakers whose unstake requests are finalized
    from a different account (finn). Note that we delay unstake
    requests so that they are issued in different cycles. *)
-let finn_finalize_batch =
+let finn_finalize_batch () =
   let open Lwt_result_syntax in
   let amount = Tez_helpers.of_int 10_000 in
   let* b, delegate = Context.init_with_constants1 constants in
@@ -570,14 +570,14 @@ let finn_finalize_batch =
 let () =
   register_test
     ~title:"Finn: Finn finalizes staker1 and staker2 in a single batch."
-  @@ fun () -> finn_finalize_batch
+  @@ fun () -> finn_finalize_batch ()
 
 (* Finn POC: Following Raphael's remark we test what happens if the
    finalize operation is submitted twice in a block. We create 3
    stakers whose unstake requests are finalized from a diffrerent
    account (finn). Note that we delay unstake requests so that they
    are issued in different cycles. *)
-let finn_finalize_interferance =
+let finn_finalize_interferance () =
   let open Lwt_result_syntax in
   let amount = Tez_helpers.of_int 10_000 in
   let* b, delegate = Context.init_with_constants1 constants in
@@ -772,4 +772,4 @@ let () =
     ~title:
       "Finn: Finn batch finalizes correctly even if one of the stakers submits \
        a finalize operation in parallel."
-  @@ fun () -> finn_finalize_interferance
+  @@ fun () -> finn_finalize_interferance ()
