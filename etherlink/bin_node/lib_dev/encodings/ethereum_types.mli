@@ -340,6 +340,8 @@ val transaction_log_body_from_rlp :
 
 val decode_hex : bytes -> hex
 
+val encode_hex : hex -> bytes
+
 module From_rlp : sig
   val decode_address : Rlp.item -> address tzresult
 
