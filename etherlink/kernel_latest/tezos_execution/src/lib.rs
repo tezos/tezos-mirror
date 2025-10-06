@@ -51,13 +51,13 @@ pub mod mir_ctx;
 mod validate;
 
 fn reveal<Host: Runtime>(
-    host: &mut Host,
+    tc_ctx: &mut TcCtx<'_, Host>,
     source_account: &TezlinkImplicitAccount,
     public_key: &PublicKey,
 ) -> Result<RevealSuccess, RevealError> {
-    log!(host, Debug, "Applying a reveal operation");
+    log!(tc_ctx.host, Debug, "Applying a reveal operation");
     let manager = source_account
-        .manager(host)
+        .manager(tc_ctx.host)
         .map_err(|_| RevealError::UnretrievableManager)?;
 
     let expected_hash = match manager {
@@ -78,13 +78,13 @@ fn reveal<Host: Runtime>(
 
     // Set the public key as the manager
     source_account
-        .set_manager_public_key(host, public_key)
+        .set_manager_public_key(tc_ctx.host, public_key)
         .map_err(|_| RevealError::FailedToWriteManager)?;
 
-    log!(host, Debug, "Reveal operation succeed");
+    log!(tc_ctx.host, Debug, "Reveal operation succeed");
 
     Ok(RevealSuccess {
-        consumed_milligas: 0_u64.into(),
+        consumed_milligas: tc_ctx.gas.milligas_consumed_by_operation(),
     })
 }
 
@@ -348,18 +348,17 @@ fn transfer<'a, Host: Runtime>(
             let _allocated = dest_account
                 .allocate(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToAllocateDestination)?;
-            transfer_tez(tc_ctx.host, sender_account, amount, &dest_account).map(
-                |success| {
-                    TransferSuccess {
-                        // This boolean is kept at false on purpose to maintain compatibility with TZKT.
-                        // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
-                        // This incurs a cost, and TZKT expects balance updates in the operation receipt representing this cost.
-                        // So, as long as we don't have balance updates to represent this cost, we keep this boolean false.
-                        allocated_destination_contract: false,
-                        ..success
-                    }
-                },
-            )
+            let receipt =
+                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?;
+            Ok(TransferSuccess {
+                // This boolean is kept at false on purpose to maintain compatibility with TZKT.
+                // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
+                // This incurs a cost, and TZKT expects balance updates in the operation receipt representing this cost.
+                // So, as long as we don't have balance updates to represent this cost, we keep this boolean false.
+                allocated_destination_contract: false,
+                consumed_milligas: tc_ctx.gas.milligas_consumed_by_operation(),
+                ..receipt
+            })
         }
         Contract::Originated(kt1) => {
             let dest_account = TezlinkOriginatedAccount::from_kt1(tc_ctx.context, kt1)
@@ -385,6 +384,11 @@ fn transfer<'a, Host: Runtime>(
             dest_account
                 .set_storage(ctx.host(), &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+
+            // In L1, the receipt of an operation only shows its own gas
+            // consumption, i.e. it does not include that of its internal
+            // operations.
+            let consumed_milligas = ctx.tc_ctx.gas.milligas_consumed_by_operation();
             execute_internal_operations(
                 ctx.tc_ctx,
                 ctx.operation_ctx,
@@ -402,6 +406,7 @@ fn transfer<'a, Host: Runtime>(
             Ok(TransferSuccess {
                 storage: Some(new_storage),
                 lazy_storage_diff,
+                consumed_milligas,
                 ..receipt
             })
         }
@@ -587,7 +592,7 @@ fn originate_contract<'a, Host: Runtime>(
     let dummy_origination_sucess = OriginationSuccess {
         balance_updates,
         originated_contracts: vec![Originated { contract }],
-        consumed_milligas: 0u64.into(),
+        consumed_milligas: ctx.gas.milligas_consumed_by_operation(),
         // TODO https://linear.app/tezos/issue/L2-325/fix-storage-size-and-paid-diff-at-origination
         // These are probably not the right values for storage_size and
         // paid_storage_size_diff, but having something different than 0
@@ -869,7 +874,7 @@ fn apply_operation<Host: Runtime>(
     let parser = Parser::new();
     match &validated_operation.content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
-            let reveal_result = reveal(host, source_account, pk);
+            let reveal_result = reveal(&mut tc_ctx, source_account, pk);
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,
                 reveal_result.map_err(Into::into),
@@ -1927,7 +1932,7 @@ mod tests {
         let operation = make_transfer_operation(
             fees,
             1,
-            4,
+            8,
             5,
             src.clone(),
             0.into(),
@@ -1969,7 +1974,7 @@ mod tests {
                         balance_updates: vec![],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 0_u64.into(),
+                        consumed_milligas: 7015_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: false,
@@ -2112,7 +2117,7 @@ mod tests {
                 ],
                 ticket_receipt: vec![],
                 originated_contracts: vec![],
-                consumed_milligas: 0_u64.into(),
+                consumed_milligas: 2645_u64.into(),
                 storage_size: 0_u64.into(),
                 paid_storage_size_diff: 0_u64.into(),
                 allocated_destination_contract: false,
@@ -2650,7 +2655,7 @@ mod tests {
         let batch = make_operation(
             10_u64,
             1,
-            0,
+            10,
             0,
             src.clone(),
             vec![reveal_content, succ_transfer, fail_transfer],
@@ -2835,7 +2840,7 @@ mod tests {
                 originated_contracts: vec![Originated {
                     contract: expected_kt1.clone(),
                 }],
-                consumed_milligas: 0u64.into(),
+                consumed_milligas: 2400u64.into(),
                 storage_size: 38u64.into(),
                 paid_storage_size_diff: 38u64.into(),
                 lazy_storage_diff: None,
@@ -2963,7 +2968,7 @@ mod tests {
         let operation = make_operation(
             10,
             1,
-            0,
+            15,
             0,
             src.clone(),
             vec![
@@ -3337,7 +3342,7 @@ mod tests {
         let operation = make_operation(
             10,
             1,
-            0,
+            10,
             0,
             src.clone(),
             vec![OperationContent::Transfer(TransferContent {
@@ -3536,7 +3541,7 @@ mod tests {
         let operation = make_operation(
             10,
             1,
-            0,
+            30,
             0,
             src.clone(),
             vec![OperationContent::Transfer(TransferContent {
@@ -3761,7 +3766,7 @@ mod tests {
         let batch = make_operation(
             5,
             1,
-            0,
+            4,
             0,
             src.clone(),
             vec![
@@ -3862,7 +3867,7 @@ mod tests {
                         originated_contracts: vec![Originated {
                             contract: expected_kt1_1.clone(),
                         }],
-                        consumed_milligas: 0_u64.into(),
+                        consumed_milligas: 2400_u64.into(),
                         storage_size: 30.into(),
                         paid_storage_size_diff: 30.into(),
                         lazy_storage_diff: None,
@@ -3928,7 +3933,7 @@ mod tests {
                         originated_contracts: vec![Originated {
                             contract: expected_kt1_2.clone(),
                         }],
-                        consumed_milligas: 0_u64.into(),
+                        consumed_milligas: 2400u64.into(),
                         storage_size: 30.into(),
                         paid_storage_size_diff: 30.into(),
                         lazy_storage_diff: None,
@@ -4140,7 +4145,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             2,
-            4,
+            11,
             5,
             src.clone(),
             0.into(),
@@ -4181,7 +4186,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             3,
-            4,
+            100,
             5,
             src.clone(),
             0.into(),
@@ -4230,7 +4235,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             4,
-            4,
+            100,
             5,
             src,
             0.into(),
