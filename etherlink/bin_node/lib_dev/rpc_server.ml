@@ -147,7 +147,7 @@ let monitor_performances ~data_dir =
 
 let start_public_server (type f) ~(mode : Configuration.mode)
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id
-    ?delegate_health_check_to ?evm_services ?data_dir (config : Configuration.t)
+    ?evm_services ?data_dir (config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container) ctxt =
   let open Lwt_result_syntax in
   let can_start_performance_metrics =
@@ -213,14 +213,7 @@ let start_public_server (type f) ~(mode : Configuration.mode)
 
   let directory =
     register_tezos_services
-    |> Services.directory
-         ~rpc_server_family
-         ?delegate_health_check_to
-         mode
-         rpc
-         config
-         tx_container
-         ctxt
+    |> Services.directory ~rpc_server_family mode rpc config tx_container ctxt
     |> register_evm_services
     |> Evm_directory.register_metrics "/metrics"
     |> Evm_directory.register_describe
