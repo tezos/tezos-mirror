@@ -13,7 +13,8 @@
   octez-libs.tezos-bees
   octez-libs.test-helpers
   octez-libs.base-test-helpers
-  octez-alcotezt)
+  octez-alcotezt
+  octez-libs.alcotezt-process)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

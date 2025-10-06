@@ -1894,7 +1894,7 @@ let octez_base_unix =
 (* Alcotezt process isolation library - defined here after octez_base/octez_base_unix
    to avoid dependency cycles. Tests that need process isolation with tzresult support
    should depend on this library. *)
-let _alcotezt_process =
+let alcotezt_process =
   octez_lib
     "alcotezt-process"
     ~path:"tezt/lib_alcotezt_process"
@@ -2680,6 +2680,7 @@ let _octez_bees_tests =
         octez_test_helpers |> open_;
         octez_base_test_helpers |> open_;
         alcotezt;
+        alcotezt_process;
       ]
 
 let octez_merkle_proof_encoding =
