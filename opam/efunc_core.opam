@@ -19,7 +19,7 @@ depends: [
   "fmt" { >= "0.8.7" }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
