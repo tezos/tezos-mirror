@@ -186,7 +186,7 @@ module Sink : Internal_event.SINK = struct
     let log =
       Format.asprintf "%a" (M.pp ~all_fields:false ~block:false) event
     in
-    let body =
+    let v_event =
       let (`O [(_, json)] | json) =
         Data_encoding.Json.construct M.encoding event
       in
@@ -197,9 +197,9 @@ module Sink : Internal_event.SINK = struct
     in
     let attributes : Opentelemetry_proto.Common.key_value list =
       [
-        {key = "message"; value = Some (String_value log)};
         {key = "section"; value = Some (String_value section_str)};
-        {key = "event"; value = Some (String_value M.name)};
+        {key = "name"; value = Some (String_value M.name)};
+        {key = "event"; value = v_event};
       ]
     in
 
@@ -211,7 +211,7 @@ module Sink : Internal_event.SINK = struct
         ~severity_text:log_level
         ?trace_id:(Option.map Opentelemetry.Trace_id.to_bytes trace_id)
         ?span_id:(Option.map Opentelemetry.Span_id.to_bytes span_id)
-        ~body
+        ~body:(Some (String_value log))
         ~attributes
         ()
     in
