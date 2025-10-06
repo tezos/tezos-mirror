@@ -392,7 +392,7 @@ let init_faucet_frontend ~faucet_api ~agent ~tezlink_sandbox_endpoint
            ()))
 
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
-    (rpc_port : int option) (verbose : bool)
+    ?(rpc_port : int option) (verbose : bool)
     (time_between_blocks : Evm_node.time_between_blocks) agent =
   let chain_id = 1 in
   let () = toplog "Initializing the tezlink scenario" in
@@ -513,41 +513,61 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       Clap.close () ;
       let () = toplog "Creating the agents" in
       let agents = Cloud.agents cloud in
-      let next_agent ~name =
-        let agent =
-          match List.find_opt (fun agent -> Agent.name agent = name) agents with
-          | None ->
-              if Cli.proxy_localhost then List.hd agents
-              else Test.fail ~__LOC__ "Agent not found: %s" name
-          | Some agent -> agent
-        in
-        Lwt.return agent
+      let tezlink_sequencer_agent =
+        match List.find_opt (fun agent -> Agent.name agent = name) agents with
+        | None ->
+            if Cli.proxy_localhost then List.hd agents
+            else Test.fail ~__LOC__ "Agent not found: %s" name
+        | Some agent -> agent
       in
-      let* tezlink_sequencer_agent = next_agent ~name in
+      let public_rpc_port =
+        match Cli.public_rpc_port with
+        | None -> Agent.next_available_port tezlink_sequencer_agent
+        | Some port -> port
+      in
       let () = toplog "Starting Tezlink sequencer" in
       let* tezlink_sandbox_endpoint =
         init_tezlink_sequencer
           cloud
           name
-          Cli.public_rpc_port
           Cli.verbose
           Cli.time_between_blocks
           tezlink_sequencer_agent
       in
       let* () =
+        let proxy_pass =
+          (* The trailing / is mandatory, otherwise the reverse proxy won't be
+             able to serve services with a path. *)
+          Client.string_of_endpoint tezlink_sandbox_endpoint ^ "/"
+        in
+        Nginx_reverse_proxy.init_simple
+          tezlink_sequencer_agent
+          ~site:"tezlink"
+          ~server_name:"localhost"
+          ~port:public_rpc_port
+          ~location:"/"
+          ~proxy_pass
+      in
+      let tezlink_proxy_endpoint =
+        match tezlink_sandbox_endpoint with
+        | Node _ ->
+            failwith "Tezlink end-point should not be a full-fledged node."
+        | Foreign_endpoint {host; scheme; port = _; path = _} ->
+            Client.Foreign_endpoint
+              (Endpoint.make ~host ~scheme ~port:public_rpc_port ())
+      in
+      let* () =
         add_service
           cloud
           ~name:"Tezlink RPC endpoint"
-          ~url:(Client.string_of_endpoint tezlink_sandbox_endpoint)
+          ~url:(Client.string_of_endpoint tezlink_proxy_endpoint)
       in
       let* () =
         add_service
           cloud
           ~name:"Check Tezlink RPC endpoint"
           ~url:
-            (sf
-               "%s/version"
-               (Client.string_of_endpoint tezlink_sandbox_endpoint))
+            (sf "%s/version" (Client.string_of_endpoint tezlink_proxy_endpoint))
       in
       let* () =
         if Cli.tzkt then
