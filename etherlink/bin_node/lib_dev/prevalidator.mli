@@ -62,6 +62,15 @@ val prevalidate_raw_transaction :
     performed. *)
 val refresh_state : unit -> unit tzresult Lwt.t
 
+(** [prevalidate_raw_transaction_tezlink raw_txn] sends a prevalidation request
+    to the worker, and waits for the result.
+
+    If the worker failed to start, a new initialization attempt will be
+    performed. *)
+val prevalidate_raw_transaction_tezlink :
+  string ->
+  (Tezos_types.Operation.t prevalidation_result, string) result tzresult Lwt.t
+
 type validation_config = {
   minimum_base_fee_per_gas : Ethereum_types.quantity;
   base_fee_per_gas : Ethereum_types.quantity;

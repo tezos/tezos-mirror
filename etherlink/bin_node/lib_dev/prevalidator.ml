@@ -211,10 +211,18 @@ module Request = struct
              tztrace )
            t
     | Refresh_state : (unit, tztrace) t
+    | Prevalidate_raw_transaction_tezlink : {
+        raw_transaction : string;
+      }
+        -> ( (Tezos_types.Operation.t prevalidation_result, string) result,
+             tztrace )
+           t
 
   let name : type a err. (a, err) t -> string = function
     | Prevalidate_raw_transaction _ -> "Prevalidate_raw_transaction"
     | Refresh_state -> "Refresh_state"
+    | Prevalidate_raw_transaction_tezlink _ ->
+        "Prevalidate_raw_transaction_tezlink"
 
   type view = View : _ t -> view
 
@@ -243,6 +251,19 @@ module Request = struct
           (obj1 (req "request" (constant "replace_state")))
           (function View Refresh_state -> Some () | _ -> None)
           (fun () ->
+            (* Only used for logging *)
+            assert false);
+        case
+          ~title:"Prevalidate_raw_transaction_tezlink"
+          Json_only
+          (obj2
+             (req "request" (constant "prevalidate_raw_transaction_tezlink"))
+             (req "raw_transaction" (string' Hex)))
+          (function
+            | View (Prevalidate_raw_transaction_tezlink {raw_transaction}) ->
+                Some ((), raw_transaction)
+            | _ -> None)
+          (fun ((), _) ->
             (* Only used for logging *)
             assert false);
       ]
@@ -685,6 +706,9 @@ module Handlers = struct
     | Prevalidate_raw_transaction {raw_transaction} ->
         is_tx_valid ctxt session raw_transaction
     | Refresh_state -> refresh_state ctxt session
+    | Prevalidate_raw_transaction_tezlink _ ->
+        (* TODO *)
+        failwith "TBI"
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -829,6 +853,10 @@ let prevalidate_raw_transaction raw_transaction =
     (Request.Prevalidate_raw_transaction {raw_transaction})
 
 let refresh_state () = worker_add_request ~request:Request.Refresh_state
+
+let prevalidate_raw_transaction_tezlink raw_transaction =
+  worker_wait_for_request
+    (Request.Prevalidate_raw_transaction_tezlink {raw_transaction})
 
 type validation_config = {
   minimum_base_fee_per_gas : Ethereum_types.quantity;
