@@ -263,7 +263,9 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~tag:Gcp_not_interruptible
   in
   let jobs_dnf_repository = Rpm_repository.jobs Release in
-  let jobs_debian_repository = Debian_repository.jobs Release in
+  let jobs_debian_repository =
+    Debian_repository.jobs ~limit_dune_build_jobs:true Release
+  in
   let job_gitlab_release_or_publish =
     let dependencies =
       [
