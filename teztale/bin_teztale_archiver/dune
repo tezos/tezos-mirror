@@ -123,20 +123,6 @@
     PtSeouLo_machine.real.ml))))
 
 (rule
- (target PsRiotum_machine.real.ml)
- (mode fallback)
- (deps next_machine.real.ml)
- (action
-  (progn
-   (copy next_machine.real.ml PsRiotum_machine.real.ml)
-   (run
-    sed
-    -i.bak -e s/Tezos_client_next/Tezos_client_PsRiotum/g -e
-    s/Tezos_protocol_next/Tezos_protocol_PsRiotum/g -e
-    s/Tezos_protocol_plugin_next/Tezos_protocol_plugin_PsRiotum/g
-    PsRiotum_machine.real.ml))))
-
-(rule
  (target next_machine.real.ml)
  (mode fallback)
  (deps alpha_machine.real.ml)

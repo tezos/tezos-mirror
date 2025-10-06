@@ -8125,7 +8125,7 @@ let hash = Protocol.hash
 
   let _021_PsQuebec = frozen (Name.v "PsQuebec" 021)
 
-  let _022_PsRiotum = active (Name.v "PsRiotum" 022)
+  let _022_PsRiotum = frozen (Name.v "PsRiotum" 022)
 
   let _023_PtSeouLo = active (Name.v "PtSeouLo" 023)
 
