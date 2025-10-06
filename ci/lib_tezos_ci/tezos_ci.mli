@@ -610,10 +610,6 @@ module Images_external : sig
 
   val datadog_ci : Image.t
 
-  val opam_ubuntu_noble : Image.t
-
-  val opam_debian_bookworm : Image.t
-
   val ci_release : Image.t
 
   val hadolint : Image.t
@@ -627,10 +623,6 @@ module Images : sig
   val docker : Image.t
 
   val datadog_ci : Image.t
-
-  val opam_ubuntu_noble : Image.t
-
-  val opam_debian_bookworm : Image.t
 
   val ci_release : Image.t
 

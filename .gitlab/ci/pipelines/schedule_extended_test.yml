@@ -2877,10 +2877,10 @@ resto.unit:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.install_opam_noble:
-  image: ocaml/opam:ubuntu-24.04
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/build-ubuntu-noble:master
   stage: test
   tags:
-  - gcp
+  - gcp_very_high_cpu
   rules:
   - when: always
   needs: []
@@ -2891,6 +2891,8 @@ oc.install_opam_noble:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
+  - apt update
+  - apt install -y sudo
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/introduction/install-opam.sh
@@ -2898,7 +2900,7 @@ oc.install_opam_noble:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    OPAMJOBS: "4"
+    CARGO_NET_OFFLINE: "false"
 
 oc.compile_sources_doc_deps:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$IMAGE
