@@ -228,6 +228,10 @@ pub fn execute_validation<Host: Runtime>(
         .map(Into::into)
         .collect();
     let (pk, source_account) = validate_source(host, context, &unvalidated_operation)?;
+    match operation.verify_signature(&pk) {
+        Ok(true) => log!(host, Debug, "Validation: OK - Signature is valid."),
+        _ => return Err(ValidityError::InvalidSignature),
+    }
     let mut balance_updates = vec![];
     for c in &unvalidated_operation {
         let (new_source_balance, op_balance_updates) =
@@ -243,13 +247,9 @@ pub fn execute_validation<Host: Runtime>(
 
         balance_updates.push(op_balance_updates);
     }
-
-    match operation.verify_signature(&pk) {
-        Ok(true) => Ok(ValidationInfo {
-            source_account,
-            balance_updates,
-            validated_operations: unvalidated_operation,
-        }),
-        _ => Err(ValidityError::InvalidSignature),
-    }
+    Ok(ValidationInfo {
+        source_account,
+        balance_updates,
+        validated_operations: unvalidated_operation,
+    })
 }
