@@ -24,3 +24,9 @@
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
   -open Tezt_etherlink))
+
+(rule
+ (target static_contracts.ml)
+ (deps (glob_files_rec contracts/**.{abi,bin,json}))
+ (action
+  (run ocaml-crunch -e bin -e abi -e json -m plain -o %{target} -s contracts)))

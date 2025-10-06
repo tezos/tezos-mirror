@@ -461,15 +461,6 @@ let nested_delegatecalls_D =
     ~label:"nested_delegatecalls_D"
     ~contract:"D"
 
-let snailtracer =
-  (* Already compiled because needs solc < 0.8.0 *)
-  {
-    label = "snailtracer";
-    abi = solidity_contracts_path ^ "/snailtracer.abi";
-    bin = solidity_contracts_path ^ "/snailtracer.bin";
-    deployed_bin = "";
-  }
-
 module Precompile = struct
   let withdrawal = "0xff00000000000000000000000000000000000001"
 

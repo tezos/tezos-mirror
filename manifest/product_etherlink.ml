@@ -527,6 +527,7 @@ let _tezt_node_benchmark =
     ~deps:
       [
         bls12_381_archive;
+        crunch;
         octez_test_helpers |> open_;
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
@@ -537,6 +538,34 @@ let _tezt_node_benchmark =
     ~dep_globs:
       ["evm_kernel_inputs/*"; "../../tezos_contracts/*"; "../../config/*"]
     ~dep_globs_rec:["../../kernel_latest/*"]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "static_contracts.ml"];
+            [S "deps"; [S "glob_files_rec"; S "contracts/**.{abi,bin,json}"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "bin";
+                S "-e";
+                S "abi";
+                S "-e";
+                S "json";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S "contracts";
+              ];
+            ];
+          ];
+        ]
 
 let _tezt_etherlink_benchmark_producer =
   public_exe

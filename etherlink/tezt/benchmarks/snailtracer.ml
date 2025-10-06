@@ -251,7 +251,7 @@ let test_snailtracer =
   in
   let tx_queue = Tx_queue.beacon ~tick_interval:0.5 in
   Log.report "Deploying SnailTracer contract" ;
-  let bin = Base.read_file Solidity_contracts.snailtracer.bin in
+  let bin = Contracts.Snailtracer.bin () in
   let bin = bin ^ encode_parameters width height in
   let* contract =
     deploy_contract ~rpc_node infos ~sequencer accounts.(0) (`Custom bin)
@@ -336,7 +336,7 @@ let test_full_image_raytracing =
   in
   let tx_queue = Tx_queue.beacon ~tick_interval:0.5 in
   Log.report "Deploying SnailTracer contract" ;
-  let bin = Base.read_file Solidity_contracts.snailtracer.bin in
+  let bin = Contracts.Snailtracer.bin () in
   let bin = bin ^ encode_parameters width height in
   let* contract =
     deploy_contract ~rpc_node infos ~sequencer sender (`Custom bin)
