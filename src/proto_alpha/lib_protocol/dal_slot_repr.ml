@@ -417,62 +417,63 @@ module History = struct
 
     let encoding =
       let open Data_encoding in
-      union
-        ~tag_size:`Uint8
-        [
-          case
-            ~title:"unpublished"
-            (Tag 2)
-            (merge_objs
-               (obj1 (req "kind" (constant "unpublished")))
-               Header.id_encoding)
-            (function
-              | Unpublished slot_id -> Some ((), slot_id) | Published _ -> None)
-            (fun ((), slot_id) -> Unpublished slot_id);
-          case
-            ~title:"published"
-            (Tag 3)
-            (merge_objs
-               (obj5
-                  (req "kind" (constant "published"))
-                  (req "publisher" Contract_repr.encoding)
-                  (req "is_proto_attested" bool)
-                  (req "attested_shards" uint16)
-                  (req "total_shards" uint16))
-               Header.encoding)
-            (function
-              | Unpublished _ -> None
-              | Published
-                  {
-                    header;
-                    publisher;
-                    is_proto_attested;
-                    attested_shards;
-                    total_shards;
-                  } ->
-                  Some
-                    ( ( (),
-                        publisher,
-                        is_proto_attested,
-                        attested_shards,
-                        total_shards ),
-                      header ))
-            (fun ( ( (),
-                     publisher,
-                     is_proto_attested,
-                     attested_shards,
-                     total_shards ),
-                   header )
-               ->
-              Published
+      let legacy_unpublished_case =
+        case
+          ~title:"unpublished"
+          (Tag 2)
+          (merge_objs
+             (obj1 (req "kind" (constant "unpublished")))
+             Header.id_encoding)
+          (function
+            | Unpublished slot_id -> Some ((), slot_id) | Published _ -> None)
+          (fun ((), slot_id) -> Unpublished slot_id)
+      in
+      let legacy_published_case =
+        case
+          ~title:"published"
+          (Tag 3)
+          (merge_objs
+             (obj5
+                (req "kind" (constant "published"))
+                (req "publisher" Contract_repr.encoding)
+                (req "is_proto_attested" bool)
+                (req "attested_shards" uint16)
+                (req "total_shards" uint16))
+             Header.encoding)
+          (function
+            | Unpublished _ -> None
+            | Published
                 {
                   header;
                   publisher;
                   is_proto_attested;
                   attested_shards;
                   total_shards;
-                });
-        ]
+                } ->
+                Some
+                  ( ( (),
+                      publisher,
+                      is_proto_attested,
+                      attested_shards,
+                      total_shards ),
+                    header ))
+          (fun ( ( (),
+                   publisher,
+                   is_proto_attested,
+                   attested_shards,
+                   total_shards ),
+                 header )
+             ->
+            Published
+              {
+                header;
+                publisher;
+                is_proto_attested;
+                attested_shards;
+                total_shards;
+              })
+      in
+      union ~tag_size:`Uint8 [legacy_unpublished_case; legacy_published_case]
 
     let equal t1 t2 =
       match (t1, t2) with
