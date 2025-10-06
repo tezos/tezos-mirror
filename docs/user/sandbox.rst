@@ -1,16 +1,18 @@
 Sandboxed mode
 --------------
 
+.. note::
+
+   The following scripts and commands assume that you have built Octez from the source code. 
+   See :ref:`Build from sources<build_from_sources>`.
+   To switch to the master branch, use ``git checkout master`` instead of ``git checkout latest-release``.
+
+
 To run a ‘localhost-only’ instance of a Tezos network, we provide two
 helper scripts:
 
 -  ``./src/bin_node/octez-sandboxed-node.sh``
 -  ``./src/bin_client/octez-init-sandboxed-client.sh``
-
-For the moment these scripts are expected to be run on the ``master``
-branch (see :ref:`Build from sources<build_from_sources>`; in
-particular, use ``git checkout master`` instead of ``git checkout
-latest-release``).
 
 Run a sandboxed node
 ~~~~~~~~~~~~~~~~~~~~
