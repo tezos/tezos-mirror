@@ -85,7 +85,6 @@ depends: [
   "tezos-sapling-parameters" { >= "1.1.0" }
   "octez-rust-tezos-context" { = version }
   "opentelemetry-lwt"
-  "octez-alcotezt-process" { with-test & = version }
   "octez-rustzcash-deps" { with-test & = version }
   "bigstring" {with-test}
   "tezt-bam" { with-test & >= "0.3" }

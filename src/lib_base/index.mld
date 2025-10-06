@@ -4,6 +4,7 @@ This is a package containing some libraries used by the Octez project.
 
 It contains the following libraries:
 
+- {{!module-Alcotezt_process}Alcotezt_process}: Process-isolated test execution for Alcotezt with Tezos error monad support
 - {{!module-Aplonk}Aplonk}
 - {{!module-Bls12_381_hash}Bls12_381_hash}
 - {{!module-Bls12_381_signature}Bls12_381_signature}
