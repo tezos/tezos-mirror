@@ -697,6 +697,16 @@ module Handlers = struct
     ctxt.session <- session ;
     return_unit
 
+  let is_tezlink_tx_valid (type _state) _ctxt _session raw_transaction :
+      (Tezos_types.Operation.t prevalidation_result, string) result tzresult
+      Lwt.t =
+    let open Lwt_result_syntax in
+    (* TODO *)
+    let*? (op : Tezos_types.Operation.t) =
+      raw_transaction |> Bytes.of_string |> Tezos_types.Operation.decode
+    in
+    return (Ok {next_nonce = Qty op.first_counter; transaction_object = op})
+
   let on_request : type r err.
       self -> (r, err) Request.t -> (r, err) result Lwt.t =
    fun self request ->
@@ -706,9 +716,8 @@ module Handlers = struct
     | Prevalidate_raw_transaction {raw_transaction} ->
         is_tx_valid ctxt session raw_transaction
     | Refresh_state -> refresh_state ctxt session
-    | Prevalidate_raw_transaction_tezlink _ ->
-        (* TODO *)
-        failwith "TBI"
+    | Prevalidate_raw_transaction_tezlink {raw_transaction} ->
+        is_tezlink_tx_valid ctxt session raw_transaction
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
