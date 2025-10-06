@@ -255,7 +255,7 @@ let container_forward_request (type f) ~(chain_family : f L2_types.chain_family)
                          Tezlink case"
                   end))
 
-let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
+let main ~mode ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
   let* telemetry_cleanup =
@@ -337,6 +337,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
   let* server_public_finalizer =
     Rpc_server.start_public_server
+      ~mode:(Rpc {evm_node_endpoint})
       ~l2_chain_id
       ~delegate_health_check_to:evm_node_endpoint
       ~evm_services:

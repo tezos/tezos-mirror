@@ -145,7 +145,7 @@ let monitor_performances ~data_dir =
   (* Run in background *)
   ignore domain
 
-let start_public_server (type f)
+let start_public_server (type f) ~(mode : Configuration.mode)
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id
     ?delegate_health_check_to ?evm_services ?data_dir (config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container) ctxt =
@@ -216,6 +216,7 @@ let start_public_server (type f)
     |> Services.directory
          ~rpc_server_family
          ?delegate_health_check_to
+         mode
          rpc
          config
          tx_container
@@ -234,13 +235,15 @@ let start_public_server (type f)
   in
   return finalizer
 
-let start_private_server ~(rpc_server_family : _ Rpc_types.rpc_server_family)
+let start_private_server ~mode
+    ~(rpc_server_family : _ Rpc_types.rpc_server_family)
     ?(block_production = `Disabled) config tx_container ctxt =
   let open Lwt_result_syntax in
   match config.Configuration.private_rpc with
   | Some private_rpc ->
       let directory =
         Services.private_directory
+          mode
           ~rpc_server_family
           private_rpc
           ~block_production
