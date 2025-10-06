@@ -24,7 +24,6 @@ type t = {
   total_supply : Tez.t;
   constants : Protocol.Alpha_context.Constants.Parametric.t;
   param_requests : (string * staking_parameters * int) list;
-  force_ai_vote_yes : bool;
   baking_policy : Block.baker_policy option;
   payload_round : int option;
   last_level_rewards : Protocol.Alpha_context.Raw_level.t;

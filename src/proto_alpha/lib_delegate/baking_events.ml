@@ -1085,9 +1085,7 @@ module Actions = struct
       ~name:"vote_for_adaptive_issuance"
       ~level:Notice
       ~msg:"Voting {value} for adaptive issuance vote"
-      ( "value",
-        Protocol.Alpha_context.Per_block_votes.adaptive_issuance_vote_encoding
-      )
+      ("value", Baking_configuration.adaptive_issuance_vote_config_encoding)
 
   let signature_timeout =
     declare_1
@@ -1406,9 +1404,7 @@ module Per_block_votes = struct
       ~name:"read_adaptive_issuance_vote"
       ~level:Notice
       ~msg:"read adaptive issuance vote = {value}"
-      ( "value",
-        Protocol.Alpha_context.Per_block_votes.adaptive_issuance_vote_encoding
-      )
+      ("value", Baking_configuration.adaptive_issuance_vote_config_encoding)
 end
 
 module Selection = struct

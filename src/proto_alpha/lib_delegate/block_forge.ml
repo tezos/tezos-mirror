@@ -46,7 +46,7 @@ type simulation_kind =
    dummy [signature]. *)
 let forge_faked_protocol_data ?(payload_hash = Block_payload_hash.zero)
     ~payload_round ~seed_nonce_hash ~liquidity_baking_toggle_vote
-    ~adaptive_issuance_vote () =
+    ~adaptive_issuance_vote:_ () =
   Block_header.
     {
       contents =
@@ -56,10 +56,7 @@ let forge_faked_protocol_data ?(payload_hash = Block_payload_hash.zero)
           seed_nonce_hash;
           proof_of_work_nonce = Baking_pow.empty_proof_of_work_nonce;
           per_block_votes =
-            {
-              liquidity_baking_vote = liquidity_baking_toggle_vote;
-              adaptive_issuance_vote;
-            };
+            {liquidity_baking_vote = liquidity_baking_toggle_vote};
         };
       signature = Signature.zero;
     }
@@ -933,10 +930,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id
           seed_nonce_hash;
           proof_of_work_nonce;
           per_block_votes =
-            {
-              liquidity_baking_vote = liquidity_baking_toggle_vote;
-              adaptive_issuance_vote;
-            };
+            {liquidity_baking_vote = liquidity_baking_toggle_vote};
         })
   in
   let unsigned_block_header =

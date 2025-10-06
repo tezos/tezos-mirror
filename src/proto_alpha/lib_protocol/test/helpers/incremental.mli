@@ -59,7 +59,6 @@ val begin_construction :
   ?mempool_mode:bool ->
   ?policy:Block.baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes_repr.per_block_vote ->
-  ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
   ?payload_round:int ->
   ?payload:packed_operation list ->
   Block.t ->

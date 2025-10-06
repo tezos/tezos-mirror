@@ -257,7 +257,9 @@ let liquidity_baking_toggle_vote_config_encoding =
   Protocol.Alpha_context.Per_block_votes.liquidity_baking_vote_encoding
 
 let adaptive_issuance_vote_config_encoding =
-  Protocol.Alpha_context.Per_block_votes.adaptive_issuance_vote_encoding
+  (* TMP: use liquidity baking encoding because it has the right type,
+     but this encoding will be removed in the next MR anyway *)
+  Protocol.Alpha_context.Per_block_votes.liquidity_baking_vote_encoding
 
 let per_block_votes_config_encoding =
   let open Data_encoding in

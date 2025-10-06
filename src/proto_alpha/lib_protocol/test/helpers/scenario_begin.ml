@@ -163,7 +163,6 @@ let begin_test ?(delegates_with_algo = []) ?algo ?(burn_rewards = false)
             total_supply;
             constants;
             param_requests = [];
-            force_ai_vote_yes = true;
             baking_policy = None;
             payload_round = None;
             last_level_rewards = init_level;

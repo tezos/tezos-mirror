@@ -76,30 +76,28 @@ let contents_encoding =
              payload_round;
              seed_nonce_hash;
              proof_of_work_nonce;
-             per_block_votes = {liquidity_baking_vote; adaptive_issuance_vote};
+             per_block_votes = {liquidity_baking_vote};
            }
          ->
         ( payload_hash,
           payload_round,
           proof_of_work_nonce,
           seed_nonce_hash,
-          liquidity_baking_vote,
-          adaptive_issuance_vote ))
+          liquidity_baking_vote ))
       (fun ( payload_hash,
              payload_round,
              proof_of_work_nonce,
              seed_nonce_hash,
-             liquidity_baking_vote,
-             adaptive_issuance_vote )
+             liquidity_baking_vote )
          ->
         {
           payload_hash;
           payload_round;
           seed_nonce_hash;
           proof_of_work_nonce;
-          per_block_votes = {liquidity_baking_vote; adaptive_issuance_vote};
+          per_block_votes = {liquidity_baking_vote};
         })
-      (obj6
+      (obj5
          (req "payload_hash" Block_payload_hash.encoding)
          (req "payload_round" Round_repr.encoding)
          (req
@@ -108,10 +106,7 @@ let contents_encoding =
          (opt "seed_nonce_hash" Nonce_hash.encoding)
          (req
             "liquidity_baking_toggle_vote"
-            Per_block_votes_repr.liquidity_baking_vote_encoding)
-         (req
-            "adaptive_issuance_vote"
-            Per_block_votes_repr.adaptive_issuance_vote_encoding))
+            Per_block_votes_repr.liquidity_baking_vote_encoding))
   in
   let binary =
     conv
@@ -209,11 +204,7 @@ let max_header_length =
       proof_of_work_nonce =
         Bytes.make Constants_repr.proof_of_work_nonce_size '0';
       seed_nonce_hash = Some Nonce_hash.zero;
-      per_block_votes =
-        {
-          liquidity_baking_vote = Per_block_vote_pass;
-          adaptive_issuance_vote = Per_block_vote_pass;
-        };
+      per_block_votes = {liquidity_baking_vote = Per_block_vote_pass};
     }
   in
   Data_encoding.Binary.length
