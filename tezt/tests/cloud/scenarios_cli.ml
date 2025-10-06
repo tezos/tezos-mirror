@@ -43,6 +43,9 @@ module Clap = struct
       | l -> "[" ^ show_list ~sep:sep_in show_elm l
     in
     list ~sep:sep_out ~dummy ~name parse_inner show_inner
+
+  let list_of_list_of_int ?dummy name =
+    list_of_list ~name ?dummy int_of_string string_of_int
 end
 
 let network_typ : Network.t Clap.typ =
@@ -93,6 +96,8 @@ module type Dal = sig
   val producer_machine_type : string option
 
   val observer_slot_indices : int list
+
+  val observers_multi_slot_indices : int list list
 
   val observer_pkhs : string list
 
@@ -387,6 +392,17 @@ module Dal () : Dal = struct
           "For each slot index specified, an observer will be created to \
            observe this slot index."
         (Clap.list_of_int "observer_slot_indices")
+        []
+
+  let observers_multi_slot_indices =
+    config.observers_multi_slot_indices
+    @ Clap.default
+        ~section
+        ~long:"observers-multi-slot-indices"
+        ~placeholder:"[<slot_index>;..],[<slot_index>;...],..."
+        ~description:
+          "For each list of slots, an observer will be created to observe them."
+        (Clap.list_of_list_of_int "observer_multi_slot_indices")
         []
 
   let observer_pkhs =

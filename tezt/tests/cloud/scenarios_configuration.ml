@@ -22,6 +22,7 @@ module DAL = struct
     producers_delay : int option;
     producer_machine_type : string option;
     observer_slot_indices : int list;
+    observers_multi_slot_indices : int list list;
     observer_pkhs : string list;
     protocol : Protocol.t option;
     data_dir : string option;
@@ -78,6 +79,7 @@ module DAL = struct
              producers_delay;
              producer_machine_type;
              observer_slot_indices;
+             observers_multi_slot_indices;
              observer_pkhs;
              protocol;
              data_dir;
@@ -119,16 +121,14 @@ module DAL = struct
                 stake,
                 bakers,
                 stake_machine_type ),
-              ( dal_producers_slot_indices,
-                producers,
-                producers_delay,
-                producer_machine_type,
-                observer_slot_indices,
-                observer_pkhs,
-                protocol,
-                data_dir,
-                etherlink,
-                etherlink_sequencer ) ),
+              ( ( dal_producers_slot_indices,
+                  producers,
+                  producers_delay,
+                  producer_machine_type,
+                  observer_slot_indices,
+                  observers_multi_slot_indices,
+                  observer_pkhs ),
+                (protocol, data_dir, etherlink, etherlink_sequencer) ) ),
             ( ( etherlink_producers,
                 etherlink_chain_id,
                 echo_rollups,
@@ -160,16 +160,14 @@ module DAL = struct
                    stake,
                    bakers,
                    stake_machine_type ),
-                 ( dal_producers_slot_indices,
-                   producers,
-                   producers_delay,
-                   producer_machine_type,
-                   observer_slot_indices,
-                   observer_pkhs,
-                   protocol,
-                   data_dir,
-                   etherlink,
-                   etherlink_sequencer ) ),
+                 ( ( dal_producers_slot_indices,
+                     producers,
+                     producers_delay,
+                     producer_machine_type,
+                     observer_slot_indices,
+                     observers_multi_slot_indices,
+                     observer_pkhs ),
+                   (protocol, data_dir, etherlink, etherlink_sequencer) ) ),
                ( ( etherlink_producers,
                    etherlink_chain_id,
                    echo_rollups,
@@ -208,6 +206,7 @@ module DAL = struct
           producers_delay;
           producer_machine_type;
           observer_slot_indices;
+          observers_multi_slot_indices;
           observer_pkhs;
           protocol;
           data_dir;
@@ -252,17 +251,20 @@ module DAL = struct
                   (opt "stake" Stake_repartition.Dal.encoding)
                   (dft "bakers" (list string) [])
                   (dft "stake_machine_type" (list string) []))
-               (obj10
-                  (dft "dal_producers_slot_indices" (list int31) [])
-                  (opt "producers" int31)
-                  (opt "producers_delay" int31)
-                  (opt "producer_machine_type" string)
-                  (dft "observer_slot_indices" (list int31) [])
-                  (dft "observer_pkhs" (list string) [])
-                  (opt "protocol" Protocol.encoding)
-                  (opt "data_dir" string)
-                  (opt "etherlink" bool)
-                  (opt "etherlink_sequencer" bool)))
+               (merge_objs
+                  (obj7
+                     (dft "dal_producers_slot_indices" (list int31) [])
+                     (opt "producers" int31)
+                     (opt "producers_delay" int31)
+                     (opt "producer_machine_type" string)
+                     (dft "observer_slot_indices" (list int31) [])
+                     (dft "observers_multi_slot_indices" (list (list int31)) [])
+                     (dft "observer_pkhs" (list string) []))
+                  (obj4
+                     (opt "protocol" Protocol.encoding)
+                     (opt "data_dir" string)
+                     (opt "etherlink" bool)
+                     (opt "etherlink_sequencer" bool))))
             (merge_objs
                (obj10
                   (opt "etherlink_producers" int31)

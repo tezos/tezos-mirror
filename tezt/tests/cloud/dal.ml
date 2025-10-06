@@ -21,6 +21,7 @@ type configuration = {
   stake_machine_type : string list;
   dal_node_producers : int list; (* slot indices *)
   observer_slot_indices : int list;
+  observers_multi_slot_indices : int list list;
   observer_pkhs : string list;
   protocol : Protocol.t;
   producer_machine_type : string option;
@@ -854,6 +855,14 @@ let init ~(configuration : configuration) etherlink_configuration cloud
         return (`Slot_indexes [slot_index], agent))
       configuration.observer_slot_indices
   in
+  let* observers_multi_slot_index_agents =
+    Lwt_list.map_s
+      (fun slot_indexes ->
+        let name = name_of (Observer (`Indexes slot_indexes)) in
+        let* agent = next_agent ~name in
+        return (`Slot_indexes slot_indexes, agent))
+      configuration.observers_multi_slot_indices
+  in
   let* observers_bakers_agents =
     Lwt_list.map_s
       (fun pkh ->
@@ -956,7 +965,8 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           ~topic
           i
           agent)
-      (observers_slot_index_agents @ observers_bakers_agents)
+      (observers_slot_index_agents @ observers_multi_slot_index_agents
+     @ observers_bakers_agents)
   in
   let () = toplog "Init: all producers and observers have been initialized" in
   let* echo_rollups =
@@ -1238,6 +1248,7 @@ let register (module Cli : Scenarios_cli.Dal) =
               index)
     in
     let observer_slot_indices = Cli.observer_slot_indices in
+    let observers_multi_slot_indices = Cli.observers_multi_slot_indices in
     let observer_pkhs = Cli.observer_pkhs in
     let protocol = Cli.protocol in
     let producer_machine_type = Cli.producer_machine_type in
@@ -1304,6 +1315,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         stake_machine_type;
         dal_node_producers;
         observer_slot_indices;
+        observers_multi_slot_indices;
         observer_pkhs;
         protocol;
         producer_machine_type;
