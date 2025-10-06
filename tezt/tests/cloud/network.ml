@@ -72,13 +72,13 @@ let encoding =
     string
 
 let default_protocol : t -> Protocol.t = function
-  | `Mainnet -> R022
-  | `Ghostnet -> R022
-  | `Shadownet -> R022
+  | `Mainnet -> S023
+  | `Ghostnet -> S023
+  | `Shadownet -> S023
   | `Weeklynet _ -> Alpha
   | `Sandbox -> Alpha
   | `Nextnet _ -> S023
-  | `Rionet -> R022
+  | `Rionet -> S023
   | `Seoulnet -> S023
 
 let block_time : t -> int = function
