@@ -71,7 +71,7 @@ let jobs =
   let tezt : tezos_job =
     Tezt.job
       ~__POS__
-      ~name:"tezt"
+      ~variant:""
         (* Exclude all tests with tags in [tezt_tags_always_disable] or
            [tezt_tags_exclusive_tags]. *)
       ~tezt_tests:(Tezt.tests_tag_selector [Not (Has_tag "flaky")])
@@ -89,16 +89,15 @@ let jobs =
        regression tests. *)
     Tezt.job
       ~__POS__
-      ~name:"tezt-time-sensitive"
+      ~variant:"time-sensitive"
       ~tezt_tests:(Tezt.tests_tag_selector ~time_sensitive:true [])
-      ~tezt_variant:"-time_sensitive"
       ~dependencies
       ()
   in
   let tezt_slow : tezos_job =
     Tezt.job
       ~__POS__
-      ~name:"tezt-slow"
+      ~variant:"slow"
       ~tezt_tests:
         (Tezt.tests_tag_selector
            ~slow:true
@@ -114,7 +113,6 @@ let jobs =
                       "src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml"
                   ));
            ])
-      ~tezt_variant:"-slow"
       ~retry:2
       ~tezt_parallel:3
       ~parallel:(Vector 20)
@@ -125,9 +123,8 @@ let jobs =
   let tezt_extra : tezos_job =
     Tezt.job
       ~__POS__
-      ~name:"tezt-extra"
+      ~variant:"extra"
       ~tezt_tests:(Tezt.tests_tag_selector ~extra:true [Not (Has_tag "flaky")])
-      ~tezt_variant:"-extra"
       ~retry:2
       ~tezt_parallel:6
       ~parallel:(Vector 10)
@@ -143,9 +140,8 @@ let jobs =
        stability. *)
     Tezt.job
       ~__POS__
-      ~name:"tezt-flaky"
+      ~variant:"flaky"
       ~tezt_tests:(Tezt.tests_tag_selector [Has_tag "flaky"])
-      ~tezt_variant:"-flaky"
         (* To handle flakiness, consider tweaking [~tezt_parallel] (passed to
            Tezt's '--job-count'), and [~tezt_retry] (passed to Tezt's
            '--retry') *)

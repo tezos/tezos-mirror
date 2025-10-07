@@ -1460,7 +1460,7 @@ let jobs pipeline_type =
       let tezt : tezos_job =
         Tezt.job
           ~__POS__
-          ~name:"tezt"
+          ~variant:""
             (* Exclude all tests with tags in [tezt_tags_always_disable] or
                [tezt_tags_exclusive_tags]. *)
           ~tezt_tests:(Tezt.tests_tag_selector [Not (Has_tag "flaky")])
@@ -1482,9 +1482,8 @@ let jobs pipeline_type =
            regression tests. *)
         Tezt.job
           ~__POS__
-          ~name:"tezt-time-sensitive"
+          ~variant:"time-sensitive"
           ~tezt_tests:(Tezt.tests_tag_selector ~time_sensitive:true [])
-          ~tezt_variant:"-time_sensitive"
           ~dependencies
           ~keep_going
           ?job_select_tezts
@@ -1495,7 +1494,7 @@ let jobs pipeline_type =
       let tezt_riscv_slow_sequential : tezos_job =
         Tezt.job
           ~__POS__
-          ~name:"tezt-riscv-slow-sequential"
+          ~variant:"riscv-slow-sequential"
           ~rules:rules_manual
           ~tezt_tests:(Tezt_core.TSL_AST.Has_tag "riscv_slow_sequential")
           ~dependencies
@@ -1506,7 +1505,7 @@ let jobs pipeline_type =
       let tezt_slow : tezos_job =
         Tezt.job
           ~__POS__
-          ~name:"tezt-slow"
+          ~variant:"slow"
           ~rules:rules_manual
           ~tezt_tests:
             (Tezt.tests_tag_selector
@@ -1523,7 +1522,6 @@ let jobs pipeline_type =
                           "src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml"
                       ));
                ])
-          ~tezt_variant:"-slow"
           ~retry:2
           ~tezt_parallel:3
           ~parallel:(Vector 20)
@@ -1536,11 +1534,10 @@ let jobs pipeline_type =
       let tezt_extra : tezos_job =
         Tezt.job
           ~__POS__
-          ~name:"tezt-extra"
+          ~variant:"extra"
           ~rules:rules_manual
           ~tezt_tests:
             (Tezt.tests_tag_selector ~extra:true [Not (Has_tag "flaky")])
-          ~tezt_variant:"-extra"
           ~retry:2
           ~tezt_parallel:6
           ~parallel:(Vector 10)
@@ -1558,9 +1555,8 @@ let jobs pipeline_type =
            stability. *)
         Tezt.job
           ~__POS__
-          ~name:"tezt-flaky"
+          ~variant:"flaky"
           ~tezt_tests:(Tezt.tests_tag_selector [Has_tag "flaky"])
-          ~tezt_variant:"-flaky"
             (* To handle flakiness, consider tweaking [~tezt_parallel] (passed to
                Tezt's '--job-count'), and [~tezt_retry] (passed to Tezt's
                '--retry') *)
@@ -1579,7 +1575,7 @@ let jobs pipeline_type =
         Tezt.job
           ~__POS__
           ~tag:Gcp
-          ~name:"tezt:static-binaries"
+          ~variant:"static-binaries"
           ~tezt_tests:
             (Tezt.tests_tag_selector [Has_tag "cli"; Not (Has_tag "flaky")])
           ~tezt_parallel:3

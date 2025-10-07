@@ -14,9 +14,9 @@ open Tezos_ci
       by {!job_select_tezts} as [~job_select_tezts]. Then the
       constructed tezt job will only run the tezts selected by the
       selection job. *)
-let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~name
+let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~variant
     ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
-    ?(tezt_parallel = 1) ?(tezt_variant = "")
+    ?(tezt_parallel = 1)
     ?(before_script =
       Common.before_script ~source_version:true ~eval_opam:false []) ?timeout
     ?(disable_test_timeout = false) ?job_select_tezts ~dependencies
@@ -24,7 +24,7 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~name
   let variables =
     [
       ("JUNIT", "tezt-junit.xml");
-      ("TEZT_VARIANT", tezt_variant);
+      ("TEZT_VARIANT", if variant = "" then "" else "-" ^ variant);
       ("TESTS", Tezt_core.TSL.show tezt_tests);
       ("TEZT_RETRY", string_of_int tezt_retry);
       ("TEZT_PARALLEL", string_of_int tezt_parallel);
@@ -112,7 +112,7 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~name
     ?timeout
     ~__POS__
     ~image:Images.CI.e2etest
-    ~name
+    ~name:(if variant = "" then "tezt" else "tezt-" ^ variant)
     ?parallel
     ~tag
     ~stage:Stages.test
@@ -136,8 +136,9 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~name
            since it will contain e.g. '&&' which we want to interpreted as TSL and not shell
            syntax. *)
       "./scripts/ci/tezt.sh " ^ with_or_without_select_tezts
-      ^ " \"${TESTS}\" --from-record tezt/records --job \
-         ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > \
+      ^ " \"${TESTS}\" --from-record tezt/records"
+      ^ (if variant = "" then "" else "/" ^ variant)
+      ^ " --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > \
          selected_tezts.tsv";
       (* For Tezt tests, there are multiple timeouts:
            - --global-timeout is the internal timeout of Tezt, which only works if tests
@@ -166,8 +167,9 @@ let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~name
          --global-timeout 1800"
       ^ (if disable_test_timeout then "" else " --test-timeout 540")
       ^ " --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak \
-         'dd_tags[memory.peak]' --from-record tezt/records --job \
-         ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
+         'dd_tags[memory.peak]' --from-record tezt/records"
+      ^ (if variant = "" then "" else "/" ^ variant)
+      ^ " --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
          tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
          ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn \
          5_000_000_000" ^ keep_going_opt ^ junit_tags;
