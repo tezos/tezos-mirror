@@ -130,3 +130,36 @@ let make_simple_config ~server_name ~port ~location ~proxy_pass =
 let init_simple agent ~site ~server_name ~port ~location ~proxy_pass =
   let config = make_simple_config ~server_name ~port ~location ~proxy_pass in
   init ~agent ~site config
+
+(* Returns an NginX configuration node corresponding to:
+server {
+  listen 0.0.0.0:<port> ssl;
+  server_name <server_name>;
+
+    ssl_certificate <certificate>;
+    ssl_certificate_key <certificate_key>;
+
+  location <location> {
+    proxy_pass <proxy_pass>;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+  }
+}
+*)
+let simple_ssl_node ~server_name ~port ~location ~proxy_pass ~certificate
+    ~certificate_key =
+  Context_block
+    ( "server",
+      [
+        Directive (sf "listen 0.0.0.0:%d ssl" port);
+        Directive (sf "server_name %s" server_name);
+        Directive (sf "ssl_certificate %s" certificate);
+        Directive (sf "ssl_certificate_key %s" certificate_key);
+        Context_block
+          ( sf "location %s" location,
+            [
+              Directive (sf "proxy_pass %s" proxy_pass);
+              Directive "proxy_set_header Host $host";
+              Directive "proxy_set_header X-Real-IP $remote_addr";
+            ] );
+      ] )
