@@ -43,7 +43,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
     # defined in [./teztale/scripts/releases/release.sh]
     if [ -n "${release_rc_version}" ]; then
       rc="${release_rc_version}"
-      jq ". += [{\"major\":${release_major_version}, \"minor\":${release_minor_version},\"rc\":${rc}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
+      jq ". += [{\"major\":${release_major_version}, \"minor\":${release_minor_version},\"rc\":${rc}}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
     else
       # This is a release, we assume it's the latest.
       # All the others are marked [latest = false].
