@@ -433,12 +433,12 @@ let determine_amplification_delays node_ctxt =
   let+ parameters =
     Node_context.get_proto_parameters ~level:`Last_proto node_ctxt
   in
-  (* The propagation window is the attestation lag minus 4 levels, because:
-     - the daemon waits 2 levels for the head to be finalized
+  (* The propagation window is the attestation lag minus 3 levels, because:
+     - the daemon waits 1 level for the head to be finalized
      - attestation operations are included in the block at the next level
      - the baker asks attestation information one level in advance *)
   let propagation_period =
-    (parameters.attestation_lag - 4)
+    (parameters.attestation_lag - 3)
     * Int64.to_int parameters.minimal_block_delay
   in
   (* We split this window in 3: one third for the normal propagation round, one
