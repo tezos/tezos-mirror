@@ -12,11 +12,9 @@ use revm::interpreter::gas::call_cost;
 use revm::interpreter::StateLoad;
 use revm::primitives::hardfork::SpecId;
 use revm::primitives::{Address, Bytes, Log, LogData, B256};
+use revm_etherlink::helpers::legacy::{h160_to_alloy, u256_to_alloy};
+use revm_etherlink::storage::world_state_handler::StorageAccount;
 use revm_etherlink::ExecutionOutcome;
-use revm_etherlink::{
-    helpers::legacy::{h160_to_alloy, u256_to_alloy},
-    storage::world_state_handler::{account_path, WorldStateHandler},
-};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
 use tezos_ethereum::{
@@ -213,16 +211,12 @@ pub struct DepositResult {
 
 pub fn execute_deposit<Host: Runtime>(
     host: &mut Host,
-    world_state_handler: &mut WorldStateHandler,
     deposit: &Deposit,
     spec_id: &SpecId,
 ) -> Result<DepositResult, revm_etherlink::Error> {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
-    let to_account_path = account_path(&h160_to_alloy(&deposit.receiver))?;
-    let mut to_account = world_state_handler
-        .get_or_create(host, &to_account_path)
-        .map_err(|e| revm_etherlink::Error::Custom(e.to_string()))?;
+    let mut to_account = StorageAccount::from_address(&h160_to_alloy(&deposit.receiver))?;
     // TODO: estimate how emitting an event influenced tick consumption
     let gas_used = call_cost(*spec_id, true, StateLoad::default());
 
@@ -260,7 +254,6 @@ mod tests {
     use evm_execution::fa_bridge::test_utils::create_fa_ticket;
     use primitive_types::{H160, U256};
     use revm::primitives::hardfork::SpecId;
-    use revm_etherlink::storage::world_state_handler::new_world_state_handler;
     use rlp::Decodable;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
@@ -359,17 +352,11 @@ mod tests {
     #[test]
     fn deposit_execution_outcome_contains_event() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
 
         let deposit = dummy_deposit();
 
-        let DepositResult { outcome, .. } = execute_deposit(
-            &mut host,
-            &mut world_state_handler,
-            &deposit,
-            &SpecId::default(),
-        )
-        .unwrap();
+        let DepositResult { outcome, .. } =
+            execute_deposit(&mut host, &deposit, &SpecId::default()).unwrap();
         let logs = outcome.result.logs();
         assert!(outcome.result.is_success());
         assert_eq!(logs.len(), 1);
@@ -387,27 +374,16 @@ mod tests {
     #[test]
     fn deposit_execution_fails_due_to_balance_overflow() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
 
         let mut deposit = dummy_deposit();
         deposit.amount = U256::MAX;
 
-        let DepositResult { outcome, .. } = execute_deposit(
-            &mut host,
-            &mut world_state_handler,
-            &deposit,
-            &SpecId::default(),
-        )
-        .unwrap();
+        let DepositResult { outcome, .. } =
+            execute_deposit(&mut host, &deposit, &SpecId::default()).unwrap();
         assert!(outcome.result.is_success());
 
-        let DepositResult { outcome, .. } = execute_deposit(
-            &mut host,
-            &mut world_state_handler,
-            &deposit,
-            &SpecId::default(),
-        )
-        .unwrap();
+        let DepositResult { outcome, .. } =
+            execute_deposit(&mut host, &deposit, &SpecId::default()).unwrap();
         assert!(!outcome.result.is_success());
         assert!(outcome.result.logs().is_empty());
     }

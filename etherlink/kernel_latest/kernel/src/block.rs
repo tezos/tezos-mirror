@@ -32,9 +32,6 @@ use block_in_progress::EthBlockInProgress;
 use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
-use revm_etherlink::storage::world_state_handler::{
-    new_world_state_handler, WorldStateHandler,
-};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
@@ -135,7 +132,6 @@ fn compute<Host: Runtime>(
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: &mut EthBlockInProgress,
     block_constants: &BlockConstants,
-    world_state_handler: &mut WorldStateHandler,
     sequencer_pool_address: Option<H160>,
     limits: &EvmLimits,
     tracer_input: Option<TracerInput>,
@@ -178,7 +174,6 @@ fn compute<Host: Runtime>(
             block_constants,
             &transaction,
             block_in_progress.index,
-            world_state_handler,
             sequencer_pool_address,
             tracer_input,
             spec_id,
@@ -321,8 +316,6 @@ pub fn compute_bip<Host: Runtime>(
     coinbase: H160,
     spec_id: &SpecId,
 ) -> anyhow::Result<BlockComputationResult> {
-    let mut world_state_handler =
-        new_world_state_handler().context("Failed to initialize World State handler")?;
     let constants: BlockConstants = block_in_progress.constants(
         chain_id,
         limits.minimum_base_fee_per_gas,
@@ -335,7 +328,6 @@ pub fn compute_bip<Host: Runtime>(
         outbox_queue,
         &mut block_in_progress,
         &constants,
-        &mut world_state_handler,
         sequencer_pool_address,
         limits,
         tracer_input,
@@ -606,7 +598,7 @@ mod tests {
     use crate::{retrieve_block_fees, retrieve_chain_id};
     use primitive_types::{H160, U256};
     use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
-    use revm_etherlink::storage::world_state_handler::account_path;
+    use revm_etherlink::storage::world_state_handler::StorageAccount;
     use sha3::{Digest, Keccak256};
     use std::str::FromStr;
     use tezos_crypto_rs::hash::ChainId;
@@ -811,28 +803,15 @@ mod tests {
         Some(H160::from_slice(data))
     }
 
-    fn set_balance<Host: Runtime>(
-        host: &mut Host,
-        world_state_handler: &mut WorldStateHandler,
-        address: &H160,
-        balance: U256,
-    ) {
-        let mut account = world_state_handler
-            .get_or_create(host, &account_path(&h160_to_alloy(address)).unwrap())
-            .unwrap();
+    fn set_balance<Host: Runtime>(host: &mut Host, address: &H160, balance: U256) {
+        let mut account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
         let mut info = account.info(host).unwrap();
         info.balance = u256_to_alloy(&balance);
         account.set_info(host, info).unwrap();
     }
 
-    fn get_balance<Host: Runtime>(
-        host: &mut Host,
-        world_state_handler: &mut WorldStateHandler,
-        address: &H160,
-    ) -> U256 {
-        let account = world_state_handler
-            .get_or_create(host, &account_path(&h160_to_alloy(address)).unwrap())
-            .unwrap();
+    fn get_balance<Host: Runtime>(host: &mut Host, address: &H160) -> U256 {
+        let account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
         let info = account.info(host).unwrap();
         alloy_to_u256(&info.balance)
     }
@@ -999,10 +978,7 @@ mod tests {
         Ok(())
     }
 
-    fn produce_block_with_several_valid_txs<Host: Runtime>(
-        host: &mut Host,
-        world_state_handler: &mut WorldStateHandler,
-    ) {
+    fn produce_block_with_several_valid_txs<Host: Runtime>(host: &mut Host) {
         let tx_hash_0 = [0; TRANSACTION_HASH_SIZE];
         let tx_hash_1 = [1; TRANSACTION_HASH_SIZE];
 
@@ -1020,12 +996,7 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
-        set_balance(
-            host,
-            world_state_handler,
-            &sender,
-            U256::from(10000000000000000000u64),
-        );
+        set_balance(host, &sender, U256::from(10000000000000000000u64));
         store_block_fees(host, &dummy_block_fees()).unwrap();
 
         produce(
@@ -1398,14 +1369,8 @@ mod tests {
         let transactions: Vec<Transaction> = vec![invalid_tx];
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
-        let mut world_state_handler = new_world_state_handler().unwrap();
         let sender = dummy_eth_caller();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            U256::from(30000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(30000u64));
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
@@ -1443,13 +1408,7 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            U256::from(1_000_000_000_000_000_000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
@@ -1486,13 +1445,7 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            U256::from(5000000000000000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(5000000000000000u64));
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
@@ -1526,14 +1479,11 @@ mod tests {
         )
         .unwrap();
 
-        let mut world_state_handler = new_world_state_handler().unwrap();
-
-        produce_block_with_several_valid_txs(&mut host, &mut world_state_handler);
+        produce_block_with_several_valid_txs(&mut host);
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
-        let dest_balance =
-            get_balance(&mut host, &mut world_state_handler, &dest_address);
+        let dest_balance = get_balance(&mut host, &dest_address);
 
         assert_eq!(dest_balance, U256::from(1000000000u64))
     }
@@ -1567,13 +1517,7 @@ mod tests {
         );
 
         let sender = dummy_eth_caller();
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            U256::from(10000000000000000000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(10000000000000000000u64));
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         // Produce block for blueprint containing transaction_0
@@ -1597,8 +1541,7 @@ mod tests {
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
-        let dest_balance =
-            get_balance(&mut host, &mut world_state_handler, &dest_address);
+        let dest_balance = get_balance(&mut host, &dest_address);
 
         assert_eq!(dest_balance, U256::from(1000000000u64))
     }
@@ -1635,13 +1578,7 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            U256::from(10000000000000000000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(10000000000000000000u64));
         store_block_fees(&mut host, &dummy_block_fees).unwrap();
 
         produce(
@@ -1672,9 +1609,7 @@ mod tests {
 
         let chain_config = dummy_evm_config(SpecId::default());
 
-        let mut world_state_handler = new_world_state_handler().unwrap();
-
-        produce_block_with_several_valid_txs(&mut host, &mut world_state_handler);
+        produce_block_with_several_valid_txs(&mut host);
 
         assert_current_block_reading_validity(&mut host, &chain_config);
     }
@@ -1697,13 +1632,7 @@ mod tests {
 
         let sender = dummy_eth_caller();
         let initial_sender_balance = U256::from(10000000000000000000u64);
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            initial_sender_balance,
-        );
+        set_balance(&mut host, &sender, initial_sender_balance);
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
@@ -1717,9 +1646,8 @@ mod tests {
 
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
-        let sender_balance = get_balance(&mut host, &mut world_state_handler, &sender);
-        let dest_balance =
-            get_balance(&mut host, &mut world_state_handler, &dest_address);
+        let sender_balance = get_balance(&mut host, &sender);
+        let dest_balance = get_balance(&mut host, &dest_address);
 
         let expected_dest_balance = U256::from(500000000u64);
         let expected_gas = 21000;
@@ -1751,13 +1679,7 @@ mod tests {
 
         let number_of_blocks_indexed = blocks_index.length(&host).unwrap();
         let sender = dummy_eth_caller();
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            U256::from(10000000000000000000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(10000000000000000000u64));
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
         produce(
             &mut host,
@@ -1814,13 +1736,7 @@ mod tests {
 
         //provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            U256::from(10000000000000000000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(10000000000000000000u64));
 
         // tx is valid because correct nonce and account provisionned
         let valid_tx = Transaction {
@@ -1846,7 +1762,6 @@ mod tests {
             &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
             &block_constants,
-            &mut world_state_handler,
             None,
             &EvmLimits::default(),
             None,
@@ -1880,9 +1795,8 @@ mod tests {
         // the transaction should not have been processed
         let dest_address =
             H160::from_str("423163e58aabec5daa3dd1130b759d24bef0f6ea").unwrap();
-        let sender_balance = get_balance(&mut host, &mut world_state_handler, &sender);
-        let dest_balance =
-            get_balance(&mut host, &mut world_state_handler, &dest_address);
+        let sender_balance = get_balance(&mut host, &sender);
+        let dest_balance = get_balance(&mut host, &dest_address);
         assert_eq!(sender_balance, U256::from(10000000000000000000u64));
         assert_eq!(dest_balance, U256::from(0u64))
     }
@@ -1891,15 +1805,12 @@ mod tests {
     fn invalid_transaction_should_bump_nonce() {
         let mut host = MockKernelHost::default();
 
-        let mut world_state_handler = new_world_state_handler().unwrap();
-
         let caller =
             address_from_str("f95abdf6ede4c3703e0e9453771fbee8592d31e9").unwrap();
 
         // Get the balance before the transaction, i.e. 0.
-        let caller_account = world_state_handler
-            .get_or_create(&host, &account_path(&h160_to_alloy(&caller)).unwrap())
-            .unwrap();
+        let caller_account =
+            StorageAccount::from_address(&h160_to_alloy(&caller)).unwrap();
         let info = caller_account.info(&mut host).unwrap();
         let default_nonce = info.nonce;
         assert_eq!(default_nonce, 0, "default nonce should be 0");
@@ -1909,7 +1820,7 @@ mod tests {
         // the transaction itself, otherwise the transaction will not even be
         // taken into account.
         let fees = U256::from(21000) * tx.gas_limit_with_fees();
-        set_balance(&mut host, &mut world_state_handler, &caller, fees);
+        set_balance(&mut host, &caller, fees);
 
         // Prepare a invalid transaction, i.e. with not enough funds.
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
@@ -2084,13 +1995,7 @@ mod tests {
         //provision sender account
         let sender = H160::from_str(TEST_ADDR).unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            sender_initial_balance,
-        );
+        set_balance(&mut host, &sender, sender_initial_balance);
 
         // These transactions are generated with the loop.sol contract, which are:
         // - create the contract
@@ -2180,13 +2085,7 @@ mod tests {
         //provision sender account
         let sender = H160::from_str(TEST_ADDR).unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            sender_initial_balance,
-        );
+        set_balance(&mut host, &sender, sender_initial_balance);
 
         // These transactions are generated with the loop.sol contract, which are:
         // - create the contract
@@ -2309,13 +2208,7 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = H160::from_str("05f32b3cc3888453ff71b01135b34ff8e41263f2").unwrap();
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            U256::from(1_000_000_000_000_000_000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
 
         produce(
             &mut host,
@@ -2389,13 +2282,7 @@ mod tests {
         store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(transactions)]);
 
         let sender = dummy_eth_caller();
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            U256::from(1_000_000_000_000_000_000u64),
-        );
+        set_balance(&mut host, &sender, U256::from(1_000_000_000_000_000_000u64));
         store_block_fees(&mut host, &dummy_block_fees()).unwrap();
 
         produce(
