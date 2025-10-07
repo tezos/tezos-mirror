@@ -22,7 +22,6 @@ use migration::MigrationStatus;
 use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
 use revm_etherlink::precompiles::initializer::init_precompile_bytecodes;
-use revm_etherlink::storage::world_state_handler::new_world_state_handler;
 use storage::{
     read_chain_id, read_da_fee, read_kernel_version, read_minimum_base_fee_per_gas,
     read_tracer_input, store_chain_id, store_da_fee, store_kernel_version,
@@ -286,10 +285,7 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let sequencer_pool_address = read_sequencer_pool_address(host);
 
     // Initialize custom precompile
-    let mut world_state_handler =
-        new_world_state_handler().map_err(|_| Error::RevmPrecompileInitError)?;
-    init_precompile_bytecodes(host, &mut world_state_handler)
-        .map_err(|_| Error::RevmPrecompileInitError)?;
+    init_precompile_bytecodes(host).map_err(|_| Error::RevmPrecompileInitError)?;
 
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not
@@ -450,9 +446,7 @@ mod tests {
     };
     use revm_etherlink::precompiles::constants::{FA_BRIDGE_SOL_ADDR, SYSTEM_SOL_ADDR};
     use revm_etherlink::precompiles::send_outbox_message::RouterInterface;
-    use revm_etherlink::storage::world_state_handler::{
-        account_path, new_world_state_handler, WorldStateHandler,
-    };
+    use revm_etherlink::storage::world_state_handler::StorageAccount;
     use revm_etherlink::storage::NATIVE_TOKEN_TICKETER_PATH;
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_data_encoding::nom::NomReader;
@@ -478,15 +472,8 @@ mod tests {
 
     const DUMMY_CHAIN_ID: U256 = U256::one();
 
-    fn set_balance<Host: Runtime>(
-        host: &mut Host,
-        world_state_handler: &mut WorldStateHandler,
-        address: &H160,
-        balance: U256,
-    ) {
-        let mut account = world_state_handler
-            .get_or_create(host, &account_path(&h160_to_alloy(address)).unwrap())
-            .unwrap();
+    fn set_balance<Host: Runtime>(host: &mut Host, address: &H160, balance: U256) {
+        let mut account = StorageAccount::from_address(&h160_to_alloy(address)).unwrap();
         let mut info = account.info(host).unwrap();
         info.balance = u256_to_alloy(&balance);
         account.set_info(host, info).unwrap();
@@ -550,13 +537,7 @@ mod tests {
         // provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut host,
-            &mut world_state_handler,
-            &sender,
-            sender_initial_balance,
-        );
+        set_balance(&mut host, &sender, sender_initial_balance);
 
         // cast calldata "withdraw_base58(string)" "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w":
         let data = hex::decode(
@@ -761,13 +742,7 @@ mod tests {
         // provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
         let sender_initial_balance = U256::from(10000000000000000000u64);
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        set_balance(
-            &mut mock_host,
-            &mut world_state_handler,
-            &sender,
-            sender_initial_balance,
-        );
+        set_balance(&mut mock_host, &sender, sender_initial_balance);
 
         // construct ticket
         let ticket = dummy_ticket();
@@ -775,9 +750,7 @@ mod tests {
         let (_, bytes) = ticket.amount().to_bytes_le();
         let amount = U256::from_little_endian(&bytes);
 
-        let mut system = world_state_handler
-            .get_or_create(&mock_host, &account_path(&SYSTEM_SOL_ADDR).unwrap())
-            .unwrap();
+        let mut system = StorageAccount::from_address(&SYSTEM_SOL_ADDR).unwrap();
 
         // patch ticket table
         let ticket_balance = system

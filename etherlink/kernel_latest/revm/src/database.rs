@@ -13,8 +13,8 @@ use crate::{
         code::CodeStorage,
         sequencer_key_change::store_sequencer_key_change,
         world_state_handler::{
-            StorageAccount, WorldStateHandler, GOVERNANCE_SEQUENCER_UPGRADE_PATH,
-            KT1_B58_SIZE, SEQUENCER_KEY_PATH, WITHDRAWALS_TICKETER_PATH,
+            StorageAccount, GOVERNANCE_SEQUENCER_UPGRADE_PATH, KT1_B58_SIZE,
+            SEQUENCER_KEY_PATH, WITHDRAWALS_TICKETER_PATH,
         },
     },
     Error,
@@ -36,8 +36,6 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 pub struct EtherlinkVMDB<'a, Host: Runtime> {
     /// Runtime host
     pub host: &'a mut Host,
-    /// EVM world state handler
-    world_state_handler: &'a mut WorldStateHandler,
     /// Constants for the current block
     block: &'a BlockConstants,
     /// Commit guard, the `DatabaseCommit` trait and in particular
@@ -69,18 +67,12 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
     pub fn new(
         host: &'a mut Host,
         block: &'a BlockConstants,
-        world_state_handler: &'a mut WorldStateHandler,
         caller: Address,
     ) -> Result<Self, Error> {
-        let system = StorageAccount::get_or_create_account(
-            host,
-            world_state_handler,
-            Address::ZERO,
-        )?;
+        let system = StorageAccount::from_address(&Address::ZERO)?;
         Ok(EtherlinkVMDB {
             host,
             block,
-            world_state_handler,
             commit_status: true,
             withdrawals: vec![],
             caller,
@@ -127,27 +119,6 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
         self.commit_status
     }
 
-    #[instrument(skip_all)]
-    pub fn initialize_storage(&mut self) -> Result<(), Error> {
-        self.world_state_handler
-            .begin_transaction(self.host)
-            .map_err(custom)
-    }
-
-    #[instrument(skip_all)]
-    pub fn commit_storage(&mut self) -> Result<(), Error> {
-        self.world_state_handler
-            .commit_transaction(self.host)
-            .map_err(custom)
-    }
-
-    #[instrument(skip_all)]
-    pub fn drop_storage(&mut self) -> Result<(), Error> {
-        self.world_state_handler
-            .rollback_transaction(self.host)
-            .map_err(custom)
-    }
-
     pub fn take_withdrawals(&mut self) -> Vec<Withdrawal> {
         std::mem::take(&mut self.withdrawals)
     }
@@ -157,11 +128,7 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     }
 
     fn update_account(&mut self, address: Address, account_state: AccountState) {
-        match StorageAccount::get_or_create_account(
-            self.host,
-            self.world_state_handler,
-            address,
-        ) {
+        match StorageAccount::from_address(&address) {
             Ok(mut storage_account) => match account_state {
                 AccountState::Touched((mut info, storage)) => {
                     if let Some(code) = info.code.take() {
@@ -288,12 +255,8 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
     type Error = Error;
 
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
-        let storage_account =
-            StorageAccount::get_account(self.host, self.world_state_handler, address)?;
-        let account_info = match storage_account {
-            Some(storage_account) => storage_account.info(self.host)?,
-            None => AccountInfo::default(),
-        };
+        let storage_account = StorageAccount::from_address(&address)?;
+        let account_info = storage_account.info(self.host)?;
 
         self.original_account_infos
             .insert(address, account_info.copy_without_code());
@@ -325,14 +288,8 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
         address: Address,
         index: StorageKey,
     ) -> Result<StorageValue, Self::Error> {
-        let storage_account =
-            StorageAccount::get_account(self.host, self.world_state_handler, address)?;
-        let storage_value = match storage_account {
-            Some(storage_account) => storage_account.get_storage(self.host, &index)?,
-            None => StorageValue::default(),
-        };
-
-        Ok(storage_value)
+        let storage_account = StorageAccount::from_address(&address)?;
+        storage_account.get_storage(self.host, &index)
     }
 
     fn block_hash(&mut self, number: u64) -> Result<B256, Self::Error> {

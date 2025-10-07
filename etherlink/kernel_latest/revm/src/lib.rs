@@ -3,7 +3,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{journal::Journal, precompiles::send_outbox_message::Withdrawal};
+use crate::{
+    journal::Journal, precompiles::send_outbox_message::Withdrawal,
+    storage::world_state_handler::StorageAccount,
+};
 use database::EtherlinkVMDB;
 use helpers::storage::u256_to_le_bytes;
 use inspectors::{
@@ -26,7 +29,6 @@ use revm::{
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, U256},
     Context, ExecuteCommitEvm, InspectEvm, MainBuilder,
 };
-use storage::world_state_handler::{account_path, WorldStateHandler};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{trace, tracing::instrument};
 use tezos_evm_runtime::runtime::Runtime;
@@ -97,9 +99,8 @@ fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, Error> {
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn tx_env<'a, Host: Runtime>(
-    host: &'a mut Host,
-    world_state_handler: &'a mut WorldStateHandler,
+fn tx_env<Host: Runtime>(
+    host: &'_ mut Host,
     caller: Address,
     destination: Option<Address>,
     gas_limit: u64,
@@ -115,9 +116,7 @@ fn tx_env<'a, Host: Runtime>(
         None => TxKind::Create,
     };
 
-    let storage_account = world_state_handler
-        .get_or_create(host, &account_path(&caller)?)
-        .map_err(custom)?;
+    let storage_account = StorageAccount::from_address(&caller)?;
     let info = storage_account.info(host)?;
 
     // Using the transaction environment builder helps to
@@ -255,7 +254,6 @@ pub fn run_transaction<'a, Host: Runtime>(
     host: &'a mut Host,
     spec_id: SpecId,
     block_constants: &'a BlockConstants,
-    world_state_handler: &'a mut WorldStateHandler,
     precompiles: EtherlinkPrecompiles,
     caller: Address,
     destination: Option<Address>,
@@ -270,7 +268,6 @@ pub fn run_transaction<'a, Host: Runtime>(
     let block_env = block_env(block_constants)?;
     let tx = tx_env(
         host,
-        world_state_handler,
         caller,
         destination,
         gas_limit,
@@ -282,7 +279,7 @@ pub fn run_transaction<'a, Host: Runtime>(
         block_constants.chain_id.as_u64(),
     )?;
 
-    let db = EtherlinkVMDB::new(host, block_constants, world_state_handler, caller)?;
+    let db = EtherlinkVMDB::new(host, block_constants, caller)?;
 
     if let Some(tracer_input) = tracer_input {
         let inspector = get_inspector_from(tracer_input, precompiles.clone(), spec_id);
@@ -397,15 +394,14 @@ mod test {
         storage::{
             sequencer_key_change::SequencerKeyChange,
             world_state_handler::{
-                new_world_state_handler, StorageAccount, SEQUENCER_KEY_CHANGE_PATH,
-                SEQUENCER_KEY_PATH, WITHDRAWALS_TICKETER_PATH,
+                StorageAccount, SEQUENCER_KEY_CHANGE_PATH, SEQUENCER_KEY_PATH,
+                WITHDRAWALS_TICKETER_PATH,
             },
         },
         test::utilities::CallAndRevert::{self, callAndRevertCall},
     };
     use crate::{
-        precompiles::provider::EtherlinkPrecompiles, run_transaction,
-        storage::world_state_handler::account_path, ExecutionOutcome,
+        precompiles::provider::EtherlinkPrecompiles, run_transaction, ExecutionOutcome,
     };
 
     mod utilities {
@@ -454,7 +450,6 @@ mod test {
     #[test]
     fn test_simple_transfer() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
         let precompiles = EtherlinkPrecompiles::new();
         let block_constants = block_constants_with_no_fees();
 
@@ -472,13 +467,9 @@ mod test {
             code: None,
         };
 
-        let mut caller_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller).unwrap())
-            .unwrap();
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
 
-        let destination_account = world_state_handler
-            .get_or_create(&host, &account_path(&destination).unwrap())
-            .unwrap();
+        let destination_account = StorageAccount::from_address(&destination).unwrap();
 
         caller_account
             .set_info_without_code(&mut host, caller_info)
@@ -494,7 +485,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             precompiles,
             caller,
             Some(destination),
@@ -528,7 +518,6 @@ mod test {
     #[test]
     fn test_contract_call_sload_sstore() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
         let precompiles = EtherlinkPrecompiles::new();
         let block_constants = block_constants_with_fees();
 
@@ -546,17 +535,13 @@ mod test {
             code: None,
         };
 
-        let mut caller_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller).unwrap())
-            .unwrap();
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
 
         caller_account
             .set_info_without_code(&mut host, caller_info)
             .unwrap();
 
-        let mut contract_account = world_state_handler
-            .get_or_create(&host, &account_path(&contract).unwrap())
-            .unwrap();
+        let mut contract_account = StorageAccount::from_address(&contract).unwrap();
 
         let bytecode = Bytecode::new_raw(Bytes::from_hex("6042600155600154").unwrap());
         let contract_info = AccountInfo {
@@ -581,7 +566,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             precompiles,
             caller,
             Some(contract),
@@ -615,7 +599,6 @@ mod test {
     #[test]
     fn test_contract_deployment() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
         let precompiles = EtherlinkPrecompiles::new();
         let block_constants = block_constants_with_fees();
 
@@ -628,9 +611,7 @@ mod test {
             code: None,
         };
 
-        let mut storage_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller).unwrap())
-            .unwrap();
+        let mut storage_account = StorageAccount::from_address(&caller).unwrap();
 
         storage_account
             .set_info_without_code(&mut host, caller_info)
@@ -640,7 +621,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             precompiles,
             caller,
             None,
@@ -673,9 +653,7 @@ mod test {
                     },
                 ..
             }) => {
-                let contract_account = world_state_handler
-                    .get_or_create(&host, &account_path(&address).unwrap())
-                    .unwrap();
+                let contract_account = StorageAccount::from_address(&address).unwrap();
                 let info = contract_account.info(&mut host).unwrap();
 
                 assert_eq!(
@@ -695,10 +673,9 @@ mod test {
     #[test]
     fn test_withdrawal_contract() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = block_constants_with_no_fees();
 
-        init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+        init_precompile_bytecodes(&mut host).unwrap();
 
         // Insert account information
         let caller =
@@ -709,9 +686,7 @@ mod test {
             code_hash: Default::default(),
             code: None,
         };
-        let mut storage_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller).unwrap())
-            .unwrap();
+        let mut storage_account = StorageAccount::from_address(&caller).unwrap();
         storage_account
             .set_info_without_code(&mut host, caller_info)
             .unwrap();
@@ -737,7 +712,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             caller,
             Some(WITHDRAWAL_SOL_ADDR),
@@ -759,14 +733,11 @@ mod test {
         assert!(result.is_success());
         let info = storage_account.info(&mut host).unwrap();
         assert_eq!(info.balance, U256::MAX.saturating_sub(withdrawn_amount));
-        let created_account = world_state_handler
-            .get_or_create(&host, &account_path(&WITHDRAWAL_SOL_ADDR).unwrap())
-            .unwrap();
+        let created_account = StorageAccount::from_address(&WITHDRAWAL_SOL_ADDR).unwrap();
         let created_account_info = created_account.info(&mut host).unwrap();
         assert_eq!(created_account_info.balance, U256::ZERO);
-        let zero_account = world_state_handler
-            .get_or_create(&host, &account_path(&PRECOMPILE_BURN_ADDRESS).unwrap())
-            .unwrap();
+        let zero_account =
+            StorageAccount::from_address(&PRECOMPILE_BURN_ADDRESS).unwrap();
         let zero_account_info = zero_account.info(&mut host).unwrap();
         assert_eq!(zero_account_info.balance, withdrawn_amount);
         let raw_expected_withdrawals = r#"[Standard(AtomicTransactionBatch(OutboxMessageTransactionBatch { batch: [OutboxMessageTransaction { parameters: MichelsonPair(MichelsonContract(Implicit(Ed25519(ContractTz1Hash("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")))), Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4"))), MichelsonPair(MichelsonPair(MichelsonNat(Zarith(0)), MichelsonOption(None)), MichelsonInt(Zarith(1)))))), destination: Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4")), entrypoint: Entrypoint { name: "burn" } }] }))]"#;
@@ -776,10 +747,9 @@ mod test {
     #[test]
     fn test_call_update_sequencer_key() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = block_constants_with_no_fees();
 
-        init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+        init_precompile_bytecodes(&mut host).unwrap();
         // Insert account information
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -789,9 +759,7 @@ mod test {
             code_hash: Default::default(),
             code: None,
         };
-        let mut storage_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller).unwrap())
-            .unwrap();
+        let mut storage_account = StorageAccount::from_address(&caller).unwrap();
         storage_account.set_info(&mut host, caller_info).unwrap();
 
         let private_key = SecretKeyEd25519::from_b58check(
@@ -822,7 +790,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             caller,
             Some(CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS),
@@ -862,7 +829,6 @@ mod test {
     #[test]
     fn test_call_mint_erc20() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = block_constants_with_fees();
 
         let caller =
@@ -874,9 +840,7 @@ mod test {
             code: None,
         };
 
-        let mut storage_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller).unwrap())
-            .unwrap();
+        let mut storage_account = StorageAccount::from_address(&caller).unwrap();
 
         storage_account
             .set_info_without_code(&mut host, caller_info)
@@ -886,7 +850,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             caller,
             None,
@@ -916,7 +879,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             caller,
             Some(contract_address),
@@ -947,10 +909,9 @@ mod test {
     #[test]
     fn test_revert_precompile_state_changes() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = block_constants_with_no_fees();
         let deploy_call_and_revert_bytecode = Bytes::from_hex("0x6080604052348015600e575f5ffd5b506103ba8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c8063b1755bc81461002d575b5f5ffd5b610047600480360381019061004291906101f3565b610049565b005b5f5f8473ffffffffffffffffffffffffffffffffffffffff16848460405161007292919061028c565b5f604051808303815f865af19150503d805f81146100ab576040519150601f19603f3d011682016040523d82523d5f602084013e6100b0565b606091505b5091509150816100f5576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100ec906102fe565b60405180910390fd5b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161012790610366565b60405180910390fd5b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61016182610138565b9050919050565b61017181610157565b811461017b575f5ffd5b50565b5f8135905061018c81610168565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f8401126101b3576101b2610192565b5b8235905067ffffffffffffffff8111156101d0576101cf610196565b5b6020830191508360018202830111156101ec576101eb61019a565b5b9250929050565b5f5f5f6040848603121561020a57610209610130565b5b5f6102178682870161017e565b935050602084013567ffffffffffffffff81111561023857610237610134565b5b6102448682870161019e565b92509250509250925092565b5f81905092915050565b828183375f83830152505050565b5f6102738385610250565b935061028083858461025a565b82840190509392505050565b5f610298828486610268565b91508190509392505050565b5f82825260208201905092915050565b7f43616c6c206661696c65640000000000000000000000000000000000000000005f82015250565b5f6102e8600b836102a4565b91506102f3826102b4565b602082019050919050565b5f6020820190508181035f830152610315816102dc565b9050919050565b7f526576657274696e6700000000000000000000000000000000000000000000005f82015250565b5f6103506009836102a4565b915061035b8261031c565b602082019050919050565b5f6020820190508181035f83015261037d81610344565b905091905056fea264697066735822122054a37109eed5c973161a962f99e7485f344af2bc66af38eed5ef05d1c30561ea64736f6c634300081e0033").unwrap();
-        init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+        init_precompile_bytecodes(&mut host).unwrap();
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         // Deploy the CallAndRevert contract
@@ -958,7 +919,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             caller,
             None,
@@ -994,12 +954,7 @@ mod test {
             ..Default::default()
         };
         let id = U256::ZERO;
-        let mut account_zero = StorageAccount::get_or_create_account(
-            &host,
-            &world_state_handler,
-            Address::ZERO,
-        )
-        .unwrap();
+        let mut account_zero = StorageAccount::from_address(&Address::ZERO).unwrap();
         account_zero
             .write_deposit(&mut host, &id, &deposit)
             .unwrap();
@@ -1031,9 +986,7 @@ mod test {
             code_hash: Default::default(),
             code: None,
         };
-        let mut storage_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller).unwrap())
-            .unwrap();
+        let mut storage_account = StorageAccount::from_address(&caller).unwrap();
         storage_account
             .set_info_without_code(&mut host, caller_info)
             .unwrap();
@@ -1046,7 +999,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             caller,
             Some(revert_contract_address),
@@ -1073,12 +1025,7 @@ mod test {
             other => panic!("ERROR: ended up in {other:?}"),
         }
 
-        let storage_account = StorageAccount::get_or_create_account(
-            &host,
-            &world_state_handler,
-            Address::ZERO,
-        )
-        .unwrap();
+        let storage_account = StorageAccount::from_address(&Address::ZERO).unwrap();
 
         // Should still be present because reverting cancelled the usage of this deposit
         storage_account.read_deposit_from_queue(&host, &id).unwrap();
@@ -1095,11 +1042,9 @@ mod test {
     #[test]
     fn test_revert_delete_created_bytecode() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        world_state_handler.begin_transaction(&mut host).unwrap();
         let block_constants = block_constants_with_no_fees();
         let deploy_create_and_revert_bytecode = Bytes::from_hex("0x6080604052348015600e575f5ffd5b506102b38061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80634f8c2d0e1461002d575b5f5ffd5b610047600480360381019061004291906101de565b610049565b005b5f815f523660a05ff09050806040517f9f8aa6e50000000000000000000000000000000000000000000000000000000081526004016100889190610264565b60405180910390fd5b5f604051905090565b5f5ffd5b5f5ffd5b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6100f0826100aa565b810181811067ffffffffffffffff8211171561010f5761010e6100ba565b5b80604052505050565b5f610121610091565b905061012d82826100e7565b919050565b5f67ffffffffffffffff82111561014c5761014b6100ba565b5b610155826100aa565b9050602081019050919050565b828183375f83830152505050565b5f61018261017d84610132565b610118565b90508281526020810184848401111561019e5761019d6100a6565b5b6101a9848285610162565b509392505050565b5f82601f8301126101c5576101c46100a2565b5b81356101d5848260208601610170565b91505092915050565b5f602082840312156101f3576101f261009a565b5b5f82013567ffffffffffffffff8111156102105761020f61009e565b5b61021c848285016101b1565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61024e82610225565b9050919050565b61025e81610244565b82525050565b5f6020820190506102775f830184610255565b9291505056fea264697066735822122053059908becc543c4f8d8f401652f4888f3e356e7d1c6567a4f53fcdf0ea6ea364736f6c634300081e0033").unwrap();
-        init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+        init_precompile_bytecodes(&mut host).unwrap();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -1108,7 +1053,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             caller,
             None,
@@ -1120,7 +1064,6 @@ mod test {
             None,
             None,
         );
-        world_state_handler.commit_transaction(&mut host).unwrap();
 
         let revert_contract_address = match result_create {
             Ok(ExecutionOutcome {
@@ -1150,7 +1093,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             caller,
             Some(revert_contract_address),
@@ -1165,20 +1107,13 @@ mod test {
         .unwrap();
 
         // Get the address where the bytecode should have been deployed
-        let addr_deployed_bytecode = match result {
+        match result {
             ExecutionResult::Revert { output, .. } => {
                 RevertCreate::abi_decode(&output).unwrap().addr
             }
             other => panic!("ERROR: ended up in {other:?}"),
         };
 
-        assert!(StorageAccount::get_account(
-            &host,
-            &mut world_state_handler,
-            addr_deployed_bytecode
-        )
-        .unwrap()
-        .is_none());
         assert!(
             nb_contract_before_deploy
                 == host.store_count_subkeys(&EVM_CODES_PATH).unwrap()
@@ -1188,10 +1123,9 @@ mod test {
     #[test]
     fn test_store_and_claim_fa_deposit_wrong_id() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = block_constants_with_no_fees();
 
-        init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+        init_precompile_bytecodes(&mut host).unwrap();
 
         // Initialize dummy deposit, store it in the deposits table with id 1
 
@@ -1199,9 +1133,7 @@ mod test {
 
         let deposit_id = U256::ONE;
 
-        let mut system = world_state_handler
-            .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
-            .unwrap();
+        let mut system = StorageAccount::from_address(&Address::ZERO).unwrap();
 
         system
             .write_deposit(&mut host, &deposit_id, &dummy_deposit)
@@ -1220,9 +1152,7 @@ mod test {
             code: None,
         };
 
-        let mut caller_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller).unwrap())
-            .unwrap();
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
 
         caller_account
             .set_info_without_code(&mut host, caller_info)
@@ -1234,7 +1164,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             caller,
             Some(FA_BRIDGE_SOL_ADDR),
@@ -1259,7 +1188,6 @@ mod test {
     #[test]
     fn test_empty_authorization_list_are_prohibited() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
         let precompiles = EtherlinkPrecompiles::new();
         let block_constants = block_constants_with_no_fees();
 
@@ -1277,13 +1205,9 @@ mod test {
             code: None,
         };
 
-        let mut caller_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller).unwrap())
-            .unwrap();
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
 
-        let destination_account = world_state_handler
-            .get_or_create(&host, &account_path(&destination).unwrap())
-            .unwrap();
+        let destination_account = StorageAccount::from_address(&destination).unwrap();
 
         caller_account
             .set_info_without_code(&mut host, caller_info)
@@ -1299,7 +1223,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             precompiles,
             caller,
             Some(destination),
@@ -1323,14 +1246,13 @@ mod test {
     #[test]
     fn deposit_and_claim_fa_with_empty_proxy() {
         let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = block_constants_with_no_fees();
 
         let proxy = Address::from(&[1u8; 20]);
         let caller = Address::from(&[2u8; 20]);
         let receiver = Address::from(&[3u8; 20]);
 
-        init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+        init_precompile_bytecodes(&mut host).unwrap();
 
         let deposit = ITable::FaDepositWithProxy {
             amount: U256::ONE,
@@ -1345,7 +1267,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             FEED_DEPOSIT_ADDR,
             Some(FA_BRIDGE_SOL_ADDR),
@@ -1365,7 +1286,6 @@ mod test {
             &mut host,
             DEFAULT_SPEC_ID,
             &block_constants,
-            &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             caller,
             Some(FA_BRIDGE_SOL_ADDR),
@@ -1435,12 +1355,7 @@ mod test {
                 provider::EtherlinkPrecompiles,
             },
             run_transaction,
-            storage::{
-                code::CodeStorage,
-                world_state_handler::{
-                    account_path, new_world_state_handler, WorldStateHandler,
-                },
-            },
+            storage::{code::CodeStorage, world_state_handler::StorageAccount},
             test::{
                 fa_bridge::{
                     DelegateCaller::makeDelegateCallCall,
@@ -1484,7 +1399,6 @@ mod test {
 
         fn setup_ticket(
             host: &mut MockKernelHost,
-            world_state_handler: &mut WorldStateHandler,
             owner: Address,
             amount: U256,
         ) -> (FixedBytes<22>, Vec<u8>, Vec<u8>) {
@@ -1498,9 +1412,7 @@ mod test {
             ]
             .concat();
 
-            let mut account_zero = world_state_handler
-                .get_or_create(host, &account_path(&Address::ZERO).unwrap())
-                .unwrap();
+            let mut account_zero = StorageAccount::from_address(&Address::ZERO).unwrap();
             account_zero
                 .write_ticket_balance(host, &ticket_hash, &owner, amount)
                 .unwrap();
@@ -1515,7 +1427,6 @@ mod test {
 
         fn execute_fa_bridge(
             host: &mut MockKernelHost,
-            world_state_handler: &mut WorldStateHandler,
             caller: Address,
             call_data: Bytes,
             gas_limit: u64,
@@ -1523,7 +1434,6 @@ mod test {
         ) -> ExecutionOutcome {
             execute_call(
                 host,
-                world_state_handler,
                 caller,
                 call_data,
                 gas_limit,
@@ -1534,13 +1444,11 @@ mod test {
 
         fn execute_fa_deposit(
             host: &mut MockKernelHost,
-            world_state_handler: &mut WorldStateHandler,
             caller: Address,
             deposit: FaDepositWithProxy,
         ) -> ExecutionOutcome {
-            let mut feed_deposit_addr = world_state_handler
-                .get_or_create(host, &account_path(&FEED_DEPOSIT_ADDR).unwrap())
-                .unwrap();
+            let mut feed_deposit_addr =
+                StorageAccount::from_address(&FEED_DEPOSIT_ADDR).unwrap();
             feed_deposit_addr
                 .set_info(
                     host,
@@ -1554,7 +1462,6 @@ mod test {
                 host,
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
-                world_state_handler,
                 EtherlinkPrecompiles::new(),
                 FEED_DEPOSIT_ADDR,
                 Some(FA_BRIDGE_SOL_ADDR),
@@ -1570,9 +1477,7 @@ mod test {
             if !outcome.result.is_success() {
                 return outcome;
             }
-            let mut caller_account = world_state_handler
-                .get_or_create(host, &account_path(&caller).unwrap())
-                .unwrap();
+            let mut caller_account = StorageAccount::from_address(&caller).unwrap();
             caller_account
                 .set_info(
                     host,
@@ -1586,7 +1491,6 @@ mod test {
                 host,
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
-                world_state_handler,
                 EtherlinkPrecompiles::new(),
                 caller,
                 Some(FA_BRIDGE_SOL_ADDR),
@@ -1607,16 +1511,13 @@ mod test {
 
         fn execute_call(
             host: &mut MockKernelHost,
-            world_state_handler: &mut WorldStateHandler,
             caller: Address,
             call_data: Bytes,
             gas_limit: u64,
             value: U256,
             destination: Address,
         ) -> ExecutionOutcome {
-            let mut caller_account = world_state_handler
-                .get_or_create(host, &account_path(&caller).unwrap())
-                .unwrap();
+            let mut caller_account = StorageAccount::from_address(&caller).unwrap();
             caller_account
                 .set_info(
                     host,
@@ -1630,7 +1531,6 @@ mod test {
                 host,
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
-                world_state_handler,
                 EtherlinkPrecompiles::new(),
                 caller,
                 Some(destination),
@@ -1647,13 +1547,10 @@ mod test {
 
         fn deploy_contract(
             host: &mut MockKernelHost,
-            world_state_handler: &mut WorldStateHandler,
             caller: Address,
             calldata: Bytes,
         ) -> Address {
-            let mut caller_account = world_state_handler
-                .get_or_create(host, &account_path(&caller).unwrap())
-                .unwrap();
+            let mut caller_account = StorageAccount::from_address(&caller).unwrap();
             caller_account
                 .set_info(
                     host,
@@ -1667,7 +1564,6 @@ mod test {
                 host,
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
-                world_state_handler,
                 EtherlinkPrecompiles::new(),
                 caller,
                 None,
@@ -1695,15 +1591,8 @@ mod test {
 
         // We read the storage key defined in the codebase of mock_fa_bridge_wrapper.sol
         // to check if the proxy was called.
-        fn get_storage_flag(
-            host: &MockKernelHost,
-            world_state_handler: &WorldStateHandler,
-            proxy: Address,
-        ) -> U256 {
-            let proxy_account = world_state_handler
-                .get(host, &account_path(&proxy).unwrap())
-                .unwrap()
-                .unwrap();
+        fn get_storage_flag(host: &MockKernelHost, proxy: Address) -> U256 {
+            let proxy_account = StorageAccount::from_address(&proxy).unwrap();
 
             proxy_account
                 .get_storage(host, &keccak256(b"FLAG_TAG").into())
@@ -1719,14 +1608,12 @@ mod test {
         #[test]
         fn fa_bridge_precompile_fails_due_to_low_gas_limit() {
             let mut host = MockKernelHost::default();
-            let mut world_state_handler = new_world_state_handler().unwrap();
-            init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+            init_precompile_bytecodes(&mut host).unwrap();
 
             // Cover basic costs
             let gas_limit = 23460;
             let res = execute_fa_bridge(
                 &mut host,
-                &mut world_state_handler,
                 Address::ZERO,
                 withdrawCall::new((
                     Address::ZERO,
@@ -1754,25 +1641,18 @@ mod test {
         #[test]
         fn fa_bridge_precompile_fails_due_to_static_call() {
             let mut host = MockKernelHost::default();
-            let mut world_state_handler = new_world_state_handler().unwrap();
-            init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+            init_precompile_bytecodes(&mut host).unwrap();
 
             let caller = Address::from([1; 20]);
             let static_call_bytecode = Bytes::from_hex("6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c806315ed14111461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855afa9150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220479572b5582551531e4488ebe613bfc74bb6a52e067fdb85660015539d4a2d2b64736f6c634300081e0033").unwrap();
-            let static_caller = deploy_contract(
-                &mut host,
-                &mut world_state_handler,
-                caller,
-                static_call_bytecode,
-            );
+            let static_caller = deploy_contract(&mut host, caller, static_call_bytecode);
 
             let ticket_owner = Address::from([1; 20]);
             let amount = U256::from(5);
             let (ticketer, content, routing_info) =
-                setup_ticket(&mut host, &mut world_state_handler, ticket_owner, amount);
+                setup_ticket(&mut host, ticket_owner, amount);
             let res = execute_call(
                 &mut host,
-                &mut world_state_handler,
                 caller,
                 makeStaticCallCall::new((
                     FA_BRIDGE_SOL_ADDR,
@@ -1801,24 +1681,18 @@ mod test {
         #[test]
         fn fa_bridge_precompile_fails_due_to_delegate_call() {
             let mut host = MockKernelHost::default();
-            let mut world_state_handler = new_world_state_handler().unwrap();
-            init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+            init_precompile_bytecodes(&mut host).unwrap();
 
             let caller = Address::from([1; 20]);
             let delegate_call_bytecode = Bytes::from_hex("6080604052348015600e575f5ffd5b506102bf8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80638771074f1461002d575b5f5ffd5b610047600480360381019061004291906101a5565b61005d565b604051610054919061021c565b60405180910390f35b5f5f5f8573ffffffffffffffffffffffffffffffffffffffff168585604051610087929190610271565b5f60405180830381855af49150503d805f81146100bf576040519150601f19603f3d011682016040523d82523d5f602084013e6100c4565b606091505b5091509150816100d657805160208201fd5b81925050509392505050565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610113826100ea565b9050919050565b61012381610109565b811461012d575f5ffd5b50565b5f8135905061013e8161011a565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f84011261016557610164610144565b5b8235905067ffffffffffffffff81111561018257610181610148565b5b60208301915083600182028301111561019e5761019d61014c565b5b9250929050565b5f5f5f604084860312156101bc576101bb6100e2565b5b5f6101c986828701610130565b935050602084013567ffffffffffffffff8111156101ea576101e96100e6565b5b6101f686828701610150565b92509250509250925092565b5f8115159050919050565b61021681610202565b82525050565b5f60208201905061022f5f83018461020d565b92915050565b5f81905092915050565b828183375f83830152505050565b5f6102588385610235565b935061026583858461023f565b82840190509392505050565b5f61027d82848661024d565b9150819050939250505056fea2646970667358221220065aceddd10343ed6e9faf40c53bcf49432de8e786641789238cf6d0eaf59c7364736f6c634300081e0033").unwrap();
-            let delegate_caller = deploy_contract(
-                &mut host,
-                &mut world_state_handler,
-                caller,
-                delegate_call_bytecode,
-            );
+            let delegate_caller =
+                deploy_contract(&mut host, caller, delegate_call_bytecode);
             let ticket_owner = Address::from([1; 20]);
             let amount = U256::from(5);
             let (ticketer, content, routing_info) =
-                setup_ticket(&mut host, &mut world_state_handler, ticket_owner, amount);
+                setup_ticket(&mut host, ticket_owner, amount);
             let res = execute_call(
                 &mut host,
-                &mut world_state_handler,
                 caller,
                 makeDelegateCallCall::new((
                     FA_BRIDGE_SOL_ADDR,
@@ -1847,17 +1721,15 @@ mod test {
         #[test]
         fn fa_bridge_precompile_succeeds_without_l2_proxy_contract() {
             let mut host = MockKernelHost::default();
-            let mut world_state_handler = new_world_state_handler().unwrap();
-            init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+            init_precompile_bytecodes(&mut host).unwrap();
 
             let ticket_owner = Address::from([1; 20]);
             let amount = U256::from(5);
             let (ticketer, content, routing_info) =
-                setup_ticket(&mut host, &mut world_state_handler, ticket_owner, amount);
+                setup_ticket(&mut host, ticket_owner, amount);
 
             let res = execute_fa_bridge(
                 &mut host,
-                &mut world_state_handler,
                 ticket_owner,
                 withdrawCall::new((
                     ticket_owner,
@@ -1890,8 +1762,7 @@ mod test {
         #[test]
         fn fa_bridge_precompile_cannot_call_itself() {
             let mut host = MockKernelHost::default();
-            let mut world_state_handler = new_world_state_handler().unwrap();
-            init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+            init_precompile_bytecodes(&mut host).unwrap();
 
             let caller = Address::from([1; 20]);
             let reentrancy_tester_bytecode = Bytes::from_hex("608060405234801561000f575f5ffd5b5060405161156d38038061156d83398181016040528101906100319190610323565b61004586868686868661005060201b60201c565b5050505050506106ba565b855f5f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550846001908161009e91906105eb565b50836002819055508260035f6101000a81548175ffffffffffffffffffffffffffffffffffffffffffff021916908360501c021790555081600490816100e491906105eb565b5080600581905550505050505050565b5f604051905090565b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61012e82610105565b9050919050565b61013e81610124565b8114610148575f5ffd5b50565b5f8151905061015981610135565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6101ad82610167565b810181811067ffffffffffffffff821117156101cc576101cb610177565b5b80604052505050565b5f6101de6100f4565b90506101ea82826101a4565b919050565b5f67ffffffffffffffff82111561020957610208610177565b5b61021282610167565b9050602081019050919050565b8281835e5f83830152505050565b5f61023f61023a846101ef565b6101d5565b90508281526020810184848401111561025b5761025a610163565b5b61026684828561021f565b509392505050565b5f82601f8301126102825761028161015f565b5b815161029284826020860161022d565b91505092915050565b5f819050919050565b6102ad8161029b565b81146102b7575f5ffd5b50565b5f815190506102c8816102a4565b92915050565b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b610302816102ce565b811461030c575f5ffd5b50565b5f8151905061031d816102f9565b92915050565b5f5f5f5f5f5f60c0878903121561033d5761033c6100fd565b5b5f61034a89828a0161014b565b965050602087015167ffffffffffffffff81111561036b5761036a610101565b5b61037789828a0161026e565b955050604061038889828a016102ba565b945050606061039989828a0161030f565b935050608087015167ffffffffffffffff8111156103ba576103b9610101565b5b6103c689828a0161026e565b92505060a06103d789828a016102ba565b9150509295509295509295565b5f81519050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52602260045260245ffd5b5f600282049050600182168061043257607f821691505b602082108103610445576104446103ee565b5b50919050565b5f819050815f5260205f209050919050565b5f6020601f8301049050919050565b5f82821b905092915050565b5f600883026104a77fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8261046c565b6104b1868361046c565b95508019841693508086168417925050509392505050565b5f819050919050565b5f6104ec6104e76104e28461029b565b6104c9565b61029b565b9050919050565b5f819050919050565b610505836104d2565b610519610511826104f3565b848454610478565b825550505050565b5f5f905090565b610530610521565b61053b8184846104fc565b505050565b5b8181101561055e576105535f82610528565b600181019050610541565b5050565b601f8211156105a3576105748161044b565b61057d8461045d565b8101602085101561058c578190505b6105a06105988561045d565b830182610540565b50505b505050565b5f82821c905092915050565b5f6105c35f19846008026105a8565b1980831691505092915050565b5f6105db83836105b4565b9150826002028217905092915050565b6105f4826103e4565b67ffffffffffffffff81111561060d5761060c610177565b5b610617825461041b565b610622828285610562565b5f60209050601f831160018114610653575f8415610641578287015190505b61064b85826105d0565b8655506106b2565b601f1984166106618661044b565b5f5b8281101561068857848901518255600182019150602085019450602081019050610663565b868310156106a557848901516106a1601f8916826105b4565b8355505b6001600288020188555050505b505050505050565b610ea6806106c75f395ff3fe608060405234801561000f575f5ffd5b5060043610610091575f3560e01c806359537d491161006457806359537d491461010b57806373af3851146101275780638a4d5a6714610145578063aa8c217c14610163578063b5c5f6721461018157610091565b8063071c9308146100955780630be69fcd146100b35780630efe6a8b146100d15780633f70f347146100ed575b5f5ffd5b61009d61019d565b6040516100aa91906105a3565b60405180910390f35b6100bb6101c1565b6040516100c891906105d4565b60405180910390f35b6100eb60048036038101906100e69190610652565b6101c7565b005b6100f56101d4565b60405161010291906106dc565b60405180910390f35b6101256004803603810190610120919061085b565b6101e6565b005b61012f61028a565b60405161013c919061097c565b60405180910390f35b61014d610316565b60405161015a919061097c565b60405180910390f35b61016b6103a2565b60405161017891906105d4565b60405180910390f35b61019b60048036038101906101969190610652565b6103a8565b005b5f5f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b60055481565b6101cf6103b5565b505050565b60035f9054906101000a900460501b81565b855f5f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555084600190816102349190610b99565b50836002819055508260035f6101000a81548175ffffffffffffffffffffffffffffffffffffffffffff021916908360501c0217905550816004908161027a9190610b99565b5080600581905550505050505050565b60018054610297906109c9565b80601f01602080910402602001604051908101604052809291908181526020018280546102c3906109c9565b801561030e5780601f106102e55761010080835404028352916020019161030e565b820191905f5260205f20905b8154815290600101906020018083116102f157829003601f168201915b505050505081565b60048054610323906109c9565b80601f016020809104026020016040519081016040528092919081815260200182805461034f906109c9565b801561039a5780601f106103715761010080835404028352916020019161039a565b820191905f5260205f20905b81548152906001019060200180831161037d57829003601f168201915b505050505081565b60025481565b6103b06103b5565b505050565b5f30600160025460035f9054906101000a900460501b60046040516024016103e1959493929190610ce9565b6040516020818303038152906040527f80fc1fe3000000000000000000000000000000000000000000000000000000007bffffffffffffffffffffffffffffffffffffffffffffffffffffffff19166020820180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff8381831617835250505050905061048e5f5f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff16825f600554610491565b50565b5f600190505b81811161055d575f8573ffffffffffffffffffffffffffffffffffffffff1684866040516104c59190610d82565b5f6040518083038185875af1925050503d805f81146104ff576040519150601f19603f3d011682016040523d82523d5f602084013e610504565b606091505b5050905080610548576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161053f90610df2565b60405180910390fd5b6001826105559190610e3d565b915050610497565b5050505050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61058d82610564565b9050919050565b61059d81610583565b82525050565b5f6020820190506105b65f830184610594565b92915050565b5f819050919050565b6105ce816105bc565b82525050565b5f6020820190506105e75f8301846105c5565b92915050565b5f604051905090565b5f5ffd5b5f5ffd5b61060781610583565b8114610611575f5ffd5b50565b5f81359050610622816105fe565b92915050565b610631816105bc565b811461063b575f5ffd5b50565b5f8135905061064c81610628565b92915050565b5f5f5f60608486031215610669576106686105f6565b5b5f61067686828701610614565b93505060206106878682870161063e565b92505060406106988682870161063e565b9150509250925092565b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b6106d6816106a2565b82525050565b5f6020820190506106ef5f8301846106cd565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b610743826106fd565b810181811067ffffffffffffffff821117156107625761076161070d565b5b80604052505050565b5f6107746105ed565b9050610780828261073a565b919050565b5f67ffffffffffffffff82111561079f5761079e61070d565b5b6107a8826106fd565b9050602081019050919050565b828183375f83830152505050565b5f6107d56107d084610785565b61076b565b9050828152602081018484840111156107f1576107f06106f9565b5b6107fc8482856107b5565b509392505050565b5f82601f830112610818576108176106f5565b5b81356108288482602086016107c3565b91505092915050565b61083a816106a2565b8114610844575f5ffd5b50565b5f8135905061085581610831565b92915050565b5f5f5f5f5f5f60c08789031215610875576108746105f6565b5b5f61088289828a01610614565b965050602087013567ffffffffffffffff8111156108a3576108a26105fa565b5b6108af89828a01610804565b95505060406108c089828a0161063e565b94505060606108d189828a01610847565b935050608087013567ffffffffffffffff8111156108f2576108f16105fa565b5b6108fe89828a01610804565b92505060a061090f89828a0161063e565b9150509295509295509295565b5f81519050919050565b5f82825260208201905092915050565b8281835e5f83830152505050565b5f61094e8261091c565b6109588185610926565b9350610968818560208601610936565b610971816106fd565b840191505092915050565b5f6020820190508181035f8301526109948184610944565b905092915050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52602260045260245ffd5b5f60028204905060018216806109e057607f821691505b6020821081036109f3576109f261099c565b5b50919050565b5f819050815f5260205f209050919050565b5f6020601f8301049050919050565b5f82821b905092915050565b5f60088302610a557fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82610a1a565b610a5f8683610a1a565b95508019841693508086168417925050509392505050565b5f819050919050565b5f610a9a610a95610a90846105bc565b610a77565b6105bc565b9050919050565b5f819050919050565b610ab383610a80565b610ac7610abf82610aa1565b848454610a26565b825550505050565b5f5f905090565b610ade610acf565b610ae9818484610aaa565b505050565b5b81811015610b0c57610b015f82610ad6565b600181019050610aef565b5050565b601f821115610b5157610b22816109f9565b610b2b84610a0b565b81016020851015610b3a578190505b610b4e610b4685610a0b565b830182610aee565b50505b505050565b5f82821c905092915050565b5f610b715f1984600802610b56565b1980831691505092915050565b5f610b898383610b62565b9150826002028217905092915050565b610ba28261091c565b67ffffffffffffffff811115610bbb57610bba61070d565b5b610bc582546109c9565b610bd0828285610b10565b5f60209050601f831160018114610c01575f8415610bef578287015190505b610bf98582610b7e565b865550610c60565b601f198416610c0f866109f9565b5f5b82811015610c3657848901518255600182019150602085019450602081019050610c11565b86831015610c535784890151610c4f601f891682610b62565b8355505b6001600288020188555050505b505050505050565b5f8154610c74816109c9565b610c7e8186610926565b9450600182165f8114610c985760018114610cae57610ce0565b60ff198316865281151560200286019350610ce0565b610cb7856109f9565b5f5b83811015610cd857815481890152600182019150602081019050610cb9565b808801955050505b50505092915050565b5f60a082019050610cfc5f830188610594565b8181036020830152610d0e8187610c68565b9050610d1d60408301866105c5565b610d2a60608301856106cd565b8181036080830152610d3c8184610c68565b90509695505050505050565b5f81905092915050565b5f610d5c8261091c565b610d668185610d48565b9350610d76818560208601610936565b80840191505092915050565b5f610d8d8284610d52565b915081905092915050565b5f82825260208201905092915050565b7f43616c6c20746f2074617267657420636f6e7472616374206661696c656400005f82015250565b5f610ddc601e83610d98565b9150610de782610da8565b602082019050919050565b5f6020820190508181035f830152610e0981610dd0565b9050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5f610e47826105bc565b9150610e52836105bc565b9250828201905080821115610e6a57610e69610e10565b5b9291505056fea264697066735822122030849f76b9e4e5acaa2fa563f76431ebe5059d03f496c9d7d864978421d72a6e64736f6c634300081e0033").unwrap();
@@ -1918,13 +1789,11 @@ mod test {
             .into();
             let reentrancy_tester = deploy_contract(
                 &mut host,
-                &mut world_state_handler,
                 caller,
                 [reentrancy_tester_bytecode, calldata].concat().into(),
             );
-            let mut system_account = world_state_handler
-                .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
-                .unwrap();
+            let mut system_account =
+                StorageAccount::from_address(&Address::ZERO).unwrap();
             system_account
                 .write_ticket_balance(
                     &mut host,
@@ -1935,7 +1804,6 @@ mod test {
                 .unwrap();
             let res = execute_fa_bridge(
                 &mut host,
-                &mut world_state_handler,
                 caller,
                 withdrawCall::new((
                     reentrancy_tester,
@@ -2029,8 +1897,7 @@ mod test {
         #[test]
         fn fa_deposit_reached_wrapper_contract() {
             let mut host = MockKernelHost::default();
-            let mut world_state_handler = new_world_state_handler().unwrap();
-            init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+            init_precompile_bytecodes(&mut host).unwrap();
 
             let caller = Address::from([1; 20]);
             let mock_wrapper_bytecode = Bytes::from_hex("608060405234801561000f575f5ffd5b50604051610a58380380610a5883398181016040528101906100319190610330565b610041848461009e60201b60201c565b5f819055508160015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550610095816100d260201b60201c565b505050506104a3565b5f82826040516020016100b2929190610414565b604051602081830303815290604052805190602001205f1c905092915050565b5f6040516020016100e29061048f565b6040516020818303038152906040528051906020012090508181555050565b5f604051905090565b5f5ffd5b5f5ffd5b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b61014681610112565b8114610150575f5ffd5b50565b5f815190506101618161013d565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6101b58261016f565b810181811067ffffffffffffffff821117156101d4576101d361017f565b5b80604052505050565b5f6101e6610101565b90506101f282826101ac565b919050565b5f67ffffffffffffffff8211156102115761021061017f565b5b61021a8261016f565b9050602081019050919050565b8281835e5f83830152505050565b5f610247610242846101f7565b6101dd565b9050828152602081018484840111156102635761026261016b565b5b61026e848285610227565b509392505050565b5f82601f83011261028a57610289610167565b5b815161029a848260208601610235565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f6102cc826102a3565b9050919050565b6102dc816102c2565b81146102e6575f5ffd5b50565b5f815190506102f7816102d3565b92915050565b5f819050919050565b61030f816102fd565b8114610319575f5ffd5b50565b5f8151905061032a81610306565b92915050565b5f5f5f5f608085870312156103485761034761010a565b5b5f61035587828801610153565b945050602085015167ffffffffffffffff8111156103765761037561010e565b5b61038287828801610276565b9350506040610393878288016102e9565b92505060606103a48782880161031c565b91505092959194509250565b5f819050919050565b6103ca6103c582610112565b6103b0565b82525050565b5f81519050919050565b5f81905092915050565b5f6103ee826103d0565b6103f881856103da565b9350610408818560208601610227565b80840191505092915050565b5f61041f82856103b9565b60168201915061042f82846103e4565b91508190509392505050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61047960088361043b565b915061048482610445565b600882019050919050565b5f6104998261046d565b9150819050919050565b6105a8806104b05f395ff3fe608060405234801561000f575f5ffd5b5060043610610034575f3560e01c80630efe6a8b14610038578063b5c5f67214610054575b5f5ffd5b610052600480360381019061004d919061038c565b610070565b005b61006e6004803603810190610069919061038c565b61019e565b005b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16146100ff576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100f69061045c565b60405180910390fd5b805f5414610142576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610139906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167f0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d41213968858360405161018891906104f1565b60405180910390a2610199826102cc565b505050565b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161461022d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102249061045c565b60405180910390fd5b805f5414610270576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610267906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167fcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5836040516102b691906104f1565b60405180910390a26102c7826102cc565b505050565b5f6040516020016102dc9061055e565b6040516020818303038152906040528051906020012090508181555050565b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610328826102ff565b9050919050565b6103388161031e565b8114610342575f5ffd5b50565b5f813590506103538161032f565b92915050565b5f819050919050565b61036b81610359565b8114610375575f5ffd5b50565b5f8135905061038681610362565b92915050565b5f5f5f606084860312156103a3576103a26102fb565b5b5f6103b086828701610345565b93505060206103c186828701610378565b92505060406103d286828701610378565b9150509250925092565b5f82825260208201905092915050565b7f4d6f636b577261707065723a206f6e6c79206b65726e656c20616c6c6f7765645f8201527f20746f206d696e7420746f6b656e730000000000000000000000000000000000602082015250565b5f610446602f836103dc565b9150610451826103ec565b604082019050919050565b5f6020820190508181035f8301526104738161043a565b9050919050565b7f4d6f636b577261707065723a2077726f6e67207469636b6574206861736800005f82015250565b5f6104ae601e836103dc565b91506104b98261047a565b602082019050919050565b5f6020820190508181035f8301526104db816104a2565b9050919050565b6104eb81610359565b82525050565b5f6020820190506105045f8301846104e2565b92915050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61054860088361050a565b915061055382610514565b600882019050919050565b5f6105688261053c565b915081905091905056fea26469706673582212208a68bac19629ffb15854b8a4320f7ad75da8dceb352e6e89ec31c8eca1cdbb3a64736f6c634300081e0033").unwrap();
@@ -2048,7 +1915,6 @@ mod test {
 
             let proxy = deploy_contract(
                 &mut host,
-                &mut world_state_handler,
                 caller,
                 [mock_wrapper_bytecode, constructor_calldata]
                     .concat()
@@ -2063,21 +1929,14 @@ mod test {
                 inboxMsgId: U256::ZERO,
             };
 
-            let outcome = execute_fa_deposit(
-                &mut host,
-                &mut world_state_handler,
-                caller,
-                deposit.clone(),
-            );
+            let outcome = execute_fa_deposit(&mut host, caller, deposit.clone());
             assert!(outcome.result.is_success());
             assert_eq!(outcome.result.logs().len(), 2);
 
-            let flag = get_storage_flag(&host, &world_state_handler, proxy);
+            let flag = get_storage_flag(&host, proxy);
             assert_eq!(deposit.amount, flag);
 
-            let system_account = world_state_handler
-                .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
-                .unwrap();
+            let system_account = StorageAccount::from_address(&Address::ZERO).unwrap();
             let receiver_balance = system_account
                 .read_ticket_balance(&host, &ticket_hash(&ticket), &caller)
                 .unwrap();
@@ -2104,8 +1963,7 @@ mod test {
         #[test]
         fn fa_deposit_proxy_state_reverted_if_ticket_balance_overflows() {
             let mut host = MockKernelHost::default();
-            let mut world_state_handler = new_world_state_handler().unwrap();
-            init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+            init_precompile_bytecodes(&mut host).unwrap();
 
             let caller = Address::from([1; 20]);
             let mock_wrapper_bytecode = Bytes::from_hex("608060405234801561000f575f5ffd5b50604051610a58380380610a5883398181016040528101906100319190610330565b610041848461009e60201b60201c565b5f819055508160015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550610095816100d260201b60201c565b505050506104a3565b5f82826040516020016100b2929190610414565b604051602081830303815290604052805190602001205f1c905092915050565b5f6040516020016100e29061048f565b6040516020818303038152906040528051906020012090508181555050565b5f604051905090565b5f5ffd5b5f5ffd5b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b61014681610112565b8114610150575f5ffd5b50565b5f815190506101618161013d565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6101b58261016f565b810181811067ffffffffffffffff821117156101d4576101d361017f565b5b80604052505050565b5f6101e6610101565b90506101f282826101ac565b919050565b5f67ffffffffffffffff8211156102115761021061017f565b5b61021a8261016f565b9050602081019050919050565b8281835e5f83830152505050565b5f610247610242846101f7565b6101dd565b9050828152602081018484840111156102635761026261016b565b5b61026e848285610227565b509392505050565b5f82601f83011261028a57610289610167565b5b815161029a848260208601610235565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f6102cc826102a3565b9050919050565b6102dc816102c2565b81146102e6575f5ffd5b50565b5f815190506102f7816102d3565b92915050565b5f819050919050565b61030f816102fd565b8114610319575f5ffd5b50565b5f8151905061032a81610306565b92915050565b5f5f5f5f608085870312156103485761034761010a565b5b5f61035587828801610153565b945050602085015167ffffffffffffffff8111156103765761037561010e565b5b61038287828801610276565b9350506040610393878288016102e9565b92505060606103a48782880161031c565b91505092959194509250565b5f819050919050565b6103ca6103c582610112565b6103b0565b82525050565b5f81519050919050565b5f81905092915050565b5f6103ee826103d0565b6103f881856103da565b9350610408818560208601610227565b80840191505092915050565b5f61041f82856103b9565b60168201915061042f82846103e4565b91508190509392505050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61047960088361043b565b915061048482610445565b600882019050919050565b5f6104998261046d565b9150819050919050565b6105a8806104b05f395ff3fe608060405234801561000f575f5ffd5b5060043610610034575f3560e01c80630efe6a8b14610038578063b5c5f67214610054575b5f5ffd5b610052600480360381019061004d919061038c565b610070565b005b61006e6004803603810190610069919061038c565b61019e565b005b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16146100ff576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100f69061045c565b60405180910390fd5b805f5414610142576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610139906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167f0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d41213968858360405161018891906104f1565b60405180910390a2610199826102cc565b505050565b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161461022d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102249061045c565b60405180910390fd5b805f5414610270576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610267906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167fcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5836040516102b691906104f1565b60405180910390a26102c7826102cc565b505050565b5f6040516020016102dc9061055e565b6040516020818303038152906040528051906020012090508181555050565b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610328826102ff565b9050919050565b6103388161031e565b8114610342575f5ffd5b50565b5f813590506103538161032f565b92915050565b5f819050919050565b61036b81610359565b8114610375575f5ffd5b50565b5f8135905061038681610362565b92915050565b5f5f5f606084860312156103a3576103a26102fb565b5b5f6103b086828701610345565b93505060206103c186828701610378565b92505060406103d286828701610378565b9150509250925092565b5f82825260208201905092915050565b7f4d6f636b577261707065723a206f6e6c79206b65726e656c20616c6c6f7765645f8201527f20746f206d696e7420746f6b656e730000000000000000000000000000000000602082015250565b5f610446602f836103dc565b9150610451826103ec565b604082019050919050565b5f6020820190508181035f8301526104738161043a565b9050919050565b7f4d6f636b577261707065723a2077726f6e67207469636b6574206861736800005f82015250565b5f6104ae601e836103dc565b91506104b98261047a565b602082019050919050565b5f6020820190508181035f8301526104db816104a2565b9050919050565b6104eb81610359565b82525050565b5f6020820190506105045f8301846104e2565b92915050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61054860088361050a565b915061055382610514565b600882019050919050565b5f6105688261053c565b915081905091905056fea26469706673582212208a68bac19629ffb15854b8a4320f7ad75da8dceb352e6e89ec31c8eca1cdbb3a64736f6c634300081e0033").unwrap();
@@ -2123,7 +1981,6 @@ mod test {
 
             let proxy = deploy_contract(
                 &mut host,
-                &mut world_state_handler,
                 caller,
                 [mock_wrapper_bytecode, constructor_calldata]
                     .concat()
@@ -2137,15 +1994,13 @@ mod test {
                 inboxLevel: U256::ZERO,
                 inboxMsgId: U256::ZERO,
             };
-            let mut system_account = world_state_handler
-                .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
-                .unwrap();
+            let mut system_account =
+                StorageAccount::from_address(&Address::ZERO).unwrap();
             system_account
                 .write_ticket_balance(&mut host, &ticket_hash(&ticket), &proxy, U256::MAX)
                 .unwrap();
 
-            let outcome =
-                execute_fa_deposit(&mut host, &mut world_state_handler, caller, deposit);
+            let outcome = execute_fa_deposit(&mut host, caller, deposit);
             dbg!(&outcome);
             assert_eq!(RevertReason::decode(outcome.result.output().unwrap()).unwrap().to_string(), "revert: Failed to increment ticket balance: ticket_balance_add call was unsuccessful".to_string());
         }
@@ -2153,8 +2008,7 @@ mod test {
         #[test]
         fn fa_deposit_refused_non_compatible_interface() {
             let mut host = MockKernelHost::default();
-            let mut world_state_handler = new_world_state_handler().unwrap();
-            init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+            init_precompile_bytecodes(&mut host).unwrap();
 
             let caller = Address::from([1; 20]);
             let proxy = Address::from([2; 20]);
@@ -2172,24 +2026,15 @@ mod test {
             let bytecode: Bytes = [208u8; 1024].to_vec().into();
             let code_hash = keccak256(&bytecode);
             CodeStorage::add(&mut host, &bytecode, Some(code_hash)).unwrap();
-            let mut account = world_state_handler
-                .get_or_create(&host, &account_path(&proxy).unwrap())
-                .unwrap();
+            let mut account = StorageAccount::from_address(&proxy).unwrap();
             let mut info = account.info(&mut host).unwrap();
             info.code_hash = code_hash;
             account.set_info(&mut host, info).unwrap();
 
-            let outcome = execute_fa_deposit(
-                &mut host,
-                &mut world_state_handler,
-                caller,
-                deposit.clone(),
-            );
+            let outcome = execute_fa_deposit(&mut host, caller, deposit.clone());
             assert_eq!(outcome.result.logs().len(), 1);
 
-            let system_account = world_state_handler
-                .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
-                .unwrap();
+            let system_account = StorageAccount::from_address(&Address::ZERO).unwrap();
             let receiver_balance = system_account
                 .read_ticket_balance(&host, &ticket_hash(&ticket), &caller)
                 .unwrap();
@@ -2203,8 +2048,7 @@ mod test {
         #[test]
         fn fa_withdrawal_executed_via_l2_proxy_contract() {
             let mut host = MockKernelHost::default();
-            let mut world_state_handler = new_world_state_handler().unwrap();
-            init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+            init_precompile_bytecodes(&mut host).unwrap();
 
             let caller = Address::from([1; 20]);
             let mock_wrapper_bytecode = Bytes::from_hex("608060405234801561000f575f5ffd5b50604051610a58380380610a5883398181016040528101906100319190610330565b610041848461009e60201b60201c565b5f819055508160015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550610095816100d260201b60201c565b505050506104a3565b5f82826040516020016100b2929190610414565b604051602081830303815290604052805190602001205f1c905092915050565b5f6040516020016100e29061048f565b6040516020818303038152906040528051906020012090508181555050565b5f604051905090565b5f5ffd5b5f5ffd5b5f7fffffffffffffffffffffffffffffffffffffffffffff0000000000000000000082169050919050565b61014681610112565b8114610150575f5ffd5b50565b5f815190506101618161013d565b92915050565b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6101b58261016f565b810181811067ffffffffffffffff821117156101d4576101d361017f565b5b80604052505050565b5f6101e6610101565b90506101f282826101ac565b919050565b5f67ffffffffffffffff8211156102115761021061017f565b5b61021a8261016f565b9050602081019050919050565b8281835e5f83830152505050565b5f610247610242846101f7565b6101dd565b9050828152602081018484840111156102635761026261016b565b5b61026e848285610227565b509392505050565b5f82601f83011261028a57610289610167565b5b815161029a848260208601610235565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f6102cc826102a3565b9050919050565b6102dc816102c2565b81146102e6575f5ffd5b50565b5f815190506102f7816102d3565b92915050565b5f819050919050565b61030f816102fd565b8114610319575f5ffd5b50565b5f8151905061032a81610306565b92915050565b5f5f5f5f608085870312156103485761034761010a565b5b5f61035587828801610153565b945050602085015167ffffffffffffffff8111156103765761037561010e565b5b61038287828801610276565b9350506040610393878288016102e9565b92505060606103a48782880161031c565b91505092959194509250565b5f819050919050565b6103ca6103c582610112565b6103b0565b82525050565b5f81519050919050565b5f81905092915050565b5f6103ee826103d0565b6103f881856103da565b9350610408818560208601610227565b80840191505092915050565b5f61041f82856103b9565b60168201915061042f82846103e4565b91508190509392505050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61047960088361043b565b915061048482610445565b600882019050919050565b5f6104998261046d565b9150819050919050565b6105a8806104b05f395ff3fe608060405234801561000f575f5ffd5b5060043610610034575f3560e01c80630efe6a8b14610038578063b5c5f67214610054575b5f5ffd5b610052600480360381019061004d919061038c565b610070565b005b61006e6004803603810190610069919061038c565b61019e565b005b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16146100ff576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100f69061045c565b60405180910390fd5b805f5414610142576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610139906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167f0f6798a560793a54c3bcfe86a93cde1e73087d944c0ea20544137d41213968858360405161018891906104f1565b60405180910390a2610199826102cc565b505050565b3373ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161461022d576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102249061045c565b60405180910390fd5b805f5414610270576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610267906104c4565b60405180910390fd5b8273ffffffffffffffffffffffffffffffffffffffff167fcc16f5dbb4873280815c1ee09dbd06736cffcc184412cf7a71a0fdb75d397ca5836040516102b691906104f1565b60405180910390a26102c7826102cc565b505050565b5f6040516020016102dc9061055e565b6040516020818303038152906040528051906020012090508181555050565b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610328826102ff565b9050919050565b6103388161031e565b8114610342575f5ffd5b50565b5f813590506103538161032f565b92915050565b5f819050919050565b61036b81610359565b8114610375575f5ffd5b50565b5f8135905061038681610362565b92915050565b5f5f5f606084860312156103a3576103a26102fb565b5b5f6103b086828701610345565b93505060206103c186828701610378565b92505060406103d286828701610378565b9150509250925092565b5f82825260208201905092915050565b7f4d6f636b577261707065723a206f6e6c79206b65726e656c20616c6c6f7765645f8201527f20746f206d696e7420746f6b656e730000000000000000000000000000000000602082015250565b5f610446602f836103dc565b9150610451826103ec565b604082019050919050565b5f6020820190508181035f8301526104738161043a565b9050919050565b7f4d6f636b577261707065723a2077726f6e67207469636b6574206861736800005f82015250565b5f6104ae601e836103dc565b91506104b98261047a565b602082019050919050565b5f6020820190508181035f8301526104db816104a2565b9050919050565b6104eb81610359565b82525050565b5f6020820190506105045f8301846104e2565b92915050565b5f81905092915050565b7f464c41475f5441470000000000000000000000000000000000000000000000005f82015250565b5f61054860088361050a565b915061055382610514565b600882019050919050565b5f6105688261053c565b915081905091905056fea26469706673582212208a68bac19629ffb15854b8a4320f7ad75da8dceb352e6e89ec31c8eca1cdbb3a64736f6c634300081e0033").unwrap();
@@ -2223,7 +2067,6 @@ mod test {
 
             let proxy = deploy_contract(
                 &mut host,
-                &mut world_state_handler,
                 caller,
                 [mock_wrapper_bytecode, constructor_calldata]
                     .concat()
@@ -2253,9 +2096,8 @@ mod test {
                 withdrawalId: U256::ZERO,
             };
 
-            let mut system_account = world_state_handler
-                .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
-                .unwrap();
+            let mut system_account =
+                StorageAccount::from_address(&Address::ZERO).unwrap();
             system_account
                 .write_ticket_balance(
                     &mut host,
@@ -2274,7 +2116,6 @@ mod test {
             .concat();
             let outcome = execute_fa_bridge(
                 &mut host,
-                &mut world_state_handler,
                 caller,
                 withdrawCall::new((
                     proxy,
@@ -2292,12 +2133,10 @@ mod test {
             assert!(!outcome.withdrawals.is_empty());
 
             // Ensure proxy contract state changed
-            let flag = get_storage_flag(&host, &world_state_handler, proxy);
+            let flag = get_storage_flag(&host, proxy);
             assert_eq!(fa_withdrawal.amount, flag);
 
-            let system_account = world_state_handler
-                .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
-                .unwrap();
+            let system_account = StorageAccount::from_address(&Address::ZERO).unwrap();
             let balance = system_account
                 .read_ticket_balance(&host, &ticket_hash(&ticket), &proxy)
                 .unwrap();
@@ -2323,18 +2162,16 @@ mod test {
         #[test]
         fn fa_withdrawal_fails_due_to_insufficient_balance() {
             let mut host = MockKernelHost::default();
-            let mut world_state_handler = new_world_state_handler().unwrap();
-            init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+            init_precompile_bytecodes(&mut host).unwrap();
 
             let caller = Address::from([1; 20]);
             let proxy = Address::from([2; 20]);
             let amount = U256::from(10u64);
             let (ticketer, content, routing_info) =
-                setup_ticket(&mut host, &mut world_state_handler, caller, amount);
+                setup_ticket(&mut host, caller, amount);
 
             let outcome = execute_fa_bridge(
                 &mut host,
-                &mut world_state_handler,
                 caller,
                 withdrawCall::new((
                     proxy,
@@ -2351,9 +2188,7 @@ mod test {
             assert!(!outcome.result.is_success());
             assert!(outcome.withdrawals.is_empty());
             assert!(outcome.result.logs().is_empty());
-            let system_account = world_state_handler
-                .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
-                .unwrap();
+            let system_account = StorageAccount::from_address(&Address::ZERO).unwrap();
             let withdrawal_counter = system_account.read_global_counter(&host).unwrap();
             assert_eq!(withdrawal_counter, U256::ZERO);
         }

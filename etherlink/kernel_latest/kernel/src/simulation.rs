@@ -681,9 +681,8 @@ mod tests {
     use primitive_types::H256;
     use revm::primitives::Address;
     use revm_etherlink::{
-        precompiles::provider::EtherlinkPrecompiles,
-        run_transaction,
-        storage::world_state_handler::{account_path, new_world_state_handler},
+        precompiles::provider::EtherlinkPrecompiles, run_transaction,
+        storage::world_state_handler::StorageAccount,
     };
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -776,14 +775,11 @@ mod tests {
             crate::block::GAS_LIMIT,
             H160::zero(),
         );
-        let mut world_state_handler = new_world_state_handler().unwrap();
 
         let caller =
             Address::from_hex("0x2424242424242424242424242424242424242424").unwrap();
         // give some funds to caller
-        let mut caller_account = world_state_handler
-            .get_or_create(host, &account_path(&caller).unwrap())
-            .unwrap();
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
         let mut info = caller_account.info(host).unwrap();
         info.balance = u256_to_alloy(&U256::MAX);
         caller_account.set_info_without_code(host, info).unwrap();
@@ -798,7 +794,6 @@ mod tests {
             host,
             revm::primitives::hardfork::SpecId::SHANGHAI,
             &block,
-            &mut world_state_handler,
             EtherlinkPrecompiles::new(),
             caller,
             None,

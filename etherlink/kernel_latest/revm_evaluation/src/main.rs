@@ -17,12 +17,8 @@ use revm::{
     state::AccountInfo,
 };
 use revm_etherlink::{
-    precompiles::provider::EtherlinkPrecompiles,
-    run_transaction,
-    storage::world_state_handler::{
-        new_world_state_handler, StorageAccount, WorldStateHandler,
-    },
-    ExecutionOutcome,
+    precompiles::provider::EtherlinkPrecompiles, run_transaction,
+    storage::world_state_handler::StorageAccount, ExecutionOutcome,
 };
 use std::{
     ffi::OsStr,
@@ -110,15 +106,9 @@ fn read_all_fixtures<P: AsRef<Path>>(fixtures_dir: P) -> Fixtures {
     fixtures
 }
 
-fn fill_state(
-    host: &mut impl Runtime,
-    world_state_handler: &mut WorldStateHandler,
-    state: HashMap<Address, Account>,
-) {
+fn fill_state(host: &mut impl Runtime, state: HashMap<Address, Account>) {
     for (address, info) in state {
-        let mut storage_account =
-            StorageAccount::get_or_create_account(host, world_state_handler, address)
-                .unwrap();
+        let mut storage_account = StorageAccount::from_address(&address).unwrap();
         for (index, value) in &info.storage {
             storage_account.set_storage(host, index, value).unwrap();
         }
@@ -128,16 +118,13 @@ fn fill_state(
 
 fn check_result(
     host: &mut impl Runtime,
-    world_state_handler: &WorldStateHandler,
     state: HashMap<Address, Account>,
     output_file: &mut Option<File>,
     total_gas_refunded: U256,
 ) -> bool {
     let mut success = true;
     for (address, info) in state {
-        let storage_account =
-            StorageAccount::get_or_create_account(host, world_state_handler, address)
-                .unwrap();
+        let storage_account = StorageAccount::from_address(&address).unwrap();
 
         let mut storage_error = String::new();
         for (index, expected_value) in &info.storage {
@@ -264,7 +251,6 @@ pub fn main() {
     );
 
     let mut host = prepare_host();
-    let mut world_state_handler = new_world_state_handler().unwrap();
 
     for NamedFixture { path, fixtures } in fixtures {
         write_out!(output_file, "---------- Test file: {:?} ----------", path);
@@ -292,7 +278,7 @@ pub fn main() {
             for (spec_name, post_entrys) in post {
                 for PostEntry { state, indexes, .. } in post_entrys {
                     host = prepare_host_with_buffer(host.buffer.take());
-                    fill_state(&mut host, &mut world_state_handler, pre.clone());
+                    fill_state(&mut host, pre.clone());
                     let spec_id = spec_name.clone().into();
                     write_out!(output_file, "EVM spec: {spec_name:?}");
                     let block_constants =
@@ -314,7 +300,6 @@ pub fn main() {
                         &mut host,
                         spec_id,
                         &block_constants,
-                        &mut world_state_handler,
                         EtherlinkPrecompiles::new(),
                         transaction.sender,
                         transaction.to,
@@ -336,7 +321,6 @@ pub fn main() {
 
                     let final_result = check_result(
                         &mut host,
-                        &world_state_handler,
                         state,
                         &mut output_file,
                         total_gas_refunded,

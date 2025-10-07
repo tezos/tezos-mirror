@@ -16,46 +16,22 @@ use crate::{
         FA_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_CONTRACT, INTERNAL_FORWARDER_SOL_CONTRACT,
         WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CONTRACT,
     },
-    storage::{
-        code::CodeStorage,
-        world_state_handler::{account_path, WorldStateHandler},
-    },
+    storage::{code::CodeStorage, world_state_handler::StorageAccount},
     Error,
 };
 
-pub fn init_precompile_bytecodes<'a, Host: Runtime>(
-    host: &'a mut Host,
-    world_state_handler: &'a mut WorldStateHandler,
-) -> Result<(), Error> {
-    init_precompile_bytecode(
-        host,
-        world_state_handler,
-        &Address::ZERO,
-        INTERNAL_FORWARDER_SOL_CONTRACT,
-    )?;
-    init_precompile_bytecode(
-        host,
-        world_state_handler,
-        &WITHDRAWAL_SOL_ADDR,
-        WITHDRAWAL_SOL_CONTRACT,
-    )?;
-    init_precompile_bytecode(
-        host,
-        world_state_handler,
-        &FA_BRIDGE_SOL_ADDR,
-        FA_BRIDGE_SOL_CONTRACT,
-    )
+pub fn init_precompile_bytecodes<Host: Runtime>(host: &'_ mut Host) -> Result<(), Error> {
+    init_precompile_bytecode(host, &Address::ZERO, INTERNAL_FORWARDER_SOL_CONTRACT)?;
+    init_precompile_bytecode(host, &WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CONTRACT)?;
+    init_precompile_bytecode(host, &FA_BRIDGE_SOL_ADDR, FA_BRIDGE_SOL_CONTRACT)
 }
 
-fn init_precompile_bytecode<'a, Host: Runtime>(
-    host: &'a mut Host,
-    world_state_handler: &'a mut WorldStateHandler,
+fn init_precompile_bytecode<Host: Runtime>(
+    host: &'_ mut Host,
     addr: &Address,
     hex_bytes: &str,
 ) -> Result<(), Error> {
-    let mut created_account = world_state_handler
-        .get_or_create(host, &account_path(addr).map_err(custom)?)
-        .map_err(custom)?;
+    let mut created_account = StorageAccount::from_address(addr)?;
     let mut account_info = created_account.info(host).map_err(custom)?;
     if account_info.code_hash != KECCAK_EMPTY {
         return Ok(());
