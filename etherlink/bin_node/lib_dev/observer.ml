@@ -187,11 +187,9 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       ~tx_container
       ()
   in
-  (* One domain for the Lwt scheduler, one domain for Evm_context and the rest
-     of the RPCs. *)
-  let pool =
-    Lwt_domain.setup_pool (max 1 (Domain.recommended_domain_count () - 2))
-  in
+  (* One domain for the Lwt scheduler, one domain for Evm_context, one domain
+     for spawning processes, one for the Irmin GC and the rest of the RPCs. *)
+  let pool = Lwt_domain.setup_pool (max 1 (Misc.domain_count_cap () - 4)) in
   let* ro_ctxt =
     Evm_ro_context.load ~pool ?network ~smart_rollup_address ~data_dir config
   in

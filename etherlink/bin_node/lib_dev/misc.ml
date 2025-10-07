@@ -79,3 +79,9 @@ let interpolate str
   in
   if not look then return (Buffer.contents buf)
   else error_with "Trailing %% are not supported"
+
+let domain_count_cap () =
+  (* The node require 5 domains minimum: one for the scheduler, one for the
+     [Evm_context] worker, one for spawning arbitrary processes, one for
+     forking for the Irmin GC, and at least one for the RPC handlers. *)
+  max (min (Domain.recommended_domain_count ()) 16) 5
