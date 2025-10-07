@@ -894,14 +894,6 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
         (["minimal_block_delay"], `String "4");
         (["delay_increment_per_round"], `String "0");
         (["blocks_per_cycle"], `Int 2);
-        (* [blocks_per_cycle] is too short in this testing scenario,
-           so we increase [tolerated_inactivity_period] *)
-        ( [
-            (if Protocol.(number protocol <= 023) then
-               "tolerated_inactivity_period"
-             else "tolerated_inactivity_period_low");
-          ],
-          `Int 2 );
         (["nonce_revelation_threshold"], `Int 1);
         (["consensus_rights_delay"], `Int consensus_rights_delay);
         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));

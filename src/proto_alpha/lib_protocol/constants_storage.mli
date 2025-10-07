@@ -157,11 +157,7 @@ val allow_tz4_delegate_enable : Raw_context.t -> bool
 
 (** Tolerated period of inactivity, in cycles, before a delegate is
     deactivated *)
-val tolerated_inactivity_period_high : Raw_context.t -> int
-
-val tolerated_inactivity_period_low : Raw_context.t -> int
-
-val tolerated_inactivity_period_threshold : Raw_context.t -> int
+val tolerated_inactivity_period : Raw_context.t -> int
 
 (* attestation aggregation feature flag *)
 val aggregate_attestation : Raw_context.t -> bool

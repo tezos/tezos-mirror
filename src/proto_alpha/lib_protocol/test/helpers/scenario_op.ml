@@ -163,16 +163,12 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
       in
       let state = State.update_delegate src_name delegate_name_opt state in
       (* update delegate activation status *)
-      let* state =
+      let state =
         (* if self delegating *)
         if Option.equal String.equal delegate_name_opt (Some src_name) then
           let activity_cycle = current_cycle in
-          Scenario_activity.update_activity
-            ~block
-            ~state
-            activity_cycle
-            src_name
-        else return state
+          Scenario_activity.update_activity src_name state activity_cycle
+        else state
       in
       return (state, [operation]))
 

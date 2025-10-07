@@ -929,9 +929,7 @@ module Constants : sig
       consensus_rights_delay : int;
       blocks_preservation_cycles : int;
       delegate_parameters_activation_delay : int;
-      tolerated_inactivity_period_high : int;
-      tolerated_inactivity_period_low : int;
-      tolerated_inactivity_period_threshold : int;
+      tolerated_inactivity_period : int;
       blocks_per_cycle : int32;
       blocks_per_commitment : int32;
       nonce_revelation_threshold : int32;
@@ -1011,6 +1009,8 @@ module Constants : sig
   val blocks_preservation_cycles : context -> int
 
   val delegate_parameters_activation_delay : context -> int
+
+  val tolerated_inactivity_period : context -> int
 
   val slashable_deposits_period : context -> int
 
@@ -2420,15 +2420,14 @@ module Delegate : sig
 
   val registered : context -> public_key_hash -> bool Lwt.t
 
-  val deactivated :
-    context -> public_key_hash -> (context * bool) tzresult Lwt.t
+  val deactivated : context -> public_key_hash -> bool tzresult Lwt.t
 
   (** See {!Forbidden_delegates_storage.is_forbidden}. *)
   val is_forbidden_delegate : t -> public_key_hash -> bool
 
   (** See {!Delegate_activation_storage.last_cycle_before_deactivation}. *)
   val last_cycle_before_deactivation :
-    context -> public_key_hash -> (context * Cycle.t) tzresult Lwt.t
+    context -> public_key_hash -> Cycle.t tzresult Lwt.t
 
   module Consensus_key : sig
     val check_not_tz4 :

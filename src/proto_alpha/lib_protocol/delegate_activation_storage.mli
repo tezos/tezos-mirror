@@ -29,26 +29,15 @@
 
     This module is responsible for maintaining the following tables:
     - {!Storage.Contract.Inactive_delegate}
-    - {!Storage.Contract.Delegate_last_cycle_before_deactivation}
-
-   Note that [Delegate_last_cycle_before_deactivation] represents the
-   last active cycle of a delegate without taking into account
-   [tolerated_inactivity_period]. When a delegate is initialized or
-   reactivated, we give it additionally [consensus_rights_delay]
-   cycles to account for the fact that it will not receive consensus
-   rights yet during the first [consensus_rights_delay] cycles *)
+    - {!Storage.Contract.Delegate_last_cycle_before_deactivation} *)
 
 val is_inactive :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  (Raw_context.t * bool) tzresult Lwt.t
+  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
 (** [last_cycle_before_deactivation ctxt delegate] is the cycle at which
     the delegate is scheduled to become inactive. *)
 val last_cycle_before_deactivation :
-  Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  (Raw_context.t * Cycle_repr.t) tzresult Lwt.t
+  Raw_context.t -> Signature.Public_key_hash.t -> Cycle_repr.t tzresult Lwt.t
 
 (** [set_inactive context delegate] adds [delegate] to the set of inactive
     contracts. *)
