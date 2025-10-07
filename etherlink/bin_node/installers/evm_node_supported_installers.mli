@@ -8,6 +8,6 @@
 (** The installer kernel used to originate Etherlink on Mainnet *)
 val mainnet : string
 
-(** The installer kernel used to originate Etherlink Braeburn on
+(** The installer kernel used to originate Etherlink Shadownet on
     Shadownet *)
-val braeburn : string
+val shadownet : string

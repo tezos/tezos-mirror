@@ -70,12 +70,12 @@ module Event = struct
       ~level:Warning
       ()
 
-  let no_default_snapshot_provider_braeburn =
+  let no_default_snapshot_provider_shadownet =
     declare_0
       ~section
-      ~name:"no_default_snapshot_provider_for_braeburn"
+      ~name:"no_default_snapshot_provider_for_shadownet"
       ~msg:
-        "the default snapshots provider for Etherlink Braeburn may not be \
+        "the default snapshots provider for Etherlink Shadownet may not be \
          available yet"
       ~level:Warning
       ()
@@ -139,7 +139,7 @@ module Params = struct
     Tezos_clic.parameter (fun _ -> function
       | "mainnet" -> Lwt.return_ok Mainnet
       | "testnet" -> Lwt.return_ok Testnet
-      | "braeburn" -> Lwt.return_ok Braeburn
+      | "braeburn" | "shadownet" -> Lwt.return_ok Shadownet
       | invalid_network ->
           failwith "'%s' is not a supported network" invalid_network)
 
@@ -567,7 +567,7 @@ let supported_network_arg ?why () =
       Format.(
         asprintf
           "The network the EVM node will be connecting to. Can be `mainnet`, \
-           `testnet` or `braeburn`.%a"
+           `testnet` or `shadownet`.%a"
           (pp_print_option (fun fmt why -> fprintf fmt " %s" why))
           why)
     Params.supported_network
@@ -1151,7 +1151,7 @@ let kernel_from_args network kernel =
     (Option.bind network (function
       | Mainnet -> Some (In_memory Evm_node_supported_installers.mainnet)
       | Testnet -> None
-      | Braeburn -> Some (In_memory Evm_node_supported_installers.braeburn)))
+      | Shadownet -> Some (In_memory Evm_node_supported_installers.shadownet)))
 
 let add_tezlink_to_node_configuration tezlink_chain_id configuration =
   let open Configuration in
@@ -1437,9 +1437,9 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
   let*! () =
     match (network, init_from_snapshot) with
-    | Some Braeburn, Some provider when provider = default_snapshot_provider ->
+    | Some Shadownet, Some provider when provider = default_snapshot_provider ->
         Internal_event.Simple.emit
-          Event.no_default_snapshot_provider_braeburn
+          Event.no_default_snapshot_provider_shadownet
           ()
     | _ -> Lwt.return_unit
   in

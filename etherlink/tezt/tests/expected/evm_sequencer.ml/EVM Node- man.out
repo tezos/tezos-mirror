@@ -127,7 +127,7 @@ Run commands:
     --kernel-verbosity <info>: Sets kernel's logging verbosity, either
       `fatal`, `error`, `info`, `debug`.
     --network <network>: The network the EVM node will be connecting to. Can
-      be `mainnet`, `testnet` or `braeburn`.
+      be `mainnet`, `testnet` or `shadownet`.
       If set, defaults to the value of EVM_NODE_NETWORK.
     --init-from-snapshot [snapshot url or file path]: Automatically download
       and import a recent snapshot for supported networks on fresh data
@@ -510,8 +510,8 @@ Run commands:
     --history <archive | rolling:n | full:n>: History mode for the EVM node.
       ':n' means n days of history.
     --network <network>: The network the EVM node will be connecting to. Can
-      be `mainnet`, `testnet` or `braeburn`. If set, additional sanity checks
-      are performed on the node’s startup.
+      be `mainnet`, `testnet` or `shadownet`. If set, additional sanity
+      checks are performed on the node’s startup.
       If set, defaults to the value of EVM_NODE_NETWORK.
   
   experimental run rpc [--data-dir <data-dir>] [--config-file <path>]
@@ -715,7 +715,7 @@ Configuration commands:
     --dal-slots <slot indices>: The DAL slots indices on which the sequencer
       is allowed to send blueprints.
     --network <network>: The network the EVM node will be connecting to. Can
-      be `mainnet`, `testnet` or `braeburn`. If set, some configuration
+      be `mainnet`, `testnet` or `shadownet`. If set, some configuration
       options defaults to well-known values for the selected network.
       If set, defaults to the value of EVM_NODE_NETWORK.
     --sunset-sec <SEC>: Number of seconds prior to a sequencer operator
@@ -734,7 +734,7 @@ Configuration commands:
       If set, defaults to the value of EVM_NODE_CONFIG_FILE.
     -p --print: Print the full configuration to the standard output.
     --network <network>: The network the EVM node will be connecting to. Can
-      be `mainnet`, `testnet` or `braeburn`. If set, check as if `--network
+      be `mainnet`, `testnet` or `shadownet`. If set, check as if `--network
       N` is set when running the node (as it turns some required
       configuration fields into optional ones).
       If set, defaults to the value of EVM_NODE_NETWORK.

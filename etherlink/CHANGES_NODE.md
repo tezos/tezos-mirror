@@ -22,7 +22,8 @@
 ### Command-line interface changes
 
 - The `download kernel` command now allows to download the upcoming kernel
-ebisu by its alias. (!19461)
+  Ebisu by its alias. (!19461)
+- Deprecates the `braeburn` network alias in favor of `shadownet`. (!19503)
 
 ### Execution changes
 
