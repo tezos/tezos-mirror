@@ -175,7 +175,7 @@ let dal_skip_list_cell_content_of_slot_id node_ctxt
           let content = Dal.Slots_history.content cell in
           Slots_statuses_cache.replace
             skip_list_cells_content_cache
-            (Dal.Slots_history.content_id content)
+            (Dal.Slots_history.content_id content).header_id
             (content, attested_level_hash))
         hash_with_cells ;
       (* The [find] below validates the fact that we fetched the info of

@@ -42,7 +42,13 @@ module Plugin = struct
 
   let tb_slot_to_int tb_slot = Slot.to_int tb_slot
 
-  type error += Aggregation_result_size_error
+  type error +=
+    | Aggregation_result_size_error
+    | Attested_level_mismatch of {
+        attested_level : int32;
+        published_level : int32;
+        attestation_lag : int;
+      }
 
   let () =
     Protocol_client_context.register_error_kind
@@ -60,6 +66,36 @@ module Plugin = struct
       Data_encoding.unit
       (function Aggregation_result_size_error -> Some () | _ -> None)
       (fun () -> Aggregation_result_size_error)
+
+  let () =
+    Protocol_client_context.register_error_kind
+      `Permanent
+      ~id:"Attested_level_mismatch"
+      ~title:"Mismatch between computed and given attested level"
+      ~description:
+        "Mismatch between the given attested level and the computed one from \
+         published_level and the lag"
+      ~pp:(fun ppf (attested_level, published_level, attestation_lag) ->
+        Format.fprintf
+          ppf
+          "Mismatch between the given attested level %ld and the computed one \
+           as %ld + %d."
+          attested_level
+          published_level
+          attestation_lag)
+      Data_encoding.(
+        obj3
+          (req "attested_level" int32)
+          (req "published_level" int32)
+          (req "attestation_lag" int8))
+      (function
+        | Attested_level_mismatch
+            {attested_level; published_level; attestation_lag} ->
+            Some (attested_level, published_level, attestation_lag)
+        | _ -> None)
+      (fun (attested_level, published_level, attestation_lag) ->
+        Attested_level_mismatch
+          {attested_level; published_level; attestation_lag})
 
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -361,7 +397,7 @@ module Plugin = struct
       (* 1. There are no cells for [published_level = 0]. *)
       if published_level <= 0l then return []
       else
-        let+ cells =
+        let* cells =
           Plugin.RPC.Dal.skip_list_cells_of_level
             cpctxt
             (`Main, `Level attested_level)
@@ -369,14 +405,26 @@ module Plugin = struct
         in
         (* 2. For other levels, fetch the cells and retrieve the slot indices
            from the cells' content. *)
-        List.map
+        let module H = Dal.Slots_history in
+        List.map_es
           (fun (hash, cell) ->
-            let slot_index =
-              Dal.(
-                Slots_history.(content cell |> content_id).index
-                |> Slot_index.to_int)
+            let cell_id = H.(content cell |> content_id) in
+            let slot_id = cell_id.H.header_id in
+            let slot_index = Dal.Slot_index.to_int slot_id.index in
+            let* () =
+              let attestation_lag =
+                H.attestation_lag_value cell_id.attestation_lag
+              in
+              let expected_attested_level =
+                Raw_level.(
+                  add slot_id.published_level attestation_lag |> to_int32)
+              in
+              fail_unless
+                (Int32.equal attested_level expected_attested_level)
+                (Attested_level_mismatch
+                   {attested_level; published_level; attestation_lag})
             in
-            (hash, cell, slot_index))
+            return (hash, cell, slot_index))
           cells
 
     let slot_header_of_cell cell =

@@ -69,8 +69,7 @@ let derive_dal_parameters (reference : Cryptobox.parameters) ~redundancy_factor
     number_of_shards = reference.number_of_shards / constants_divider;
   }
 
-let content_slot_id = function
-  | Hist.Unpublished id | Published {header = {id; _}; _} -> id
+let content_slot_id cell = (Hist.content_id cell).header_id
 
 let dal_attestation slot_indexes =
   let open Alpha_context.Dal in

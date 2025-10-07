@@ -3110,9 +3110,10 @@ module Dal : sig
     }
 
     type cell_content = private
-      | Unpublished of Slot.Header.id
+      | Unpublished of cell_id
       | Published of {
           header : Slot.Header.t;
+          attestation_lag : attestation_lag_kind;
           publisher : Contract.t;
           is_proto_attested : bool;
           attested_shards : int;
@@ -3121,7 +3122,7 @@ module Dal : sig
 
     val content : t -> cell_content
 
-    val content_id : cell_content -> Slot.Header.id
+    val content_id : cell_content -> cell_id
 
     val pp : Format.formatter -> t -> unit
 
