@@ -23,6 +23,7 @@ val run :
   unit tzresult Lwt.t
 
 val deploy :
+  ?nonce:Z.t ->
   ?gas_limit:Z.t ->
   rpc_endpoint:Uri.t ->
   scenario:[< `Custom of string | `ERC20] ->

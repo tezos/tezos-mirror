@@ -196,11 +196,11 @@ let floodgate_accounts evm_node accounts =
   in
   return (Array.of_list accounts)
 
-let send_deploy ?gas_limit ~sender (scenario : [< `ERC20 | `Custom of string])
-    infos evm_node =
+let send_deploy ?nonce ?gas_limit ~sender
+    (scenario : [< `ERC20 | `Custom of string]) infos evm_node =
   let rpc_endpoint = Evm_node.endpoint evm_node |> Uri.of_string in
   let*? addr =
-    Floodgate.deploy ?gas_limit ~rpc_endpoint ~scenario infos sender
+    Floodgate.deploy ?nonce ?gas_limit ~rpc_endpoint ~scenario infos sender
   in
   return addr
 
