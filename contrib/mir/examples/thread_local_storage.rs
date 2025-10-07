@@ -8,7 +8,7 @@
 //! Emulate persistent storage using `thread_local!`.
 
 use mir::ast::*;
-use mir::context::Ctx;
+use mir::context::{Ctx, TypecheckingCtx};
 use mir::parser::Parser;
 use std::cell::RefCell;
 
@@ -30,7 +30,9 @@ fn run_contract(parameter: Micheline) {
     let parser = Parser::new();
     let contract_micheline = parser.parse_top_level(SCRIPT).unwrap();
     let mut ctx = Ctx::default();
-    let contract_typechecked = contract_micheline.typecheck_script(&mut ctx, true).unwrap();
+    let contract_typechecked = contract_micheline
+        .typecheck_script(ctx.gas(), true)
+        .unwrap();
     STORAGE.with(|storage| {
         storage.replace_with(|storage| {
             let storage = Micheline::decode_raw(&parser.arena, storage).unwrap();

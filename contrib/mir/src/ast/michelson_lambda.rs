@@ -138,6 +138,7 @@ mod tests {
             TypedValue,
         },
         context::Ctx,
+        gas::Gas,
         irrefutable_match::irrefutable_match,
         parser::Parser,
         stk,
@@ -149,7 +150,7 @@ mod tests {
         let arena = Arena::new();
         let code = parser.parse("{ LAMBDA (pair int nat unit) unit { DROP; UNIT }; PUSH int 1; APPLY; PUSH nat 2; APPLY }").unwrap();
         let code = code
-            .typecheck_instruction(&mut Ctx::default(), None, &[])
+            .typecheck_instruction(&mut Gas::default(), None, &[])
             .unwrap();
         let mut stack = stk![];
         code.interpret(&mut Ctx::default(), &arena, &mut stack)
@@ -181,7 +182,7 @@ mod tests {
         let arena = Arena::new();
         let code = parser.parse("{ LAMBDA_REC (pair int nat unit) unit { DROP 2; UNIT }; PUSH int 1; APPLY; PUSH nat 2; APPLY }").unwrap();
         let code = code
-            .typecheck_instruction(&mut Ctx::default(), None, &[])
+            .typecheck_instruction(&mut Gas::default(), None, &[])
             .unwrap();
         let mut stack = stk![];
         code.interpret(&mut Ctx::default(), &arena, &mut stack)
@@ -234,7 +235,7 @@ mod tests {
             )
             .unwrap();
         let code = code
-            .typecheck_instruction(&mut Ctx::default(), None, &[])
+            .typecheck_instruction(&mut Gas::default(), None, &[])
             .unwrap();
         let mut stack = stk![];
         code.interpret(&mut Ctx::default(), &arena, &mut stack)

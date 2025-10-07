@@ -8,7 +8,7 @@
 //! Only parse the script once, save a few cycles on subsequent runs.
 
 use mir::ast::*;
-use mir::context::Ctx;
+use mir::context::{Ctx, TypecheckingCtx};
 use mir::parser::Parser;
 use std::sync::OnceLock;
 
@@ -38,7 +38,9 @@ fn run_contract(parameter: Micheline, storage: Micheline) {
     // The contract is only lazily parsed once.
     let contract_micheline = contract();
     let mut ctx = Ctx::default();
-    let contract_typechecked = contract_micheline.typecheck_script(&mut ctx, true).unwrap();
+    let contract_typechecked = contract_micheline
+        .typecheck_script(ctx.gas(), true)
+        .unwrap();
 
     let (_, new_storage) = contract_typechecked
         .interpret(

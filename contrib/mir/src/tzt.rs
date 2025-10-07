@@ -20,7 +20,7 @@ use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
 use crate::ast::*;
 use crate::context::*;
-use crate::gas;
+use crate::gas::{self, Gas};
 use crate::interpreter::*;
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
@@ -148,7 +148,7 @@ fn typecheck_stack<'a>(
 
     stk.into_iter()
         .map(|(t, v)| {
-            let t = parse_ty(&mut ctx, &t)?;
+            let t = parse_ty(ctx.gas(), &t)?;
             let tc_val = typecheck_value(&v, &mut ctx, &t)?;
             Ok((t, tc_val))
         })
@@ -241,7 +241,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         };
 
         let parameter = match m_parameter {
-            Some(p) => Some(p.get_entrypoints(&mut Ctx::default())?),
+            Some(p) => Some(p.get_entrypoints(&mut Gas::default())?),
             None => None,
         };
 
@@ -272,7 +272,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                         typecheck_value(&ahm, &mut Ctx::default(), &Type::Address)?;
                         TypedValue::Address)
                     .hash;
-                    let entrypoints = ctm.get_entrypoints(&mut Ctx::default()).unwrap();
+                    let entrypoints = ctm.get_entrypoints(&mut Gas::default()).unwrap();
                     match a.get(&address_hash) {
                         None => {
                             a.insert(address_hash, entrypoints);
@@ -296,8 +296,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                         TypedValue::Int)
                     .clone()
                     .into();
-                    let key_ty = parse_ty(&mut Ctx::default(), &key_ty)?;
-                    let val_ty = parse_ty(&mut Ctx::default(), &val_ty)?;
+                    let key_ty = parse_ty(&mut Gas::default(), &key_ty)?;
+                    let val_ty = parse_ty(&mut Gas::default(), &val_ty)?;
                     let elts = match elts {
                         Micheline::Seq(elts) => elts,
                         _ => return Err("Big map elements must be a sequence".into()),
@@ -509,7 +509,7 @@ fn execute_tzt_test_code<'a>(
     // This value along with the test expectation
     // from the test file will be used to decide if
     // the test was a success or a fail.
-    let typechecked_code = typecheck_instruction(&code, ctx, Some(&parameter), &mut t_stack)?;
+    let typechecked_code = typecheck_instruction(&code, ctx.gas(), Some(&parameter), &mut t_stack)?;
     let mut i_stack: IStack = TopIsFirst::from(vals).0;
     typechecked_code.interpret(ctx, arena, &mut i_stack)?;
     Ok((t_stack, i_stack))
@@ -527,7 +527,7 @@ pub fn run_tzt_test<'a>(
     // expectation from the test, and declare the result of the test
     // accordingly.
     let mut ctx = Ctx::default();
-    ctx.gas = crate::gas::Gas::default();
+    ctx.gas = Gas::default();
     ctx.amount = test.amount.unwrap_or_default();
     ctx.balance = test.balance.unwrap_or_default();
     ctx.chain_id = test.chain_id.unwrap_or(Ctx::default().chain_id);
