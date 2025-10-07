@@ -18,11 +18,9 @@ type env = {
   gas_limit : Z.t;
   accounts : Floodgate_lib.Account.t Array.t;
   wxtz_addr : string;
-  gld_addr : string;
-  gld2_addr : string;
+  gld_tokens : string list;
   factory_addr : string;
   router_addr : string;
-  multicall_addr : string;
   nb_hops : int;
 }
 
@@ -189,9 +187,16 @@ let add_xtz_liquidity {sequencer; rpc_node; infos; router_addr; _} ~sender
   in
   unit
 
-let add_liquidity
-    {sequencer; rpc_node; infos; router_addr; gld_addr; gld2_addr; _} ~sender
-    ~gld ~gld2 =
+let add_xtz_liquidities env ~sender =
+  Lwt_list.iteri_s
+    (fun i token_addr ->
+      Log.info "Adding XTZ/GLD%i Liquidity" (i + 1) ;
+      let token = 1000 * 10 * (i + 1) in
+      add_xtz_liquidity env ~sender ~token_addr ~xtz:1000 ~token)
+    env.gld_tokens
+
+let add_liquidity {sequencer; rpc_node; infos; router_addr; _} ~sender ~gld
+    ~gld2 =
   let name = "addLiquidity" in
   let params_ty =
     [
@@ -209,10 +214,10 @@ let add_liquidity
   let to_ = Account.address sender in
   let params =
     [
-      `address (address gld_addr);
-      `address (address gld2_addr);
-      `int (to_wei gld);
-      `int (to_wei gld2);
+      `address (address (fst gld));
+      `address (address (fst gld2));
+      `int (to_wei (snd gld));
+      `int (to_wei (snd gld2));
       `int Z.one;
       `int Z.one;
       `address to_;
@@ -233,6 +238,25 @@ let add_liquidity
   in
   unit
 
+let pairs {gld_tokens; _} =
+  let tokens = List.mapi (fun i t -> (sf "GLD%d" (i + 1), t)) gld_tokens in
+  match tokens with
+  | [] -> assert false
+  | [_] -> []
+  | [gld1; gld2] -> [(gld1, gld2)]
+  | t :: rest -> List.combine tokens (rest @ [t])
+
+let add_token_liquidities env ~sender =
+  match env.gld_tokens with
+  | [] | [_] -> unit
+  | _ ->
+      Log.info "Adding token liquidities" ;
+      Lwt_list.iter_s
+        (fun ((n1, p1), (n2, p2)) ->
+          Log.info " - Adding liquidity in %s/%s" n1 n2 ;
+          add_liquidity env ~sender ~gld:(p1, 100_000) ~gld2:(p2, 200_000))
+        (pairs env)
+
 let approve_router {sequencer; rpc_node; infos; router_addr; _} ~sender
     ~token_addr =
   let name = "approve" in
@@ -252,18 +276,18 @@ let approve_router {sequencer; rpc_node; infos; router_addr; _} ~sender
   in
   unit
 
+let approve_router_to_tokens env ~sender =
+  Lwt_list.iteri_s
+    (fun i token_addr ->
+      Log.info "Approving router to GLD%d" (i + 1) ;
+      approve_router env ~sender ~token_addr)
+    env.gld_tokens
+
 let mk_path env ~nb_hops =
-  let rec mk acc = function
-    | 0 -> List.rev acc
-    | i ->
-        let acc =
-          `address
-            (address (if i mod 2 = 0 then env.gld_addr else env.gld2_addr))
-          :: acc
-        in
-        mk acc (i - 1)
-  in
-  mk [`address (address env.wxtz_addr)] nb_hops
+  let tokens = Seq.cycle (List.to_seq env.gld_tokens) in
+  let hops = Seq.take nb_hops tokens in
+  let rpath = Seq.map (fun a -> `address (address a)) hops in
+  `address (address env.wxtz_addr) :: List.of_seq rpath
 
 let swap_xtz ~nb_hops env iteration sender_index =
   let sender = env.accounts.(sender_index) in
@@ -287,11 +311,12 @@ let swap_xtz ~nb_hops env iteration sender_index =
       env.rpc_node
       env.router_addr
       sender
-      ~gas_limit:(Z.of_int 500_000)
+      ~gas_limit:(Z.of_int (260_000 * nb_hops)) (* Rough approximation *)
       ~value:(Z.of_int (10000 + (iteration * 100)))
       ~name:"swapExactETHForTokens" (* "swapETHForExactTokens" *)
       params_ty
       params
+      ~check_success:true
   in
   unit
 
@@ -303,17 +328,45 @@ let step ({sequencer; accounts; nb_hops; _} as env) iteration =
   in
   wait_for_application sequencer step_f
 
-let create_pair
-    {sequencer; rpc_node; infos; factory_addr; gld_addr; gld2_addr; _} ~sender =
+let create_pair ?nonce {sequencer; rpc_node; infos; factory_addr; _} ~sender
+    ((n, gld_addr), (n2, gld2_addr)) =
+  Log.info " - Create pair %s/%s" n n2 ;
   let name = "createPair" in
   let params_ty = [`address; `address] in
   let params = [`address (address gld_addr); `address (address gld2_addr)] in
   wait_for_application sequencer @@ fun () ->
-  let* _ = call infos rpc_node factory_addr sender ~name params_ty params in
+  let* _ =
+    call infos rpc_node factory_addr sender ?nonce ~name params_ty params
+  in
   unit
+
+let create_pairs env ~sender =
+  match env.gld_tokens with
+  | [] | [_] -> unit
+  | _ ->
+      Log.info "Creating pairs" ;
+      Lwt_list.iter_s (create_pair env ~sender) (pairs env)
+
+let deploy_gld_token infos ~sequencer ~rpc_node ~sender i =
+  Log.report "Deploying GLD%d" i ;
+  let gldbin = Contracts.UniswapV2.GLDToken.json () |> bin_of_json_contract in
+  let bin =
+    gldbin
+    ^ encode_value
+        (`tuple [`string; `string])
+        (`array [`string (sf "Gold%d" i); `string (sf "GLD%d" i)])
+  in
+  wait_for_application sequencer @@ fun () ->
+  deploy_contract ~rpc_node infos ~sequencer sender (`Custom bin)
+
+let deploy_gld_tokens infos ~sequencer ~rpc_node ~sender nb =
+  Lwt_list.map_s
+    (fun i -> deploy_gld_token infos ~sequencer ~rpc_node ~sender (i + 1))
+    (List.init nb Fun.id)
 
 let test_swaps =
   let nb_accounts = Option.value parameters.accounts ~default:100 in
+  let nb_tokens = Option.value parameters.contracts ~default:1 in
   let nb_hops = parameters.swap_hops in
   let accounts = Eth_account.accounts nb_accounts in
   let eth_bootstrap_accounts =
@@ -358,29 +411,10 @@ let test_swaps =
   Log.report "Deploying WXTZ" ;
   let* wxtz_addr = deploy_contract ~rpc_node infos ~sequencer sender `ERC20 in
   Log.info "  WXTZ: %s" wxtz_addr ;
-  Log.report "Deploying GLD" ;
-  let gldbin = Contracts.UniswapV2.GLDToken.json () |> bin_of_json_contract in
-  let bin =
-    gldbin
-    ^ encode_value
-        (`tuple [`string; `string])
-        (`array [`string "Gold"; `string "GLD"])
+
+  let* gld_tokens =
+    deploy_gld_tokens infos ~sequencer ~rpc_node ~sender nb_tokens
   in
-  let* gld_addr =
-    deploy_contract ~rpc_node infos ~sequencer sender (`Custom bin)
-  in
-  Log.info "  GLD: %s" gld_addr ;
-  Log.report "Deploying GLD2" ;
-  let bin =
-    gldbin
-    ^ encode_value
-        (`tuple [`string; `string])
-        (`array [`string "Gold2"; `string "GLD2"])
-  in
-  let* gld2_addr =
-    deploy_contract ~rpc_node infos ~sequencer sender (`Custom bin)
-  in
-  Log.info "  GLD2: %s" gld2_addr ;
 
   Log.report "Deploying UniswapV2 contracts" ;
   let fee_recv = sender in
@@ -414,41 +448,26 @@ let test_swaps =
       accounts;
       factory_addr;
       router_addr;
-      multicall_addr;
       wxtz_addr;
-      gld_addr;
-      gld2_addr;
+      gld_tokens;
       nb_hops;
     }
   in
-  Log.info "Creating pair GLD/GLD2" ;
-  let* () = create_pair env ~sender in
 
-  Log.info "Approving router to GLD" ;
-  let* () = approve_router env ~sender ~token_addr:env.gld_addr in
-  Log.info "Approving router to GLD2" ;
-  let* () = approve_router env ~sender ~token_addr:env.gld2_addr in
+  let* () = create_pairs env ~sender in
 
-  Log.info "Adding XTZ/GLD Liquidity" ;
+  let* () = approve_router_to_tokens env ~sender in
+
+  Log.info "Adding XTZ/GLD1 Liquidity" ;
   let* () =
     add_xtz_liquidity
       env
       ~sender
-      ~token_addr:env.gld_addr
+      ~token_addr:(List.hd env.gld_tokens)
       ~xtz:1000
       ~token:10_000
   in
-  Log.info "Adding XTZ/GLD2 Liquidity" ;
-  let* () =
-    add_xtz_liquidity
-      env
-      ~sender
-      ~token_addr:env.gld2_addr
-      ~xtz:1000
-      ~token:100_000
-  in
-  Log.info "Adding GLD/GLD2 Liquidity" ;
-  let* () = add_liquidity env ~sender ~gld:100_000 ~gld2:200_000 in
+  let* () = add_token_liquidities env ~sender in
 
   monitor_gasometer sequencer @@ fun () ->
   let* stop_profile =
