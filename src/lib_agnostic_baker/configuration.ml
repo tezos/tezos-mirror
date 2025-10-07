@@ -178,13 +178,13 @@ let liquidity_baking_toggle_vote_arg =
     ~placeholder:"vote"
     per_block_vote_parameter
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/8055
+   Remove this argument in Octez v25. *)
 let adaptive_issuance_vote_arg =
   Tezos_clic.arg
     ~doc:
-      "Vote to adopt or not the adaptive issuance feature. The possible values \
-       for this option are: \"off\" to request not activating it, \"on\" to \
-       request activating it, and \"pass\" to abstain. If you do not vote, \
-       default value is \"pass\"."
+      "DEPRECATED: This argument is ignored by the baker and will be removed \
+       in the next major version of Octez."
     ~long:"adaptive-issuance-vote"
     ~placeholder:"vote"
     per_block_vote_parameter
