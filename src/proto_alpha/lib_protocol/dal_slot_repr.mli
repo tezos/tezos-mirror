@@ -279,9 +279,18 @@ module History : sig
        confirmed slot headers. *)
   type t
 
-  (** Storing attestation lag in the cells of skip-lists in a retro-compatible
-      way. This first step is to introduce the needed code for the extension. *)
-  type attestation_lag_kind = Legacy
+  (** Starting with the first protocol (P) with this refactoring, the
+      attestation lag changes, and future protocols may even make it dynamic. We
+      want to store the attestation-lag information in skip-list cells without
+      breaking the hashes of cells produced before P.  To do so, we use the type
+      below to either use the legacy (implicit) lag or an explicit value carried
+      by new cells.
+
+    - [Legacy]: cell predates protocol P; the lag wasn't serialized, so we
+      infer it from history and DO NOT include it in the cell's encoding.
+    - [Dynamic n]: cell created at/after P; the lag is serialized and thus
+      committed in the cell's hash. *)
+  type attestation_lag_kind = Legacy | Dynamic of int
 
   (** Returns the value of attestation_lag parameter based on the given
       attestation_lag_kind. *)

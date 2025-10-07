@@ -3098,7 +3098,7 @@ module Dal : sig
   module Slots_history : sig
     type t
 
-    type attestation_lag_kind = Legacy
+    type attestation_lag_kind = Legacy | Dynamic of int
 
     val attestation_lag_value : attestation_lag_kind -> int
 

@@ -335,18 +335,24 @@ module History = struct
   (* History is represented via a skip list. The content of the cell
      is the hash of a merkle proof. *)
 
-  type attestation_lag_kind = Legacy
+  type attestation_lag_kind = Legacy | Dynamic of int
 
   (** The legacy attestation lag used by mainnet, ghostnet and shadownet *)
   let legacy_attestation_lag = 8
 
-  let attestation_lag_value = function Legacy -> legacy_attestation_lag
+  let attestation_lag_value = function
+    | Legacy -> legacy_attestation_lag
+    | Dynamic n -> n
 
   let attestation_lag_kind_equal lag1 lag2 =
-    match (lag1, lag2) with Legacy, Legacy -> true
+    match (lag1, lag2) with
+    | Legacy, Legacy -> true
+    | Dynamic n1, Dynamic n2 -> Compare.Int.equal n1 n2
+    | Legacy, Dynamic _ | Dynamic _, Legacy -> false
 
   let pp_attestation_lag_kind fmt = function
     | Legacy -> Format.fprintf fmt "Legacy:%d" legacy_attestation_lag
+    | Dynamic n -> Format.fprintf fmt "Dynamic:%d" n
 
   type cell_id = {header_id : Header.id; attestation_lag : attestation_lag_kind}
 
@@ -457,6 +463,10 @@ module History = struct
           (function
             | Unpublished {header_id; attestation_lag = Legacy} ->
                 Some ((), header_id)
+            | Unpublished {attestation_lag = Dynamic _; _} ->
+                (* We'll use a different encoding for [Dynamic] to keep
+                 encoding&hash retro-compatibility for [Legacy]. *)
+                None
             | Published _ -> None)
           (fun ((), header_id) ->
             Unpublished {header_id; attestation_lag = Legacy})
@@ -475,6 +485,10 @@ module History = struct
              Header.encoding)
           (function
             | Unpublished _ -> None
+            | Published {attestation_lag = Dynamic _; _} ->
+                (* We'll use a different encoding for [Dynamic] to keep
+                 encoding&hash retro-compatibility for [Legacy]. *)
+                None
             | Published
                 {
                   header;
