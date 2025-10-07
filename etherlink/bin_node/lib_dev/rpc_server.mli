@@ -32,6 +32,7 @@ type block_production = [`Single_node | `Disabled]
     sequencer setup, [`Disabled] means no block production method is
     available. *)
 val start_private_server :
+  mode:Configuration.mode ->
   rpc_server_family:'f Rpc_types.rpc_server_family ->
   ?block_production:block_production ->
   Configuration.t ->
@@ -48,9 +49,9 @@ val start_private_server :
     If [data_dir] is provided and the host provides the necessary binaries,
     performance metrics are enabled. *)
 val start_public_server :
+  mode:Configuration.mode ->
   rpc_server_family:'f Rpc_types.rpc_server_family ->
   l2_chain_id:L2_types.chain_id option ->
-  ?delegate_health_check_to:Uri.t ->
   ?evm_services:evm_services_methods ->
   ?data_dir:string ->
   Configuration.t ->

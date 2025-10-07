@@ -30,6 +30,8 @@ Available services:
         at least the blueprint for) a given level 
   - GET /health_check
       Assess the health of the RPC server 
+  - GET /mode
+      Expose the operating mode of the EVM node 
   + tezlink/
     + chains/<chain_id>/
       - /tezlink/chains/<chain_id>/blocks/<block_id> <dynamic>

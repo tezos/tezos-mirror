@@ -242,6 +242,7 @@ let main
 
   let* server_finalizer =
     Rpc_server.start_public_server
+      ~mode:Proxy
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
       ~l2_chain_id
       config

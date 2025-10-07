@@ -145,9 +145,9 @@ let monitor_performances ~data_dir =
   (* Run in background *)
   ignore domain
 
-let start_public_server (type f)
+let start_public_server (type f) ~(mode : Configuration.mode)
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id
-    ?delegate_health_check_to ?evm_services ?data_dir (config : Configuration.t)
+    ?evm_services ?data_dir (config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container) ctxt =
   let open Lwt_result_syntax in
   let can_start_performance_metrics =
@@ -213,13 +213,7 @@ let start_public_server (type f)
 
   let directory =
     register_tezos_services
-    |> Services.directory
-         ~rpc_server_family
-         ?delegate_health_check_to
-         rpc
-         config
-         tx_container
-         ctxt
+    |> Services.directory ~rpc_server_family mode rpc config tx_container ctxt
     |> register_evm_services
     |> Evm_directory.register_metrics "/metrics"
     |> Evm_directory.register_describe
@@ -234,13 +228,15 @@ let start_public_server (type f)
   in
   return finalizer
 
-let start_private_server ~(rpc_server_family : _ Rpc_types.rpc_server_family)
+let start_private_server ~mode
+    ~(rpc_server_family : _ Rpc_types.rpc_server_family)
     ?(block_production = `Disabled) config tx_container ctxt =
   let open Lwt_result_syntax in
   match config.Configuration.private_rpc with
   | Some private_rpc ->
       let directory =
         Services.private_directory
+          mode
           ~rpc_server_family
           private_rpc
           ~block_production

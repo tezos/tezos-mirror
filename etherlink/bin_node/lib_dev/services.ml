@@ -46,6 +46,13 @@ let configuration_service =
     ~output:Data_encoding.Json.encoding
     Path.(root / "configuration")
 
+let mode_service =
+  Service.get_service
+    ~description:"Expose the operating mode of the EVM node"
+    ~query:Query.empty
+    ~output:Data_encoding.string
+    Path.(root / "mode")
+
 type health_check_query = {drift_threshold : Z.t}
 
 let health_check_service =
@@ -142,9 +149,9 @@ let configuration_handler config =
     (Configuration.encoding hidden)
     config
 
-let health_check_handler ?delegate_to db_liveness_check query =
-  match delegate_to with
-  | None ->
+let health_check_handler mode db_liveness_check query =
+  match mode with
+  | Configuration.Sequencer | Observer | Proxy ->
       let open Lwt_result_syntax in
       let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping
       and* () =
@@ -165,7 +172,7 @@ let health_check_handler ?delegate_to db_liveness_check query =
         fail_when has_timeout Stalled_database
       in
       return_unit
-  | Some evm_node_endpoint ->
+  | Rpc {evm_node_endpoint} ->
       Rollup_services.call_service
         ~keep_alive:false
         ~base:evm_node_endpoint
@@ -175,6 +182,25 @@ let health_check_handler ?delegate_to db_liveness_check query =
         query
         ()
 
+let evm_mode_handler evm_mode =
+  let open Lwt_result_syntax in
+  match evm_mode with
+  | Configuration.Sequencer -> return "sequencer"
+  | Observer -> return "observer"
+  | Proxy -> return "proxy"
+  | Rpc {evm_node_endpoint} ->
+      let+ evm_node_mode =
+        Rollup_services.call_service
+          ~keep_alive:false
+          ~base:evm_node_endpoint
+          ~media_types:[Media_type.json]
+          mode_service
+          ()
+          ()
+          ()
+      in
+      Format.sprintf "rpc (%s)" evm_node_mode
+
 let version dir =
   Evm_directory.register0 dir version_service (fun () () ->
       Lwt.return_ok client_version)
@@ -183,9 +209,13 @@ let configuration config dir =
   Evm_directory.register0 dir configuration_service (fun () () ->
       configuration_handler config |> Lwt.return_ok)
 
-let health_check ?delegate_to db_liveness_check dir =
+let evm_mode evm_mode dir =
+  Evm_directory.register0 dir mode_service (fun () () ->
+      evm_mode_handler evm_mode)
+
+let health_check mode db_liveness_check dir =
   Evm_directory.register0 dir health_check_service (fun query () ->
-      health_check_handler ?delegate_to db_liveness_check query)
+      health_check_handler mode db_liveness_check query)
 
 let get_block_by_number ~full_transaction_object block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
@@ -1453,9 +1483,9 @@ let dispatch_websocket_private (type f)
     "/private/ws"
     (dispatch_private_websocket rpc_server_family ~block_production rpc)
 
-let directory (type f) ~(rpc_server_family : f Rpc_types.rpc_server_family)
-    ?delegate_health_check_to rpc config
-    (tx_container : f Services_backend_sig.tx_container) backend dir =
+let directory (type f) ~(rpc_server_family : f Rpc_types.rpc_server_family) mode
+    rpc config (tx_container : f Services_backend_sig.tx_container) backend dir
+    =
   let db_liveness_check () =
     let open Lwt_result_syntax in
     let (module Backend : Services_backend_sig.S) = fst backend in
@@ -1473,16 +1503,16 @@ let directory (type f) ~(rpc_server_family : f Rpc_types.rpc_server_family)
             return_unit)
   in
 
-  dir |> version |> configuration config
-  |> health_check ?delegate_to:delegate_health_check_to db_liveness_check
+  dir |> version |> configuration config |> evm_mode mode
+  |> health_check mode db_liveness_check
   |> dispatch_public rpc_server_family rpc config tx_container backend
   |> dispatch_websocket_public rpc_server_family rpc config tx_container backend
 
-let private_directory ~rpc_server_family rpc config
+let private_directory ~rpc_server_family mode rpc config
     (tx_container : _ Services_backend_sig.tx_container) backend
     ~block_production =
   Evm_directory.empty config.experimental_features.rpc_server
-  |> version
+  |> version |> evm_mode mode
   |> dispatch_private
        rpc_server_family
        rpc

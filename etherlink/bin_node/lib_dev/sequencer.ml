@@ -481,6 +481,7 @@ let main ~data_dir ~cctxt ?(genesis_timestamp = Misc.now ())
 
   let* finalizer_public_server =
     Rpc_server.start_public_server
+      ~mode:Sequencer
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(
@@ -495,6 +496,7 @@ let main ~data_dir ~cctxt ?(genesis_timestamp = Misc.now ())
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
+      ~mode:Sequencer
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
          else Rpc_types.Single_chain_node_rpc_server chain_family)

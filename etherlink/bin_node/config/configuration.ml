@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type mode = Sequencer | Observer | Proxy | Rpc of {evm_node_endpoint : Uri.t}
+
 type supported_network = Mainnet | Testnet | Braeburn
 
 let pp_supported_network fmt network =

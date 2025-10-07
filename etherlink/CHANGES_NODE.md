@@ -8,6 +8,10 @@
 
 ### RPCs changes
 
+- Add new GET `/mode` RPC endpoint to expose the current
+  operating mode of the EVM node. This enables external monitoring
+  tools to query and track node configuration. (!19486)
+
 ### Monitoring changes
 
 ### Command-line interface changes
