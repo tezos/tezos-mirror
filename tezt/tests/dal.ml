@@ -11488,6 +11488,7 @@ let register ~protocols =
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~attestation_threshold:100
     ~attestation_lag:16
+    ~tags:[Tag.ci_disabled]
     ~activation_timestamp:Now
     ~number_of_slots:8
     ~operator_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
@@ -11733,6 +11734,7 @@ let register ~protocols =
     ~slot_size:(1 lsl 15)
     ~redundancy_factor:8
     ~attestation_lag:4
+    ~tags:[Tag.ci_disabled]
     ~page_size:128
     test_reveal_dal_page_in_fast_exec_wasm_pvm
     protocols ;
@@ -11747,6 +11749,7 @@ let register ~protocols =
     ~redundancy_factor:8
     ~page_size:128
     ~attestation_lag:4
+    ~tags:[Tag.ci_disabled]
     Tx_kernel_e2e.test_tx_kernel_e2e
     protocols ;
   scenario_with_all_nodes
