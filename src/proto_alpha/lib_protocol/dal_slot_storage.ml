@@ -65,7 +65,7 @@ let get_slot_headers_history ctxt =
   | Some slots_history -> slots_history
 
 let update_skip_list ctxt ~slot_headers_statuses ~published_level
-    ~number_of_slots =
+    ~number_of_slots ~attestation_lag =
   let open Lwt_result_syntax in
   let open Dal_slot_repr.History in
   let* slots_history = get_slot_headers_history ctxt in
@@ -82,7 +82,7 @@ let update_skip_list ctxt ~slot_headers_statuses ~published_level
       slots_history
       cache
       ~published_level
-      ~attestation_lag:Legacy
+      ~attestation_lag:(Dynamic attestation_lag)
       slot_headers_statuses
   in
   let*! ctxt = Storage.Dal.Slot.History.add ctxt slots_history in
@@ -115,7 +115,8 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
   let open Lwt_result_syntax in
   let {Level_repr.level = raw_level; _} = Raw_context.current_level ctxt in
   let Constants_parametric_repr.{dal; _} = Raw_context.constants ctxt in
-  match Raw_level_repr.(sub raw_level dal.attestation_lag) with
+  let attestation_lag = dal.attestation_lag in
+  match Raw_level_repr.(sub raw_level attestation_lag) with
   | None -> return (ctxt, Dal_attestation_repr.empty)
   | Some published_level ->
       let* published_slots = find_slot_headers ctxt published_level in
@@ -140,5 +141,6 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
           ~slot_headers_statuses
           ~published_level
           ~number_of_slots
+          ~attestation_lag
       in
       return (ctxt, attestation)
