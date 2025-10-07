@@ -9,13 +9,11 @@ use revm::{
     state::{AccountInfo, Bytecode},
 };
 use rlp::{Decodable, Encodable, Rlp};
-use tezos_evm_logging::tracing::instrument;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::{
     path::{OwnedPath, RefPath},
     runtime::RuntimeError,
 };
-use tezos_smart_rollup_storage::storage::Storage;
 
 use crate::{
     custom,
@@ -200,26 +198,6 @@ impl From<AccountInfo> for AccountInfoInternal {
 }
 
 impl StorageAccount {
-    pub fn get_account(
-        host: &impl Runtime,
-        world_state_handler: &mut WorldStateHandler,
-        address: Address,
-    ) -> Result<Option<StorageAccount>, Error> {
-        world_state_handler
-            .get(host, &account_path(&address)?)
-            .map_err(custom)
-    }
-
-    pub fn get_or_create_account(
-        host: &impl Runtime,
-        world_state_handler: &WorldStateHandler,
-        address: Address,
-    ) -> Result<StorageAccount, Error> {
-        world_state_handler
-            .get_or_create(host, &account_path(&address)?)
-            .map_err(custom)
-    }
-
     pub fn from_address(address: &Address) -> Result<Self, Error> {
         let path = concat(&EVM_ACCOUNTS_PATH, &account_path(address)?)?;
         Ok(path.into())
@@ -496,13 +474,6 @@ impl From<OwnedPath> for StorageAccount {
     fn from(path: OwnedPath) -> Self {
         Self { path }
     }
-}
-
-pub type WorldStateHandler = Storage<StorageAccount>;
-
-#[instrument]
-pub fn new_world_state_handler() -> Result<WorldStateHandler, Error> {
-    Storage::<StorageAccount>::init(&EVM_ACCOUNTS_PATH).map_err(custom)
 }
 
 #[cfg(test)]
