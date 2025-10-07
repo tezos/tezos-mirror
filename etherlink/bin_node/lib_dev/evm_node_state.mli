@@ -127,7 +127,7 @@ type rw = [`Read | `Write] t
 
 (** A context hash is the hash produced when the data of the context is
     committed to disk, i.e. the {!type:commit} hash. *)
-type hash
+type hash = Smart_rollup_context_hash.t
 
 (** [load cache_size path] initializes from disk a context from [path].
     [cache_size] allows to change the LRU cache size of Irmin
@@ -164,10 +164,6 @@ val gc :
 (** [wait_gc_completion index] will return a blocking thread if a
     GC run is currently ongoing. *)
 val wait_gc_completion : [> `Write] index -> unit Lwt.t
-
-val context_hash_of_hash : hash -> Smart_rollup_context_hash.t
-
-val hash_of_context_hash : Smart_rollup_context_hash.t -> hash
 
 (** State of the PVM that this rollup node deals with *)
 module PVMState : sig

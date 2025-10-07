@@ -209,8 +209,7 @@ module Q = struct
     custom
       ~encode:(fun hash ->
         Ok
-          (hash |> Evm_node_state.context_hash_of_hash
-         |> Smart_rollup_context_hash.to_context_hash
+          (hash |> Smart_rollup_context_hash.to_context_hash
          |> Context_hash.to_b58check))
       ~decode:(fun bytes ->
         let open Result_syntax in
@@ -218,8 +217,7 @@ module Q = struct
           Option.to_result ~none:"Not a valid b58check encoded hash"
           @@ Context_hash.of_b58check_opt bytes
         in
-        hash |> Smart_rollup_context_hash.of_context_hash
-        |> Evm_node_state.hash_of_context_hash)
+        hash |> Smart_rollup_context_hash.of_context_hash)
       string
 
   let root_hash =

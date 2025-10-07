@@ -112,8 +112,7 @@ type 'a t =
 
 type rw = [`Read | `Write] t
 
-(* TODO TZK-27: Make hash generic wrt storage context *)
-type hash = Irmin_context.hash
+type hash = Smart_rollup_context_hash.t
 
 let make_index ~index ~context_impl = Index {index; context_impl}
 
@@ -141,20 +140,13 @@ let commit : type a. ?message:string -> a t -> hash Lwt.t =
   let open Lwt_syntax in
   let index = (index : _ Impl.index :> [`Read | `Write] Impl.index) in
   let* hash = Impl.commit ?message {index; tree} in
-
-  (* TODO TZK-27: Make hash generic wrt storage context *)
   let hash = Impl.context_hash_of_hash hash in
-  let hash = Irmin_context.hash_of_context_hash hash in
-
   return hash
 
 let checkout_exn : type a. a index -> hash -> a t Lwt.t =
  fun (Index {index; context_impl = (module Impl)}) hash ->
   let open Lwt_syntax in
-  (* TODO TZK-27: Make hash generic wrt storage context *)
-  let hash = Irmin_context.context_hash_of_hash hash in
   let hash = Impl.hash_of_context_hash hash in
-
   let* {index; tree} = Impl.checkout_exn index hash in
   return @@ make_ctxt ~index ~tree ~context_impl:(module Impl)
 
@@ -169,10 +161,7 @@ let split : type a. a index -> unit =
 let gc : type a. a index -> ?callback:(unit -> unit Lwt.t) -> hash -> unit Lwt.t
     =
  fun (Index {index; context_impl = (module Impl)}) ?callback hash ->
-  (* TODO TZK-27: Make hash generic wrt storage context *)
-  let hash = Irmin_context.context_hash_of_hash hash in
   let hash = Impl.hash_of_context_hash hash in
-
   let index = (index : _ Impl.index :> [`Read | `Write] Impl.index) in
   Impl.gc index ?callback hash
 
@@ -180,10 +169,6 @@ let wait_gc_completion : type a. a index -> unit Lwt.t =
  fun (Index {index; context_impl = (module Impl)}) ->
   let index = (index : _ Impl.index :> [`Read | `Write] Impl.index) in
   Impl.wait_gc_completion index
-
-let context_hash_of_hash h = Irmin_context.context_hash_of_hash h
-
-let hash_of_context_hash h = Irmin_context.hash_of_context_hash h
 
 module PVMState = struct
   type value = tree
