@@ -51,7 +51,7 @@ let () =
     (fun () -> Prague_not_enabled)
 
 module K = struct
-  (* Constants extracted from several EIPs. 
+  (* Constants extracted from several EIPs.
      For more details see:
      - https://eips.ethereum.org/EIPS/eip-7623
      - https://eips.ethereum.org/EIPS/eip-3860 *)
@@ -84,19 +84,31 @@ let is_prague_enabled ~storage_version = storage_version >= 37
 type mode = Minimal | Full
 
 module Types = struct
-  type 'a inner_session = {
-    state : 'a;
-    state_backend : (module Services_backend_sig.S with type Reader.state = 'a);
+  type etherlink_infos = {
     minimum_base_fee_per_gas : Z.t;
     base_fee_per_gas : Z.t;
     da_fee_per_bytes : Z.t;
     maximum_gas_per_transaction : Z.t;
+  }
+
+  let etherlink_infos_default =
+    {
+      minimum_base_fee_per_gas = Z.zero;
+      base_fee_per_gas = Z.zero;
+      da_fee_per_bytes = Z.zero;
+      maximum_gas_per_transaction = Z.zero;
+    }
+
+  type 'a inner_session = {
+    state : 'a;
+    state_backend : (module Services_backend_sig.S with type Reader.state = 'a);
     storage_version : int;
+    etherlink_infos : etherlink_infos;
   }
 
   type session = Session : 'a inner_session -> session
 
-  let session_of_state (type state) state_backend state =
+  let etherlink_infos_of_state (type state) state_backend state =
     let open Lwt_result_syntax in
     let (module Backend_rpc : Services_backend_sig.S
           with type Reader.state = state) =
@@ -125,24 +137,42 @@ module Types = struct
       Etherlink_durable_storage.maximum_gas_per_transaction
         (Backend_rpc.Reader.read state)
     in
+    return
+      {
+        base_fee_per_gas;
+        minimum_base_fee_per_gas;
+        da_fee_per_bytes;
+        maximum_gas_per_transaction;
+      }
+
+  let session_of_state (type state) chain_family state_backend state =
+    let open Lwt_result_syntax in
+    let (module Backend_rpc : Services_backend_sig.S
+          with type Reader.state = state) =
+      state_backend
+    in
     let* storage_version =
       Durable_storage.storage_version (Backend_rpc.Reader.read state)
     in
-    return
-      (Session
-         {
-           state;
-           state_backend;
-           storage_version;
-           base_fee_per_gas;
-           minimum_base_fee_per_gas;
-           da_fee_per_bytes;
-           maximum_gas_per_transaction;
-         })
+    match chain_family with
+    | L2_types.Ex_chain_family EVM ->
+        let* etherlink_infos = etherlink_infos_of_state state_backend state in
+        return
+          (Session {state; state_backend; storage_version; etherlink_infos})
+    | L2_types.Ex_chain_family Michelson ->
+        return
+          (Session
+             {
+               state;
+               state_backend;
+               storage_version;
+               etherlink_infos = etherlink_infos_default;
+             })
 
   type parameters = {
     mode : mode;
     chain_id : L2_types.chain_id;
+    chain_family : L2_types.ex_chain_family;
     max_number_of_chunks : int option;
     session : session;
   }
@@ -150,6 +180,7 @@ module Types = struct
   type state = {
     mode : mode;
     chain_id : L2_types.chain_id;
+    chain_family : L2_types.ex_chain_family;
     max_number_of_chunks : int option;
     mutable session : session;
   }
@@ -254,14 +285,17 @@ let validate_gas_limit session (transaction : Transaction.transaction) :
     (* since Dionysus, the execution gas limit is always computed from the
        minimum base fee per gas *)
     Fees.execution_gas_limit
-      ~da_fee_per_byte:(Qty session.da_fee_per_bytes)
+      ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
       ~access_list:transaction.access_list
-      ~minimum_base_fee_per_gas:session.minimum_base_fee_per_gas
+      ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
       ~gas_limit:transaction.gas_limit
       transaction.data
   in
   if session.storage_version < 34 then
-    if Compare.Z.(execution_gas_limit <= session.maximum_gas_per_transaction)
+    if
+      Compare.Z.(
+        execution_gas_limit
+        <= session.etherlink_infos.maximum_gas_per_transaction)
     then return (Ok ())
     else
       return
@@ -270,7 +304,7 @@ let validate_gas_limit session (transaction : Transaction.transaction) :
               "Gas limit for execution is too high. Maximum limit is %a, \
                transaction has %a"
               Z.pp_print
-              session.maximum_gas_per_transaction
+              session.etherlink_infos.maximum_gas_per_transaction
               Z.pp_print
               execution_gas_limit))
   else return (Ok ())
@@ -460,8 +494,8 @@ let validate_minimum_gas_requirement ~session
   in
   let da_inclusion_fees =
     Fees.da_fees_gas_limit_overhead
-      ~da_fee_per_byte:(Qty session.da_fee_per_bytes)
-      ~minimum_base_fee_per_gas:session.minimum_base_fee_per_gas
+      ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
+      ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
       transaction.Transaction.data
   in
   let gas_limit = transaction.gas_limit in
@@ -520,7 +554,7 @@ let validate_balance_and_gas_with_backend (type state) ~caller session
   in
   let** _total_cost =
     validate_balance_and_max_fee_per_gas
-      ~base_fee_per_gas:(Qty session.base_fee_per_gas)
+      ~base_fee_per_gas:(Qty session.etherlink_infos.base_fee_per_gas)
       ~transaction
       ~from_balance
   in
@@ -588,9 +622,12 @@ module Handlers = struct
   type launch_error = tztrace
 
   let on_launch _self ()
-      ({chain_id; mode; max_number_of_chunks; session} : Types.parameters) =
+      ({chain_id; mode; max_number_of_chunks; chain_family; session} :
+        Types.parameters) =
     let open Lwt_result_syntax in
-    return ({chain_id; mode; max_number_of_chunks; session} : Types.state)
+    return
+      ({chain_id; mode; max_number_of_chunks; chain_family; session}
+        : Types.state)
 
   let is_tx_valid (type state) ctxt session raw_transaction :
       (prevalidation_result, string) result tzresult Lwt.t =
@@ -616,7 +653,9 @@ module Handlers = struct
       session.state_backend
     in
     let* state = Backend_rpc.Reader.get_state () in
-    let* session = Types.session_of_state session.state_backend state in
+    let* session =
+      Types.session_of_state ctxt.chain_family session.state_backend state
+    in
     ctxt.session <- session ;
     return_unit
 
@@ -676,33 +715,32 @@ let start (type state f) ?max_number_of_chunks
   worker := Starting starting_promise ;
   let*! start_result =
     protect @@ fun () ->
-    match chain_family with
-    | L2_types.EVM ->
-        let (module Backend_rpc : Services_backend_sig.S
-              with type Reader.state = state) =
-          state_backend
-        in
-        let* state = Backend_rpc.Reader.get_state () in
-        let* chain_id =
-          Durable_storage.chain_id (Backend_rpc.Reader.read state)
-        in
-        let* session = Types.session_of_state state_backend state in
-        let* w =
-          Worker.launch
-            table
-            ()
-            {chain_id; mode; max_number_of_chunks; session}
-            (module Handlers)
-        in
-        worker := Started w ;
-        Lwt.wakeup starting_waker () ;
-        let*! () = Prevalidator_events.is_ready () in
-        return_unit
-    | Michelson ->
-        (* Tezlink does not use the prevalidator worker *)
-        worker := Not_started ;
-        Lwt.wakeup starting_waker () ;
-        return_unit
+    let (module Backend_rpc : Services_backend_sig.S
+          with type Reader.state = state) =
+      state_backend
+    in
+    let* state = Backend_rpc.Reader.get_state () in
+    let* chain_id = Durable_storage.chain_id (Backend_rpc.Reader.read state) in
+    let* session =
+      Types.session_of_state (Ex_chain_family chain_family) state_backend state
+    in
+    let* w =
+      Worker.launch
+        table
+        ()
+        {
+          chain_id;
+          mode;
+          max_number_of_chunks;
+          chain_family = Ex_chain_family chain_family;
+          session;
+        }
+        (module Handlers)
+    in
+    worker := Started w ;
+    Lwt.wakeup starting_waker () ;
+    let*! () = Prevalidator_events.is_ready () in
+    return_unit
   in
   match start_result with
   | Ok () -> return_unit
