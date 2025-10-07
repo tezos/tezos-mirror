@@ -45,6 +45,7 @@ type configuration = {
   bootstrap_dal_node_identity_file : string option;
   external_rpc : bool;
   disable_shard_validation : bool;
+  disable_amplification : bool;
   ignore_pkhs : string list;
   ppx_profiling_verbosity : string option;
   ppx_profiling_backends : string list;
@@ -496,6 +497,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           agent
           ~node:bootstrap_node
           ~disable_shard_validation:configuration.disable_shard_validation
+          ~disable_amplification:configuration.disable_amplification
       in
       Lwt.return_some dal_node
     else Lwt.return_none
@@ -949,6 +951,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           ~ignore_pkhs:configuration.ignore_pkhs
           ~disable_shard_validation:configuration.disable_shard_validation
+          ~disable_amplification:configuration.disable_amplification
           ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
           ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
           teztale
@@ -971,7 +974,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           ~disable_shard_validation:configuration.disable_shard_validation
-            (* TODO one shot stuff, do a proper config *)
+          ~disable_amplification:configuration.disable_amplification
           ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
           ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
           teztale
@@ -994,7 +997,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           ~disable_shard_validation:configuration.disable_shard_validation
-            (* TODO one shot stuff, do a proper config *)
+          ~disable_amplification:configuration.disable_amplification
           ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
           ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
           teztale
@@ -1335,6 +1338,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let bakers = Cli.bakers in
     let external_rpc = Cli.node_external_rpc_server in
     let disable_shard_validation = Cli.disable_shard_validation in
+    let disable_amplification = Cli.disable_amplification in
     let ppx_profiling_verbosity = Cli.ppx_profiling_verbosity in
     let ppx_profiling_backends = Cli.ppx_profiling_backends in
     let network_health_monitoring = Cli.enable_network_health_monitoring in
@@ -1375,6 +1379,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         bootstrap_dal_node_identity_file;
         external_rpc;
         disable_shard_validation;
+        disable_amplification;
         ignore_pkhs;
         ppx_profiling_verbosity;
         ppx_profiling_backends;

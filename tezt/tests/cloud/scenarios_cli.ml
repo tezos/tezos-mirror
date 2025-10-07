@@ -141,6 +141,8 @@ module type Dal = sig
 
   val disable_shard_validation : bool
 
+  val disable_amplification : bool
+
   val ignore_pkhs : string list
 
   val ppx_profiling_verbosity : string option
@@ -640,6 +642,15 @@ module Dal () : Dal = struct
       ~set_long:"disable-shard-validation"
       ~description:"All DAL nodes will bypass the shard validation stage."
       (Option.value ~default:false config.disable_shard_validation)
+
+  let disable_amplification =
+    Clap.flag
+      ~section
+      ~set_long:"disable-amplification"
+      ~description:
+        "DAL nodes will not do the missing-shards reconstruction and \
+         propagation."
+      (Option.value ~default:false config.disable_amplification)
 
   let ignore_pkhs =
     config.ignore_pkhs

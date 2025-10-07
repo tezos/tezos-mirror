@@ -44,6 +44,7 @@ module DAL : sig
     with_dal : bool option;
     proxy_localhost : bool option;
     disable_shard_validation : bool option;
+    disable_amplification : bool option;
     ignore_pkhs : string list;
     ppx_profiling_verbosity : string option;
     ppx_profiling_backends : string list;

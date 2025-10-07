@@ -44,6 +44,7 @@ module DAL = struct
     with_dal : bool option;
     proxy_localhost : bool option;
     disable_shard_validation : bool option;
+    disable_amplification : bool option;
     ignore_pkhs : string list;
     ppx_profiling_verbosity : string option;
     ppx_profiling_backends : string list;
@@ -102,6 +103,7 @@ module DAL = struct
              with_dal;
              proxy_localhost;
              disable_shard_validation;
+             disable_amplification;
              ignore_pkhs;
              ppx_profiling_verbosity;
              ppx_profiling_backends;
@@ -142,15 +144,16 @@ module DAL = struct
                 memtrace,
                 bootstrap_node_identity_file,
                 bootstrap_dal_node_identity_file ),
-              ( refresh_binaries,
-                node_external_rpc_server,
-                with_dal,
-                proxy_localhost,
-                disable_shard_validation,
-                ignore_pkhs,
-                ppx_profiling_verbosity,
-                ppx_profiling_backends,
-                enable_network_health_monitoring,
+              ( ( refresh_binaries,
+                  node_external_rpc_server,
+                  with_dal,
+                  proxy_localhost,
+                  disable_shard_validation,
+                  disable_amplification,
+                  ignore_pkhs,
+                  ppx_profiling_verbosity,
+                  ppx_profiling_backends,
+                  enable_network_health_monitoring ),
                 tezlink ) ) ),
           (slot_size, number_of_slots, attestation_lag, traps_fraction) ))
       (fun ( ( ( ( blocks_history,
@@ -182,15 +185,16 @@ module DAL = struct
                    memtrace,
                    bootstrap_node_identity_file,
                    bootstrap_dal_node_identity_file ),
-                 ( refresh_binaries,
-                   node_external_rpc_server,
-                   with_dal,
-                   proxy_localhost,
-                   disable_shard_validation,
-                   ignore_pkhs,
-                   ppx_profiling_verbosity,
-                   ppx_profiling_backends,
-                   enable_network_health_monitoring,
+                 ( ( refresh_binaries,
+                     node_external_rpc_server,
+                     with_dal,
+                     proxy_localhost,
+                     disable_shard_validation,
+                     disable_amplification,
+                     ignore_pkhs,
+                     ppx_profiling_verbosity,
+                     ppx_profiling_backends,
+                     enable_network_health_monitoring ),
                    tezlink ) ) ),
              (slot_size, number_of_slots, attestation_lag, traps_fraction) )
          ->
@@ -232,6 +236,7 @@ module DAL = struct
           with_dal;
           proxy_localhost;
           disable_shard_validation;
+          disable_amplification;
           ignore_pkhs;
           ppx_profiling_verbosity;
           ppx_profiling_backends;
@@ -283,17 +288,19 @@ module DAL = struct
                   (opt "memtrace" bool)
                   (opt "bootstrap_node_identity_file" string)
                   (opt "bootstrap_dal_node_identity_file" string))
-               (obj10
-                  (opt "refresh_binaries" bool)
-                  (opt "node_external_rpc_server" bool)
-                  (opt "with_dal" bool)
-                  (opt "proxy_localhost" bool)
-                  (opt "disable_shard_validation" bool)
-                  (dft "ignore_pkhs" (list string) [])
-                  (opt "ppx_profiling_verbosity" string)
-                  (dft "ppx_profiling_backends" (list string) [])
-                  (opt "enable_network_health_monitoring" bool)
-                  (opt "tezlink" bool))))
+               (merge_objs
+                  (obj10
+                     (opt "refresh_binaries" bool)
+                     (opt "node_external_rpc_server" bool)
+                     (opt "with_dal" bool)
+                     (opt "proxy_localhost" bool)
+                     (opt "disable_shard_validation" bool)
+                     (opt "disable_amplification" bool)
+                     (dft "ignore_pkhs" (list string) [])
+                     (opt "ppx_profiling_verbosity" string)
+                     (dft "ppx_profiling_backends" (list string) [])
+                     (opt "enable_network_health_monitoring" bool))
+                  (obj1 (opt "tezlink" bool)))))
          (obj4
             (opt "slot_size" int31)
             (opt "number_of_slots" int31)
