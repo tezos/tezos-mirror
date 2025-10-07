@@ -143,15 +143,17 @@ module type PROTOCOL = sig
     val deactivated :
       context -> Signature.public_key_hash -> bool tzresult Lwt.t
 
-    val consensus_key :
+    val consensus_keys :
       context ->
       Signature.public_key_hash ->
-      Signature.public_key tzresult Lwt.t
+      (Signature.public_key * Signature.public_key list) tzresult Lwt.t
 
-    val companion_key :
+    val companion_keys :
       context ->
       Signature.public_key_hash ->
-      Bls12_381_signature.MinPk.pk option tzresult Lwt.t
+      (Bls12_381_signature.MinPk.pk option * Bls12_381_signature.MinPk.pk list)
+      tzresult
+      Lwt.t
   end
 
   val hash : Protocol_hash.t

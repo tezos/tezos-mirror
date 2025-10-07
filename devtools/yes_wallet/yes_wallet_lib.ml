@@ -229,6 +229,48 @@ let filter_up_to_staking_share share total_stake to_mutez keys_list =
       in
       loop ([], 0L) keys_list |> fst |> List.rev
 
+let get_consensus_keys (type ctxt pkh)
+    (module P : Sigs.PROTOCOL
+      with type context = ctxt
+       and type Signature.public_key_hash = pkh) (ctxt : ctxt) pk (pkh : pkh) =
+  let open Lwt_result_syntax in
+  let* cpk, pending_cpks = P.Delegate.consensus_keys ctxt pkh in
+  let cpk = P.Signature.To_latest.public_key cpk in
+  let pending_cpks =
+    List.map
+      (fun pending_pk ->
+        let pending_pk = P.Signature.To_latest.public_key pending_pk in
+        let pending_pkh = Tezos_crypto.Signature.Public_key.hash pending_pk in
+        (pending_pkh, pending_pk))
+      pending_cpks
+  in
+  if Tezos_crypto.Signature.Public_key.equal pk cpk then
+    return (None, pending_cpks)
+  else
+    let cpkh = Tezos_crypto.Signature.Public_key.hash cpk in
+    return (Some (cpkh, cpk), pending_cpks)
+
+let get_companion_keys (type ctxt pkh)
+    (module P : Sigs.PROTOCOL
+      with type context = ctxt
+       and type Signature.public_key_hash = pkh) (ctxt : ctxt) (pkh : pkh) =
+  let open Lwt_result_syntax in
+  let* cpk, pending_cpks = P.Delegate.companion_keys ctxt pkh in
+  let pending_cpks =
+    List.map
+      (fun pending_pk ->
+        let pending_pkh =
+          Tezos_crypto.Signature.Bls.Public_key.hash pending_pk
+        in
+        (pending_pkh, pending_pk))
+      pending_cpks
+  in
+  match cpk with
+  | Some cpk ->
+      let cpkh = Tezos_crypto.Signature.Bls.Public_key.hash cpk in
+      return (Some (cpkh, cpk), pending_cpks)
+  | None -> return (None, pending_cpks)
+
 let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
     (header : Block_header.shell_header) active_bakers_only staking_share_opt
     accounts_pkh_lists =
@@ -260,28 +302,15 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
       ~order:`Sorted
       ~init:(Ok ([], P.Tez.zero))
       ~f:(fun pkh acc ->
-        let* pk = P.Delegate.pubkey ctxt pkh in
-        let* consensus_key =
-          let* cpk = P.Delegate.consensus_key ctxt pkh in
-          if
-            Tezos_crypto.Signature.Public_key.equal
-              (P.Signature.To_latest.public_key pk)
-              (P.Signature.To_latest.public_key cpk)
-          then return_none
-          else
-            let cpkh =
-              Tezos_crypto.Signature.Public_key.hash
-                (P.Signature.To_latest.public_key cpk)
-            in
-            return_some (cpkh, P.Signature.To_latest.public_key cpk)
+        let* pk =
+          P.Delegate.pubkey ctxt pkh
+          |> Lwt_result.map P.Signature.To_latest.public_key
         in
-        let* companion_key =
-          let* pk_opt = P.Delegate.companion_key ctxt pkh in
-          match pk_opt with
-          | None -> return_none
-          | Some pk ->
-              let pkh = Tezos_crypto.Signature.Bls.Public_key.hash pk in
-              return_some (pkh, pk)
+        let* active_consensus_key, pending_consensus_keys =
+          get_consensus_keys (module P) ctxt pk pkh
+        in
+        let* active_companion_key, pending_companion_keys =
+          get_companion_keys (module P) ctxt pkh
         in
         let*? key_list_acc, staking_balance_acc = acc in
         let* staking_balance = P.Delegate.staking_balance ctxt pkh in
@@ -295,16 +324,19 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
         let staking_balance_info :
             Signature.public_key_hash
             * Signature.public_key
-            * (Signature.public_key_hash * Signature.public_key) option
-            * (Signature.Bls.Public_key_hash.t * Bls12_381_signature.MinPk.pk)
-              option
+            * ((Signature.public_key_hash * Signature.public_key) option
+              * (Signature.public_key_hash * Signature.public_key) list)
+            * ((Signature.Bls.Public_key_hash.t * Bls12_381_signature.MinPk.pk)
+               option
+              * (Signature.Bls.Public_key_hash.t * Bls12_381_signature.MinPk.pk)
+                list)
             * P.Tez.t
             * P.Tez.t
             * P.Tez.t =
           ( P.Signature.To_latest.public_key_hash pkh,
-            P.Signature.To_latest.public_key pk,
-            consensus_key,
-            companion_key,
+            pk,
+            (active_consensus_key, pending_consensus_keys),
+            (active_companion_key, pending_companion_keys),
             staking_balance,
             frozen_deposits,
             unstaked_frozen_deposits )
@@ -772,9 +804,12 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
   let* ( (delegates :
            (Signature.public_key_hash
            * Signature.public_key
-           * (Signature.public_key_hash * Signature.public_key) option
-           * (Signature.Bls.Public_key_hash.t * Bls12_381_signature.MinPk.pk)
-             option
+           * ((Signature.public_key_hash * Signature.public_key) option
+             * (Signature.public_key_hash * Signature.public_key) list)
+           * ((Signature.Bls.Public_key_hash.t * Bls12_381_signature.MinPk.pk)
+              option
+             * (Signature.Bls.Public_key_hash.t * Bls12_381_signature.MinPk.pk)
+               list)
            * int64
            * int64
            * int64)
@@ -795,23 +830,24 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
            acc
            ( pkh,
              pk,
-             consensus_key,
-             companion_key,
+             (active_consensus_key, pending_consensus_keys),
+             (active_companion_key, pending_companion_keys),
              stake,
              frozen_deposits,
              unstake_frozen_deposits )
          ->
-        let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
-        let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
-        let consensus_key =
-          match consensus_key with
-          | Some (cpkh, cpk) ->
-              let cpkh =
-                Tezos_crypto.Signature.Public_key_hash.to_b58check cpkh
-              in
-              let cpk = Tezos_crypto.Signature.Public_key.to_b58check cpk in
-              Some (cpkh, cpk)
-          | None -> None
+        let to_b58check (pkh, pk) =
+          ( Tezos_crypto.Signature.Public_key_hash.to_b58check pkh,
+            Tezos_crypto.Signature.Public_key.to_b58check pk )
+        in
+        let pkh, pk = to_b58check (pkh, pk) in
+        let active_consensus_key, consensus_keys =
+          let pendings = List.map to_b58check pending_consensus_keys in
+          match active_consensus_key with
+          | Some keys ->
+              let keys = to_b58check keys in
+              (Some keys, keys :: pendings)
+          | None -> (None, pendings)
         in
         let alias =
           List.find_map
@@ -826,28 +862,36 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
           ( alias,
             pkh,
             pk,
-            consensus_key,
+            active_consensus_key,
             stake,
             frozen_deposits,
             unstake_frozen_deposits )
         in
-        let consensus_key_alias =
-          match consensus_key with
-          | None -> []
-          | Some (cpkh, cpk) ->
-              [(alias ^ "_consensus_key", cpkh, cpk, None, 0L, 0L, 0L)]
+        let consensus_keys_alias =
+          List.mapi
+            (fun i (cpkh, cpk) ->
+              let alias = Format.asprintf "%s_consensus_key_%d" alias i in
+              (alias, cpkh, cpk, None, 0L, 0L, 0L))
+            consensus_keys
         in
-        let companion_key_alias =
-          match companion_key with
-          | None -> []
-          | Some (pkh, pk) ->
-              let pkh =
-                Tezos_crypto.Signature.Bls.Public_key_hash.to_b58check pkh
-              in
-              let pk = Tezos_crypto.Signature.Bls.Public_key.to_b58check pk in
-              [(alias ^ "_companion_key", pkh, pk, None, 0L, 0L, 0L)]
+        let companion_keys_alias =
+          let to_b58check (pkh, pk) =
+            ( Tezos_crypto.Signature.Bls.Public_key_hash.to_b58check pkh,
+              Tezos_crypto.Signature.Bls.Public_key.to_b58check pk )
+          in
+          let companion_keys =
+            let pendings = List.map to_b58check pending_companion_keys in
+            match active_companion_key with
+            | Some keys -> to_b58check keys :: pendings
+            | None -> pendings
+          in
+          List.mapi
+            (fun i (cpkh, cpk) ->
+              let alias = Format.asprintf "%s_companion_key_%d" alias i in
+              (alias, cpkh, cpk, None, 0L, 0L, 0L))
+            companion_keys
         in
-        companion_key_alias @ consensus_key_alias @ (delegate_alias :: acc))
+        companion_keys_alias @ consensus_keys_alias @ (delegate_alias :: acc))
       []
       delegates
     |> List.rev
