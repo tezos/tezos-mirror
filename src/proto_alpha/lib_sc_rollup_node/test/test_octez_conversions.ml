@@ -281,11 +281,13 @@ let gen_slot_history =
   in
   List.fold_left_e
     (fun hist (published_level, attested_slots) ->
-      Dal.Slots_history.update_skip_list_no_cache
-        ~number_of_slots
-        hist
-        ~published_level
-        attested_slots)
+      Dal.Slots_history.(
+        update_skip_list_no_cache
+          ~number_of_slots
+          hist
+          ~published_level
+          attested_slots
+          ~attestation_lag:Legacy))
     Dal.Slots_history.genesis
     l
   |> function
@@ -315,12 +317,14 @@ let gen_slot_history_cache =
   in
   List.fold_left_e
     (fun (hist, cache) (published_level, attested_slots) ->
-      Dal.Slots_history.update_skip_list
-        ~number_of_slots
-        hist
-        cache
-        ~published_level
-        attested_slots)
+      Dal.Slots_history.(
+        update_skip_list
+          ~number_of_slots
+          hist
+          cache
+          ~published_level
+          attested_slots
+          ~attestation_lag:Legacy))
     (Dal.Slots_history.genesis, cache)
     l
   |> function

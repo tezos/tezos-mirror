@@ -3151,6 +3151,7 @@ module Dal : sig
       t ->
       published_level:Raw_level.t ->
       number_of_slots:int ->
+      attestation_lag:attestation_lag_kind ->
       (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
       t tzresult
 
@@ -3159,6 +3160,7 @@ module Dal : sig
       History_cache.t ->
       published_level:Raw_level.t ->
       number_of_slots:int ->
+      attestation_lag:attestation_lag_kind ->
       (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
       (t * History_cache.t) tzresult
 

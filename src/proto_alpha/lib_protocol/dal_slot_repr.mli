@@ -399,6 +399,7 @@ module History : sig
     History_cache.t ->
     published_level:Raw_level_repr.t ->
     number_of_slots:int ->
+    attestation_lag:attestation_lag_kind ->
     (Header.t
     * Contract_repr.t
     * Dal_attestation_repr.Accountability.attestation_status)
@@ -411,6 +412,7 @@ module History : sig
     t ->
     published_level:Raw_level_repr.t ->
     number_of_slots:int ->
+    attestation_lag:attestation_lag_kind ->
     (Header.t
     * Contract_repr.t
     * Dal_attestation_repr.Accountability.attestation_status)

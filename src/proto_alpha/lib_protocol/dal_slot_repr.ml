@@ -912,7 +912,7 @@ module History = struct
        will simplify the shape of proofs and help bounding the history cache
        required for their generation. *)
     let update_skip_list (t : t) cache ~published_level ~number_of_slots
-        slot_headers_with_statuses =
+        ~attestation_lag slot_headers_with_statuses =
       let open Result_syntax in
       let* () =
         List.iter_e
@@ -927,14 +927,19 @@ module History = struct
         fill_slot_headers
           ~number_of_slots
           ~published_level
-          ~attestation_lag:Legacy
+          ~attestation_lag
           slot_headers_with_statuses
       in
       List.fold_left_e (add_cell ~number_of_slots) (t, cache) slot_headers
 
     let update_skip_list_no_cache =
       let empty_cache = History_cache.empty ~capacity:0L in
-      fun t ~published_level ~number_of_slots slot_headers_with_statuses ->
+      fun t
+          ~published_level
+          ~number_of_slots
+          ~attestation_lag
+          slot_headers_with_statuses
+        ->
         let open Result_syntax in
         let+ cell, (_ : History_cache.t) =
           update_skip_list
@@ -942,6 +947,7 @@ module History = struct
             empty_cache
             ~published_level
             ~number_of_slots
+            ~attestation_lag
             slot_headers_with_statuses
         in
         cell

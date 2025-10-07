@@ -222,7 +222,8 @@ let gen_dal_slots_history () =
             ~number_of_slots
             history
             ~published_level
-            slot_headers)
+            slot_headers
+            ~attestation_lag:Legacy)
         |> function
         | Ok history -> loop history llist
         | Error e ->
