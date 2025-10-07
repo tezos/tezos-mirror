@@ -454,6 +454,9 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
            pkhs
            cctxt
          ->
+        let*! () =
+          Events.warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote
+        in
         let* delegates = get_delegates cctxt pkhs in
         let dal_node_rpc_ctxt =
           Option.map create_dal_node_rpc_ctxt dal_node_endpoint
@@ -704,9 +707,7 @@ let run_baker ?(recommend_agnostic_baker = true)
     else Lwt.return per_block_vote_file
   in
   let*! () =
-    if Option.is_some adaptive_issuance_vote then
-      Events.(emit unused_cli_adaptive_issuance_vote ())
-    else Lwt.return_unit
+    Events.warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote
   in
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for

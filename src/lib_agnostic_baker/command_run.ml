@@ -180,9 +180,7 @@ let run_baker (module Plugin : Protocol_plugin_sig.S)
     else Lwt.return per_block_vote_file
   in
   let*! () =
-    if Option.is_some adaptive_issuance_vote then
-      Events.(emit unused_cli_adaptive_issuance_vote ())
-    else Lwt.return_unit
+    Events.warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote
   in
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for

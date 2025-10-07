@@ -98,15 +98,21 @@ module Commands = struct
          protocol switches."
       ()
 
-  let unused_cli_adaptive_issuance_vote =
+  let deprecated_adaptive_issuance_vote =
     declare_0
       ~section
-      ~name:"unused_cli_adaptive_issuance_vote"
+      ~name:"deprecated_adaptive_issuance_vote"
       ~level:Warning
       ~msg:
-        "Adaptive issuance is now enabled, voting is no longer necessary. \
-         Please remove the argument from the CLI."
+        "DEPRECATED ARGUMENT: The 'adaptive-issuance-vote' argument \
+         (placeholder 'vote') is deprecated. It is already ignored by the \
+         baker, and will be removed in the next major version of Octez."
       ()
+
+  let warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote =
+    if Option.is_some adaptive_issuance_vote then
+      emit deprecated_adaptive_issuance_vote ()
+    else Lwt.return_unit
 end
 
 module State_transitions = struct
