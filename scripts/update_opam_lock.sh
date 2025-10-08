@@ -100,7 +100,7 @@ opam pin add cohttp-lwt-unix.5.3.1~octez https://github.com/killian-delarue/ocam
 # `v0.16.4` cherry-picking a work-in-progress pull request that improves the
 # mechanism to check `-mpopcnt` compatibility.
 echo "---- Pinning base"
-opam pin add https://github.com/vch9/base.git#1d0cdedec2a8c63608d3c34531565903d5918ff6 -y
+opam pin add https://github.com/vch9/base.git#7f6581ba5e29fd340266cb901a59f24ebfbe67f1 -y
 
 # Ask opam to find a solution that covers both:
 # - 'octez-deps', so that we can compile Octez;
