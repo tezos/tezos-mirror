@@ -861,6 +861,8 @@ module Constants : sig
       traps_fraction : Q.t;
     }
 
+    val dal_encoding : dal Data_encoding.t
+
     type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level.t}
 
     type sc_rollup_reveal_activation_level = {
@@ -3204,8 +3206,9 @@ module Dal : sig
     val is_denounced : context -> public_key_hash -> bool Lwt.t
   end
 
-  module Prev_attestation_lag : sig
-    val get : context -> int tzresult Lwt.t
+  module Past_parameters : sig
+    val parameters :
+      context -> Raw_level.t -> Constants.Parametric.dal tzresult Lwt.t
   end
 end
 

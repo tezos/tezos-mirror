@@ -1130,10 +1130,12 @@ module Dal : sig
        and type key = Signature.Public_key_hash.t
        and type value = unit
 
-  (** This stores the value of [attestation_lag] at the previous protocol.
+  (** This stores the value of Dal constants for each protocol.
       Useful during protocol migration when the parameter's value changes. *)
-  module Prev_attestation_lag :
-    Single_data_storage with type t := Raw_context.t and type value = int
+  module Past_parameters :
+    Single_data_storage
+      with type value = Constants_parametric_repr.past_dal_parameters list
+       and type t := Raw_context.t
 end
 
 module Zk_rollup : sig

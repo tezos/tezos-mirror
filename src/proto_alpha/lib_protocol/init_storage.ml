@@ -142,10 +142,16 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
   let* ctxt =
     match previous_proto_constants with
     | Some previous_proto_constants ->
-        Sc_rollup_storage.save_commitment_period
+        let* ctxt =
+          Sc_rollup_storage.save_commitment_period
+            ctxt
+            previous_proto_constants.sc_rollup.commitment_period_in_blocks
+            level
+        in
+        Dal_storage.save_parameters
           ctxt
-          previous_proto_constants.sc_rollup.commitment_period_in_blocks
-          level
+          previous_proto_constants.dal
+          ~next_protocol_activation:level
     | None -> return ctxt
   in
   let parametric = Raw_context.constants ctxt in
@@ -237,19 +243,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         (* Migration of refutation games needs to be kept for each protocol. *)
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
-        in
-        let* ctxt =
-          match previous_proto_constants with
-          | Some previous_proto_constants ->
-              let*! ctxt =
-                Storage.Dal.Prev_attestation_lag.add
-                  ctxt
-                  previous_proto_constants.dal.attestation_lag
-              in
-              return ctxt
-          | None ->
-              (* unreachable because the previous protocol is not Genesis *)
-              assert false
         in
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
