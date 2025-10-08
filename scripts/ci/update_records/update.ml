@@ -79,15 +79,7 @@ let fetch_pipeline_records_from_jobs records_directory pipeline =
     match parse_tezt_job_name name with
     | None -> None
     | Some (variant, index) ->
-        let artifact_path =
-          sf
-            "tezt-results-%d%s.json"
-            index
-            (match variant with
-            | None -> ""
-            | Some variant ->
-                "-" ^ String.map (function '-' -> '_' | c -> c) variant)
-        in
+        let artifact_path = "tezt-results.json" in
         Log.info "Will fetch %s from job #%d (%s)" artifact_path job_id name ;
         Some
           ( Gitlab.project_job_artifact ~project ~job_id ~artifact_path (),
