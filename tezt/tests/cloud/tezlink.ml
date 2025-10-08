@@ -546,16 +546,13 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           Cli.time_between_blocks
           tezlink_sequencer_agent
       in
-      let tezlink_proxy_endpoint, _ip =
+      let tezlink_proxy_endpoint =
         match tezlink_sandbox_endpoint with
         | Node _ ->
             failwith "Tezlink end-point should not be a full-fledged node."
         | Foreign_endpoint {host; scheme; port = _; path = _} ->
-            let endpoint =
-              Client.Foreign_endpoint
-                (Endpoint.make ~host ~scheme ~port:public_rpc_port ())
-            in
-            (endpoint, host)
+            Client.Foreign_endpoint
+              (Endpoint.make ~host ~scheme ~port:public_rpc_port ())
       in
       let* () =
         add_service

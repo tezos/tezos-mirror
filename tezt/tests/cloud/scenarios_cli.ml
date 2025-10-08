@@ -1102,10 +1102,6 @@ module type Tezlink = sig
   val verbose : bool
 
   val time_between_blocks : Tezos.Evm_node.time_between_blocks
-
-  (* Different than the --dns option of Tezt Cloud, as this one is tailored for
-     Tezlink and requires less options (no IP for instance). *)
-  val dns_name : string option
 end
 
 module Tezlink () : Tezlink = struct
@@ -1190,13 +1186,4 @@ module Tezlink () : Tezlink = struct
           (* `Tezos.Evm_node.Nothing` is a placeholder and will be ignored as we registered an error in Clap *)
           Tezos.Evm_node.Nothing
       | Some f -> Time_between_blocks f
-
-  let dns_name =
-    Clap.optional_string
-      ~section
-      ~long:"dns-name"
-      ~description:
-        "Set a DNS name for the created virtual machine. Requires the cloud or \
-         proxy flags."
-      ()
 end
