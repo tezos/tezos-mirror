@@ -227,6 +227,9 @@ let opentelemetry_ambient_context_lwt =
 
 let opentelemetry_lwt = external_lib "opentelemetry-lwt" V.True
 
+let opentelemetry_client_cohttp_lwt =
+  external_lib "opentelemetry-client-cohttp-lwt" V.True
+
 let optint = external_lib "optint" V.True
 
 let ppx_expect = inline_tests_backend (external_lib "ppx_expect" V.True)

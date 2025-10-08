@@ -20,7 +20,6 @@ depends: [
   "zarith" { >= "1.13" & < "1.14" }
   "bigstringaf" { >= "0.5.0" }
   "ppx_expect"
-  "lwt_ppx"
   "cohttp" { = "5.3.1~octez" }
   "cohttp-lwt" { = "5.3.1~octez" }
   "cohttp-lwt-unix" { = "5.3.1~octez" }
@@ -69,6 +68,7 @@ depends: [
   "lwt_eio"
   "ppxlib" { >= "0.34.0" }
   "ambient-context-lwt" { = "0.1.0" }
+  "opentelemetry-client-cohttp-lwt"
   "bheap" { >= "2.0.0" }
   "digestif" { >= "0.9.0" }
   "jsonm"
@@ -100,7 +100,6 @@ conflicts: [
   "json_data_encoding"
   "json_data_encoding_browser"
   "json_data_encoding_bson"
-  "opentelemetry-client-cohttp-lwt"
   "prometheus"
   "prometheus-app"
   "resto"

@@ -10,7 +10,6 @@ SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml \
        internals.ml \
        product_data_encoding.mli product_data_encoding.ml \
        product_websocket.mli product_websocket.ml \
-       product_opentelemetry.mli product_opentelemetry.ml \
        product_prometheus.mli product_prometheus.ml \
        product_resto.mli product_resto.ml \
        product_efunc_core.mli product_efunc_core.ml \

@@ -15,6 +15,5 @@ brassaia
 brassaia-eio
 rust-toolchain
 data-encoding
-opentelemetry
 prometheus
 resto

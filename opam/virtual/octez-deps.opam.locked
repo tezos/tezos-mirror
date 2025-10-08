@@ -200,6 +200,7 @@ depends: [
   "opam-file-format" {= "2.2.0"}
   "opentelemetry" {= "0.11.2"}
   "opentelemetry-lwt" {= "0.11.2"}
+  "opentelemetry-client-cohttp-lwt" {= "0.11.2"}
   "optint" {= "0.3.0"}
   "ordering" {= "3.20.0"}
   "parsexp" {= "v0.16.0"}
@@ -298,7 +299,6 @@ conflicts: [
   "json_data_encoding_browser"
   "json_data_encoding_bson"
   "lwt_domain"
-  "opentelemetry-client-cohttp-lwt"
   "prometheus"
   "prometheus-app"
   "resto"
