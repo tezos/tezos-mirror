@@ -70,20 +70,6 @@ impl TezlinkImplicitAccount {
             Err(ValidityError::CounterInTheFuture(error))
         }
     }
-
-    fn get_manager_key(
-        &self,
-        host: &impl Runtime,
-    ) -> Result<Result<PublicKey, ValidityError>, tezos_storage::error::Error> {
-        let manager = self.manager(host).ok();
-        match manager {
-            None => Ok(Err(ValidityError::MissingManagerContract)),
-            Some(Manager::NotRevealed(public_key_hash)) => {
-                Ok(Err(ValidityError::UnrevealedManagerKey(public_key_hash)))
-            }
-            Some(Manager::Revealed(public_key)) => Ok(Ok(public_key)),
-        }
-    }
 }
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
@@ -123,9 +109,17 @@ fn get_revealed_key<Host: Runtime>(
 ) -> Result<PublicKey, ValidityError> {
     match first_content {
         OperationContent::Reveal(RevealContent { pk, proof: _ }) => Ok(pk.clone()),
-        _ => account
-            .get_manager_key(host)
-            .map_err(|_| ValidityError::FailedToFetchManagerKey)?,
+        _ => {
+            let manager = account
+                .manager(host)
+                .map_err(|_| ValidityError::FailedToFetchManagerKey)?;
+            match manager {
+                Manager::Revealed(public_key) => Ok(public_key),
+                Manager::NotRevealed(public_key_hash) => {
+                    Err(ValidityError::UnrevealedManagerKey(public_key_hash))
+                }
+            }
+        }
     }
 }
 
