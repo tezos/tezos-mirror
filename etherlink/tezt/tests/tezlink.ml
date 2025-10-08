@@ -1809,7 +1809,12 @@ let test_tezlink_prevalidation =
   in
 
   (* case already revealed *)
-  let previously_revealed_rex = rex (sf "") in
+  let previously_revealed_rex =
+    rex
+      (sf
+         "Previously revealed manager key for contract %s."
+         Constant.bootstrap1.public_key_hash)
+  in
   let* op_previously_revealed =
     Operation.Manager.(
       operation

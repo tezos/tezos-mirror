@@ -124,21 +124,33 @@ type batch_validation_context = {
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
   let open Lwt_result_syntax in
-  ignore operation ;
-  (* TODO check supported by tezlink *)
-  (* TODO check source *)
-  (* TODO check counter is ok *)
-  (* TODO check gas limit high enough *)
-  (* TODO check only one reveal, at the start *)
-  (* TODO check manager solvent for fees *)
-  (* the update will be updated during the validation steps *)
-  return
-    (Ok
-       {
-         ctxt with
-         next_counter = Manager_counter.succ ctxt.next_counter;
-         length = ctxt.length + 1;
-       })
+  match operation with
+  | Manager_operation {operation = Reveal _; _} when not (ctxt.length = 0) ->
+      tzfail_p
+      @@ Imported_protocol.Validate_errors.Manager.Incorrect_reveal_position
+  | Manager_operation
+      {
+        source = _;
+        fee = _;
+        counter = _;
+        operation = _;
+        gas_limit = _;
+        storage_limit = _;
+      } ->
+      (* TODO check supported by tezlink *)
+      (* TODO check source *)
+      (* TODO check counter is ok *)
+      (* TODO check gas limit high enough *)
+      (* TODO check manager solvent for fees *)
+      (* the update will be updated during the validation steps *)
+      return
+        (Ok
+           {
+             ctxt with
+             next_counter = Manager_counter.succ ctxt.next_counter;
+             length = ctxt.length + 1;
+           })
+  | _ -> tzfail @@ Not_a_manager_operation ctxt.error_clue
 
 let rec validate_batch ~(ctxt : batch_validation_context)
     (rest : packed_contents list) =
