@@ -152,6 +152,12 @@ module WASM = struct
         "src/proto_alpha/lib_protocol/test/integration/wasm_kernel/echo.wasm"
       ()
 
+  let echo_dal_reveal =
+    Uses.make
+      ~tag:"echo_dal_reveal"
+      ~path:"tezt/tests/kernels/echo_dal_reveal.wasm"
+      ()
+
   let evm_kernel =
     Uses.make
       ~how_to_build:"make -f etherlink.mk build"

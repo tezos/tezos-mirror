@@ -61,8 +61,8 @@ let load_kernel_file
    and returns a hex-encoded Wasm PVM boot sector, suitable for passing to
    [originate_sc_rollup].
 *)
-let read_kernel ?base name : string =
-  hex_encode (load_kernel_file ?base (name ^ ".wasm"))
+let read_kernel ?base ?(suffix = ".wasm") name : string =
+  hex_encode (load_kernel_file ?base (name ^ suffix))
 
 module Installer_kernel_config = struct
   type move_args = {from : string; to_ : string}
