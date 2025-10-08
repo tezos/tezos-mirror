@@ -465,7 +465,7 @@ module History = struct
                 Some ((), header_id)
             | Unpublished {attestation_lag = Dynamic _; _} ->
                 (* We'll use a different encoding for [Dynamic] to keep
-                 encoding&hash retro-compatibility for [Legacy]. *)
+                 encoding and hash retro-compatibility for [Legacy]. *)
                 None
             | Published _ -> None)
           (fun ((), header_id) ->
@@ -487,7 +487,7 @@ module History = struct
             | Unpublished _ -> None
             | Published {attestation_lag = Dynamic _; _} ->
                 (* We'll use a different encoding for [Dynamic] to keep
-                 encoding&hash retro-compatibility for [Legacy]. *)
+                 encoding and hash retro-compatibility for [Legacy]. *)
                 None
             | Published
                 {
@@ -522,7 +522,82 @@ module History = struct
                 total_shards;
               })
       in
-      union ~tag_size:`Uint8 [legacy_unpublished_case; legacy_published_case]
+      let dynamic_unpublished_case =
+        case
+          ~title:"unpublished_dyn"
+          (Tag 4)
+          (merge_objs
+             (obj2
+                (req "kind" (constant "unpublished"))
+                (req "attestation_lag" uint8))
+             Header.id_encoding)
+          (function
+            | Unpublished {header_id; attestation_lag = Dynamic lag} ->
+                Some (((), lag), header_id)
+            | Unpublished {attestation_lag = Legacy; _} -> None
+            | Published _ -> None)
+          (fun (((), lag), header_id) ->
+            Unpublished {header_id; attestation_lag = Dynamic lag})
+      in
+      let dynamic_published_case =
+        case
+          ~title:"published_dyn"
+          (Tag 5)
+          (merge_objs
+             (obj6
+                (req "kind" (constant "published"))
+                (req "publisher" Contract_repr.encoding)
+                (req "is_proto_attested" bool)
+                (req "attested_shards" uint16)
+                (req "total_shards" uint16)
+                (req "attestation_lag" uint8))
+             Header.encoding)
+          (function
+            | Unpublished _ -> None
+            | Published {attestation_lag = Legacy; _} -> None
+            | Published
+                {
+                  header;
+                  attestation_lag = Dynamic lag;
+                  publisher;
+                  is_proto_attested;
+                  attested_shards;
+                  total_shards;
+                } ->
+                Some
+                  ( ( (),
+                      publisher,
+                      is_proto_attested,
+                      attested_shards,
+                      total_shards,
+                      lag ),
+                    header ))
+          (fun ( ( (),
+                   publisher,
+                   is_proto_attested,
+                   attested_shards,
+                   total_shards,
+                   lag ),
+                 header )
+             ->
+            Published
+              {
+                header;
+                attestation_lag = Dynamic lag;
+                publisher;
+                is_proto_attested;
+                attested_shards;
+                total_shards;
+              })
+      in
+      union
+        ~tag_size:`Uint8
+        [
+          legacy_unpublished_case;
+          legacy_published_case;
+          dynamic_unpublished_case;
+          dynamic_published_case;
+        ]
 
     let equal t1 t2 =
       match (t1, t2) with
