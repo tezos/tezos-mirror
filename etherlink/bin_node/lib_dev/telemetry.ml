@@ -43,7 +43,7 @@ module Jsonrpc = struct
         ]
       span_name
 
-  let return_error : JSONRPC.error -> ('a, JSONRPC.error) result Lwt.t =
+  let return_error : JSONRPC.error -> JSONRPC.return_value Lwt.t =
    fun err ->
     (match Opentelemetry.Scope.get_ambient_scope () with
     | Some scope ->
@@ -55,7 +55,7 @@ module Jsonrpc = struct
                ("rpc.jsonrpc.error_message", `String err.message);
              ])
     | None -> ()) ;
-    Lwt.return_error err
+    Lwt.return (JSONRPC.Direct (Error err))
 end
 
 module Attributes = struct

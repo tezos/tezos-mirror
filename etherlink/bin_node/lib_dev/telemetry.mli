@@ -31,7 +31,7 @@ module Jsonrpc : sig
 
   (** [return_error err] decorates the current scope with the attributes
       related to [err]. *)
-  val return_error : JSONRPC.error -> ('a, JSONRPC.error) result Lwt.t
+  val return_error : JSONRPC.error -> JSONRPC.return_value Lwt.t
 end
 
 (** OpenTelemetry Etherlink-specific semantics conventions *)

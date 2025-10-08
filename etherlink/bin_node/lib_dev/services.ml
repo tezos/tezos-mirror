@@ -606,11 +606,15 @@ let encode : type a.
     "Service.encode"
   @@ fun _ -> Data_encoding.Json.construct M.output_encoding v
 
+let direct_rpc_value v = JSONRPC.Direct v
+
+let lazy_rpc_value v = JSONRPC.Lazy v
+
 let build : type input output.
     (module METHOD with type input = input and type output = output) ->
     f:(input option -> (output, Rpc_errors.t) Result.t tzresult Lwt.t) ->
     Data_encoding.json option ->
-    JSONRPC.value Lwt.t =
+    JSONRPC.return_value Lwt.t =
  fun (module Method) ~f parameters ->
   let open Lwt_syntax in
   Lwt.catch
@@ -619,10 +623,11 @@ let build : type input output.
       let+ v = f decoded in
       match v with
       | Error err ->
-          Error
-            (Rpc_errors.internal_error
-            @@ Format.asprintf "%a" pp_print_trace err)
-      | Ok value -> Result.map (encode (module Method)) value)
+          direct_rpc_value
+            (Error
+               (Rpc_errors.internal_error
+               @@ Format.asprintf "%a" pp_print_trace err))
+      | Ok value -> direct_rpc_value (Result.map (encode (module Method)) value))
     (fun exn ->
       Telemetry.Jsonrpc.return_error @@ Rpc_errors.invalid_request
       @@ Printexc.to_string exn)
@@ -638,6 +643,50 @@ let expect_input input f =
 
 let build_with_input method_ ~f parameters =
   build method_ ~f:(fun input -> expect_input input f) parameters
+
+let build_with_lazy_output : type input output.
+    (module METHOD with type input = input and type output = output) ->
+    f:
+      (input option ->
+      (output, Rpc_errors.t) Result.t tzresult Lwt.t tzresult Lwt.t) ->
+    Data_encoding.json option ->
+    JSONRPC.return_value Lwt.t =
+ fun (module Method) ~f parameters ->
+  let open Lwt_syntax in
+  Lwt.catch
+    (fun () ->
+      let decoded = Option.map (decode (module Method)) parameters in
+      let+ v = f decoded in
+      match v with
+      | Error err ->
+          direct_rpc_value
+            (Error
+               (Rpc_errors.internal_error
+               @@ Format.asprintf "%a" pp_print_trace err))
+      | Ok promise ->
+          let encode = function
+            | Ok v -> Result.map (encode (module Method)) v
+            | Error err ->
+                Error
+                  (Rpc_errors.internal_error
+                  @@ Format.asprintf "%a" pp_print_trace err)
+          in
+          lazy_rpc_value (Lwt.map encode promise))
+    (fun exn ->
+      Telemetry.Jsonrpc.return_error @@ Rpc_errors.invalid_request
+      @@ Printexc.to_string exn)
+
+let build_with_input_and_lazy_output method_ ~f parameters =
+  let missing_parameter () =
+    Lwt_result.return (Lwt.return (Ok (Error Rpc_errors.invalid_input)))
+  in
+  let expect_input input f =
+    match input with None -> missing_parameter () | Some v -> f v
+  in
+  build_with_lazy_output
+    method_
+    ~f:(fun input -> expect_input input f)
+    parameters
 
 let get_fee_history block_count block_parameter config
     (module Backend_rpc : Services_backend_sig.S) =
@@ -788,7 +837,8 @@ let dispatch_request (type f) ~websocket
     (rpc : Configuration.rpc) (config : Configuration.t) (mode : Mode.t)
     (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _)
-    ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
+    ({method_; parameters; id} : JSONRPC.request) :
+    JSONRPC.return_response Lwt.t =
   let open Lwt_result_syntax in
   let open Ethereum_types in
   Telemetry.Jsonrpc.trace_dispatch_with
@@ -797,7 +847,7 @@ let dispatch_request (type f) ~websocket
     method_
     id
   @@ fun _scope ->
-  let*! value =
+  let*! return_value =
     match
       map_method_name ~rpc_server_family ~restrict:rpc.restricted_rpcs method_
     with
@@ -1419,14 +1469,15 @@ let dispatch_request (type f) ~websocket
         | _ ->
             Stdlib.failwith "The pattern matching of methods is not exhaustive")
   in
-  Lwt.return JSONRPC.{value; id}
+  Lwt.return JSONRPC.{return_value; id}
 
 let dispatch_private_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) (_config : Configuration.t) (_ : Mode.t)
     (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
-    ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
+    ({method_; parameters; id} : JSONRPC.request) :
+    JSONRPC.return_response Lwt.t =
   let open Lwt_syntax in
   Telemetry.Jsonrpc.trace_dispatch_with
     ~websocket
@@ -1435,30 +1486,32 @@ let dispatch_private_request (type f) ~websocket
     id
   @@ fun _scope ->
   let unsupported () =
-    return
-      (Error
-         JSONRPC.
-           {
-             code = -3200;
-             message = "Method not supported";
-             data = Some (`String method_);
-           })
+    Lwt.return
+    @@ direct_rpc_value
+         (Error
+            JSONRPC.
+              {
+                code = -3200;
+                message = "Method not supported";
+                data = Some (`String method_);
+              })
   in
-  let* value =
+  let* return_value =
     (* Private RPCs can only be accessed locally, they're not accessible to the
        end user. *)
     match
       map_method_name ~rpc_server_family ~restrict:rpc.restricted_rpcs method_
     with
     | Unknown ->
-        return
-          (Error
-             JSONRPC.
-               {
-                 code = -3200;
-                 message = "Method not found";
-                 data = Some (`String method_);
-               })
+        Lwt.return
+        @@ direct_rpc_value
+             (Error
+                JSONRPC.
+                  {
+                    code = -3200;
+                    message = "Method not found";
+                    data = Some (`String method_);
+                  })
     | Unsupported -> unsupported ()
     | Disabled ->
         Telemetry.Jsonrpc.return_error (Rpc_errors.method_disabled method_)
@@ -1606,7 +1659,7 @@ let dispatch_private_request (type f) ~websocket
         build ~f module_ parameters
     | _ -> Stdlib.failwith "The pattern matching of methods is not exhaustive"
   in
-  return JSONRPC.{value; id}
+  return JSONRPC.{return_value; id}
 
 let can_process_batch size = function
   | Configuration.Limit l -> size <= l
@@ -1616,9 +1669,19 @@ let dispatch_handler ~service_name (rpc : Configuration.rpc) config mode
     tx_container ctx dispatch_request (input : JSONRPC.request batched_request)
     =
   let open Lwt_syntax in
+  let wait_for_return_output JSONRPC.{return_value; id} =
+    match return_value with
+    | JSONRPC.Direct value -> return JSONRPC.{value; id}
+    | JSONRPC.Lazy value ->
+        let* value in
+        return JSONRPC.{value; id}
+  in
   match input with
   | Singleton request ->
-      let* response = dispatch_request config mode tx_container ctx request in
+      let* return_value =
+        dispatch_request config mode tx_container ctx request
+      in
+      let* response = wait_for_return_output return_value in
       return (Singleton response)
   | Batch requests ->
       let batch_size = List.length requests in
@@ -1628,12 +1691,14 @@ let dispatch_handler ~service_name (rpc : Configuration.rpc) config mode
         if can_process_batch batch_size rpc.batch_limit then
           dispatch_request config mode tx_container ctx
         else fun req ->
-          let value =
-            Error Rpc_errors.(invalid_request "too many requests in batch")
+          let response =
+            direct_rpc_value
+              (Error Rpc_errors.(invalid_request "too many requests in batch"))
           in
-          Lwt.return JSONRPC.{value; id = req.id}
+          return JSONRPC.{return_value = response; id = req.id}
       in
-      let* outputs = List.map_s process requests in
+      let* outputs_waiter = List.map_s process requests in
+      let* outputs = List.map_p wait_for_return_output outputs_waiter in
       return (Batch outputs)
 
 let websocket_response_of_response response = {response; subscription = None}
@@ -1686,7 +1751,12 @@ let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
         sid := id ;
         rpc_ok id
       in
-      let* value = build_with_input ~f module_ input.parameters in
+      let* return_value = build_with_input ~f module_ input.parameters in
+      let* value =
+        match return_value with
+        | JSONRPC.Direct value -> return value
+        | JSONRPC.Lazy value -> value
+      in
       let response = JSONRPC.{value; id = input.id} in
       let subscription_id = !sid in
       let stream, stopper = !sub_stream in
@@ -1701,10 +1771,15 @@ let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
         let* status = eth_unsubscribe ~id in
         rpc_ok status
       in
-      let+ value = build_with_input ~f module_ input.parameters in
+      let* return_value = build_with_input ~f module_ input.parameters in
+      let+ value =
+        match return_value with
+        | JSONRPC.Direct value -> return value
+        | JSONRPC.Lazy value -> value
+      in
       websocket_response_of_response JSONRPC.{value; id = input.id}
   | _ ->
-      let+ response =
+      let* {return_value; id} =
         dispatch_request
           ~websocket:true
           rpc_server_family
@@ -1715,6 +1790,13 @@ let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
           ctx
           input
       in
+      let+ response =
+        match return_value with
+        | JSONRPC.Direct value -> return JSONRPC.{value; id}
+        | JSONRPC.Lazy value ->
+            let* value in
+            return JSONRPC.{value; id}
+      in
       websocket_response_of_response response
 
 let dispatch_private_websocket
@@ -1722,7 +1804,7 @@ let dispatch_private_websocket
     (rpc : Configuration.rpc) config mode tx_container ctx
     (input : JSONRPC.request) =
   let open Lwt_syntax in
-  let+ response =
+  let* {return_value; id} =
     dispatch_private_request
       ~websocket:true
       rpc_server_family
@@ -1733,6 +1815,13 @@ let dispatch_private_websocket
       tx_container
       ctx
       input
+  in
+  let+ response =
+    match return_value with
+    | JSONRPC.Direct value -> return JSONRPC.{value; id}
+    | JSONRPC.Lazy value ->
+        let* value in
+        return JSONRPC.{value; id}
   in
   websocket_response_of_response response
 
