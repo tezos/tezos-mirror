@@ -446,6 +446,16 @@ module Proto_client = struct
           (Time.System.of_protocol_exn next_level_timestamp)
           (Time.System.now ())
 
+  (* Copied from removed Plugin.Mempool in order to remove dependency on
+     protocol freeze *)
+  module Mempool_defaults = struct
+    let minimal_fees_mutez = 100L
+
+    let minimal_nanotez_per_gas_unit = Q.of_int 100
+
+    let minimal_nanotez_per_byte = Q.of_int 1000
+  end
+
   let check_fee_parameters Injector.{fee_parameters; _} =
     let check_value operation_kind name compare to_string mempool_default value
         =
@@ -474,8 +484,7 @@ module Proto_client = struct
           "minimal_fees"
           Int64.compare
           Int64.to_string
-          (Protocol.Alpha_context.Tez.to_mutez
-             Plugin.Mempool.default_minimal_fees)
+          Mempool_defaults.minimal_fees_mutez
           minimal_fees.mutez
       and+ () =
         check_value
@@ -483,7 +492,7 @@ module Proto_client = struct
           "minimal_nanotez_per_byte"
           Q.compare
           Q.to_string
-          Plugin.Mempool.default_minimal_nanotez_per_byte
+          Mempool_defaults.minimal_nanotez_per_byte
           minimal_nanotez_per_byte
       and+ () =
         check_value
@@ -491,7 +500,7 @@ module Proto_client = struct
           "minimal_nanotez_per_gas_unit"
           Q.compare
           Q.to_string
-          Plugin.Mempool.default_minimal_nanotez_per_gas_unit
+          Mempool_defaults.minimal_nanotez_per_gas_unit
           minimal_nanotez_per_gas_unit
       in
       ()
