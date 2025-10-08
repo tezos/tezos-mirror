@@ -81,3 +81,11 @@ let post_slot cctxt ?slot_index slot =
      ()
      query
      slot [@profiler.aggregate_s {verbosity = Notice} "post_slot"])
+
+let get_slot_status cctxt (slot_id : Types.slot_id) =
+  call
+    cctxt
+    Services.get_slot_status
+    (((), slot_id.slot_level), slot_id.slot_index)
+    ()
+    ()
