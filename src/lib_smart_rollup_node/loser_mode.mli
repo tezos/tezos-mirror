@@ -26,6 +26,13 @@
 (** A list of failures. *)
 type t
 
+type dal_parameters = {
+  number_of_slots : int64;
+  attestation_lag : int64;
+  slot_size : int64;
+  page_size : int64;
+}
+
 val encoding : t Data_encoding.t
 
 (** [no_failures] are planned. *)
@@ -44,3 +51,5 @@ val make : string -> t option
    [message_index] and for all [message_ticks]. Ticks are sorted by
    increasing order. *)
 val is_failure : t -> level:int -> message_index:int -> int64 list
+
+val is_invalid_dal_parameters : t -> dal_parameters option
