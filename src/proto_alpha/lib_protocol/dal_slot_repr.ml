@@ -1545,15 +1545,17 @@ module History = struct
       let cell_content = Skip_list.content target_cell in
       (* We check that the target cell has the same level and index than the
          page we're about to prove. *)
-      let cell_id = (Content.content_id cell_content).header_id in
+      let {header_id = slot_id; attestation_lag} =
+        Content.content_id cell_content
+      in
       let* () =
         error_when
-          Raw_level_repr.(cell_id.published_level <> published_level)
+          Raw_level_repr.(slot_id.published_level <> published_level)
           (dal_proof_error "verify_proof_repr: published_level mismatch.")
       in
       let* () =
         error_when
-          (not (Dal_slot_index_repr.equal cell_id.index index))
+          (not (Dal_slot_index_repr.equal slot_id.index index))
           (dal_proof_error "verify_proof_repr: slot index mismatch.")
       in
       (* We check that the given inclusion proof indeed links our L1 snapshot to
@@ -1567,25 +1569,33 @@ module History = struct
           ~restricted_commitments_publishers
           cell_content
       in
-      match (proof, is_commitment_attested) with
-      | Page_unconfirmed _, Some _ ->
-          error
-          @@ dal_proof_error
-               "verify_proof_repr: the confirmation proof doesn't contain the \
-                attested slot."
-      | Page_unconfirmed _, None -> return_none
-      | Page_confirmed _, None ->
-          error
-          @@ dal_proof_error
-               "verify_proof_repr: the unconfirmation proof contains the \
-                target slot."
-      | Page_confirmed {page_data; page_proof; _}, Some commitment ->
-          (* We check that the page indeed belongs to the target slot at the
+      let* data_opt =
+        match (proof, is_commitment_attested) with
+        | Page_unconfirmed _, Some _ ->
+            error
+            @@ dal_proof_error
+                 "verify_proof_repr: the confirmation proof doesn't contain \
+                  the attested slot."
+        | Page_unconfirmed _, None -> return_none
+        | Page_confirmed _, None ->
+            error
+            @@ dal_proof_error
+                 "verify_proof_repr: the unconfirmation proof contains the \
+                  target slot."
+        | Page_confirmed {page_data; page_proof; _}, Some commitment ->
+            (* We check that the page indeed belongs to the target slot at the
              given page index. *)
-          let* () =
-            check_page_proof dal_params page_proof page_data page_id commitment
-          in
-          return_some page_data
+            let* () =
+              check_page_proof
+                dal_params
+                page_proof
+                page_data
+                page_id
+                commitment
+            in
+            return_some page_data
+      in
+      return (data_opt, attestation_lag)
 
     let verify_proof dal_params page_id snapshot serialized_proof =
       let open Result_syntax in

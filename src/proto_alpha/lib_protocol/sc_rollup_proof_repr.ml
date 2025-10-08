@@ -304,14 +304,14 @@ module Dal_helpers = struct
         page_id
         ~dal_attested_slots_validity_lag
     then
-      let* input =
+      let* input_opt, _attestation_lag =
         Dal_slot_repr.History.verify_proof
           dal_parameters
           page_id
           dal_snapshot
           proof
       in
-      return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input))
+      return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input_opt))
     else return_none
 
   let produce ~metadata ~dal_activation_level ~dal_attestation_lag

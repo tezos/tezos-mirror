@@ -520,8 +520,16 @@ module History : sig
       that could contain the page identified by [page_id].
 
       [dal_parameters] is used when verifying that/if the page is part of
-      the candidate slot (if any). *)
-  val verify_proof : parameters -> Page.t -> t -> proof -> bytes option tzresult
+      the candidate slot (if any).
+
+      In both cases, the attestation lag used for the target cell in the skip
+      list is returned, alongside the page's bytes if the slot is attested. *)
+  val verify_proof :
+    parameters ->
+    Page.t ->
+    t ->
+    proof ->
+    (bytes option * attestation_lag_kind) tzresult
 
   (** Given a DAL proof, this function returns the values of the fields
       [attestation_threshold_percent] [restricted_commitments_publishers] stored

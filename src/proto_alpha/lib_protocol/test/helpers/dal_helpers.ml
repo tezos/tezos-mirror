@@ -217,6 +217,7 @@ struct
     | Some check_verify ->
         let*? proof, _input_opt = res in
         let@ res = Hist.verify_proof params page_id skip_list proof in
+        let res = Result.map (fun (bytes_opt, _lag) -> bytes_opt) res in
         check_verify res page_info
 
   (* Some check functions. *)
