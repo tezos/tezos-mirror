@@ -289,10 +289,20 @@ module Dal_helpers = struct
          ~published_level
          ~dal_attested_slots_validity_lag
 
-  let verify ~metadata ~dal_activation_level ~dal_attestation_lag
-      ~dal_number_of_slots ~commit_inbox_level dal_parameters page_id
-      dal_snapshot proof ~dal_attested_slots_validity_lag =
+  let verify ~metadata ~dal_activation_level ~dal_number_of_slots
+      ~commit_inbox_level dal_parameters page_id dal_snapshot proof
+      ~dal_attested_slots_validity_lag =
     let open Result_syntax in
+    let* input_opt, attestation_lag =
+      Dal_slot_repr.History.verify_proof
+        dal_parameters
+        page_id
+        dal_snapshot
+        proof
+    in
+    let dal_attestation_lag =
+      Dal_slot_repr.History.attestation_lag_value attestation_lag
+    in
     if
       page_id_is_valid
         dal_parameters
@@ -303,15 +313,7 @@ module Dal_helpers = struct
         ~dal_number_of_slots
         page_id
         ~dal_attested_slots_validity_lag
-    then
-      let* input_opt, _attestation_lag =
-        Dal_slot_repr.History.verify_proof
-          dal_parameters
-          page_id
-          dal_snapshot
-          proof
-      in
-      return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input_opt))
+    then return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input_opt))
     else return_none
 
   let produce ~metadata ~dal_activation_level ~dal_attestation_lag
@@ -414,7 +416,6 @@ let valid (type state proof output)
           ~dal_activation_level
           ~dal_attested_slots_validity_lag
           dal_parameters
-          ~dal_attestation_lag
           ~commit_inbox_level
           page_id
           dal_snapshot
