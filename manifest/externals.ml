@@ -220,7 +220,7 @@ let ocplib_ocamlres =
 
 let opam_file_format = external_lib "opam-file-format" V.(at_least "2.1.6")
 
-let opentelemetry = external_lib "opentelemetry" V.True
+let opentelemetry = external_lib "opentelemetry" V.(at_least "0.12")
 
 let opentelemetry_ambient_context_lwt =
   external_sublib opentelemetry "opentelemetry.ambient-context.lwt"

@@ -85,7 +85,7 @@ depends: [
   "ocp-ocamlres" { >= "0.4" }
   "ocplib-endian"
   "opam-file-format" { >= "2.1.6" }
-  "opentelemetry"
+  "opentelemetry" { >= "0.12" }
   "opentelemetry-client-cohttp-lwt"
   "opentelemetry-lwt"
   "optint"
