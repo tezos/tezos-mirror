@@ -723,15 +723,13 @@ module Get_estimate_gas = struct
 end
 
 module Txpool_content = struct
-  open Ethereum_types
-
   type input = unit
 
-  type output = txpool
+  type output = Transaction_object.txqueue_content
 
   let input_encoding = Data_encoding.unit
 
-  let output_encoding = txpool_encoding
+  let output_encoding = Transaction_object.txqueue_content_encoding
 
   let method_ = "txpool_content"
 

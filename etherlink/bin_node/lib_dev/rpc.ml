@@ -181,7 +181,11 @@ module Forward_container
 
   let content () =
     Lwt_result.return
-      Ethereum_types.{pending = AddressMap.empty; queued = AddressMap.empty}
+      Transaction_object.
+        {
+          pending = Ethereum_types.AddressMap.empty;
+          queued = Ethereum_types.AddressMap.empty;
+        }
 
   let shutdown () = Lwt_result_syntax.return_unit
 

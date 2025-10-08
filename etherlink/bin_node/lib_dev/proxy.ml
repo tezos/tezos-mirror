@@ -50,7 +50,11 @@ let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
 
       let content () =
         Lwt_result.return
-          Ethereum_types.{pending = AddressMap.empty; queued = AddressMap.empty}
+          Transaction_object.
+            {
+              pending = Ethereum_types.AddressMap.empty;
+              queued = Ethereum_types.AddressMap.empty;
+            }
 
       let shutdown () = Lwt_result_syntax.return_unit
 

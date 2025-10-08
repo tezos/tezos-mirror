@@ -37,7 +37,7 @@ module type L2_transaction = sig
   val make_txpool :
     pending:legacy Ethereum_types.NonceMap.t AddressMap.t ->
     queued:legacy Ethereum_types.NonceMap.t AddressMap.t ->
-    Ethereum_types.txpool
+    Transaction_object.txqueue_content
 end
 
 module Eth_transaction_object :
@@ -79,12 +79,8 @@ module Eth_transaction_object :
 
   module AddressMap = AddressMap
 
-  (* TODO *)
-  let make_txpool ~pending:_ ~queued:_ =
-    {
-      pending = Ethereum_types.AddressMap.empty;
-      queued = Ethereum_types.AddressMap.empty;
-    }
+  let make_txpool ~pending ~queued : Transaction_object.txqueue_content =
+    {pending; queued}
 end
 
 type tezlink_batch_nonces = {first : Z.t; length : int}
@@ -94,8 +90,6 @@ module Tezlink_operation :
     with type t = Tezos_types.Operation.t
      and type legacy = Tezos_types.Operation.t
      and type nonce = tezlink_batch_nonces = struct
-  open Ethereum_types
-
   type t = Tezos_types.Operation.t
 
   type legacy = Tezos_types.Operation.t
@@ -129,7 +123,7 @@ module Tezlink_operation :
 
   module AddressMap = Map.Make (Signature.Public_key_hash)
 
-  let make_txpool ~pending:_ ~queued:_ =
+  let make_txpool ~pending:_ ~queued:_ : Transaction_object.txqueue_content =
     {
       pending = Ethereum_types.AddressMap.empty;
       queued = Ethereum_types.AddressMap.empty;

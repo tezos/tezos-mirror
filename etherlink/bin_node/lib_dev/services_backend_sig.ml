@@ -217,7 +217,7 @@ module type Tx_container = sig
 
   (** [content ()] returns all the transactions found in tx
       container. *)
-  val content : unit -> Ethereum_types.txpool tzresult Lwt.t
+  val content : unit -> Transaction_object.txqueue_content tzresult Lwt.t
 
   (** [shutdown ()] stops the tx container, waiting for the ongoing request
     to be processed. *)

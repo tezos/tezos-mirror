@@ -308,7 +308,7 @@ struct
       | Lock_transactions : (unit, tztrace) t
       | Unlock_transactions : (unit, tztrace) t
       | Is_locked : (bool, tztrace) t
-      | Content : (Ethereum_types.txpool, tztrace) t
+      | Content : (Transaction_object.txqueue_content, tztrace) t
       | Size_info : (Metrics.Tx_pool.size_info, tztrace) t
       | Pop_transactions : {
           validation_state : 'a;

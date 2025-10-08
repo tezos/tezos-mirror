@@ -1240,3 +1240,19 @@ let encoding =
         (fun _ -> None)
         (fun ((), o) -> EIP_1559 o);
     ]
+
+type txqueue_content = {
+  pending : t NonceMap.t AddressMap.t;
+  queued : t NonceMap.t AddressMap.t;
+}
+
+let txqueue_content_encoding =
+  let open Data_encoding in
+  let field_encoding =
+    AddressMap.associative_array_encoding
+      (NonceMap.associative_array_encoding encoding)
+  in
+  conv
+    (fun {pending; queued} -> (pending, queued))
+    (fun (pending, queued) -> {pending; queued})
+    (obj2 (req "pending" field_encoding) (req "queued" field_encoding))

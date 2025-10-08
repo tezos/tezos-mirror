@@ -38,7 +38,7 @@ module type L2_transaction = sig
   val make_txpool :
     pending:legacy Ethereum_types.NonceMap.t AddressMap.t ->
     queued:legacy Ethereum_types.NonceMap.t AddressMap.t ->
-    Ethereum_types.txpool
+    Transaction_object.txqueue_content
 end
 
 module Eth_transaction_object :
