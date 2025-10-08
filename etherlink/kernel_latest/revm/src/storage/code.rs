@@ -58,7 +58,7 @@ impl CodeStorage {
     }
 
     fn exists(&self, host: &impl Runtime) -> Result<bool, Error> {
-        let store_has_code = host.store_has(&self.path)?;
+        let store_has_code = host.store_has(&concat(&self.path, &CODE_PATH)?)?;
         Ok(store_has_code.is_some())
     }
 
@@ -128,7 +128,8 @@ impl CodeStorage {
             let number_reference = code.decrement_code_usage(host)?;
             // This was the last smart contract using this code
             if number_reference == 0 {
-                host.store_delete(&code.path)?;
+                host.store_delete_value(&concat(&code.path, &CODE_PATH)?)?;
+                host.store_delete_value(&concat(&code.path, &REFERENCE_PATH)?)?;
             };
         };
         Ok(())

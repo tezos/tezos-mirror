@@ -118,7 +118,7 @@ pub struct StorageAccount {
 // Used as a value for the durable storage, can't use REVM `AccountInfo`
 // because we need to implement `RlpEncodable` `RlpDecodable`
 // TODO: Remove pub when `evm_execution` doesn't use it anymore.
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
 pub struct AccountInfoInternal {
     pub balance: U256,
     pub nonce: u64,
@@ -238,6 +238,11 @@ impl StorageAccount {
                     code_hash: read_b256_be_default(host, &code_hash_path, KECCAK_EMPTY)?,
                 };
 
+                if info == AccountInfoInternal::default() {
+                    // Account doesn't exist
+                    return Ok(AccountInfo::default());
+                }
+
                 // Write migration
                 match host.store_read_all(&code_path) {
                     Ok(bytes) => {
@@ -256,7 +261,7 @@ impl StorageAccount {
 
                 // Delete legacy account entries
                 for path in &[balance_path, nonce_path, code_hash_path, code_path] {
-                    match host.store_delete(path) {
+                    match host.store_delete_value(path) {
                         Ok(()) | Err(RuntimeError::PathNotFound) => (),
                         Err(err) => return Err(Error::Runtime(err)),
                     };
@@ -317,7 +322,7 @@ impl StorageAccount {
 
     pub fn delete_info(&mut self, host: &mut impl Runtime) -> Result<(), Error> {
         let path = concat(&self.path, &INFO_PATH)?;
-        match host.store_delete(&path) {
+        match host.store_delete_value(&path) {
             Ok(()) | Err(RuntimeError::PathNotFound) => (),
             Err(err) => return Err(Error::Runtime(err)),
         };
@@ -373,14 +378,6 @@ impl StorageAccount {
         let value_bytes = value.to_be_bytes::<{ U256::BYTES }>();
 
         Ok(host.store_write(&path, &value_bytes, 0)?)
-    }
-
-    pub fn clear_storage(&mut self, host: &mut impl Runtime) -> Result<(), Error> {
-        let path = concat(&self.path, &STORAGE_ROOT_PATH)?;
-        if host.store_has(&path)?.is_some() {
-            host.store_delete(&path)?
-        }
-        Ok(())
     }
 
     pub(crate) fn read_global_counter(&self, host: &impl Runtime) -> Result<U256, Error> {
@@ -466,7 +463,7 @@ impl StorageAccount {
         deposit_id: &U256,
     ) -> Result<(), Error> {
         let deposit_path = self.deposit_path(deposit_id)?;
-        Ok(host.store_delete(&deposit_path)?)
+        Ok(host.store_delete_value(&deposit_path)?)
     }
 }
 
