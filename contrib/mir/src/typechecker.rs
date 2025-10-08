@@ -13,6 +13,7 @@ use chrono::prelude::DateTime;
 use entrypoint::DEFAULT_EP_NAME;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};
+use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
@@ -167,6 +168,9 @@ pub enum TcError {
     /// Two views with the same name where declared in a script
     #[error("two views were declared with the same name {0}")]
     DuplicatedView(String),
+    /// View names must be at most 31 characters and match the expression [a-zA-Z0-9_.%@]*
+    #[error("Invalid name for view {0}")]
+    InvalidViewName(String),
 }
 
 impl From<TryFromBigIntError<()>> for TcError {
@@ -251,6 +255,15 @@ pub enum StacksNotEqualReason {
 #[error("types not equal: {0:?} != {1:?}")]
 pub struct TypesNotEqual(Type, Type);
 
+/// Check that name is a valid view name
+pub fn check_view_name(name: &str) -> Result<(), TcError> {
+    let re = Regex::new(r"^[a-zA-Z0-9_.%@]*$").expect("view name regex should be valid");
+    if name.len() > 31 || !re.is_match(name) {
+        return Err(TcError::InvalidViewName(name.to_owned()));
+    };
+    Ok(())
+}
+
 impl<'a> Micheline<'a> {
     /// Typechecks `Micheline` as a value, given its type (also as `Micheline`).
     /// Validates the type.
@@ -307,8 +320,6 @@ impl<'a> Micheline<'a> {
     /// Typecheck the contract script. Validates the script's types, then
     /// typechecks the code and checks the result stack is as expected. Returns
     /// typechecked script.
-    /// If the script contains some views, they are not typechecked.
-    /// TODO https://linear.app/tezos/issue/L2-376/type-check-views
     pub fn typecheck_script(
         &self,
         gas: &mut Gas,
@@ -348,6 +359,7 @@ impl<'a> Micheline<'a> {
                     [Micheline::String(name), input_type, output_type, code],
                     anns,
                 ) if anns.is_empty() => {
+                    check_view_name(name)?;
                     // TODO: consume some gas
                     let name: String = name.into();
                     let input_type = input_type.parse_ty(gas)?;
@@ -2251,7 +2263,6 @@ pub(crate) fn typecheck_instruction<'a>(
             no_overload!(CREATE_CONTRACT, len 3)
         }
         (App(CREATE_CONTRACT, expect_args!(1), _), _) => unexpected_micheline!(),
-
         (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
             Err(TcError::TodoInstr(*prim))?
         }
