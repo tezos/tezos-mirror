@@ -923,8 +923,8 @@ oc.tezt:fetch-records:
     expire_in: 4 hours
     paths:
     - tezt-fetch-records.log
-    - tezt/records/*.json
-    - tezt/records/*.json.broken
+    - tezt/records/**/*.json
+    - tezt/records/**/*.json.broken
     when: always
 
 build_octez_source:

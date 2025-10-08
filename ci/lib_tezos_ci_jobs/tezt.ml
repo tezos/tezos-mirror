@@ -265,7 +265,7 @@ let job_tezt_fetch_records ?rules () : tezos_job =
          ~when_:Always
          [
            "tezt-fetch-records.log";
-           "tezt/records/*.json";
+           "tezt/records/**/*.json";
            (* Keep broken records for debugging *)
-           "tezt/records/*.json.broken";
+           "tezt/records/**/*.json.broken";
          ])
