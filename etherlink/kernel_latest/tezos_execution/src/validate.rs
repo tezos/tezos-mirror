@@ -134,10 +134,6 @@ fn validate_source<Host: Runtime>(
     context: &Context,
     content: &Vec<ManagerOperation<OperationContent>>,
 ) -> Result<(PublicKey, TezlinkImplicitAccount), ValidityError> {
-    if content.is_empty() {
-        return Err(ValidityError::EmptyBatch);
-    }
-
     let source = &content[0].source;
 
     for c in content {
@@ -242,6 +238,10 @@ pub fn execute_validation<Host: Runtime>(
     context: &Context,
     operation: tezos_tezlink::operation::Operation,
 ) -> Result<ValidatedBatch, ValidityError> {
+    if operation.content.is_empty() {
+        return Err(ValidityError::EmptyBatch);
+    }
+
     let mut validated_operations = Vec::new();
     let unvalidated_operation: Vec<ManagerOperation<OperationContent>> = operation
         .content
