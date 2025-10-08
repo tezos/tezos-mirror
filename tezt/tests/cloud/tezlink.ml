@@ -382,14 +382,7 @@ let init_faucet_frontend ~faucet_api ~agent ~tezlink_sandbox_endpoint
       ~port:faucet_frontend_port
       ()
   in
-  return
-    Client.(
-      Foreign_endpoint
-        (Endpoint.make
-           ~host:(Runner.address runner)
-           ~scheme:"http"
-           ~port:faucet_frontend_port
-           ()))
+  return (build_endpoint ~runner faucet_frontend_port)
 
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
     ?(rpc_port : int option) (verbose : bool)
