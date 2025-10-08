@@ -9,9 +9,6 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
-(* these tags are used to build multi-arch docker images on native runners *)
-let tags_matrix = [("TAGS", ["gcp_very_high_cpu"; "gcp_arm64"])]
-
 let debian_releases = ["unstable"; "bookworm"; "trixie"]
 
 let debian_matrix = [("RELEASE", debian_releases)]
@@ -28,24 +25,56 @@ let fedora_releases = ["39"; "41"; "42"]
 
 let fedora_matrix = [("RELEASE", fedora_releases)]
 
+type compilation =
+  | Amd64_only (* Built on amd64 runner *)
+  | Arm64_only
+    (* Built on arm64 runner. The image will be suffixed with -arm64 *)
+  | Emulated
+    (* Built on amd64 runners. Arm64 image is built using qumu.
+       Use 1 runner / 1 job to create one multi-arch image *)
+  | Native
+(* Both amd64 and arm64 images are built on their respective native architectures
+   Use 3 runners. 2 jobs for building the images, one job for merging the manifest
+   must be added to create one multi-arch image. Both images are suffixed,
+   repesctively, with -amd64 or -arm64 *)
+
 let jobs =
   let make_job_base_images ~__POS__ ~name ~matrix ~distribution ?image_path
-      ?(changes = Changeset.make []) ?tags dockerfile =
-    (* if [tags] is omitted then we build for two different architectures
-     using emulation. If [tags] is not empty ( we assume a matrix ), then
-     we build using a native runner setting the tag accordingly. In the former
-     case, we must also run a merge manifest job *)
+      ?(changes = Changeset.make []) ?(compilation = Emulated) dockerfile =
+    (* This function can build docker images both in a emulated environment using
+       qemu or natively. The advantage of choosing emulated vs native depends on
+       the build time associated to the image. Small images are more efficiently
+       built in an emulated environment, while larger images are better build
+       natively.
+
+       if [compilation] parameter is either set to [Emulated] or omitted then we build for two different
+       architectures using qemu. This handles both build and merging the
+       manifest of the images.
+
+       If [compilation] is either [ Amd64_only ] or [ Arm64_only ] we build the
+       images natively, but the arm64 image is going to be postix with "-arm64".
+
+       If [compilation] is set to [Native] we build for both architectures using
+       a native runner. In this case we also must add a merge manifest job.*)
     let script =
       Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile
     in
-    let emulated = Option.is_none tags in
+    (* cf. [scripts/ci/build-base-images.sh] for more details on the coupling between $PLATFORM and $TAGS *)
+    let platform, tags =
+      match compilation with
+      | Amd64_only -> ("linux/amd64", [])
+      | Arm64_only -> ("", [("TAGS", ["gcp_arm64"])])
+      | Emulated -> ("linux/amd64,linux/arm64", []) (* default *)
+      | Native -> ("", [("TAGS", ["gcp_very_high_cpu"; "gcp_arm64"])])
+    in
+    let emulated = tags = [] in
     let variables =
       [
         ("DISTRIBUTION", distribution);
         ( "IMAGE_PATH",
           if Option.is_none image_path then distribution
           else Option.get image_path );
-        ("PLATFORM", if emulated then "linux/amd64,linux/arm64" else "");
+        ("PLATFORM", platform);
       ]
     in
     job_docker_authenticated
@@ -58,7 +87,7 @@ let jobs =
           job_rule ~changes:(Changeset.encode changes) ~when_:On_success ();
           job_rule ~if_:Rules.force_rebuild ~when_:On_success ();
         ]
-      ~parallel:(Matrix [matrix @ Option.value ~default:[] tags])
+      ~parallel:(Matrix [matrix @ tags])
       ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
       [script]
   in
@@ -111,7 +140,7 @@ let jobs =
         ~distribution:"debian-rust"
         ~image_path:"debian"
         ~matrix:[("RELEASE", ["unstable"])]
-        ~tags:tags_matrix
+        ~compilation:Native
         "images/base-images/Dockerfile.rust"
     in
     let merge =
