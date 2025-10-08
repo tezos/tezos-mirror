@@ -526,11 +526,11 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | Some port -> port
       in
       let internal_port =
-        match Cli.dns_name with
-        | None ->
+        match Tezt_cloud.Tezt_cloud_cli.dns_domains with
+        | [] ->
             (* No DNS so no proxy, so we must use the public RPC port. *)
             Some public_rpc_port
-        | Some _ ->
+        | _ :: _ ->
             (* We let the system choose a fresh internal RPC node port.
                Note that it will be publicy exposed, it's just that we don't need
                to share this one. *)
@@ -546,7 +546,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           Cli.time_between_blocks
           tezlink_sequencer_agent
       in
-      let tezlink_proxy_endpoint, ip =
+      let tezlink_proxy_endpoint, _ip =
         match tezlink_sandbox_endpoint with
         | Node _ ->
             failwith "Tezlink end-point should not be a full-fledged node."
@@ -647,18 +647,9 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         else unit
       in
       let* () =
-        match Cli.dns_name with
-        | Some dns_name when Tezt_cloud.Tezt_cloud_cli.(proxy || not localhost)
+        match Tezt_cloud.Tezt_cloud_cli.dns_domains with
+        | full_name :: _ when Tezt_cloud.Tezt_cloud_cli.(proxy || not localhost)
           ->
-            let* () =
-              (* Binds a name to the machine. Overwrites the previous bond to
-                 name, if any. Creates the subdomain if it does not exist. *)
-              Tezt_cloud.Gcloud.DNS.add_subdomain
-                ~zone:"tezlink-nomadic-labs-com"
-                ~name:dns_name
-                ~value:ip
-            in
-            let full_name = sf "%s.tezlink.nomadic-labs.com" dns_name in
             let* ssl = Ssl.generate tezlink_sequencer_agent full_name in
             let* () =
               let proxy_pass =
@@ -684,7 +675,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               toplog "SSL certificate: %s, SSL key: %s" ssl.certificate ssl.key
             in
             unit
-        | Some _ | None -> unit
+        | _ -> unit
       in
       let () = toplog "Starting main loop" in
       loop 0)
