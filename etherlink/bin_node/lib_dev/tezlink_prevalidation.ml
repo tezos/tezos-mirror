@@ -86,7 +86,12 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
        - the [balance_left] to check fees can be payed. This value will decrease
          by the amount of fees of each operation.
 *)
-type batch_validation_context = unit
+type batch_validation_context = {
+  source : public_key_hash;
+  balance_left : Tez.t;
+  next_counter : Manager_counter.t;
+  error_clue : clue;
+}
 
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
@@ -99,7 +104,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
   (* TODO check only one reveal, at the start *)
   (* TODO check manager solvent for fees *)
   (* the update will be updated during the validation steps *)
-  return (Ok ctxt)
+  return (Ok {ctxt with next_counter = Manager_counter.succ ctxt.next_counter})
 
 let rec validate_batch ~(ctxt : batch_validation_context)
     (rest : packed_contents list) =
@@ -134,9 +139,26 @@ let validate_tezlink_operation ~read raw =
         (Contents first_operation, Operation.to_list (Contents_list rest))
   in
   let** pk, source = validate_manager_info ~error_clue ~read first in
-  ignore source ;
-  (* TODO build validation context *)
-  let** _ = validate_batch ~ctxt:() (first :: rest) in
+  let contract_of = Tezos_types.Contract.of_implicit in
+  let* counter = Tezlink_durable_storage.counter read @@ contract_of source in
+  (* We convert the counter to the native counter type, to limit the number of
+     such conversion. We use an internal function to avoid going through
+     serialization to convert. *)
+  let counter = Manager_counter.Internal_for_tests.of_int @@ Z.to_int counter in
+  let* balance_left =
+    Tezlink_durable_storage.balance read @@ contract_of source
+  in
+  let** _ =
+    validate_batch
+      ~ctxt:
+        {
+          source;
+          balance_left;
+          next_counter = Manager_counter.succ counter;
+          error_clue;
+        }
+      (first :: rest)
+  in
   (* TODO check signature *)
   ignore pk ;
   ignore signature ;
