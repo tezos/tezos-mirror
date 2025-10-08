@@ -216,17 +216,9 @@ module Wasm_internal = struct
 end
 
 module Kernel = struct
-  type config = Wasm_debugger.config
-
   let config = Wasm_debugger.config
 
-  type kernel = In_memory of string | On_disk of string
-
-  let to_wasm_kernel = function
-    | In_memory kernel -> Wasm_debugger.In_memory kernel
-    | On_disk kernel -> Wasm_debugger.On_disk kernel
-
-  let read_kernel kernel = Wasm_debugger.read_kernel (to_wasm_kernel kernel)
+  let read_kernel = Wasm_debugger.read_kernel
 
   let check_kernel = Wasm_debugger.check_kernel
 
@@ -239,7 +231,6 @@ module Kernel = struct
   let start ~tree version kernel =
     let open Lwt_result_syntax in
     let tree = Wasm_internal.to_irmin_exn tree in
-    let kernel = to_wasm_kernel kernel in
     let* tree = Wasm_debugger.start ~tree version kernel in
     return (Wasm_internal.of_irmin tree)
 

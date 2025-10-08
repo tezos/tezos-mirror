@@ -21,7 +21,7 @@ type head = {
 
 type parameters = {
   configuration : Configuration.t;
-  kernel_path : Wasm_debugger.kernel option;
+  kernel_path : Pvm_types.kernel option;
   data_dir : string;
   smart_rollup_address : string option;
   store_perm : Sqlite.perm;
@@ -1620,7 +1620,7 @@ module State = struct
       Read_write
       (Evm_state.irmin_store_path ~data_dir)
 
-  let on_disk_kernel = function Wasm_debugger.On_disk _ -> true | _ -> false
+  let on_disk_kernel = function Pvm_types.On_disk _ -> true | _ -> false
 
   let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
       ?smart_rollup_address ~store_perm ?signer ?snapshot_url

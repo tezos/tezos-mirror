@@ -274,7 +274,7 @@ let main ~data_dir ~cctxt ?(genesis_timestamp = Misc.now ())
           Option.iter_es
             (fun kernel ->
               match kernel with
-              | Wasm_debugger.On_disk _ when status = Loaded ->
+              | Pvm_types.On_disk _ when status = Loaded ->
                   (* [kernel] being [On_disk] means it was provided by the
                      user. [status] being [Loaded] means the data-dir was
                      already populated or a snapshot was imported.

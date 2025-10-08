@@ -19,7 +19,7 @@
 *)
 val main :
   disable_da_fees:bool ->
-  ?kernel:Wasm_debugger.kernel ->
+  ?kernel:Pvm_types.kernel ->
   ?kernel_verbosity:Events.kernel_log_level ->
   data_dir:string ->
   number:Ethereum_types.quantity ->

@@ -194,8 +194,6 @@ module Wasm_internal : sig
 end
 
 module Kernel : sig
-  type config
-
   (** Constructs a configuration for rollup execution. *)
   val config :
     ?sender:Tezos_protocol_alpha.Protocol.Contract_hash.t ->
@@ -209,17 +207,13 @@ module Kernel : sig
     ?timings_file:string ->
     ?trace_host_funs:bool ->
     unit ->
-    config
-
-  (** Describe where the kernel code can be found: either in-memory from a
-      buffer, or on-disk using a given path. *)
-  type kernel = In_memory of string | On_disk of string
+    Pvm_types.config
 
   (** [read_kernel kernel] returns a tuple consisting of the kernel code
       [content] and a boolean [is_binary], where [is_binary] is [true] if
       [content] is a WASM blob, and [false] if it is a wat file (WebAssembly text
       format). *)
-  val read_kernel : kernel -> (string * bool) tzresult Lwt.t
+  val read_kernel : Pvm_types.kernel -> (string * bool) tzresult Lwt.t
 
   val check_kernel :
     binary:bool ->
@@ -234,7 +228,7 @@ module Kernel : sig
   val start :
     tree:State.t ->
     Tezos_scoru_wasm.Wasm_pvm_state.version ->
-    kernel ->
+    Pvm_types.kernel ->
     State.t tzresult Lwt.t
 
   val find_key_in_durable :
@@ -252,7 +246,7 @@ module Kernel : sig
     wasm_entrypoint:string ->
     int32 ->
     string trace Seq.t ->
-    config ->
+    Pvm_types.config ->
     Octez_smart_rollup_wasm_debugger_lib.Commands.eval_step ->
     State.t ->
     (State.t * int64 * string trace Seq.t * int32) tzresult Lwt.t
@@ -265,7 +259,7 @@ module Kernel : sig
     no_reboot:bool ->
     int32 ->
     string trace Seq.t ->
-    config ->
+    Pvm_types.config ->
     string Octez_smart_rollup_wasm_debugger_lib.Custom_section.FuncMap.t ->
     State.t ->
     (State.t * string trace Seq.t * int32) tzresult Lwt.t

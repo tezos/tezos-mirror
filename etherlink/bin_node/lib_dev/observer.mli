@@ -14,7 +14,7 @@
     was not already created. *)
 val main :
   ?network:Configuration.supported_network ->
-  ?kernel_path:Wasm_debugger.kernel ->
+  ?kernel_path:Pvm_types.kernel ->
   data_dir:string ->
   config:Configuration.t ->
   no_sync:bool ->

@@ -33,14 +33,14 @@ val execute :
   data_dir:string ->
   ?log_file:string ->
   ?wasm_entrypoint:string ->
-  config:Wasm_debugger.config ->
+  config:Pvm_types.config ->
   native_execution:bool ->
   t ->
   Wasm_runtime.kernel_input ->
   t tzresult Lwt.t
 
 (** [init ~kernel] initializes the local [evm_state] with [kernel]. *)
-val init : kernel:Wasm_debugger.kernel -> t tzresult Lwt.t
+val init : kernel:Pvm_types.kernel -> t tzresult Lwt.t
 
 (** [modify ~key ~value evm_state] sets [value] at [key] in the local EVM
     state. *)
@@ -76,7 +76,7 @@ val execute_and_inspect :
   ?wasm_pvm_fallback:bool ->
   data_dir:string ->
   ?wasm_entrypoint:string ->
-  config:Wasm_debugger.config ->
+  config:Pvm_types.config ->
   native_execution_policy:Configuration.native_execution_policy ->
   input:Simulation.Encodings.simulate_input ->
   t ->
@@ -115,7 +115,7 @@ val apply_unsigned_chunks :
   ?profile:Configuration.profile_mode ->
   data_dir:string ->
   chain_family:_ L2_types.chain_family ->
-  config:Wasm_debugger.config ->
+  config:Pvm_types.config ->
   native_execution_policy:Configuration.native_execution_policy ->
   t ->
   Sequencer_blueprint.unsigned_chunked_blueprint ->
