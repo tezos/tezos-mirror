@@ -4,7 +4,7 @@
 //! Module containing the types and functions exposed to OCaml.
 
 use crate::{
-    bindings,
+    bindings::{self, end_span, init_spans},
     host::Host,
     runtime::{self, InputsBuffer, RunStatus},
     telemetry::Scope,
@@ -139,6 +139,7 @@ pub fn wasm_runtime_run(
     let ctxt = ctxt.as_mut();
     let mut inputs_buffer = InputsBuffer::new(level, inputs.into_vec());
     let mut scope = Scope::new(otel_scope);
+    init_spans(scope.current(), "wasm_runtime_run")?;
     scope.start("wasm_runtime_run")?;
     loop {
         let host = Host::new(
@@ -160,6 +161,7 @@ pub fn wasm_runtime_run(
         match runtime.run()? {
             RunStatus::Done(evm_tree) => {
                 scope.close_all();
+                end_span()?;
                 return Ok(evm_tree);
             }
             RunStatus::PendingKernelUpgrade(new_tree, remaining_inputs) => {
