@@ -288,6 +288,9 @@ module Tezt_cloud_cli : sig
   val localhost : bool
 
   val proxy : bool
+
+  (** Equivalent to [Cli.dns_domains] *)
+  val dns_domains : string list
 end
 
 module Artifact_helpers : sig
