@@ -458,7 +458,7 @@ let install_finalizer state ~telemetry_cleanup =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let message = state.node_ctxt.Node_context.cctxt#message in
-  telemetry_cleanup () ;
+  let* () = telemetry_cleanup () in
   let* () = message "Shutting down RPC server@." in
   let* () = Rpc_server.shutdown state.rpc_server in
   let* () = message "Shutting down Injector@." in
@@ -1225,7 +1225,7 @@ module Replay = struct
     let* node_ctxt, cleanup = mk_node_ctxt ~profiling ~data_dir cctxt block in
     Lwt.finalize
       (fun () -> replay_block_aux ~preload:true ~verbose:true node_ctxt block)
-      (Lwt.wrap1 cleanup)
+      cleanup
 
   let replay_blocks ~data_dir ?profiling cctxt start_level end_level =
     let open Lwt_result_syntax in
@@ -1246,5 +1246,5 @@ module Replay = struct
             first := false ;
             replay_block_aux ~preload node_ctxt (`Level l))
           levels)
-      (Lwt.wrap1 cleanup)
+      cleanup
 end

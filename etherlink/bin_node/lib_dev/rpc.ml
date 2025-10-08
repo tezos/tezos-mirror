@@ -43,7 +43,7 @@ let install_finalizer_rpc ~(tx_container : _ Services_backend_sig.tx_container)
     Services_backend_sig.tx_container_module tx_container
   in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-  telemetry_cleanup () ;
+  let* () = telemetry_cleanup () in
   let* () = Events.shutdown_node ~exit_status in
   let* () = server_public_finalizer () in
   Misc.unwrap_error_monad @@ fun () -> Tx_container.shutdown ()

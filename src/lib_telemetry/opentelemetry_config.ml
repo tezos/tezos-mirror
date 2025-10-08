@@ -109,7 +109,7 @@ let gc_telemetry_encoding =
 
 let otel_config_encoding =
   let open Data_encoding in
-  let open Opentelemetry_client_cohttp_lwt.Config in
+  let open Opentelemetry_client.Config in
   conv
     (fun {
            debug;

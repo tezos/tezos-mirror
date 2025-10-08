@@ -26,7 +26,7 @@ let add_event ?attrs name =
   Opentelemetry.(
     Scope.get_ambient_scope ()
     |> Option.iter @@ fun scope ->
-       Trace.add_event scope @@ fun () -> Event.make ?attrs name)
+       Scope.add_event scope @@ fun () -> Event.make ?attrs name)
 
 let add_attribute attrs id value =
   match attrs with None -> [(id, value)] | Some attrs -> (id, value) :: attrs

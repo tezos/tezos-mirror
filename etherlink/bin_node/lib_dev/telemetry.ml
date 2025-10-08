@@ -47,7 +47,7 @@ module Jsonrpc = struct
    fun err ->
     (match Opentelemetry.Scope.get_ambient_scope () with
     | Some scope ->
-        Opentelemetry_lwt.Trace.add_attrs
+        Opentelemetry.Scope.add_attrs
           scope
           (Fun.const
              [

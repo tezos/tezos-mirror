@@ -57,7 +57,7 @@ let call_service media_types ?logger ?(headers = []) ~base rpc b c input =
     ~kind:Span_kind_client
     Format.(sprintf "%s %s" method_ path)
   @@ fun scope ->
-  Opentelemetry_lwt.Trace.add_attrs scope make_attrs ;
+  Opentelemetry.Scope.add_attrs scope make_attrs ;
   let headers =
     if Opentelemetry.Collector.has_backend () then
       traceparent_header scope :: headers
