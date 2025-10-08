@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use num_bigint::{BigInt, Sign, TryFromBigIntError};
 use tezos_crypto_rs::PublicKeySignatureVerifier;
 use tezos_data_encoding::{enc::BinError, types::Narith};
 use tezos_evm_logging::{log, Level::*};
@@ -12,7 +13,7 @@ use tezos_tezlink::{
         serialize_unsigned_operation, ManagerOperation, Operation, OperationContent,
         RevealContent,
     },
-    operation_result::{CounterError, ValidityError},
+    operation_result::{Balance, CounterError, UpdateOrigin, ValidityError},
 };
 
 use crate::{
@@ -83,6 +84,29 @@ impl TezlinkImplicitAccount {
             Some(Manager::Revealed(public_key)) => Ok(Ok(public_key)),
         }
     }
+}
+
+/// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
+fn compute_fees_balance_updates(
+    source: &TezlinkImplicitAccount,
+    amount: &Narith,
+) -> Result<(BalanceUpdate, BalanceUpdate), TryFromBigIntError<BigInt>> {
+    let source_delta = BigInt::from_biguint(Sign::Minus, amount.into());
+    let block_fees = BigInt::from_biguint(Sign::Plus, amount.into());
+
+    let source_update = BalanceUpdate {
+        balance: Balance::Account(source.contract()),
+        changes: source_delta.try_into()?,
+        update_origin: UpdateOrigin::BlockApplication,
+    };
+
+    let block_fees = BalanceUpdate {
+        balance: Balance::BlockFees,
+        changes: block_fees.try_into()?,
+        update_origin: UpdateOrigin::BlockApplication,
+    };
+
+    Ok((source_update, block_fees))
 }
 
 /// In order to validate an operation, we need to check its signature,
@@ -203,9 +227,8 @@ fn validate_individual_operation<Host: Runtime>(
         new_balance
     );
 
-    let (src_delta, block_fees) =
-        crate::compute_fees_balance_updates(account, &content.fee)
-            .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
+    let (src_delta, block_fees) = compute_fees_balance_updates(account, &content.fee)
+        .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
 
     Ok((new_balance, vec![src_delta, block_fees]))
 }

@@ -669,32 +669,6 @@ fn originate_contract<Host: Runtime>(
     Ok(dummy_origination_sucess)
 }
 
-/// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
-fn compute_fees_balance_updates(
-    source: &TezlinkImplicitAccount,
-    amount: &Narith,
-) -> Result<
-    (BalanceUpdate, BalanceUpdate),
-    num_bigint::TryFromBigIntError<num_bigint::BigInt>,
-> {
-    let source_delta = BigInt::from_biguint(num_bigint::Sign::Minus, amount.into());
-    let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
-
-    let source_update = BalanceUpdate {
-        balance: Balance::Account(source.contract()),
-        changes: source_delta.try_into()?,
-        update_origin: UpdateOrigin::BlockApplication,
-    };
-
-    let block_fees = BalanceUpdate {
-        balance: Balance::BlockFees,
-        changes: block_fees.try_into()?,
-        update_origin: UpdateOrigin::BlockApplication,
-    };
-
-    Ok((source_update, block_fees))
-}
-
 /// Prepares balance updates in the format expected by the Tezos operation.
 fn compute_balance_updates(
     giver: &impl TezlinkAccount,
