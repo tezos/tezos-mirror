@@ -271,11 +271,11 @@ that B only included attestations corresponding to ``584 = 5251 - 4667`` additio
 maximum ``2333`` extra attestations it could have theoretically included.) Finally, consider some
 delegate C, whose baking power at some cycle is 1% of the total stake. Note that
 his expected number of validator slots for that cycle is
-``1/100 * BLOCKS_PER_CYCLE * CONSENSUS_COMMITTEE_SIZE = 1/100 * 2400 * 7000 = 168,000``
+``1/100 * BLOCKS_PER_CYCLE * CONSENSUS_COMMITTEE_SIZE = 1/100 * 14400 * 7000 = 1,008,000``
 slots. Assume also that the attesting power of C's attestations
-included during that cycle has been ``112,456`` slots. Given that this number is
-bigger than the minimum required (``168,000 * 2 / 3``), it receives an attesting
-reward of ``168,000 * 0.000571 = 95.928`` tez for that cycle.
+included during that cycle has been ``673,456`` slots. Given that this number is
+bigger than the minimum required (``1,008,000 * 2 / 3``), it receives an attesting
+reward of ``1,008,000 * 0.000571 = 575.568`` tez for that cycle.
 
 .. _slashing_alpha:
 
@@ -386,7 +386,7 @@ Consensus related protocol parameters
    * - ``MINIMAL_BLOCK_DELAY``
      - 6s
    * - ``BLOCKS_PER_CYCLE``
-     - 2400
+     - 14400
    * - ``DELAY_INCREMENT_PER_ROUND``
      - 3s
    * - ``CONSENSUS_RIGHTS_DELAY``
