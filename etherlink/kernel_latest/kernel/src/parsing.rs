@@ -19,9 +19,9 @@ use crate::{
     upgrade::KernelUpgrade,
     upgrade::SequencerUpgrade,
 };
-use evm_execution::fa_bridge::deposit::FaDeposit;
-use evm_execution::fa_bridge::TICKS_PER_FA_DEPOSIT_PARSING;
 use primitive_types::U256;
+use revm_etherlink::helpers::legacy::FaDeposit;
+use revm_etherlink::precompiles::constants::TICKS_PER_FA_DEPOSIT_PARSING;
 use rlp::Encodable;
 use sha3::{Digest, Keccak256};
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeySignatureVerifier};

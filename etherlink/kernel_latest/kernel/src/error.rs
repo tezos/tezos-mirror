@@ -5,7 +5,6 @@
 //
 // SPDX-License-Identifier: MIT
 use core::str::Utf8Error;
-use evm_execution::{DurableStorageError, EthereumError};
 use primitive_types::U256;
 use rlp::DecoderError;
 use tezos_data_encoding::enc::BinError;
@@ -97,9 +96,9 @@ pub enum Error {
     #[error("Invalid parsing")]
     InvalidParsing,
     #[error(transparent)]
-    InvalidRunTransaction(EthereumError),
+    InvalidRunTransaction(revm_etherlink::Error),
     #[error("Simulation failed: {0}")]
-    Simulation(EthereumError),
+    Simulation(revm_etherlink::Error),
     #[error(transparent)]
     UpgradeError(UpgradeProcessError),
     #[error(transparent)]
@@ -120,7 +119,7 @@ pub enum Error {
 
 impl From<revm_etherlink::Error> for Error {
     fn from(err: revm_etherlink::Error) -> Self {
-        Error::Simulation(EthereumError::WrappedError(err.to_string().into()))
+        Error::Simulation(err)
     }
 }
 
@@ -167,17 +166,6 @@ impl From<UpgradeProcessError> for Error {
 impl From<StorageError> for Error {
     fn from(e: StorageError) -> Self {
         Self::Storage(e)
-    }
-}
-
-impl From<DurableStorageError> for Error {
-    fn from(e: DurableStorageError) -> Self {
-        match e {
-            DurableStorageError::PathError(e) => Self::Storage(StorageError::Path(e)),
-            DurableStorageError::RuntimeError(e) => {
-                Self::Storage(StorageError::Runtime(e))
-            }
-        }
     }
 }
 

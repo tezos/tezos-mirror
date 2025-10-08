@@ -50,6 +50,12 @@ pub enum Error {
     Runtime(#[from] RuntimeError),
     #[error("Execution error: {0}")]
     Custom(String),
+    /// Converting non-execution fees to gas overflowed u64::max
+    #[error("Gas for fees overflowed u64::max in conversion")]
+    FeesToGasOverflow,
+    /// Underflow of gas limit when subtracting gas for fees
+    #[error("Insufficient gas to cover the non-execution fees")]
+    GasToFeesUnderflow,
 }
 
 pub(crate) fn custom<E: std::fmt::Display>(e: E) -> Error {

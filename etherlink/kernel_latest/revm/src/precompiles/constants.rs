@@ -109,6 +109,19 @@ pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 24_200;
 // Consumed gas is ~81000 for both queue execute_without_proxy entrypoints
 pub const FA_DEPOSIT_EXECUTION_COST: u64 = 100_000;
 
+pub const FA_DEPOSIT_QUEUE_GAS_LIMIT: u64 = 0;
+
+/// Overapproximation of the amount of ticks for parsing FA deposit.
+/// Also includes hashing costs.
+///
+/// Obtained by running the `bench_fa_deposit` and examining both
+/// `hashing_ticks` and `signature_verification_ticks` (parsing).
+/// The final value is maximum total plus +50% reserve.
+///
+/// NOTE that we have a hard cap because of the maximum inbox message size limitation.
+/// If it is lifted at some point in the future, we need to reflect that.
+pub const TICKS_PER_FA_DEPOSIT_PARSING: u64 = 3_500_000;
+
 pub(crate) const SEQUENCER_UPGRADE_DELAY: u64 = 60 * 60 * 24; // 24 hours
 
 #[cfg(test)]

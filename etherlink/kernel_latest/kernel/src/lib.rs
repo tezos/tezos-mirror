@@ -435,20 +435,19 @@ mod tests {
         read_transaction_receipt_status, store_chain_id, ENABLE_FA_BRIDGE,
     };
     use alloy_primitives::keccak256;
-    use evm_execution::fa_bridge::deposit::{ticket_hash, FaDeposit};
-    use evm_execution::fa_bridge::test_utils::{
-        convert_h160, convert_u256, dummy_ticket, kernel_wrapper, ticket_id, SolCall,
-    };
+    use alloy_sol_types::sol;
     use pretty_assertions::assert_eq;
     use primitive_types::{H160, U256};
     use revm_etherlink::helpers::legacy::{
-        alloy_to_h160, h160_to_alloy, h256_to_alloy, u256_to_alloy,
+        alloy_to_h160, h160_to_alloy, h256_to_alloy, ticket_hash, u256_to_alloy,
+        FaDeposit,
     };
     use revm_etherlink::precompiles::constants::{FA_BRIDGE_SOL_ADDR, SYSTEM_SOL_ADDR};
     use revm_etherlink::precompiles::send_outbox_message::RouterInterface;
     use revm_etherlink::storage::world_state_handler::StorageAccount;
     use revm_etherlink::storage::NATIVE_TOKEN_TICKETER_PATH;
     use tezos_crypto_rs::hash::ContractKt1Hash;
+    use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::nom::NomReader;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::TransactionStatus;
@@ -457,6 +456,7 @@ mod tests {
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
 
+    use alloy_sol_types::SolCall;
     use tezos_evm_runtime::runtime::Runtime;
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup::michelson::{
@@ -478,6 +478,31 @@ mod tests {
         info.balance = u256_to_alloy(&balance);
         account.set_info(host, info).unwrap();
     }
+
+    /// Create ticket with dummy creator and content
+    pub fn dummy_ticket() -> FA2_1Ticket {
+        use tezos_crypto_rs::hash::HashTrait;
+
+        let ticketer = ContractKt1Hash::try_from_bytes(&[1u8; 20]).unwrap();
+        FA2_1Ticket::new(
+            Contract::from_b58check(&ticketer.to_base58_check()).unwrap(),
+            MichelsonPair(0.into(), MichelsonOption(None)),
+            1i32,
+        )
+        .expect("Failed to construct ticket")
+    }
+
+    /// Return ticket creator and content in forged form
+    pub fn ticket_id(ticket: &FA2_1Ticket) -> ([u8; 22], Vec<u8>) {
+        let mut ticketer = Vec::new();
+        ticket.creator().0.bin_write(&mut ticketer).unwrap();
+
+        let mut content = Vec::new();
+        ticket.contents().bin_write(&mut content).unwrap();
+
+        (ticketer.try_into().unwrap(), content)
+    }
+    sol!(kernel_wrapper, "../revm/contracts/abi/fa_bridge.abi");
 
     #[test]
     fn load_block_fees_new() {
@@ -774,9 +799,9 @@ mod tests {
         let routing_info = hex::decode("0000000000000000000000000000000000000000000001000000000000000000000000000000000000000000").unwrap();
 
         let data = kernel_wrapper::withdrawCall::new((
-            convert_h160(&sender),
+            h160_to_alloy(&sender),
             routing_info.into(),
-            convert_u256(&amount),
+            u256_to_alloy(&amount),
             ticketer.into(),
             content.into(),
         ))

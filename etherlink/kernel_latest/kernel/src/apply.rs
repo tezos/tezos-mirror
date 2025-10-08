@@ -7,12 +7,10 @@
 // SPDX-License-Identifier: MIT
 
 use alloy_sol_types::{sol, SolCall};
-use evm_execution::fa_bridge::deposit::{FaDeposit, FaDepositWithProxy};
-use evm_execution::EthereumError;
 use primitive_types::{H160, U256};
 use revm::primitives::hardfork::SpecId;
 use revm::primitives::{Address, Bytes, Log, B256};
-use revm_etherlink::helpers::legacy::alloy_to_h160;
+use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit, FaDepositWithProxy};
 use revm_etherlink::inspectors::call_tracer::{
     CallTrace, CallTracerConfig, CallTracerInput,
 };
@@ -30,7 +28,6 @@ use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
     ExecutionOutcome,
 };
-use std::borrow::Cow;
 use tezos_ethereum::access_list::{AccessList, AccessListItem};
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
@@ -330,7 +327,6 @@ pub fn revm_run_transaction<Host: Runtime>(
     //
     // TODO: Simplify all the base structures to avoid these translations
     // once we fully make the switch to REVM.
-
     let mut bytes = vec![0u8; 32];
     value.to_little_endian(&mut bytes);
     revm_etherlink::run_transaction(
@@ -345,11 +341,9 @@ pub fn revm_run_transaction<Host: Runtime>(
         u128::from_le_bytes(if effective_gas_price.bits() < 128 {
             effective_gas_price.low_u128().to_le_bytes()
         } else {
-            return Err(Error::InvalidRunTransaction(
-                evm_execution::EthereumError::WrappedError(Cow::from(
-                    "Given amount does not fit in a u128",
-                )),
-            )
+            return Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
+                "Given amount does not fit in a u128".to_string(),
+            ))
             .into());
         }),
         revm::primitives::U256::from_le_slice(&bytes),
@@ -405,9 +399,9 @@ pub fn revm_run_transaction<Host: Runtime>(
         }),
     )
     .map_err(|err| {
-        Error::InvalidRunTransaction(evm_execution::EthereumError::WrappedError(
-            Cow::from(format!("REVM error {err:?}")),
-        ))
+        Error::InvalidRunTransaction(revm_etherlink::Error::Custom(format!(
+            "REVM error {err:?}"
+        )))
         .into()
     })
 }
@@ -459,9 +453,9 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     ) {
         Ok(outcome) => outcome,
         Err(err) => {
-            return Err(Error::InvalidRunTransaction(
-                evm_execution::EthereumError::WrappedError(Cow::Owned(err.to_string())),
-            )
+            return Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
+                err.to_string(),
+            ))
             .into());
         }
     };
@@ -519,9 +513,7 @@ fn apply_deposit<Host: Runtime>(
         outcome: execution_outcome,
         estimated_ticks_used,
     } = execute_deposit(host, deposit, spec_id).map_err(|e| {
-        Error::InvalidRunTransaction(EthereumError::WrappedError(Cow::Owned(
-            e.to_string(),
-        )))
+        Error::InvalidRunTransaction(revm_etherlink::Error::Custom(e.to_string()))
     })?;
 
     trace_deposit(
@@ -639,9 +631,9 @@ fn apply_fa_deposit<Host: Runtime>(
     ) {
         Ok(outcome) => outcome,
         Err(err) => {
-            return Err(Error::InvalidRunTransaction(
-                evm_execution::EthereumError::WrappedError(Cow::Owned(err.to_string())),
-            ));
+            return Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
+                err.to_string(),
+            )));
         }
     };
 
@@ -772,8 +764,10 @@ pub fn apply_transaction<Host: Runtime>(
     spec_id: &SpecId,
     limits: &EvmLimits,
 ) -> Result<ExecutionResult<ExecutionInfo>, anyhow::Error> {
-    let tracer_input =
-        get_tracer_configuration(B256::from_slice(&transaction.tx_hash), tracer_input);
+    let tracer_input = get_tracer_configuration(
+        revm::primitives::B256::from_slice(&transaction.tx_hash),
+        tracer_input,
+    );
     let apply_result = match &transaction.content {
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,

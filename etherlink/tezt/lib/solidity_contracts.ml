@@ -391,8 +391,7 @@ let batcher =
 
 let reentrancy_test =
   compile_contract
-    ~source:
-      "etherlink/kernel_latest/evm_execution/tests/contracts/src/ReentrancyTester.sol"
+    ~source:"etherlink/kernel_latest/revm/contracts/tests/reentrancy_tester.sol"
     ~label:"reentrancy_tester"
     ~contract:"ReentrancyTester"
 
