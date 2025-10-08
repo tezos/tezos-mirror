@@ -211,6 +211,9 @@ struct
         ~get_history
         skip_list
     in
+    let res =
+      Result.map (fun (proof, input_opt, _lag) -> (proof, input_opt)) res
+    in
     let* () = check_produce res page_info in
     match check_verify with
     | None -> return_unit

@@ -1403,73 +1403,80 @@ module History = struct
           @@ dal_proof_error
                "Skip_list.search returned Nearest', while all given levels to \
                 produce proofs are supposed to be in the skip list."
-      | Found target_cell -> (
-          let inc_proof = List.rev search_result.Skip_list.rev_path in
-          let is_commitment_attested =
-            Skip_list.content target_cell
-            |> is_commitment_attested
-                 ~attestation_threshold_percent
-                 ~restricted_commitments_publishers
-          in
-          match (page_info, is_commitment_attested) with
-          | Some (page_data, page_proof), Some commitment ->
-              (* The case where the slot to which the page is supposed to belong
+      | Found target_cell ->
+          let* proof, page_opt =
+            let inc_proof = List.rev search_result.Skip_list.rev_path in
+            let is_commitment_attested =
+              Skip_list.content target_cell
+              |> is_commitment_attested
+                   ~attestation_threshold_percent
+                   ~restricted_commitments_publishers
+            in
+            match (page_info, is_commitment_attested) with
+            | Some (page_data, page_proof), Some commitment ->
+                (* The case where the slot to which the page is supposed to belong
                  is found and the page's information are given. *)
-              let*? () =
-                (* We check the page's proof against the commitment. *)
-                check_page_proof
-                  dal_params
-                  page_proof
-                  page_data
-                  page_id
-                  commitment
-              in
-              (* All checks succeeded. We return a `Page_confirmed` proof. *)
-              return
-                ( Page_confirmed
-                    {
-                      target_cell;
-                      inc_proof;
-                      page_data;
-                      page_proof;
-                      attestation_threshold_percent;
-                      restricted_commitments_publishers;
-                    },
-                  Some page_data )
-          | None, None ->
-              (* The slot corresponding to the given page's index is not found in
+                let*? () =
+                  (* We check the page's proof against the commitment. *)
+                  check_page_proof
+                    dal_params
+                    page_proof
+                    page_data
+                    page_id
+                    commitment
+                in
+                (* All checks succeeded. We return a `Page_confirmed` proof. *)
+                return
+                  ( Page_confirmed
+                      {
+                        target_cell;
+                        inc_proof;
+                        page_data;
+                        page_proof;
+                        attestation_threshold_percent;
+                        restricted_commitments_publishers;
+                      },
+                    Some page_data )
+            | None, None ->
+                (* The slot corresponding to the given page's index is not found in
                  the attested slots of the page's level, and no information is
                  given for that page. So, we produce a proof that the page is not
                  attested. *)
-              return
-                ( Page_unconfirmed
-                    {
-                      target_cell;
-                      inc_proof;
-                      attestation_threshold_percent;
-                      restricted_commitments_publishers;
-                    },
-                  None )
-          | None, Some _ ->
-              (* Mismatch: case where no page information are given, but the
+                return
+                  ( Page_unconfirmed
+                      {
+                        target_cell;
+                        inc_proof;
+                        attestation_threshold_percent;
+                        restricted_commitments_publishers;
+                      },
+                    None )
+            | None, Some _ ->
+                (* Mismatch: case where no page information are given, but the
                  slot is attested. *)
-              tzfail
-              @@ dal_proof_error
-                   "The page ID's slot is confirmed, but no page content and \
-                    proof are provided."
-          | Some _, None ->
-              (* Mismatch: case where page information are given, but the slot
+                tzfail
+                @@ dal_proof_error
+                     "The page ID's slot is confirmed, but no page content and \
+                      proof are provided."
+            | Some _, None ->
+                (* Mismatch: case where page information are given, but the slot
                  is not attested. *)
-              tzfail
-              @@ dal_proof_error
-                   "The page ID's slot is not confirmed, but page content and \
-                    proof are provided.")
+                tzfail
+                @@ dal_proof_error
+                     "The page ID's slot is not confirmed, but page content \
+                      and proof are provided."
+          in
+          let {attestation_lag; header_id = _} =
+            Skip_list.content target_cell |> Content.content_id
+          in
+          return (proof, page_opt, attestation_lag)
 
     let produce_proof dal_params ~attestation_threshold_percent
         ~restricted_commitments_publishers page_id ~page_info ~get_history
-        slots_hist : (proof * Page.content option) tzresult Lwt.t =
+        slots_hist :
+        (proof * Page.content option * attestation_lag_kind) tzresult Lwt.t =
       let open Lwt_result_syntax in
-      let* proof_repr, page_data =
+      let* proof_repr, page_data, attestation_lag =
         produce_proof_repr
           dal_params
           ~attestation_threshold_percent
@@ -1480,7 +1487,7 @@ module History = struct
           slots_hist
       in
       let*? serialized_proof = serialize_proof proof_repr in
-      return (serialized_proof, page_data)
+      return (serialized_proof, page_data, attestation_lag)
 
     (* Given a starting cell [snapshot] and a (final) [target], this function
        checks that the provided [inc_proof] encodes a minimal path from

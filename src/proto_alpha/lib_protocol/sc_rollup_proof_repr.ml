@@ -333,7 +333,7 @@ module Dal_helpers = struct
         page_id
         ~dal_attested_slots_validity_lag
     then
-      let* proof, content_opt =
+      let* proof, content_opt, _attestation_lag =
         Dal_slot_repr.History.produce_proof
           dal_parameters
           ~attestation_threshold_percent
