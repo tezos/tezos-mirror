@@ -313,6 +313,6 @@ fmt: black
 clean:
 	@-rm -Rf "$(BUILDDIR)" "$(BUILDDIRTXT)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
-	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv octezdoc.txt
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv $(BUILDDIR)/octezdoc.txt
 	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html seoul/octez-*.html
 	@-rm -Rf ../openapi-tmp

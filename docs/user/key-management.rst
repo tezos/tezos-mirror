@@ -328,6 +328,8 @@ possession. This is the signature of the consensus public key using the consensu
 ensures ownership of the key. This process is done automatically by the client, and the proof is included in
 the receipt of the update operation.
 
+.. _baking_consensus_key:
+
 Baking With a Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -395,6 +397,10 @@ Alternatively, it is possible to register a companion key when registering as a 
 It is even possible to register both a consensus key and a companion key, with the following command::
 
    octez-client register key <manager_key> as delegate --consensus-key <consensus_key> --companion-key <companion_key>
+
+Please do (re)start the baker and provide the the new companion key alias alongside the consensus and/or the delegate's key on the command line (the latter is still needed until the new keys become active)::
+
+   octez-baker run with local node ~/.tezos-node <consensus_key> <companion_key> <delegate_key_alias> --liquidity-baking-toggle-vote pass
 
 .. _activate_fundraiser_account:
 

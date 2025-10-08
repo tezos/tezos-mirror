@@ -53,8 +53,8 @@ See https://forum.tezosagora.org/t/heads-up-native-multisig-accounts-in-protocol
 
 .. warning::
 
-   Introduction of this feature needed some breaking changes for tool providers see :doc:`breaking
-   changes <../introduction/breaking_changes>`.
+   The introduction of this feature entailed a few :ref:`breaking changes <operation_encodings_s>`, so it is recommended to update any tool producing or
+   processing reveal operations to a Seoul-compatible version…
 
 .. _snapshot_v23:
 

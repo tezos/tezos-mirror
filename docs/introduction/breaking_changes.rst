@@ -14,8 +14,10 @@ that may be breaking.
 
 In the particular case of RPC changes, you may consult complementary information on :ref:`RPC versioning <rpc_versioning>`, covering how new versions are introduced, the deprecation policy, and a concrete calendar of RPCs planned to be removed.
 
-Denunciation operations
------------------------
+.. _operation_encodings_s:
+
+Operation encoding changes in Seoul
+-----------------------------------
 
 Protocol S adds new operations and changes the encoding of some existing operations, for instance by adding new fields.
 These changes are related to the support for tz4 BLS addresses and their aggregated signatures.
@@ -31,13 +33,14 @@ Most of the changes in the encodings of existing operations are either purely ad
   format <../shell/p2p_api>` may experience some issues. For example, the ``reveal``
   operation has a new boolean field to mark the presence of the optional ``proof`` for
   tz4 revelation.
+  Users of such tools should check that they are operating versions compatible with the changes introduced by the Seoul protocol, and upgrade them if needed.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
 Starting in protocol S, the ``Double_preattestation_evidence`` and
 ``Double_attestation_evidence`` operations are replaced with a
-new ``Double_consensus_operation_evidence`` operation, 
+new ``Double_consensus_operation_evidence`` operation,
 in order to enable denunciations of aggregated consensus operations. This new
 operation contains a denounced slot and two denounced consensus
 operations. For the evidence to be valid, the denounced operations
@@ -48,6 +51,9 @@ aggregate whose committee includes this slot.
 The receipts for these operations have also been reworked, see :ref:`seoul_receipts_changes`.
 
 All existing tz4 addresses are being unrevealed when protocol S is adopted, and they must provide a proof of possession to be revealed again, see :ref:`seoul_breaking_changes`.
+This proof may be generated using the client command::
+
+	octez-client create bls proof for <alias>
 
 Attestations
 ------------
