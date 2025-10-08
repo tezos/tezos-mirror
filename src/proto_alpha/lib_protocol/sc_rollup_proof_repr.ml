@@ -316,12 +316,24 @@ module Dal_helpers = struct
     then return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input_opt))
     else return_none
 
-  let produce ~metadata ~dal_activation_level ~dal_attestation_lag
-      ~dal_number_of_slots ~commit_inbox_level dal_parameters
-      ~attestation_threshold_percent ~restricted_commitments_publishers page_id
-      ~page_info ~get_history confirmed_slots_history
-      ~dal_attested_slots_validity_lag =
+  let produce ~metadata ~dal_activation_level ~dal_number_of_slots
+      ~commit_inbox_level dal_parameters ~attestation_threshold_percent
+      ~restricted_commitments_publishers page_id ~page_info ~get_history
+      confirmed_slots_history ~dal_attested_slots_validity_lag =
     let open Lwt_result_syntax in
+    let* proof, content_opt, attestation_lag =
+      Dal_slot_repr.History.produce_proof
+        dal_parameters
+        ~attestation_threshold_percent
+        ~restricted_commitments_publishers
+        page_id
+        ~page_info
+        ~get_history
+        confirmed_slots_history
+    in
+    let dal_attestation_lag =
+      Dal_slot_repr.History.attestation_lag_value attestation_lag
+    in
     if
       page_id_is_valid
         dal_parameters
@@ -333,16 +345,6 @@ module Dal_helpers = struct
         page_id
         ~dal_attested_slots_validity_lag
     then
-      let* proof, content_opt, _attestation_lag =
-        Dal_slot_repr.History.produce_proof
-          dal_parameters
-          ~attestation_threshold_percent
-          ~restricted_commitments_publishers
-          page_id
-          ~page_info
-          ~get_history
-          confirmed_slots_history
-      in
       return
         ( Some (Reveal_proof (Dal_page_proof {proof; page_id})),
           Some (Sc_rollup_PVM_sig.Reveal (Dal_page content_opt)) )
@@ -612,7 +614,6 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           ~metadata
           ~dal_activation_level
           dal_parameters
-          ~dal_attestation_lag
           ~commit_inbox_level
           ~attestation_threshold_percent:None
           ~restricted_commitments_publishers:None
@@ -637,7 +638,6 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           ~metadata
           ~dal_activation_level
           dal_parameters
-          ~dal_attestation_lag
           ~commit_inbox_level
           ~attestation_threshold_percent
           ~restricted_commitments_publishers
