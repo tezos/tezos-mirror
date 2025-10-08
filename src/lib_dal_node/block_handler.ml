@@ -192,7 +192,7 @@ let store_skip_list_cells ctxt cctxt dal_constants ~attested_level
   in
   let cells_of_level =
     List.map
-      (fun (hash, cell, slot_index) ->
+      (fun (hash, cell, slot_index, _cell_attestation_lag) ->
         ( Dal_proto_types.Skip_list_hash.of_proto
             Plugin.Skip_list.hash_encoding
             hash,

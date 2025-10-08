@@ -33,6 +33,8 @@ type operation_application_result =
 
 type slot_index = int
 
+type attestation_lag = int
+
 (** Information extracted from DAL slots headers operations included in L1
     blocks. Each slot header is made of an L1 level for which it is published,
     the slot's index and commitment. *)
@@ -176,7 +178,7 @@ module type T = sig
       dal_constants:Tezos_dal_node_services.Types.proto_parameters ->
       pred_publication_level_dal_constants:
         Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t Lazy.t ->
-      (hash * cell * slot_index) list tzresult Lwt.t
+      (hash * cell * slot_index * attestation_lag) list tzresult Lwt.t
 
     (** Extracts and returns the slot header of the given cell if it was
         published to L1. *)

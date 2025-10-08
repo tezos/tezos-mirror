@@ -311,11 +311,11 @@ module Plugin = struct
         ~pred_publication_level_dal_constants:_ =
       let open Lwt_result_syntax in
       let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
+      let attestation_lag =
+        dal_constants.Tezos_dal_node_services.Types.attestation_lag
+      in
       let published_level =
-        Int32.sub
-          attested_level
-          (Int32.of_int
-             dal_constants.Tezos_dal_node_services.Types.attestation_lag)
+        Int32.sub attested_level (Int32.of_int attestation_lag)
       in
       (* 1. There are no cells for [published_level = 0]. *)
       if published_level <= 0l then return []
@@ -335,7 +335,7 @@ module Plugin = struct
                 Slots_history.(content cell |> content_id).index
                 |> Slot_index.to_int)
             in
-            (hash, cell, slot_index))
+            (hash, cell, slot_index, attestation_lag))
           cells
 
     let slot_header_of_cell cell =

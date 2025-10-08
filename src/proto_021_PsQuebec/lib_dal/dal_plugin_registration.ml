@@ -293,11 +293,11 @@ module Plugin = struct
           ~block:(`Level attested_level)
           ~operations_metadata:`Never
       in
+      let attestation_lag =
+        dal_constants.Tezos_dal_node_services.Types.attestation_lag
+      in
       let published_level =
-        Int32.sub
-          attested_level
-          (Int32.of_int
-             dal_constants.Tezos_dal_node_services.Types.attestation_lag)
+        Int32.sub attested_level (Int32.of_int attestation_lag)
       in
       (* 1. There are no cells for [published_level = 0]. *)
       if published_level <= 0l then return []
@@ -434,7 +434,7 @@ module Plugin = struct
                   (* This should never happen: all hashes from [ordered_hashes_by_insertion]
                      must exist in [last_cells_map]. *)
                   assert false
-              | Some cell -> (hash, cell, slot_index))
+              | Some cell -> (hash, cell, slot_index, attestation_lag))
             ordered_hashes_by_insertion
         in
         return last_cells_ordered_by_insertion
