@@ -610,6 +610,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                    "http://sandbox.tzkt.io/blocks?tzkt_api_url=%s"
                    (Client.url_encoded_string_of_endpoint tzkt_api))
           in
+          let* () =
           if Cli.faucet then
             let () = toplog "Starting faucet" in
             let faucet_account = Constant.bootstrap1 in
@@ -645,14 +646,13 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~faucet_pkh
                 ~tzkt_api
             in
-            let* () =
               add_service
                 cloud
                 ~name:"Faucet"
                 ~url:(Client.string_of_endpoint faucet_frontend)
+          else unit
             in
             unit
-          else unit
         else unit
       in
       let* () =
