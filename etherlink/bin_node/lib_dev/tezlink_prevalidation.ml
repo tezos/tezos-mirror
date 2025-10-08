@@ -12,6 +12,26 @@ let ( let** ) v f =
   let* r = v in
   match r with Ok v -> f v | Error err -> return (Error err)
 
+let validate_manager_info ~read (Contents op : packed_contents) =
+  let open Lwt_result_syntax in
+  match op with
+  | Manager_operation {source; operation; _} -> (
+      let contract = Tezos_types.Contract.of_implicit source in
+      let* manager = Tezlink_durable_storage.manager read contract in
+      match (manager, operation) with
+      | Some (Public_key _), Reveal _ -> failwith "TODO already revealed"
+      | Some (Public_key pk), _op -> return (Ok (pk, source))
+      | Some (Hash _), Reveal {public_key; _} ->
+          (* the revealed public key might be the one we're searching for *)
+          let open Signature in
+          let pkh_revealed = Public_key.hash public_key in
+          if Public_key_hash.equal source pkh_revealed then
+            return @@ Ok (public_key, source)
+          else failwith "TODO not revealed"
+      | Some (Hash _), _op -> failwith "TODO not revealed"
+      | None, _ -> failwith "TODO unknown source")
+  | _ -> failwith "TODO not a manager operation"
+
 (** Information required to validate an operation. Some will change while folding
    on the batch. We'll need :
        - the [source]
@@ -66,9 +86,11 @@ let validate_tezlink_operation ~read raw =
     | Cons (first_operation, rest) ->
         (Contents first_operation, Operation.to_list (Contents_list rest))
   in
-  (* TODO validate pk using first *)
+  let** pk, source = validate_manager_info ~read first in
+  ignore source ;
   (* TODO build validation context *)
   let** _ = validate_batch ~ctxt:() (first :: rest) in
   (* TODO check signature *)
+  ignore pk ;
   ignore signature ;
   return (Ok operation)
