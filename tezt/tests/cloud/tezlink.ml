@@ -525,8 +525,22 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | None -> Agent.next_available_port tezlink_sequencer_agent
         | Some port -> port
       in
+      let dns_domain =
+        match Tezt_cloud.Tezt_cloud_cli.dns_domains with
+        | [] -> None
+        | _ :: _ :: _ ->
+            Test.fail
+              "Multiple DNS domains are not yet supported in this scenario"
+        | [dns_domain] ->
+            if Tezt_cloud.Tezt_cloud_cli.((not proxy) && localhost) then
+              Test.fail
+                "Setting a DNS domain in non-proxy localhost mode is \
+                 unexpected, please remove the `--dns-domain` option from the \
+                 command line."
+            else Some dns_domain
+      in
       let internal_port =
-        match Cli.dns_name with
+        match dns_domain with
         | None ->
             (* No DNS so no proxy, so we must use the public RPC port. *)
             Some public_rpc_port
@@ -546,16 +560,13 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           Cli.time_between_blocks
           tezlink_sequencer_agent
       in
-      let tezlink_proxy_endpoint, ip =
+      let tezlink_proxy_endpoint =
         match tezlink_sandbox_endpoint with
         | Node _ ->
             failwith "Tezlink end-point should not be a full-fledged node."
         | Foreign_endpoint {host; scheme; port = _; path = _} ->
-            let endpoint =
-              Client.Foreign_endpoint
-                (Endpoint.make ~host ~scheme ~port:public_rpc_port ())
-            in
-            (endpoint, host)
+            Client.Foreign_endpoint
+              (Endpoint.make ~host ~scheme ~port:public_rpc_port ())
       in
       let* () =
         add_service
@@ -647,18 +658,8 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         else unit
       in
       let* () =
-        match Cli.dns_name with
-        | Some dns_name when Tezt_cloud.Tezt_cloud_cli.(proxy || not localhost)
-          ->
-            let* () =
-              (* Binds a name to the machine. Overwrites the previous bond to
-                 name, if any. Creates the subdomain if it does not exist. *)
-              Tezt_cloud.Gcloud.DNS.add_subdomain
-                ~zone:"tezlink-nomadic-labs-com"
-                ~name:dns_name
-                ~value:ip
-            in
-            let full_name = sf "%s.tezlink.nomadic-labs.com" dns_name in
+        match dns_domain with
+        | Some full_name ->
             let* ssl = Ssl.generate tezlink_sequencer_agent full_name in
             let* () =
               let proxy_pass =
@@ -684,7 +685,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               toplog "SSL certificate: %s, SSL key: %s" ssl.certificate ssl.key
             in
             unit
-        | Some _ | None -> unit
+        | None -> unit
       in
       let () = toplog "Starting main loop" in
       loop 0)

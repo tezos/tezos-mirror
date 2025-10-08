@@ -285,9 +285,14 @@ module Tezt_cloud_cli : sig
     unit ->
     Data_encoding.Json.t
 
+  (** Equivalent to [Cli.localhost] *)
   val localhost : bool
 
+  (** Equivalent to [Cli.proxy] *)
   val proxy : bool
+
+  (** Equivalent to [Cli.dns_domains] *)
+  val dns_domains : string list
 end
 
 module Artifact_helpers : sig
