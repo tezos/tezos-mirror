@@ -192,3 +192,98 @@ module Wasm_internal : sig
 
   val of_irmin : Irmin_context.tree -> Context.tree
 end
+
+module Kernel : sig
+  type config
+
+  (** Constructs a configuration for rollup execution. *)
+  val config :
+    ?sender:Tezos_protocol_alpha.Protocol.Contract_hash.t ->
+    ?source:Signature.Public_key_hash.t ->
+    ?destination:Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup.Address.t ->
+    ?preimage_directory:string ->
+    ?preimage_endpoint:Uri.t ->
+    ?dal_pages_directory:string ->
+    ?kernel_debug:bool ->
+    ?flamecharts_directory:string ->
+    ?timings_file:string ->
+    ?trace_host_funs:bool ->
+    unit ->
+    config
+
+  (** Describe where the kernel code can be found: either in-memory from a
+      buffer, or on-disk using a given path. *)
+  type kernel = In_memory of string | On_disk of string
+
+  (** [read_kernel kernel] returns a tuple consisting of the kernel code
+      [content] and a boolean [is_binary], where [is_binary] is [true] if
+      [content] is a WASM blob, and [false] if it is a wat file (WebAssembly text
+      format). *)
+  val read_kernel : kernel -> (string * bool) tzresult Lwt.t
+
+  val check_kernel :
+    binary:bool ->
+    name:string ->
+    Tezos_scoru_wasm.Wasm_pvm_state.version ->
+    string ->
+    unit tzresult Lwt.t
+
+  val set_durable_value :
+    ?edit_readonly:bool -> State.t -> string -> string -> State.t Lwt.t
+
+  val start :
+    tree:State.t ->
+    Tezos_scoru_wasm.Wasm_pvm_state.version ->
+    kernel ->
+    State.t tzresult Lwt.t
+
+  val find_key_in_durable :
+    State.t ->
+    Tezos_scoru_wasm.Durable.key ->
+    Tezos_lazy_containers.Chunked_byte_vector.t option Lwt.t
+
+  val wrap_as_durable_storage :
+    State.t -> Tezos_webassembly_interpreter.Durable_storage.t Lwt.t
+
+  val eval :
+    ?hooks:Tezos_scoru_wasm.Hooks.t ->
+    ?migrate_to:Tezos_scoru_wasm.Pvm_input_kind.protocol ->
+    write_debug:Tezos_scoru_wasm.Builtins.write_debug ->
+    wasm_entrypoint:string ->
+    int32 ->
+    string trace Seq.t ->
+    config ->
+    Octez_smart_rollup_wasm_debugger_lib.Commands.eval_step ->
+    State.t ->
+    (State.t * int64 * string trace Seq.t * int32) tzresult Lwt.t
+
+  val profile :
+    ?migrate_to:Tezos_scoru_wasm.Pvm_input_kind.protocol ->
+    ?hooks:Tezos_scoru_wasm.Hooks.t ->
+    collapse:bool ->
+    with_time:bool ->
+    no_reboot:bool ->
+    int32 ->
+    string trace Seq.t ->
+    config ->
+    string Octez_smart_rollup_wasm_debugger_lib.Custom_section.FuncMap.t ->
+    State.t ->
+    (State.t * string trace Seq.t * int32) tzresult Lwt.t
+
+  val encode :
+    Tezos_scoru_wasm.Wasm_pvm_state.Internal_state.pvm_state ->
+    State.t ->
+    State.t Lwt.t
+
+  val decode :
+    State.t -> Tezos_scoru_wasm.Wasm_pvm_state.Internal_state.pvm_state Lwt.t
+
+  val get_wasm_version :
+    State.t -> Tezos_scoru_wasm.Wasm_pvm_state.version Lwt.t
+
+  val get_function_symbols :
+    State.t ->
+    string Octez_smart_rollup_wasm_debugger_lib.Custom_section.FuncMap.t
+    tzresult
+    Lwt.t
+end
