@@ -7,7 +7,7 @@ use tezos_crypto_rs::PublicKeySignatureVerifier;
 use tezos_data_encoding::{enc::BinError, types::Narith};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::PublicKey;
+use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::{
     operation::{
         serialize_unsigned_operation, ManagerOperation, Operation, OperationContent,
@@ -88,14 +88,14 @@ impl TezlinkImplicitAccount {
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
 fn compute_fees_balance_updates(
-    source: &TezlinkImplicitAccount,
+    source: &PublicKeyHash,
     amount: &Narith,
 ) -> Result<(BalanceUpdate, BalanceUpdate), TryFromBigIntError<BigInt>> {
     let source_delta = BigInt::from_biguint(Sign::Minus, amount.into());
     let block_fees = BigInt::from_biguint(Sign::Plus, amount.into());
 
     let source_update = BalanceUpdate {
-        balance: Balance::Account(source.contract()),
+        balance: Balance::Account(Contract::Implicit(source.clone())),
         changes: source_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
@@ -227,8 +227,9 @@ fn validate_individual_operation<Host: Runtime>(
         new_balance
     );
 
-    let (src_delta, block_fees) = compute_fees_balance_updates(account, &content.fee)
-        .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
+    let (src_delta, block_fees) =
+        compute_fees_balance_updates(account.pkh(), &content.fee)
+            .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
 
     Ok((new_balance, vec![src_delta, block_fees]))
 }
