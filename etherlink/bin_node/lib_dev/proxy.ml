@@ -28,8 +28,6 @@ let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
     (module struct
       type address = Ethereum_types.address
 
-      type legacy_transaction_object = Transaction_object.t
-
       type transaction_object = Transaction_object.t
 
       let nonce ~next_nonce _address = Lwt_result.return next_nonce
@@ -83,7 +81,6 @@ let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
         Lwt_result_syntax.return_unit
     end : Services_backend_sig.Tx_container
       with type address = Ethereum_types.address
-       and type legacy_transaction_object = Transaction_object.t
        and type transaction_object = Transaction_object.t)
   in
   let open Result_syntax in
