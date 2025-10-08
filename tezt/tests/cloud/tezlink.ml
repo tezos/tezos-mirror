@@ -525,12 +525,26 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | None -> Agent.next_available_port tezlink_sequencer_agent
         | Some port -> port
       in
-      let internal_port =
+      let dns_domain =
         match Tezt_cloud.Tezt_cloud_cli.dns_domains with
-        | [] ->
+        | [] -> None
+        | _ :: _ :: _ ->
+            Test.fail
+              "Multiple DNS domains are not yet supported in this scenario"
+        | [dns_domain] ->
+            if Tezt_cloud.Tezt_cloud_cli.((not proxy) && localhost) then
+              Test.fail
+                "Setting a DNS domain in non-proxy localhost mode is \
+                 unexpected, please remove the `--dns-domain` option from the \
+                 command line."
+            else Some dns_domain
+      in
+      let internal_port =
+        match dns_domain with
+        | None ->
             (* No DNS so no proxy, so we must use the public RPC port. *)
             Some public_rpc_port
-        | _ :: _ ->
+        | Some _ ->
             (* We let the system choose a fresh internal RPC node port.
                Note that it will be publicy exposed, it's just that we don't need
                to share this one. *)
@@ -644,9 +658,8 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         else unit
       in
       let* () =
-        match Tezt_cloud.Tezt_cloud_cli.dns_domains with
-        | full_name :: _ when Tezt_cloud.Tezt_cloud_cli.(proxy || not localhost)
-          ->
+        match dns_domain with
+        | Some full_name ->
             let* ssl = Ssl.generate tezlink_sequencer_agent full_name in
             let* () =
               let proxy_pass =
@@ -672,7 +685,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               toplog "SSL certificate: %s, SSL key: %s" ssl.certificate ssl.key
             in
             unit
-        | _ -> unit
+        | None -> unit
       in
       let () = toplog "Starting main loop" in
       loop 0)
