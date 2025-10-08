@@ -555,10 +555,7 @@ let mem_init :
           proof_of_work_nonce;
           (* following Baking_configuration.per_block_votes in lib_delegate *)
           per_block_votes =
-            {
-              liquidity_baking_vote = Per_block_votes.Per_block_vote_pass;
-              adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass;
-            };
+            {liquidity_baking_vote = Per_block_votes.Per_block_vote_pass};
         }
       in
       let unsigned_bytes =

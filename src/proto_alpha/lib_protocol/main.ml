@@ -419,8 +419,6 @@ let init chain_id ctxt block_header =
            {
              liquidity_baking_vote =
                Alpha_context.Per_block_votes.Per_block_vote_pass;
-             adaptive_issuance_vote =
-               Alpha_context.Per_block_votes.Per_block_vote_pass;
            };
          seed_nonce_hash = None;
          proof_of_work_nonce =

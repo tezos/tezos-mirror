@@ -31,10 +31,7 @@ type per_block_vote =
   | Per_block_vote_off
   | Per_block_vote_pass
 
-type per_block_votes = {
-  liquidity_baking_vote : per_block_vote;
-  adaptive_issuance_vote : per_block_vote;
-}
+type per_block_votes = {liquidity_baking_vote : per_block_vote}
 
 let ema_max = 2_000_000_000l
 
@@ -68,23 +65,13 @@ let liquidity_baking_vote_encoding =
     "liquidity_baking_vote"
     (Compact.make ~tag_size:`Uint8 per_block_vote_compact_encoding)
 
-let adaptive_issuance_vote_encoding =
-  let open Data_encoding in
-  def
-    "adaptive_issuance_vote"
-    (Compact.make ~tag_size:`Uint8 per_block_vote_compact_encoding)
-
 let per_block_votes_compact_encoding =
   let open Data_encoding in
   let open Compact in
   conv
-    (fun {liquidity_baking_vote; adaptive_issuance_vote} ->
-      (liquidity_baking_vote, adaptive_issuance_vote))
-    (fun (liquidity_baking_vote, adaptive_issuance_vote) ->
-      {liquidity_baking_vote; adaptive_issuance_vote})
-    (obj2
-       (req "liquidity_baking_vote" per_block_vote_compact_encoding)
-       (req "adaptive_issuance_vote" per_block_vote_compact_encoding))
+    (fun {liquidity_baking_vote} -> liquidity_baking_vote)
+    (fun liquidity_baking_vote -> {liquidity_baking_vote})
+    (obj1 (req "liquidity_baking_vote" per_block_vote_compact_encoding))
 
 let per_block_votes_encoding =
   let open Data_encoding in
@@ -98,35 +85,11 @@ module Liquidity_baking_toggle_EMA = Votes_EMA_repr.Make (struct
   let ema_max = ema_max
 end)
 
-module Adaptive_issuance_launch_EMA = Votes_EMA_repr.Make (struct
-  (* The baker_contribution parameter of the adaptive issuance
-     activation vote was chosen so that 2 weeks are needed to move
-     the EMA from 0% to 50% when all bakers vote On.
-
-     This was computed using the following formula:
-
-     baker_contrib = (1/2) * ema_max * (1 - 2^(-1/k))
-
-     where k is the number of blocks in 2 weeks (which is 151200).
-
-     Because of a small accumulation of rounding errors, two more
-     blocks are actually needed. *)
-  let baker_contribution = Z.of_int 4584
-
-  let ema_max = ema_max
-end)
-
 let compute_new_liquidity_baking_ema ~per_block_vote ema =
   match per_block_vote with
   | Per_block_vote_pass -> ema
   | Per_block_vote_off -> Liquidity_baking_toggle_EMA.update_ema_up ema
   | Per_block_vote_on -> Liquidity_baking_toggle_EMA.update_ema_down ema
-
-let compute_new_adaptive_issuance_ema ~per_block_vote ema =
-  match per_block_vote with
-  | Per_block_vote_pass -> ema
-  | Per_block_vote_off -> Adaptive_issuance_launch_EMA.update_ema_down ema
-  | Per_block_vote_on -> Adaptive_issuance_launch_EMA.update_ema_up ema
 
 module Internal_for_tests = struct
   let ema_max = ema_max

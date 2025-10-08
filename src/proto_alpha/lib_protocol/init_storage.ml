@@ -156,6 +156,9 @@ let cleanup_values_for_protocol_t ctxt
   in
   return ctxt
 
+let remove_ai_ema_for_protocol_t ctxt =
+  Raw_context.remove ctxt ["adaptive_issuance_ema"]
+
 (* End of code to remove at next automatic protocol snapshot *)
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
@@ -281,6 +284,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
                 {c with cycles_per_voting_period = 1l})
           else Lwt.return ctxt
         in
+        let*! ctxt = remove_ai_ema_for_protocol_t ctxt in
         let* ctxt = Address_registry_storage.init ctxt in
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)

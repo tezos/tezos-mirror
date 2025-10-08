@@ -275,17 +275,11 @@ let finalize_payload_ ?payload_round ?baker : t -> t_incr tzresult Lwt.t =
     (Int32.to_int (Int32.succ Block.(block.header.shell.level)))
     (Protocol.Alpha_context.Cycle.to_int32 next_level.cycle)
     baker_name ;
-  let adaptive_issuance_vote =
-    if state.force_ai_vote_yes then
-      Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
-    else Per_block_vote_pass
-  in
   let* block' =
     Block.bake
       ~baking_mode:Baking
       ?policy
       ~operations:state.pending_operations
-      ~adaptive_issuance_vote
       block
   in
   let* i =
@@ -293,7 +287,6 @@ let finalize_payload_ ?payload_round ?baker : t -> t_incr tzresult Lwt.t =
       ?payload_round
       ~payload:state.pending_operations
       ?policy
-      ~adaptive_issuance_vote
       block
   in
   let* i, state =

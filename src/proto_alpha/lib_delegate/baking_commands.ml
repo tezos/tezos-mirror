@@ -381,10 +381,7 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
                         seed_nonce_hash = None;
                         proof_of_work_nonce;
                         per_block_votes =
-                          {
-                            liquidity_baking_vote = Per_block_vote_pass;
-                            adaptive_issuance_vote = Per_block_vote_pass;
-                          };
+                          {liquidity_baking_vote = Per_block_vote_pass};
                       })
               in
               let _then = Time.System.now () in

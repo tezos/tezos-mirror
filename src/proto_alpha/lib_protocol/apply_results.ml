@@ -2606,8 +2606,6 @@ type block_metadata = {
   deactivated : Signature.Public_key_hash.t list;
   balance_updates : Receipt.balance_updates;
   liquidity_baking_toggle_ema : Per_block_votes.Liquidity_baking_toggle_EMA.t;
-  adaptive_issuance_vote_ema : Per_block_votes.Adaptive_issuance_launch_EMA.t;
-  adaptive_issuance_launch_cycle : Cycle.t option;
   implicit_operations_results : packed_successful_manager_operation_result list;
   dal_attestation : Dal.Attestation.t;
 }
@@ -2627,8 +2625,6 @@ let block_metadata_encoding =
               deactivated;
               balance_updates;
               liquidity_baking_toggle_ema;
-              adaptive_issuance_vote_ema;
-              adaptive_issuance_launch_cycle;
               implicit_operations_results;
               dal_attestation;
             }
@@ -2640,9 +2636,7 @@ let block_metadata_encoding =
              nonce_hash,
              deactivated,
              balance_updates,
-             liquidity_baking_toggle_ema,
-             adaptive_issuance_vote_ema,
-             adaptive_issuance_launch_cycle ),
+             liquidity_baking_toggle_ema ),
            ( implicit_operations_results,
              proposer_active_key,
              baker_active_key,
@@ -2655,9 +2649,7 @@ let block_metadata_encoding =
                 nonce_hash,
                 deactivated,
                 balance_updates,
-                liquidity_baking_toggle_ema,
-                adaptive_issuance_vote_ema,
-                adaptive_issuance_launch_cycle ),
+                liquidity_baking_toggle_ema ),
               ( implicit_operations_results,
                 proposer_active_key,
                 baker_active_key,
@@ -2674,13 +2666,11 @@ let block_metadata_encoding =
            deactivated;
            balance_updates;
            liquidity_baking_toggle_ema;
-           adaptive_issuance_vote_ema;
-           adaptive_issuance_launch_cycle;
            implicit_operations_results;
            dal_attestation;
          })
        (merge_objs
-          (obj10
+          (obj8
              (req "proposer" Signature.Public_key_hash.encoding)
              (req "baker" Signature.Public_key_hash.encoding)
              (req "level_info" Level.encoding)
@@ -2690,11 +2680,7 @@ let block_metadata_encoding =
              (dft "balance_updates" Receipt.balance_updates_encoding [])
              (req
                 "liquidity_baking_toggle_ema"
-                Per_block_votes.Liquidity_baking_toggle_EMA.encoding)
-             (req
-                "adaptive_issuance_vote_ema"
-                Per_block_votes.Adaptive_issuance_launch_EMA.encoding)
-             (opt "adaptive_issuance_activation_cycle" Cycle.encoding))
+                Per_block_votes.Liquidity_baking_toggle_EMA.encoding))
           (obj5
              (req
                 "implicit_operations_results"

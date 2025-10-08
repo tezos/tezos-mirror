@@ -364,7 +364,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     global_state.config.per_block_votes
   in
   (* Prioritize reading from the [vote_file] if it exists. *)
-  let*! {liquidity_baking_vote; adaptive_issuance_vote} =
+  let*! {liquidity_baking_vote} =
     let of_protocol = function
       | Protocol.Alpha_context.Per_block_votes.Per_block_vote_on ->
           Octez_agnostic_baker.Per_block_votes.Per_block_vote_on
@@ -382,8 +382,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
           Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass
     in
     let default =
-      Protocol.Alpha_context.Per_block_votes.
-        {liquidity_baking_vote; adaptive_issuance_vote}
+      Protocol.Alpha_context.Per_block_votes.{liquidity_baking_vote}
     in
     match vote_file with
     | Some per_block_vote_file ->
@@ -395,7 +394,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
             }
         in
         let*! Octez_agnostic_baker.Per_block_votes.
-                {liquidity_baking_vote; adaptive_issuance_vote} =
+                {liquidity_baking_vote; adaptive_issuance_vote = _} =
           (Per_block_vote_file.read_per_block_votes_no_fail
              ~default
              ~per_block_vote_file
@@ -403,10 +402,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
         in
         Lwt.return
           Protocol.Alpha_context.Per_block_votes.
-            {
-              liquidity_baking_vote = to_protocol liquidity_baking_vote;
-              adaptive_issuance_vote = to_protocol adaptive_issuance_vote;
-            }
+            {liquidity_baking_vote = to_protocol liquidity_baking_vote}
     | None -> Lwt.return default
   in
   let*! () =
@@ -473,9 +469,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
            ~level:injection_level.level
            ~round [@profiler.record_s {verbosity = Info} "register nonce"])
   in
-  let baking_votes =
-    {Per_block_votes.liquidity_baking_vote; adaptive_issuance_vote}
-  in
+  let baking_votes = {Per_block_votes.liquidity_baking_vote} in
   return
     {
       signed_block_header;
@@ -944,7 +938,7 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
                 {
                   state.global_state.config.per_block_votes with
                   liquidity_baking_vote = baking_votes.liquidity_baking_vote;
-                  adaptive_issuance_vote = baking_votes.adaptive_issuance_vote;
+                  adaptive_issuance_vote = Per_block_vote_pass;
                 };
             };
         };

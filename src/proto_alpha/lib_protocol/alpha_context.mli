@@ -5481,28 +5481,18 @@ module Per_block_votes : sig
 
   type per_block_votes = Per_block_votes_repr.per_block_votes = {
     liquidity_baking_vote : per_block_vote;
-    adaptive_issuance_vote : per_block_vote;
   }
 
   val liquidity_baking_vote_encoding : per_block_vote Data_encoding.encoding
-
-  val adaptive_issuance_vote_encoding : per_block_vote Data_encoding.encoding
 
   val per_block_votes_encoding : per_block_votes Data_encoding.encoding
 
   module Liquidity_baking_toggle_EMA : Votes_EMA.T
 
-  module Adaptive_issuance_launch_EMA : Votes_EMA.T
-
   val compute_new_liquidity_baking_ema :
     per_block_vote:per_block_vote ->
     Liquidity_baking_toggle_EMA.t ->
     Liquidity_baking_toggle_EMA.t
-
-  val compute_new_adaptive_issuance_ema :
-    per_block_vote:per_block_vote ->
-    Adaptive_issuance_launch_EMA.t ->
-    Adaptive_issuance_launch_EMA.t
 end
 
 (** This module re-exports definitions from {!Liquidity_baking_storage}. *)
@@ -5519,13 +5509,6 @@ end
 
 (** This module re-exports definitions from {!Adaptive_issuance_storage}. *)
 module Adaptive_issuance : sig
-  val update_ema :
-    context ->
-    vote:Per_block_votes.per_block_vote ->
-    (context * Cycle.t option * Per_block_votes.Adaptive_issuance_launch_EMA.t)
-    tzresult
-    Lwt.t
-
   val launch_cycle : context -> Cycle.t option tzresult Lwt.t
 end
 
