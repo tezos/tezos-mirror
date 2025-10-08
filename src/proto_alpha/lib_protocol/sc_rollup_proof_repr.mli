@@ -168,10 +168,9 @@ val valid :
   Sc_rollup_inbox_repr.history_proof ->
   Raw_level_repr.t ->
   Dal_slot_repr.History.t ->
-  Dal_slot_repr.parameters ->
+  find_dal_parameters:
+    (Raw_level_repr.t -> Constants_parametric_repr.dal tzresult Lwt.t) ->
   dal_activation_level:Raw_level_repr.t option ->
-  dal_attestation_lag:int ->
-  dal_number_of_slots:int ->
   is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->
   dal_attested_slots_validity_lag:int ->
   'proof t ->
@@ -244,7 +243,7 @@ module type PVM_with_context_and_state = sig
   end
 end
 
-(** [produce ~metadata pvm_and_state inbox_context inbox_history
+(** [produce ~metadata ~find_dal_parameters pvm_and_state inbox_context inbox_history
     commit_inbox_level] will construct a full refutation game proof out of
     the [state] given in [pvm_and_state].  It uses the [inbox] if necessary to
     provide input in the proof. If the input is above or at [commit_level] it
@@ -267,6 +266,8 @@ end
 *)
 val produce :
   metadata:Sc_rollup_metadata_repr.t ->
+  find_dal_parameters:
+    (Raw_level_repr.t -> Constants_parametric_repr.dal tzresult Lwt.t) ->
   (module PVM_with_context_and_state) ->
   Raw_level_repr.t ->
   is_reveal_enabled:Sc_rollup_PVM_sig.is_reveal_enabled ->

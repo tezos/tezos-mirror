@@ -254,6 +254,31 @@ let generate_proof (node_ctxt : _ Node_context.t)
            supported in protocols <= 18. *)
         fun ~current_block_level:_ _ -> true
   in
+
+  let find_dal_parameters level =
+    Environment.Error_monad.catch_s (fun () ->
+        let open Lwt_syntax in
+        let* shell_result =
+          Plugin.RPC.Dal.past_parameters
+            (new Protocol_client_context.wrap_full node_ctxt.cctxt)
+            (node_ctxt.cctxt#chain, `Head 0)
+            level
+        in
+        (* Convert [shell_tzresult] to protocol's [tzresult].
+           Note that this is the opposite direction than the one provided by
+           `Environment.wrap_tzresult`. *)
+        match shell_result with
+        | Ok dal_params -> Lwt.return dal_params
+        | Error err ->
+            Lwt.fail
+              (Failure
+                 (Format.asprintf
+                    "Failed to retrieve DAL parameters for level %a: %a"
+                    Raw_level.pp
+                    level
+                    pp_print_trace
+                    err)))
+  in
   let* proof =
     trace
       (Sc_rollup_node_errors.Cannot_produce_proof
@@ -264,6 +289,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
     @@ let*! result =
          Sc_rollup.Proof.produce
            ~metadata
+           ~find_dal_parameters
            (module P)
            (Raw_level.of_int32_exn game.inbox_level)
            ~is_reveal_enabled
@@ -281,10 +307,8 @@ let generate_proof (node_ctxt : _ Node_context.t)
       snapshot
       (Raw_level.of_int32_exn game.inbox_level)
       dal_slots_history
-      dal_parameters
       ~dal_activation_level
-      ~dal_attestation_lag
-      ~dal_number_of_slots
+      ~find_dal_parameters
       ~pvm:(module PVM)
       unserialized_proof
       ~is_reveal_enabled
