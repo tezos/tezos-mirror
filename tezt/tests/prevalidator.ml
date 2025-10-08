@@ -3791,18 +3791,31 @@ module Revamped = struct
     in
     unit
 
-  let consensus_minimal_slots_feature_flag =
+  let consensus_minimal_slots_feature_flag ~abaab =
     Protocol.register_test
       ~__FILE__
-      ~title:"Mempool filters consensus operations with non-minimal slots"
+      ~title:
+        (Format.asprintf
+           "Mempool filters consensus operations with non-minimal slots (abaab \
+            %s)"
+           (if abaab then "on" else "off"))
       ~tags:[team; "mempool"; "consensus"; "minimal"; "slots"]
       ~supports:(Protocol.From_protocol 023)
     @@ fun protocol ->
     log_step 1 "Initialize node and activate protocol" ;
+    let pair_to_ratio (num, den) =
+      let str = "all_bakers_attest_activation_threshold" in
+      [([str; "numerator"], `Int num); ([str; "denominator"], `Int den)]
+    in
+    let abaab_threshold =
+      if Protocol.number protocol < 024 then []
+      else if abaab then pair_to_ratio (0, 1)
+      else pair_to_ratio (2, 1)
+    in
     let* parameter_file =
       Protocol.write_parameter_file
         ~base:(Either.Right (protocol, None))
-        [(["aggregate_attestation"], `Bool true)]
+        ([(["aggregate_attestation"], `Bool true)] @ abaab_threshold)
     in
     let* node, client =
       Client.init_with_protocol `Client ~protocol ~parameter_file ()
@@ -3838,51 +3851,78 @@ module Revamped = struct
     let* validated, refused =
       Lwt_list.fold_left_s
         (fun (validated, refused) level ->
-          let* attesting_rights =
-            Operation.Consensus.get_rounds ~level ~protocol client
-          in
-          (* TODO ABAAB: this test assumes the rounds are attestation slots, this needs
-             to be updated with the flag status *)
-          (* Look for a delegate that has more than one slot *)
-          let delegate, slots =
-            let delegate_opt =
-              Array.find_map
-                (fun account ->
-                  match
-                    List.assoc_opt
-                      account.Account.public_key_hash
-                      attesting_rights
-                  with
-                  | Some (_ :: _ :: _ as slots) -> Some (account, slots)
-                  | _ -> None)
-                Account.Bootstrap.keys
+          if abaab then
+            let delegate = Account.Bootstrap.keys.(0) in
+            let* slot =
+              Operation.Consensus.get_attestation_slot
+                ~delegate
+                ~level
+                ~protocol
+                client
             in
-            match delegate_opt with
-            | Some (delegate, slots) -> (delegate, slots)
-            | None ->
-                Test.fail
-                  "found no delegate with more than one slot at level %d"
-                  level
-          in
-          (* Inject an attestation with a minimal slot *)
-          let* (`OpHash valid_attestation) =
-            attest_for ~delegate ~level ~slot:(List.hd slots)
-          in
-          (* Inject an attestation with a non-minimal slot *)
-          let* (`OpHash refused_attestation) =
-            attest_for ~delegate ~level ~slot:(List.nth slots 1)
-          in
-          (* Inject a preattestation with a minimal slot *)
-          let* (`OpHash valid_preattestation) =
-            preattest_for ~delegate ~level ~slot:(List.hd slots)
-          in
-          (* Inject a preattestation with a non-minimal slot *)
-          let* (`OpHash refused_preattestation) =
-            preattest_for ~delegate ~level ~slot:(List.nth slots 1)
-          in
-          return
-            ( valid_attestation :: valid_preattestation :: validated,
-              refused_attestation :: refused_preattestation :: refused ))
+            (* Inject an attestation with the correct slot *)
+            let* (`OpHash valid_attestation) =
+              attest_for ~delegate ~level ~slot
+            in
+            (* Inject an attestation with an incorrect slot *)
+            let* (`OpHash refused_attestation) =
+              attest_for ~delegate ~level ~slot:(slot + 1)
+            in
+            (* Inject a preattestation with the correct slot *)
+            let* (`OpHash valid_preattestation) =
+              preattest_for ~delegate ~level ~slot
+            in
+            (* Inject a preattestation with an incorrect slot *)
+            let* (`OpHash refused_preattestation) =
+              preattest_for ~delegate ~level ~slot:(slot + 1)
+            in
+            return
+              ( valid_attestation :: valid_preattestation :: validated,
+                refused_attestation :: refused_preattestation :: refused )
+          else
+            let* attesting_rights =
+              Operation.Consensus.get_rounds ~level ~protocol client
+            in
+            (* Look for a delegate that has more than one slot *)
+            let delegate, slots =
+              let delegate_opt =
+                Array.find_map
+                  (fun account ->
+                    match
+                      List.assoc_opt
+                        account.Account.public_key_hash
+                        attesting_rights
+                    with
+                    | Some (_ :: _ :: _ as slots) -> Some (account, slots)
+                    | _ -> None)
+                  Account.Bootstrap.keys
+              in
+              match delegate_opt with
+              | Some (delegate, slots) -> (delegate, slots)
+              | None ->
+                  Test.fail
+                    "found no delegate with more than one slot at level %d"
+                    level
+            in
+            (* Inject an attestation with a minimal slot *)
+            let* (`OpHash valid_attestation) =
+              attest_for ~delegate ~level ~slot:(List.hd slots)
+            in
+            (* Inject an attestation with a non-minimal slot *)
+            let* (`OpHash refused_attestation) =
+              attest_for ~delegate ~level ~slot:(List.nth slots 1)
+            in
+            (* Inject a preattestation with a minimal slot *)
+            let* (`OpHash valid_preattestation) =
+              preattest_for ~delegate ~level ~slot:(List.hd slots)
+            in
+            (* Inject a preattestation with a non-minimal slot *)
+            let* (`OpHash refused_preattestation) =
+              preattest_for ~delegate ~level ~slot:(List.nth slots 1)
+            in
+            return
+              ( valid_attestation :: valid_preattestation :: validated,
+                refused_attestation :: refused_preattestation :: refused ))
         ([], [])
         accepted_levels
     in
@@ -4404,4 +4444,5 @@ let register ~protocols =
   Revamped.request_operations_from_peer protocols ;
   force_operation_injection protocols ;
   Revamped.injecting_old_operation_fails protocols ;
-  Revamped.consensus_minimal_slots_feature_flag protocols
+  Revamped.consensus_minimal_slots_feature_flag protocols ~abaab:false ;
+  Revamped.consensus_minimal_slots_feature_flag protocols ~abaab:true
