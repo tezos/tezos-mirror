@@ -13,7 +13,7 @@ let patch_da_fees evm_state =
 
 let patch_kernel ~kernel evm_state =
   let open Lwt_result_syntax in
-  let* content, binary = Wasm_debugger.read_kernel kernel in
+  let* content, binary = Pvm.Kernel.read_kernel kernel in
   let*! kernel =
     if binary then Lwt.return content else Wasm_utils_functor.wat2wasm content
   in
