@@ -24,6 +24,7 @@ let tzfail_p e = Lwt_result_syntax.tzfail @@ Imported_env.Ecoproto_error e
 type error +=
   | Parsing_failure of clue * Data_encoding.Binary.read_error
   | Not_a_manager_operation of clue
+  | Unsupported_manager_operation of clue
 
 let () =
   register_error_kind
@@ -61,7 +62,25 @@ let () =
         raw)
     Data_encoding.(obj1 (req "operation" clue_encoding))
     (function Not_a_manager_operation raw -> Some raw | _ -> None)
-    (fun raw -> Not_a_manager_operation raw)
+    (fun raw -> Not_a_manager_operation raw) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.unsupported_manager_operation"
+    ~title:"Failed to prevalidate an operation: unsupported manager operation."
+    ~description:
+      "Prevalidation of the operation failed because it contains at least one \
+       unsupported operation. The only supported operations are reveal, \
+       transaction and origination."
+    ~pp:(fun ppf op ->
+      Format.fprintf
+        ppf
+        "Failed to prevalidate an operation: it contains at least one \
+         unsupported operation %a"
+        pp_clue
+        op)
+    Data_encoding.(obj1 (req "operation" clue_encoding))
+    (function Unsupported_manager_operation op -> Some op | _ -> None)
+    (fun op -> Unsupported_manager_operation op)
 
 let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
   let open Lwt_result_syntax in
@@ -121,6 +140,13 @@ type batch_validation_context = {
   length : int;
 }
 
+let validate_supported_operation (type kind) ~ctxt
+    (operation : kind manager_operation) =
+  let open Lwt_result_syntax in
+  match operation with
+  | Reveal _ | Transaction _ | Origination _ -> return (Ok ())
+  | _ -> tzfail @@ Unsupported_manager_operation ctxt.error_clue
+
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
   let open Lwt_result_syntax in
@@ -133,11 +159,11 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
         source = _;
         fee = _;
         counter = _;
-        operation = _;
+        operation;
         gas_limit = _;
         storage_limit = _;
       } ->
-      (* TODO check supported by tezlink *)
+      let** () = validate_supported_operation ~ctxt operation in
       (* TODO check source *)
       (* TODO check counter is ok *)
       (* TODO check gas limit high enough *)

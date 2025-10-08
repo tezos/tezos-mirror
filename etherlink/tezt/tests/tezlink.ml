@@ -1834,6 +1834,29 @@ let test_tezlink_prevalidation =
       client_tezlink
   in
 
+  (* case unsupported manager *)
+  let* op_not_supported =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~source:Constant.bootstrap1
+            (update_consensus_key ~public_key:unknown.public_key ());
+        ]
+        client)
+  in
+  let unsupported_rex =
+    rex "evm_node.dev.tezlink.unsupported_manager_operation"
+  in
+  let* _ =
+    Operation.inject
+      ~error:unsupported_rex
+      ~dont_wait:true
+      op_not_supported
+      client_tezlink
+  in
+
   unit
 
 let () =
