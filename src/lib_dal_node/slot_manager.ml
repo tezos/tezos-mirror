@@ -356,20 +356,19 @@ let try_get_commitment_of_slot_id_from_memory ctxt slot_id =
    skip list cell stored in the SQLite store.
 
    Steps:
-   - Fetch the skip list cell for the given [attested_level] and slot index from
-     the SQLite store.
+   - Fetch the skip list cell for the given [slot_id] from the SQLite store.
    - Decode the cell using the DAL plugin.
    - Return the extracted slot header, if available.
 
     Returns [None] if the cell is not found in the store. *)
 let try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
-    ctxt ~attested_level slot_id =
+    ctxt slot_id =
   let open Lwt_result_syntax in
   let* cell_bytes_opt =
     Store.Skip_list_cells.find_by_slot_id_opt
       (Node_context.get_store ctxt)
-      ~attested_level
-      ~slot_index:slot_id.Types.Slot_id.slot_index
+      ~published_level:slot_id.Types.Slot_id.slot_level
+      ~slot_index:slot_id.slot_index
   in
   match cell_bytes_opt with
   | None -> return_none
@@ -435,15 +434,12 @@ let try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt dal_constants
   let open Lwt_result_syntax in
   let*! published_slot_header_opt =
     let*! from_sqlite =
-      try_get_slot_header_from_indexed_skip_list
-        dal_plugin
-        ctxt
-        ~attested_level
-        slot_id
+      try_get_slot_header_from_indexed_skip_list dal_plugin ctxt slot_id
     in
     match from_sqlite with
     | Ok (Some _header as res) -> return res
     | _ ->
+        (* TODO: the attested level is wrong! *)
         try_get_slot_header_from_L1_skip_list
           dal_plugin
           ctxt

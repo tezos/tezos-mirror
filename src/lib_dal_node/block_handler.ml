@@ -74,9 +74,13 @@ let remove_old_level_stored_data proto_parameters ctxt current_level =
            (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
               We may want to remove this check. *)
            if Node_context.supports_refutations ctxt then
-             let* res =
-               Store.Skip_list_cells.remove store ~attested_level:oldest_level
+             let published_level =
+               Int32.(
+                 sub
+                   oldest_level
+                   (of_int proto_parameters.Types.attestation_lag))
              in
+             let* res = Store.Skip_list_cells.remove store ~published_level in
              match res with
              | Ok () -> Event.emit_removed_skip_list_cells ~level:oldest_level
              | Error error ->
@@ -194,7 +198,15 @@ let store_skip_list_cells ctxt cctxt dal_constants ~attested_level
       cells_of_level
   in
   let store = Node_context.get_store ctxt in
-  Store.Skip_list_cells.insert store ~attested_level cells_of_level
+  (* DAL/FIXME: use the lag and published_level returned by the cells_of_level
+     in https://gitlab.com/tezos/tezos/-/merge_requests/19512 *)
+  let attestation_lag = dal_constants.Types.attestation_lag in
+  let published_level = Int32.(sub attested_level (of_int attestation_lag)) in
+  Store.Skip_list_cells.insert
+    store
+    ~published_level
+    ~attestation_lag
+    cells_of_level
 
 (* This functions counts, for each slot, the number of shards attested by the bakers. *)
 let attested_shards_per_slot attestations slot_to_committee ~number_of_slots

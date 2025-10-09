@@ -255,13 +255,13 @@ module Skip_list_cells : sig
     Skip_list_hash.t ->
     Skip_list_cell.t option tzresult Lwt.t
 
-  (** [find_by_slot_id_opt ?conn store ~attested_level ~slot_index] returns the
-      cell associated to ([attested_level], [slot_index]) in the [store], if
+  (** [find_by_slot_id_opt ?conn store ~published_level ~slot_index] returns the
+      cell associated to ([published_level], [slot_index]) in the [store], if
       any. *)
   val find_by_slot_id_opt :
     ?conn:Sqlite.conn ->
     t ->
-    attested_level:int32 ->
+    published_level:int32 ->
     slot_index:Types.slot_index ->
     Dal_proto_types.Skip_list_cell.t option tzresult Lwt.t
 
@@ -269,7 +269,7 @@ module Skip_list_cells : sig
   val find_by_level :
     ?conn:Sqlite.conn ->
     t ->
-    attested_level:int32 ->
+    published_level:int32 ->
     (Dal_proto_types.Skip_list_cell.t
     * Dal_proto_types.Skip_list_hash.t
     * Types.slot_index)
@@ -277,22 +277,23 @@ module Skip_list_cells : sig
     tzresult
     Lwt.t
 
-  (** [insert ?conn store ~attested_level values] inserts the given list of [values]
-      associated to the given [attested_level] in the [store]. Any existing value
-      is overridden. *)
+  (** [insert ?conn store ~published_level ~attestation_lag values] inserts the
+      given list of [values] associated to the given [published_level] in the
+      [store]. Any existing value is overridden. *)
   val insert :
     ?conn:Dal_store_sqlite3.conn ->
     t ->
-    attested_level:int32 ->
+    published_level:int32 ->
+    attestation_lag:int ->
     (Skip_list_hash.t * Skip_list_cell.t * Types.slot_index) list ->
     unit tzresult Lwt.t
 
-  (** [remove ?conn store ~attested_level] removes any data related to [attested_level]
+  (** [remove ?conn store ~published_level] removes any data related to [published_level]
       from the [store]. *)
   val remove :
     ?conn:Dal_store_sqlite3.conn ->
     t ->
-    attested_level:int32 ->
+    published_level:int32 ->
     unit tzresult Lwt.t
 
   (** [schemas data_dir] returns the list of SQL statements allowing
