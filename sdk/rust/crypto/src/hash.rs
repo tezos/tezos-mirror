@@ -68,6 +68,8 @@ mod prefix_bytes {
     pub const NONCE_HASH: [u8; 3] = [69, 220, 169];
     pub const OPERATION_LIST_HASH: [u8; 2] = [133, 233];
     pub const SMART_ROLLUP_HASH: [u8; 3] = [6, 124, 117];
+    pub const SMART_ROLLUP_COMMITMENT_HASH: [u8; 4] = [17, 165, 134, 138];
+    pub const SMART_ROLLUP_STATE_HASH: [u8; 4] = [17, 165, 235, 240];
     pub const SCRIPT_EXPR_HASH: [u8; 4] = [13, 44, 64, 27];
 }
 
@@ -332,6 +334,8 @@ define_hash!(BlsSignature);
 define_hash!(NonceHash);
 define_hash!(OperationListHash);
 define_hash!(SmartRollupHash);
+define_hash!(SmartRollupCommitmentHash);
+define_hash!(SmartRollupStateHash);
 define_hash!(ScriptExprHash);
 
 macro_rules! unknown_sig {
@@ -432,6 +436,10 @@ pub enum HashType {
     OperationListHash,
     // "\006\124\117" (* sr1(36) *)
     SmartRollupHash,
+    // "\017\165\134\138" (* src1(54) *)
+    SmartRollupCommitmentHash,
+    // "\017\165\235\240" (* srs1(54) *)
+    SmartRollupStateHash,
     // "\013\044\064\027" (* expr(54) *)
     ScriptExprHash,
 }
@@ -478,6 +486,8 @@ impl HashType {
             HashType::NonceHash => &NONCE_HASH,
             HashType::OperationListHash => &OPERATION_LIST_HASH,
             HashType::SmartRollupHash => &SMART_ROLLUP_HASH,
+            HashType::SmartRollupCommitmentHash => &SMART_ROLLUP_COMMITMENT_HASH,
+            HashType::SmartRollupStateHash => &SMART_ROLLUP_STATE_HASH,
             HashType::ScriptExprHash => &SCRIPT_EXPR_HASH,
         }
     }
@@ -497,6 +507,8 @@ impl HashType {
             | HashType::OperationMetadataListListHash
             | HashType::PublicKeyEd25519
             | HashType::NonceHash
+            | HashType::SmartRollupCommitmentHash
+            | HashType::SmartRollupStateHash
             | HashType::OperationListHash => 32,
             HashType::CryptoboxPublicKeyHash => 16,
             HashType::ContractKt1Hash
@@ -1423,6 +1435,18 @@ mod tests {
                 "sr1VN4vvy9uW7zftBvCRmh3RXm3KWS9atR9Q",
                 "sr1VHPsgVnB3gzRyRULuVV2zmbKyRBMq9gbV"
             ]
+        );
+
+        test!(
+            smart_rollup_commitment_hash,
+            SmartRollupCommitmentHash,
+            ["src12UJzB8mg7yU6nWPzicH7ofJbFjyJEbHvwtZdfRXi8DQHNp1LY8",]
+        );
+
+        test!(
+            smart_rollup_state_hash,
+            SmartRollupStateHash,
+            ["srs11ZWE34ur1d8j81Eqt68v2P5gFkP3hHms6kQ9Qo26j7ktDeu85y",]
         );
 
         test!(

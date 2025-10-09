@@ -50,6 +50,8 @@ encode_hash!(P256Signature);
 encode_hash!(BlsSignature);
 encode_hash!(NonceHash);
 encode_hash!(SmartRollupHash);
+encode_hash!(SmartRollupCommitmentHash);
+encode_hash!(SmartRollupStateHash);
 
 macro_rules! hash_nom_reader {
     ($hash_name:ident) => {
@@ -95,6 +97,8 @@ hash_nom_reader!(P256Signature);
 hash_nom_reader!(BlsSignature);
 hash_nom_reader!(NonceHash);
 hash_nom_reader!(SmartRollupHash);
+hash_nom_reader!(SmartRollupCommitmentHash);
+hash_nom_reader!(SmartRollupStateHash);
 
 macro_rules! hash_has_encoding {
     ($hash_name:ident, $enc_ref_name:ident) => {
@@ -138,3 +142,5 @@ hash_has_encoding!(P256Signature, P256_SIGNATURE_HASH);
 hash_has_encoding!(BlsSignature, BLS_SIGNATURE_HASH);
 hash_has_encoding!(NonceHash, NONCE_HASH);
 hash_has_encoding!(SmartRollupHash, SMART_ROLLUP_HASH);
+hash_has_encoding!(SmartRollupCommitmentHash, SMART_ROLLUP_COMMITMENT_HASH);
+hash_has_encoding!(SmartRollupStateHash, SMART_ROLLUP_STATE_HASH);
