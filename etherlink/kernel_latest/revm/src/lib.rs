@@ -379,7 +379,7 @@ mod test {
     use super::Error;
     use crate::helpers::storage::bytes_hash;
     use crate::precompiles::constants::FEED_DEPOSIT_ADDR;
-    use crate::storage::code::{CodeStorage, EVM_CODES_PATH};
+    use crate::storage::code::CodeStorage;
     use crate::test::utilities::CreateAndRevert::{
         createAndRevertCall, CreateAndRevertCalls,
     };
@@ -1088,9 +1088,6 @@ mod test {
                 bytecode: Bytes::from_hex("0x6080604052348015600e575f5ffd5b50606a80601a5f395ff3fe6080604052348015600e575f5ffd5b50600436106026575f3560e01c80636b59084d14602a575b5f5ffd5b60306032565b005b56fea2646970667358221220e7c453431baacca104fa0d26c8d9fb06266545148b18a79c3ed740ce52d16a0a64736f6c634300081e0033").unwrap()
             });
 
-        let nb_contract_before_deploy =
-            host.store_count_subkeys(&EVM_CODES_PATH).unwrap();
-
         // Call the CallAndRevert contract with the calldata for FAWithdrawal
         let ExecutionOutcome {
             result,
@@ -1113,16 +1110,18 @@ mod test {
         .unwrap();
 
         // Get the address where the bytecode should have been deployed
-        match result {
+        let addr_deployed_bytecode = match result {
             ExecutionResult::Revert { output, .. } => {
                 RevertCreate::abi_decode(&output).unwrap().addr
             }
             other => panic!("ERROR: ended up in {other:?}"),
         };
 
-        assert!(
-            nb_contract_before_deploy
-                == host.store_count_subkeys(&EVM_CODES_PATH).unwrap()
+        let storage_account =
+            StorageAccount::from_address(&addr_deployed_bytecode).unwrap();
+        assert_eq!(
+            storage_account.info(&mut host).unwrap(),
+            AccountInfo::default()
         );
     }
 
