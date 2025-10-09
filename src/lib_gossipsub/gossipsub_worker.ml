@@ -376,7 +376,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       [GS.Route_message] output);
       - Notifying the application layer if it is interested in it.
 
-      Note that it's the responsability of the automaton modules to filter out
+      Note that it's the responsibility of the automaton modules to filter out
       peers based on various criteria (bad score, connection expired, ...). *)
   let handle_receive_message (received_message : GS.receive_message) :
       worker_state * [`Receive_message] GS.output -> worker_state = function
@@ -416,7 +416,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   (** From the worker's perspective, the outcome of joining a new topic from the
       application layer are:
       - Sending [Subscribe] messages to connected peers with that topic;
-      - Sending [Graft] messages to the newly construced topic's mesh. *)
+      - Sending [Graft] messages to the newly constructed topic's mesh. *)
   let handle_join topic = function
     | state, GS.Already_joined -> state
     | state, Joining_topic {to_graft} ->

@@ -131,6 +131,14 @@ val get_profiles : t -> Types.profile
     operators, twice attestation lag for observers and attesters.) *)
 val get_attested_data_default_store_period : t -> Types.proto_parameters -> int
 
+(** Returns the maximum number of slot ids for which the node should keep the
+    shards in the "in-memory cache". This is necessary to keep shards long
+    enough to be able to denounce delegates attesting trapped shards. It is set
+    to [slots_to_follow *(attestation_lag + tenderbake_finality +
+    additional_blocks)] where [slots_to_follow] depends on the profile of the
+    node. *)
+val get_memory_cache_size : t -> Types.proto_parameters -> int
+
 (** Resolves a profile by either returning it unchanged (for bootstrap
     and controller profiles) or generating a new observer profile for
     random observer profile. The random slot is selected within the

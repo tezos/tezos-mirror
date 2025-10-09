@@ -319,15 +319,16 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     with
     | Controller profile
       when Controller_profiles.can_publish_on_slot_index slot_index profile ->
-        (* If one is an observer or an operator for current slot, then they expect all the shards. *)
+        (* If one is an observer or an operator for current slot, then they
+           expect all the shards. *)
         let total_number_of_shards =
           proto_parameters.cryptobox_parameters.number_of_shards
         in
         update_metric_and_emit_event (fun () ->
             IntSet.of_list (0 -- total_number_of_shards))
     | Controller profile when Controller_profiles.has_attester profile ->
-        (* If one is not observing the slot but is an attester, then they
-               expect a number of shards depending of the committee draw. *)
+        (* If one is not observing the slot but is an attester, then they expect
+           a number of shards depending of the committee draw. *)
         let attesters = Controller_profiles.attesters profile in
         let* committee =
           let level =

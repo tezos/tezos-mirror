@@ -220,32 +220,53 @@ let get_refutation_game_period proto_parameters =
 (* This function returns whether the node should store skip list cells, in
    addition to the retention period for attested data (slots, shards, etc). *)
 let get_attested_data_default_store_period t proto_parameters =
-  (* We double the period (no matter the profile), to give some slack, just in
-     case (finalisation period, off by one, attestation_lag, refutation games
-     reset after a protocol upgrade, ...). *)
-  let refutation_game_period =
-    2 * get_refutation_game_period proto_parameters
-  in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7772
-     This period should be zero. *)
-  let bootstrap_node_period = 2 * proto_parameters.attestation_lag in
-  (* For observability purpose, we aim for a non-slot operator profile
-     to keep shards for about 10 minutes.
-     150 blocks is 10 minutes on Ghostnet, 20 minutes on Mainnet. *)
-  let default_period = 150 in
   let supports_refutations_bis, period =
     match get_profiles t with
     | Controller c ->
         let has_operator = Controller_profiles.(has_operator c) in
         let period =
-          if has_operator then refutation_game_period else default_period
+          if has_operator then
+            (* We double the period (no matter the profile), to give some slack,
+               just in case (finalisation period, off by one, attestation_lag,
+               refutation games reset after a protocol upgrade, ...). *)
+            2 * get_refutation_game_period proto_parameters
+          else
+            (* For observability purpose, we aim for a non-slot operator profile
+               to keep shards for about 10 minutes. 150 blocks is 10 minutes on
+               Ghostnet, 20 minutes on Mainnet. *)
+            150
         in
         (has_operator, period)
-    | Bootstrap -> (false, bootstrap_node_period)
+    | Bootstrap ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7772
+     This period should be zero. *)
+        let bootstrap_node_period = 2 * proto_parameters.attestation_lag in
+        (false, bootstrap_node_period)
   in
   (* This is just to keep this function synced with {!supports_refutations}. *)
   assert (supports_refutations_bis = supports_refutations t) ;
   period
+
+let get_memory_cache_size t proto_parameters =
+  let slots_to_follow =
+    match get_profiles t with
+    | Controller _ ->
+        (* We take the [number_of_slots] from the [proto_parameters] in any case
+           to make sure that a DAL node started without any attester profile,
+           but who registers one afterwards, will have a cache of the right
+           size. *)
+        proto_parameters.Types.number_of_slots
+    | Bootstrap ->
+        (* As the bootstrap is not expected to hold any value, we set it to 1 to
+           get an empty cache. *)
+        1
+  in
+  let attestation_lag = proto_parameters.attestation_lag in
+  (* We assume the Tenderbake finality to be 2. *)
+  let tenderbake_finality = 2 in
+  (* Adding a few blocks for safety. *)
+  let additional_blocks = 3 in
+  slots_to_follow * (attestation_lag + tenderbake_finality + additional_blocks)
 
 let profiles_filename = "profiles.json"
 

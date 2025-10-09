@@ -421,11 +421,12 @@ end
   Shards -- cache-first selector via [source_target]
 
   Policy:
-  - Reads/counts: If the slot is present in cache, use the cache, otherwise use
-  the disk (if available, otherwise the data is missing).
+  - Reads/counts: If the slot is present in the memory cache, use the cache,
+  otherwise use the disk (if available, otherwise the data is missing).
   - Writes:
-      * cache-only (disk=None): write to cache.
-      * disk-backed: write to disk (must succeed) then write to cache.
+      * cache-only (disk=None): write to the memory cache.
+      * disk-backed: write to memory cache (allowed to fail), and then, write to
+        disk (must succeed).
   - Removal always clears cache first, then disk if present.
 *)
 module Shards = struct
@@ -453,12 +454,9 @@ module Shards = struct
         in
         return_some store
     in
-    let storage_period =
-      Profile_manager.get_attested_data_default_store_period
-        profile_ctxt
-        proto_parameters
+    let cache_size =
+      Profile_manager.get_memory_cache_size profile_ctxt proto_parameters
     in
-    let cache_size = storage_period * proto_parameters.number_of_slots in
     let cache = Cache.init cache_size in
     return {disk; cache}
 
@@ -477,10 +475,11 @@ module Shards = struct
     match disk with
     | None -> Cache.write_all cache slot_id shards
     | Some d ->
+        (* Write to memory cache, making the value available first, and ignore
+           failure. *)
+        let*! (_ : (unit, _) result) = Cache.write_all cache slot_id shards in
         (* Disk must succeed for persistence. *)
         let* () = Disk.write_all d slot_id shards in
-        (* Then write-through to cache; ignore its failure. *)
-        let*! (_ : (unit, _) result) = Cache.write_all cache slot_id shards in
         return_unit
 
   let read st slot_id shard_id =
