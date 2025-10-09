@@ -171,9 +171,9 @@ let () =
       constants.delay_increment_per_round >= Period.one_second)
 
 let () =
-  register_test ~title:"one cycle is 4 hours" @@ fun () ->
+  register_test ~title:"one cycle is 1 day" @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
-  check_protocol_time_correlation ~constants ~cycles:1l ~duration:(Hours 4l)
+  check_protocol_time_correlation ~constants ~cycles:1l ~duration:(Days 1l)
 
 let () =
   register_test ~title:"voting period is 14 days" @@ fun () ->
@@ -193,12 +193,12 @@ let () =
     ~duration:(Days 5l)
 
 let () =
-  register_test ~title:"tolerated inactivity period is 8 hours" @@ fun () ->
+  register_test ~title:"tolerated inactivity period is 2 days" @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
   check_protocol_time_correlation
     ~constants
     ~cycles:(Int32.of_int constants.tolerated_inactivity_period)
-    ~duration:(Hours 8l)
+    ~duration:(Days 2l)
 
 let () =
   register_test ~title:"Nonce commitment per cycle is above 128" @@ fun () ->

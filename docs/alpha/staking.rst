@@ -101,7 +101,7 @@ Delegates can modify these staking parameters at all times, using the
 ``set_delegate_parameters`` pseudo-operation: that is, by transferring 0
 tez to their own ``set_delegate_parameters`` entry-point. The chosen values for both
 parameters need to be supplied. The new parameters are then applied
-``DELEGATE_PARAMETERS_ACTIVATION_DELAY`` (currently 30) cycles later.
+``DELEGATE_PARAMETERS_ACTIVATION_DELAY`` (currently 5) cycles later.
 
 ::
 

@@ -254,11 +254,8 @@ let constants_mainnet : Constants.Parametric.t =
        also be longer than the delay for unstake requests to become
        finalizable, to make possible for delegators to finish
        unstaking before the new parameters take effect if they are
-       unhappy with the change.
-
-       Current value is 5 days (30 cycles of 4 hours).
-       Last updated in protocol T. *)
-    delegate_parameters_activation_delay = 30;
+       unhappy with the change. *)
+    delegate_parameters_activation_delay = 5;
     (* At the end of a cycle, a delegate gets deactivated if the chain
        has witnessed no consensus activity (baking, attesting) from it
        during the past [tolerated_inactivity_period] cycles, including
@@ -281,12 +278,12 @@ let constants_mainnet : Constants.Parametric.t =
        blocks. Multiply it by [minimal_block_delay] to get the minimal
        duration of a cycle in seconds.
 
-       [blocks_per_cycle = 2400l] has been chosen so that cycles last
-       4 hours (plus drift from non-zero rounds) on mainnet
+       [blocks_per_cycle = 14400l] has been chosen so that cycles last
+       one day (24h) (plus drift from non-zero rounds) on mainnet
        where [minimal_block_delay] is 6s.
 
        Last updated in protocol T. *)
-    blocks_per_cycle = 2400l;
+    blocks_per_cycle = 14400l;
     (* Each [blocks_per_commitment] blocks, the block producer has to commit on
        a nonce. Currently we target 128 nonces per cycle in order to ensure the
        nonces are produced by sufficiently many different bakers.
@@ -295,16 +292,14 @@ let constants_mainnet : Constants.Parametric.t =
        Don't forget to update cycles-eras when updating this parameter.
        Last updated in protocol T.
     *)
-    blocks_per_commitment = 18l;
+    blocks_per_commitment = 112l;
     (* Duration in levels of the nonce revelation phase (which precedes the VDF
        phase).
        Last updated in protocol T. *)
-    nonce_revelation_threshold = 200l;
+    nonce_revelation_threshold = 400l;
     (* [cycles_per_voting_period] is the duration of any voting period.
-       It is currently 14 days (84 cycles of 4 hours).
-
-       Last updated in protocol T. *)
-    cycles_per_voting_period = 84l;
+       Last updated in protocol R. *)
+    cycles_per_voting_period = 14l;
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
     hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 1_040_000);
     (* When reducing blocks time, consider adapting this constant so
@@ -313,14 +308,14 @@ let constants_mainnet : Constants.Parametric.t =
     minimal_stake = Tez.(mul_exn one 6_000);
     minimal_frozen_stake = Tez.(mul_exn one 600);
     (* VDF's difficulty must be a multiple of `nonce_revelation_threshold` times
-       the block time. At the moment it is equal to 1200M = 1200 * 5 * 0.2M with
-          - 1200 ~= 200 * 6 that is nonce_revelation_threshold * block time
-          - 0.2M  ~= number of modular squaring per second on benchmark machine
+       the block time. At the moment it is equal to 2400M = 2400 * 5 * 0.2M with
+          - 2400 ~= 400 * 6 that is nonce_revelation_threshold * block time
+          - 0.2M ~= number of modular squaring per second on benchmark machine
          with 2.8GHz CPU
           - 5: security factor (strictly higher than the ratio between highest CPU
          clock rate and benchmark machine that is 9.12/2.8 ~= 3.
        Last updated in protocol T. *)
-    vdf_difficulty = 1_200_000_000L;
+    vdf_difficulty = 2_400_000_000L;
     origination_size = 257;
     issuance_weights =
       {

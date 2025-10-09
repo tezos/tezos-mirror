@@ -429,7 +429,7 @@ each block, but rather every 192 blocks.
 
 Where:
 
-- ``blocks_per_commitment`` (18) is the interval in blocks between each revelation, both VDF and nonce.
+- ``blocks_per_commitment`` (112) is the interval in blocks between each revelation, both VDF and nonce.
 
 
 The `RPC endpoint

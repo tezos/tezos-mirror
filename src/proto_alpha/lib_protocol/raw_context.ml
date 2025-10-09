@@ -1026,6 +1026,9 @@ type block_time_delays = {
   max_operations_time_to_live : int;
   delay_increment_per_round : Period_repr.t;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
+  blocks_per_cycle : int32;
+  blocks_per_commitment : int32;
+  nonce_revelation_threshold : int32;
   sc_rollup : Constants_parametric_repr.sc_rollup;
 }
 
@@ -1044,6 +1047,12 @@ let update_block_time_related_constants
     Gas_limit_repr.Arith.(integral_of_int_exn 1_040_000)
   in
   let max_operations_time_to_live = 4 * old.max_operations_time_to_live / 3 in
+
+  let increase x = Int32.(div (mul 4l x) 3l) in
+  let blocks_per_cycle = increase old.blocks_per_cycle in
+  let blocks_per_commitment = increase old.blocks_per_commitment in
+  let nonce_revelation_threshold = increase old.nonce_revelation_threshold in
+
   let sc_rollup =
     Constants_parametric_repr.update_sc_rollup_parameter_with_block_time
       6
@@ -1054,66 +1063,10 @@ let update_block_time_related_constants
     max_operations_time_to_live;
     delay_increment_per_round;
     hard_gas_limit_per_block;
-    sc_rollup;
-  }
-
-type cycle_duration_delays = {
-  blocks_per_cycle : int32;
-  delegate_parameters_activation_delay : int;
-  cycles_per_voting_period : int32;
-  blocks_per_commitment : int32;
-  nonce_revelation_threshold : int32;
-  vdf_difficulty : int64;
-}
-
-let new_constants_four_hours_cycles ~preserve_duration_in_days
-    ~previous_minimal_block_delay ~minimal_block_delay
-    ~(previous_delays : cycle_duration_delays) : cycle_duration_delays =
-  let previous_minimal_block_delay_sec =
-    Period_repr.to_seconds previous_minimal_block_delay
-  in
-  let minimal_block_delay_sec = Period_repr.to_seconds minimal_block_delay in
-  let blocks_per_cycle =
-    Int64.(to_int32 (div (mul 4L 3600L) minimal_block_delay_sec))
-  in
-  let blocks_per_commitment = Int32.(div blocks_per_cycle 128l) in
-  let nonce_revelation_threshold = Int32.(div (div blocks_per_cycle 2l) 6l) in
-  (* keeping half of the cycle for VDF result revelation and as margin to finish VDF computation *)
-  (* Then 1/6th to reveal nonces, 5/6th to compute VDF *)
-  let vdf_difficulty =
-    Int64.(
-      mul
-        (mul
-           (mul minimal_block_delay_sec 5L)
-           (of_int32 nonce_revelation_threshold))
-        200_000L)
-  in
-  let preserve_duration cst =
-    if not preserve_duration_in_days then cst
-    else
-      Int64.(
-        to_int32
-        @@ div
-             (mul
-                (mul (of_int32 cst) previous_minimal_block_delay_sec)
-                (of_int32 previous_delays.blocks_per_cycle))
-             (mul minimal_block_delay_sec (of_int32 blocks_per_cycle)))
-  in
-  let delegate_parameters_activation_delay =
-    Int32.to_int
-    @@ preserve_duration
-         (Int32.of_int previous_delays.delegate_parameters_activation_delay)
-  in
-  let cycles_per_voting_period =
-    preserve_duration previous_delays.cycles_per_voting_period
-  in
-  {
     blocks_per_cycle;
-    delegate_parameters_activation_delay;
-    cycles_per_voting_period;
     blocks_per_commitment;
     nonce_revelation_threshold;
-    vdf_difficulty;
+    sc_rollup;
   }
 
 (* End of code to remove at next automatic protocol snapshot *)
@@ -1683,16 +1636,19 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         in
         let is_new_constants =
           (* This check is used to trigger the constant changes at
-             migration on this protocol for mainnet and ghostnet with
-             blocks_per_cycle = 10800l *)
+             migration on this protocol for mainnet *)
           Compare.Int32.(c.blocks_per_cycle = 10800l)
+          && Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 8L)
         in
-        (* Part 1: update constants related to the block time with 6s block time *)
+        (* Update constants related to the block time with 6s block time *)
         let {
           minimal_block_delay;
           max_operations_time_to_live;
           delay_increment_per_round;
           hard_gas_limit_per_block;
+          blocks_per_cycle;
+          blocks_per_commitment;
+          nonce_revelation_threshold;
           sc_rollup;
         } =
           let previous_blocktime_delays =
@@ -1701,53 +1657,15 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               max_operations_time_to_live;
               delay_increment_per_round;
               hard_gas_limit_per_block;
+              blocks_per_cycle;
+              blocks_per_commitment;
+              nonce_revelation_threshold;
               sc_rollup;
             }
           in
-          if
-            is_new_constants
-            && Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 8L)
-          then update_block_time_related_constants ~previous_blocktime_delays
-          else previous_blocktime_delays
-        in
-
-        (* Part 2: update constants related to the cycle duration with 4h cycle *)
-        let {
-          blocks_per_cycle;
-          delegate_parameters_activation_delay;
-          cycles_per_voting_period;
-          blocks_per_commitment;
-          nonce_revelation_threshold;
-          vdf_difficulty;
-        } =
-          let previous_delays =
-            {
-              blocks_per_cycle;
-              blocks_per_commitment;
-              delegate_parameters_activation_delay;
-              cycles_per_voting_period;
-              nonce_revelation_threshold;
-              vdf_difficulty;
-            }
-          in
           if is_new_constants then
-            (* we keep the same duration in days for the
-               [cycles_per_voting_period] and
-               [delegate_parameters_activation_delay] protocol
-               constants on mainnet *)
-            let is_mainnet =
-              Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 8L)
-            in
-            (* [previous_minimal_block_delay] is used to preserve
-               duration for the [cycles_per_voting_period],
-               [delegate_parameters_activation_delay],
-               [tolerated_inactivity_period] protocol constants *)
-            new_constants_four_hours_cycles
-              ~preserve_duration_in_days:is_mainnet
-              ~previous_minimal_block_delay:c.minimal_block_delay
-              ~minimal_block_delay
-              ~previous_delays
-          else previous_delays
+            update_block_time_related_constants ~previous_blocktime_delays
+          else previous_blocktime_delays
         in
         let* ctxt =
           if is_new_constants then

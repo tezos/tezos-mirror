@@ -105,39 +105,8 @@ Errors
 Protocol parameters
 -------------------
 
-- Lowered the number of blocks per cycle (``blocks_per_cycle``) from
-  10800 (~1 day) to 2400 (~4 hours) on mainnet (with 6-second minimal
-  block time). (MRs :gl:`!17583`, :gl:`!19045`)
-
-  - On ghostnet where minimal block time is 4s, lowered
-    ``blocks_per_cycle`` from 10800 (~12 hours) to 3600 (~4
-    hours). (MR :gl:`!17583`)
-
-- In order for the duration of voting periods to stay about the same,
-  updated the number of cycles per voting period
-  (``cycles_per_voting_period``) on mainnet from 14 cycles (that is,
-  ~14 days with old cycle duration) to 84 cycles (~14 days with new
-  cycle duration). (MR :gl:`!17583`)
-
-- In order to keep the same duration in days for the activation of
-  delegate parameters, updated the number of cycles after which
-  submitted delegate parameters take effect
-  (``delegate_parameters_activation_delay``) on mainnet from 5 cycles
-  (that is, ~5 days with old cycle duration) to 30 cycles (~5 days
-  with new cycle duration). (MR :gl:`!17583`)
-
-- Reduced blocks per commitment (``blocks_per_commitment``) to 18 to
-  keep the number of nonces per cycle to 128. (MRs :gl:`!17583`,
-  :gl:`!19045`)
-
-- Reduced the nonce revelation period (``nonce_revelation_threshold``)
-  from 300 blocks to 200 blocks. Reduced accordingly the VDF
-  difficulty (``vdf_difficulty``) as well. (MRs :gl:`!17583`,
-  :gl:`!19045`)
-
-
-6s Block Time (MR :gl:`!19045`)
----------------------------------
+6s Block Time (MRs :gl:`!19045`, :gl:`!19473`)
+----------------------------------------------
 
 Block time have been reduced from 8 seconds to 6 seconds. That is, a
 block can be produced with a delay of 6 seconds with respect to the
@@ -160,13 +129,13 @@ reduced block time.
      - ``3``
    * - ``blocks_per_cycle`` (blocks)
      - ``10800``
-     - ``2400``
+     - ``14400``
    * - ``blocks_per_commitment`` (blocks)
      - ``84``
-     - ``18``
+     - ``112``
    * - ``nonce_revelation_threshold`` (blocks)
      - ``300``
-     - ``200``
+     - ``400``
    * - ``max_operations_time_to_live`` (blocks)
      - ``450``
      - ``600``
