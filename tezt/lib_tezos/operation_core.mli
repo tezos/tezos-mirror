@@ -812,3 +812,14 @@ val outdated_dal_denunciation : rex
 
     Captures [hash]. *)
 val injection_error_unknown_branch : rex
+
+(** Matches the message
+    [DAL shard proof error: Invalid shard (for commitment = %a)]
+    from [src/proto_alpha/lib_protocol/dal_slot_repr.ml]. *)
+val dal_entrapment_wrong_commitment : rex
+
+(** Matches the message
+    [Invalid accusation for delegate %a, level %d, and DAL slot index %d: the DAL slot was not published.]
+    from [src/proto_alpha/lib_protocol/validate_errors.ml]
+*)
+val dal_entrapment_of_not_published_commitment : rex
