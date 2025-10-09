@@ -18,6 +18,8 @@ type with_storage = {kind : t; storage : Script_repr.lazy_expr}
 
 val encoding : t Data_encoding.t
 
+val with_storage_encoding : with_storage Data_encoding.t
+
 val rpc_arg : t RPC_arg.arg
 
 val equal : t -> t -> bool

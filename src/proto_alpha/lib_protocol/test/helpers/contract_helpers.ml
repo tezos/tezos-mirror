@@ -118,7 +118,7 @@ let run_script ctx ?logger ?(step_constants = default_step_constants)
       Readable
       step_constants
       ?logger
-      ~script
+      ~script:(Script.Script script)
       ~cached_script:None
       ~entrypoint
       ~parameter:parameter_expr

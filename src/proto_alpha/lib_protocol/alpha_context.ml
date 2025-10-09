@@ -365,6 +365,39 @@ module Script = struct
   include Michelson_v1_primitives
   include Script_repr
 
+  type michelson_with_storage = t = {code : lazy_expr; storage : lazy_expr}
+
+  type native_kind = Script_native_repr.t = Accumulator
+
+  type native_with_storage = Script_native_repr.with_storage = {
+    kind : native_kind;
+    storage : lazy_expr;
+  }
+
+  type t = Contract_repr.originated_kind =
+    | Script of michelson_with_storage
+    | Native of native_with_storage
+
+  let michelson_with_storage_encoding = Script_repr.encoding
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"michelson"
+          (Tag 0)
+          michelson_with_storage_encoding
+          (function Script m -> Some m | Native _ -> None)
+          (fun m -> Script m);
+        case
+          ~title:"native"
+          (Tag 1)
+          Script_native_repr.with_storage_encoding
+          (function Native n -> Some n | Script _ -> None)
+          (fun n -> Native n);
+      ]
+
   type consume_deserialization_gas = Always | When_needed
 
   let force_decode_in_context ~consume_deserialization_gas ctxt lexpr =

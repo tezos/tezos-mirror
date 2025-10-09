@@ -66,7 +66,8 @@ let ( @! ) f g =
   let* ret = g ctxt in
   return (ret, ctxt)
 
-let equal_scripts (s1 : Script.t) (s2 : Script.t) =
+let equal_scripts_with_code (s1 : Script.michelson_with_storage)
+    (s2 : Script.michelson_with_storage) =
   let open Result_syntax in
   Script_repr.(
     let* code1 = force_bytes s1.code in
@@ -74,6 +75,23 @@ let equal_scripts (s1 : Script.t) (s2 : Script.t) =
     let* storage1 = force_bytes s1.storage in
     let* storage2 = force_bytes s2.storage in
     return (Bytes.equal code1 code2 && Bytes.equal storage1 storage2))
+
+let equal_native_scripts (s1 : Script.native_with_storage)
+    (s2 : Script.native_with_storage) =
+  let open Result_syntax in
+  Script_repr.(
+    let kind1 = s1.kind in
+    let kind2 = s2.kind in
+    let* storage1 = force_bytes s1.storage in
+    let* storage2 = force_bytes s2.storage in
+    return
+      (Script_native_repr.equal kind1 kind2 && Bytes.equal storage1 storage2))
+
+let equal_scripts (s1 : Script.t) (s2 : Script.t) =
+  match (s1, s2) with
+  | Script s1, Script s2 -> equal_scripts_with_code s1 s2
+  | Native s1, Native s2 -> equal_native_scripts s1 s2
+  | _, _ -> Ok false
 
 let find ctxt addr =
   let open Lwt_result_wrap_syntax in

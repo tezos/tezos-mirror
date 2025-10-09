@@ -558,8 +558,16 @@ let get_script c contract_hash =
   let* c, storage = Storage.Contract.Storage.find c contract in
   match (code, storage) with
   | None, None -> return (c, None)
-  | Some code, Some storage -> return (c, Some {Script_repr.code; storage})
-  | None, Some _ | Some _, None -> failwith "get_script"
+  | Some code, Some storage ->
+      return (c, Some (Contract_repr.Script {Script_repr.code; storage}))
+  | None, Some storage -> (
+      let* c, native_kind = Storage.Contract.Native.find c contract in
+      match native_kind with
+      | None -> return (c, None)
+      | Some native_kind ->
+          return (c, Some (Contract_repr.Native {kind = native_kind; storage})))
+  (* A contract without storage is an illformed contract. *)
+  | Some _, None -> failwith "get_script"
 
 let get_storage ctxt contract_hash =
   let open Lwt_result_syntax in

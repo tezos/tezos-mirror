@@ -193,7 +193,7 @@ module S = struct
     RPC_service.get_service
       ~description:"Access the code and data of the contract."
       ~query:RPC_query.empty
-      ~output:Script.encoding
+      ~output:Script.michelson_with_storage_encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "script")
 
   let storage =
@@ -567,8 +567,10 @@ let register () =
           let+ counter = Contract.get_counter ctxt mgr in
           Some counter) ;
   register_originated_opt_field ~chunked:true S.script (fun c v ->
-      let+ _, v = Contract.get_script c v in
-      v) ;
+      let* _, v = Contract.get_script c v in
+      match v with
+      | None | Some (Script.Native _) -> return_none
+      | Some (Script.Script s) -> return_some s) ;
   register_originated_opt_field ~chunked:true S.storage (fun ctxt contract ->
       let* ctxt, script = Contract.get_script ctxt contract in
       match script with
@@ -753,7 +755,7 @@ let register () =
       | Originated contract -> (
           let* ctxt, script = Contract.get_script ctxt contract in
           match script with
-          | None ->
+          | None | Some (Native _) ->
               return
                 {
                   balance;
@@ -762,10 +764,11 @@ let register () =
                   counter = None;
                   revealed = None;
                 }
-          | Some script ->
+          | Some (Script script) ->
               let ctxt = Gas.set_unlimited ctxt in
               let+ script, _ctxt =
-                Script_ir_translator.parse_and_unparse_script_unaccounted
+                Script_ir_translator
+                .parse_and_unparse_michelson_script_unaccounted
                   ctxt
                   ~legacy:true
                   ~allow_forged_tickets_in_storage:true
@@ -777,7 +780,7 @@ let register () =
               {
                 balance;
                 delegate;
-                script = Some script;
+                script = Some (Script script);
                 counter = None;
                 revealed = None;
               })) ;

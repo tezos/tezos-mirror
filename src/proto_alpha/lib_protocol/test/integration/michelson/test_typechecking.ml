@@ -74,7 +74,7 @@ let test_unparse_view () =
   let* v = Incremental.begin_construction b in
   let ctx = Incremental.alpha_ctxt v in
   let*@ unparsed_script, _ctx =
-    Script_ir_translator.parse_and_unparse_script_unaccounted
+    Script_ir_translator.parse_and_unparse_michelson_script_unaccounted
       ctx
       ~legacy:true
       ~allow_forged_tickets_in_storage:false

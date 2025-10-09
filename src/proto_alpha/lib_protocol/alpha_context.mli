@@ -572,7 +572,7 @@ end
 
 module Entrypoint : module type of Entrypoint_repr
 
-(** This module re-exports definitions from {!Script_repr} and
+(** This module re-exports definitions from {!Script_repr}, {!Script_native_repr} and
     {!Michelson_v1_primitives}. *)
 module Script : sig
   type error += Lazy_script_decode
@@ -754,13 +754,21 @@ module Script : sig
 
   type node = location michelson_node
 
-  type t = {code : lazy_expr; storage : lazy_expr}
+  type michelson_with_storage = {code : lazy_expr; storage : lazy_expr}
+
+  type native_kind = Script_native_repr.t = Accumulator
+
+  type native_with_storage = {kind : native_kind; storage : lazy_expr}
+
+  type t = Script of michelson_with_storage | Native of native_with_storage
 
   val location_encoding : location Data_encoding.t
 
   val expr_encoding : expr Data_encoding.t
 
   val prim_encoding : prim Data_encoding.t
+
+  val michelson_with_storage_encoding : michelson_with_storage Data_encoding.t
 
   val encoding : t Data_encoding.t
 
@@ -1858,7 +1866,7 @@ module Contract : sig
     context ->
     prepaid_bootstrap_storage:bool ->
     Contract_hash.t ->
-    script:Script.t * Lazy_storage.diffs option ->
+    script:Script.michelson_with_storage * Lazy_storage.diffs option ->
     context tzresult Lwt.t
 
   (** See {!Contract_delegate_storage.is_delegate}. *)
@@ -4942,7 +4950,7 @@ and _ manager_operation =
       -> Kind.transaction manager_operation
   | Origination : {
       delegate : public_key_hash option;
-      script : Script.t;
+      script : Script.michelson_with_storage;
       credit : Tez.t;
     }
       -> Kind.origination manager_operation
@@ -5400,8 +5408,10 @@ val prepare_first_block :
   Context.t ->
   typecheck_smart_contract:
     (context ->
-    Script.t ->
-    ((Script.t * Lazy_storage.diffs option) * context) tzresult Lwt.t) ->
+    Script.michelson_with_storage ->
+    ((Script.michelson_with_storage * Lazy_storage.diffs option) * context)
+    tzresult
+    Lwt.t) ->
   typecheck_smart_rollup:(context -> Script.expr -> context tzresult) ->
   level:Int32.t ->
   timestamp:Time.t ->
@@ -5461,7 +5471,7 @@ module Parameters : sig
   type bootstrap_contract = {
     delegate : public_key_hash option;
     amount : Tez.t;
-    script : Script.t;
+    script : Script.michelson_with_storage;
     hash : Contract_hash.t option;
   }
 

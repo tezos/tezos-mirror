@@ -123,7 +123,7 @@ val get_script_code :
 val get_script :
   Raw_context.t ->
   Contract_hash.t ->
-  (Raw_context.t * Script_repr.t option) tzresult Lwt.t
+  (Raw_context.t * Contract_repr.originated_kind option) tzresult Lwt.t
 
 val get_storage :
   Raw_context.t ->

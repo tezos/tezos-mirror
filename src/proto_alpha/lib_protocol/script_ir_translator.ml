@@ -5198,6 +5198,8 @@ let parse_storage :
          storage_type
          (root storage))
 
+let parse_native _ctxt ~kind:_ = failwith "Unimplemented"
+
 let parse_script :
     unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
@@ -5212,12 +5214,20 @@ let parse_script :
       ctxt
       ~allow_forged_tickets_in_storage
       ~allow_forged_lazy_storage_id_in_storage
-      {code; storage}
+      script
     ->
-    let* ( Ex_code
-             (Code {code; arg_type; storage_type; views; entrypoints; code_size}),
-           ctxt ) =
-      parse_code ~unparse_code_rec ~elab_conf ctxt ~code
+    let* ( ( Ex_code
+               (Code
+                  {code; arg_type; storage_type; views; entrypoints; code_size}),
+             ctxt ),
+           storage ) =
+      match script with
+      | Script {code; storage} ->
+          let* ex_code = parse_code ~unparse_code_rec ~elab_conf ctxt ~code in
+          return (ex_code, storage)
+      | Native {kind; storage} ->
+          let* ex_code = parse_native ctxt ~kind in
+          return (ex_code, storage)
     in
     let+ storage, ctxt =
       parse_storage
@@ -5386,7 +5396,7 @@ let unparse_code_rec : unparse_code_rec =
     let* code, ctxt = unparse_code ctxt ~stack_depth mode node in
     return (Micheline.root code, ctxt)
 
-let parse_and_unparse_script_unaccounted ctxt ~legacy
+let parse_and_unparse_michelson_script_unaccounted ctxt ~legacy
     ~allow_forged_tickets_in_storage ~allow_forged_lazy_storage_id_in_storage
     mode ~normalize_types {code; storage} =
   let open Lwt_result_syntax in

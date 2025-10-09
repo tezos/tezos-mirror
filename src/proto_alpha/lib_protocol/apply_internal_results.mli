@@ -45,7 +45,7 @@ type 'kind internal_operation_contents =
       -> Kind.transaction internal_operation_contents
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
-      script : Script.t;
+      script : Script.michelson_with_storage;
       credit : Tez.t;
     }
       -> Kind.origination internal_operation_contents

@@ -282,7 +282,7 @@ let origination_operation block ~sender ~baker ~script ~storage ~forges_tickets
       ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
       ~allow_forged_tickets_in_storage:true
       ~allow_forged_lazy_storage_id_in_storage:true
-      script
+      (Script script)
   in
   let operation =
     Script_typed_ir.Internal_operation

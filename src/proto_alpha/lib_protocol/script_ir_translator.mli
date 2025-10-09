@@ -337,15 +337,15 @@ val parse_script :
   (ex_script * context) tzresult Lwt.t
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
-val parse_and_unparse_script_unaccounted :
+val parse_and_unparse_michelson_script_unaccounted :
   context ->
   legacy:bool ->
   allow_forged_tickets_in_storage:bool ->
   allow_forged_lazy_storage_id_in_storage:bool ->
   Script_ir_unparser.unparsing_mode ->
   normalize_types:bool ->
-  Script.t ->
-  (Script.t * context) tzresult Lwt.t
+  Script.michelson_with_storage ->
+  (Script.michelson_with_storage * context) tzresult Lwt.t
 
 val parse_contract_data :
   context ->

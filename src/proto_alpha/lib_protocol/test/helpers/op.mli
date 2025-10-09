@@ -426,7 +426,7 @@ val contract_origination :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
   ?delegate:public_key_hash ->
-  script:Script.t ->
+  script:Script.michelson_with_storage ->
   ?public_key:public_key ->
   ?credit:Tez.t ->
   ?fee:Tez.t ->
@@ -440,7 +440,7 @@ val contract_origination_hash :
   ?force_reveal:bool ->
   ?counter:Manager_counter.t ->
   ?delegate:public_key_hash ->
-  script:Script.t ->
+  script:Script.michelson_with_storage ->
   ?public_key:public_key ->
   ?credit:Tez.t ->
   ?fee:Tez.t ->
@@ -578,7 +578,7 @@ val ballot :
   Vote.ballot ->
   Operation.packed tzresult Lwt.t
 
-val dummy_script : Script.t
+val dummy_script : Script.michelson_with_storage
 
 val dummy_script_cost : Tez.t
 

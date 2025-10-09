@@ -161,7 +161,7 @@ let () =
 (* This script is actually never run, its usage is to ensure a
    contract that has the type `contract <ty>` is originated, which
    will be required as callback of the view. *)
-let make_tzip4_viewer_script ty : Script.t =
+let make_tzip4_viewer_script ty : Script.michelson_with_storage =
   let loc = 0 in
   let ty = Micheline.root ty in
   let code =
@@ -244,7 +244,7 @@ let extract_parameter_from_operations entrypoint operations callback =
    generates a script that calls a view from a given contract, and stores the
    result in its storage. *)
 let make_michelson_viewer_script address view input input_ty output_ty :
-    Script.t =
+    Script.michelson_with_storage =
   let loc = 0 in
   let address = Micheline.String (loc, Contract.to_b58check address) in
   let push ty value = Micheline.Prim (loc, Script.I_PUSH, [ty; value], []) in

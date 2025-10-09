@@ -21,6 +21,15 @@ let encoding : t Data_encoding.t =
         (fun () -> Accumulator);
     ]
 
+let with_storage_encoding =
+  Data_encoding.(
+    conv
+      (fun {kind; storage} -> (kind, storage))
+      (fun (kind, storage) -> {kind; storage})
+      (obj2
+         (req "kind" encoding)
+         (req "storage" Script_repr.lazy_expr_encoding)))
+
 let rpc_arg =
   RPC_arg.make
     ~descr:"A native contract kind"

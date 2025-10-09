@@ -356,7 +356,7 @@ let origination_operation ctxt ~sender ~script:(code, storage) ~orig_contract =
       ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
       ~allow_forged_tickets_in_storage:true
       ~allow_forged_lazy_storage_id_in_storage:true
-      script
+      (Script script)
   in
   let operation =
     Internal_operation

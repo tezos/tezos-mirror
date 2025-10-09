@@ -189,7 +189,7 @@ module Bootstrap_contract = struct
       (obj4
          (opt "delegate" Signature.Public_key_hash.encoding)
          (req "amount" Tez.encoding)
-         (req "script" Script.encoding)
+         (req "script" Script.michelson_with_storage_encoding)
          (opt "hash" Contract_hash.encoding))
 end
 
