@@ -136,7 +136,6 @@ module Make_daemon (Agent : AGENT) :
             ~max_delay:10.
             ~delay:1.
             ~factor:1.5
-            ~tries:max_int
             ~is_error:(function Cannot_connect_to_node _ -> true | _ -> false)
             (fun node_addr -> Rpc_services.get_level ~node_addr)
             node_addr

@@ -881,13 +881,13 @@ let perform_sanity_check cctxt ~chain_id =
   return_unit
 
 let retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
-    ~tries ?(msg = fun _errs -> "Connection failed. ") f x =
+    ?tries ?(msg = fun _errs -> "Connection failed. ") f x =
   Utils.retry
     ~emit:(cctxt#message "%s")
     ?max_delay
     ~delay
     ~factor
-    ~tries
+    ?tries
     ~msg
     ~is_error:(function
       | RPC_client_errors.Request_failed {error = Connection_failed _; _} ->
@@ -986,7 +986,6 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
         ~max_delay:2.
         ~delay:1.
         ~factor:2.
-        ~tries:max_int
         ~msg:(fun _errs ->
           "Failed to register profiles, DAL node is not reachable. ")
         (fun () -> register dal_ctxt)

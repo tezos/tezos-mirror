@@ -70,7 +70,7 @@ val retry :
   ?max_delay:float ->
   delay:float ->
   factor:float ->
-  tries:int ->
+  ?tries:int ->
   is_error:('err -> bool) ->
   emit:(string -> unit Lwt.t) ->
   ?msg:('err list -> string) ->
