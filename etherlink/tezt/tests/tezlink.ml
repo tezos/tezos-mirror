@@ -1703,7 +1703,7 @@ let test_tezlink_prevalidation =
   register_tezlink_test
     ~title:"Test Tezlink prevalidation"
     ~tags:["kernel"; "prevalidation"]
-    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; client; _} _protocol ->
   let endpoint =
     Client.(
@@ -1854,6 +1854,34 @@ let test_tezlink_prevalidation =
       ~error:unsupported_rex
       ~dont_wait:true
       op_not_supported
+      client_tezlink
+  in
+
+  (* case batch with two sources *)
+  let counter = 2 in
+  let* op_two_sources =
+    Operation.Manager.(
+      operation
+        [
+          make ~fee:1000 ~counter ~source:Constant.bootstrap1 (transfer ());
+          make
+            ~fee:1000
+            ~counter:(counter + 1)
+            ~source:Constant.bootstrap2
+            (transfer ());
+        ]
+        client)
+  in
+  let two_sources_rex =
+    rex
+      "Inconsistent sources in operation batch. All operations in a batch must \
+       have the same source."
+  in
+  let* _ =
+    Operation.inject
+      ~error:two_sources_rex
+      ~dont_wait:true
+      op_two_sources
       client_tezlink
   in
 

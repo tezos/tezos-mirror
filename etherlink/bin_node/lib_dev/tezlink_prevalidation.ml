@@ -147,6 +147,16 @@ let validate_supported_operation (type kind) ~ctxt
   | Reveal _ | Transaction _ | Origination _ -> return (Ok ())
   | _ -> tzfail @@ Unsupported_manager_operation ctxt.error_clue
 
+let validate_source ~ctxt second_source =
+  let open Lwt_result_syntax in
+  if Signature.Public_key_hash.equal ctxt.source second_source then
+    return (Ok ())
+  else
+    tzfail_p
+    @@ Imported_protocol.Validate_errors.Manager.(
+         Inconsistent_sources
+           {expected_source = ctxt.source; source = second_source})
+
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
   let open Lwt_result_syntax in
@@ -156,7 +166,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       @@ Imported_protocol.Validate_errors.Manager.Incorrect_reveal_position
   | Manager_operation
       {
-        source = _;
+        source;
         fee = _;
         counter = _;
         operation;
@@ -164,7 +174,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
         storage_limit = _;
       } ->
       let** () = validate_supported_operation ~ctxt operation in
-      (* TODO check source *)
+      let** () = validate_source ~ctxt source in
       (* TODO check counter is ok *)
       (* TODO check gas limit high enough *)
       (* TODO check manager solvent for fees *)
