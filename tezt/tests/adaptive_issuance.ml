@@ -238,8 +238,8 @@ let check_with_roundings ?(margin = 1) got expected =
 let assert_with_roundings ~__LOC__ ?margin got expected =
   if not (check_with_roundings ?margin got expected) then
     Test.fail
-      "@[<v 2>%s: Asserted equality (up to rounding) failed. got %d, expected \
-       %d.@]@."
+      "@[<v 2>%s: Asserted equality (up to rounding) failed. got %#d, expected \
+       %#d.@]@."
       __LOC__
       got
       expected
@@ -260,7 +260,7 @@ let check_balance_updates balance_updates (predicates : bu_check list) =
       then
         Test.fail
           "@[<v 2>Inconsistent balance update, could it be a regression.@. \
-           Expected:@ @[%s, change amount: %d@]@.Got:@ @[%s@]@]"
+           Expected:@ @[%s, change amount: %#d@]@.Got:@ @[%s@]@]"
           msg
           change
           (List.fold_left
@@ -586,7 +586,7 @@ let test_staking =
     @@ RPC.get_chain_block_context_contract_staking_numerator
          Constant.bootstrap2.public_key_hash
   in
-  Log.info "Numerator/denominator before: %d/%d " numerator denominator ;
+  Log.info "Numerator/denominator before: %#d/%#d " numerator denominator ;
   let bake = Helpers.bake ~ai_vote:Pass ~endpoint ~protocol in
   let* () = Helpers.bake_n_cycles bake 1 client_1 in
 
@@ -614,7 +614,7 @@ let test_staking =
          staker0.public_key_hash
   in
   Log.info
-    "Numerator/denominator after for %s: %d/%d "
+    "Numerator/denominator after for %s: %#d/%#d "
     staker0.alias
     numerator0
     (JSON.as_int denominator) ;
@@ -628,7 +628,7 @@ let test_staking =
   assert (numerator0 + numerator1 = JSON.as_int denominator) ;
 
   Log.info
-    "Numerator/denominator after for %s: %d/%d "
+    "Numerator/denominator after for %s: %#d/%#d "
     staker1.alias
     numerator1
     (JSON.as_int denominator) ;
@@ -658,7 +658,7 @@ let test_staking =
            contract.public_key_hash
     in
     Log.info
-      "Balance of %s: spendable : %s, staked_balance : %d"
+      "Balance of %s: spendable : %s, staked_balance : %#d"
       contract.alias
       (Tez.to_string balance)
       staked_balance ;
@@ -1132,14 +1132,14 @@ let test_staking =
   assert (List.length finalizable == 1) ;
   assert (List.length unfinalizable == 1) ;
 
-  Log.info "Unstaked frozen balance: %d" unstaked_frozen_balance ;
+  Log.info "Unstaked frozen balance: %#d" unstaked_frozen_balance ;
   let* unstaked_finalizable_balance =
     Client.RPC.call client_1
     @@ RPC.get_chain_block_context_contract_unstaked_finalizable_balance
          staker0.public_key_hash
   in
-  Log.info "Unstaked finalizable balance: %d" unstaked_finalizable_balance ;
-  assert (check_with_roundings unstaked_finalizable_balance 1000000000) ;
+  Log.info "Unstaked finalizable balance: %#d" unstaked_finalizable_balance ;
+  assert (check_with_roundings unstaked_finalizable_balance 1_000_000_000) ;
 
   let finalize_unstake =
     Client.spawn_finalize_unstake ~staker:staker0.public_key_hash client_1
@@ -1220,7 +1220,7 @@ let test_staking =
     @@ RPC.get_chain_block_context_contract_unstaked_finalizable_balance
          staker0.public_key_hash
   in
-  Log.info "Unstaked finalizable balance: %d" unstaked_finalizable_balance ;
+  Log.info "Unstaked finalizable balance: %#d" unstaked_finalizable_balance ;
   assert (unstaked_finalizable_balance = 0) ;
   let* () =
     repeat 2 (fun () ->
