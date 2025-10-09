@@ -23,6 +23,8 @@ val run :
   unit tzresult Lwt.t
 
 val deploy :
+  ?nonce:Z.t ->
+  ?gas_limit:Z.t ->
   rpc_endpoint:Uri.t ->
   scenario:[< `Custom of string | `ERC20] ->
   Network_info.t ->
@@ -33,3 +35,6 @@ val start_new_head_monitor : ws_uri:Uri.t -> unit tzresult Lwt.t
 
 val start_blueprint_follower :
   relay_endpoint:Uri.t -> rpc_endpoint:Uri.t -> 'a tzresult Lwt.t
+
+val get_transaction_receipt :
+  Uri.t -> Ethereum_types.hash -> Transaction_receipt.t tzresult Lwt.t

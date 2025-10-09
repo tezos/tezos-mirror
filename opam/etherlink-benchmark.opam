@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "octez-evm-node-libs" { = version }
   "bls12-381"
+  "crunch" { >= "3.3.0" }
   "octez-libs"
   "tezt-tezos"
   "tezt-etherlink" { = version }

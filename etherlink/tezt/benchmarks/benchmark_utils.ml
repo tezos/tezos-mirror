@@ -19,6 +19,7 @@ type parameters = {
   spp : int;
   width : int;
   height : int;
+  swap_hops : int;
 }
 
 let parameters =
@@ -110,6 +111,14 @@ let parameters =
         "Height of image for SnailTracer. Higher values will use more gas."
       48
   in
+  let swap_hops =
+    Clap.default_int
+      ~section
+      ~long:"swap-hops"
+      ~placeholder:"nb"
+      ~description:"Number of hops to do in swap path."
+      1
+  in
   {
     profiling;
     time_between_blocks;
@@ -120,6 +129,7 @@ let parameters =
     spp;
     width;
     height;
+    swap_hops;
   }
 
 let ( let+? ) x f =
@@ -186,14 +196,16 @@ let floodgate_accounts evm_node accounts =
   in
   return (Array.of_list accounts)
 
-let send_deploy ~sender (scenario : [< `ERC20 | `Custom of string]) infos
-    evm_node =
+let send_deploy ?nonce ?gas_limit ~sender
+    (scenario : [< `ERC20 | `Custom of string]) infos evm_node =
   let rpc_endpoint = Evm_node.endpoint evm_node |> Uri.of_string in
-  let*? addr = Floodgate.deploy ~rpc_endpoint ~scenario infos sender in
+  let*? addr =
+    Floodgate.deploy ?nonce ?gas_limit ~rpc_endpoint ~scenario infos sender
+  in
   return addr
 
-let deploy_contract ~rpc_node infos ~sequencer sender contract =
-  let deploy () = send_deploy ~sender contract infos rpc_node in
+let deploy_contract ?gas_limit ~rpc_node infos ~sequencer sender contract =
+  let deploy () = send_deploy ?gas_limit ~sender contract infos rpc_node in
   wait_for_application sequencer deploy
 
 let deploy_contracts ~rpc_node infos ~sequencer accounts contract nb =
@@ -205,25 +217,95 @@ let deploy_contracts ~rpc_node infos ~sequencer accounts contract nb =
   in
   wait_for_application sequencer deploys
 
-let call infos contract gas_limit sender ?nonce ?value ?name abi params =
+let estimate_gas infos node sender ~value ~to_ data =
+  let open Evm_node_lib_dev_encoding.Ethereum_types in
+  let data =
+    Option.map (fun b -> Hash (Hex ((b : Efunc_core.Private.b) :> string))) data
+  in
+  let from = Account.address_et sender in
+  Network_info.get_gas_limit
+    ~rpc_endpoint:(Uri.of_string (Evm_node.endpoint node))
+    ~base_fee_per_gas:infos.Network_info.base_fee_per_gas
+    ~from
+    ?data
+    ~value
+    ~to_
+    ()
+
+type gas_limit = Gas_limit of Z.t | Estimate of Evm_node.t
+
+let rec pp_evm_value fmt (v : Efunc_core.Types.evm_value) =
+  match v with
+  | `string s -> Format.fprintf fmt "%S" s
+  | `bool b -> Format.pp_print_bool fmt b
+  | `int z -> Z.pp_print fmt z
+  | `bytes b -> Format.pp_print_string fmt (b :> string)
+  | `address a -> Format.fprintf fmt "0x%s" (a :> string)
+  | `array l ->
+      Format.fprintf
+        fmt
+        "@[<hov 1>[%a]@]"
+        (Format.pp_print_list
+           ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+           pp_evm_value)
+        l
+
+let call infos rpc_node contract sender ?gas_limit ?nonce ?(value = Z.zero)
+    ?name ?(check_success = false) abi params =
+  let open Evm_node_lib_dev_encoding.Ethereum_types in
+  let pp_tx fmt () =
+    Format.fprintf
+      fmt
+      "@[<hov 2>%s@[<hov 1>(%a)@]@ %sto@ %s@ from@ %s@]"
+      (match name with None -> "Transfer" | Some n -> "Call " ^ n)
+      (Format.pp_print_list
+         ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+         pp_evm_value)
+      params
+      (if Z.(equal value zero) then ""
+       else sf "with %f XTZ " (Z.to_float value /. (10. ** 18.)))
+      contract
+      (Address.to_string (Account.address_et sender))
+  in
+  Log.debug "%a" pp_tx () ;
   let confirmed, waker = Lwt.task () in
   let data =
     match name with
     | None -> None
     | Some name -> Some (Efunc_core.Evm.encode ~name abi params)
   in
+  let* gas_limit =
+    match gas_limit with
+    | Some g -> return g
+    | None ->
+        Log.debug " - Estimate gas limit" ;
+        let*? g =
+          estimate_gas
+            infos
+            rpc_node
+            sender
+            ~value
+            ~to_:(Address.of_string contract)
+            data
+        in
+        Log.debug " - Gas limit: %a" Z.pp_print g ;
+        return g
+  in
+  let tx_hash = ref (Hash (Hex "")) in
   let* () =
     Tx_queue.transfer
       ~gas_limit
       ~infos
       ~to_:(Efunc_core.Private.a contract)
       ?data
-      ?value
+      ~value
       ~from:sender
       ?nonce
       ()
       ~callback:(function
-      | `Accepted _ -> unit
+      | `Accepted h ->
+          tx_hash := h ;
+          unit
       | (`Refused | `Dropped | `Confirmed) as status ->
           let c =
             match status with
@@ -233,6 +315,22 @@ let call infos contract gas_limit sender ?nonce ?value ?name abi params =
           in
           incr c ;
           Lwt.wakeup waker status ;
+          if check_success then
+            Lwt.async (fun () ->
+                let*? receipt =
+                  Floodgate.get_transaction_receipt
+                    (Evm_node.endpoint rpc_node |> Uri.of_string)
+                    !tx_hash
+                in
+                let tx_status = Qty.to_z receipt.status in
+                if Z.(equal tx_status one) then unit
+                else
+                  let (Hash (Hex h)) = !tx_hash in
+                  Test.fail
+                    "Transaction %s was included as failed:\n%a"
+                    h
+                    pp_tx
+                    ()) ;
           unit)
   in
   confirmed
