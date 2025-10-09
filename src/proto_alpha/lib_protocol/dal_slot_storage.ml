@@ -111,36 +111,53 @@ let remove_old_headers ctxt ~published_level =
   | None -> return ctxt
   | Some level -> Storage.Dal.Slot.Headers.remove ctxt level
 
+(* Finalize DAL slot headers for a given (single) published level:
+   - Fetch headers published at [published_level].
+   - Compute their attestation status via [is_slot_attested].
+   - Update the DAL skip-list and storage, mutating [ctxt]:
+      + Prune old headers in Storage.Dal.Slot.Headers per denunciation window,
+      + Write the new skip-list head to Storage.Dal.Slot.History,
+      + Append per-level cells to Storage.Dal.Slot.LevelHistories.
+   - Return the updated [ctxt] and the attestation bitset. *)
+let finalize_slot_headers_for_published_level ctxt ~number_of_slots
+    ~attestation_lag published_level =
+  let open Lwt_result_syntax in
+  let* published_slots = find_slot_headers ctxt published_level in
+  let*! ctxt = remove_old_headers ctxt ~published_level in
+  let* ctxt, attestation, slot_headers_statuses =
+    match published_slots with
+    | None -> return (ctxt, Dal_attestation_repr.empty, [])
+    | Some published_slots ->
+        let slot_headers_statuses, attestation =
+          let is_slot_attested slot =
+            Raw_context.Dal.is_slot_index_attested
+              ctxt
+              slot.Dal_slot_repr.Header.id.index
+          in
+          compute_slot_headers_statuses ~is_slot_attested published_slots
+        in
+        return (ctxt, attestation, slot_headers_statuses)
+  in
+  let* ctxt =
+    update_skip_list
+      ctxt
+      ~slot_headers_statuses
+      ~published_level
+      ~number_of_slots
+      ~attestation_lag
+  in
+  return (ctxt, attestation)
+
 let finalize_pending_slot_headers ctxt ~number_of_slots =
   let open Lwt_result_syntax in
   let {Level_repr.level = raw_level; _} = Raw_context.current_level ctxt in
   let Constants_parametric_repr.{dal; _} = Raw_context.constants ctxt in
-  let attestation_lag = dal.attestation_lag in
-  match Raw_level_repr.(sub raw_level attestation_lag) with
+  let curr_attestation_lag = dal.attestation_lag in
+  match Raw_level_repr.(sub raw_level curr_attestation_lag) with
   | None -> return (ctxt, Dal_attestation_repr.empty)
   | Some published_level ->
-      let* published_slots = find_slot_headers ctxt published_level in
-      let*! ctxt = remove_old_headers ctxt ~published_level in
-      let* ctxt, attestation, slot_headers_statuses =
-        match published_slots with
-        | None -> return (ctxt, Dal_attestation_repr.empty, [])
-        | Some published_slots ->
-            let slot_headers_statuses, attestation =
-              let is_slot_attested slot =
-                Raw_context.Dal.is_slot_index_attested
-                  ctxt
-                  slot.Dal_slot_repr.Header.id.index
-              in
-              compute_slot_headers_statuses ~is_slot_attested published_slots
-            in
-            return (ctxt, attestation, slot_headers_statuses)
-      in
-      let* ctxt =
-        update_skip_list
-          ctxt
-          ~slot_headers_statuses
-          ~published_level
-          ~number_of_slots
-          ~attestation_lag
-      in
-      return (ctxt, attestation)
+      finalize_slot_headers_for_published_level
+        ctxt
+        published_level
+        ~number_of_slots
+        ~attestation_lag:curr_attestation_lag
