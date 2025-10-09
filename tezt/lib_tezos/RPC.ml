@@ -1912,6 +1912,21 @@ let get_chain_block_context_dal_commitments_history ?(chain = "main")
     ["chains"; chain; "blocks"; block; "context"; "dal"; "commitments_history"]
     Fun.id
 
+let get_chain_block_context_dal_cells_of_level ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "dal";
+      "skip_list_cells_of_level";
+    ]
+    Fun.id
+
 let get_chain_block_context_raw_json ?(chain = "main") ?(block = "head")
     ?(path = []) () =
   make
