@@ -10,6 +10,5 @@ mod constants;
 mod host;
 mod reveal;
 mod runtime;
-mod telemetry;
 mod types;
 mod write_debug;
