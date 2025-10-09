@@ -1219,6 +1219,13 @@ let simple_slot_producer ~slot_index ~slot_size ~from ~into dal_node l1_node
       let* _op_hash =
         publish_commitment
           ~force:true
+            (* This value is quite high (way higher than required). But the
+             default value of 1200µtez was not sufficient for a publication to
+             be validated by the mempool in the test
+             [test_migration_accuser_issue]. I do not understand why, since
+             publication fees on real networks are less than 1000µtez.
+          *)
+          ~fee:5000
           ~source
           ~index:slot_index
           ~commitment
