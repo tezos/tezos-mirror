@@ -58,13 +58,17 @@ module Dal_RPC = struct
   include Dal.RPC.Local
 end
 
-let init_logger () =
+type logger = {log_step : 'a. ('a, Format.formatter, unit, unit) format4 -> 'a}
+
+let init_logger () : logger =
   let counter = ref 1 in
-  fun fmt ->
+  let log_step fmt =
     let color = Log.Color.(bold ++ FG.blue) in
     let prefix = "step-" ^ string_of_int !counter in
     incr counter ;
     Log.info ~color ~prefix fmt
+  in
+  {log_step}
 
 let read_dir dir =
   let* dir = Lwt_unix.opendir dir in
@@ -9580,7 +9584,7 @@ let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
 let test_producer_attester (protocol : Protocol.t)
     (dal_params : Dal_common.Parameters.t) (_cryptobox : Cryptobox.t)
     (node : Node.t) (client : Client.t) (_dal_node : Dal_node.t) : unit Lwt.t =
-  let log_step = init_logger () in
+  let {log_step} = init_logger () in
   let index = 3 in
   let slot_size = dal_params.cryptobox.slot_size in
   log_step "Declaration of a producer" ;
@@ -9663,7 +9667,7 @@ let test_producer_attester (protocol : Protocol.t)
 let test_attester_did_not_attest (protocol : Protocol.t)
     (dal_params : Dal_common.Parameters.t) (_cryptobox : Cryptobox.t)
     (node : Node.t) (client : Client.t) (_dal_node : Dal_node.t) : unit Lwt.t =
-  let log_step = init_logger () in
+  let {log_step} = init_logger () in
   let index = 3 in
   let slot_size = dal_params.cryptobox.slot_size in
   log_step "Declaration of a producer" ;
