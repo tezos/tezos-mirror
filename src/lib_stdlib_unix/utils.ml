@@ -115,14 +115,20 @@ let copy_dir ?(perm = 0o755) ?progress src dst =
 
 let copy_file = copy_file ~count_progress:(fun _ -> ())
 
-let rec retry ?max_delay ~delay ~factor ~tries ~is_error ~emit ?(msg = "") f x =
+let rec retry ?max_delay ~delay ~factor ~tries ~is_error ~emit
+    ?(msg = fun _ -> "") f x =
   let open Lwt.Syntax in
   let* result = f x in
   match result with
   | Ok _ as r -> Lwt.return r
-  | Error (err :: _) as errs when tries > 0 && is_error err -> (
+  | Error (err :: _ as errs) when tries > 0 && is_error err -> (
       let* () =
-        emit (Format.sprintf "%sRetrying in %.2f seconds..." msg delay)
+        emit
+          (Format.sprintf
+             "%sRetrying in %.2f seconds, %d attempts left..."
+             (msg errs)
+             delay
+             tries)
       in
       let* result =
         Lwt.pick
@@ -134,7 +140,7 @@ let rec retry ?max_delay ~delay ~factor ~tries ~is_error ~emit ?(msg = "") f x =
           ]
       in
       match result with
-      | `Killed -> Lwt.return errs
+      | `Killed -> Lwt.return_error errs
       | `Continue ->
           let next_delay = delay *. factor in
           let delay =
@@ -153,4 +159,6 @@ let rec retry ?max_delay ~delay ~factor ~tries ~is_error ~emit ?(msg = "") f x =
             ~emit
             f
             x)
-  | Error _ as err -> Lwt.return err
+  | Error errs as err ->
+      let* () = emit (Format.sprintf "%sNo attempts left." (msg errs)) in
+      Lwt.return err
