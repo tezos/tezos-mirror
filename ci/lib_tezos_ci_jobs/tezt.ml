@@ -5,175 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Gitlab_ci.Util
-open Tezos_ci
+(* Global, non-component-specific, Tezt jobs.
+   They all run tests from [tezt/tests/main.exe].
+   Eventually most tests should be moved to component-specific Tezt jobs instead. *)
 
-(** Create a tezt job.
-
-      To enable tezt selection via manifest, pass a job as constructed
-      by {!job_select_tezts} as [~job_select_tezts]. Then the
-      constructed tezt job will only run the tezts selected by the
-      selection job. *)
-let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~variant
-    ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
-    ?(tezt_parallel = 1)
-    ?(before_script =
-      Common.before_script ~source_version:true ~eval_opam:false []) ?timeout
-    ?(disable_test_timeout = false) ?job_select_tezts ~dependencies
-    ?allow_failure ?(keep_going = false) () : tezos_job =
-  let variables =
-    [
-      ("JUNIT", "tezt-junit.xml");
-      ("TEZT_VARIANT", if variant = "" then "" else "-" ^ variant);
-      ("TESTS", Tezt_core.TSL.show tezt_tests);
-      ("TEZT_RETRY", string_of_int tezt_retry);
-      ("TEZT_PARALLEL", string_of_int tezt_parallel);
-      ("TEZT_NO_NPX", "true");
-    ]
-  in
-  let artifacts =
-    artifacts
-      ~reports:(reports ~junit:"$JUNIT" ())
-      [
-        "selected_tezts.tsv";
-        "tezt.log";
-        "tezt-*.log";
-        "tezt-results.json";
-        "$JUNIT";
-      ]
-      (* The record artifacts [tezt-results.json]
-         should be stored for as long as a given commit on master is
-         expected to be HEAD in order to support auto-balancing. At
-         the time of writing, we have approximately 6 merges per day,
-         so 1 day should more than enough. However, we set it to 3
-         days to keep records over the weekend. The tezt artifacts
-         (including records and coverage) take up roughly 2MB /
-         job. Total artifact storage becomes [N*P*T*W] where [N] is
-         the days of retention (7 atm), [P] the number of pipelines
-         per day (~200 atm), [T] the number of Tezt jobs per pipeline
-         (100) and [W] the artifact size per tezt job (2MB). This
-         makes 280GB which is ~4% of our
-         {{:https://gitlab.com/tezos/tezos/-/artifacts}total artifact
-         usage}. *)
-      ~expire_in:(Duration (Days 7))
-      ~when_:Always
-  in
-  let print_variables =
-    [
-      "TESTS";
-      "JUNIT";
-      "CI_NODE_INDEX";
-      "CI_NODE_TOTAL";
-      "TEZT_PARALLEL";
-      "TEZT_VARIANT";
-    ]
-  in
-  let with_or_without_select_tezts, dependencies =
-    match job_select_tezts with
-    | Some job_select_tezts ->
-        let dependencies =
-          Tezos_ci.dependencies_add_artifact_dependency
-            dependencies
-            job_select_tezts
-        in
-        ("--with-select-tezts", dependencies)
-    | None -> ("--without-select-tezts", dependencies)
-  in
-  let retry =
-    if retry = 0 then None else Some {Gitlab_ci.Types.max = retry; when_ = []}
-  in
-  let junit_tags =
-    (* List of tags to include in JUnit reports that we send to DataDog. *)
-    [
-      (* Tags that change the job that runs the test.
-           Useful to be able to filter on only a specific job type in DataDog. *)
-      "flaky";
-      "time_sensitive";
-      "slow";
-      "extra";
-      (* Tags that denote the owner of tests.
-           Useful in case we want to send alerts to specific teams. *)
-      "infrastructure";
-      "layer1";
-      "tezos2";
-      "etherlink";
-      (* Tags that change alert thresholds. *)
-      "memory_hungry";
-    ]
-  in
-  let junit_tags =
-    junit_tags
-    |> List.map (fun tag ->
-           Printf.sprintf " --junit-tag 'dd_tags[tezt-tag.%s]=%s'" tag tag)
-    |> String.concat ""
-  in
-  let keep_going_opt = if keep_going then " --keep-going" else "" in
-  job
-    ?timeout
-    ~__POS__
-    ~image:Images.CI.e2etest
-    ~name:(if variant = "" then "tezt" else "tezt-" ^ variant)
-    ?parallel
-    ~tag
-    ~stage:Stages.test
-    ?rules
-    ~artifacts
-    ~variables
-    ~dependencies
-    ?retry
-    ~before_script
-    ?allow_failure
-    [
-      (* Print [print_variables] in a shell-friendly manner for easier debugging *)
-      "echo \""
-      ^ String.concat
-          " "
-          (List.map (fun var -> sf {|%s=\"${%s}\"|} var var) print_variables)
-      ^ "\"";
-      (* Store the list of tests that have been scheduled for execution for later debugging.
-           It is imperative this this first call to tezt receives any flags passed to the
-           second call that affect test selection.Note that TESTS must be quoted (here and below)
-           since it will contain e.g. '&&' which we want to interpreted as TSL and not shell
-           syntax. *)
-      "./scripts/ci/tezt.sh " ^ with_or_without_select_tezts
-      ^ " -- \"${TESTS}\" --from-record tezt/records"
-      ^ (if variant = "" then "" else "/" ^ variant)
-      ^ " --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > \
-         selected_tezts.tsv";
-      (* For Tezt tests, there are multiple timeouts:
-           - --global-timeout is the internal timeout of Tezt, which only works if tests
-             are cooperative;
-           - the "timeout" command, which we set to send SIGTERM to Tezt 60s after --global-timeout
-             in case tests are not cooperative;
-           - the "timeout" command also sends SIGKILL 60s after having sent SIGTERM in case
-             Tezt is still stuck;
-           - the CI timeout.
-           The use of the "timeout" command is to make sure that Tezt eventually exits,
-           because if the CI timeout is reached, there are no artefacts,
-           and thus no logs to investigate.
-           See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818 *)
-      (* To observe memory usage of tests, we use the following options:
-           - --record-mem-peak causes Tezt to measure memory usage
-             (it is implied by --mem-warn so we could omit it);
-           - --junit-mem-peak tells Tezt to store peak memory usage
-             in a <property> named dd_tags[memory.peak] in JUnit reports,
-             which makes DataDog aware of it
-             (see https://docs.datadoghq.com/tests/setup/junit_xml/?tab=linux#providing-metadata-through-property-elements);
-           - --mem-warn causes Tezt to warn if a test uses more than the specified
-             amount of memory (in bytes). We set the threshold to 5 GB. *)
-      "./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh \
-       --send-junit ${JUNIT} " ^ with_or_without_select_tezts
-      ^ " -- \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
-         --global-timeout 1800"
-      ^ (if disable_test_timeout then "" else " --test-timeout 540")
-      ^ " --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak \
-         'dd_tags[memory.peak]' --from-record tezt/records"
-      ^ (if variant = "" then "" else "/" ^ variant)
-      ^ " --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
-         tezt-results.json --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} \
-         --record-mem-peak --mem-warn 5_000_000_000" ^ keep_going_opt
-      ^ junit_tags;
-    ]
+(* We will define Tezt jobs for tests that have not been split into components.
+   As such, those jobs are shared between multiple components.
+   So we define them in the [Shared] component. *)
+module CI = Cacio.Shared
 
 (** Tezt tag selector string.
 
@@ -209,63 +48,186 @@ let tests_tag_selector ?(time_sensitive = false) ?(slow = false)
     @ List.map (fun tag -> TSL_AST.Not (Has_tag tag)) negative
     @ and_)
 
-(** Selects tezt tests based on merge request diff.
+let common_needs =
+  [
+    (Cacio.Artifacts, Code_verification.job_build_x86_64_release Before_merging);
+    (Artifacts, Code_verification.job_build_x86_64_extra_exp Before_merging);
+    (Artifacts, Code_verification.job_build_x86_64_extra_dev Before_merging);
+    (Artifacts, Code_verification.job_build_kernels Before_merging);
+  ]
 
-      This job only makes sense in merge request pipelines. To enable
-      tezt selection, it should be passed to the [~job_select_tezts]
-      argument to {!Tezt.job}. *)
-let job_select_tezts ?rules () : tezos_job =
-  Tezos_ci.job
-    ~__POS__
-    ~name:"select_tezts"
-      (* We need:
-           - Git (to run git diff)
-           - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest) *)
-    ?rules
-    ~image:Images.CI.prebuild
-    ~stage:Stages.build
-    ~before_script:
-      (Common.before_script ~take_ownership:true ~eval_opam:true [])
-    (script_propagate_exit_code "scripts/ci/select_tezts.sh")
-    ~allow_failure:(With_exit_codes [17])
-    ~artifacts:
-      (artifacts
-         ~expire_in:(Duration (Days 3))
-         ~when_:Always
-         ["selected_tezts.tsl"])
+(* Note: before the migration to Cacio, some jobs had a job timeout of 60 minutes.
+   But they still had a global Tezt timeout of 30 minutes,
+   and they were still wrapped under a [timeout] call of 31 minutes,
+   essentially rendering the exception to the job timeout useless.
+   So for now we keep the default timeout.
+   If you want to change it, use [~global_timeout: (Minutes 60)].
+   The [tezt_job] function will compute the rest. *)
 
-(* Fetch records for Tezt generated on the last merge request
-     pipeline on the most recently merged MR and makes them available
-     in artifacts for future merge request pipelines. *)
-let job_tezt_fetch_records ?rules () : tezos_job =
-  Tezos_ci.job
-    ~__POS__
-    ~name:"oc.tezt:fetch-records"
-    ~image:Images.CI.build
-    ~stage:Stages.build
-    ~before_script:
-      (Common.before_script
-         ~take_ownership:true
-         ~source_version:true
-         ~eval_opam:true
-         [])
-    ?rules
-    [
-      "dune exec scripts/ci/update_records/update.exe -- --log-file \
-       tezt-fetch-records.log --from last-successful-schedule-extended-test \
-       --info";
-    ]
-    ~after_script:["./scripts/ci/filter_corrupted_records.sh"]
-      (* Allow failure of this job, since Tezt can use the records
-           stored in the repo as backup for balancing. *)
+let job_tezt =
+  Cacio.parameterize @@ fun pipeline ->
+  CI.tezt_job
+    ""
+    ~description:"Run normal Tezt tests."
+    ~select_tezts:
+      (match pipeline with `merge_request -> true | `scheduled -> false)
+    ~keep_going:
+      (match pipeline with `merge_request -> false | `scheduled -> true)
+    ~fetch_records_from:"schedule_extended_test"
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~needs_legacy:common_needs
+    ~test_coverage:true
+    ~test_selection:(tests_tag_selector [Not (Has_tag "flaky")])
+    ~parallel_jobs:50
+    ~parallel_tests:6
+    ~retry_jobs:2
+    ~retry_tests:1
+
+let job_tezt_time_sensitive =
+  Cacio.parameterize @@ fun pipeline ->
+  CI.tezt_job
+    "time-sensitive"
+    ~description:"Run Tezt tests tagged as time_sensitive."
+    ~select_tezts:
+      (match pipeline with `merge_request -> true | `scheduled -> false)
+    ~keep_going:
+      (match pipeline with `merge_request -> false | `scheduled -> true)
+    ~fetch_records_from:"schedule_extended_test"
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~needs_legacy:common_needs
+    ~test_coverage:true
+    ~test_selection:(tests_tag_selector ~time_sensitive:true [])
+    ~retry_jobs:2
+    ~retry_tests:1
+
+let job_tezt_riscv_slow_sequential =
+  Cacio.parameterize @@ fun pipeline ->
+  CI.tezt_job
+    "riscv-slow-sequential"
+    ~description:"Run Tezt tests tagged as riscv_slow_sequential."
+    ~select_tezts:
+      (match pipeline with `merge_request -> true | `scheduled -> false)
+    ~keep_going:
+      (match pipeline with `merge_request -> false | `scheduled -> true)
+    ~fetch_records_from:"schedule_extended_test"
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~needs_legacy:common_needs
+    ~test_selection:(Tezt_core.TSL_AST.Has_tag "riscv_slow_sequential")
+    ~test_timeout:No_timeout
+    ~retry_jobs:2
+    ~retry_tests:1
+
+let job_tezt_slow =
+  Cacio.parameterize @@ fun pipeline ->
+  CI.tezt_job
+    "slow"
+    ~description:"Run Tezt tests tagged as slow."
+    ~select_tezts:
+      (match pipeline with `merge_request -> true | `scheduled -> false)
+    ~keep_going:
+      (match pipeline with `merge_request -> false | `scheduled -> true)
+    ~fetch_records_from:"schedule_extended_test"
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~needs_legacy:common_needs
+    ~test_selection:(tests_tag_selector ~slow:true [])
+    ~test_timeout:No_timeout
+    ~parallel_jobs:20
+    ~parallel_tests:3
+    ~retry_jobs:2
+    ~retry_tests:1
+
+let job_tezt_extra =
+  Cacio.parameterize @@ fun pipeline ->
+  CI.tezt_job
+    "extra"
+    ~description:"Run Tezt tests tagged as extra and not flaky."
+    ~select_tezts:
+      (match pipeline with `merge_request -> true | `scheduled -> false)
+    ~keep_going:
+      (match pipeline with `merge_request -> false | `scheduled -> true)
+    ~fetch_records_from:"schedule_extended_test"
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~needs_legacy:common_needs
+    ~test_selection:(tests_tag_selector ~extra:true [Not (Has_tag "flaky")])
+    ~parallel_jobs:10
+    ~parallel_tests:6
+    ~retry_jobs:2
+    ~retry_tests:1
+
+let job_tezt_flaky =
+  Cacio.parameterize @@ fun pipeline ->
+  CI.tezt_job
+    "flaky"
+    ~description:"Run Tezt tests tagged as flaky."
+    ~select_tezts:
+      (match pipeline with `merge_request -> true | `scheduled -> false)
+    ~keep_going:
+      (match pipeline with `merge_request -> false | `scheduled -> true)
+    ~fetch_records_from:"schedule_extended_test"
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~needs_legacy:common_needs
+    ~test_coverage:true
     ~allow_failure:Yes
-    ~artifacts:
-      (artifacts
-         ~expire_in:(Duration (Hours 4))
-         ~when_:Always
-         [
-           "tezt-fetch-records.log";
-           "tezt/records/**/*.json";
-           (* Keep broken records for debugging *)
-           "tezt/records/**/*.json.broken";
-         ])
+    ~test_selection:(tests_tag_selector [Has_tag "flaky"])
+    ~retry_jobs:2
+    ~retry_tests:3
+
+let job_tezt_static_binaries =
+  Cacio.parameterize @@ fun pipeline ->
+  CI.tezt_job
+    "static-binaries"
+    ~description:
+      "Run Tezt tests tagged as cli and not flaky, using static executables."
+    ~cpu:Normal
+    ~select_tezts:
+      (match pipeline with `merge_request -> true | `scheduled -> false)
+    ~keep_going:
+      (match pipeline with `merge_request -> false | `scheduled -> true)
+    ~fetch_records_from:"schedule_extended_test"
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~needs_legacy:
+      [
+        (* The static job should actually be taken from Code_verification,
+           but it is only defined at toplevel in Master_branch.
+           Since we only need the name, this is fine.
+           We did the same in the docs/ci. *)
+        (Cacio.Artifacts, Master_branch.job_static_x86_64);
+        (Artifacts, Code_verification.job_build_x86_64_extra_exp Before_merging);
+        (Artifacts, Code_verification.job_build_x86_64_extra_dev Before_merging);
+        (* No need for kernels for this job. *)
+      ]
+    ~test_selection:(tests_tag_selector [Has_tag "cli"; Not (Has_tag "flaky")])
+    ~parallel_tests:3
+    ~retry_tests:1
+    ~before_script:["mv octez-binaries/x86_64/octez-* ."]
+
+let register () =
+  CI.register_before_merging_jobs
+    [
+      (Auto, job_tezt `merge_request);
+      (Auto, job_tezt_time_sensitive `merge_request);
+      (Manual, job_tezt_riscv_slow_sequential `merge_request);
+      (Manual, job_tezt_slow `merge_request);
+      (Manual, job_tezt_extra `merge_request);
+      (Manual, job_tezt_flaky `merge_request);
+      (Auto, job_tezt_static_binaries `merge_request);
+    ] ;
+  CI.register_schedule_extended_test_jobs
+    [
+      (Auto, job_tezt `scheduled);
+      (Auto, job_tezt_time_sensitive `scheduled);
+      (Auto, job_tezt_riscv_slow_sequential `scheduled);
+      (Auto, job_tezt_slow `scheduled);
+      (Auto, job_tezt_extra `scheduled);
+      (Auto, job_tezt_flaky `scheduled);
+      (Auto, job_tezt_static_binaries `scheduled);
+    ] ;
+  CI.register_custom_extended_test_jobs
+    [
+      (Auto, job_tezt `scheduled);
+      (Auto, job_tezt_time_sensitive `scheduled);
+      (Auto, job_tezt_slow `scheduled);
+      (Auto, job_tezt_extra `scheduled);
+      (Auto, job_tezt_flaky `scheduled);
+    ] ;
+  ()

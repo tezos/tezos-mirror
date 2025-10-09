@@ -642,21 +642,6 @@ let jobs pipeline_type =
   in
 
   let job_build_kernels = job_build_kernels pipeline_type in
-  let job_tezt_fetch_records =
-    Tezt.job_tezt_fetch_records
-      ~rules:(make_rules ~changes:changeset_octez ())
-      ()
-  in
-  let job_select_tezts =
-    (* Scheduled pipelines execute all tezt tests: no need for [job_select_tezts]. *)
-    match pipeline_type with
-    | Before_merging | Merge_train ->
-        Some
-          (Tezt.job_select_tezts
-             ~rules:(make_rules ~changes:changeset_octez ())
-             ())
-    | Schedule_extended_test -> None
-  in
   (* Octez static binaries *)
   let job_static_x86_64_experimental =
     job_build_static_binaries
@@ -737,13 +722,11 @@ let jobs pipeline_type =
       job_build_x86_64_extra_dev;
       job_build_x86_64_extra_exp;
       job_build_kernels;
-      job_tezt_fetch_records;
       build_octez_source;
       job_build_layer1_profiling
         ~rules:(make_rules ~changes:changeset_octez ())
         ();
     ]
-    @ Option.to_list job_select_tezts
     @ bin_packages_jobs
   in
 
@@ -1400,210 +1383,6 @@ let jobs pipeline_type =
               ();
           ]
     in
-    (* Tezt jobs.
-
-              The Tezt jobs are split into a set of special-purpose jobs running the
-              tests of the corresponding tag:
-              - [tezt-time_sensitive]: runs the jobs with tag [time_sensitive];
-              - [tezt-slow]: runs the jobs with tag [slow];
-              - [tezt-extra]: runs the jobs with tag [extra] not tagged
-                 as [flaky].
-              - [tezt-flaky]: runs the jobs with tag [flaky] and
-                 none of the tags above;
-
-              and a job [tezt] that runs all remaining tests (excepting those
-              that are tagged [ci_disabled], that are disabled in the CI.)
-
-              There is an implicit rule that the Tezt tags [time_sensitive],
-              [slow], [extra] and [cloud] are mutually exclusive.
-              The [flaky] tag is not exclusive to these tags.
-              If e.g. a test has both tags [slow] and [flaky], it will run in
-              [tezt-slow], to prevent flaky tests to run in the [tezt-flaky]
-              job if they also have another special tag. Tests tagged [cloud] are
-              meant to be used with Tezt cloud (see [tezt/lib_cloud/README.md]) and
-              do not run in the CI.
-
-              For more information on tags, see [src/lib_test/tag.mli].
-
-              Important: the [Custom_test_extended_pipeline.jobs] function
-              declares a set of jobs that must match the ones defined
-              below. Please update the jobs accordingly.
-    *)
-    let jobs_tezt =
-      let dependencies =
-        Dependent
-          [
-            Artifacts job_build_x86_64_release;
-            Artifacts job_build_x86_64_extra_exp;
-            Artifacts job_build_x86_64_extra_dev;
-            Artifacts job_build_kernels;
-            Artifacts job_tezt_fetch_records;
-          ]
-      in
-      (* Rules for tezt jobs that are started automatically.
-
-         Tezt jobs are selected whenever a file in [changeset_octez] is modified.
-         The tezt jobs are dependent (they need the binaries and such). *)
-      let rules = make_rules ~dependent:true ~changes:changeset_octez () in
-      (* Rules for tezt jobs that are started manually.
-
-         These jobs can only be manually started on [before_merging]
-         pipelines when its artifact dependencies exist, which they do
-         when [changeset_octez] is changed. *)
-      let rules_manual =
-        make_rules ~dependent:true ~manual:(On_changes changeset_octez) ()
-      in
-      let coverage_expiry = Duration (Days 3) in
-      let keep_going =
-        match pipeline_type with Schedule_extended_test -> true | _ -> false
-      in
-      let tezt : tezos_job =
-        Tezt.job
-          ~__POS__
-          ~variant:""
-            (* Exclude all tests with tags in [tezt_tags_always_disable] or
-               [tezt_tags_exclusive_tags]. *)
-          ~tezt_tests:(Tezt.tests_tag_selector [Not (Has_tag "flaky")])
-          ~tezt_parallel:6
-          ~parallel:(Vector 50)
-          ~timeout:(Minutes 40)
-          ~rules
-          ~dependencies
-          ~keep_going
-          ?job_select_tezts
-          ()
-        |> Coverage.enable_output_artifact ~expire_in:coverage_expiry
-      in
-      let tezt_time_sensitive : tezos_job =
-        (* the following tests are executed with [~tezt_parallel:1] to ensure
-           that other tests do not affect their executions. However, these
-           tests are not particularly cpu/memory-intensive hence they do not
-           need to run on a particular machine contrary to performance
-           regression tests. *)
-        Tezt.job
-          ~__POS__
-          ~variant:"time-sensitive"
-          ~tezt_tests:(Tezt.tests_tag_selector ~time_sensitive:true [])
-          ~dependencies
-          ~keep_going
-          ?job_select_tezts
-          ~rules
-          ()
-        |> Coverage.enable_output_artifact ~expire_in:coverage_expiry
-      in
-      let tezt_riscv_slow_sequential : tezos_job =
-        Tezt.job
-          ~__POS__
-          ~variant:"riscv-slow-sequential"
-          ~rules:rules_manual
-          ~tezt_tests:(Tezt_core.TSL_AST.Has_tag "riscv_slow_sequential")
-          ~dependencies
-          ~keep_going
-          ~disable_test_timeout:true
-          ()
-      in
-      let tezt_slow : tezos_job =
-        Tezt.job
-          ~__POS__
-          ~variant:"slow"
-          ~rules:rules_manual
-          ~tezt_tests:
-            (Tezt.tests_tag_selector
-               ~slow:true
-               (* TODO: https://gitlab.com/tezos/tezos/-/issues/7063
-                  The deselection of Paris [test_adaptive_issuance_launch.ml]
-                  should be removed once the fixes to its slowness has been
-                  snapshotted from Alpha. *)
-               [
-                 Not
-                   (String_predicate
-                      ( File,
-                        Is
-                          "src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml"
-                      ));
-               ])
-          ~retry:2
-          ~tezt_parallel:3
-          ~parallel:(Vector 20)
-          ~dependencies
-          ~keep_going
-          ?job_select_tezts
-          ~disable_test_timeout:true
-          ()
-      in
-      let tezt_extra : tezos_job =
-        Tezt.job
-          ~__POS__
-          ~variant:"extra"
-          ~rules:rules_manual
-          ~tezt_tests:
-            (Tezt.tests_tag_selector ~extra:true [Not (Has_tag "flaky")])
-          ~retry:2
-          ~tezt_parallel:6
-          ~parallel:(Vector 10)
-          ~dependencies
-          ~keep_going
-          ?job_select_tezts
-          ()
-      in
-      let tezt_flaky : tezos_job =
-        (* Runs tests tagged "flaky" [Tag.flaky].
-
-           These tests only run on scheduled pipelines. They run with
-           higher retries (both GitLab CI job retries, and tezt
-           retries). They also run with [~parallel:1] to increase
-           stability. *)
-        Tezt.job
-          ~__POS__
-          ~variant:"flaky"
-          ~tezt_tests:(Tezt.tests_tag_selector [Has_tag "flaky"])
-            (* To handle flakiness, consider tweaking [~tezt_parallel] (passed to
-               Tezt's '--job-count'), and [~tezt_retry] (passed to Tezt's
-               '--retry') *)
-          ~retry:2
-          ~tezt_retry:3
-          ~tezt_parallel:1
-          ~dependencies
-          ~keep_going
-          ?job_select_tezts
-          ~rules:rules_manual
-          ~allow_failure:Yes
-          ()
-        |> Coverage.enable_output_artifact
-      in
-      let tezt_static_binaries : tezos_job =
-        Tezt.job
-          ~__POS__
-          ~tag:Gcp
-          ~variant:"static-binaries"
-          ~tezt_tests:
-            (Tezt.tests_tag_selector [Has_tag "cli"; Not (Has_tag "flaky")])
-          ~tezt_parallel:3
-          ~retry:0
-          ~dependencies:
-            (Dependent
-               [
-                 Artifacts job_build_x86_64_extra_exp;
-                 Artifacts job_build_x86_64_extra_dev;
-                 Artifacts job_static_x86_64_experimental;
-                 Artifacts job_tezt_fetch_records;
-               ])
-          ~keep_going
-          ~rules
-          ?job_select_tezts
-          ~before_script:(before_script ["mv octez-binaries/x86_64/octez-* ."])
-          ()
-      in
-      [
-        tezt;
-        tezt_time_sensitive;
-        tezt_slow;
-        tezt_extra;
-        tezt_flaky;
-        tezt_static_binaries;
-        tezt_riscv_slow_sequential;
-      ]
-    in
     let jobs_sdk_rust : tezos_job list =
       let job_test_sdk_rust =
         job
@@ -1741,7 +1520,7 @@ let jobs pipeline_type =
           ]
     in
     jobs_debian @ jobs_misc @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_kernels
-    @ jobs_unit @ jobs_install_octez @ jobs_tezt
+    @ jobs_unit @ jobs_install_octez
   in
 
   (* Coverage jobs *)
