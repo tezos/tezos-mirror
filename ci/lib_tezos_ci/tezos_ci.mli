@@ -722,6 +722,9 @@ module Hooks : sig
   (** Jobs to add to [before_merging] and [merge_train] pipelines. *)
   val before_merging : tezos_job list ref
 
+  (** Jobs to add to [schedule_extended_test] pipelines. *)
+  val schedule_extended_test : tezos_job list ref
+
   (** Jobs to add to [master] branch pipelines. *)
   val master : tezos_job list ref
 

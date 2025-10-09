@@ -255,6 +255,11 @@ module type COMPONENT_API = sig
   (** Register jobs to be included in [before_merging] and [merge_train] pipelines. *)
   val register_before_merging_jobs : (trigger * job) list -> unit
 
+  (** Register jobs to be included in [schedule_extended_test] pipelines.
+
+      Only available in the [Shared] component. *)
+  val register_schedule_extended_test_jobs : (trigger * job) list -> unit
+
   (** Register jobs to be included in [master_branch] pipelines. *)
   val register_master_jobs : (trigger * job) list -> unit
 

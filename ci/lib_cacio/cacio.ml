@@ -594,6 +594,8 @@ module type COMPONENT_API = sig
 
   val register_before_merging_jobs : (trigger * job) list -> unit
 
+  val register_schedule_extended_test_jobs : (trigger * job) list -> unit
+
   val register_master_jobs : (trigger * job) list -> unit
 
   val register_scheduled_pipeline :
@@ -719,6 +721,18 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     in
     let jobs = convert_jobs ~with_condition:true jobs in
     Tezos_ci.Hooks.before_merging := jobs @ !Tezos_ci.Hooks.before_merging
+
+  let register_schedule_extended_test_jobs jobs =
+    match Component.name with
+    | Some _ ->
+        failwith
+          "register_schedule_extended_test_jobs can only be used from the \
+           Shared component; regular components should define their own \
+           schedule pipelines with register_scheduled_pipeline"
+    | None ->
+        let jobs = convert_jobs ~with_condition:false jobs in
+        Tezos_ci.Hooks.schedule_extended_test :=
+          jobs @ !Tezos_ci.Hooks.schedule_extended_test
 
   let register_master_jobs jobs =
     let jobs = convert_jobs ~with_condition:false jobs in

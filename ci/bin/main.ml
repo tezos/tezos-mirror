@@ -334,8 +334,9 @@ let () =
     "schedule_extended_test"
     schedule_extended_tests
     ~jobs:
-      (Code_verification.jobs Schedule_extended_test
-      |> List.map (with_interruptible false))
+      ((Code_verification.jobs Schedule_extended_test
+       |> List.map (with_interruptible false))
+      @ !Hooks.schedule_extended_test)
     ~description:
       "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
        This pipeline unconditionally executes all jobs in 'before_merging' \
