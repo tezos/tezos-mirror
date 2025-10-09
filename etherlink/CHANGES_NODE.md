@@ -11,6 +11,8 @@
 - Add new GET `/mode` RPC endpoint to expose the current
   operating mode of the EVM node. This enables external monitoring
   tools to query and track node configuration. (!19486)
+- Outputs of `txpool_content` and inputs of `injectTransaction` RPCs no longer downcast
+  transactions to the legacy format; eip `2930`, `1559` and `7702` are now available.
 
 ### Monitoring changes
 
