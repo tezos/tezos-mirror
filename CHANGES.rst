@@ -101,6 +101,10 @@ Smart Rollup node
   after the first valid JSON object. Now, any extraneous data will cause the
   function to return an error. (MR :gl:`!18745`)
 
+- Update opentelemetry library to 0.12 which should fix the issue where a log
+  protobuf encoding crashes the node when telemetry is activated. (MR
+  :gl:`!19516`)
+
 
 Smart Rollup WASM Debugger
 --------------------------

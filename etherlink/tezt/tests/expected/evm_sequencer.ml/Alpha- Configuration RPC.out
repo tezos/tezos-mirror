@@ -70,7 +70,7 @@
     "headers": [],
     "batch_traces": 400,
     "batch_logs": 400,
-    "batch_timeout_ms": 500,
+    "batch_timeout_ms": 2000,
     "gc_telemetry": {
       "enable": false,
       "min_duration_ms": 1
@@ -157,7 +157,7 @@
     "headers": [],
     "batch_traces": 400,
     "batch_logs": 400,
-    "batch_timeout_ms": 500,
+    "batch_timeout_ms": 2000,
     "gc_telemetry": {
       "enable": false,
       "min_duration_ms": 1
@@ -249,7 +249,7 @@
     "headers": [],
     "batch_traces": 400,
     "batch_logs": 400,
-    "batch_timeout_ms": 500,
+    "batch_timeout_ms": 2000,
     "gc_telemetry": {
       "enable": false,
       "min_duration_ms": 1

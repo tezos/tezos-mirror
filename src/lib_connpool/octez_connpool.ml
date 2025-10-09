@@ -68,7 +68,7 @@ let validate {alive; _} =
   let open Lwt_syntax in
   (match Opentelemetry.Scope.get_ambient_scope () with
   | Some scope ->
-      Opentelemetry_lwt.Trace.add_attrs scope (fun () ->
+      Opentelemetry.Scope.add_attrs scope (fun () ->
           [("octez_connpool.reuse", `Bool alive)])
   | _ -> ()) ;
   return alive
@@ -221,7 +221,7 @@ let call_exn ?timeout ?(headers = Cohttp.Header.init ())
     ~kind:Span_kind_client
     Format.(sprintf "%s %s" (Cohttp.Code.string_of_method meth) route)
   @@ fun scope ->
-  Opentelemetry_lwt.Trace.add_attrs scope make_attrs ;
+  Opentelemetry.Scope.add_attrs scope make_attrs ;
   Lwt.catch
     (fun () ->
       let headers =
@@ -239,7 +239,7 @@ let call_exn ?timeout ?(headers = Cohttp.Header.init ())
         | None | Some `Keep_alive -> Lwt.return_unit
         | Some `Close | Some (`Unknown _) -> close_conn conn
       in
-      Opentelemetry_lwt.Trace.add_attrs scope (fun () ->
+      Opentelemetry.Scope.add_attrs scope (fun () ->
           let resp_code = Cohttp.Code.code_of_status resp.status in
           if resp_code >= 400 then
             Opentelemetry.Scope.set_status

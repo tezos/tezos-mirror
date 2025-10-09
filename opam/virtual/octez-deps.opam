@@ -76,7 +76,6 @@ depends: [
   "lwt-watcher" { = "0.2" }
   "lwt_eio"
   "lwt_log"
-  "lwt_ppx"
   "memtrace"
   "mirage-crypto-rng" { >= "1.0.0" }
   "mtime" { >= "2.0.0" }
@@ -86,7 +85,8 @@ depends: [
   "ocp-ocamlres" { >= "0.4" }
   "ocplib-endian"
   "opam-file-format" { >= "2.1.6" }
-  "opentelemetry"
+  "opentelemetry" { >= "0.12" }
+  "opentelemetry-client-cohttp-lwt"
   "opentelemetry-lwt"
   "optint"
   "ppx_deriving"
@@ -139,7 +139,6 @@ conflicts: [
   "json_data_encoding_browser"
   "json_data_encoding_bson"
   "lwt_domain"
-  "opentelemetry-client-cohttp-lwt"
   "prometheus"
   "prometheus-app"
   "resto"

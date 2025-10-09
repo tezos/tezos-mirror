@@ -13,7 +13,6 @@ open Internals
 open Product_data_encoding
 open Product_prometheus
 open Product_resto
-open Product_opentelemetry
 
 include Product (struct
   let name = "octez"
@@ -42,8 +41,7 @@ include Product (struct
       "brassaia-eio/";
       "rust-toolchain";
     ]
-    @ Product_data_encoding.product_source
-    @ Product_opentelemetry.product_source @ Product_prometheus.product_source
+    @ Product_data_encoding.product_source @ Product_prometheus.product_source
     @ Product_resto.product_source
 end)
 
@@ -138,14 +136,6 @@ let () =
     registered_octez_libs
     ~target:"!module-Resto"
     ~text:"Resto"
-
-(* Back-register the cohttp library which is currently maintained as its
-   own product but still attached to octez-libs. *)
-let () =
-  Sub_lib.add_doc_link
-    registered_octez_libs
-    ~target:"!module-OpenTelemetry_client_cohttp_lwt"
-    ~text:"Opentelemetry_client_cohttp_lwt"
 
 (* Container of the registered sublibraries of [octez-shell-libs] *)
 let registered_octez_shell_libs = Sub_lib.make_container ()

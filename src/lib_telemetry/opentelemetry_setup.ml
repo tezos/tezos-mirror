@@ -47,7 +47,7 @@ let setup ~data_dir ~service_namespace ~service_name ~version ?level ?sections
       gc_telemetry;
     } =
   let open Lwt_result_syntax in
-  let no_clean_up = return (fun () -> ()) in
+  let no_clean_up = return Lwt.return in
   if enable then (
     let*! instance_id =
       match instance_id with
@@ -86,5 +86,9 @@ let setup ~data_dir ~service_namespace ~service_name ~version ?level ?sections
     | Some (module Backend) ->
         let* () = Events.activate ?level ?sections () in
         let*! () = Event.(emit enabled) (service_namespace, instance_id) in
-        return Backend.cleanup)
+        return (fun () ->
+            let clean_up_done, clean_up_done_resolver = Lwt.task () in
+            let on_done () = Lwt.wakeup_later clean_up_done_resolver () in
+            Backend.cleanup ~on_done () ;
+            clean_up_done))
   else no_clean_up

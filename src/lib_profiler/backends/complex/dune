@@ -16,7 +16,7 @@
   octez-libs.prometheus
   opentelemetry
   ambient-context-lwt
-  octez-libs.opentelemetry-client-cohttp-lwt)
+  opentelemetry-client-cohttp-lwt)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

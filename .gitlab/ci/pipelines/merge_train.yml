@@ -671,7 +671,6 @@ oc.build:static-x86_64-linux-binaries:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -749,7 +748,6 @@ oc.build:static-arm64-linux-binaries:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -836,7 +834,6 @@ oc.build_x86_64-released:
     - irmin/**/*.ml*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -932,7 +929,6 @@ oc.build_amd64-extra-dev:
     - irmin/**/*.ml*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -1044,7 +1040,6 @@ oc.build_amd64-extra-exp:
     - irmin/**/*.ml*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -1159,7 +1154,6 @@ oc.build_kernels:
     - kernels.mk
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -1241,7 +1235,6 @@ oc.tezt:fetch-records:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -1350,7 +1343,6 @@ build-layer1-profiling:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -1427,7 +1419,6 @@ select_tezts:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -1715,7 +1706,6 @@ oc.integration:compiler-rejections:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -1782,7 +1772,6 @@ oc.script:test-gen-genesis:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -1895,7 +1884,6 @@ oc.script:test_octez_release_versions:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -2404,7 +2392,6 @@ oc.unit:non-proto-x86_64:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -2496,7 +2483,6 @@ oc.unit:other-x86_64:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -2588,7 +2574,6 @@ oc.unit:proto-x86_64:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -2680,7 +2665,6 @@ oc.unit:non-proto-arm64:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -2761,7 +2745,6 @@ oc.unit:webassembly-x86_64:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -2813,7 +2796,6 @@ oc.unit:protocol_compiles:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -3062,7 +3044,6 @@ tezt:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -3160,7 +3141,6 @@ tezt-time-sensitive:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -3257,7 +3237,6 @@ tezt-slow:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -3352,7 +3331,6 @@ tezt-extra:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -3447,7 +3425,6 @@ tezt-flaky:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -3546,7 +3523,6 @@ tezt-static-binaries:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -3637,7 +3613,6 @@ tezt-riscv-slow-sequential:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain
@@ -3732,7 +3707,6 @@ oc.unified_coverage:
     - irmin/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
-    - opentelemetry/**/*
     - prometheus/**/*
     - resto/**/*
     - rust-toolchain

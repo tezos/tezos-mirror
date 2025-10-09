@@ -19,4 +19,4 @@ val setup :
   ?level:Internal_event.level ->
   ?sections:(Internal_event.Section.t * Internal_event.level) list ->
   Opentelemetry_config.t ->
-  (unit -> unit) tzresult Lwt.t
+  (unit -> unit Lwt.t) tzresult Lwt.t

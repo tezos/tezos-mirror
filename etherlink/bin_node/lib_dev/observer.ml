@@ -114,7 +114,7 @@ let install_finalizer_observer ~rollup_node_tracking
     Services_backend_sig.tx_container_module tx_container
   in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-  telemetry_cleanup () ;
+  let* () = telemetry_cleanup () in
   let* () = Events.shutdown_node ~exit_status in
   let* () = finalizer_public_server () in
   let* () = finalizer_private_server () in
