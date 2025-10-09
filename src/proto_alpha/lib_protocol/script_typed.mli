@@ -13,6 +13,7 @@ type ('arg, 'storage) implementation =
   | Lambda : {
       code :
         (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
+      views : view_map;
     }
       -> ('arg, 'storage) implementation
   | Native : {
@@ -26,7 +27,6 @@ type ('arg, 'storage) script =
       arg_type : ('arg, _) ty;
       storage : 'storage;
       storage_type : ('storage, _) ty;
-      views : view_map;
       entrypoints : 'arg entrypoints;
       code_size : Cache_memory_helpers.sint;
           (* This is an over-approximation of the value size in memory, in

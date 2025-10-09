@@ -1616,7 +1616,6 @@ module Scripts = struct
                       implementation;
                       arg_type;
                       storage_type;
-                      views;
                       entrypoints;
                       code_size;
                     }),
@@ -1639,7 +1638,6 @@ module Scripts = struct
                  implementation;
                  arg_type;
                  storage_type;
-                 views;
                  entrypoints;
                  code_size;
                  storage;
