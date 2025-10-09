@@ -171,6 +171,9 @@ pub enum TcError {
     /// View names must be at most 31 characters and match the expression [a-zA-Z0-9_.%@]*
     #[error("Invalid name for view {0}")]
     InvalidViewName(String),
+    /// View instructions must be a sequence
+    #[error("{0} instructions are not a sequence")]
+    NonSeqViewInstrs(String),
 }
 
 impl From<TryFromBigIntError<()>> for TcError {
@@ -395,6 +398,28 @@ impl<'a> Micheline<'a> {
         let storage = storage_ty
             .ok_or(TcError::MissingTopLevelElt(Prim::storage))?
             .parse_ty(gas)?;
+        for view in views.clone() {
+            let (
+                name,
+                View {
+                    input_type,
+                    output_type,
+                    code,
+                },
+            ) = view;
+            match code {
+                Micheline::Seq(instrs) => {
+                    typecheck_lambda(
+                        instrs,
+                        gas,
+                        Type::Pair(Rc::new((input_type.clone(), storage.clone()))),
+                        output_type.clone(),
+                        false,
+                    )?;
+                }
+                _ => return Err(TcError::NonSeqViewInstrs(name)),
+            }
+        }
         parameter.ensure_prop(gas, TypeProperty::Passable)?;
         storage.ensure_prop(
             gas,
