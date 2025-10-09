@@ -16,6 +16,12 @@ type t =
     represents both the contract code and its storage. *)
 type with_storage = {kind : t; storage : Script_repr.lazy_expr}
 
+module Accumulator_contract : sig
+  val initial_storage : Script_repr.lazy_expr
+
+  val with_initial_storage : with_storage
+end
+
 val encoding : t Data_encoding.t
 
 val with_storage_encoding : with_storage Data_encoding.t

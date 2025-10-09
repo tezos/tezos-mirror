@@ -183,6 +183,12 @@ val raw_originate :
   script:Script_repr.t * Lazy_storage_diff.diffs option ->
   Raw_context.t tzresult Lwt.t
 
+val native_originate :
+  Raw_context.t ->
+  Contract_hash.t ->
+  script:Script_native_repr.with_storage * Lazy_storage_diff.diffs option ->
+  (Raw_context.t, error trace) result Lwt.t
+
 val fresh_contract_from_current_nonce :
   Raw_context.t -> (Raw_context.t * Contract_hash.t) tzresult
 

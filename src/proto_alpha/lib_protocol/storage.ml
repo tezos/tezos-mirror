@@ -608,6 +608,25 @@ module Contract = struct
            (Make_index (Destination_repr.Index))
         (Encoding.N)
   end
+
+  module Native_contracts = struct
+    module Raw_context =
+      Make_subcontext (Registered) (Raw_context)
+        (struct
+          let name = ["native_contracts"]
+        end)
+
+    module Accumulator =
+      Make_single_data_storage (Registered) (Raw_context)
+        (struct
+          let name = ["accumulator"]
+        end)
+        (struct
+          type t = Contract_hash.t
+
+          let encoding = Contract_repr.originated_encoding
+        end)
+  end
 end
 
 module type NEXT = sig

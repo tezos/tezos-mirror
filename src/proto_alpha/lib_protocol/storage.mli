@@ -350,6 +350,16 @@ module Contract : sig
          and type key = Destination_repr.t
          and type value = Z.t
   end
+
+  (** Associates known native contracts with their addresses, as they are
+      originated during protocol stitching and their can cannot be easily
+      retrieved. *)
+  module Native_contracts : sig
+    module Accumulator :
+      Single_data_storage
+        with type value = Contract_hash.t
+         and type t := Raw_context.t
+  end
 end
 
 module Big_map : sig

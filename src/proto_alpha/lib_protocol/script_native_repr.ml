@@ -9,6 +9,19 @@ type t = Accumulator
 
 type with_storage = {kind : t; storage : Script_repr.lazy_expr}
 
+module Accumulator_contract = struct
+  let initial_storage =
+    Micheline.(
+      Prim
+        ( dummy_location,
+          Michelson_v1_primitives.D_Pair,
+          [Int (dummy_location, Z.zero); Int (dummy_location, Z.zero)],
+          [] ))
+    |> Micheline.strip_locations |> Script_repr.lazy_expr
+
+  let with_initial_storage = {kind = Accumulator; storage = initial_storage}
+end
+
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   union
