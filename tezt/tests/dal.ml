@@ -4649,7 +4649,7 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
     ~activation_timestamp:Now
     ~operator_profiles:[slot_index]
     ~minimal_block_delay:
-      (* to be sure there is enough time to published slots *)
+      (* to be sure there is enough time to publish slots *)
       "2"
     ~blocks_per_cycle:32
     ~consensus_committee_size:512
@@ -4660,6 +4660,197 @@ let test_migration_accuser_issue ~migrate_from ~migrate_to =
          encounter at least one trap in these many shards is (1 - 1/2000)^10240
          = 0.6%. *)
     ~number_of_shards:512
+    ~migrate_from
+    ~migrate_to
+    ()
+
+(* This test checks that the migration goes well when the attestation lag is
+   reduced. It uses the baker and features publication at the last level of
+   "previous" protocol. It verifies that this publication is not attested in
+   the "new" protocol.
+
+   Here is an explanation of the potential issue:
+   We denote by M the migration level. We assume a migration from attestation
+   lag from 8 to 5 in this explanation.
+
+   If we use publication time protocol, we expect
+
+   M - 9 -> attested at M - 1
+   M - 8 -> attested at M
+   M - 7 -> attested at M + 1
+   M - 6 -> attested at M + 2
+   M - 5 -> attested at M + 3
+   M - 4 -> attested at M + 4
+   M - 3 -> attested at M + 5 <<< Conflict
+   M - 2 -> attested at M + 6 <<<
+   M - 1 -> attested at M + 7 <<<
+   M     -> attested at M + 5 <<< Conflict
+   M + 1 -> attested at M + 6 <<<
+   M + 2 -> attested at M + 7 <<<
+   M + 3 -> attested at M + 8
+
+   We see that attestations at levels M + 5, M + 6 and M + 7 are ambiguous
+   since there are 2 publication levels which are expected to be attested at
+   the same level.
+   The publication levels targetting attestation at an ambiguous level are
+   marked with <<<.
+
+   If we use attestation time protocol, we expect
+
+   M - 10 -> attested at M - 2
+   M - 9  -> attested at M - 1
+   M - 8  -> attested at M
+   M - 7  -> undefined
+   M - 6  -> undefined
+   M - 5  -> undefined
+   M - 4  -> attested at M + 1
+   M - 3  -> attested at M + 2
+
+   There is an issue in both cases, so one has to make a choice.
+   We assume in this test that the publications between
+   M - previous_attestations_lag + 1 and M are not attested.
+*)
+let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
+  let tags = ["migration"; "dal"; "attestation_lag"] in
+  let description = "test migration with reduction of the attestation_lag" in
+  let {log_step} = init_logger () in
+  (* We select a slot index to publish on. *)
+  let slot_index = 0 in
+  let scenario ~migration_level (dal_parameters : Dal.Parameters.t) client node
+      dal_node =
+    let* level = Client.level client in
+    (* We will publish random data for a whole cycle, which includes a migration
+       in the middle. *)
+    let first_level = level + 1 in
+    let last_publication_level = 22 in
+    (* [dal_parameters] should contain the parameters of the "previous"
+       protocol. *)
+    log_step "Getting the parameters of the next protocol" ;
+    let base = Either.right (migrate_to, None) in
+    let* proto_parameters = generate_protocol_parameters base migrate_to [] in
+    let new_dal_parameters =
+      Dal.Parameters.from_protocol_parameters proto_parameters
+    in
+    let old_lag = dal_parameters.attestation_lag in
+    let new_lag = new_dal_parameters.attestation_lag in
+    (* We want to have enough levels to attest in "previous" and to
+       attest in "next" commitments published in "next".
+    *)
+    log_step
+      "Checking that the migration level is at good distance of both ends" ;
+    assert (first_level + old_lag < migration_level) ;
+    assert (migration_level + new_lag < last_publication_level) ;
+    log_step
+      "Launching a producer publishing from first_level = %d to last_level = %d"
+      first_level
+      last_publication_level ;
+    let _promise =
+      simple_slot_producer
+        ~slot_size:dal_parameters.cryptobox.slot_size
+        ~slot_index
+        ~from:first_level
+        ~into:last_publication_level
+        dal_node
+        node
+        client
+    in
+    log_step "Start baker" ;
+    let baker =
+      let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
+      Agnostic_baker.create
+        ~dal_node_rpc_endpoint
+        ~delegates:
+          (List.map
+             (fun x -> x.Account.public_key_hash)
+             Constant.all_secret_keys)
+        node
+        client
+    in
+    let* () = Agnostic_baker.run baker in
+    let* _level = Node.wait_for_level node migration_level in
+    log_step "Migrated to next protocol" ;
+    let* _level = Node.wait_for_level node last_publication_level in
+    log_step "Turning the baker off" ;
+    let* () = Agnostic_baker.terminate baker in
+    let check_if_metadata_contain_expected_dal lvl metadata =
+      if lvl <= migration_level then (
+        log_step
+          "Checking that level %d which is before migration is considered as \
+           attested"
+          lvl ;
+        Check.is_true
+          ((function
+             | None -> false
+             | Some vec -> Array.length vec > slot_index && vec.(slot_index))
+             metadata.RPC.dal_attestation)
+          ~__LOC__
+          ~error_msg:"Slot before migration is expected to be attested")
+      else if lvl = migration_level + 1 then
+        Check.is_false
+          ((function
+             | None -> false | Some vec -> Array.fold_left ( || ) false vec)
+             metadata.dal_attestation)
+          ~__LOC__
+          ~error_msg:"The migration level block is not supposed to be attested"
+      else if lvl <= migration_level + new_lag then (
+        log_step
+          "Checking that level %d which is after migration but refers to a \
+           publication before is attested only if the attestation_level did \
+           not change between the 2 protocols."
+          lvl ;
+        if new_lag = old_lag then
+          Check.is_true
+            ((function
+               | None -> false
+               | Some vec -> Array.length vec > slot_index && vec.(slot_index))
+               metadata.dal_attestation)
+            ~__LOC__
+            ~error_msg:
+              "Slot published before migration is expected to be attested \
+               after migration"
+        else
+          Check.is_false
+            ((function
+               | None -> true | Some vec -> Array.fold_left ( || ) false vec)
+               metadata.dal_attestation)
+            ~__LOC__
+            ~error_msg:
+              "Slot published before migration is expected to not be attested \
+               after migration")
+      else (
+        log_step
+          "Checking that level %d which is after migration and refers to a \
+           publication after migration is considered as attested"
+          lvl ;
+        Check.is_true
+          ((function
+             | None -> false
+             | Some vec -> Array.length vec > slot_index && vec.(slot_index))
+             metadata.dal_attestation)
+          ~__LOC__
+          ~error_msg:"Slot published after migration is expected to be attested")
+    in
+    let rec loop level =
+      if level <= last_publication_level then
+        let* metadata =
+          Node.RPC.call node
+          @@ RPC.get_chain_block_metadata ~block:(string_of_int level) ()
+        in
+        let () = check_if_metadata_contain_expected_dal level metadata in
+        loop (level + 1)
+      else unit
+    in
+    let* () = loop (first_level + old_lag + 1) in
+    unit
+  in
+  test_l1_migration_scenario
+    ~scenario
+    ~tags
+    ~description
+    ~uses:[Constant.octez_agnostic_baker]
+    ~activation_timestamp:Now
+    ~operator_profiles:[slot_index]
+    ~migration_level:12
     ~migrate_from
     ~migrate_to
     ()
@@ -11916,7 +12107,8 @@ let register_migration ~migrate_from ~migrate_to =
     ~migrate_from
     ~migrate_to ;
   tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
-  test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to
+  test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to ;
+  test_migration_with_attestation_lag_change ~migrate_from ~migrate_to
 
 let () =
   Regression.register
