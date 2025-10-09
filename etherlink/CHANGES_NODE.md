@@ -29,6 +29,7 @@
 
 * Caps the number of native threads used by the node to prevent runtime errors.
   (!19479)
+- Supports executing Ebisu natively. (!)
 
 ### Storage changes
 

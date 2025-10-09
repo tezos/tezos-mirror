@@ -146,7 +146,7 @@ fn store_has(env: FunctionEnvMut<Env>, key_ptr: u32, key_len: u32) -> Result<i32
     trace!("store_has({})", key.as_str());
 
     let host = runtime_env.host();
-    match bindings::store_has(host.tree(), key) {
+    match bindings::store_has(&host.tree(), key) {
         Ok(i) => Ok(i as i32),
         Err(err) => result_from_binding_error(err),
     }
@@ -164,8 +164,9 @@ fn store_delete(
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
     trace!("store_delete({})", key.as_str());
 
+    let tree = &runtime_env.host().tree().clone();
     let host = runtime_env.host();
-    match bindings::store_delete(&host.tree(), key, false) {
+    match bindings::store_delete(&tree, key, false) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(0)
@@ -186,8 +187,9 @@ fn store_delete_value(
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
     trace!("store_delete_value({})", key.as_str());
 
+    let tree = &runtime_env.host().tree().clone();
     let host = runtime_env.host();
-    match bindings::store_delete(&host.tree(), key, true) {
+    match bindings::store_delete(&tree, key, true) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(0)
@@ -216,8 +218,9 @@ fn store_copy(
         runtime_env.mut_host().request_kernel_reload();
     }
 
+    let tree = &runtime_env.host().tree().clone();
     let host = runtime_env.host();
-    match bindings::store_copy(host.tree(), from, to) {
+    match bindings::store_copy(&tree, from, to) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(0)
@@ -246,8 +249,9 @@ fn store_move(
         runtime_env.mut_host().request_kernel_reload();
     }
 
+    let tree = &runtime_env.host().tree().clone();
     let host = runtime_env.host();
-    match bindings::store_move(host.tree(), from, to) {
+    match bindings::store_move(&tree, from, to) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(0)
@@ -272,7 +276,7 @@ fn store_get_hash(
     trace!("store_get_hash({})", key.as_str());
 
     let host = runtime_env.host();
-    match bindings::store_get_hash(host.tree(), &key) {
+    match bindings::store_get_hash(&host.tree(), &key) {
         Ok(hash) => {
             let hash_bytes = hash.as_bytes();
             let to_write = std::cmp::min(hash_bytes.len(), max_size as usize);
@@ -297,7 +301,7 @@ fn store_list_size(
     trace!("store_list_size({})", key.as_str());
 
     let host = runtime_env.host();
-    match bindings::store_list_size(host.tree(), key) {
+    match bindings::store_list_size(&host.tree(), key) {
         Ok(res) => Ok(res as i64),
         Err(err) => i64_result_from_binding_error(err),
     }
@@ -317,7 +321,7 @@ fn store_value_size(
     trace!("store_value_size({})", key.as_str());
 
     let host = runtime_env.host();
-    match bindings::store_value_size(host.tree(), key) {
+    match bindings::store_value_size(&host.tree(), key) {
         Ok(res) => Ok(res as i32),
         Err(err) => result_from_binding_error(err),
     }
@@ -338,8 +342,9 @@ fn store_read(
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
     trace!("store_read({})", key.as_str());
 
+    let tree = &runtime_env.host().tree().clone();
     let host = runtime_env.host();
-    match bindings::store_read(host.tree(), key, offset as usize, max_bytes as usize) {
+    match bindings::store_read(&host.tree(), key, offset as usize, max_bytes as usize) {
         Ok(buffer) => {
             memory_view.write(dst_ptr as u64, buffer.as_bytes())?;
             Ok(max_bytes as i32)
@@ -364,8 +369,9 @@ fn store_write(
     trace!("store_write({})", key.as_str());
     let buffer = read_from_memory(&memory_view, src_ptr, src_len)?;
 
+    let tree = &runtime_env.host().tree().clone();
     let host = runtime_env.host();
-    match bindings::store_write(host.tree(), key, offset as usize, &buffer) {
+    match bindings::store_write(&tree, key, offset as usize, &buffer) {
         Ok((evm_tree, res)) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(res as i32)

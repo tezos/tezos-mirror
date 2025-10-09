@@ -1012,7 +1012,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm-execution-latest"
+name = "evm-execution-ebisu"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
@@ -1030,25 +1030,25 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "revm",
- "revm-etherlink",
+ "revm-etherlink-ebisu",
  "ripemd",
  "rlp",
  "sha2 0.10.9",
  "sha3",
  "substrate-bn",
- "tezos-evm-logging-latest",
- "tezos-evm-runtime-latest",
- "tezos-indexable-storage-latest",
+ "tezos-evm-logging-ebisu",
+ "tezos-evm-runtime-ebisu",
+ "tezos-indexable-storage-ebisu",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
- "tezos-storage-latest",
+ "tezos-storage-ebisu",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum_latest",
+ "tezos_ethereum_ebisu",
  "thiserror 1.0.69",
 ]
 
@@ -1072,7 +1072,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm_kernel"
+name = "evm_kernel_ebisu"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
@@ -1082,7 +1082,7 @@ dependencies = [
  "ethbloom",
  "ethereum",
  "evm",
- "evm-execution-latest",
+ "evm-execution-ebisu",
  "getrandom 0.2.15",
  "hex",
  "libsecp256k1",
@@ -1094,14 +1094,14 @@ dependencies = [
  "primitive-types",
  "proptest",
  "revm",
- "revm-etherlink",
+ "revm-etherlink-ebisu",
  "rlp",
  "sha3",
  "softfloat",
- "tezos-evm-logging-latest",
- "tezos-evm-runtime-latest",
- "tezos-execution-latest",
- "tezos-indexable-storage-latest",
+ "tezos-evm-logging-ebisu",
+ "tezos-evm-runtime-ebisu",
+ "tezos-execution-ebisu",
+ "tezos-indexable-storage-ebisu",
  "tezos-smart-rollup",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
@@ -1112,11 +1112,11 @@ dependencies = [
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-panic-hook",
  "tezos-smart-rollup-storage",
- "tezos-storage-latest",
+ "tezos-storage-ebisu",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum_latest",
- "tezos_tezlink_latest",
+ "tezos_ethereum_ebisu",
+ "tezos_tezlink_ebisu",
  "thiserror 1.0.69",
  "tracing",
 ]
@@ -1214,7 +1214,7 @@ checksum = "c4567c8db10ae91089c99af84c68c38da3ec2f087c3f82960bcdbf3656b6f4d7"
 dependencies = [
  "cfg-if",
  "libc",
- "wasi 0.11.0+wasi-snapshot-preview1",
+ "wasi 0.11.1+wasi-snapshot-preview1",
 ]
 
 [[package]]
@@ -2335,7 +2335,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "revm-etherlink"
+name = "revm-etherlink-ebisu"
 version = "0.1.0"
 dependencies = [
  "alloy-sol-types",
@@ -2346,15 +2346,15 @@ dependencies = [
  "primitive-types",
  "revm",
  "rlp",
- "tezos-evm-logging-latest",
- "tezos-evm-runtime-latest",
- "tezos-indexable-storage-latest",
+ "tezos-evm-logging-ebisu",
+ "tezos-evm-runtime-ebisu",
+ "tezos-indexable-storage-ebisu",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-storage",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum_latest",
+ "tezos_ethereum_ebisu",
  "thiserror 1.0.69",
  "tracing",
 ]
@@ -2901,7 +2901,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-evm-logging-latest"
+name = "tezos-evm-logging-ebisu"
 version = "0.1.0"
 dependencies = [
  "nop-macros",
@@ -2912,11 +2912,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-evm-runtime-latest"
+name = "tezos-evm-runtime-ebisu"
 version = "0.1.0"
 dependencies = [
  "sha3",
- "tezos-evm-logging-latest",
+ "tezos-evm-logging-ebisu",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
  "tezos-smart-rollup-encoding",
@@ -2926,7 +2926,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-execution-latest"
+name = "tezos-execution-ebisu"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2937,28 +2937,28 @@ dependencies = [
  "num-traits",
  "pretty_assertions",
  "primitive-types",
- "tezos-evm-logging-latest",
- "tezos-evm-runtime-latest",
+ "tezos-evm-logging-ebisu",
+ "tezos-evm-runtime-ebisu",
  "tezos-smart-rollup",
  "tezos-smart-rollup-host",
- "tezos-storage-latest",
+ "tezos-storage-ebisu",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_tezlink_latest",
+ "tezos_tezlink_ebisu",
  "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "tezos-indexable-storage-latest"
+name = "tezos-indexable-storage-ebisu"
 version = "0.1.0"
 dependencies = [
  "rlp",
- "tezos-evm-logging-latest",
- "tezos-evm-runtime-latest",
+ "tezos-evm-logging-ebisu",
+ "tezos-evm-runtime-ebisu",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-mock",
  "tezos-smart-rollup-storage",
- "tezos-storage-latest",
+ "tezos-storage-ebisu",
  "thiserror 1.0.69",
 ]
 
@@ -3124,7 +3124,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-storage-latest"
+name = "tezos-storage-ebisu"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3133,12 +3133,12 @@ dependencies = [
  "primitive-types",
  "rlp",
  "sha3",
- "tezos-evm-runtime-latest",
+ "tezos-evm-runtime-ebisu",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-storage",
  "tezos_crypto_rs",
  "tezos_data_encoding",
- "tezos_ethereum_latest",
+ "tezos_ethereum_ebisu",
  "thiserror 1.0.69",
 ]
 
@@ -3198,7 +3198,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos_ethereum_latest"
+name = "tezos_ethereum_ebisu"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3218,7 +3218,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos_tezlink_latest"
+name = "tezos_tezlink_ebisu"
 version = "0.1.0"
 dependencies = [
  "fixed-hash",
@@ -3478,9 +3478,9 @@ dependencies = [
 
 [[package]]
 name = "wasi"
-version = "0.11.0+wasi-snapshot-preview1"
+version = "0.11.1+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
+checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
 
 [[package]]
 name = "wasi"

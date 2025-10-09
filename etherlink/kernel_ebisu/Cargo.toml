@@ -63,15 +63,15 @@ libsecp256k1 = { version = "0.7", default-features = false, features = [
 ] }
 
 # kernel crates
-revm-etherlink = { package = "revm-etherlink", path = "./revm" }
-tezos_ethereum = { package = "tezos_ethereum_latest", path = "./ethereum" }
-tezos_tezlink = { package = "tezos_tezlink_latest", path = "./tezos" }
-evm-execution = { package = "evm-execution-latest", path = "./evm_execution" }
-tezos-execution = { package = "tezos-execution-latest", path = "./tezos_execution" }
-tezos-evm-logging = { package = "tezos-evm-logging-latest", path = "./logging" }
-tezos-evm-runtime = { package = "tezos-evm-runtime-latest", path = "./runtime" }
-tezos-indexable-storage = { package = "tezos-indexable-storage-latest", path = "./indexable_storage" }
-tezos-storage = { package = "tezos-storage-latest", path = "./storage" }
+revm-etherlink = { package = "revm-etherlink-ebisu", path = "./revm" }
+tezos_ethereum = { package = "tezos_ethereum_ebisu", path = "./ethereum" }
+tezos_tezlink = { package = "tezos_tezlink_ebisu", path = "./tezos" }
+evm-execution = { package = "evm-execution-ebisu", path = "./evm_execution" }
+tezos-execution = { package = "tezos-execution-ebisu", path = "./tezos_execution" }
+tezos-evm-logging = { package = "tezos-evm-logging-ebisu", path = "./logging" }
+tezos-evm-runtime = { package = "tezos-evm-runtime-ebisu", path = "./runtime" }
+tezos-indexable-storage = { package = "tezos-indexable-storage-ebisu", path = "./indexable_storage" }
+tezos-storage = { package = "tezos-storage-ebisu", path = "./storage" }
 
 # SDK
 # we disable BLS, because we don’t need it and it is a roadblock for the native execution
@@ -104,10 +104,10 @@ proptest = { version = "1.0" }
 pretty_assertions = { version = "1.4.0" }
 
 # alloy
-alloy-sol-types = { version = "1.3.0", default-features = false, features = [
+alloy-sol-types = { version = "=1.3.0", default-features = false, features = [
     "json",
 ] }
-alloy-primitives = { version = "1.2.0", default-features = false }
+alloy-primitives = { version = "=1.3.0", default-features = false }
 
 # mir without bls
 mir = { git = "https://gitlab.com/tezos/tezos.git", rev = "c6a2505d04f85d16471098d127c1bff4354aef10", default-features = false }

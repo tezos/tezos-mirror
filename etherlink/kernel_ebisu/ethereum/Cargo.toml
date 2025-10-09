@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = "tezos_ethereum_latest"
+name = "tezos_ethereum_ebisu"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"

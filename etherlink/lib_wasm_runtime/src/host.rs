@@ -4,7 +4,14 @@
 //! Low-level interactions with the persistent state manipulated by the kernel
 //! (starting with the durable storage).
 
-use std::{collections::VecDeque, fs::File, io::Read, path::PathBuf};
+use std::{
+    cell::{Ref, RefCell},
+    collections::VecDeque,
+    fs::File,
+    io::Read,
+    path::PathBuf,
+    rc::Rc,
+};
 
 use log::{debug, error, info, trace, warn};
 use ocaml::Error;
@@ -13,6 +20,7 @@ use runtime_calypso::internal_runtime::InternalRuntime as CalypsoInternalRuntime
 use runtime_calypso2::internal_runtime::InternalRuntime as Calypso2InternalRuntime;
 use runtime_dionysus::internal_runtime::InternalRuntime as DionysusInternalRuntime;
 use runtime_dionysus_r1::internal_runtime::InternalRuntime as DionysusR1InternalRuntime;
+use runtime_ebisu::internal_runtime::InternalRuntime as EbisuInternalRuntime;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_host::{
     input::Message,
@@ -75,13 +83,15 @@ pub enum RuntimeVersion {
 
 pub struct Host {
     inputs_buffer: InputsBuffer,
-    tree: EvmTree,
+    tree: Rc<RefCell<EvmTree>>,
     rollup_address: SmartRollupAddress,
     needs_kernel_reload: bool,
     preimages_dir: OCamlString,
     preimages_endpoint: Option<OCamlString>,
     pub version: RuntimeVersion,
 }
+
+pub struct Hasher(Rc<RefCell<EvmTree>>);
 
 impl Host {
     pub fn new(
@@ -93,13 +103,17 @@ impl Host {
     ) -> Self {
         Host {
             inputs_buffer,
-            tree: tree.clone(),
+            tree: Rc::new(RefCell::new(tree.clone())),
             rollup_address,
             needs_kernel_reload: false,
             preimages_dir,
             preimages_endpoint,
             version: RuntimeVersion::V0,
         }
+    }
+
+    pub fn hasher(&self) -> Hasher {
+        Hasher(self.tree.clone())
     }
 
     pub fn preimages_dir(&self) -> &str {
@@ -123,12 +137,12 @@ impl Host {
         &self.rollup_address
     }
 
-    pub fn tree(&self) -> &EvmTree {
-        &self.tree
+    pub fn tree(&self) -> Ref<EvmTree> {
+        self.tree.borrow()
     }
 
     pub fn set_tree(&mut self, evm_tree: EvmTree) {
-        self.tree = evm_tree;
+        *self.tree.borrow_mut() = evm_tree;
     }
 
     pub fn write_debug(&self, msg: &[u8]) {
@@ -144,15 +158,15 @@ impl Host {
     }
 
     pub fn reboot_requested(&mut self) -> Result<bool, Error> {
-        let (reboot, evm_tree) = bindings::check_reboot_flag(&self.tree)?;
-        self.tree = evm_tree;
+        let (reboot, evm_tree) = bindings::check_reboot_flag(&self.tree())?;
+        *self.tree.borrow_mut() = evm_tree;
 
         Ok(reboot)
     }
 
     pub fn create_reboot_flag(&mut self) -> Result<(), Error> {
-        let (evm_tree, _) = bindings::store_write(&self.tree, REBOOT_FLAG, 0, &[])?;
-        self.tree = evm_tree;
+        let (evm_tree, _) = bindings::store_write(&self.tree(), REBOOT_FLAG, 0, &[])?;
+        *self.tree.borrow_mut() = evm_tree;
 
         Ok(())
     }
@@ -228,7 +242,7 @@ impl Runtime for Host {
 
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
         trace!("store_has({path})");
-        let res = bindings::store_has(self.tree(), path.as_bytes());
+        let res = bindings::store_has(&self.tree(), path.as_bytes());
 
         match res.map_err(from_binding_error)? {
             0 => Ok(None),
@@ -251,7 +265,7 @@ impl Runtime for Host {
         trace!("store_read({path})");
         let max_bytes = std::cmp::min(max_bytes, MAX_FILE_CHUNK_SIZE);
 
-        let res = bindings::store_read(self.tree(), path.as_bytes(), from_offset, max_bytes)
+        let res = bindings::store_read(&self.tree(), path.as_bytes(), from_offset, max_bytes)
             .map_err(from_binding_error)
             .map_err(self.check_path_has_value(path))?;
 
@@ -266,7 +280,7 @@ impl Runtime for Host {
     ) -> Result<usize, RuntimeError> {
         trace!("store_read_slice({path})");
         let max_bytes = std::cmp::min(buffer.len(), MAX_FILE_CHUNK_SIZE);
-        let res = bindings::store_read(self.tree(), path.as_bytes(), from_offset, max_bytes)
+        let res = bindings::store_read(&self.tree(), path.as_bytes(), from_offset, max_bytes)
             .map_err(from_binding_error)?;
 
         buffer.copy_from_slice(res.as_bytes());
@@ -276,7 +290,7 @@ impl Runtime for Host {
 
     fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError> {
         trace!("store_read_all({path})");
-        let res = bindings::read_value(self.tree(), path.as_bytes())
+        let res = bindings::read_value(&self.tree(), path.as_bytes())
             .map_err(from_binding_error)
             .map_err(self.check_path_exists(path))?;
         Ok(res.as_bytes().to_owned())
@@ -289,8 +303,9 @@ impl Runtime for Host {
         at_offset: usize,
     ) -> Result<(), RuntimeError> {
         trace!("store_write({path})");
-        let (new_tree, _size) = bindings::store_write(self.tree(), path.as_bytes(), at_offset, src)
-            .map_err(from_binding_error)?;
+        let (new_tree, _size) =
+            bindings::store_write(&self.tree(), path.as_bytes(), at_offset, src)
+                .map_err(from_binding_error)?;
         self.set_tree(new_tree);
 
         Ok(())
@@ -298,7 +313,7 @@ impl Runtime for Host {
 
     fn store_write_all<T: Path>(&mut self, path: &T, src: &[u8]) -> Result<(), RuntimeError> {
         trace!("store_write_all({path})");
-        let new_tree = bindings::store_write_all(self.tree(), path.as_bytes(), src)
+        let new_tree = bindings::store_write_all(&self.tree(), path.as_bytes(), src)
             .map_err(from_binding_error)?;
         self.set_tree(new_tree);
 
@@ -311,7 +326,7 @@ impl Runtime for Host {
             return Err(RuntimeError::PathNotFound);
         }
 
-        let new_tree = bindings::store_delete(self.tree(), path.as_bytes(), false)
+        let new_tree = bindings::store_delete(&self.tree(), path.as_bytes(), false)
             .map_err(from_binding_error)?;
         self.set_tree(new_tree);
 
@@ -320,7 +335,7 @@ impl Runtime for Host {
 
     fn store_delete_value<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
         trace!("store_delete_value({path})");
-        let new_tree = bindings::store_delete(self.tree(), path.as_bytes(), true)
+        let new_tree = bindings::store_delete(&self.tree(), path.as_bytes(), true)
             .map_err(from_binding_error)?;
         self.set_tree(new_tree);
 
@@ -329,7 +344,7 @@ impl Runtime for Host {
 
     fn store_count_subkeys<T: Path>(&self, prefix: &T) -> Result<u64, RuntimeError> {
         trace!("store_count_subkeys({prefix})");
-        let res = bindings::store_list_size(self.tree(), prefix.as_bytes())
+        let res = bindings::store_list_size(&self.tree(), prefix.as_bytes())
             .map_err(from_binding_error)?;
 
         Ok(res as u64)
@@ -341,7 +356,7 @@ impl Runtime for Host {
         to_path: &impl Path,
     ) -> Result<(), RuntimeError> {
         trace!("store_move({from_path}, {to_path})");
-        let new_tree = bindings::store_move(self.tree(), from_path.as_bytes(), to_path.as_bytes())
+        let new_tree = bindings::store_move(&self.tree(), from_path.as_bytes(), to_path.as_bytes())
             .map_err(from_binding_error)
             .map_err(self.check_path_exists(from_path))?;
         self.set_tree(new_tree);
@@ -360,7 +375,7 @@ impl Runtime for Host {
         to_path: &impl Path,
     ) -> Result<(), RuntimeError> {
         trace!("store_copy({from_path}, {to_path})");
-        let new_tree = bindings::store_copy(self.tree(), from_path.as_bytes(), to_path.as_bytes())
+        let new_tree = bindings::store_copy(&self.tree(), from_path.as_bytes(), to_path.as_bytes())
             .map_err(from_binding_error)
             .map_err(self.check_path_exists(from_path))?;
         self.set_tree(new_tree);
@@ -425,7 +440,7 @@ impl Runtime for Host {
         trace!("store_value_size({path})");
         match self.version {
             RuntimeVersion::V0 => {
-                let res = bindings::store_value_size(self.tree(), path.as_bytes())
+                let res = bindings::store_value_size(&self.tree(), path.as_bytes())
                     .map_err(from_binding_error)
                     .map_err(self.check_path_exists(path))?;
 
@@ -436,7 +451,7 @@ impl Runtime for Host {
             RuntimeVersion::V1 => {
                 // Changes compared to V0 introduced by
                 // https://gitlab.com/tezos/tezos/-/merge_requests/15897.
-                let res = bindings::store_value_size(self.tree(), path.as_bytes())
+                let res = bindings::store_value_size(&self.tree(), path.as_bytes())
                     .map_err(from_binding_error)
                     .map_err(self.check_path_has_value(path))?;
 
@@ -493,7 +508,7 @@ impl BifrostInternalRuntime for Host {
     fn __internal_store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
         trace!("store_get_hash({path})");
         let hash =
-            bindings::store_get_hash(self.tree(), path.as_bytes()).map_err(from_binding_error)?;
+            bindings::store_get_hash(&self.tree(), path.as_bytes()).map_err(from_binding_error)?;
 
         Ok(hash.as_bytes().to_vec())
     }
@@ -503,7 +518,7 @@ impl CalypsoInternalRuntime for Host {
     fn __internal_store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
         trace!("store_get_hash({path})");
         let hash =
-            bindings::store_get_hash(self.tree(), path.as_bytes()).map_err(from_binding_error)?;
+            bindings::store_get_hash(&self.tree(), path.as_bytes()).map_err(from_binding_error)?;
 
         Ok(hash.as_bytes().to_vec())
     }
@@ -513,7 +528,7 @@ impl Calypso2InternalRuntime for Host {
     fn __internal_store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
         trace!("store_get_hash({path})");
         let hash =
-            bindings::store_get_hash(self.tree(), path.as_bytes()).map_err(from_binding_error)?;
+            bindings::store_get_hash(&self.tree(), path.as_bytes()).map_err(from_binding_error)?;
 
         Ok(hash.as_bytes().to_vec())
     }
@@ -523,7 +538,7 @@ impl DionysusInternalRuntime for Host {
     fn __internal_store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
         trace!("store_get_hash({path})");
         let hash =
-            bindings::store_get_hash(self.tree(), path.as_bytes()).map_err(from_binding_error)?;
+            bindings::store_get_hash(&self.tree(), path.as_bytes()).map_err(from_binding_error)?;
 
         Ok(hash.as_bytes().to_vec())
     }
@@ -533,7 +548,20 @@ impl DionysusR1InternalRuntime for Host {
     fn __internal_store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
         trace!("store_get_hash({path})");
         let hash =
-            bindings::store_get_hash(self.tree(), path.as_bytes()).map_err(from_binding_error)?;
+            bindings::store_get_hash(&self.tree(), path.as_bytes()).map_err(from_binding_error)?;
+
+        Ok(hash.as_bytes().to_vec())
+    }
+}
+
+impl EbisuInternalRuntime for Hasher {
+    fn __internal_store_get_hash<T: tezos_smart_rollup_host::path::Path>(
+        &mut self,
+        path: &T,
+    ) -> Result<Vec<u8>, tezos_smart_rollup_host::runtime::RuntimeError> {
+        trace!("store_get_hash({path})");
+        let hash = bindings::store_get_hash(&self.0.borrow(), path.as_bytes())
+            .map_err(from_binding_error)?;
 
         Ok(hash.as_bytes().to_vec())
     }
