@@ -73,6 +73,7 @@
   Script_repr_costs_generated
   Script_repr_costs
   Script_repr
+  Script_native_repr
   Cache_memory_helpers
   Seed_repr
   Sampler
@@ -368,6 +369,7 @@
   script_repr_costs_generated.ml
   script_repr_costs.ml
   script_repr.ml script_repr.mli
+  script_native_repr.ml script_native_repr.mli
   cache_memory_helpers.ml
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -668,6 +670,7 @@
   script_repr_costs_generated.ml
   script_repr_costs.ml
   script_repr.ml script_repr.mli
+  script_native_repr.ml script_native_repr.mli
   cache_memory_helpers.ml
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -952,6 +955,7 @@
   script_repr_costs_generated.ml
   script_repr_costs.ml
   script_repr.ml script_repr.mli
+  script_native_repr.ml script_native_repr.mli
   cache_memory_helpers.ml
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
