@@ -7,7 +7,9 @@
 use crate::contract::Contract;
 use crate::entrypoint::Entrypoint;
 use tezos_crypto_rs::{
-    hash::{BlockHash, BlsSignature},
+    hash::{
+        SmartRollupCommitmentHash, SmartRollupHash, SmartRollupStateHash, {BlockHash, BlsSignature},
+    },
     public_key::PublicKey,
     public_key_hash::PublicKeyHash,
 };
@@ -35,6 +37,11 @@ pub enum OperationContent {
     Origination(ManagerOperationContent<OriginationContent>),
     #[encoding(tag = 110)]
     Delegation(ManagerOperationContent<DelegationContent>),
+    // SMART_ROLLUP_OPERATION_TAG_OFFSET = 200;
+    #[encoding(tag = 202)] // SMART_ROLLUP_OPERATION_TAG_OFFSET + 2
+    SmartRollupCement(ManagerOperationContent<SmartRollupCementContent>),
+    #[encoding(tag = 203)] // SMART_ROLLUP_OPERATION_TAG_OFFSET + 3
+    SmartRollupPublish(ManagerOperationContent<SmartRollupPublishContent>),
 }
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
@@ -167,6 +174,25 @@ pub struct Script {
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct DelegationContent {
     pub delegate: Option<PublicKeyHash>,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct SmartRollupCementContent {
+    pub address: SmartRollupHash,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct SmartRollupCommitment {
+    pub compressed_state: SmartRollupStateHash,
+    pub inbox_level: i32,
+    pub predecessor: SmartRollupCommitmentHash,
+    pub number_of_ticks: i64,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct SmartRollupPublishContent {
+    pub address: SmartRollupHash,
+    pub commitment: SmartRollupCommitment,
 }
 
 #[cfg(test)]
@@ -1065,6 +1091,101 @@ mod tests {
 
         let (bytes, decoded_unsigned) = UnsignedOperation::nom_read(&encoded_unsigned).unwrap();
         assert_eq!(unsigned, decoded_unsigned);
+        assert!(bytes.is_empty());
+    }
+
+    /// Test `smart_rollup_cement` encoding
+    ///
+    /// Generated with:
+    /// ```sh
+    /// octez-codec encode "023-PtSeouLo.operation.contents" from '{
+    ///   "kind": "smart_rollup_cement",
+    ///   "source": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+    ///   "fee": "1234",
+    ///   "counter": "789",
+    ///   "gas_limit": "2000",
+    ///   "storage_limit": "10",
+    ///   "rollup": "sr1V6huFSUBUujzubUCg9nNXqpzfG9t4XD1h"
+    /// }'
+    /// ```
+    #[test]
+    fn smart_rollup_cement_encoding() {
+        let operation = OperationContent::SmartRollupCement(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
+            fee: 1_234.into(),
+            counter: 789.into(),
+            gas_limit: 2_000.into(),
+            storage_limit: 10.into(),
+            operation: SmartRollupCementContent {
+                address: SmartRollupHash::from_base58_check("sr1V6huFSUBUujzubUCg9nNXqpzfG9t4XD1h")
+                    .unwrap(),
+            },
+        });
+
+        let encoded_operation = operation.to_bytes().unwrap();
+
+        let bytes = hex::decode("ca00e7670f32038107a59a2b9cfefae36ea21f5aa63cd2099506d00f0afceda8e679c698b26b5f6772411955354a81a05c").unwrap();
+        assert_eq!(bytes, encoded_operation);
+
+        let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
+        assert_eq!(operation, decoded_operation);
+        assert!(bytes.is_empty());
+    }
+
+    /// Test `smart_rollup_publish` encoding
+    ///
+    /// Generated with:
+    ///
+    /// ```sh
+    /// octez-codec encode "023-PtSeouLo.operation.contents" from '{
+    ///   "kind": "smart_rollup_publish",
+    ///   "source": "tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF",
+    ///   "fee": "4000",
+    ///   "counter": "61",
+    ///   "gas_limit": "4200",
+    ///   "storage_limit": "0",
+    ///   "rollup": "sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg",
+    ///   "commitment": {
+    ///     "compressed_state": "srs11ZWE34ur1d8j81Eqt68v2P5gFkP3hHms6kQ9Qo26j7ktDeu85y",
+    ///     "inbox_level": 42,
+    ///     "predecessor": "src12UJzB8mg7yU6nWPzicH7ofJbFjyJEbHvwtZdfRXi8DQHNp1LY8",
+    ///     "number_of_ticks": "1234567890"
+    ///   }
+    /// }'
+    /// ```
+    #[test]
+    fn smart_rollup_publish_encoding() {
+        let operation = OperationContent::SmartRollupPublish(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF").unwrap(),
+            fee: 4_000.into(),
+            counter: 61.into(),
+            gas_limit: 4_200.into(),
+            storage_limit: 00.into(),
+            operation: SmartRollupPublishContent {
+                address: SmartRollupHash::from_base58_check("sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg")
+                    .unwrap(),
+                commitment: SmartRollupCommitment {
+                    compressed_state: SmartRollupStateHash::from_base58_check(
+                        "srs11ZWE34ur1d8j81Eqt68v2P5gFkP3hHms6kQ9Qo26j7ktDeu85y",
+                    )
+                    .unwrap(),
+                    inbox_level: 42,
+                    predecessor: SmartRollupCommitmentHash::from_base58_check(
+                        "src12UJzB8mg7yU6nWPzicH7ofJbFjyJEbHvwtZdfRXi8DQHNp1LY8",
+                    )
+                    .unwrap(),
+                    number_of_ticks: 1_234_567_890,
+                },
+            },
+        });
+
+        let encoded_operation = operation.to_bytes().unwrap();
+
+        let bytes = hex::decode("cb03ae7b7d713977a27ec643969f0c2e665ba9ad9aa1a01f3de8200027b7e1d8fb4292cca7b57c065ac9f210fcf2250111111111111111111111111111111111111111111111111111111111111111110000002a000000000000000000000000000000000000000000000000000000000000000000000000499602d2").unwrap();
+        assert_eq!(bytes, encoded_operation);
+
+        let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
+        assert_eq!(operation, decoded_operation);
         assert!(bytes.is_empty());
     }
 }
