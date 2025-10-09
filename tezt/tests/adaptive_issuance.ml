@@ -312,12 +312,6 @@ let test_staking =
   in
 
   let* _proto_hash, endpoint, client_1, node_1 = init ~overrides protocol in
-  let* constants =
-    Client.RPC.call client_1 @@ RPC.get_chain_block_context_constants ()
-  in
-  let consensus_rights_delay =
-    JSON.(constants |-> "consensus_rights_delay" |> as_int)
-  in
 
   log_step 1 "Prepare second node for double baking" ;
   Log.info "Starting second node" ;
@@ -684,7 +678,7 @@ let test_staking =
   let* () = bake_n ~endpoint ~protocol client_1 1 in
 
   let* () =
-    repeat 5 (fun () ->
+    repeat 7 (fun () ->
         let* () = bake_n ~endpoint ~protocol client_1 1 in
         let* b0 = check_and_return_balances ~check:!balances0 staker0 in
         let* b1 = check_and_return_balances ~check:!balances1 staker1 in
@@ -797,7 +791,7 @@ let test_staking =
     Client.spawn_unstake (Tez.of_int 500000) ~staker:staker0.alias client_1
   in
 
-  let* _ = Helpers.bake_n_cycles bake consensus_rights_delay client_1 in
+  let* _ = Helpers.bake_n_cycles bake 2 client_1 in
 
   let* () = Process.check ~expect_failure:false unstake0 in
 
@@ -980,7 +974,7 @@ let test_staking =
 
   (* slashed stake *)
   let amount_slashed_from_stakers_deposits =
-    if Protocol.(number protocol > number S023) then 50_248_757 else 50_248_756
+    if Protocol.(number protocol > number S023) then 50_248_756 else 50_248_756
   in
   let amount_rewarded_from_stakers_deposits =
     amount_slashed_from_stakers_deposits / reward_denominator
@@ -991,7 +985,7 @@ let test_staking =
 
   (* slashing baker (bootstrap2) stake*)
   let amount_slashed_from_baker_deposits =
-    if Protocol.(number protocol > number S023) then 10_049_775_146
+    if Protocol.(number protocol > number S023) then 10_049_785_808
     else 10_049_764_732
   in
 

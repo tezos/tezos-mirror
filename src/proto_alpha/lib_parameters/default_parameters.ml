@@ -238,8 +238,8 @@ let constants_mainnet : Constants.Parametric.t =
        [n+1+consensus_rights_delay] are sampled based on the current
        baking power of bakers.
 
-       Last updated in protocol T. *)
-    consensus_rights_delay = 1;
+       Last updated in protocol P. *)
+    consensus_rights_delay = 2;
     blocks_preservation_cycles = 1;
     (* [delegate_parameters_activation_delay] is the number of full
        cycles after which submitted delegate parameters are actually
@@ -382,15 +382,11 @@ let constants_mainnet : Constants.Parametric.t =
        chosen not too exceed 100 000 000 bytes. *)
     cache_script_size = 100_000_000;
     (* A cache for the stake distribution for all cycles stored at any moment:
-       consensus_rights_delay + slashing_delay + 2 = 1 + 1 + 2 = 4
-       currently.
-
-       Last updated in protocol T. *)
-    cache_stake_distribution_cycles = 4;
-    (* One for the sampler state for all cycles stored at any moment (as above).
-
-       Last updated in protocol T. *)
-    cache_sampler_state_cycles = 4;
+       consensus_rights_delay + max_slashing_period + 1 = 2 + 2 + 1 = 5
+       currently. *)
+    cache_stake_distribution_cycles = 5;
+    (* One for the sampler state for all cycles stored at any moment (as above). *)
+    cache_sampler_state_cycles = 5;
     dal = default_dal;
     sc_rollup;
     zk_rollup =
@@ -456,6 +452,7 @@ let constants_sandbox =
         };
     issuance_weights;
     blocks_preservation_cycles = 1;
+    consensus_rights_delay = 2;
     delegate_parameters_activation_delay = 2;
     blocks_per_cycle = 8l;
     blocks_per_commitment = 4l;
@@ -494,6 +491,7 @@ let constants_test =
             };
         };
     issuance_weights;
+    consensus_rights_delay = 2;
     delegate_parameters_activation_delay = 3;
     blocks_preservation_cycles = 1;
     blocks_per_cycle = 12l;

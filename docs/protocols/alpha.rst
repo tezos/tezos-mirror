@@ -135,15 +135,6 @@ Protocol parameters
   difficulty (``vdf_difficulty``) as well. (MRs :gl:`!17583`,
   :gl:`!19045`)
 
-- Lowered the ``consensus_rights_delay`` protocol constant from 2
-  cycles to 1 cycle. (MR :gl:`!18783`)
-
-- Reduced the ``cache_stake_distribution_cycles`` and
-  ``cache_sampler_state_cycles`` protocol constants from 5 cycles to 4
-  cycles, in order to reduce memory consumption. Only
-  ``consensus_rights_delay + slashing_delay + 2 = 1 + 1 + 2 = 4``
-  cycles are needed. (MR :gl:`!18783`)
-
 
 6s Block Time (MR :gl:`!19045`)
 ---------------------------------

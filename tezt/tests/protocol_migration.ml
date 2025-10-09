@@ -1388,21 +1388,15 @@ let test_unstaked_requests_many_delegates () =
         let expected_list =
           (* unstaked_frozen_balance =?= 0 *)
           match target_cycle with
-          (* D0 unstakes in C0: D0 unstaked_frozen <> 0 *)
           | 1 -> List.init 6 (fun i -> if i = 0 then false else true)
-          (* D1 unstakes in C1: D0, D1 unstaked_frozen <> 0 *)
           | 2 -> List.init 6 (fun i -> if i <= 1 then false else true)
-          (* D2 unstakes in C2: D0, D1, D2 unstaked_frozen <> 0 *)
           | 3 -> List.init 6 (fun i -> if i <= 2 then false else true)
-          (* D3 unstakes in C3: D1, D2, D3 unstaked_frozen <> 0; D0 unstaked_frozen = 0 *)
           | 4 -> List.init 6 (fun i -> if 1 <= i && i <= 3 then false else true)
-          (* D4 unstakes in C4: D3, D4 unstaked_frozen <> 0; D0, D1, D2 unstaked_frozen = 0 *)
-          | 5 -> List.init 6 (fun i -> if 3 <= i && i <= 4 then false else true)
-          (* D5 unstakes in C5: D4, D5 unstaked_frozen <> 0; D0, D1, D2, D3 unstaked_frozen = 0 *)
-          | 6 -> List.init 6 (fun i -> if 4 <= i then false else true)
-          (* D5 unstaked_frozen <> 0; D0, D1, D2, D3, D4 unstaked_frozen = 0 *)
-          | 7 -> List.init 6 (fun i -> if 5 <= i then false else true)
-          | 8 -> List.init 6 (fun _i -> true)
+          | 5 -> List.init 6 (fun i -> if 2 <= i && i <= 4 then false else true)
+          | 6 -> List.init 6 (fun i -> if 3 <= i then false else true)
+          | 7 -> List.init 6 (fun i -> if 4 <= i then false else true)
+          | 8 -> List.init 6 (fun i -> if i = 5 then false else true)
+          | 9 -> List.init 6 (fun _i -> true)
           | _ -> failwith "unexpected input"
         in
         let* () =
@@ -1424,8 +1418,8 @@ let test_unstaked_requests_many_delegates () =
           else unit
         in
         unit)
-      (* From cycle 1 to 8 *)
-      (List.init 8 (fun i -> i + 1))
+      (* From cycle 1 to 9 *)
+      (List.init 9 (fun i -> i + 1))
   in
   unit
 
@@ -1590,6 +1584,20 @@ let test_unstaked_requests_and_min_delegated () =
     bake_until_cycle_with_and_check
       ~bakers:[default_baker]
       ~target_cycle:5
+      ~delegate:default_baker
+      ~check_last_block:(fun _ -> unit)
+      ~check_next_block:(fun _ ->
+        let* _ = Local_helpers.unstake_requests ~staker:delegate_0 client in
+        Local_helpers.check_is_finalizable_all_requests
+          ~staker:delegate_0
+          ~expected:false
+          client)
+      client
+  in
+  let* () =
+    bake_until_cycle_with_and_check
+      ~bakers:[default_baker]
+      ~target_cycle:6
       ~delegate:default_baker
       ~check_last_block:(fun _ -> unit)
       ~check_next_block:(fun _ ->
@@ -1960,132 +1968,6 @@ let test_tz4_manager_operation ~with_empty_mempool =
   else
     Test.fail "Reveal of tz4 account is not included in the block: %s" receipt
 
-let test_consensus_rights_delay_shortening () =
-  let migrate_from = Option.get Protocol.(previous_protocol Alpha) in
-  let migrate_to = Protocol.Alpha in
-
-  let check_baking_rights_rpc ~expect_failure ~cycle client =
-    let*? process =
-      Client.RPC.spawn client
-      @@ RPC.get_chain_block_helper_baking_rights ~cycle ()
-    in
-    let* () = Process.check ~expect_failure process in
-    Log.info
-      ~color:Log.Color.FG.green
-      "Checked the baking rights for cycle = %s (expect_failure = %s)"
-      (Int.to_string cycle)
-      (Bool.to_string expect_failure) ;
-    unit
-  in
-  let check_baking_rights nb_cycles_to_check ?nb_cycles_is_valid client =
-    let* level =
-      Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
-    in
-    let nb_cycles_is_valid =
-      Option.value ~default:nb_cycles_to_check nb_cycles_is_valid
-    in
-    Lwt_list.iter_s
-      (fun cycle ->
-        let expect_failure = cycle > level.cycle + nb_cycles_is_valid in
-        check_baking_rights_rpc ~expect_failure ~cycle client)
-      (range level.cycle (level.cycle + nb_cycles_to_check))
-  in
-
-  let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
-  let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
-  for migration_level = blocks_per_cycle to 2 * blocks_per_cycle do
-    Test.register
-      ~__FILE__
-      ~title:
-        (Printf.sprintf
-           "protocol migration for consensus_rights_delay shortening at level \
-            %d"
-           migration_level)
-      ~tags:["protocol"; "migration"; "consensus_rights_delay"]
-    @@ fun () ->
-    let parameter_file = Protocol.parameter_file migrate_from in
-    let old_parameters = JSON.parse_file parameter_file in
-    let* client, _node =
-      Local_helpers.activate_protocol
-        ~parameter_file
-        ~migrate_from
-        ~migrate_to
-        ~migration_level
-    in
-    let consensus_rights_delay =
-      JSON.(get "consensus_rights_delay" parameters |> as_int)
-    in
-    let old_consensus_rights_delay =
-      JSON.(get "consensus_rights_delay" old_parameters |> as_int)
-    in
-    Log.info
-      ~color:Log.Color.FG.green
-      "blocks_per_cycle = %d, old_consensus_rights_delay = %d, \
-       consensus_rights_delay = %d, migration_level = %d"
-      blocks_per_cycle
-      old_consensus_rights_delay
-      consensus_rights_delay
-      migration_level ;
-
-    Log.info
-      ~color:Log.Color.FG.blue
-      "Checking baking rights before the migration" ;
-    let* () =
-      check_baking_rights
-        old_consensus_rights_delay
-        ~nb_cycles_is_valid:old_consensus_rights_delay
-        client
-    in
-    let* () = Client.bake_until_level ~target_level:migration_level client in
-    Log.info ~color:Log.Color.FG.green "Checking migration block consistency" ;
-    let* () =
-      block_check
-        ~expected_block_type:`Migration
-        client
-        ~migrate_from
-        ~migrate_to
-    in
-    let* () = Client.bake_for_and_wait client in
-    Log.info
-      ~color:Log.Color.FG.green
-      "Checking post-migration block consistency (first block of new protocol \
-       %s)."
-      (Protocol.name migrate_to) ;
-    let* () =
-      block_check
-        ~expected_block_type:`Non_migration
-        client
-        ~migrate_from
-        ~migrate_to
-    in
-    Log.info
-      ~color:Log.Color.FG.blue
-      "Checking baking rights just after the migration" ;
-    let* () =
-      check_baking_rights
-        old_consensus_rights_delay
-        ~nb_cycles_is_valid:consensus_rights_delay
-        client
-    in
-    (* Test that we can still bake after migration *)
-    let* () =
-      repeat
-        ((consensus_rights_delay + 2) * blocks_per_cycle)
-        (fun () -> Client.bake_for_and_wait client)
-    in
-    Log.info
-      ~color:Log.Color.FG.blue
-      "Checking baking rights after %d cycles after the migration"
-      (consensus_rights_delay + 2) ;
-    let* () =
-      check_baking_rights
-        old_consensus_rights_delay
-        ~nb_cycles_is_valid:consensus_rights_delay
-        client
-    in
-    unit
-  done
-
 let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
@@ -2096,5 +1978,4 @@ let register ~migrate_from ~migrate_to =
   test_unstaked_requests_and_min_delegated () ;
   test_reveal_migration () ;
   test_tz4_manager_operation ~with_empty_mempool:true ;
-  test_tz4_manager_operation ~with_empty_mempool:false ;
-  test_consensus_rights_delay_shortening ()
+  test_tz4_manager_operation ~with_empty_mempool:false

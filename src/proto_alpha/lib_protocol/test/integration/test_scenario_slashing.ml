@@ -326,14 +326,12 @@ let test_slash_timing =
        --> exclude_bakers ["delegate"]
        --> make_denunciations ()
       |+ Tag "without another slash" --> Empty)
-  --> next_cycle
-  (* Stake again to ensure that [delegate] has sufficient current
-     stake to get unforbidden, see the comment in
-     Protocol.Forbidden_delegates_storage.should_unforbid. *)
   --> stake "delegate" Half
-  --> list_map_branched [0; 1; 2; 3; 4] (fun i ->
-          let i = Protocol.Constants_repr.slashing_delay + i in
-          Tag (string_of_int i ^ " cycles lag") --> wait_n_cycles i)
+  --> List.fold_left
+        (fun acc i ->
+          acc |+ Tag (string_of_int i ^ " cycles lag") --> wait_n_cycles i)
+        wait_for_slashing
+        [3; 4; 5; 6]
   --> double_bake "delegate"
   --> exclude_bakers ["delegate"]
   --> make_denunciations () --> next_cycle
@@ -593,7 +591,7 @@ let test_mega_slash =
        because of the slash that happens before rights computation, which
        puts it under the minimal frozen threshold required to bake. *)
     --> wait_n_cycles_f (fun (_, state) ->
-            state.State.constants.consensus_rights_delay + 1)
+            state.State.constants.consensus_rights_delay + 2)
     --> check_has_no_slots ~loc:__LOC__ "delegate"
     --> next_cycle
     --> check_has_slots ~loc:__LOC__ "delegate"
