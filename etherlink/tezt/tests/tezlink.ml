@@ -1919,6 +1919,59 @@ let test_tezlink_prevalidation =
       client_tezlink
   in
 
+  (* case counter in the past *)
+  let* op_wrong_counter =
+    Operation.Manager.(
+      operation
+        [make ~fee:1000 ~counter:0 ~source:Constant.bootstrap1 (transfer ())]
+        client)
+  in
+  let wrong_counter_rex =
+    rex
+      (sf
+         "Counter %d already used for contract %s"
+         0
+         Constant.bootstrap1.public_key_hash)
+  in
+  let* _ =
+    Operation.inject
+      ~error:wrong_counter_rex
+      ~dont_wait:true
+      op_wrong_counter
+      client_tezlink
+  in
+
+  (* case batch with non consecutive counters *)
+  let counter = 2 in
+  let* op_non_consecutive_counter =
+    Operation.Manager.(
+      operation
+        [
+          make ~fee:1000 ~counter ~source:Constant.bootstrap1 (transfer ());
+          make
+            ~fee:1000
+            ~counter:(counter + 4)
+            ~source:Constant.bootstrap1
+            (transfer ());
+        ]
+        client)
+  in
+  let non_consecutive_counter_rex =
+    rex
+      (sf
+         "Non-consecutive counters for source %s: jumped from %d to %d"
+         Constant.bootstrap1.public_key_hash
+         2
+         6)
+  in
+  let* _ =
+    Operation.inject
+      ~error:non_consecutive_counter_rex
+      ~dont_wait:true
+      op_non_consecutive_counter
+      client_tezlink
+  in
+
   unit
 
 let () =

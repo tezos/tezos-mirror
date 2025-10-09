@@ -155,6 +155,9 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
 type batch_validation_context = {
   source : public_key_hash;
   balance_left : Tez.t;
+  previous_counter : Manager_counter.t option;
+      (* Used for [Inconsistent_counter] error, so only relevant starting from
+         the second operation. *)
   next_counter : Manager_counter.t;
       (* invariant: next_counter = first_counter + length *)
   error_clue : clue;
@@ -195,6 +198,21 @@ let validate_balance ~ctxt ~fee =
            Balance_too_low
              (Implicit ctxt.source, tezrep_of ctxt.balance_left, tezrep_of fee))
 
+let validate_counter ~ctxt counter =
+  let open Lwt_result_syntax in
+  if Manager_counter.equal ctxt.next_counter counter then return (Ok ())
+  else
+    match ctxt.previous_counter with
+    | Some previous_counter ->
+        tzfail_p
+        @@ Imported_protocol.Validate_errors.Manager.(
+             Inconsistent_counters
+               {source = ctxt.source; previous_counter; counter})
+    | None ->
+        (* the first counter in the batch is equal to ctxt.counter by
+           construction *)
+        failwith "unreachable"
+
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
   let open Lwt_result_syntax in
@@ -203,10 +221,10 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       tzfail_p
       @@ Imported_protocol.Validate_errors.Manager.Incorrect_reveal_position
   | Manager_operation
-      {source; fee; counter = _; operation; gas_limit = _; storage_limit = _} ->
+      {source; fee; counter; operation; gas_limit = _; storage_limit = _} ->
       let** () = validate_supported_operation ~ctxt operation in
       let** () = validate_source ~ctxt source in
-      (* TODO check counter is ok *)
+      let** () = validate_counter ~ctxt counter in
       (* TODO check gas limit high enough *)
       let** balance_left = validate_balance ~ctxt ~fee in
       (* the update will be updated during the validation steps *)
@@ -214,6 +232,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
         (Ok
            {
              ctxt with
+             previous_counter = Some ctxt.next_counter;
              next_counter = Manager_counter.succ ctxt.next_counter;
              length = ctxt.length + 1;
              balance_left;
@@ -228,6 +247,29 @@ let rec validate_batch ~(ctxt : batch_validation_context)
   | c :: rest ->
       let** ctxt = validate_operation_in_batch ~ctxt c in
       (validate_batch [@ocaml.tailcall]) ~ctxt rest
+
+let validate_first_counter ~read ~source ~first_counter =
+  let open Lwt_result_syntax in
+  let* counter =
+    Tezlink_durable_storage.counter read
+    @@ Tezos_types.Contract.of_implicit source
+  in
+  let*? first_counter = Tezos_types.Operation.counter_to_z first_counter in
+  if Z.gt first_counter counter then
+    (* we allow the first counter to be in the future *) return (Ok ())
+  else
+    let expected =
+      Imported_protocol.Manager_counter_repr.Internal_for_tests.of_int
+      @@ Z.to_int counter
+    in
+    let found =
+      Imported_protocol.Manager_counter_repr.Internal_for_tests.of_int
+      @@ Z.to_int first_counter
+    in
+
+    tzfail_p
+    @@ Imported_protocol.Contract_storage.(
+         Counter_in_the_past {contract = Implicit source; expected; found})
 
 let validate_size ~raw ~error_clue =
   let open Lwt_result_syntax in
@@ -268,12 +310,14 @@ let validate_tezlink_operation ~read raw =
     Tezlink_durable_storage.balance read
     @@ Tezos_types.Contract.of_implicit source
   in
+  let** () = validate_first_counter ~read ~source ~first_counter in
   let** ctxt =
     validate_batch
       ~ctxt:
         {
           source;
           balance_left;
+          previous_counter = None;
           next_counter = first_counter;
           error_clue;
           first_counter;
