@@ -272,6 +272,14 @@ module Contract : sig
        and type t := Raw_context.t
        and type local_context := local_context
 
+  (** Contracts are considered native if they have a `/native` value. They won't
+      have `/code` in that case. *)
+  module Native :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Contract_repr.t
+       and type value = Script_native_repr.t
+       and type t := Raw_context.t
+
   module Code :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Contract_repr.t

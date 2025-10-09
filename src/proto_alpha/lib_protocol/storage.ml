@@ -471,6 +471,14 @@ module Contract = struct
     let keys_unaccounted = I.keys_unaccounted
   end
 
+  module Native =
+    Indexed_context.Make_carbonated_map
+      (Registered)
+      (struct
+        let name = ["native"]
+      end)
+      (Script_native_repr)
+
   module Code = Make_carbonated_map_expr (struct
     let name = ["code"]
   end)
