@@ -38,7 +38,6 @@ pub struct TcCtx<Host, Context, Gas> {
 
 pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
     pub tc_ctx: TcCtx<Host, Context, Gas>,
-
     pub sender: AddressHash,
     pub amount: i64,
     pub self_address: AddressHash,
@@ -47,7 +46,6 @@ pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
     pub now: Timestamp,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub chain_id: ChainId,
-
     pub source: PublicKeyHash,
     pub operation_counter: OpCounter,
     pub origination_nonce: OrigNonce,
