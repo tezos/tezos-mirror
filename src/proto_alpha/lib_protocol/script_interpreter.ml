@@ -1878,7 +1878,10 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
         trace
           (Runtime_contract_error step_constants.self)
           (interp logger (ctxt, step_constants) code (arg, old_storage))
-    | Native {kind = _} -> assert false
+    | Native {kind} ->
+        trace
+          (Runtime_contract_error step_constants.self)
+          (Script_native.execute (ctxt, step_constants) kind arg old_storage)
   in
   let* storage, lazy_storage_diff, ctxt =
     Script_ir_translator.extract_lazy_storage_diff
