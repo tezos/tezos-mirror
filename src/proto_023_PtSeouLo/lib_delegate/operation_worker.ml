@@ -737,7 +737,7 @@ let run ?(monitor_node_operations = true) ~constants
         ~factor:2.
         ~tries:5
         ~is_error:(function _ -> true)
-        ~msg:"unable to call monitor operations RPC."
+        ~msg:(fun _ -> "unable to call monitor operations RPC.")
         (fun () ->
           (monitor_operations
              cctxt
