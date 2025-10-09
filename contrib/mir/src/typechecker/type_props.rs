@@ -23,6 +23,8 @@ pub enum TypeProperty {
     Packable,
     BigMapValue,
     Duplicable,
+    ViewInput,
+    ViewOutput,
 }
 
 impl std::fmt::Display for TypeProperty {
@@ -35,6 +37,8 @@ impl std::fmt::Display for TypeProperty {
             TypeProperty::Packable => "packable",
             TypeProperty::BigMapValue => "allowed big_map value",
             TypeProperty::Duplicable => "duplicable",
+            TypeProperty::ViewInput => "allowed view input",
+            TypeProperty::ViewOutput => "allowed view output",
         };
         write!(f, "{s}")
     }
@@ -58,7 +62,9 @@ impl Type {
                 TypeProperty::Comparable
                 | TypeProperty::Pushable
                 | TypeProperty::Duplicable
-                | TypeProperty::Packable => return invalid_type_prop(),
+                | TypeProperty::Packable
+                | TypeProperty::ViewOutput
+                | TypeProperty::ViewInput => return invalid_type_prop(),
                 TypeProperty::Passable | TypeProperty::Storable | TypeProperty::BigMapValue => (),
             },
             #[cfg(feature = "bls")]
@@ -69,7 +75,9 @@ impl Type {
                 | TypeProperty::Pushable
                 | TypeProperty::Packable
                 | TypeProperty::BigMapValue
-                | TypeProperty::Duplicable => (),
+                | TypeProperty::Duplicable
+                | TypeProperty::ViewOutput
+                | TypeProperty::ViewInput => (),
             },
             Operation => match prop {
                 TypeProperty::Comparable
@@ -77,7 +85,9 @@ impl Type {
                 | TypeProperty::Storable
                 | TypeProperty::Pushable
                 | TypeProperty::Packable
-                | TypeProperty::BigMapValue => return invalid_type_prop(),
+                | TypeProperty::BigMapValue
+                | TypeProperty::ViewOutput
+                | TypeProperty::ViewInput => return invalid_type_prop(),
                 TypeProperty::Duplicable => (),
             },
             Pair(p) | Or(p) => {
@@ -92,7 +102,9 @@ impl Type {
                 | TypeProperty::Pushable
                 | TypeProperty::Packable
                 | TypeProperty::BigMapValue
-                | TypeProperty::Duplicable => x.ensure_prop(gas, prop)?,
+                | TypeProperty::Duplicable
+                | TypeProperty::ViewOutput
+                | TypeProperty::ViewInput => x.ensure_prop(gas, prop)?,
             },
             Set(x) => match prop {
                 TypeProperty::Comparable => return invalid_type_prop(),
@@ -101,7 +113,9 @@ impl Type {
                 | TypeProperty::Pushable
                 | TypeProperty::Packable
                 | TypeProperty::BigMapValue
-                | TypeProperty::Duplicable => x.ensure_prop(gas, prop)?,
+                | TypeProperty::Duplicable
+                | TypeProperty::ViewOutput
+                | TypeProperty::ViewInput => x.ensure_prop(gas, prop)?,
             },
             Map(p) => match prop {
                 TypeProperty::Comparable => return invalid_type_prop(),
@@ -110,13 +124,17 @@ impl Type {
                 | TypeProperty::Pushable
                 | TypeProperty::Packable
                 | TypeProperty::BigMapValue
-                | TypeProperty::Duplicable => p.1.ensure_prop(gas, prop)?,
+                | TypeProperty::Duplicable
+                | TypeProperty::ViewOutput
+                | TypeProperty::ViewInput => p.1.ensure_prop(gas, prop)?,
             },
             BigMap(p) => match prop {
                 TypeProperty::Comparable
                 | TypeProperty::BigMapValue
                 | TypeProperty::Packable
-                | TypeProperty::Pushable => return invalid_type_prop(),
+                | TypeProperty::Pushable
+                | TypeProperty::ViewOutput
+                | TypeProperty::ViewInput => return invalid_type_prop(),
                 #[cfg(feature = "allow_lazy_storage_transfer")]
                 TypeProperty::Passable => p.1.ensure_prop(gas, prop)?,
                 #[cfg(not(feature = "allow_lazy_storage_transfer"))]
@@ -124,7 +142,11 @@ impl Type {
                 TypeProperty::Duplicable | TypeProperty::Storable => p.1.ensure_prop(gas, prop)?,
             },
             Contract(_) => match prop {
-                TypeProperty::Passable | TypeProperty::Packable | TypeProperty::Duplicable => (),
+                TypeProperty::Passable
+                | TypeProperty::Packable
+                | TypeProperty::Duplicable
+                | TypeProperty::ViewOutput
+                | TypeProperty::ViewInput => (),
                 TypeProperty::Comparable
                 | TypeProperty::Storable
                 | TypeProperty::Pushable
@@ -137,7 +159,9 @@ impl Type {
                 | TypeProperty::Pushable
                 | TypeProperty::Packable
                 | TypeProperty::BigMapValue
-                | TypeProperty::Duplicable => (),
+                | TypeProperty::Duplicable
+                | TypeProperty::ViewOutput
+                | TypeProperty::ViewInput => (),
             },
         }
         Ok(())

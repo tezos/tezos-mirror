@@ -363,7 +363,9 @@ impl<'a> Micheline<'a> {
                     // TODO: consume some gas
                     let name: String = name.into();
                     let input_type = input_type.parse_ty(gas)?;
+                    input_type.ensure_prop(gas, TypeProperty::ViewInput)?;
                     let output_type = output_type.parse_ty(gas)?;
+                    output_type.ensure_prop(gas, TypeProperty::ViewOutput)?;
                     let previous_view = views.insert(
                         name.clone(),
                         View {
