@@ -592,6 +592,34 @@ module type COMPONENT_API = sig
     string list ->
     job
 
+  type tezt_timeout = No_timeout | Minutes of int
+
+  val tezt_job :
+    description:string ->
+    ?provider:Tezos_ci.Runner.Provider.t ->
+    ?arch:Tezos_ci.Runner.Arch.t ->
+    ?cpu:Tezos_ci.Runner.CPU.t ->
+    ?storage:Tezos_ci.Runner.Storage.t ->
+    ?select_tezts:bool ->
+    ?fetch_records_from:string ->
+    ?only_if_changed:string list ->
+    ?needs:(need * job) list ->
+    ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
+    ?test_coverage:bool ->
+    ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
+    ?tezt_exe:string ->
+    ?global_timeout:tezt_timeout ->
+    ?test_timeout:tezt_timeout ->
+    ?parallel_jobs:int ->
+    ?parallel_tests:int ->
+    ?retry_jobs:int ->
+    ?retry_tests:int ->
+    ?keep_going:bool ->
+    ?test_selection:Tezt_core.TSL_AST.t ->
+    ?before_script:string list ->
+    string ->
+    job
+
   val register_before_merging_jobs : (trigger * job) list -> unit
 
   val register_schedule_extended_test_jobs : (trigger * job) list -> unit
@@ -622,6 +650,9 @@ module type COMPONENT_API = sig
 
   val register_dedicated_test_release_pipeline : (trigger * job) list -> unit
 end
+
+(* [job_select_tezts] will be initialized further down. *)
+let job_select_tezts = ref None
 
 (* We could avoid using a functor if we required the user of this module
    to pass the component's [name] and [paths] to the functions that need them,
@@ -707,6 +738,274 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       image_dependencies;
       services;
     }
+
+  (* This job is allowed to fail because Tezt can still run without records,
+     or with records that are committed in the repository. *)
+  let job_tezt_fetch_records =
+    parameterize @@ fun from_pipeline ->
+    job
+      ("fetch_tezt_records_from_" ^ from_pipeline)
+      ~__POS__
+      ~description:
+        "Fetch Tezt records so that jobs that run Tezt tests can use them for \
+         auto-balancing."
+      ~image:Tezos_ci.Images.CI.build
+      ~stage:Build
+      ~allow_failure:Yes
+      ~artifacts:
+        (Gitlab_ci.Util.artifacts
+           ~expire_in:(Duration (Hours 4))
+           ~when_:Always
+           [
+             "tezt-fetch-records.log";
+             "tezt/records/**.json";
+             (* Keep broken records for debugging *)
+             "tezt/records/**.json.broken";
+           ])
+      [
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "dune exec scripts/ci/update_records/update.exe -- --info --log-file \
+         tezt-fetch-records.log --from last-successful-scheduled:"
+        ^ from_pipeline;
+        "./scripts/ci/filter_corrupted_records.sh";
+      ]
+
+  module SH = struct
+    (* Mini-module to help craft large shell commands. *)
+
+    (* [arguments] is a list of list.
+       For instance, it can be [["--verbose"]; ["--log-file"; "logs.txt"]].
+       Using a list of list instead of a list allows to
+       group related arguments together without ocamlformat ungrouping them.
+       It also allows to easily insert optional arguments.
+
+       This does not quote because we sometimes want to insert variables.
+       So, use with caution. *)
+    let command executable arguments =
+      String.concat " " (executable :: List.flatten arguments)
+
+    let redirect_stdout_to path command = command ^ " > " ^ path
+
+    let wrap_with executable arguments cmd =
+      command executable arguments ^ " " ^ cmd
+
+    let quote = Filename.quote
+  end
+
+  type tezt_timeout = No_timeout | Minutes of int
+
+  let tezt_job ~description ?provider ?arch ?(cpu = Tezos_ci.Runner.CPU.Tezt)
+      ?storage ?(select_tezts = true) ?fetch_records_from ?only_if_changed
+      ?(needs = []) ?needs_legacy ?test_coverage ?allow_failure ?tezt_exe
+      ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
+      ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
+      ?(keep_going = false) ?(test_selection = Tezt_core.TSL_AST.True)
+      ?(before_script = []) variant =
+    let record_dir =
+      let dir =
+        match Component.name with
+        | None -> "tezt/records"
+        | Some name -> "tezt/records" // name
+      in
+      if variant = "" then dir else dir // variant
+    in
+    let variables =
+      [
+        (* The following variables are only used in the YAML.
+           We can inline them later but for now the diff with the old Tezt.job function
+           is easier to review with them. *)
+        ("JUNIT", "tezt-junit.xml");
+        ("TEZT_VARIANT", if variant = "" then "" else "-" ^ variant);
+        ("TESTS", Tezt_core.TSL.show test_selection);
+        ("TEZT_RETRY", string_of_int retry_tests);
+        ("TEZT_PARALLEL", string_of_int parallel_tests);
+        (* The following variable must be an environment variable
+           because it is not only used in the YAML. *)
+        ("TEZT_NO_NPX", "true");
+      ]
+    in
+    let variables_to_echo =
+      (* Later this could be computed from [variables], but for now we try to reduce
+         the diff as much as possible to ease reviewing. *)
+      [
+        "TESTS";
+        "JUNIT";
+        "CI_NODE_INDEX";
+        "CI_NODE_TOTAL";
+        "TEZT_PARALLEL";
+        "TEZT_VARIANT";
+      ]
+    in
+    let cmd_echo_variables =
+      let message =
+        variables_to_echo
+        |> List.map (fun var -> sf {|%s=\"${%s}\"|} var var)
+        |> String.concat " "
+      in
+      "echo \"" ^ message ^ "\""
+    in
+    (* It would be a good idea to define the arguments that control test selection
+       only once, to share the code for both [tezt.sh] invocations,
+       as it is important that exactly the same tests are selected.
+       But this makes the diff for the merge request that introduces this function
+       harder to read, so for now we don't. *)
+    let cmd_store_list_of_selected_tests =
+      SH.command
+        "./scripts/ci/tezt.sh"
+        [
+          (match tezt_exe with
+          | None -> []
+          | Some path -> ["--tezt-exe"; SH.quote path]);
+          [
+            (if select_tezts then "--with-select-tezts"
+             else "--without-select-tezts");
+          ];
+          ["--"];
+          ["\"${TESTS}\""];
+          [
+            "--from-record";
+            (* Ideally we woud use SH.quote here.
+               For now we don't because it makes the diff harder to read. *)
+            record_dir;
+          ];
+          ["--job"; "${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}"];
+          ["--list-tsv"];
+        ]
+      |> SH.redirect_stdout_to "selected_tezts.tsv"
+    in
+    let cmd_run_tests =
+      let junit_tags =
+        (* List of tags to include in JUnit reports that we send to DataDog. *)
+        [
+          (* Tags that change the job that runs the test.
+             Useful to be able to filter on only a specific job type in DataDog. *)
+          "flaky";
+          "time_sensitive";
+          "slow";
+          "extra";
+          (* Tags that denote the owner of tests.
+             Useful in case we want to send alerts to specific teams. *)
+          "infrastructure";
+          "layer1";
+          "tezos2";
+          "etherlink";
+          (* Tags that change alert thresholds. *)
+          "memory_hungry";
+        ]
+      in
+      SH.command
+        "./scripts/ci/tezt.sh"
+        [
+          ["--send-junit"; "${JUNIT}"];
+          [
+            (if select_tezts then "--with-select-tezts"
+             else "--without-select-tezts");
+          ];
+          ["--"];
+          ["\"${TESTS}\""];
+          ["--color"];
+          ["--log-buffer-size"; "5000"];
+          ["--log-file"; "tezt.log"];
+          (match global_timeout with
+          | No_timeout -> []
+          | Minutes m -> ["--global-timeout"; string_of_int (60 * m)]);
+          (match test_timeout with
+          | No_timeout -> []
+          | Minutes m -> ["--test-timeout"; string_of_int (60 * m)]);
+          ["--on-unknown-regression-files"; "fail"];
+          ["--junit"; "${JUNIT}"];
+          ["--junit-mem-peak"; SH.quote "dd_tags[memory.peak]"];
+          [
+            "--from-record";
+            (* Ideally we woud use SH.quote here.
+               For now we don't because it makes the diff harder to read. *)
+            record_dir;
+          ];
+          ["--job"; "${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}"];
+          ["--record"; "tezt-results.json"];
+          ["--job-count"; "${TEZT_PARALLEL}"];
+          ["--retry"; "${TEZT_RETRY}"];
+          ["--record-mem-peak"];
+          ["--mem-warn"; "5_000_000_000"];
+          (if keep_going then ["--keep-going"] else []);
+          ( Fun.flip List.concat_map junit_tags @@ fun tag ->
+            ["--junit-tag"; Printf.sprintf "'dd_tags[tezt-tag.%s]=%s'" tag tag]
+          );
+        ]
+    in
+    let wrap_with_timeout command =
+      (* Wrapping the Tezt call with the [timeout] command allows to avoid GitLab timeouts.
+         The latter cause artifacts to be lost.
+         See https://gitlab.com/gitlab-org/gitlab/-/issues/19818. *)
+      match global_timeout with
+      | No_timeout -> command
+      | Minutes m ->
+          SH.wrap_with
+            "timeout"
+            [["-k"; "60"]; [string_of_int (60 * (m + 1))]]
+            command
+    in
+    let wrap_with_exit_code = SH.wrap_with "./scripts/ci/exit_code.sh" [] in
+    let needs =
+      if select_tezts then
+        match !job_select_tezts with
+        | None -> failwith "job_select_tezts has not been initialized"
+        | Some job -> (Artifacts, job) :: needs
+      else needs
+    in
+    let needs =
+      match fetch_records_from with
+      | None -> needs
+      | Some pipeline_name ->
+          (Artifacts, job_tezt_fetch_records pipeline_name) :: needs
+    in
+    job
+      (if variant = "" then "tezt" else "tezt-" ^ variant)
+      ~__POS__
+      ~stage:Test
+      ~description
+      ?provider
+      ?arch
+      ~cpu
+      ?storage
+      ~image:Tezos_ci.Images.CI.e2etest
+      ?only_if_changed
+      ~needs
+      ?needs_legacy
+      ?parallel:
+        (if parallel_jobs > 1 then Some (Vector parallel_jobs) else None)
+      ~variables
+      ~artifacts:
+        (Gitlab_ci.Util.artifacts
+           ~reports:(Gitlab_ci.Util.reports ~junit:"$JUNIT" ())
+           [
+             "selected_tezts.tsv";
+             "tezt.log";
+             "tezt-*.log";
+             "tezt-results.json";
+             "$JUNIT";
+           ]
+           ~expire_in:(Duration (Days 7))
+           ~when_:Always)
+      ?test_coverage
+      ?allow_failure
+      ?retry:
+        (match retry_jobs with
+        | None -> None
+        | Some max -> Some {max; when_ = []})
+      ?timeout:
+        (match global_timeout with
+        | No_timeout -> None
+        | Minutes m -> Some (Minutes (m + 10)))
+      (before_script
+      @ [
+          ". ./scripts/version.sh";
+          cmd_echo_variables;
+          cmd_store_list_of_selected_tests;
+          wrap_with_exit_code (wrap_with_timeout cmd_run_tests);
+        ])
 
   let register_before_merging_jobs jobs =
     (* Add [trigger] as a dependency of all [jobs]. *)
@@ -878,3 +1177,28 @@ module Shared = Make (struct
 
   let paths = []
 end)
+
+(* Initialize [job_select_tezts]. *)
+let () =
+  (* This job needs the following executables from its [~image]:
+     - Git (to run git diff)
+     - ocamlyacc, ocamllex and ocamlc (to build manifest/manifest) *)
+  job_select_tezts :=
+    Some
+      (Shared.job
+         "select_tezts"
+         ~__POS__
+         ~description:"Run Manifezt to select the set of Tezt tests to run."
+         ~image:Tezos_ci.Images.CI.prebuild
+         ~stage:Build
+         ~artifacts:
+           (Gitlab_ci.Util.artifacts
+              ~expire_in:(Duration (Days 3))
+              ~when_:Always
+              ["selected_tezts.tsl"])
+         ~allow_failure:(With_exit_codes [17])
+         [
+           "./scripts/ci/take_ownership.sh";
+           "eval $(opam env)";
+           "scripts/ci/select_tezts.sh || exit $?";
+         ])

@@ -252,6 +252,95 @@ module type COMPONENT_API = sig
     string list ->
     job
 
+  (** Time interval for timeouts passed to {!tezt_job}. *)
+  type tezt_timeout = No_timeout | Minutes of int
+
+  (** Define a job that runs Tezt tests.
+
+      Just like {!job}, this function must only be called once per job. See {!parameterize}.
+
+      The main [string] argument is the name of the job.
+      It will be prefixed by the name of the component.
+
+      General parameters:
+      - [tezt_exe] is the path to the Tezt executable, relative to [_build/default/].
+        It defaults to [tezt/tests/main.exe]. This executable is assumed to have been
+        built by another job, which you must specify as a dependency with an [Artifacts]
+        [~needs] or [~needs_legacy].
+      - [before_script] is prepended to the job's script.
+
+      Timeouts:
+      - [global_timeout] is Tezt's [--global-timeout].
+        It defaults to 30 minutes.
+        Do not set it to [No_timeout] unless you have a VERY good reason.
+      - If [global_timeout] is specified,
+        the main Tezt call is wrapped under the [timeout] command,
+        causing [SIGTERM] to be sent to Tezt after [global_timeout] plus 1 minute,
+        and [SIGKILL] to be sent 1 more minute after that.
+      - If [global_timeout] is specified,
+        the CI job itself also gets a timeout of [global_timeout] plus 10 minutes.
+      - [test_timeout] is Tezt's [--test-timeout].
+        It defaults to 9 minutes.
+
+      Parallel execution:
+      - [parallel_jobs] is GitLab's [parallel:] field.
+        It is the number of CI jobs that are spawned to run in parallel.
+        It defaults to 1.
+      - [parallel_tests] is Tezt's [--job-count].
+        It is the maximum number of tests that Tezt shall run in parallel in a given CI job.
+        It defaults to 6.
+
+      Error handling:
+      - [retry_jobs] is GitLab's [retry:] field.
+        It allows GitLab to re-launch jobs that failed.
+        By default, there is no retry.
+      - [retry_tests] is Tezt's [--retry].
+        It allows Tezt to re-run tests that failed.
+        By default, there is no retry.
+      - [keep_going] is Tezt's [--keep-going].
+        It defaults to [false] (don't keep going).
+
+      Test selection:
+      - [select_tezts] controls whether to activate test selection using Manifezt.
+        It defaults to [true]. When active, it causes the job to depend
+        on the [select_tezts] job, which is automatically added to the pipeline if necessary.
+      - [fetch_records_from] is the name of a scheduled pipeline to fetch Tezt records from.
+        This allows Tezt to better select test for auto-balancing
+        when using [parallel_jobs > 1]. If specified, it causes the job to depend
+        on a [fetch_tezt_records_from_*] job which is automatically added to the pipeline
+        if necessary.
+      - [test_selection] is a TSL expression.
+        TSL is the Test Selection Language fo Tezt.
+        It allows to select a subset of tests to run.
+        It defaults to [True], i.e. "run all tests".
+
+      For other arguments, see the documentation of the [job] function above. *)
+  val tezt_job :
+    description:string ->
+    ?provider:Tezos_ci.Runner.Provider.t ->
+    ?arch:Tezos_ci.Runner.Arch.t ->
+    ?cpu:Tezos_ci.Runner.CPU.t ->
+    ?storage:Tezos_ci.Runner.Storage.t ->
+    ?select_tezts:bool ->
+    ?fetch_records_from:string ->
+    ?only_if_changed:string list ->
+    ?needs:(need * job) list ->
+    ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
+    ?test_coverage:bool ->
+    ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
+    ?tezt_exe:string ->
+    ?global_timeout:tezt_timeout ->
+    ?test_timeout:tezt_timeout ->
+    ?parallel_jobs:int ->
+    ?parallel_tests:int ->
+    ?retry_jobs:int ->
+    ?retry_tests:int ->
+    ?keep_going:bool ->
+    ?test_selection:Tezt_core.TSL_AST.t ->
+    ?before_script:string list ->
+    string ->
+    job
+
   (** Register jobs to be included in [before_merging] and [merge_train] pipelines. *)
   val register_before_merging_jobs : (trigger * job) list -> unit
 

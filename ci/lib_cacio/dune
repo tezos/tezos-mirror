@@ -5,4 +5,5 @@
  (name cacio)
  (libraries
   gitlab_ci
-  tezos_ci))
+  tezos_ci
+  tezt.core))
