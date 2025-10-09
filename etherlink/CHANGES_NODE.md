@@ -14,6 +14,9 @@
 
 ### Monitoring changes
 
+- Update opentelemetry library to 0.12 which should fix the issue where a log
+  protobuf encoding crashes the node when telemetry is activated. (!19516)
+
 ### Command-line interface changes
 
 - The `download kernel` command now allows to download the upcoming kernel
