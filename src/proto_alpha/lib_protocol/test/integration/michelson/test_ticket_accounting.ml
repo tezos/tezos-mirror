@@ -344,7 +344,7 @@ let origination_operation ctxt ~sender ~script:(code, storage) ~orig_contract =
                {
                  storage_type;
                  storage;
-                 code = _;
+                 implementation = _;
                  arg_type = _;
                  views = _;
                  entrypoints = _;

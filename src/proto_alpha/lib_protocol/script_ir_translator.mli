@@ -90,14 +90,21 @@ type toplevel = {
   views : Script_typed_ir.view_map;
 }
 
+type ('arg, 'storage) implementation =
+      ('arg, 'storage) Script_typed_ir.implementation =
+  | Lambda : {
+      code :
+        (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
+    }
+      -> ('arg, 'storage) implementation
+  | Native : {
+      kind : ('arg, 'storage) Script_native_types.kind;
+    }
+      -> ('arg, 'storage) implementation
+
 type ('arg, 'storage) code =
   | Code : {
-      code :
-        ( ('arg, 'storage) Script_typed_ir.pair,
-          ( Script_typed_ir.operation Script_list.t,
-            'storage )
-          Script_typed_ir.pair )
-        Script_typed_ir.lambda;
+      implementation : ('arg, 'storage) implementation;
       arg_type : ('arg, _) Script_typed_ir.ty;
       storage_type : ('storage, _) Script_typed_ir.ty;
       views : Script_typed_ir.view_map;
@@ -317,6 +324,9 @@ val parse_code :
   context ->
   code:Script.lazy_expr ->
   (ex_code * context) tzresult Lwt.t
+
+val get_typed_native_code :
+  t -> kind:Script.native_kind -> (ex_code * context) tzresult Lwt.t
 
 val parse_storage :
   elab_conf:Script_ir_translator_config.elab_config ->

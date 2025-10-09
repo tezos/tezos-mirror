@@ -270,7 +270,7 @@ let origination_operation block ~sender ~baker ~script ~storage ~forges_tickets
                {
                  storage_type;
                  storage;
-                 code = _;
+                 implementation = _;
                  arg_type = _;
                  views = _;
                  entrypoints = _;

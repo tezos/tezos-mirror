@@ -1613,7 +1613,7 @@ module Scripts = struct
         let* ( Ex_code
                  (Code
                     {
-                      code;
+                      implementation;
                       arg_type;
                       storage_type;
                       views;
@@ -1636,7 +1636,7 @@ module Scripts = struct
           Script_ir_translator.Ex_script
             (Script
                {
-                 code;
+                 implementation;
                  arg_type;
                  storage_type;
                  views;
