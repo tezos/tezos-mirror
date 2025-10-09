@@ -39,6 +39,18 @@ let log_step counter msg =
   let prefix = "step" ^ string_of_int counter in
   Log.info ~color ~prefix msg
 
+let title_abaab ~abaab title =
+  Format.asprintf "%s (abaab: %s)" title (if abaab then "on" else "off")
+
+let abaab_threshold ~abaab ~protocol =
+  let pair_to_ratio (num, den) =
+    let str = "all_bakers_attest_activation_threshold" in
+    [([str; "numerator"], `Int num); ([str; "denominator"], `Int den)]
+  in
+  if Protocol.number protocol < 024 then []
+  else if abaab then pair_to_ratio (0, 1)
+  else pair_to_ratio (2, 1)
+
 let bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5 =
   Constant.(bootstrap1, bootstrap2, bootstrap3, bootstrap4, bootstrap5)
 
@@ -267,16 +279,26 @@ let baker_remote_test =
   let* _ = Node.wait_for_level node 3 in
   unit
 
-let baker_check_consensus_branch =
+let baker_check_consensus_branch ~abaab =
   Protocol.register_test
     ~__FILE__
-    ~title:"Baker check branch in consensus operations"
+    ~title:(title_abaab ~abaab "Baker check branch in consensus operations")
     ~tags:[team; "baker"; "grandparent"; "parent"]
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   Log.info "Init client and node with protocol %s" (Protocol.name protocol) ;
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      (abaab_threshold ~abaab ~protocol)
+  in
   let* node, client =
-    Client.init_with_protocol `Client ~protocol () ~timestamp:Now
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~parameter_file
+      ()
+      ~timestamp:Now
   in
 
   let target_level = 5 in
@@ -314,17 +336,27 @@ let baker_check_consensus_branch =
     ops
 
 (** Test that blocks are applied only if round >= [force_apply_from_round]. *)
-let force_apply_from_round =
+let force_apply_from_round ~abaab =
   Protocol.register_test
     ~__FILE__
-    ~title:"Baker check force apply from round"
+    ~title:(title_abaab ~abaab "Baker check force apply from round")
     ~tags:[team; "baker"; "force_apply_from_round"]
     ~supports:Protocol.(From_protocol 021)
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   log_step 1 "initialize a node and a client with protocol" ;
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      (abaab_threshold ~abaab ~protocol)
+  in
   let* node, client =
-    Client.init_with_protocol `Client ~protocol () ~timestamp:Now
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~parameter_file
+      ()
+      ~timestamp:Now
   in
 
   log_step 2 "wait for level 1" ;
@@ -654,22 +686,23 @@ let check_consensus_operations ?expected_attestations_committee
   in
   unit
 
-let simple_attestation_aggregation ~remote_mode protocol =
+let simple_attestation_aggregation ~abaab ~remote_mode protocol =
   log_step 1 "Initialize a node and a client with protocol" ;
   let consensus_rights_delay = 1 in
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      [
-        (["allow_tz4_delegate_enable"], `Bool true);
-        (["aggregate_attestation"], `Bool true);
-        (* Diminish some constants to activate consensus keys faster *)
-        (["blocks_per_cycle"], `Int 2);
-        (["nonce_revelation_threshold"], `Int 1);
-        (["consensus_rights_delay"], `Int consensus_rights_delay);
-        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-      ]
+      ([
+         (["allow_tz4_delegate_enable"], `Bool true);
+         (["aggregate_attestation"], `Bool true);
+         (* Diminish some constants to activate consensus keys faster *)
+         (["blocks_per_cycle"], `Int 2);
+         (["nonce_revelation_threshold"], `Int 1);
+         (["consensus_rights_delay"], `Int consensus_rights_delay);
+         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+       ]
+      @ abaab_threshold ~abaab ~protocol)
   in
   let* node, client =
     Client.init_with_protocol
@@ -735,29 +768,31 @@ let simple_attestation_aggregation ~remote_mode protocol =
   unit
 
 (* Test that the baker aggregates eligible attestations.*)
-let simple_attestations_aggregation_local_context =
+let simple_attestations_aggregation_local_context ~abaab =
   Protocol.register_test
     ~__FILE__
-    ~title:"Simple attestations aggregation local context"
+    ~title:(title_abaab ~abaab "Simple attestations aggregation local context")
     ~tags:[team; "baker"; "attestation"; "aggregation"; "local"]
     ~supports:Protocol.(From_protocol 023)
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
-  @@ fun protocol -> simple_attestation_aggregation ~remote_mode:false protocol
+  @@ fun protocol ->
+  simple_attestation_aggregation ~abaab ~remote_mode:false protocol
 
 (* Test that the baker aggregates eligible attestations.*)
-let simple_attestations_aggregation_remote_node =
+let simple_attestations_aggregation_remote_node ~abaab =
   Protocol.register_test
     ~__FILE__
-    ~title:"Simple attestations aggregation remote node"
+    ~title:(title_abaab ~abaab "Simple attestations aggregation remote node")
     ~tags:[team; "baker"; "attestation"; "aggregation"; "remote"]
     ~supports:Protocol.(From_protocol 023)
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
-  @@ fun protocol -> simple_attestation_aggregation ~remote_mode:true protocol
+  @@ fun protocol ->
+  simple_attestation_aggregation ~abaab ~remote_mode:true protocol
 
-let prequorum_check_levels =
+let prequorum_check_levels ~abaab =
   Protocol.register_test
     ~__FILE__
-    ~title:"prequorum monitoring check operations level"
+    ~title:(title_abaab ~abaab "prequorum monitoring check operations level")
     ~tags:[team; "prequorum"; "monitoring"; "check"]
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
@@ -768,7 +803,8 @@ let prequorum_check_levels =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Left parameter_file)
-      [(["minimal_block_delay"], `String "4")]
+      ([(["minimal_block_delay"], `String "4")]
+      @ abaab_threshold ~abaab ~protocol)
   in
   let* node, client =
     Client.init_with_protocol
@@ -877,28 +913,29 @@ let z_of_bool_vector dal_attestation =
   in
   Array.fold_left aux (0, 0) dal_attestation |> fst |> Z.of_int
 
-let attestations_aggregation_on_reproposal ~remote_mode protocol =
+let attestations_aggregation_on_reproposal ~abaab ~remote_mode protocol =
   let consensus_rights_delay = 1 in
   let consensus_committee_size = 256 in
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      [
-        (["allow_tz4_delegate_enable"], `Bool true);
-        (["aggregate_attestation"], `Bool true);
-        (* Using custom consensus constants to be able to trigger reproposals *)
-        (["consensus_committee_size"], `Int consensus_committee_size);
-        (["consensus_threshold_size"], `Int 70);
-        (* Diminish some constants to activate consensus keys faster,
+      ([
+         (["allow_tz4_delegate_enable"], `Bool true);
+         (["aggregate_attestation"], `Bool true);
+         (* Using custom consensus constants to be able to trigger reproposals *)
+         (["consensus_committee_size"], `Int consensus_committee_size);
+         (["consensus_threshold_size"], `Int 70);
+         (* Diminish some constants to activate consensus keys faster,
            and make round durations as small as possible *)
-        (["minimal_block_delay"], `String "4");
-        (["delay_increment_per_round"], `String "0");
-        (["blocks_per_cycle"], `Int 2);
-        (["nonce_revelation_threshold"], `Int 1);
-        (["consensus_rights_delay"], `Int consensus_rights_delay);
-        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-      ]
+         (["minimal_block_delay"], `String "4");
+         (["delay_increment_per_round"], `String "0");
+         (["blocks_per_cycle"], `Int 2);
+         (["nonce_revelation_threshold"], `Int 1);
+         (["consensus_rights_delay"], `Int consensus_rights_delay);
+         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+       ]
+      @ abaab_threshold ~abaab ~protocol)
   in
   let* node, client =
     Client.init_with_protocol
@@ -1159,30 +1196,37 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
   unit
 
 (* Test that the baker correctly aggregates eligible attestations on reproposals.*)
-let attestations_aggregation_on_reproposal_local_context =
+let attestations_aggregation_on_reproposal_local_context ~abaab =
   Protocol.register_test
     ~__FILE__
-    ~title:"Attestations aggregation on reproposal local context"
+    ~title:
+      (title_abaab
+         ~abaab
+         "Attestations aggregation on reproposal local context")
     ~tags:[team; "baker"; "attestation"; "aggregation"; "reproposal"; "local"]
     ~supports:Protocol.(From_protocol 023)
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
-  attestations_aggregation_on_reproposal ~remote_mode:false protocol
+  attestations_aggregation_on_reproposal ~abaab ~remote_mode:false protocol
 
-let attestations_aggregation_on_reproposal_remote_node =
+let attestations_aggregation_on_reproposal_remote_node ~abaab =
   Protocol.register_test
     ~__FILE__
-    ~title:"Attestations aggregation on reproposal remote node"
+    ~title:
+      (title_abaab ~abaab "Attestations aggregation on reproposal remote node")
     ~tags:[team; "baker"; "attestation"; "aggregation"; "reproposal"; "remote"]
     ~supports:Protocol.(From_protocol 023)
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
-  attestations_aggregation_on_reproposal ~remote_mode:true protocol
+  attestations_aggregation_on_reproposal ~abaab ~remote_mode:true protocol
 
-let aggregated_operations_retrival_from_block_content =
+let aggregated_operations_retrival_from_block_content ~abaab =
   Protocol.register_test
     ~__FILE__
-    ~title:"Aggregated operations are retrieved from the block content"
+    ~title:
+      (title_abaab
+         ~abaab
+         "Aggregated operations are retrieved from the block content")
     ~tags:[team; "baker"; "aggregation"; "reproposal"; "retrival"]
     ~supports:Protocol.(From_protocol 023)
   @@ fun protocol ->
@@ -1191,16 +1235,17 @@ let aggregated_operations_retrival_from_block_content =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
-      [
-        (["allow_tz4_delegate_enable"], `Bool true);
-        (["aggregate_attestation"], `Bool true);
-        (* Diminish some constants to activate consensus keys faster *)
-        (["blocks_per_cycle"], `Int 2);
-        (["nonce_revelation_threshold"], `Int 1);
-        (["consensus_rights_delay"], `Int consensus_rights_delay);
-        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
-        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
-      ]
+      ([
+         (["allow_tz4_delegate_enable"], `Bool true);
+         (["aggregate_attestation"], `Bool true);
+         (* Diminish some constants to activate consensus keys faster *)
+         (["blocks_per_cycle"], `Int 2);
+         (["nonce_revelation_threshold"], `Int 1);
+         (["consensus_rights_delay"], `Int consensus_rights_delay);
+         (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+         (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+       ]
+      @ abaab_threshold ~abaab ~protocol)
   in
   let* node, client =
     Client.init_with_protocol `Client ~protocol ~parameter_file ()
@@ -1372,6 +1417,16 @@ let stream_is_refreshed_on_timeout =
         "The baker did not refresh the streamed RPC after prolonged inactivity \
          from the mempool"
 
+let register_with_abaab ~abaab ~protocols =
+  baker_check_consensus_branch ~abaab protocols ;
+  force_apply_from_round ~abaab protocols ;
+  simple_attestations_aggregation_local_context ~abaab protocols ;
+  simple_attestations_aggregation_remote_node ~abaab protocols ;
+  prequorum_check_levels ~abaab protocols ;
+  attestations_aggregation_on_reproposal_local_context ~abaab protocols ;
+  attestations_aggregation_on_reproposal_remote_node ~abaab protocols ;
+  aggregated_operations_retrival_from_block_content ~abaab protocols
+
 let register ~protocols =
   check_node_version_check_bypass_test protocols ;
   check_node_version_allowed_test protocols ;
@@ -1382,13 +1437,7 @@ let register ~protocols =
   baker_stresstest_apply protocols ;
   bls_baker_test protocols ;
   baker_remote_test protocols ;
-  baker_check_consensus_branch protocols ;
-  force_apply_from_round protocols ;
-  simple_attestations_aggregation_local_context protocols ;
-  simple_attestations_aggregation_remote_node protocols ;
-  prequorum_check_levels protocols ;
-  attestations_aggregation_on_reproposal_local_context protocols ;
-  attestations_aggregation_on_reproposal_remote_node protocols ;
-  aggregated_operations_retrival_from_block_content protocols ;
   unable_to_reach_node_mempool protocols ;
-  stream_is_refreshed_on_timeout protocols
+  stream_is_refreshed_on_timeout protocols ;
+  register_with_abaab ~abaab:false ~protocols ;
+  register_with_abaab ~abaab:true ~protocols
