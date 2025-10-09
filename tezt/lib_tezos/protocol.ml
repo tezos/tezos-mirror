@@ -105,18 +105,29 @@ type bootstrap_smart_rollup = {
   whitelist : string list option;
 }
 
+type bootstrap_parameters = {
+  balance : int option;
+  consensus_key : Account.key option;
+  delegate : Account.key option;
+}
+
 let default_bootstrap_balance = 4_000_000_000_000
 
+let default_bootstrap_parameters =
+  {balance = None; consensus_key = None; delegate = None}
+
 let write_parameter_file :
-    ?bootstrap_accounts:(Account.key * int option) list ->
-    ?additional_bootstrap_accounts:(Account.key * int option * bool) list ->
+    ?overwrite_bootstrap_accounts:
+      (Account.key * bootstrap_parameters option) list option ->
+    ?additional_bootstrap_accounts:
+      (Account.key * bootstrap_parameters option * bool) list ->
     ?bootstrap_smart_rollups:bootstrap_smart_rollup list ->
     ?bootstrap_contracts:bootstrap_contract list ->
     ?output_file:string ->
     base:(string, t * constants option) Either.t ->
     parameter_overrides ->
     string Lwt.t =
- fun ?(bootstrap_accounts = default_bootstrap_accounts)
+ fun ?(overwrite_bootstrap_accounts = Some default_bootstrap_accounts)
      ?(additional_bootstrap_accounts = [])
      ?(bootstrap_smart_rollups = [])
      ?(bootstrap_contracts = [])
@@ -137,21 +148,40 @@ let write_parameter_file :
     if List.mem_assoc ["bootstrap_accounts"] parameter_overrides then
       parameter_overrides
     else
-      let bootstrap_accounts =
-        List.map
-          (fun ((account : Account.key), default_balance) ->
-            `A
-              [
-                `String account.public_key;
-                `String
-                  (string_of_int
-                     (Option.value
-                        ~default:default_bootstrap_balance
-                        default_balance));
-              ])
-          bootstrap_accounts
-      in
-      (["bootstrap_accounts"], `A bootstrap_accounts) :: parameter_overrides
+      match overwrite_bootstrap_accounts with
+      | None -> parameter_overrides
+      | Some bootstrap_accounts ->
+          let bootstrap_accounts =
+            List.map
+              (fun ((account : Account.key), bootstrap_param) ->
+                let bootstrap_param =
+                  Option.value
+                    ~default:default_bootstrap_parameters
+                    bootstrap_param
+                in
+                `A
+                  ([
+                     `String account.public_key;
+                     `String
+                       (string_of_int
+                          (Option.value
+                             ~default:default_bootstrap_balance
+                             bootstrap_param.balance));
+                   ]
+                  @
+                  match
+                    (bootstrap_param.consensus_key, bootstrap_param.delegate)
+                  with
+                  | None, None -> []
+                  | Some ck, None -> [`String ck.public_key]
+                  | None, Some dlg -> [`String dlg.public_key_hash]
+                  | Some _, Some _ ->
+                      failwith
+                        "Cannot both set a consensus key and a delegate to a \
+                         bootstrap account."))
+              bootstrap_accounts
+          in
+          (["bootstrap_accounts"], `A bootstrap_accounts) :: parameter_overrides
   in
   let parameter_overrides =
     if List.mem_assoc ["bootstrap_smart_rollups"] parameter_overrides then
@@ -235,16 +265,30 @@ let write_parameter_file :
     in
     let additional_bootstrap_accounts =
       List.map
-        (fun ((account : Account.key), default_balance, is_revealed) ->
+        (fun ((account : Account.key), bootstrap_param, is_revealed) ->
+          let bootstrap_param =
+            Option.value ~default:default_bootstrap_parameters bootstrap_param
+          in
           `A
-            [
-              `String
-                (if is_revealed then account.public_key
-                 else account.public_key_hash);
-              `String
-                (string_of_int
-                   (Option.value ~default:4000000000000 default_balance));
-            ])
+            ([
+               `String
+                 (if is_revealed then account.public_key
+                  else account.public_key_hash);
+               `String
+                 (string_of_int
+                    (Option.value
+                       ~default:default_bootstrap_balance
+                       bootstrap_param.balance));
+             ]
+            @
+            match (bootstrap_param.consensus_key, bootstrap_param.delegate) with
+            | None, None -> []
+            | Some ck, None -> [`String ck.public_key]
+            | None, Some dlg -> [`String dlg.public_key_hash]
+            | Some _, Some _ ->
+                failwith
+                  "Cannot both set a consensus key and a delegate to a \
+                   bootstrap account."))
         additional_bootstrap_accounts
     in
     Ezjsonm.update

@@ -306,7 +306,14 @@ module Local = struct
       |> Lwt_list.map_s (fun alias ->
              let* () = Lwt_io.printf "." in
              let* account_key = Client.show_address ~alias client in
-             return (account_key, bootstrap_amount_mutez))
+             return
+               ( account_key,
+                 Some
+                   {
+                     Protocol.balance = bootstrap_amount_mutez;
+                     consensus_key = None;
+                     delegate = None;
+                   } ))
     in
     let* () = Lwt_io.printf "\n" in
     let* () =
@@ -316,7 +323,7 @@ module Local = struct
     in
     let* _filename =
       Tezt_tezos.Protocol.write_parameter_file
-        ~bootstrap_accounts
+        ~overwrite_bootstrap_accounts:(Some bootstrap_accounts)
         ~base:(Either.Left activation_parameters_filename)
         ~output_file:output_parameters_filename
         []

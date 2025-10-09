@@ -160,7 +160,7 @@ let baker_reward_test =
 let baker_test protocol ~keys =
   let* parameter_file =
     Protocol.write_parameter_file
-      ~bootstrap_accounts:(List.map (fun k -> (k, None)) keys)
+      ~overwrite_bootstrap_accounts:(Some (List.map (fun k -> (k, None)) keys))
       ~base:(Right (protocol, None))
       []
   in
@@ -249,7 +249,7 @@ let bls_baker_test =
   in
   let* parameter_file =
     Protocol.write_parameter_file
-      ~bootstrap_accounts:(List.map (fun k -> (k, None)) keys)
+      ~overwrite_bootstrap_accounts:(Some (List.map (fun k -> (k, None)) keys))
       ~base:(Right (protocol, None))
       [(["allow_tz4_delegate_enable"], `Bool true)]
   in

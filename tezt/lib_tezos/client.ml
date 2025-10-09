@@ -3203,7 +3203,16 @@ let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
       | None -> acc
       | Some accounts ->
           List.fold_left
-            (fun acc x -> (x, default_accounts_balance, revealed) :: acc)
+            (fun acc x ->
+              ( x,
+                Some
+                  {
+                    Protocol.balance = default_accounts_balance;
+                    consensus_key = None;
+                    delegate = None;
+                  },
+                revealed )
+              :: acc)
             acc
             accounts
     in
@@ -3218,6 +3227,7 @@ let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
     in
     let* parameter_file =
       Protocol.write_parameter_file
+        ~overwrite_bootstrap_accounts:None
         ~additional_bootstrap_accounts
         ~base:
           (Option.fold
