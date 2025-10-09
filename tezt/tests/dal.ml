@@ -4809,6 +4809,236 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     ~migrate_to
     ()
 
+let get_delegate node ~level ~tb_index =
+  let* json =
+    Node.RPC.call node @@ RPC.get_chain_block_helper_validators ~level ()
+  in
+  let pkh =
+    Option.get
+    @@ List.find_map
+         (fun elem ->
+           if
+             List.mem
+               tb_index
+               JSON.(elem |-> "slots" |> as_list |> List.map as_int)
+           then Some JSON.(elem |-> "delegate" |> as_string)
+           else None)
+         (JSON.as_list json)
+  in
+  return
+  @@ List.find
+       (fun acc -> acc.Account.public_key_hash = pkh)
+       Constant.all_secret_keys
+
+(* A commitment is published in the "previous protocol" and attested in the
+   same protocol. Then, in the "new protocol" a trap denunciation is sent.
+
+   This denunciation is valid only if the denounced trap refers to the
+   publication sent "previous attestation lag" before.
+
+   Still in the "previous protocol", a baker DAL attests the publication slot
+   of all levels between the publication level and the migration level
+   (despite the trap fraction being 1).
+
+   Since the migration level is expected to be after publication level +
+   previous attestation lag, the attestation is expected to be in the
+   "previous protocol".
+
+   Then denunciations are sent in the "new protocol", both for the attestation
+   "new attestation lag" and "previous attestation lag" after the publication.
+
+   We expect the one using the "new attestation lag" to be invalid and the
+   other one to be included.
+*)
+let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
+    ~migrate_to =
+  let slot_index = 0 in
+  let tags = ["migration"; "dal"; "accusation"; "attestation_lag"] in
+  let description =
+    "test accusation during migration with reduction of the attestation_lag"
+  in
+  let scenario ~migration_level (dal_parameters : Dal.Parameters.t) client node
+      dal_node =
+    (* We do not use the DAL node in this test *)
+    let* () = Dal_node.terminate dal_node in
+    Log.info "Compute the attestation lag before and after migration" ;
+    (* [dal_parameters] should contain the parameters of the "previous"
+       protocol. *)
+    let old_lag = dal_parameters.attestation_lag in
+    let base = Either.right (migrate_to, None) in
+    let* new_proto_parameters =
+      generate_protocol_parameters base migrate_to []
+    in
+    let new_dal_parameters =
+      Dal.Parameters.from_protocol_parameters new_proto_parameters
+    in
+    let new_lag = new_dal_parameters.attestation_lag in
+    Log.info "Initializing the cryptobox" ;
+    let* () = Helpers.init_prover ~__LOC__ () in
+    let* cryptobox = Helpers.make_cryptobox dal_parameters.cryptobox in
+    let slot_size = dal_parameters.cryptobox.slot_size in
+    (* A slot which will be published should be targeted by the denunciation. *)
+    let slot_with_trap = Helpers.(bytes_of_slot (make_slot ~slot_size "A")) in
+    let commitment_with_trap, proof_with_trap, shards_with_proofs_with_trap =
+      Helpers.get_commitment_and_shards_with_proofs
+        cryptobox
+        ~slot:slot_with_trap
+    in
+    let shard_index = 0 in
+    let shard_denounced, proof_denounced =
+      Seq.find
+        (fun (Cryptobox.{index; _}, _proof) -> index = shard_index)
+        shards_with_proofs_with_trap
+      |> Option.get
+    in
+
+    let* level = Client.level client in
+    let publi_with_trap_level = level + 1 in
+    Log.info
+      "Computing the delegate which sends the attestation related to the shard \
+       we want to denounce." ;
+    (* Given that there are 2 potential attestation lags, we compute the one
+       associated to both. *)
+    (* This computation relies on the fact the shard index is the same as the
+       index in the Tenderbake committee. *)
+    let* delegate_old =
+      get_delegate
+        node
+        ~level:(publi_with_trap_level + old_lag - 1)
+        ~tb_index:shard_index
+    in
+    let* delegate_new =
+      get_delegate
+        node
+        ~level:(publi_with_trap_level + new_lag - 1)
+        ~tb_index:shard_index
+    in
+    (* We want to have enough levels to attest in "previous" what has been
+       published at [publi_with_trap_level]. *)
+    assert (publi_with_trap_level + old_lag <= migration_level) ;
+    Log.info "Publishing the to-be-denounced slot." ;
+    let* _op_hash =
+      Helpers.publish_commitment
+        ~source:Constant.bootstrap1
+        ~index:slot_index
+        ~commitment:commitment_with_trap
+        ~proof:proof_with_trap
+        client
+    in
+    let* () = bake_for client in
+    Log.info
+      "The to-be-denounced delegates attest at every level, until the \
+       attestation of the denounced shard (included)." ;
+    let availability = Slots [slot_index] in
+    let craft_attestation delegate =
+      let* attestation, _op_hash =
+        inject_dal_attestation_exn
+          ~protocol:migrate_from
+          ~signer:delegate
+          ~nb_slots:dal_parameters.number_of_slots
+          availability
+          client
+      in
+      let* signature = Operation.sign attestation client in
+      return (attestation, signature)
+    in
+    let* () = bake_for ~count:(new_lag - 1) client in
+    Log.info "Crafting the attestation using the \"new\" attestation lag" ;
+    let* attestation_new = craft_attestation delegate_new in
+    let* () = bake_for ~count:(old_lag - new_lag) client in
+    Log.info "Crafting the attestation using the \"old\" attestation lag" ;
+    let* attestation_old = craft_attestation delegate_old in
+    Log.info "We bake until 2 levels after the migration." ;
+    let* () =
+      repeat
+        (migration_level - publi_with_trap_level - old_lag + 3)
+        (fun () -> bake_for client)
+    in
+    Log.info
+      "Craft an entrapment evidence which uses the \"new\" attestation lag" ;
+    let accusation =
+      Operation.Anonymous.dal_entrapment_evidence_standalone_attestation
+        ~protocol:migrate_to
+        ~attestation:attestation_new
+        ~slot_index
+        shard_denounced
+        proof_denounced
+    in
+    Log.info "Inject this accusation" ;
+    (* This accusation should be accepted only if the protocol migration does
+       not imply a variation of the attestation lag *)
+    if new_lag = old_lag then (
+      let () =
+        Log.info
+          "Since attestation lag did not change, this accusation should be \
+           injected and included without issue."
+      in
+      let* _op_hash = Operation.Anonymous.inject accusation client in
+      let* () = bake_for client in
+      let* ops =
+        Node.RPC.call node
+        @@ RPC.get_chain_block_operations_validation_pass
+             ~block:"head"
+             ~validation_pass:2
+             ()
+      in
+      Check.(List.length (JSON.as_list ops) = 1)
+        ~__LOC__
+        Check.(int)
+        ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
+      unit)
+    else
+      let () =
+        Log.info
+          "Since attestation lag changed, this accusation refer to the wrong \
+           commitment, hence injection should fail."
+      in
+      let* _op_hash =
+        Operation.Anonymous.inject
+          ~error:Operation_core.dal_entrapment_of_not_published_commitment
+          accusation
+          client
+      in
+      let* () = bake_for client in
+      Log.info
+        "Craft an entrapment evidence which uses the \"old\" attestation lag" ;
+      let accusation =
+        Operation.Anonymous.dal_entrapment_evidence_standalone_attestation
+          ~protocol:migrate_to
+          ~attestation:attestation_old
+          ~slot_index
+          shard_denounced
+          proof_denounced
+      in
+      Log.info
+        "Injection of this new accusation should work fine and be included in \
+         the next block" ;
+      let* _op_hash = Operation.Anonymous.inject accusation client in
+      let* () = bake_for client in
+      let* ops =
+        Node.RPC.call node
+        @@ RPC.get_chain_block_operations_validation_pass
+             ~block:"head"
+             ~validation_pass:2
+             ()
+      in
+      Check.(List.length (JSON.as_list ops) = 1)
+        ~__LOC__
+        Check.(int)
+        ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
+      unit
+  in
+  test_l1_migration_scenario
+    ~scenario
+    ~tags
+    ~description
+    ~activation_timestamp:Now
+    ~operator_profiles:[slot_index]
+    ~traps_fraction:Q.one
+    ~migration_level:10
+    ~migrate_to
+    ()
+
 let test_operator_profile _protocol _dal_parameters _cryptobox _node _client
     dal_node =
   let index = 0 in
@@ -12136,7 +12366,10 @@ let register_migration ~migrate_from ~migrate_to =
     ~migrate_to ;
   tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
   test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to ;
-  test_migration_with_attestation_lag_change ~migrate_from ~migrate_to
+  test_migration_with_attestation_lag_change ~migrate_from ~migrate_to;
+  test_accusation_migration_with_attestation_lag_decrease
+    ~migrate_from
+    ~migrate_to
 
 let () =
   Regression.register
