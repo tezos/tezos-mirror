@@ -120,7 +120,7 @@ let remove_old_headers ctxt ~published_level =
       + Append per-level cells to Storage.Dal.Slot.LevelHistories.
    - Return the updated [ctxt] and the attestation bitset. *)
 let finalize_slot_headers_for_published_level ctxt ~number_of_slots
-    ~attestation_lag published_level =
+    ~attestation_lag ~is_slot_attested published_level =
   let open Lwt_result_syntax in
   let* published_slots = find_slot_headers ctxt published_level in
   let*! ctxt = remove_old_headers ctxt ~published_level in
@@ -129,11 +129,6 @@ let finalize_slot_headers_for_published_level ctxt ~number_of_slots
     | None -> return (ctxt, Dal_attestation_repr.empty, [])
     | Some published_slots ->
         let slot_headers_statuses, attestation =
-          let is_slot_attested slot =
-            Raw_context.Dal.is_slot_index_attested
-              ctxt
-              slot.Dal_slot_repr.Header.id.index
-          in
           compute_slot_headers_statuses ~is_slot_attested published_slots
         in
         return (ctxt, attestation, slot_headers_statuses)
@@ -156,8 +151,14 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
   match Raw_level_repr.(sub raw_level curr_attestation_lag) with
   | None -> return (ctxt, Dal_attestation_repr.empty)
   | Some published_level ->
+      let is_slot_attested slot =
+        Raw_context.Dal.is_slot_index_attested
+          ctxt
+          slot.Dal_slot_repr.Header.id.index
+      in
       finalize_slot_headers_for_published_level
         ctxt
         published_level
         ~number_of_slots
         ~attestation_lag:curr_attestation_lag
+        ~is_slot_attested
