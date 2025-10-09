@@ -3747,7 +3747,7 @@ let test_clean_bps =
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
-    ~title:"All blueprints are cleared on flush"
+    ~title:"All blueprints are stale on flush"
     ~tags:["evm"; "flush"; "clean"]
     ~use_dal:Register_without_feature
     ~kernels:[Latest]
@@ -3833,19 +3833,37 @@ let test_clean_bps =
   (* Bake a new L1 block to force the flush. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
 
-  (* check not in storage anymore*)
-  let* subkeys =
+  (* check that their generation is old*)
+  let* generation =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_durable_state_value
          ~pvm_kind:"wasm_2_0_0"
-         ~operation:Sc_rollup_rpc.Subkeys
-         ~key:"/evm/blueprints/42"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:"/evm/blueprints/42/generation"
          ()
   in
+  let generation =
+    match generation with
+    | Some g -> g
+    | None -> Test.fail "The blueprint generation should be an integer"
+  in
+  let* current_generation =
+    Sc_rollup_node.RPC.call sc_rollup_node
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key:"/evm/blueprints/generation"
+         ()
+  in
+  let current_generation =
+    match current_generation with
+    | Some g -> g
+    | None -> Test.fail "The current blueprint generation should be an integer"
+  in
   Check.(
-    (subkeys = [])
-      (list string)
-      ~error_msg:"The blueprint should have been cleared, but we found %L") ;
+    (generation <> current_generation)
+      string
+      ~error_msg:"The blueprint generation should be old, got %L, current is %R") ;
   unit
 
 let test_delayed_inbox_flushing_event =
