@@ -317,7 +317,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 pin-depends: [
   [
     "base.v0.16.4"
-    "git+https://github.com/vch9/base.git#1d0cdedec2a8c63608d3c34531565903d5918ff6"
+    "git+https://github.com/vch9/base.git#7f6581ba5e29fd340266cb901a59f24ebfbe67f1"
   ]
   [
     "cohttp.5.3.1~octez"
