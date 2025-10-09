@@ -1211,14 +1211,8 @@ module Scripts = struct
         ~now_opt
         ~level_opt
     in
-    let script_entrypoint_type ctxt expr entrypoint =
-      let ctxt = Gas.set_unlimited ctxt in
-      let legacy = false in
+    let entrypoint_type ctxt arg_type entrypoint entrypoints =
       let open Script_ir_translator in
-      let* {arg_type; _}, ctxt = parse_toplevel ctxt expr in
-      let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _ =
-        parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-      in
       let*? r, _ctxt =
         Gas_monad.run ctxt
         @@ Script_ir_translator.find_entrypoint
@@ -1229,6 +1223,24 @@ module Scripts = struct
       in
       let*? (Ex_ty_cstr {original_type_expr; _}) = r in
       return @@ Micheline.strip_locations original_type_expr
+    in
+    let script_entrypoint_type ctxt expr entrypoint =
+      let open Script_ir_translator in
+      let ctxt = Gas.set_unlimited ctxt in
+      let* {arg_type; _}, ctxt =
+        Script_ir_translator.parse_toplevel ctxt expr
+      in
+      let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _ =
+        parse_parameter_ty_and_entrypoints ctxt ~legacy:false arg_type
+      in
+      entrypoint_type ctxt arg_type entrypoint entrypoints
+    in
+    let native_entrypoint_type ctxt native entrypoint =
+      let ctxt = Gas.set_unlimited ctxt in
+      let*? (Ex_kind_and_types (_, {arg_type; entrypoints; _})) =
+        Script_native_types.get_typed_kind_and_types native
+      in
+      entrypoint_type ctxt arg_type entrypoint entrypoints
     in
     let script_view_type ctxt contract expr view =
       let ctxt = Gas.set_unlimited ctxt in
@@ -1241,6 +1253,36 @@ module Scripts = struct
             (View_helpers.View_not_found (contract, view))
       | Some Script_typed_ir.{input_ty; output_ty; _} ->
           return (input_ty, output_ty)
+    in
+    let native_view_type ctxt contract kind view =
+      let*? (Ex_kind_and_types (kind, _)) =
+        Script_native_types.get_typed_kind_and_types kind
+      in
+      let*? views = Script_native.get_views kind in
+      let*? view_name = Script_string.of_string view in
+      match Script_map.get view_name views with
+      | None ->
+          Environment.Error_monad.tzfail
+            (View_helpers.View_not_found (contract, view))
+      | Some
+          (Script_native_types.Ex_view
+             {
+               ty = {input_ty = Ty_ex_c input_ty; output_ty = Ty_ex_c output_ty};
+               _;
+             }) ->
+          let*? unparsed_input_ty, _ctxt =
+            Script_ir_unparser.unparse_ty
+              ~loc:Micheline.dummy_location
+              ctxt
+              input_ty
+          in
+          let*? unparsed_output_ty, _ctxt =
+            Script_ir_unparser.unparse_ty
+              ~loc:Micheline.dummy_location
+              ctxt
+              output_ty
+          in
+          return (unparsed_input_ty, unparsed_output_ty)
     in
     Registration.register0
       ~chunked:true
@@ -1412,17 +1454,13 @@ module Scripts = struct
                  View_helpers.Viewed_contract_has_no_script)
             script_opt
         in
-        (* The native case will be handled in a later MR (!19583). *)
-        let script =
+        let* view_ty =
           match script with
-          | Script.Script s -> s
-          | Native _ ->
-              Stdlib.failwith
-                "Tzip4 views are not implemented yet for native contracts"
+          | Script.Native n -> native_entrypoint_type ctxt n.kind entrypoint
+          | Script.Script s ->
+              let*? decoded_script = Script_repr.(force_decode s.code) in
+              script_entrypoint_type ctxt decoded_script entrypoint
         in
-        (* let*? script = Environment.Error_monad.Result_syntax wrap_tzresult script in *)
-        let*? decoded_script = Script_repr.(force_decode script.code) in
-        let* view_ty = script_entrypoint_type ctxt decoded_script entrypoint in
         let*? ty = View_helpers.extract_view_output_type entrypoint view_ty in
         let contract = Contract.Originated contract_hash in
         let* balance = Contract.get_balance ctxt contract in
@@ -1471,7 +1509,7 @@ module Scripts = struct
             ctxt
             unparsing_mode
             step_constants
-            ~script:(Script.Script script)
+            ~script
             ~cached_script:None
             ~entrypoint
             ~parameter
@@ -1511,19 +1549,15 @@ module Scripts = struct
             ~none:(Error_monad.error View_helpers.Viewed_contract_has_no_script)
             script_opt
         in
-        (* The native case will be handled in a later MR (!19583). *)
-        let script =
-          match script with
-          | Script.Script s -> s
-          | Script.Native _ ->
-              Stdlib.failwith
-                "Views are not implemented yet for native contracts"
-        in
-        let*? decoded_script = Script_repr.(force_decode script.code) in
-        let contract = Contract.Originated contract_hash in
         let* input_ty, output_ty =
-          script_view_type ctxt contract_hash decoded_script view
+          match script with
+          | Script.Native {kind; _} ->
+              native_view_type ctxt contract_hash kind view
+          | Script.Script {code; _} ->
+              let*? decoded_script = Script_repr.(force_decode code) in
+              script_view_type ctxt contract_hash decoded_script view
         in
+        let contract = Contract.Originated contract_hash in
         let* balance = Contract.get_balance ctxt contract in
         let ctxt, step_constants =
           compute_step_constants
