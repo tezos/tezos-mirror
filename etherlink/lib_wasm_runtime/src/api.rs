@@ -140,7 +140,6 @@ pub fn wasm_runtime_run(
     let mut inputs_buffer = InputsBuffer::new(level, inputs.into_vec());
     let mut scope = Scope::new(otel_scope);
     init_spans(scope.current(), "wasm_runtime_run")?;
-    scope.start("wasm_runtime_run")?;
     loop {
         let host = Host::new(
             &scope,
@@ -160,7 +159,6 @@ pub fn wasm_runtime_run(
 
         match runtime.run()? {
             RunStatus::Done(evm_tree) => {
-                scope.close_all();
                 end_span()?;
                 return Ok(evm_tree);
             }

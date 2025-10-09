@@ -9,7 +9,7 @@ mod host_funcs;
 pub use crate::host::{Host, InputsBuffer};
 use crate::{
     api::{Kernel, KernelsCache},
-    bindings,
+    bindings::{self, end_span, start_span},
     constants::KERNEL,
     host::RuntimeVersion,
     types::{ContextHash, EvmTree},
@@ -40,11 +40,11 @@ pub trait Runtime {
         let _ = self.mut_host().reboot_requested()?;
 
         loop {
-            self.mut_host().start_span("run")?;
+            start_span("run")?;
 
             self.call()?;
 
-            self.mut_host().close_span();
+            end_span()?;
 
             if self.host().needs_kernel_reload() {
                 return Ok(RunStatus::PendingKernelUpgrade(
