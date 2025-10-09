@@ -3200,6 +3200,10 @@ module Dal : sig
     (** See {!Dal_already_denounced_storage.is_denounced}. *)
     val is_denounced : context -> public_key_hash -> bool Lwt.t
   end
+
+  module Prev_attestation_lag : sig
+    val get : context -> int tzresult Lwt.t
+  end
 end
 
 (** This module re-exports definitions from {!Dal_errors_repr}. *)

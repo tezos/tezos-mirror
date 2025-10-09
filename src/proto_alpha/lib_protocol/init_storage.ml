@@ -238,6 +238,19 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
+        let* ctxt =
+          match previous_proto_constants with
+          | Some previous_proto_constants ->
+              let*! ctxt =
+                Storage.Dal.Prev_attestation_lag.add
+                  ctxt
+                  previous_proto_constants.dal.attestation_lag
+              in
+              return ctxt
+          | None ->
+              (* unreachable because the previous protocol is not Genesis *)
+              assert false
+        in
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in
