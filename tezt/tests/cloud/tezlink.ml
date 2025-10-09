@@ -113,9 +113,9 @@ let git_clone agent ?branch repo_url directory =
     @ (match branch with None -> [] | Some branch -> ["-b"; branch])
     @ [repo_url; directory])
 
-let build_endpoint ~runner port =
-  Client.Foreign_endpoint
-    (Endpoint.make ~host:(Runner.address runner) ~scheme:"http" ~port ())
+let build_endpoint ?path ~runner port =
+  let host = Runner.address runner in
+  Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme:"http" ~port ())
 
 let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
     ~time_between_blocks =
