@@ -607,6 +607,8 @@ module Helpers = struct
 
   type slot = string
 
+  let bytes_of_slot = Bytes.of_string
+
   let make_slot ?(padding = true) ~slot_size slot =
     let actual_slot_size = String.length slot in
     if actual_slot_size < slot_size && padding then

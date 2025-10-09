@@ -76,6 +76,8 @@ module Helpers : sig
      are smaller than the expected size of a slot. *)
   type slot
 
+  val bytes_of_slot : slot -> bytes
+
   (** [make_slot ?padding ~slot_size content] produces a slot. If [padding=true]
       (which is the default), then the content is padded to reach the expected
       size given by [slot_size] (which is usually obtained from
