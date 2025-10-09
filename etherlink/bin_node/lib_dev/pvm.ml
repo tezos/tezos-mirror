@@ -85,131 +85,132 @@ module type S = sig
   end
 end
 
-type ('repo, 'tree) context_impl =
-  (module S with type repo = 'repo and type tree = 'tree)
+module Context = struct
+  type ('repo, 'tree) impl =
+    (module S with type repo = 'repo and type tree = 'tree)
 
-type tree =
-  | Tree : {tree : 'tree; context_impl : ('repo, 'tree) context_impl} -> tree
+  type tree = Tree : {tree : 'tree; impl : ('repo, 'tree) impl} -> tree
 
-type 'a index =
-  | Index : {
-      index : ('a, 'repo) Context_sigs.index;
-      context_impl : ('repo, 'tree) context_impl;
-    }
-      -> 'a index
+  type 'a index =
+    | Index : {
+        index : ('a, 'repo) Context_sigs.index;
+        impl : ('repo, 'tree) impl;
+      }
+        -> 'a index
 
-type rw_index = [`Read | `Write] index
+  type rw_index = [`Read | `Write] index
 
-type ro_index = [`Read] index
+  type ro_index = [`Read] index
 
-type 'a t =
-  | Context : {
-      index : ('a, 'repo) Context_sigs.index;
-      tree : 'tree;
-      context_impl : ('repo, 'tree) context_impl;
-    }
-      -> 'a t
+  type 'a t =
+    | Context : {
+        index : ('a, 'repo) Context_sigs.index;
+        tree : 'tree;
+        impl : ('repo, 'tree) impl;
+      }
+        -> 'a t
 
-type rw = [`Read | `Write] t
+  type rw = [`Read | `Write] t
 
-type hash = Smart_rollup_context_hash.t
+  type hash = Smart_rollup_context_hash.t
 
-let make_index ~index ~context_impl = Index {index; context_impl}
+  let make_index ~index ~impl = Index {index; impl}
 
-let make_ctxt ~index ~tree ~context_impl = Context {index; tree; context_impl}
+  let make_ctxt ~index ~tree ~impl = Context {index; tree; impl}
 
-let make_tree ~tree ~context_impl = Tree {tree; context_impl}
+  let make_tree ~tree ~impl = Tree {tree; impl}
 
-let load : type tree repo.
-    (repo, tree) context_impl ->
-    cache_size:int ->
-    ?async_domain:bool ->
-    'a Access_mode.t ->
-    string ->
-    'a index tzresult Lwt.t =
- fun (module Impl) ~cache_size ?async_domain mode path ->
-  let open Lwt_result_syntax in
-  let* index = Impl.load ~cache_size ?async_domain mode path in
-  return @@ make_index ~index ~context_impl:(module Impl)
+  let equiv = Context.equiv
 
-let reload (Index {index; context_impl = (module Impl)} : [< `Read] index) =
-  Impl.reload index
+  let load : type tree repo.
+      (repo, tree) impl ->
+      cache_size:int ->
+      ?async_domain:bool ->
+      'a Access_mode.t ->
+      string ->
+      'a index tzresult Lwt.t =
+   fun (module Impl) ~cache_size ?async_domain mode path ->
+    let open Lwt_result_syntax in
+    let* index = Impl.load ~cache_size ?async_domain mode path in
+    return @@ make_index ~index ~impl:(module Impl)
 
-let commit : type a. ?message:string -> a t -> hash Lwt.t =
- fun ?message (Context {index; tree; context_impl = (module Impl)}) ->
-  let open Lwt_syntax in
-  let index = (index : _ Impl.index :> [`Read | `Write] Impl.index) in
-  let* hash = Impl.commit ?message {index; tree} in
-  let hash = Impl.context_hash_of_hash hash in
-  return hash
+  let reload (Index {index; impl = (module Impl)} : [< `Read] index) =
+    Impl.reload index
 
-let checkout_exn : type a. a index -> hash -> a t Lwt.t =
- fun (Index {index; context_impl = (module Impl)}) hash ->
-  let open Lwt_syntax in
-  let hash = Impl.hash_of_context_hash hash in
-  let* {index; tree} = Impl.checkout_exn index hash in
-  return @@ make_ctxt ~index ~tree ~context_impl:(module Impl)
+  let commit : type a. ?message:string -> a t -> hash Lwt.t =
+   fun ?message (Context {index; tree; impl = (module Impl)}) ->
+    let open Lwt_syntax in
+    let index = (index : _ Impl.index :> [`Read | `Write] Impl.index) in
+    let* hash = Impl.commit ?message {index; tree} in
+    let hash = Impl.context_hash_of_hash hash in
+    return hash
 
-let empty : type a. a index -> a t =
- fun (Index {index; context_impl = (module Impl)}) ->
-  let empty = Impl.empty index in
-  make_ctxt ~index:empty.index ~tree:empty.tree ~context_impl:(module Impl)
+  let checkout_exn : type a. a index -> hash -> a t Lwt.t =
+   fun (Index {index; impl = (module Impl)}) hash ->
+    let open Lwt_syntax in
+    let hash = Impl.hash_of_context_hash hash in
+    let* {index; tree} = Impl.checkout_exn index hash in
+    return @@ make_ctxt ~index ~tree ~impl:(module Impl)
 
-let split : type a. a index -> unit =
- fun (Index {index; context_impl = (module Impl)}) -> Impl.split index
+  let empty : type a. a index -> a t =
+   fun (Index {index; impl = (module Impl)}) ->
+    let empty = Impl.empty index in
+    make_ctxt ~index:empty.index ~tree:empty.tree ~impl:(module Impl)
 
-let gc : type a. a index -> ?callback:(unit -> unit Lwt.t) -> hash -> unit Lwt.t
-    =
- fun (Index {index; context_impl = (module Impl)}) ?callback hash ->
-  let hash = Impl.hash_of_context_hash hash in
-  let index = (index : _ Impl.index :> [`Read | `Write] Impl.index) in
-  Impl.gc index ?callback hash
+  let split : type a. a index -> unit =
+   fun (Index {index; impl = (module Impl)}) -> Impl.split index
 
-let wait_gc_completion : type a. a index -> unit Lwt.t =
- fun (Index {index; context_impl = (module Impl)}) ->
-  let index = (index : _ Impl.index :> [`Read | `Write] Impl.index) in
-  Impl.wait_gc_completion index
+  let gc : type a.
+      a index -> ?callback:(unit -> unit Lwt.t) -> hash -> unit Lwt.t =
+   fun (Index {index; impl = (module Impl)}) ?callback hash ->
+    let hash = Impl.hash_of_context_hash hash in
+    let index = (index : _ Impl.index :> [`Read | `Write] Impl.index) in
+    Impl.gc index ?callback hash
 
-module PVMState = struct
-  type value = tree
+  let wait_gc_completion : type a. a index -> unit Lwt.t =
+   fun (Index {index; impl = (module Impl)}) ->
+    let index = (index : _ Impl.index :> [`Read | `Write] Impl.index) in
+    Impl.wait_gc_completion index
+end
 
-  let empty : type tree repo. (repo, tree) context_impl -> unit -> value =
+module State = struct
+  type t = Context.tree
+
+  let empty : type tree repo. (repo, tree) Context.impl -> unit -> t =
    fun (module Impl) () ->
     let tree = Impl.PVMState.empty () in
-    make_tree ~tree ~context_impl:(module Impl)
+    Context.make_tree ~tree ~impl:(module Impl)
 
-  let get : type a. a t -> value Lwt.t =
-   fun (Context {index; tree; context_impl = (module Impl)}) ->
+  let get : type a. a Context.t -> t Lwt.t =
+   fun (Context {index; tree; impl = (module Impl)}) ->
     let open Lwt_syntax in
     let* tree = Impl.PVMState.get {index; tree} in
-    return @@ make_tree ~tree ~context_impl:(module Impl)
+    return @@ Context.make_tree ~tree ~impl:(module Impl)
 
-  let set : type a. a t -> value -> a t Lwt.t =
-   fun (Context {index; tree; context_impl = (module Impl)})
-       (Tree ({context_impl = (module ImplT); _} as t)) ->
+  let set : type a. a Context.t -> t -> a Context.t Lwt.t =
+   fun (Context {index; tree; impl = (module Impl)})
+       (Tree ({impl = (module ImplT); _} as t)) ->
     let open Lwt_syntax in
     match Context.equiv Impl.equality_witness ImplT.equality_witness with
     | Some Refl, Some Refl ->
         let* ctxt = Impl.PVMState.set {index; tree} t.tree in
         return
-        @@ make_ctxt
+        @@ Context.make_ctxt
              ~index:ctxt.index
              ~tree:ctxt.tree
-             ~context_impl:(module Impl)
+             ~impl:(module Impl)
     | _ -> raise (Invalid_argument "Implementation mismatch")
 end
 
-(* TODO TZX-24: Only make `Wasm_internal` available when node is instantiated
- * with the Wasm PVM *)
 module Wasm_internal = struct
-  let to_irmin_exn : tree -> Irmin_context.tree =
-   fun (Tree {tree; context_impl = (module Impl)}) ->
+  let to_irmin_exn : Context.tree -> Irmin_context.tree =
+   fun (Tree {tree; impl = (module Impl)}) ->
     match
       Context.equiv Irmin_context.equality_witness Impl.equality_witness
     with
     | Some Refl, Some Refl -> tree
     | _ -> raise (Invalid_argument "Not an Irmin tree")
 
-  let of_irmin : Irmin_context.tree -> tree =
-   fun tree -> make_tree ~tree ~context_impl:(module Irmin_context)
+  let of_irmin : Irmin_context.tree -> Context.tree =
+   fun tree -> Context.make_tree ~tree ~impl:(module Irmin_context)
 end

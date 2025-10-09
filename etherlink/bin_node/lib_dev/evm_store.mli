@@ -64,31 +64,25 @@ end
 
 module Context_hashes : sig
   val store :
-    conn ->
-    Ethereum_types.quantity ->
-    Evm_node_state.hash ->
-    unit tzresult Lwt.t
+    conn -> Ethereum_types.quantity -> Pvm.Context.hash -> unit tzresult Lwt.t
 
   val find :
-    conn -> Ethereum_types.quantity -> Evm_node_state.hash option tzresult Lwt.t
+    conn -> Ethereum_types.quantity -> Pvm.Context.hash option tzresult Lwt.t
 
   val find_latest :
-    conn ->
-    (Ethereum_types.quantity * Evm_node_state.hash) option tzresult Lwt.t
+    conn -> (Ethereum_types.quantity * Pvm.Context.hash) option tzresult Lwt.t
 
   val get_latest :
-    conn -> (Ethereum_types.quantity * Evm_node_state.hash) tzresult Lwt.t
+    conn -> (Ethereum_types.quantity * Pvm.Context.hash) tzresult Lwt.t
 
   val find_earliest :
-    conn ->
-    (Ethereum_types.quantity * Evm_node_state.hash) option tzresult Lwt.t
+    conn -> (Ethereum_types.quantity * Pvm.Context.hash) option tzresult Lwt.t
 
   val get_earliest :
-    conn -> (Ethereum_types.quantity * Evm_node_state.hash) tzresult Lwt.t
+    conn -> (Ethereum_types.quantity * Pvm.Context.hash) tzresult Lwt.t
 
   val find_finalized :
-    conn ->
-    (Ethereum_types.quantity * Evm_node_state.hash) option tzresult Lwt.t
+    conn -> (Ethereum_types.quantity * Pvm.Context.hash) option tzresult Lwt.t
 
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
@@ -235,7 +229,7 @@ module Block_storage_mode : sig
 end
 
 val context_hash_of_block_hash :
-  conn -> Ethereum_types.block_hash -> Evm_node_state.hash option tzresult Lwt.t
+  conn -> Ethereum_types.block_hash -> Pvm.Context.hash option tzresult Lwt.t
 
 module Transactions : sig
   val store : conn -> Transaction_info.t -> unit tzresult Lwt.t

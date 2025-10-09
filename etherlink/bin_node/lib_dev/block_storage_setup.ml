@@ -65,7 +65,7 @@ let enable ~keep_alive ?evm_node_endpoint store =
   let tmp_world_state_path = tmp_path ^ world_state_path in
   let store_get_hash tree key =
     let open Lwt_syntax in
-    let evm_node_state = Evm_node_state.Wasm_internal.of_irmin tree in
+    let evm_node_state = Pvm.Wasm_internal.of_irmin tree in
     let enable_fallback =
       match
         Lwt_domain.run_in_main @@ fun () ->
