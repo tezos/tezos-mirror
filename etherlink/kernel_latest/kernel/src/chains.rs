@@ -31,7 +31,7 @@ use tezos_crypto_rs::hash::ChainId;
 use tezos_data_encoding::nom::NomReader;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_execution::context;
+use tezos_execution::{context, mir_ctx::BlockCtx};
 use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::{
@@ -474,6 +474,11 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
         let context = context::Context::from(&self.storage_root_path())?;
 
+        let block_ctx = BlockCtx {
+            level: &number,
+            now: &timestamp,
+            chain_id: &self.chain_id,
+        };
         // Compute operations that are in the block in progress
         while !operations.is_empty() {
             // Retrieve the next operation in the VecDequeue
@@ -489,9 +494,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 &context,
                 hash.clone(),
                 operation.clone(),
-                &number,
-                &timestamp,
-                &self.chain_id,
+                &block_ctx,
             ) {
                 Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {

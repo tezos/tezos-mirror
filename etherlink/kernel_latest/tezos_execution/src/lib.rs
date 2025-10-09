@@ -17,15 +17,12 @@ use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
 use primitive_types::H256;
 use std::collections::{BTreeMap, HashMap};
-use tezos_crypto_rs::{
-    hash::{ChainId, ContractKt1Hash},
-    PublicKeyWithHash,
-};
+use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
-use tezos_smart_rollup::types::{Contract, PublicKey, Timestamp};
-use tezos_tezlink::enc_wrappers::{BlockNumber, OperationHash};
+use tezos_smart_rollup::types::{Contract, PublicKey};
+use tezos_tezlink::enc_wrappers::OperationHash;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{Operation, OriginationContent, Script};
 use tezos_tezlink::operation_result::{
@@ -43,13 +40,13 @@ use tezos_tezlink::{
 };
 
 use crate::address::OriginationNonce;
-use crate::mir_ctx::{convert_big_map_diff, Ctx, TcCtx};
+use crate::mir_ctx::{convert_big_map_diff, BlockCtx, Ctx, TcCtx};
 
 extern crate alloc;
 pub mod account_storage;
 mod address;
 pub mod context;
-mod mir_ctx;
+pub mod mir_ctx;
 mod validate;
 
 fn reveal<Host: Runtime>(
@@ -158,6 +155,7 @@ fn burn_tez(
 fn execute_internal_operations<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
+    block_ctx: &BlockCtx,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
     sender_account: &TezlinkOriginatedAccount,
     parser: &'a Parser<'a>,
@@ -166,9 +164,6 @@ fn execute_internal_operations<'a, Host: Runtime>(
     operation_counter: &mut u128,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     origination_nonce: &mut OriginationNonce,
-    level: &BlockNumber,
-    now: &Timestamp,
-    chain_id: &ChainId,
 ) -> Result<(), ApplyOperationError> {
     let mut failed = None;
     for (index, OperationInfo { operation, counter }) in
@@ -219,6 +214,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
                     let receipt = transfer(
                         host,
                         context,
+                        block_ctx,
                         sender_account,
                         &content.amount,
                         &content.destination,
@@ -233,9 +229,6 @@ fn execute_internal_operations<'a, Host: Runtime>(
                         operation_counter,
                         all_internal_receipts,
                         origination_nonce,
-                        level,
-                        now,
-                        chain_id,
                     );
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
@@ -348,6 +341,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
 fn transfer<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
+    block_ctx: &BlockCtx,
     sender_account: &impl TezlinkAccount,
     amount: &Narith,
     dest_contract: &Contract,
@@ -359,9 +353,6 @@ fn transfer<'a, Host: Runtime>(
     operation_counter: &mut u128,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     origination_nonce: &mut OriginationNonce,
-    level: &BlockNumber,
-    now: &Timestamp,
-    chain_id: &ChainId,
 ) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
@@ -425,9 +416,7 @@ fn transfer<'a, Host: Runtime>(
                 balance,
                 operation_counter,
                 origination_nonce,
-                level: *level,
-                now: *now,
-                chain_id: chain_id.clone(),
+                block_ctx,
             };
             let (internal_operations, new_storage) = execute_smart_contract(
                 code, storage, entrypoint, param, parser, &mut ctx,
@@ -440,6 +429,7 @@ fn transfer<'a, Host: Runtime>(
             execute_internal_operations(
                 host,
                 context,
+                block_ctx,
                 internal_operations,
                 &dest_account,
                 parser,
@@ -448,9 +438,6 @@ fn transfer<'a, Host: Runtime>(
                 ctx.operation_counter,
                 all_internal_receipts,
                 ctx.origination_nonce,
-                level,
-                now,
-                chain_id,
             )
             .map_err(|err| {
                 TransferError::FailedToExecuteInternalOperation(err.to_string())
@@ -497,15 +484,13 @@ fn get_contract_entrypoint(
 fn transfer_external<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
+    block_ctx: &BlockCtx,
     source_account: &TezlinkImplicitAccount,
     amount: &Narith,
     dest: &Contract,
     parameter: &Option<Parameter>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     origination_nonce: &mut OriginationNonce,
-    level: &BlockNumber,
-    now: &Timestamp,
-    chain_id: &ChainId,
 ) -> Result<TransferTarget, TransferError> {
     log!(
         host,
@@ -529,6 +514,7 @@ fn transfer_external<Host: Runtime>(
     transfer(
         host,
         context,
+        block_ctx,
         source_account,
         amount,
         dest,
@@ -540,9 +526,6 @@ fn transfer_external<Host: Runtime>(
         &mut 0,
         all_internal_receipts,
         origination_nonce,
-        level,
-        now,
-        chain_id,
     )
     .map(Into::into)
 }
@@ -798,9 +781,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     context: &context::Context,
     hash: OperationHash,
     operation: Operation,
-    level: &BlockNumber,
-    now: &Timestamp,
-    chain_id: &ChainId,
+    block_ctx: &BlockCtx,
 ) -> Result<Vec<OperationResultSum>, OperationError> {
     let mut safe_host = SafeStorage {
         host,
@@ -837,9 +818,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         context,
         &mut origination_nonce,
         validation_info,
-        level,
-        now,
-        chain_id,
+        block_ctx,
     );
 
     log!(safe_host, Debug, "Receipts: {:#?}", receipts);
@@ -869,9 +848,7 @@ fn apply_batch<Host: Runtime>(
     context: &Context,
     origination_nonce: &mut OriginationNonce,
     validation_info: validate::ValidatedBatch,
-    level: &BlockNumber,
-    now: &Timestamp,
-    chain_id: &ChainId,
+    block_ctx: &BlockCtx,
 ) -> (Vec<OperationResultSum>, bool) {
     let validate::ValidatedBatch {
         source_account,
@@ -906,9 +883,7 @@ fn apply_batch<Host: Runtime>(
                 origination_nonce,
                 &source_account,
                 validated_operation,
-                level,
-                now,
-                chain_id,
+                block_ctx,
             )
         };
 
@@ -936,9 +911,7 @@ fn apply_operation<Host: Runtime>(
     origination_nonce: &mut OriginationNonce,
     source_account: &TezlinkImplicitAccount,
     validated_operation: validate::ValidatedOperation,
-    level: &BlockNumber,
-    now: &Timestamp,
-    chain_id: &ChainId,
+    block_ctx: &BlockCtx,
 ) -> OperationResultSum {
     let mut internal_operations_receipts = Vec::new();
     match &validated_operation.content.operation {
@@ -959,15 +932,13 @@ fn apply_operation<Host: Runtime>(
             let transfer_result = transfer_external(
                 host,
                 context,
+                block_ctx,
                 source_account,
                 amount,
                 destination,
                 parameters,
                 &mut internal_operations_receipts,
                 origination_nonce,
-                level,
-                now,
-                chain_id,
             );
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,
@@ -1013,13 +984,13 @@ fn apply_operation<Host: Runtime>(
 mod tests {
     use crate::{
         account_storage::TezlinkOriginatedAccount, address::OriginationNonce,
-        TezlinkImplicitAccount,
+        mir_ctx::BlockCtx, TezlinkImplicitAccount,
     };
     use mir::ast::{Entrypoint, Micheline};
     use num_traits::ops::checked::CheckedSub;
     use pretty_assertions::assert_eq;
     use primitive_types::H256;
-    use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, HashTrait, SecretKeyEd25519};
+    use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait, SecretKeyEd25519};
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
@@ -1048,6 +1019,16 @@ mod tests {
         account_storage::{Manager, TezlinkAccount},
         context, validate_and_apply_operation, OperationError,
     };
+
+    macro_rules! block_ctx {
+        () => {
+            BlockCtx {
+                level: &0u32.into(),
+                now: &0i64.into(),
+                chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            }
+        };
+    }
 
     #[derive(Clone)]
     struct Bootstrap {
@@ -1395,9 +1376,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         );
 
         let expected_error =
@@ -1429,9 +1408,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         );
 
         let expected_error =
@@ -1463,9 +1440,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         );
 
         let expected_error =
@@ -1511,9 +1486,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1574,9 +1547,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1632,9 +1603,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         );
 
         let expected_error = OperationError::Validation(ValidityError::InvalidSignature);
@@ -1675,9 +1644,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1748,9 +1715,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1825,9 +1790,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1913,9 +1876,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2026,9 +1987,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect("validate_and_apply_operation should not have failed with a kernel error")
         .remove(0);
@@ -2157,9 +2116,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2268,9 +2225,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2348,9 +2303,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2412,9 +2365,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2493,9 +2444,7 @@ mod tests {
             &ctx,
             OperationHash(H256::zero()),
             batch,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .unwrap();
 
@@ -2663,9 +2612,7 @@ mod tests {
             &ctx,
             OperationHash(H256::zero()),
             batch,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         );
 
         let expected_error =
@@ -2758,9 +2705,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             batch,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .unwrap();
 
@@ -2873,9 +2818,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3088,9 +3031,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3252,9 +3193,7 @@ mod tests {
             &context::Context::init_context(),
             operation.hash().unwrap(),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3316,9 +3255,7 @@ mod tests {
             &context::Context::init_context(),
             operation.hash().unwrap(),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3384,9 +3321,7 @@ mod tests {
             &context::Context::init_context(),
             operation.hash().unwrap(),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3463,9 +3398,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3664,9 +3597,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3891,9 +3822,7 @@ mod tests {
             &ctx,
             OperationHash(H256::zero()),
             batch,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .unwrap();
 
@@ -4157,9 +4086,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4233,9 +4160,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4275,9 +4200,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4318,9 +4241,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4369,9 +4290,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",

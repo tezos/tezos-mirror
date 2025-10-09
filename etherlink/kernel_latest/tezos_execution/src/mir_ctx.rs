@@ -36,19 +36,23 @@ pub struct TcCtx<Host, Context, Gas> {
     pub gas: Gas,
 }
 
-pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
+pub struct Ctx<'block, Host, Context, Gas, OpCounter, OrigNonce> {
     pub tc_ctx: TcCtx<Host, Context, Gas>,
     pub sender: AddressHash,
     pub amount: i64,
     pub self_address: AddressHash,
     pub balance: i64,
-    pub level: BlockNumber,
-    pub now: Timestamp,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
-    pub chain_id: ChainId,
     pub source: PublicKeyHash,
     pub operation_counter: OpCounter,
     pub origination_nonce: OrigNonce,
+    pub block_ctx: &'block BlockCtx<'block>,
+}
+
+pub struct BlockCtx<'block> {
+    pub level: &'block BlockNumber,
+    pub now: &'block Timestamp,
+    pub chain_id: &'block ChainId,
 }
 
 #[macro_export]
@@ -58,21 +62,24 @@ macro_rules! make_default_ctx {
         let mut operation_counter = 0;
         let mut origination_nonce =
             OriginationNonce::initial(OperationHash(H256::zero()));
+        let block_ctx = BlockCtx {
+            level: &0u32.into(),
+            now: &0i64.into(),
+            // default chain id NetXynUjJNZm7wi
+            chain_id: &tezos_crypto_rs::hash::ChainId::try_from(vec![
+                0xf3, 0xd4, 0x85, 0x54,
+            ])
+            .unwrap(),
+        };
         let mut $ctx = Ctx {
             tc_ctx: TcCtx {
                 host: $host,
                 context: $context,
                 gas: &mut gas,
             },
+            block_ctx: &block_ctx,
             balance: 0,
             amount: 0,
-            level: 0u32.into(),
-            now: 0i64.into(),
-            // default chain id NetXynUjJNZm7wi
-            chain_id: tezos_crypto_rs::hash::ChainId::try_from(vec![
-                0xf3, 0xd4, 0x85, 0x54,
-            ])
-            .unwrap(),
             big_map_diff: BTreeMap::new(),
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
@@ -123,7 +130,7 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a>
 }
 
 impl<'a, Host: Runtime> TypecheckingCtx<'a>
-    for Ctx<&mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
+    for Ctx<'_, &mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
 {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.tc_ctx.gas()
@@ -145,7 +152,7 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a>
 }
 
 impl<'a, Host: Runtime> CtxTrait<'a>
-    for Ctx<&mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
+    for Ctx<'_, &mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
 {
     fn sender(&self) -> AddressHash {
         self.sender.clone()
@@ -168,7 +175,7 @@ impl<'a, Host: Runtime> CtxTrait<'a>
     }
 
     fn level(&self) -> BigUint {
-        self.level.block_number.into()
+        self.block_ctx.level.block_number.into()
     }
 
     fn min_block_time(&self) -> BigUint {
@@ -176,7 +183,7 @@ impl<'a, Host: Runtime> CtxTrait<'a>
     }
 
     fn chain_id(&self) -> mir::ast::ChainId {
-        self.chain_id.clone()
+        self.block_ctx.chain_id.clone()
     }
 
     fn voting_power(&self, _: &PublicKeyHash) -> BigUint {
@@ -184,7 +191,7 @@ impl<'a, Host: Runtime> CtxTrait<'a>
     }
 
     fn now(&self) -> num_bigint::BigInt {
-        i64::from(self.now).into()
+        i64::from(*self.block_ctx.now).into()
     }
 
     fn total_voting_power(&self) -> BigUint {
@@ -208,7 +215,9 @@ impl<'a, Host: Runtime> CtxTrait<'a>
     }
 }
 
-impl<Host: Runtime> Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce> {
+impl<Host: Runtime>
+    Ctx<'_, &mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce>
+{
     pub fn host(&mut self) -> &mut Host {
         self.tc_ctx.host
     }
@@ -295,7 +304,7 @@ pub fn convert_big_map_diff(
 }
 
 impl<'a, Host: Runtime> LazyStorage<'a>
-    for Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce>
+    for Ctx<'_, &mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce>
 {
     fn big_map_get(
         &mut self,
