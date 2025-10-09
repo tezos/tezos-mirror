@@ -260,6 +260,11 @@ module type COMPONENT_API = sig
       Only available in the [Shared] component. *)
   val register_schedule_extended_test_jobs : (trigger * job) list -> unit
 
+  (** Register jobs to be included in [custom_extended_test] pipelines.
+
+      Only available in the [Shared] component. *)
+  val register_custom_extended_test_jobs : (trigger * job) list -> unit
+
   (** Register jobs to be included in [master_branch] pipelines. *)
   val register_master_jobs : (trigger * job) list -> unit
 

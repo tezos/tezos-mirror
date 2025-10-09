@@ -1758,6 +1758,8 @@ module Hooks = struct
 
   let schedule_extended_test = ref []
 
+  let custom_extended_test = ref []
+
   let master = ref []
 
   let global_release = ref []

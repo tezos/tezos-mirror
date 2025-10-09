@@ -344,11 +344,11 @@ let () =
        pipelines run only subset of all jobs depending on files modified by \
        the MR. This \"safety net\"-pipeline ensures that all jobs run at least \
        daily." ;
+  let custom_extended_test_jobs = Custom_extended_test_pipeline.jobs () in
   register
     "schedule_extended_rpc_test"
     schedule_extended_rpc_tests
-    ~jobs:
-      (Custom_extended_test_pipeline.jobs |> List.map (with_interruptible false))
+    ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))
     ~description:
       "Scheduled run of all tezt tests with external RPC servers, weekly on \
        'master'.\n\n\
@@ -357,8 +357,7 @@ let () =
   register
     "schedule_extended_validation_test"
     schedule_extended_validation_tests
-    ~jobs:
-      (Custom_extended_test_pipeline.jobs |> List.map (with_interruptible false))
+    ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))
     ~description:
       "Scheduled run of all tezt tests with single-process validation, weekly \
        on 'master'.\n\n\
@@ -367,8 +366,7 @@ let () =
   register
     "schedule_extended_baker_remote_mode_test"
     schedule_extended_baker_remote_mode_tests
-    ~jobs:
-      (Custom_extended_test_pipeline.jobs |> List.map (with_interruptible false))
+    ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))
     ~description:
       "Scheduled run of all tezt tests with baker using remote node, weekly on \
        'master'.\n\n\
@@ -376,8 +374,7 @@ let () =
   register
     "schedule_extended_dal_use_baker"
     schedule_extended_dal_use_baker
-    ~jobs:
-      (Custom_extended_test_pipeline.jobs |> List.map (with_interruptible false))
+    ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))
     ~description:
       "Scheduled run of all tezt tests with dal using baker commands weekly on \
        'master'.\n\n\

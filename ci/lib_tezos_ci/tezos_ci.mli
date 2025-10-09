@@ -725,6 +725,9 @@ module Hooks : sig
   (** Jobs to add to [schedule_extended_test] pipelines. *)
   val schedule_extended_test : tezos_job list ref
 
+  (** Jobs to add to [custom_extended_test] pipelines. *)
+  val custom_extended_test : tezos_job list ref
+
   (** Jobs to add to [master] branch pipelines. *)
   val master : tezos_job list ref
 

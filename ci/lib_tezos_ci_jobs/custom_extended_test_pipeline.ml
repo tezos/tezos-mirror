@@ -45,7 +45,7 @@ let job_build_x86_64_extra_dev =
     ~arch:Amd64
     "script-inputs/dev-executables"
 
-let jobs =
+let jobs () =
   (* Tezt jobs.
 
      This is intended to execute the same jobs as those performed in
@@ -152,16 +152,17 @@ let jobs =
       ~allow_failure:Yes
       ()
   in
-  [
-    tezt;
-    tezt_time_sensitive;
-    tezt_slow;
-    tezt_extra;
-    tezt_flaky;
-    job_build_x86_64_release;
-    job_build_x86_64_extra_dev;
-    job_build_x86_64_extra_exp;
-    job_build_kernels;
-    job_tezt_fetch_records;
-    job_datadog_pipeline_trace;
-  ]
+  !Hooks.custom_extended_test
+  @ [
+      tezt;
+      tezt_time_sensitive;
+      tezt_slow;
+      tezt_extra;
+      tezt_flaky;
+      job_build_x86_64_release;
+      job_build_x86_64_extra_dev;
+      job_build_x86_64_extra_exp;
+      job_build_kernels;
+      job_tezt_fetch_records;
+      job_datadog_pipeline_trace;
+    ]
