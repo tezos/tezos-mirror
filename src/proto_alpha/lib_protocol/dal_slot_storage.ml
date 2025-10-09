@@ -151,14 +151,64 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
   match Raw_level_repr.(sub raw_level curr_attestation_lag) with
   | None -> return (ctxt, Dal_attestation_repr.empty)
   | Some published_level ->
-      let is_slot_attested slot =
-        Raw_context.Dal.is_slot_index_attested
-          ctxt
-          slot.Dal_slot_repr.Header.id.index
+      (* DAL/TODO: remove after P1->P2 migration:
+
+         Detect whether we are at the first block after the lag shrink. We do
+         this by comparing the current attestation lag read from the protocol
+         parameters with the attestation lag used for the head of the DAL skip
+         list.
+
+         Normal case:
+
+         - This is the case when curr_attestation_lag = prev_attestation_lag
+
+         Migration case:
+
+         - This is the case when k = prev_attestation_lag - curr_attestation_lag
+         > 0.
+
+         => We should process [k + 1] published levels at once to avoid
+         introducing a gap of [k] levels without cells in the skip list. This
+         requires updating the context correctly, in particular the
+         [LevelHistories] entry. *)
+      let* sl_history_head = get_slot_headers_history ctxt in
+      let Dal_slot_repr.History.
+            {header_id = _; attestation_lag = prev_attestation_lag} =
+        Dal_slot_repr.History.(content sl_history_head |> content_id)
       in
-      finalize_slot_headers_for_published_level
-        ctxt
-        published_level
-        ~number_of_slots
-        ~attestation_lag:curr_attestation_lag
-        ~is_slot_attested
+      let prev_attestation_lag =
+        Dal_slot_repr.History.attestation_lag_value prev_attestation_lag
+      in
+
+      let reset_dummy_genesis =
+        Dal_slot_repr.History.(equal sl_history_head genesis)
+      in
+      if
+        Compare.Int.(
+          curr_attestation_lag = prev_attestation_lag || reset_dummy_genesis)
+      then
+        (* Normal path: process the next published level, or the first published
+           level if the previous genesis cell was the dummy value. *)
+        let is_slot_attested slot =
+          Raw_context.Dal.is_slot_index_attested
+            ctxt
+            slot.Dal_slot_repr.Header.id.index
+        in
+        finalize_slot_headers_for_published_level
+          ctxt
+          published_level
+          ~number_of_slots
+          ~attestation_lag:curr_attestation_lag
+          ~is_slot_attested
+      else
+        let () =
+          assert (Compare.Int.(curr_attestation_lag < prev_attestation_lag))
+        in
+        (* Migration path: there are missing published levels between the
+           skip-list head and [published_level] because attestation_lag has
+           shrunk at migration from [prev_attestation_lag] to
+           [curr_attestation_lag].
+
+           We will backfill the missing [prev_attestation_lag -
+           curr_attestation_lag] levels with 32 cells each. *)
+        failwith "TODO: implemented in next commits"
