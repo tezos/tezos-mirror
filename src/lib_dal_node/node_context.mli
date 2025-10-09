@@ -222,6 +222,11 @@ val warn_if_attesters_not_delegates :
     validation in the DAL node. *)
 val get_disable_shard_validation : t -> bool
 
+(** [get_last_migration_level ctxt] returns the first block with a new [proto_level],
+    which is the last block of the old protocol. See
+    [Proto_plugins.get_plugin_and_parameters_for_level] for more clarifications. *)
+val get_last_migration_level : t -> int32
+
 (** Module for P2P-related accessors.  *)
 module P2P : sig
   (** [connect t ?timeout point] initiates a connection to the point

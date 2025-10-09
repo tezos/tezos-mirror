@@ -31,6 +31,10 @@ module Plugins = struct
     |> List.map
          (fun (_block_level, {proto_level = _; plugin; proto_parameters = _}) ->
            plugin)
+
+  let current_proto_level t =
+    LevelMap.min_binding_opt t
+    |> Option.map (fun (_, proto_plugin) -> proto_plugin.proto_level)
 end
 
 let singleton = Plugins.add Plugins.empty

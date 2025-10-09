@@ -46,6 +46,7 @@ type t = {
   l1_crawler_status_input : L1_crawler_status.t Lwt_watcher.input;
   disable_shard_validation : bool;
   ignore_pkhs : Signature.Public_key_hash.Set.t;
+  mutable last_migration_level : int32;
 }
 
 let init config ~network_name profile_ctxt cryptobox
@@ -72,6 +73,7 @@ let init config ~network_name profile_ctxt cryptobox
     l1_crawler_status_input = Lwt_watcher.create_input ();
     disable_shard_validation;
     ignore_pkhs;
+    last_migration_level = 0l;
   }
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
@@ -105,14 +107,22 @@ let may_reconstruct ~reconstruct slot_id t =
 
 let may_add_plugin ctxt cctxt ~block_level ~proto_level =
   let open Lwt_result_syntax in
-  let* proto_plugins =
+  let old_proto_plugins = ctxt.proto_plugins in
+  let* new_proto_plugins =
     Proto_plugins.may_add
       cctxt
-      ctxt.proto_plugins
+      old_proto_plugins
       ~first_level:block_level
       ~proto_level
   in
-  ctxt.proto_plugins <- proto_plugins ;
+  if
+    not
+    @@ Option.equal
+         Int.equal
+         (Proto_plugins.current_proto_level old_proto_plugins)
+         (Proto_plugins.current_proto_level new_proto_plugins)
+  then ctxt.last_migration_level <- block_level ;
+  ctxt.proto_plugins <- new_proto_plugins ;
   return_unit
 
 let get_plugin_and_parameters_for_level ctxt ~level =
@@ -253,6 +263,8 @@ let warn_if_attesters_not_delegates ctxt controller_profiles =
       pkh_set
 
 let get_disable_shard_validation ctxt = ctxt.disable_shard_validation
+
+let get_last_migration_level ctxt = ctxt.last_migration_level
 
 module P2P = struct
   let connect {transport_layer; _} ?timeout point =

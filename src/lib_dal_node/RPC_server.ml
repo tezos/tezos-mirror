@@ -453,39 +453,25 @@ module Profile_handlers = struct
       assigned_shard_indexes
 
   let get_attestable_slots ctxt pkh attested_level () () =
-    let get_attestable_slots ~shard_indices store proto_parameters
+    let get_attestable_slots ~shard_indices store last_known_parameters
         ~attested_level =
       let open Lwt_result_syntax in
       let number_of_assigned_shards = List.length shard_indices in
       if number_of_assigned_shards = 0 then return Types.Not_in_committee
       else
         let published_level =
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4612
-             Correctly compute [published_level] in case of protocol changes, in
-             particular a change of the value of [attestation_lag]. *)
           Int32.(
-            sub attested_level (of_int proto_parameters.Types.attestation_lag))
+            sub
+              attested_level
+              (of_int last_known_parameters.Types.attestation_lag))
         in
         if published_level < 1l then
           let slots =
-            Stdlib.List.init proto_parameters.number_of_slots (fun _ -> false)
+            Stdlib.List.init last_known_parameters.number_of_slots (fun _ ->
+                false)
           in
           return (Types.Attestable_slots {slots; published_level})
         else
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7291
-
-             Normally, for checking whether the incentives are enabled we would
-             use the (parameters at) [attested_level].  However, the attestation
-             level may be in the future and we may not have the plugin for
-             it. *)
-          let* proto_parameters =
-            Node_context.get_proto_parameters
-              ctxt
-              ~level:(`Level published_level)
-            |> Lwt.return
-            |> lwt_map_error (fun e -> `Other e)
-          in
-
           let shards_store = Store.shards store in
           let number_of_shards_stored slot_index =
             let slot_id : Types.slot_id =
@@ -500,12 +486,6 @@ module Profile_handlers = struct
             in
             (slot_id, number_stored_shards)
           in
-          let all_slot_indexes =
-            Utils.Infix.(0 -- (proto_parameters.number_of_slots - 1))
-          in
-          let* number_of_stored_shards_per_slot =
-            List.map_es number_of_shards_stored all_slot_indexes
-          in
           let* published_level_parameters =
             Node_context.get_proto_parameters
               ctxt
@@ -513,17 +493,23 @@ module Profile_handlers = struct
             |> Lwt.return
             |> lwt_map_error (fun e -> `Other e)
           in
+          let all_slot_indexes =
+            Utils.Infix.(0 -- (published_level_parameters.number_of_slots - 1))
+          in
+          let* number_of_stored_shards_per_slot =
+            List.map_es number_of_shards_stored all_slot_indexes
+          in
           let* flags =
             List.map_es
               (fun (slot_id, num_stored) ->
                 let all_stored = num_stored = number_of_assigned_shards in
-                if not published_level_parameters.incentives_enable then
+                if not last_known_parameters.incentives_enable then
                   return all_stored
                 else if not all_stored then return false
                 else
                   is_slot_attestable_with_traps
                     shards_store
-                    published_level_parameters.traps_fraction
+                    last_known_parameters.traps_fraction
                     pkh
                     shard_indices
                     slot_id)
@@ -540,6 +526,59 @@ module Profile_handlers = struct
             (fun _exn -> ()) ;
           return (Types.Attestable_slots {slots = flags; published_level})
     in
+
+    (* Decide whether to short-circuit attestation computation at attested level [L]
+       because of a protocol migration that decreased [attestation_lag].
+
+       - M = migration level (first level of the new protocol);
+       - new_lag = attestation_lag at attested level L (new protocol);
+       - published_level = L - new_lag 
+       
+       If published_level is still in the old protocol and the old lag > new lag,
+       then for L in [M .. M + new_lag - 1] the corresponding published data belongs
+       to the old protocol and should be ignored for attestation purposes. *)
+    let should_drop_due_to_migration last_known_parameters =
+      let open Lwt_result_syntax in
+      let migration_level = Node_context.get_last_migration_level ctxt in
+      let new_lag = Int32.of_int last_known_parameters.Types.attestation_lag in
+      let published_level = Int32.(sub attested_level new_lag) in
+      let* published_level_parameters =
+        Node_context.get_proto_parameters ctxt ~level:(`Level published_level)
+        |> Lwt.return
+        |> lwt_map_error (fun e -> `Other e)
+      in
+      let old_lag =
+        Int32.of_int published_level_parameters.Types.attestation_lag
+      in
+      return
+        (old_lag > new_lag
+        && migration_level <= attested_level
+        && attested_level < Int32.add migration_level new_lag)
+    in
+
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8064 *)
+    let get_attestable_slots ~shard_indices store last_known_parameters
+        ~attested_level =
+      let open Lwt_result_syntax in
+      let* should_drop_due_to_migration =
+        should_drop_due_to_migration last_known_parameters
+      in
+      if should_drop_due_to_migration then
+        let*! () = Event.emit_skip_attesting_shards ~level:attested_level in
+
+        let slots =
+          Stdlib.List.init last_known_parameters.number_of_slots (fun _ ->
+              false)
+        in
+        return (Types.Attestable_slots {slots; published_level = 0l})
+      else
+        get_attestable_slots
+          ~shard_indices
+          store
+          last_known_parameters
+          ~attested_level
+    in
+
     call_handler1 (fun () ->
         let open Lwt_result_syntax in
         let last_finalized_level = Node_context.get_last_finalized_level ctxt in
@@ -555,8 +594,8 @@ module Profile_handlers = struct
             ~level:attestation_level
           |> Errors.other_lwt_result
         in
-        let* proto_parameters =
-          Node_context.get_proto_parameters ctxt ~level:`Last_proto
+        let* last_known_parameters =
+          Node_context.get_proto_parameters ctxt ~level:(`Level attested_level)
           |> Lwt.return
           |> lwt_map_error (fun e -> `Other e)
         in
@@ -564,7 +603,7 @@ module Profile_handlers = struct
         get_attestable_slots
           ~shard_indices
           store
-          proto_parameters
+          last_known_parameters
           ~attested_level)
 end
 
