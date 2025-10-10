@@ -909,7 +909,7 @@ fn apply_batch<Host: Runtime>(
     let mut first_failure: Option<usize> = None;
     let mut receipts = Vec::with_capacity(validated_operations.len());
 
-    for (index, (content, balance_uppdate)) in validated_operations
+    for (index, (content, balance_update)) in validated_operations
         .into_iter()
         .zip(balance_updates)
         .enumerate()
@@ -928,7 +928,7 @@ fn apply_batch<Host: Runtime>(
                 "Skipping this operation because we already failed on {:?}.",
                 first_failure
             );
-            produce_skipped_receipt(&content)
+            produce_skipped_receipt(&content, balance_update)
         } else {
             apply_operation(
                 host,
@@ -936,7 +936,7 @@ fn apply_batch<Host: Runtime>(
                 origination_nonce,
                 &content,
                 &source_account,
-                balance_uppdate,
+                balance_update,
                 level,
                 now,
                 chain_id,
@@ -3896,6 +3896,13 @@ mod tests {
             },
         });
 
+        // op-5 transfer: self-transfer 1ꜩ is skipped
+        let transfer_content = OperationContent::Transfer(TransferContent {
+            amount: 1.into(),
+            destination: src_acc.contract(),
+            parameters: None,
+        });
+
         let batch = make_operation(
             5,
             1,
@@ -3907,6 +3914,7 @@ mod tests {
                 origination_content_1,
                 origination_content_2,
                 origination_content_3,
+                transfer_content,
             ],
         );
 
@@ -4096,6 +4104,22 @@ mod tests {
                 ),
                 internal_operation_results: vec![],
             }),
+            OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Skipped,
+                internal_operation_results: vec![],
+            }),
         ];
         assert_eq!(
             receipts, expected_receipts,
@@ -4104,14 +4128,14 @@ mod tests {
         // Check the balances
         assert_eq!(
             src_acc.balance(&host).unwrap(),
-            399980.into(),
+            399975.into(),
             "Source account balance should be 399980ꜩ after the operations"
         );
 
         // Check the counters
         assert_eq!(
             src_acc.counter(&host).unwrap(),
-            4.into(),
+            5.into(),
             "Source account counter should be 4 after the operations"
         );
 
