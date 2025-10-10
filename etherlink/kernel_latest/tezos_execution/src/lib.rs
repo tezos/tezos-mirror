@@ -415,7 +415,7 @@ fn transfer<'a, Host: Runtime>(
                 balance,
                 block_ctx,
                 operation_ctx: &mut OperationCtx {
-                    source: source_account.pkh(),
+                    source: source_account,
                     counter: operation_counter,
                     origination_nonce,
                 },

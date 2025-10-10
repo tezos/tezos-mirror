@@ -4,6 +4,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::account_storage::TezlinkImplicitAccount;
 use crate::address::OriginationNonce;
 use crate::context::{big_maps::*, Context};
 use crate::get_contract_entrypoint;
@@ -41,7 +42,7 @@ pub struct OperationCtx<'operation> {
     // a 'batch lifetime. Downgrade it to an 'operation
     // lifetime is not a problem for the compiler.
     // However, it could be misleading in terms of comprehension
-    pub source: &'operation PublicKeyHash,
+    pub source: &'operation TezlinkImplicitAccount,
     pub origination_nonce: &'operation mut OriginationNonce,
     pub counter: &'operation mut u128,
 }
@@ -81,7 +82,14 @@ macro_rules! make_default_ctx {
         };
         let mut operation_ctx = OperationCtx {
             counter: &mut operation_counter,
-            source: &"tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
+            source: &TezlinkImplicitAccount::from_public_key_hash(
+                $context,
+                &tezos_crypto_rs::public_key_hash::PublicKeyHash::from_b58check(
+                    "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP",
+                )
+                .unwrap(),
+            )
+            .unwrap(),
             origination_nonce: &mut origination_nonce,
         };
         let mut $ctx = Ctx {
@@ -170,7 +178,7 @@ impl<'a, Host: Runtime> CtxTrait<'a>
     }
 
     fn source(&self) -> PublicKeyHash {
-        self.operation_ctx.source.clone()
+        self.operation_ctx.source.pkh().clone()
     }
 
     fn amount(&self) -> i64 {
