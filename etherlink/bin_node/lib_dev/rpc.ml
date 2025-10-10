@@ -84,25 +84,20 @@ module Forward_container
       val inject_transaction :
         keep_alive:bool ->
         base:Uri.t ->
-        tx_object:Tx.legacy ->
+        tx_object:Tx.t ->
         raw_tx:string ->
         (Ethereum_types.hash, string) result tzresult Lwt.t
 
-      (* REVIEW NOTE: Temporary return type change, to avoid a gargantuan MR
-      Impact is none, Tezlink and Etherlink now share the same type in tx obj and legacy *)
       val get_transaction_by_hash :
         keep_alive:bool ->
         base:Uri.t ->
         Ethereum_types.hash ->
-        (Tx.legacy option, string) result tzresult Lwt.t
+        (Tx.t option, string) result tzresult Lwt.t
     end) :
   Services_backend_sig.Tx_container
     with type address = Tx.address
-     and type legacy_transaction_object = Tx.legacy
      and type transaction_object = Tx.t = struct
   type address = Tx.address
-
-  type legacy_transaction_object = Tx.legacy
 
   type transaction_object = Tx.t
 
@@ -152,7 +147,7 @@ module Forward_container
         (*we return the known next_nonce instead of failing *)
         return next_nonce
 
-  let add ~next_nonce:_ (tx_object : Tx.legacy) ~raw_tx =
+  let add ~next_nonce:_ (tx_object : Tx.t) ~raw_tx =
     let open Lwt_syntax in
     let* () =
       Internal_event.Simple.emit
@@ -165,7 +160,7 @@ module Forward_container
       ~tx_object
       ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
 
-  let find hash : legacy_transaction_object option tzresult Lwt.t =
+  let find hash : transaction_object option tzresult Lwt.t =
     let open Lwt_result_syntax in
     let* res =
       Injector.get_transaction_by_hash

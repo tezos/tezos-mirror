@@ -151,7 +151,7 @@ struct
     open Ethereum_types
     module S = String.Hashtbl
 
-    type t = Tx.legacy S.t
+    type t = Tx.t S.t
 
     let empty ~start_size = S.create start_size
 
@@ -286,13 +286,13 @@ struct
     type request = {
       next_nonce : Ethereum_types.quantity;
       payload : Ethereum_types.hex;
-      tx_object : Tx.legacy;
+      tx_object : Tx.t;
       callback : callback;
     }
 
     type ('a, 'b) t =
       | Inject : request -> ((unit, string) result, tztrace) t
-      | Find : {txn_hash : Ethereum_types.hash} -> (Tx.legacy option, tztrace) t
+      | Find : {txn_hash : Ethereum_types.hash} -> (Tx.t option, tztrace) t
       | Nonce : {
           next_nonce : Ethereum_types.quantity;
           address : Tx.address;
@@ -313,12 +313,9 @@ struct
       | Pop_transactions : {
           validation_state : 'a;
           validate_tx :
-            'a ->
-            string ->
-            Tx.legacy ->
-            [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t;
+            'a -> string -> Tx.t -> [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t;
         }
-          -> ((string * Tx.legacy) list, tztrace) t
+          -> ((string * Tx.t) list, tztrace) t
       | Confirm_transactions : {
           confirmed_txs : Ethereum_types.hash Seq.t;
           clear_pending_queue_after : bool;
@@ -973,7 +970,7 @@ struct
             String.Hashtbl.fold
               (fun hash value acc ->
                 match lookup_fn hash value with
-                | Some (obj : Tx.legacy) ->
+                | Some (obj : Tx.t) ->
                     let existing_nonce_map =
                       Tx.AddressMap.find_opt
                         (Tx.from_address_of_tx_object obj)
@@ -1085,8 +1082,6 @@ struct
   end
 
   type address = Tx.address
-
-  type legacy_transaction_object = Tx.legacy
 
   type transaction_object = Tx.t
 

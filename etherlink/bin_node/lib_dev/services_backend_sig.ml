@@ -187,8 +187,6 @@ type endpoint = Rpc of Uri.t | Websocket of Websocket_client.t
 module type Tx_container = sig
   type address
 
-  type legacy_transaction_object
-
   type transaction_object
 
   (** [nonce ~next_nonce address] must returns the next gap nonce
@@ -203,7 +201,7 @@ module type Tx_container = sig
       [next_nonce] is the next expected nonce found in the backend. *)
   val add :
     next_nonce:Ethereum_types.quantity ->
-    legacy_transaction_object ->
+    transaction_object ->
     raw_tx:Ethereum_types.hex ->
     (Ethereum_types.hash, string) result tzresult Lwt.t
 
@@ -212,8 +210,7 @@ module type Tx_container = sig
 
   (** [find hash] returns the transaction_object found in tx
       container. *)
-  val find :
-    Ethereum_types.hash -> legacy_transaction_object option tzresult Lwt.t
+  val find : Ethereum_types.hash -> transaction_object option tzresult Lwt.t
 
   (** [content ()] returns all the transactions found in tx
       container. *)
@@ -272,10 +269,10 @@ module type Tx_container = sig
     validate_tx:
       ('a ->
       string ->
-      legacy_transaction_object ->
+      transaction_object ->
       [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t) ->
     initial_validation_state:'a ->
-    (string * legacy_transaction_object) list tzresult Lwt.t
+    (string * transaction_object) list tzresult Lwt.t
 
   (** [size_info] returns the size of the tx container. *)
   val size_info : unit -> Metrics.Tx_pool.size_info tzresult Lwt.t
@@ -290,12 +287,11 @@ type 'f tx_container =
   | Evm_tx_container :
       (module Tx_container
          with type address = Ethereum_types.address
-          and type legacy_transaction_object = Transaction_object.t
           and type transaction_object = Transaction_object.t)
       -> L2_types.evm_chain_family tx_container
   | Michelson_tx_container :
       (module Tx_container
-         with type legacy_transaction_object = Tezos_types.Operation.t)
+         with type transaction_object = Tezos_types.Operation.t)
       -> L2_types.michelson_chain_family tx_container
 
 (** Some functions of the Tx_container module, such as [add], have
