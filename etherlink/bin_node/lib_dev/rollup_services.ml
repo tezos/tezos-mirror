@@ -260,6 +260,14 @@ let global_block_watcher :
     ~output:Sc_rollup_block.encoding
     (open_root / "global" / "monitor_blocks")
 
+let finalized_block_watcher :
+    ([`GET], unit, unit, unit, unit, Sc_rollup_block.t) Service.service =
+  Tezos_rpc.Service.get_service
+    ~description:"Monitor and streaming the finalized L2 blocks"
+    ~query:Tezos_rpc.Query.empty
+    ~output:Sc_rollup_block.encoding
+    (open_root / "global" / "monitor_finalized_blocks")
+
 let global_current_tezos_level :
     ([`GET], unit, unit, unit, unit, int32 option) Service.service =
   Tezos_rpc.Service.get_service
@@ -318,7 +326,7 @@ let call_service ~keep_alive ~base ?media_types ~timeout rpc b c input =
   let f base = call_service ~base ?media_types ~timeout rpc b c input in
   if keep_alive then retry_connection f base else f base
 
-let make_streamed_call ~timeout rollup_node_endpoint =
+let make_streamed_call ~timeout rollup_node_endpoint service =
   let open Lwt_result_syntax in
   let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
@@ -328,7 +336,7 @@ let make_streamed_call ~timeout rollup_node_endpoint =
     Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
       [Media_type.json]
       ~base:rollup_node_endpoint
-      global_block_watcher
+      service
       ~on_chunk
       ~on_close
       ()
@@ -340,6 +348,28 @@ let make_streamed_call ~timeout rollup_node_endpoint =
     if Lwt_stream.is_closed stream then () else on_close ()
   in
   return (stream, close)
+
+let monitor_blocks rollup_node_endpoint =
+  make_streamed_call rollup_node_endpoint global_block_watcher
+
+let monitor_finalized_blocks rollup_node_endpoint =
+  make_streamed_call rollup_node_endpoint finalized_block_watcher
+
+let monitor_finalized_levels ~timeout rollup_node_endpoint =
+  let open Lwt_result_syntax in
+  let*! res = monitor_finalized_blocks ~timeout rollup_node_endpoint in
+  match res with
+  | Ok (stream, close) ->
+      return
+        ( Lwt_stream.map (fun (b : Sc_rollup_block.t) -> b.header.level) stream,
+          close )
+  | Error e ->
+      let*! () = Events.rpc_call_fallback "monitor_finalized_blocks" e in
+      let+ stream, close = monitor_blocks ~timeout rollup_node_endpoint in
+      ( Lwt_stream.map
+          (fun (b : Sc_rollup_block.t) -> Int32.sub b.header.level 2l)
+          stream,
+        close )
 
 let publish :
     ?drop_duplicate:bool ->
