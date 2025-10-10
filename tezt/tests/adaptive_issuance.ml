@@ -76,6 +76,10 @@ module Helpers = struct
       current_level
       (current_level + nb_blocks_to_bake) ;
     repeat nb_blocks_to_bake (fun () -> bake ?keys client)
+
+  let ceil_q q =
+    let floor = Q.to_int q in
+    if Q.equal q (Q.of_int floor) then floor else floor + 1
 end
 
 let log_step counter msg =
@@ -959,6 +963,12 @@ let test_staking =
     Node.RPC.call node_2
     @@ RPC.get_chain_block_context_delegate Constant.bootstrap2.public_key_hash
   in
+  let* misbehaviour_stake_distribution =
+    (* Last chance to retrieve this, because it gets cleared from the
+       context at the end of cycle [misbehaviour_cycle + 1]. *)
+    Node.RPC.call node_2
+    @@ RPC.get_stake_distribution ~cycle:misbehaviour_cycle ()
+  in
 
   (* Bake the block that applies the slashing (last block of cycle
      [misbehaviour_cycle + 1]). We will now check the slashed and
@@ -1007,13 +1017,42 @@ let test_staking =
       |> to_int)
   in
 
-  (* slashed stake *)
+  (* Compute the expected amounts slashed from the baker's and the
+     external stakers' staked tez respectively.
+
+     Note: we're skipping over some steps of slashing computation,
+     e.g. applying the delegate's and global
+     limit_of_staking_over_baking (we're very far from reaching it
+     here), and bounding the amount to slash from the baker by its
+     currently staked amount (which is more than high enough). *)
+  let own_staked =
+    JSON.(bootstrap2_info_right_before_slashing |-> "own_staked" |> as_int)
+  in
+  let external_staked =
+    JSON.(bootstrap2_info_right_before_slashing |-> "external_staked" |> as_int)
+  in
+  let total_staked = own_staked + external_staked in
+  let baker_share = Q.(own_staked // total_staked) in
+  let total_staked_recorded_for_misbehaviour_rights =
+    List.find_map
+      (fun RPC.{delegate; staked; weighted_delegated = _} ->
+        if String.equal delegate Constant.bootstrap2.public_key_hash then
+          Some staked
+        else None)
+      misbehaviour_stake_distribution
+    |> Option.get
+  in
+  let amount_slashed_from_total_staked =
+    Q.(
+      of_int total_staked_recorded_for_misbehaviour_rights
+      * double_baking_penalty
+      |> to_int)
+  in
   let amount_slashed_from_own_staked =
-    if Protocol.(number protocol > number S023) then 10_049_785_808
-    else 10_049_764_732
+    Q.(baker_share * of_int amount_slashed_from_total_staked) |> Helpers.ceil_q
   in
   let amount_slashed_from_external_staked =
-    if Protocol.(number protocol > number S023) then 50_248_756 else 50_248_756
+    amount_slashed_from_total_staked - amount_slashed_from_own_staked
   in
 
   (* Compute rewarded vs burned amounts. *)
