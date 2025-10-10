@@ -112,7 +112,7 @@ let addr_to_topic address =
   let padded_hex = String.make (64 - String.length addr_hex) '0' ^ addr_hex in
   Ethereum_types.Hash (Hex padded_hex)
 
-(** [mk_filter address selector whitelist] creates an Ethereum log filter for
+(** [mk_filter address selectors whitelist] creates an Ethereum log filter for
     events.
 
     This function builds a filter to match logs from a specific contract address
@@ -130,14 +130,14 @@ let addr_to_topic address =
       addresses
 
     @param address The contract address to filter logs from
-    @param selector The event selector (keccak hash of the event signature)
+    @param selectors The event selectors (keccak hashes of the events signatures)
     @param whitelist Optional list of whitelist items containing proxy
       addresses and ticket hashes
     @return A filter configuration for Ethereum log queries
 *)
-let mk_filter address selector whitelist =
+let mk_filter address selectors whitelist =
   (* First topic is always the event selector *)
-  let selector_topic = Some (Ethereum_types.Filter.One selector) in
+  let selector_topic = Some (Ethereum_types.Filter.Or selectors) in
   (* Construct topics array based on whitelist configuration *)
   let topics =
     match whitelist with
@@ -417,7 +417,23 @@ let () =
     (fun (block, limit) -> Too_many_deposits_in_one_block {block; limit})
 
 module Deposit = struct
-  (*
+  type data = Db.deposit = {
+    nonce : Ethereum_types.quantity;
+    proxy : Ethereum_types.Address.t;
+    ticket_hash : Ethereum_types.hash;
+    receiver : Ethereum_types.Address.t;
+    amount : Ethereum_types.quantity;
+  }
+
+  (* FA bridge address, see [kernel]/revm/src/precompiles/constants.rs *)
+  let fa_bridge_address_hex = "ff00000000000000000000000000000000000002"
+
+  let fa_bridge_address_0x = "0x" ^ fa_bridge_address_hex
+
+  let fa_bridge_address = Ethereum_types.Address (Hex fa_bridge_address_hex)
+
+  module Dionysus = struct
+    (*
     event QueuedEvent (
         uint256 nonce,
         address receiver,
@@ -429,25 +445,30 @@ module Deposit = struct
    topics  = keccak selector + ticket_hash + proxy
   *)
 
-  type data = Db.deposit = {
-    nonce : Ethereum_types.quantity;
-    proxy : Ethereum_types.Address.t;
-    ticket_hash : Ethereum_types.hash;
-    receiver : Ethereum_types.Address.t;
-    amount : Ethereum_types.quantity;
-  }
+    let topic =
+      kecack_topic "QueuedDeposit(uint256,address,uint256,uint256,uint256)"
+  end
 
-  (* TODO: same precompile as withdrawals at first *)
-  let address_hex = "ff00000000000000000000000000000000000002"
+  module Ebisu = struct
+    (*
+      event QueuedDeposit(
+        uint256 indexed ticketHash,
+        address indexed proxy,
+        uint256 nonce,
+        address receiver,
+        uint256 amount,
+        uint256 inboxLevel,
+        uint256 inboxMsgId
+      );
+    *)
 
-  let address_0x = "0x" ^ address_hex
+    let topic =
+      kecack_topic
+        "QueuedDeposit(uint256,address,uint256,address,uint256,uint256,uint256)"
+  end
 
-  let address = Ethereum_types.Address (Hex address_hex)
-
-  let topic =
-    kecack_topic "QueuedDeposit(uint256,address,uint256,uint256,uint256)"
-
-  let filter whitelist = mk_filter address topic whitelist
+  let filter whitelist =
+    mk_filter fa_bridge_address [Dionysus.topic; Ebisu.topic] whitelist
 
   let whitelist_filter whitelist topics =
     let open Result_syntax in
@@ -549,7 +570,7 @@ let parse_log whitelist (log : Ethereum_types.transaction_log) =
   let* deposit_data = Deposit.decode_event_data whitelist log in
   return (Option.map (parsed_log_to_db log) deposit_data)
 
-let precompiled_contract_address = Efunc_core.Private.a Deposit.address_hex
+let fa_bridge_address = Efunc_core.Private.a Deposit.fa_bridge_address_hex
 
 let claim ctx ~deposit_id =
   let open Lwt_result_syntax in
@@ -558,9 +579,7 @@ let claim ctx ~deposit_id =
   in
   let _ : unit Lwt.t =
     let open Lwt_syntax in
-    let* res =
-      Tx_queue.transfer ctx ~to_:precompiled_contract_address ~data ()
-    in
+    let* res = Tx_queue.transfer ctx ~to_:fa_bridge_address ~data () in
     match res with
     | Ok (Ok ()) -> return_unit
     | Error trace ->
@@ -645,7 +664,7 @@ let rec get_logs ?(n = 1) ctx ~block =
              {
                from_block = Some (Number block);
                to_block = Some (Number block);
-               address = Some (Single Deposit.address);
+               address = Some (Single Deposit.fa_bridge_address);
                topics = Some filter.topics;
                block_hash = None;
              } ))
@@ -691,7 +710,7 @@ let handle_confirmed_txs {db; ws_client; _} number =
      let (Hex input) = Transaction_object.input tx in
      match Transaction_object.to_ tx with
      | Some to_
-       when Ethereum_types.Address.compare to_ Deposit.address = 0
+       when Ethereum_types.Address.compare to_ Deposit.fa_bridge_address = 0
             && is_claim_input input -> (
          let tx_hash = Transaction_object.hash tx in
          let input =
