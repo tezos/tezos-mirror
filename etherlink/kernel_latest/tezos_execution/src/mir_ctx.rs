@@ -4,7 +4,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::account_storage::TezlinkImplicitAccount;
+use crate::account_storage::{
+    TezlinkAccount, TezlinkImplicitAccount, TezlinkOriginatedAccount,
+};
 use crate::address::OriginationNonce;
 use crate::context::{big_maps::*, Context};
 use crate::get_contract_entrypoint;
@@ -21,14 +23,15 @@ use num_bigint::BigUint;
 use primitive_types::H256;
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::ChainId;
-use tezos_data_encoding::types::Zarith;
+use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::Timestamp;
+use tezos_smart_rollup::types::{Contract, Timestamp};
 use tezos_storage::{read_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
     Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
 };
+use tezos_tezlink::operation_result::TransferError;
 use typed_arena::Arena;
 
 pub struct TcCtx<'operation, Host: Runtime> {
@@ -47,14 +50,17 @@ pub struct OperationCtx<'operation> {
     pub counter: &'operation mut u128,
 }
 
-pub struct Ctx<'a, 'block, 'operation, Host: Runtime> {
-    pub tc_ctx: &'a mut TcCtx<'operation, Host>,
+pub struct ExecCtx {
     pub sender: AddressHash,
     pub amount: i64,
     pub self_address: AddressHash,
     pub balance: i64,
-    pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
+}
 
+pub struct Ctx<'a, 'block, 'operation, Host: Runtime> {
+    pub tc_ctx: &'a mut TcCtx<'operation, Host>,
+    pub exec_ctx: ExecCtx,
+    pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub operation_ctx: &'a mut OperationCtx<'operation>,
     pub block_ctx: &'block BlockCtx<'block>,
 }
@@ -63,6 +69,44 @@ pub struct BlockCtx<'block> {
     pub level: &'block BlockNumber,
     pub now: &'block Timestamp,
     pub chain_id: &'block ChainId,
+}
+
+fn address_from_contract(contract: Contract) -> AddressHash {
+    match contract {
+        Contract::Originated(kt1) => AddressHash::Kt1(kt1),
+        Contract::Implicit(hash) => AddressHash::Implicit(hash),
+    }
+}
+
+impl ExecCtx {
+    pub fn create(
+        host: &mut impl Runtime,
+        sender_account: &impl TezlinkAccount,
+        dest_account: &TezlinkOriginatedAccount,
+        amount: &Narith,
+    ) -> Result<Self, TransferError> {
+        let sender = address_from_contract(sender_account.contract());
+        let amount = amount.0.clone().try_into().map_err(
+            |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
+                TransferError::MirAmountToNarithError(err.to_string())
+            },
+        )?;
+        let self_address = address_from_contract(dest_account.contract());
+        let balance = dest_account
+            .balance(host)
+            .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
+        let balance = balance.0.try_into().map_err(
+            |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
+                TransferError::MirAmountToNarithError(err.to_string())
+            },
+        )?;
+        Ok(Self {
+            sender,
+            amount,
+            self_address,
+            balance,
+        })
+    }
 }
 
 #[macro_export]
@@ -98,15 +142,18 @@ macro_rules! make_default_ctx {
             context: $context,
             gas: &mut gas,
         };
+        let exec_ctx = ExecCtx {
+            balance: 0,
+            amount: 0,
+            self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
+            sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
+        };
         let mut $ctx = Ctx {
             tc_ctx: &mut tc_ctx,
             block_ctx: &block_ctx,
-            operation_ctx: &mut operation_ctx,
-            balance: 0,
-            amount: 0,
             big_map_diff: BTreeMap::new(),
-            self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
-            sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
+            operation_ctx: &mut operation_ctx,
+            exec_ctx,
         };
     };
 }
@@ -170,7 +217,7 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a> for Ctx<'_, '_, '_, Host> {
 
 impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, '_, '_, Host> {
     fn sender(&self) -> AddressHash {
-        self.sender.clone()
+        self.exec_ctx.sender.clone()
     }
 
     fn source(&self) -> PublicKeyHash {
@@ -178,15 +225,15 @@ impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, '_, '_, Host> {
     }
 
     fn amount(&self) -> i64 {
-        self.amount
+        self.exec_ctx.amount
     }
 
     fn self_address(&self) -> AddressHash {
-        self.self_address.clone()
+        self.exec_ctx.self_address.clone()
     }
 
     fn balance(&self) -> i64 {
-        self.balance
+        self.exec_ctx.balance
     }
 
     fn level(&self) -> BigUint {

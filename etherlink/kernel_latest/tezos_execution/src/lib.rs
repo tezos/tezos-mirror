@@ -40,7 +40,7 @@ use tezos_tezlink::{
 };
 
 use crate::address::OriginationNonce;
-use crate::mir_ctx::{convert_big_map_diff, BlockCtx, Ctx, OperationCtx, TcCtx};
+use crate::mir_ctx::{convert_big_map_diff, BlockCtx, Ctx, ExecCtx, OperationCtx, TcCtx};
 
 extern crate alloc;
 pub mod account_storage;
@@ -92,13 +92,6 @@ fn contract_from_address(address: AddressHash) -> Result<Contract, TransferError
         AddressHash::Kt1(kt1) => Ok(Contract::Originated(kt1)),
         AddressHash::Implicit(pkh) => Ok(Contract::Implicit(pkh)),
         AddressHash::Sr1(_) => Err(TransferError::MirAddressUnsupportedError),
-    }
-}
-
-fn address_from_contract(contract: Contract) -> AddressHash {
-    match contract {
-        Contract::Originated(kt1) => AddressHash::Kt1(kt1),
-        Contract::Implicit(hash) => AddressHash::Implicit(hash),
     }
 }
 
@@ -376,34 +369,18 @@ fn transfer<'a, Host: Runtime>(
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             let receipt =
                 transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?;
-            let sender = address_from_contract(sender_account.contract());
-            let amount = amount.0.clone().try_into().map_err(
-                |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
-                    TransferError::MirAmountToNarithError(err.to_string())
-                },
-            )?;
-            let self_address = address_from_contract(dest_contract.clone());
-            let balance = dest_account
-                .balance(tc_ctx.host)
-                .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
-            let balance = balance.0.try_into().map_err(
-                |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
-                    TransferError::MirAmountToNarithError(err.to_string())
-                },
-            )?;
             let code = dest_account
                 .code(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
             let storage = dest_account
                 .storage(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
+            let exec_ctx =
+                ExecCtx::create(tc_ctx.host, sender_account, &dest_account, amount)?;
             let mut ctx = Ctx {
                 tc_ctx,
-                sender,
-                amount,
-                self_address,
                 big_map_diff: BTreeMap::new(),
-                balance,
+                exec_ctx,
                 block_ctx,
                 operation_ctx,
             };
