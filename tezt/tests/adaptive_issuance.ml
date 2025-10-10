@@ -874,6 +874,7 @@ let test_staking =
       ~keys:[Constant.bootstrap2.public_key_hash]
       client_2
   in
+  let* misbehaviour_cycle = Node.current_cycle node_2 in
 
   let* _ = Node.wait_for_level node_2 (common_ancestor + node_2_branch_size) in
 
@@ -945,28 +946,65 @@ let test_staking =
      check that the block receipt contains the expected slashed and rewarded \
      amounts." ;
 
-  (* Bake a cycle to wait for the slashing *)
+  (* Bake until the block right before the slashing (second-to-last
+     block of cycle [misbehaviour_cycle + 1]), so that we can retrieve
+     data that will be needed to compute expected slashed amounts. *)
   let* () =
-    Helpers.bake_n_cycles
-      bake
+    Client.bake_until_cycle_end
+      ~target_cycle:(misbehaviour_cycle + 1)
       ~keys:[Constant.bootstrap1.public_key_hash]
-      1
       client_1
   in
+  let* bootstrap2_info_right_before_slashing =
+    Node.RPC.call node_2
+    @@ RPC.get_chain_block_context_delegate Constant.bootstrap2.public_key_hash
+  in
 
+  (* Bake the block that applies the slashing (last block of cycle
+     [misbehaviour_cycle + 1]). We will now check the slashed and
+     rewarded amounts in this block's receipts. *)
+  let* () = bake ~keys:[Constant.bootstrap1.public_key_hash] client_1 in
   let* bu = Operation_receipt.get_block_metadata client_1 in
   let* bu = Operation_receipt.Balance_updates.from_result [bu] in
 
-  (* slashed stakers (including baker) unstake deposit *)
+  (* Compute the expected amount slashed from unstaked requests
+     (baker's and external stakers' are counted together) *)
+  let unstake_requests_earliest_slashable_cycle =
+    (* Rights for the misbehaviour cycle were determined at the end of
+       cycle [misbehaviour_cycle - consensus_rights_delay - 1], so any
+       funds unstaked in cycle [misbehaviour_cycle -
+       consensus_rights_delay] and up have contributed to those
+       rights. *)
+    misbehaviour_cycle - consensus_rights_delay
+  in
+  let total_amount_in_slashable_unstake_requests =
+    let open JSON in
+    let unstake_requests =
+      bootstrap2_info_right_before_slashing |-> "total_unstaked_per_cycle"
+      |> as_list
+    in
+    List.fold_left
+      (fun total_amount unstake_request ->
+        if
+          unstake_request |-> "cycle" |> as_int
+          >= unstake_requests_earliest_slashable_cycle
+        then total_amount + (unstake_request |-> "deposit" |> as_int)
+        else total_amount)
+      0
+      unstake_requests
+  in
+  let percentage_of_frozen_deposits_slashed_per_double_baking =
+    JSON.(
+      constants |-> "percentage_of_frozen_deposits_slashed_per_double_baking"
+      |> as_int)
+  in
+  let double_baking_penalty =
+    Q.(percentage_of_frozen_deposits_slashed_per_double_baking // 10_000)
+  in
   let amount_slashed_from_unstake_requests =
-    if Protocol.(number protocol > number S023) then
-      (* From T on, when activating the protocol from Genesis, the
-         initialization of consensus rights for the first cycles is
-         done with AI already in effect, so delegation already counts
-         less than staking. This slightly skews the balances in the
-         whole test. *)
-      50_000_004
-    else 50_000_003
+    Q.(
+      of_int total_amount_in_slashable_unstake_requests * double_baking_penalty
+      |> to_int)
   in
 
   (* slashed stake *)
@@ -979,7 +1017,9 @@ let test_staking =
   in
 
   (* Compute rewarded vs burned amounts. *)
-  let global_limit_of_staking_over_baking = 9 in
+  let global_limit_of_staking_over_baking =
+    JSON.(constants |-> "global_limit_of_staking_over_baking" |> as_int)
+  in
   (* It's critical that the rewarded amount cannot exceed the amount
      slashed from the baker's own deposits; otherwise, the baker may
      actually gain tez by purposefully double signing and denuncing
