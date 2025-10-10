@@ -5851,7 +5851,32 @@ module History_rpcs = struct
     end) in
     let seen_indexes = ref SeenIndexes.empty in
     let at_least_one_attested_status = ref false in
+
     let rec check_cell cell ~check_level =
+      let* lag_at_check_level =
+        let block = Option.map string_of_int check_level in
+        let* dal_parameters = Dal.Parameters.from_client ?block client in
+        return dal_parameters.attestation_lag
+      in
+      let* lag_at_pred_check_level =
+        let block =
+          Option.fold
+            ~none:None
+            ~some:(fun level ->
+              if level <= 1 then None else Some (string_of_int (level - 1)))
+            check_level
+        in
+        let* dal_parameters = Dal.Parameters.from_client ?block client in
+        return dal_parameters.attestation_lag
+      in
+      (* Select the right lag while taking care of the false returned lag in the
+         migration block (pevious lag used for validation but parameters patched
+         at block finalization). *)
+      let lag =
+        if lag_at_check_level = lag_at_pred_check_level then lag_at_check_level
+        else lag_at_pred_check_level
+      in
+
       let skip_list_kind = JSON.(cell |-> "kind" |> as_string) in
       let expected_skip_list_kind = "dal_skip_list" in
       Check.(
@@ -5865,17 +5890,19 @@ module History_rpcs = struct
         seen_indexes := SeenIndexes.add cell_index !seen_indexes ;
         let content = JSON.(skip_list |-> "content") in
         let cell_level = JSON.(content |-> "level" |> as_int) in
+
         (match check_level with
         | Some level ->
             assert (level >= first_dal_level) ;
-            let expected_level =
+            let expected_published_level =
               if level = first_dal_level then (* the "level" of genesis *) 0
               else level - lag
             in
             Check.(
-              (cell_level = expected_level)
+              (cell_level = expected_published_level)
                 int
-                ~error_msg:"Unexpected cell level: got %L, expected %R")
+                ~error_msg:
+                  "Unexpected cell's published level: got %L, expected %R")
         | None -> ()) ;
         let cell_slot_index = JSON.(content |-> "index" |> as_int) in
         let () =
@@ -12369,7 +12396,7 @@ let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
   tests ~migrate_from ~migrate_to ~check_rpc:true
 
 let register_migration ~migrate_from ~migrate_to =
-  test_migration_plugin ~migration_level:4 ~migrate_from ~migrate_to ;
+  test_migration_plugin ~migration_level:11 ~migrate_from ~migrate_to ;
   History_rpcs.test_commitments_history_rpcs_with_migration
     ~migration_level:11
     ~migrate_from
