@@ -5765,7 +5765,7 @@ let test_attestation_through_p2p ~batching_time_interval _protocol
 module History_rpcs = struct
   (* In the following function, no migration is performed (expect from genesis
      to alpha) when [migration_level] is equal to or smaller than 1. *)
-  let scenario ?(migration_level = 1) ~slot_index ~first_cell_level
+  let main_scenario ?(migration_level = 1) ~slot_index ~first_cell_level
       ~first_dal_level ~last_confirmed_published_level protocol dal_parameters
       client node dal_node =
     let module Map_int = Map.Make (Int) in
@@ -6028,7 +6028,7 @@ module History_rpcs = struct
 
   let test_commitments_history_rpcs protocols =
     let scenario protocol dal_parameters _ client node dal_node =
-      scenario
+      main_scenario
         ~slot_index:3
         ~first_cell_level:0
         ~first_dal_level:1
@@ -6063,7 +6063,7 @@ module History_rpcs = struct
          doesn't have the DAL activated. *)
       (* We'll have 3 levels with a published and attested slot. *)
       let last_confirmed_published_level = migration_level + 3 in
-      scenario
+      main_scenario
         ~slot_index
         ~first_cell_level:0
         ~first_dal_level:1
