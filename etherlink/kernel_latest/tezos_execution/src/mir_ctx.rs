@@ -38,6 +38,7 @@ pub struct TcCtx<'operation, Host: Runtime> {
     pub host: &'operation mut Host,
     pub context: &'operation Context,
     pub gas: &'operation mut Gas,
+    pub big_map_diff: &'operation mut BTreeMap<Zarith, StorageDiff>,
 }
 
 pub struct OperationCtx<'operation> {
@@ -60,7 +61,6 @@ pub struct ExecCtx {
 pub struct Ctx<'a, 'block, 'operation, Host: Runtime> {
     pub tc_ctx: &'a mut TcCtx<'operation, Host>,
     pub exec_ctx: ExecCtx,
-    pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub operation_ctx: &'a mut OperationCtx<'operation>,
     pub block_ctx: &'block BlockCtx<'block>,
 }
@@ -141,6 +141,7 @@ macro_rules! make_default_ctx {
             host: $host,
             context: $context,
             gas: &mut gas,
+            big_map_diff: &mut BTreeMap::new(),
         };
         let exec_ctx = ExecCtx {
             balance: 0,
@@ -151,7 +152,6 @@ macro_rules! make_default_ctx {
         let mut $ctx = Ctx {
             tc_ctx: &mut tc_ctx,
             block_ctx: &block_ctx,
-            big_map_diff: BTreeMap::new(),
             operation_ctx: &mut operation_ctx,
             exec_ctx,
         };
@@ -293,7 +293,7 @@ impl<Host: Runtime> Ctx<'_, '_, '_, Host> {
             key_type,
             value_type,
         });
-        self.big_map_diff.insert(id, allocation);
+        self.tc_ctx.big_map_diff.insert(id, allocation);
     }
 
     /// Insert in the context a big_map diff that represents an update
@@ -309,9 +309,10 @@ impl<Host: Runtime> Ctx<'_, '_, '_, Host> {
             key,
             value,
         };
-        match self.big_map_diff.get_mut(id) {
+        match self.tc_ctx.big_map_diff.get_mut(id) {
             None => {
-                self.big_map_diff
+                self.tc_ctx
+                    .big_map_diff
                     .insert(id.clone(), StorageDiff::Update(vec![update]));
             }
             Some(diff) => diff.push_update(update),
@@ -320,12 +321,12 @@ impl<Host: Runtime> Ctx<'_, '_, '_, Host> {
 
     /// Insert in the context a big_map diff that represents a remove
     fn big_map_diff_remove(&mut self, id: Zarith) {
-        self.big_map_diff.insert(id, StorageDiff::Remove);
+        self.tc_ctx.big_map_diff.insert(id, StorageDiff::Remove);
     }
 
     /// Insert in the context a big_map diff that represents a copy
     fn big_map_diff_copy(&mut self, id: Zarith, source: Zarith) {
-        self.big_map_diff.insert(
+        self.tc_ctx.big_map_diff.insert(
             id,
             StorageDiff::Copy(Copy {
                 source,

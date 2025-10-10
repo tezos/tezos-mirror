@@ -379,7 +379,6 @@ fn transfer<'a, Host: Runtime>(
                 ExecCtx::create(tc_ctx.host, sender_account, &dest_account, amount)?;
             let mut ctx = Ctx {
                 tc_ctx,
-                big_map_diff: BTreeMap::new(),
                 exec_ctx,
                 block_ctx,
                 operation_ctx,
@@ -404,7 +403,7 @@ fn transfer<'a, Host: Runtime>(
             })?;
             log!(ctx.host(), Debug, "Transfer operation succeeded");
             let lazy_storage_diff =
-                convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff));
+                convert_big_map_diff(std::mem::take(ctx.tc_ctx.big_map_diff));
             Ok(TransferSuccess {
                 storage: Some(new_storage),
                 lazy_storage_diff,
@@ -520,7 +519,7 @@ fn handle_storage_with_big_maps<Host: Runtime>(
     let storage = storage
         .into_micheline_optimized_legacy(&parser.arena)
         .encode();
-    let lazy_storage_diff = convert_big_map_diff(ctx.big_map_diff);
+    let lazy_storage_diff = convert_big_map_diff(std::mem::take(ctx.tc_ctx.big_map_diff));
     Ok((storage, lazy_storage_diff))
 }
 
@@ -887,6 +886,7 @@ fn apply_operation<Host: Runtime>(
                 host,
                 context,
                 gas: &mut mir::gas::Gas::default(),
+                big_map_diff: &mut BTreeMap::new(),
             };
             let mut operation_ctx = OperationCtx {
                 source: source_account,
