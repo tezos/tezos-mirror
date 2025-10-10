@@ -230,11 +230,6 @@ documentation.odoc:
   - . ./scripts/ci/sccache-start.sh
   script:
   - eval $(opam env)
-  - export OPAMFETCH='wget'
-  - opam remote add default https://opam.ocaml.org/
-  - opam repo add archive git+https://github.com/ocaml/opam-repository-archive
-  - opam update
-  - opam install --yes odoc.2.4.4
   - make -C docs odoc-lite
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
