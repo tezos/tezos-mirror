@@ -40,7 +40,7 @@ use tezos_tezlink::{
 };
 
 use crate::address::OriginationNonce;
-use crate::mir_ctx::{convert_big_map_diff, BlockCtx, Ctx, TcCtx};
+use crate::mir_ctx::{convert_big_map_diff, BlockCtx, Ctx, OperationCtx, TcCtx};
 
 extern crate alloc;
 pub mod account_storage;
@@ -408,15 +408,17 @@ fn transfer<'a, Host: Runtime>(
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
             let mut ctx = Ctx {
                 tc_ctx: TcCtx { host, context, gas },
-                source: source_account.pkh().clone(),
                 sender,
                 amount,
                 self_address,
                 big_map_diff: BTreeMap::new(),
                 balance,
-                operation_counter,
-                origination_nonce,
                 block_ctx,
+                operation_ctx: &mut OperationCtx {
+                    source: source_account.pkh(),
+                    counter: operation_counter,
+                    origination_nonce,
+                },
             };
             let (internal_operations, new_storage) = execute_smart_contract(
                 code, storage, entrypoint, param, parser, &mut ctx,
@@ -435,9 +437,9 @@ fn transfer<'a, Host: Runtime>(
                 parser,
                 source_account,
                 gas,
-                ctx.operation_counter,
+                ctx.operation_ctx.counter,
                 all_internal_receipts,
-                ctx.origination_nonce,
+                ctx.operation_ctx.origination_nonce,
             )
             .map_err(|err| {
                 TransferError::FailedToExecuteInternalOperation(err.to_string())

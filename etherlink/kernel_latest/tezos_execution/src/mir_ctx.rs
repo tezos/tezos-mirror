@@ -36,16 +36,24 @@ pub struct TcCtx<Host, Context, Gas> {
     pub gas: Gas,
 }
 
-pub struct Ctx<'block, Host, Context, Gas, OpCounter, OrigNonce> {
+pub struct OperationCtx<'operation> {
+    // In reality, 'source' and 'origination_nonce' have
+    // a 'batch lifetime. Downgrade it to an 'operation
+    // lifetime is not a problem for the compiler.
+    // However, it could be misleading in terms of comprehension
+    pub source: &'operation PublicKeyHash,
+    pub origination_nonce: &'operation mut OriginationNonce,
+    pub counter: &'operation mut u128,
+}
+
+pub struct Ctx<'block, 'operation, Host, Context, Gas> {
     pub tc_ctx: TcCtx<Host, Context, Gas>,
     pub sender: AddressHash,
     pub amount: i64,
     pub self_address: AddressHash,
     pub balance: i64,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
-    pub source: PublicKeyHash,
-    pub operation_counter: OpCounter,
-    pub origination_nonce: OrigNonce,
+    pub operation_ctx: &'operation mut OperationCtx<'operation>,
     pub block_ctx: &'block BlockCtx<'block>,
 }
 
@@ -71,6 +79,11 @@ macro_rules! make_default_ctx {
             ])
             .unwrap(),
         };
+        let mut operation_ctx = OperationCtx {
+            counter: &mut operation_counter,
+            source: &"tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
+            origination_nonce: &mut origination_nonce,
+        };
         let mut $ctx = Ctx {
             tc_ctx: TcCtx {
                 host: $host,
@@ -78,14 +91,12 @@ macro_rules! make_default_ctx {
                 gas: &mut gas,
             },
             block_ctx: &block_ctx,
+            operation_ctx: &mut operation_ctx,
             balance: 0,
             amount: 0,
             big_map_diff: BTreeMap::new(),
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
-            source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
-            operation_counter: &mut operation_counter,
-            origination_nonce: &mut origination_nonce,
         };
     };
 }
@@ -130,7 +141,7 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a>
 }
 
 impl<'a, Host: Runtime> TypecheckingCtx<'a>
-    for Ctx<'_, &mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
+    for Ctx<'_, '_, &mut Host, &Context, &mut mir::gas::Gas>
 {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.tc_ctx.gas()
@@ -152,14 +163,14 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a>
 }
 
 impl<'a, Host: Runtime> CtxTrait<'a>
-    for Ctx<'_, &mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
+    for Ctx<'_, '_, &mut Host, &Context, &mut mir::gas::Gas>
 {
     fn sender(&self) -> AddressHash {
         self.sender.clone()
     }
 
     fn source(&self) -> PublicKeyHash {
-        self.source.clone()
+        self.operation_ctx.source.clone()
     }
 
     fn amount(&self) -> i64 {
@@ -199,25 +210,23 @@ impl<'a, Host: Runtime> CtxTrait<'a>
     }
 
     fn operation_group_hash(&self) -> [u8; 32] {
-        self.origination_nonce.operation.0 .0
+        self.operation_ctx.origination_nonce.operation.0 .0
     }
 
     fn origination_counter(&mut self) -> u32 {
-        let c: &mut u32 = &mut self.origination_nonce.index;
+        let c: &mut u32 = &mut self.operation_ctx.origination_nonce.index;
         *c += 1;
         *c
     }
 
     fn operation_counter(&mut self) -> u128 {
-        let c: &mut u128 = self.operation_counter;
+        let c: &mut u128 = self.operation_ctx.counter;
         *c += 1;
         *c
     }
 }
 
-impl<Host: Runtime>
-    Ctx<'_, &mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce>
-{
+impl<Host: Runtime> Ctx<'_, '_, &mut Host, &Context, &mut Gas> {
     pub fn host(&mut self) -> &mut Host {
         self.tc_ctx.host
     }
@@ -303,9 +312,7 @@ pub fn convert_big_map_diff(
     }
 }
 
-impl<'a, Host: Runtime> LazyStorage<'a>
-    for Ctx<'_, &mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce>
-{
+impl<'a, Host: Runtime> LazyStorage<'a> for Ctx<'_, '_, &mut Host, &Context, &mut Gas> {
     fn big_map_get(
         &mut self,
         arena: &'a Arena<Micheline<'a>>,
@@ -444,7 +451,7 @@ mod tests {
     }
 
     fn assert_big_map_eq<'a, Host: Runtime>(
-        ctx: &mut Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce>,
+        ctx: &mut Ctx<&mut Host, &Context, &mut Gas>,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key_type: Type,
