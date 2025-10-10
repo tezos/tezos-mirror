@@ -161,7 +161,7 @@ val store_slot_headers :
   block_level:int32 ->
   Dal_plugin.slot_header list ->
   Store.t ->
-  unit tzresult Lwt.t
+  unit Lwt.t
 
 (** [update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots store] updates the statuses of the
@@ -179,11 +179,12 @@ val update_selected_slot_headers_statuses :
   number_of_slots:int ->
   (Dal_plugin.slot_index -> bool) ->
   Store.t ->
-  unit tzresult Lwt.t
+  unit
 
 (** [get_slot_status ~slot_id store] returns the status associated to the
     accepted slot of id [slot_id] or [None] if no status is currently
-    stored for that slot id.
+    stored for that slot id. Relies on a cache and the skip list store.
+    i.e. only works for operator nodes.
 *)
 val get_slot_status :
   slot_id:Types.slot_id ->

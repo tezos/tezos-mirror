@@ -88,8 +88,8 @@ module Slot_id_cache : sig
   val find_opt : t -> Types.slot_id -> commitment option
 end
 
-module Statuses : sig
-  (** A store keeping the attestation status of slot ids. *)
+module Statuses_cache : sig
+  (** A cache keeping the attestation status of slot ids. *)
 
   type t
 
@@ -104,19 +104,11 @@ module Statuses : sig
     number_of_slots:int ->
     (int -> bool) ->
     t ->
-    unit tzresult Lwt.t
+    unit
 
-  (** [get_slot_status ~slot_id store] returns the status associated
-      to the given accepted [slot_id], or [None] if no status is
-      associated to the [slot_id]. *)
-  val get_slot_status :
-    slot_id:Types.slot_id ->
-    t ->
-    (Types.header_status, [> Errors.other | Errors.not_found]) result Lwt.t
-
-  (** [remove_level_status ~level store] removes the status of all the
-      slot ids published at the given level. *)
-  val remove_level_status : level:int32 -> t -> unit tzresult Lwt.t
+  (** [get_slot_status cache ~slot_id] returns the status associated
+      to the given [slot_id], if any. *)
+  val get_slot_status : t -> Types.slot_id -> Types.header_status option
 end
 
 module Commitment_indexed_cache : sig
@@ -196,9 +188,9 @@ val shards : t -> Shards.t
     with the store [t]. *)
 val skip_list_cells : t -> Dal_store_sqlite3.Skip_list_cells.t
 
-(** [slot_header_statuses t] returns the statuses store  associated with the store
+(** [statuses_cache t] returns the statuses cache associated with the store
     [t]. *)
-val slot_header_statuses : t -> Statuses.t
+val statuses_cache : t -> Statuses_cache.t
 
 (** [slots t] returns the slots store associated with the store
     [t]. *)
@@ -241,7 +233,7 @@ val add_slot_headers :
   block_level:int32 ->
   Dal_plugin.slot_header list ->
   t ->
-  unit tzresult Lwt.t
+  unit Lwt.t
 
 (** [Skip_list_cells] manages the storage of [Skip_list_cell.t] *)
 module Skip_list_cells : sig

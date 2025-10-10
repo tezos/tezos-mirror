@@ -809,28 +809,29 @@ module Statuses = struct
         | Some `Attested -> return_some `Attested
         | Some `Unattested -> return_some `Unattested)
 
-  let get_status_from_store ctxt (slot_id : Types.slot_id) =
-    let node_store = Node_context.get_store ctxt in
-    let slot_header_statuses_store = Store.slot_header_statuses node_store in
-    Store.Statuses.get_slot_status ~slot_id slot_header_statuses_store
-
   let find_status ctxt (slot_id : Types.slot_id) =
     let open Lwt_result_syntax in
-    let*! status = get_status_from_skip_list ctxt slot_id in
-    match status with
-    | Ok (Some res) -> return res
-    | Ok None | Error _ -> get_status_from_store ctxt slot_id
+    let store = Node_context.get_store ctxt in
+    let statuses_cache = Store.statuses_cache store in
+    match Store.Statuses_cache.get_slot_status statuses_cache slot_id with
+    | Some status -> return status
+    | None -> (
+        let*! status = get_status_from_skip_list ctxt slot_id in
+        match status with
+        | Ok (Some res) -> return res
+        | Ok None -> fail `Not_found
+        | Error e -> fail (`Other e))
 end
 
 let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots node_store =
-  let slot_header_statuses_store = Store.slot_header_statuses node_store in
-  Store.Statuses.update_selected_slot_headers_statuses
+  let statuses_cache = Store.statuses_cache node_store in
+  Store.Statuses_cache.update_selected_slot_headers_statuses
     ~block_level
     ~attestation_lag
     ~number_of_slots
     attested_slots
-    slot_header_statuses_store
+    statuses_cache
 
 let get_slot_status ~slot_id ctxt = Statuses.find_status ctxt slot_id
 

@@ -25,6 +25,17 @@
 
 module Profiler = (val Profiler.wrap Dal_profiler.dal_profiler)
 
+(** FIFO-keyed map with slot_id as keys. *)
+module Slot_map =
+  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+    (struct
+      type t = Types.Slot_id.t
+
+      let equal = Types.Slot_id.equal
+
+      let hash = Types.Slot_id.hash
+    end)
+
 module Version = struct
   type t = int
 
@@ -46,8 +57,9 @@ module Version = struct
      - 0: came with octez release v20; used Irmin for storing slots
      - 1: removed Irmin dependency; added slot and status stores; changed layout of shard
        store by indexing on slot ids instead of commitments
-     - 2: switch the KVS skip list store for a sqlite3 one. *)
-  let current_version = 2
+     - 2: switch the KVS skip list store for a sqlite3 one.
+     - 3: remove status store, keep cache. *)
+  let current_version = 3
 
   type error += Could_not_read_data_dir_version of string
 
@@ -133,8 +145,6 @@ module Stores_dirs = struct
   let shard = "shard_store"
 
   let slot = "slot_store"
-
-  let status = "status_store"
 
   let skip_list_cells = "skip_list_store"
 end
@@ -320,18 +330,6 @@ module Shards_disk = struct
 end
 
 module Shards_cache = struct
-  (** Underlying FIFO-keyed map from slot_id -> map from shard index to share. This is
-      used as the alternative to the on-disk storage [Shards_disk] for shards. *)
-  module Slot_map =
-    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
-      (struct
-        type t = Types.Slot_id.t
-
-        let equal = Types.Slot_id.equal
-
-        let hash = Types.Slot_id.hash
-      end)
-
   module Int_map = Map.Make (Int)
 
   type t = Cryptobox.share Int_map.t Slot_map.t
@@ -663,91 +661,39 @@ module Traps = struct
           []
 end
 
-module Statuses = struct
-  type t = (int32, int, Types.header_status) KVS.t
+module Statuses_cache = struct
+  type t = Types.header_status Slot_map.t
 
-  let file_layout ~root_dir slot_level =
-    (* The number of entries per file is the number of slots. We put
-       here the max value (4096) because we don't have a cryptobox
-       at hand to get the number_of_slots parameter. *)
-    let number_of_keys_per_file = 4096 in
-    let level_string = Format.asprintf "%ld" slot_level in
-    let filepath = Filename.concat root_dir level_string in
-    Key_value_store.layout
-      ~encoding:Types.header_status_encoding
-      ~filepath
-      ~eq:Stdlib.( = )
-      ~index_of:Fun.id
-      ~number_of_keys_per_file
-      ()
-
-  let init node_store_dir status_store_dir =
-    let root_dir = Filename.concat node_store_dir status_store_dir in
-    KVS.init ~lru_size:Constants.status_store_lru_size ~root_dir
+  let init = Slot_map.create
 
   let add_status t status (slot_id : Types.slot_id) =
-    let open Lwt_result_syntax in
-    let* () =
-      KVS.write_value
-        ~override:true
-        t
-        file_layout
-        slot_id.slot_level
-        slot_id.slot_index
-        status
-      |> Errors.other_lwt_result
-    in
-    let*! () =
-      Event.emit_stored_slot_status
-        ~published_level:slot_id.slot_level
-        ~slot_index:slot_id.slot_index
-        ~status
-    in
-    return_unit
+    Slot_map.replace t slot_id status
 
-  let find_status t (slot_id : Types.slot_id) =
-    let open Lwt_result_syntax in
-    let*! res =
-      KVS.read_value t file_layout slot_id.slot_level slot_id.slot_index
-    in
-    match res with
-    | Ok status -> return status
-    | Error [KVS.Missing_stored_kvs_data _] -> fail Errors.not_found
-    | Error err ->
-        let data_kind = Types.Store.Header_status in
-        fail @@ Errors.decoding_failed data_kind err
+  let get_slot_status = Slot_map.find_opt
 
   let update_slot_headers_attestation ~published_level ~number_of_slots t
       attested =
-    let open Lwt_result_syntax in
-    List.iter_es
+    List.iter
       (fun slot_index ->
         let index = Types.Slot_id.{slot_level = published_level; slot_index} in
         if attested slot_index then (
           Dal_metrics.slot_attested ~set:true slot_index ;
-          add_status t `Attested index |> Errors.to_tzresult)
+          add_status t `Attested index)
         else
-          let* old_data_opt =
-            find_status t index |> Errors.to_option_tzresult
-          in
+          let old_data_opt = get_slot_status t index in
           Dal_metrics.slot_attested ~set:false slot_index ;
-          if Option.is_some old_data_opt then
-            add_status t `Unattested index |> Errors.to_tzresult
+          if Option.is_some old_data_opt then add_status t `Unattested index
           else
             (* There is no header that has been included in a block
                and selected for this index. So, the slot cannot be
                attested or unattested. *)
-            return_unit)
+            ())
       (0 -- (number_of_slots - 1))
 
   let update_selected_slot_headers_statuses ~block_level ~attestation_lag
       ~number_of_slots attested t =
     let published_level = Int32.(sub block_level (of_int attestation_lag)) in
     update_slot_headers_attestation ~published_level ~number_of_slots t attested
-
-  let get_slot_status ~slot_id t = find_status t slot_id
-
-  let remove_level_status ~level t = KVS.remove_file t file_layout level
 end
 
 module Commitment_indexed_cache =
@@ -848,7 +794,7 @@ end
 
 (** Store context *)
 type t = {
-  slot_header_statuses : Statuses.t;
+  statuses_cache : Statuses_cache.t;
   shards : Shards.t;
   slots : Slots.t;
   traps : Traps.t;
@@ -877,7 +823,7 @@ let shards {shards; _} = shards
 
 let skip_list_cells t = t.skip_list_cells_store
 
-let slot_header_statuses {slot_header_statuses; _} = slot_header_statuses
+let statuses_cache {statuses_cache; _} = statuses_cache
 
 let slots {slots; _} = slots
 
@@ -972,7 +918,7 @@ let init config profile_ctxt proto_parameters =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
   let* () = check_version_and_may_upgrade base_dir in
-  let* slot_header_statuses = Statuses.init base_dir Stores_dirs.status in
+  let statuses_cache = Statuses_cache.init Constants.statuses_cache_size in
   let* shards =
     Shards.init ~profile_ctxt ~proto_parameters base_dir Stores_dirs.shard
   in
@@ -989,7 +935,7 @@ let init config profile_ctxt proto_parameters =
       shards;
       slots;
       traps;
-      slot_header_statuses;
+      statuses_cache;
       cache = Commitment_indexed_cache.create Constants.cache_size;
       finalized_commitments =
         Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;
@@ -1001,10 +947,10 @@ let init config profile_ctxt proto_parameters =
 
 let add_slot_headers ~number_of_slots ~block_level slot_headers t =
   let module SI = Set.Make (Int) in
-  let open Lwt_result_syntax in
-  let slot_header_statuses = t.slot_header_statuses in
+  let open Lwt_syntax in
+  let statuses_cache = t.statuses_cache in
   let* waiting =
-    List.fold_left_es
+    List.fold_left_s
       (fun waiting slot_header ->
         let Dal_plugin.{slot_index; commitment = _; published_level} =
           slot_header
@@ -1012,9 +958,8 @@ let add_slot_headers ~number_of_slots ~block_level slot_headers t =
         (* This invariant should hold. *)
         assert (Int32.equal published_level block_level) ;
         let index = Types.Slot_id.{slot_level = published_level; slot_index} in
-        let* () =
-          Statuses.add_status slot_header_statuses `Waiting_attestation index
-          |> Errors.to_tzresult
+        let () =
+          Statuses_cache.add_status statuses_cache `Waiting_attestation index
         in
         Slot_id_cache.add ~number_of_slots t.finalized_commitments slot_header ;
         return (SI.add slot_index waiting))
