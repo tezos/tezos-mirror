@@ -15,7 +15,6 @@ use mir::{
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
-use primitive_types::H256;
 use std::collections::{BTreeMap, HashMap};
 use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
@@ -259,8 +258,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
                     })
                 } else {
                     let receipt = originate_contract(
-                        tc_ctx.host,
-                        tc_ctx.context,
+                        tc_ctx,
                         address,
                         operation_ctx.source,
                         sender_account,
@@ -485,8 +483,8 @@ fn transfer_external<'a, Host: Runtime>(
 
 /// This function typechecks both fields of a &Script: the code and the storage.
 /// It returns the typechecked storage.
-fn typecheck_code_and_storage<'a, Ctx: mir::context::CtxTrait<'a>>(
-    ctx: &mut Ctx,
+fn typecheck_code_and_storage<'a, Host: Runtime>(
+    ctx: &mut TcCtx<'a, Host>,
     parser: &'a Parser<'a>,
     script: &Script,
 ) -> Result<TypedValue<'a>, OriginationError> {
@@ -494,7 +492,7 @@ fn typecheck_code_and_storage<'a, Ctx: mir::context::CtxTrait<'a>>(
         .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
     let allow_lazy_storage_in_storage = true;
     let contract_typechecked = contract_micheline
-        .typecheck_script(ctx.gas(), allow_lazy_storage_in_storage)
+        .typecheck_script(ctx.gas, allow_lazy_storage_in_storage)
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Script : {e}")))?;
     let storage_micheline = Micheline::decode_raw(&parser.arena, &script.storage)
         .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
@@ -503,23 +501,22 @@ fn typecheck_code_and_storage<'a, Ctx: mir::context::CtxTrait<'a>>(
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Storage : {e}")))
 }
 
-fn handle_storage_with_big_maps<Host: Runtime>(
-    host: &mut Host,
-    context: &Context,
-    mut storage: TypedValue<'_>,
+fn handle_storage_with_big_maps<'a, Host: Runtime>(
+    ctx: &mut TcCtx<'a, Host>,
+    mut storage: TypedValue<'a>,
 ) -> Result<(Vec<u8>, Option<LazyStorageDiffList>), OriginationError> {
     let parser = Parser::new();
-    make_default_ctx!(ctx, host, context);
+
     let mut big_maps = vec![];
     storage.view_big_maps_mut(&mut big_maps);
 
     // Dump big_map allocation, starting with empty big_maps
-    mir::ast::big_map::dump_big_map_updates(&mut ctx, &[], &mut big_maps)
+    mir::ast::big_map::dump_big_map_updates(ctx, &[], &mut big_maps)
         .map_err(|err| OriginationError::MirBigMapAllocation(err.to_string()))?;
     let storage = storage
         .into_micheline_optimized_legacy(&parser.arena)
         .encode();
-    let lazy_storage_diff = convert_big_map_diff(std::mem::take(ctx.tc_ctx.big_map_diff));
+    let lazy_storage_diff = convert_big_map_diff(std::mem::take(ctx.big_map_diff));
     Ok((storage, lazy_storage_diff))
 }
 
@@ -530,29 +527,27 @@ const ORIGINATION_COST: u64 = ORIGINATION_SIZE * COST_PER_BYTES;
 
 /// Originate a contract deployed by the public key hash given in parameter. For now
 /// the origination is not correctly implemented.
-#[allow(clippy::too_many_arguments)]
-fn originate_contract<Host: Runtime>(
-    host: &mut Host,
-    context: &Context,
+fn originate_contract<'a, Host: Runtime>(
+    ctx: &mut TcCtx<'a, Host>,
     contract: ContractKt1Hash,
     source_account: &TezlinkImplicitAccount,
     sender_account: &impl TezlinkAccount,
     initial_balance: &Narith,
     script_code: &[u8],
-    script_storage: TypedValue<'_>,
+    script_storage: TypedValue<'a>,
 ) -> Result<OriginationSuccess, OriginationError> {
     // If the origination is internal the big map are handled by the first transfer
     // The big_maps vector will be filled only if the origination is "external"
 
     let (new_storage, lazy_storage_diff) =
-        handle_storage_with_big_maps(host, context, script_storage)?;
+        handle_storage_with_big_maps(ctx, script_storage)?;
 
     // Set the storage of the contract
-    let smart_contract = TezlinkOriginatedAccount::from_kt1(context, &contract)
+    let smart_contract = TezlinkOriginatedAccount::from_kt1(ctx.context, &contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
     let total_size = smart_contract
-        .init(host, script_code, &new_storage)
+        .init(ctx.host, script_code, &new_storage)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
@@ -584,10 +579,15 @@ fn originate_contract<Host: Runtime>(
     balance_updates.extend(origination_fees_balance_updates);
 
     // Apply the balance change, accordingly to the balance updates computed
-    apply_balance_changes(host, sender_account, &smart_contract, &initial_balance.0)
-        .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
+    apply_balance_changes(
+        ctx.host,
+        sender_account,
+        &smart_contract,
+        &initial_balance.0,
+    )
+    .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
-    let _ = burn_tez(host, source_account, &(ORIGINATION_COST + storage_fees))
+    let _ = burn_tez(ctx.host, source_account, &(ORIGINATION_COST + storage_fees))
         .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
     let dummy_origination_sucess = OriginationSuccess {
@@ -866,6 +866,12 @@ fn apply_operation<Host: Runtime>(
     block_ctx: &BlockCtx,
 ) -> OperationResultSum {
     let mut internal_operations_receipts = Vec::new();
+    let mut tc_ctx = TcCtx {
+        host,
+        context,
+        gas: &mut mir::gas::Gas::default(),
+        big_map_diff: &mut BTreeMap::new(),
+    };
     let parser = Parser::new();
     match &validated_operation.content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
@@ -882,12 +888,6 @@ fn apply_operation<Host: Runtime>(
             destination,
             parameters,
         }) => {
-            let mut tc_ctx = TcCtx {
-                host,
-                context,
-                gas: &mut mir::gas::Gas::default(),
-                big_map_diff: &mut BTreeMap::new(),
-            };
             let mut operation_ctx = OperationCtx {
                 source: source_account,
                 counter: &mut 0u128,
@@ -916,14 +916,11 @@ fn apply_operation<Host: Runtime>(
             ref script,
         }) => {
             let address = origination_nonce.generate_kt1();
-            let parser = Parser::new();
-            make_default_ctx!(ctx, host, context);
             let typechecked_storage =
-                typecheck_code_and_storage(&mut ctx, &parser, script);
+                typecheck_code_and_storage(&mut tc_ctx, &parser, script);
             let origination_result = match typechecked_storage {
                 Ok(storage) => originate_contract(
-                    ctx.host(),
-                    context,
+                    &mut tc_ctx,
                     address,
                     source_account,
                     source_account,
