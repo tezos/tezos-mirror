@@ -620,23 +620,26 @@ pub fn produce_operation_result<M: OperationKind>(
 
 pub fn produce_skipped_receipt(
     op: &ManagerOperation<OperationContent>,
+    balance_updates: Vec<BalanceUpdate>,
 ) -> OperationResultSum {
     match op.operation {
         OperationContent::Reveal(_) => {
-            OperationResultSum::Reveal(produce_skipped_result())
+            OperationResultSum::Reveal(produce_skipped_result(balance_updates))
         }
         OperationContent::Transfer(_) => {
-            OperationResultSum::Transfer(produce_skipped_result())
+            OperationResultSum::Transfer(produce_skipped_result(balance_updates))
         }
         OperationContent::Origination(_) => {
-            OperationResultSum::Origination(produce_skipped_result())
+            OperationResultSum::Origination(produce_skipped_result(balance_updates))
         }
     }
 }
 
-fn produce_skipped_result<M: OperationKind>() -> OperationResult<M> {
+fn produce_skipped_result<M: OperationKind>(
+    balance_updates: Vec<BalanceUpdate>,
+) -> OperationResult<M> {
     OperationResult {
-        balance_updates: vec![],
+        balance_updates,
         result: ContentResult::Skipped,
         internal_operation_results: vec![],
     }

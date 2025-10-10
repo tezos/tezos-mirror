@@ -909,7 +909,7 @@ fn apply_batch<Host: Runtime>(
     let mut first_failure: Option<usize> = None;
     let mut receipts = Vec::with_capacity(validated_operations.len());
 
-    for (index, (content, balance_uppdate)) in validated_operations
+    for (index, (content, balance_update)) in validated_operations
         .into_iter()
         .zip(balance_updates)
         .enumerate()
@@ -928,7 +928,7 @@ fn apply_batch<Host: Runtime>(
                 "Skipping this operation because we already failed on {:?}.",
                 first_failure
             );
-            produce_skipped_receipt(&content)
+            produce_skipped_receipt(&content, balance_update)
         } else {
             apply_operation(
                 host,
@@ -936,7 +936,7 @@ fn apply_batch<Host: Runtime>(
                 origination_nonce,
                 &content,
                 &source_account,
-                balance_uppdate,
+                balance_update,
                 level,
                 now,
                 chain_id,
@@ -4105,7 +4105,18 @@ mod tests {
                 internal_operation_results: vec![],
             }),
             OperationResultSum::Transfer(OperationResult {
-                balance_updates: vec![],
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
                 result: ContentResult::Skipped,
                 internal_operation_results: vec![],
             }),
