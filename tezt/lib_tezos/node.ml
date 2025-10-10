@@ -1276,3 +1276,7 @@ module RPC = struct
   include RPC_callers
   include RPC
 end
+
+let current_cycle node =
+  let* level = RPC.call node @@ RPC.get_chain_block_helper_current_level () in
+  return level.cycle

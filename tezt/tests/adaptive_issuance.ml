@@ -1354,14 +1354,9 @@ let test_delegate_parameter_UX =
       "Staking - test set_delegate_parameters and update_delegate_parameters UX"
     ~tags:["staking"; "node"; "client"]
   @@ fun protocol ->
-  let* _proto_hash, endpoint, client, _node_1 = init protocol in
+  let* _proto_hash, endpoint, client, node = init protocol in
   let bake = Helpers.bake ~ai_vote:Pass ~endpoint ~protocol in
-  let current_cycle () =
-    let* level =
-      Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
-    in
-    return level.cycle
-  in
+  let current_cycle () = Node.current_cycle node in
 
   let* delegate_parameters_activation_delay =
     let* json =
