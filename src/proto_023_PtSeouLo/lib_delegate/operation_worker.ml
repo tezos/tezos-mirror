@@ -740,7 +740,7 @@ let flush_operation_pool state (head_level, head_round) =
   let operation_pool = {Operation_pool.empty with consensus = attestations} in
   state.operation_pool <- operation_pool
 
-let run ?(monitor_node_operations = true) ~constants
+let run ?(monitor_node_operations = true) ~constants ~round_durations
     (cctxt : #Protocol_client_context.full) =
   let open Lwt_syntax in
   let state =
@@ -779,7 +779,7 @@ let run ?(monitor_node_operations = true) ~constants
            degraded state or retry indefinitely, we shut it down explicitly. *)
         let* () = Events.(emit node_unreachable_crash ()) in
         Lwt_exit.exit_and_raise (*ECONNREFUSED*) 111
-    | Ok (head, operation_stream, op_stream_stopper) ->
+    | Ok (((_, round) as head), operation_stream, op_stream_stopper) ->
         () [@profiler.stop] ;
         ()
         [@profiler.record
@@ -802,8 +802,10 @@ let run ?(monitor_node_operations = true) ~constants
           state
           head
         [@profiler.record_f {verbosity = Notice} "update operations pool"] ;
-        (* TODO: make this value round dependent *)
-        let stream_timeout = 20. in
+        let stream_timeout =
+          Round.round_duration round_durations (Round.succ round)
+          |> Period.to_seconds |> Int64.to_float
+        in
         let rec loop () =
           let* result =
             Lwt.pick
