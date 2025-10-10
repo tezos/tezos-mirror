@@ -57,6 +57,17 @@ module Events = struct
       ~pp1:Format.pp_print_string
       ("msg", Data_encoding.string)
 
+  let monitor_operations_stream_timeout =
+    declare_1
+      ~section
+      ~name:"monitor_operations_stream_timeout"
+      ~level:Warning
+      ~msg:
+        "No data received from monitor_operations RPC for {timeout} seconds. \
+         Assuming the stream is stalled and refreshing it."
+      ~pp1:Format.pp_print_float
+      ("timeout", Data_encoding.float)
+
   let ended =
     declare_1
       ~section
@@ -799,10 +810,32 @@ let run ?(monitor_node_operations = true)
           state
           head
         [@profiler.record_f {verbosity = Notice} "update operations pool"] ;
+        (* TODO: make this value round dependent *)
+        let stream_timeout = 20. in
         let rec loop () =
-          let* ops = Lwt_stream.get operation_stream in
-          match ops with
-          | None ->
+          let* result =
+            Lwt.pick
+              [
+                (let* ops = Lwt_stream.get operation_stream in
+                 return (`Stream ops));
+                (let* () = Lwt_unix.sleep stream_timeout in
+                 return `Timeout);
+              ]
+          in
+          match result with
+          | `Timeout ->
+              (* The monitor_operations RPC has neither produced new data nor
+                 closed the stream for some time. This can occur naturally, but
+                 may also indicate a stalled stream. Restarting it is
+                 inexpensive and can prevent the baker from hanging
+                 indefinitely. *)
+              let* () =
+                Events.(emit monitor_operations_stream_timeout stream_timeout)
+              in
+              op_stream_stopper () ;
+              let* () = reset_monitoring state in
+              worker_loop ()
+          | `Stream None ->
               (* When the stream closes, it means a new head has been set,
                  we reset the monitoring and flush current operations *)
               let* () = Events.(emit end_of_stream ()) in
@@ -816,7 +849,7 @@ let run ?(monitor_node_operations = true)
               in
               () [@profiler.stop] ;
               worker_loop ()
-          | Some ops ->
+          | `Stream (Some ops) ->
               (state.operation_pool <-
                 Operation_pool.add_operations state.operation_pool ops)
               [@profiler.aggregate_f {verbosity = Info} "add operations"] ;
