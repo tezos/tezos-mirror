@@ -272,8 +272,11 @@ let get_slot_commitment :
     service =
   Tezos_rpc.Service.get_service
     ~description:
-      "Return the accepted commitment associated to the given slot index and \
-       published at the given level."
+      "Return the commitment associated to the given slot index and published \
+       at the given level, if any. The commitment is fetched from the \
+       skip-list storage. Note that the commitment is not present in the \
+       storage immediately after publication, but only when its attestation \
+       status is known and final."
     ~query:Tezos_rpc.Query.empty
     ~output:Cryptobox.Commitment.encoding
     Tezos_rpc.Path.(
