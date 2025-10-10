@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -19,21 +20,18 @@ module Internal_for_tests : sig
     Irmin_context.tree -> string -> (bytes, Error_code.t) result
 
   val store_delete :
-    scope ->
     Irmin_context.tree ->
     string ->
     bool ->
     (Irmin_context.tree, Error_code.t) result
 
   val store_copy :
-    scope ->
     Irmin_context.tree ->
     string ->
     string ->
     (Irmin_context.tree, Error_code.t) result
 
   val store_move :
-    scope ->
     Irmin_context.tree ->
     string ->
     string ->
@@ -41,28 +39,21 @@ module Internal_for_tests : sig
 
   val mem_tree : Irmin_context.tree -> string -> (bool, Error_code.t) result
 
-  val store_has :
-    scope -> Irmin_context.tree -> string -> (int, Error_code.t) result
+  val store_has : Irmin_context.tree -> string -> (int, Error_code.t) result
 
   val store_get_hash :
     Irmin_context.tree -> string -> (bytes, Error_code.t) result
 
   val store_list_size :
-    scope -> Irmin_context.tree -> string -> (int, Error_code.t) result
+    Irmin_context.tree -> string -> (int, Error_code.t) result
 
   val store_value_size :
-    scope -> Irmin_context.tree -> string -> (int, Error_code.t) result
+    Irmin_context.tree -> string -> (int, Error_code.t) result
 
   val store_read :
-    scope ->
-    Irmin_context.tree ->
-    string ->
-    int ->
-    int ->
-    (bytes, Error_code.t) result
+    Irmin_context.tree -> string -> int -> int -> (bytes, Error_code.t) result
 
   val store_write :
-    scope ->
     Irmin_context.tree ->
     string ->
     int ->
@@ -70,7 +61,6 @@ module Internal_for_tests : sig
     (Irmin_context.tree * int, Error_code.t) result
 
   val store_write_all :
-    scope ->
     Irmin_context.tree ->
     string ->
     bytes ->

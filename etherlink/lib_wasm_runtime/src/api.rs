@@ -7,7 +7,6 @@ use crate::{
     bindings::{self, end_span, init_spans},
     host::Host,
     runtime::{self, InputsBuffer, RunStatus},
-    telemetry::Scope,
     types::{ContextHash, EvmTree, OCamlString, OpenTelemetryScope, SmartRollupAddress},
 };
 use log::trace;
@@ -138,11 +137,9 @@ pub fn wasm_runtime_run(
 ) -> Result<EvmTree, Error> {
     let ctxt = ctxt.as_mut();
     let mut inputs_buffer = InputsBuffer::new(level, inputs.into_vec());
-    let mut scope = Scope::new(otel_scope);
-    init_spans(scope.current(), "wasm_runtime_run")?;
+    init_spans(&otel_scope, "wasm_runtime_run")?;
     loop {
         let host = Host::new(
-            &scope,
             &tree,
             rollup_address,
             inputs_buffer,

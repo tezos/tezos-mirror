@@ -26,7 +26,6 @@ use crate::{
     bindings::{self, BindingsError},
     constants::REBOOT_FLAG,
     reveal,
-    telemetry::{self, Scope},
     types::{EvmTree, OCamlString, OpenTelemetryScope, SmartRollupAddress},
     write_debug::write_debug,
 };
@@ -81,13 +80,11 @@ pub struct Host {
     needs_kernel_reload: bool,
     preimages_dir: OCamlString,
     preimages_endpoint: Option<OCamlString>,
-    scope: Scope,
     pub version: RuntimeVersion,
 }
 
 impl Host {
     pub fn new(
-        scope: &Scope,
         tree: &EvmTree,
         rollup_address: SmartRollupAddress,
         inputs_buffer: InputsBuffer,
@@ -101,28 +98,8 @@ impl Host {
             needs_kernel_reload: false,
             preimages_dir,
             preimages_endpoint,
-            scope: scope.clone(),
             version: RuntimeVersion::V0,
         }
-    }
-
-    pub fn start_span(&mut self, span_name: &str) -> Result<(), BindingsError> {
-        self.scope.start(span_name)?;
-        Ok(())
-    }
-
-    pub fn close_span(&mut self) -> Result<(), BindingsError> {
-        self.scope.close()?;
-        Ok(())
-    }
-
-    pub fn close_all_spans(&mut self) -> Result<(), BindingsError> {
-        self.scope.close_all()?;
-        Ok(())
-    }
-
-    pub fn scope(&self) -> &OpenTelemetryScope {
-        &self.scope.current()
     }
 
     pub fn preimages_dir(&self) -> &str {
@@ -174,7 +151,7 @@ impl Host {
     }
 
     pub fn create_reboot_flag(&mut self) -> Result<(), Error> {
-        let (evm_tree, _) = bindings::store_write(self.scope(), &self.tree, REBOOT_FLAG, 0, &[])?;
+        let (evm_tree, _) = bindings::store_write(&self.tree, REBOOT_FLAG, 0, &[])?;
         self.tree = evm_tree;
 
         Ok(())
@@ -251,7 +228,7 @@ impl Runtime for Host {
 
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
         trace!("store_has({path})");
-        let res = bindings::store_has(self.scope(), self.tree(), path.as_bytes());
+        let res = bindings::store_has(self.tree(), path.as_bytes());
 
         match res.map_err(from_binding_error)? {
             0 => Ok(None),
@@ -274,15 +251,9 @@ impl Runtime for Host {
         trace!("store_read({path})");
         let max_bytes = std::cmp::min(max_bytes, MAX_FILE_CHUNK_SIZE);
 
-        let res = bindings::store_read(
-            self.scope(),
-            self.tree(),
-            path.as_bytes(),
-            from_offset,
-            max_bytes,
-        )
-        .map_err(from_binding_error)
-        .map_err(self.check_path_has_value(path))?;
+        let res = bindings::store_read(self.tree(), path.as_bytes(), from_offset, max_bytes)
+            .map_err(from_binding_error)
+            .map_err(self.check_path_has_value(path))?;
 
         Ok(res.as_bytes().to_owned())
     }
@@ -295,14 +266,8 @@ impl Runtime for Host {
     ) -> Result<usize, RuntimeError> {
         trace!("store_read_slice({path})");
         let max_bytes = std::cmp::min(buffer.len(), MAX_FILE_CHUNK_SIZE);
-        let res = bindings::store_read(
-            self.scope(),
-            self.tree(),
-            path.as_bytes(),
-            from_offset,
-            max_bytes,
-        )
-        .map_err(from_binding_error)?;
+        let res = bindings::store_read(self.tree(), path.as_bytes(), from_offset, max_bytes)
+            .map_err(from_binding_error)?;
 
         buffer.copy_from_slice(res.as_bytes());
 
@@ -324,9 +289,8 @@ impl Runtime for Host {
         at_offset: usize,
     ) -> Result<(), RuntimeError> {
         trace!("store_write({path})");
-        let (new_tree, _size) =
-            bindings::store_write(self.scope(), self.tree(), path.as_bytes(), at_offset, src)
-                .map_err(from_binding_error)?;
+        let (new_tree, _size) = bindings::store_write(self.tree(), path.as_bytes(), at_offset, src)
+            .map_err(from_binding_error)?;
         self.set_tree(new_tree);
 
         Ok(())
@@ -334,7 +298,7 @@ impl Runtime for Host {
 
     fn store_write_all<T: Path>(&mut self, path: &T, src: &[u8]) -> Result<(), RuntimeError> {
         trace!("store_write_all({path})");
-        let new_tree = bindings::store_write_all(self.scope(), self.tree(), path.as_bytes(), src)
+        let new_tree = bindings::store_write_all(self.tree(), path.as_bytes(), src)
             .map_err(from_binding_error)?;
         self.set_tree(new_tree);
 
@@ -347,7 +311,7 @@ impl Runtime for Host {
             return Err(RuntimeError::PathNotFound);
         }
 
-        let new_tree = bindings::store_delete(self.scope(), self.tree(), path.as_bytes(), false)
+        let new_tree = bindings::store_delete(self.tree(), path.as_bytes(), false)
             .map_err(from_binding_error)?;
         self.set_tree(new_tree);
 
@@ -356,7 +320,7 @@ impl Runtime for Host {
 
     fn store_delete_value<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
         trace!("store_delete_value({path})");
-        let new_tree = bindings::store_delete(self.scope(), self.tree(), path.as_bytes(), true)
+        let new_tree = bindings::store_delete(self.tree(), path.as_bytes(), true)
             .map_err(from_binding_error)?;
         self.set_tree(new_tree);
 
@@ -365,7 +329,7 @@ impl Runtime for Host {
 
     fn store_count_subkeys<T: Path>(&self, prefix: &T) -> Result<u64, RuntimeError> {
         trace!("store_count_subkeys({prefix})");
-        let res = bindings::store_list_size(self.scope(), self.tree(), prefix.as_bytes())
+        let res = bindings::store_list_size(self.tree(), prefix.as_bytes())
             .map_err(from_binding_error)?;
 
         Ok(res as u64)
@@ -377,14 +341,9 @@ impl Runtime for Host {
         to_path: &impl Path,
     ) -> Result<(), RuntimeError> {
         trace!("store_move({from_path}, {to_path})");
-        let new_tree = bindings::store_move(
-            self.scope(),
-            self.tree(),
-            from_path.as_bytes(),
-            to_path.as_bytes(),
-        )
-        .map_err(from_binding_error)
-        .map_err(self.check_path_exists(from_path))?;
+        let new_tree = bindings::store_move(self.tree(), from_path.as_bytes(), to_path.as_bytes())
+            .map_err(from_binding_error)
+            .map_err(self.check_path_exists(from_path))?;
         self.set_tree(new_tree);
 
         if to_path.as_bytes() == b"/kernel/boot.wasm" {
@@ -401,14 +360,9 @@ impl Runtime for Host {
         to_path: &impl Path,
     ) -> Result<(), RuntimeError> {
         trace!("store_copy({from_path}, {to_path})");
-        let new_tree = bindings::store_copy(
-            self.scope(),
-            self.tree(),
-            from_path.as_bytes(),
-            to_path.as_bytes(),
-        )
-        .map_err(from_binding_error)
-        .map_err(self.check_path_exists(from_path))?;
+        let new_tree = bindings::store_copy(self.tree(), from_path.as_bytes(), to_path.as_bytes())
+            .map_err(from_binding_error)
+            .map_err(self.check_path_exists(from_path))?;
         self.set_tree(new_tree);
 
         if to_path.as_bytes() == b"/kernel/boot.wasm" {
@@ -471,7 +425,7 @@ impl Runtime for Host {
         trace!("store_value_size({path})");
         match self.version {
             RuntimeVersion::V0 => {
-                let res = bindings::store_value_size(self.scope(), self.tree(), path.as_bytes())
+                let res = bindings::store_value_size(self.tree(), path.as_bytes())
                     .map_err(from_binding_error)
                     .map_err(self.check_path_exists(path))?;
 
@@ -482,7 +436,7 @@ impl Runtime for Host {
             RuntimeVersion::V1 => {
                 // Changes compared to V0 introduced by
                 // https://gitlab.com/tezos/tezos/-/merge_requests/15897.
-                let res = bindings::store_value_size(self.scope(), self.tree(), path.as_bytes())
+                let res = bindings::store_value_size(self.tree(), path.as_bytes())
                     .map_err(from_binding_error)
                     .map_err(self.check_path_has_value(path))?;
 

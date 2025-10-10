@@ -7,7 +7,7 @@
 use std::{fs, path::PathBuf};
 
 use crate::{
-    bindings::{self, BindingsError, Key},
+    bindings::{self, end_span, start_span, BindingsError, Key},
     reveal::{self, RevealPreimageError},
 };
 
@@ -146,7 +146,7 @@ fn store_has(env: FunctionEnvMut<Env>, key_ptr: u32, key_len: u32) -> Result<i32
     trace!("store_has({})", key.as_str());
 
     let host = runtime_env.host();
-    match bindings::store_has(host.scope(), host.tree(), key) {
+    match bindings::store_has(host.tree(), key) {
         Ok(i) => Ok(i as i32),
         Err(err) => result_from_binding_error(err),
     }
@@ -165,7 +165,7 @@ fn store_delete(
     trace!("store_delete({})", key.as_str());
 
     let host = runtime_env.host();
-    match bindings::store_delete(host.scope(), &host.tree(), key, false) {
+    match bindings::store_delete(&host.tree(), key, false) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(0)
@@ -187,7 +187,7 @@ fn store_delete_value(
     trace!("store_delete_value({})", key.as_str());
 
     let host = runtime_env.host();
-    match bindings::store_delete(host.scope(), &host.tree(), key, true) {
+    match bindings::store_delete(&host.tree(), key, true) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(0)
@@ -217,7 +217,7 @@ fn store_copy(
     }
 
     let host = runtime_env.host();
-    match bindings::store_copy(host.scope(), host.tree(), from, to) {
+    match bindings::store_copy(host.tree(), from, to) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(0)
@@ -247,7 +247,7 @@ fn store_move(
     }
 
     let host = runtime_env.host();
-    match bindings::store_move(host.scope(), host.tree(), from, to) {
+    match bindings::store_move(host.tree(), from, to) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(0)
@@ -297,7 +297,7 @@ fn store_list_size(
     trace!("store_list_size({})", key.as_str());
 
     let host = runtime_env.host();
-    match bindings::store_list_size(host.scope(), host.tree(), key) {
+    match bindings::store_list_size(host.tree(), key) {
         Ok(res) => Ok(res as i64),
         Err(err) => i64_result_from_binding_error(err),
     }
@@ -317,7 +317,7 @@ fn store_value_size(
     trace!("store_value_size({})", key.as_str());
 
     let host = runtime_env.host();
-    match bindings::store_value_size(host.scope(), host.tree(), key) {
+    match bindings::store_value_size(host.tree(), key) {
         Ok(res) => Ok(res as i32),
         Err(err) => result_from_binding_error(err),
     }
@@ -339,13 +339,7 @@ fn store_read(
     trace!("store_read({})", key.as_str());
 
     let host = runtime_env.host();
-    match bindings::store_read(
-        host.scope(),
-        host.tree(),
-        key,
-        offset as usize,
-        max_bytes as usize,
-    ) {
+    match bindings::store_read(host.tree(), key, offset as usize, max_bytes as usize) {
         Ok(buffer) => {
             memory_view.write(dst_ptr as u64, buffer.as_bytes())?;
             Ok(max_bytes as i32)
@@ -371,7 +365,7 @@ fn store_write(
     let buffer = read_from_memory(&memory_view, src_ptr, src_len)?;
 
     let host = runtime_env.host();
-    match bindings::store_write(host.scope(), host.tree(), key, offset as usize, &buffer) {
+    match bindings::store_write(host.tree(), key, offset as usize, &buffer) {
         Ok((evm_tree, res)) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(res as i32)
@@ -386,6 +380,7 @@ fn reveal_metadata(
     max_bytes: u32,
 ) -> Result<i32, RuntimeError> {
     trace!("reveal_metadata");
+    start_span("reaveal_metadata");
     let (runtime_env, store) = env.data_and_store_mut();
     let memory = runtime_env.memory();
     let memory_view = memory.view(&store);
@@ -409,6 +404,7 @@ fn reveal_metadata(
         )?;
     }
 
+    end_span();
     Ok(to_write as i32)
 }
 

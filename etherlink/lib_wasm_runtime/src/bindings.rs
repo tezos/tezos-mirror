@@ -12,6 +12,16 @@ use std::{
     fmt::{Display, Formatter},
 };
 
+#[macro_export]
+macro_rules! otel_trace {
+    ($name:expr, $expr:expr) => {{
+        crate::bindings::start_span($name);
+        let __otel_result = { $expr };
+        crate::bindings::end_span();
+        __otel_result
+    }};
+}
+
 pub trait Key {
     fn as_str(&self) -> &str;
 }
@@ -54,18 +64,16 @@ mod ocaml_imports {
         pub fn layer2_store__check_reboot_flag(evm_tree: EvmTree) -> (bool, EvmTree);
 
         pub fn layer2_store__store_get_hash(evm_tree: EvmTree, key: &str) -> Result<ContextHash, isize>;
-        pub fn layer2_store__store_delete(otel_scope: &OpenTelemetryScope, evm_tree: EvmTree, key: &str, is_value: bool) -> Result<EvmTree, isize>;
-        pub fn layer2_store__store_has(otel_scope: &OpenTelemetryScope, evm_tree: EvmTree, key: &str) -> Result<isize, isize>;
-        pub fn layer2_store__store_copy(otel_scope: &OpenTelemetryScope, evm_tree: EvmTree, from: &str, to: &str) -> Result<EvmTree, isize>;
-        pub fn layer2_store__store_move(otel_scope: &OpenTelemetryScope, evm_tree: EvmTree, from: &str, to: &str) -> Result<EvmTree, isize>;
-        pub fn layer2_store__store_list_size(otel_scope: &OpenTelemetryScope, evm_tree: EvmTree, key: &str) -> Result<isize, isize>;
-        pub fn layer2_store__store_value_size(otel_scope: &OpenTelemetryScope, evm_tree: EvmTree, key: &str) -> Result<isize, isize>;
-        pub fn layer2_store__store_read(otel_scope: &OpenTelemetryScope, evm_tree: EvmTree, key: &str, offset: usize, num_bytes: usize) -> Result<OCamlBytes, isize>;
-        pub fn layer2_store__store_write(otel_scope: &OpenTelemetryScope, evm_tree: EvmTree, key: &str, offset: usize, bytes: &[u8]) -> Result<(EvmTree, isize), isize>;
-        pub fn layer2_store__store_write_all(otel_scope: &OpenTelemetryScope, evm_tree: EvmTree, key: &str, bytes: &[u8]) -> Result<EvmTree, isize>;
+        pub fn layer2_store__store_delete(evm_tree: EvmTree, key: &str, is_value: bool) -> Result<EvmTree, isize>;
+        pub fn layer2_store__store_has(evm_tree: EvmTree, key: &str) -> Result<isize, isize>;
+        pub fn layer2_store__store_copy(evm_tree: EvmTree, from: &str, to: &str) -> Result<EvmTree, isize>;
+        pub fn layer2_store__store_move(evm_tree: EvmTree, from: &str, to: &str) -> Result<EvmTree, isize>;
+        pub fn layer2_store__store_list_size(evm_tree: EvmTree, key: &str) -> Result<isize, isize>;
+        pub fn layer2_store__store_value_size(evm_tree: EvmTree, key: &str) -> Result<isize, isize>;
+        pub fn layer2_store__store_read(evm_tree: EvmTree, key: &str, offset: usize, num_bytes: usize) -> Result<OCamlBytes, isize>;
+        pub fn layer2_store__store_write(evm_tree: EvmTree, key: &str, offset: usize, bytes: &[u8]) -> Result<(EvmTree, isize), isize>;
+        pub fn layer2_store__store_write_all( evm_tree: EvmTree, key: &str, bytes: &[u8]) -> Result<EvmTree, isize>;
 
-        pub fn open_span(parent_scope: &OpenTelemetryScope, span_name: &str) -> OpenTelemetryScope;
-        pub fn close_span(scope: &OpenTelemetryScope) -> ();
         pub fn init_spans(scope: &OpenTelemetryScope, span_nem: &str);
         pub fn start_span(span_name: &str);
         pub fn end_span();
@@ -86,8 +94,11 @@ pub fn fetch_preimage_from_remote(
         hash_hex
     );
     unsafe {
-        ocaml_imports::fetch_preimage_from_remote(&gc(), preimages_endpoint, hash_hex)
-            .map_err(BindingsError::OCamlError)
+        otel_trace!(
+            "reveal_preimage",
+            ocaml_imports::fetch_preimage_from_remote(&gc(), preimages_endpoint, hash_hex)
+                .map_err(BindingsError::OCamlError)
+        )
     }
 }
 
@@ -97,8 +108,11 @@ where
 {
     trace!("store_get_hash({})", key.as_str());
     let res = unsafe {
-        ocaml_imports::layer2_store__store_get_hash(&gc(), evm_tree.clone(), key.as_str())
-            .map_err(BindingsError::OCamlError)?
+        otel_trace!(
+            "__internal_store_get_hash",
+            ocaml_imports::layer2_store__store_get_hash(&gc(), evm_tree.clone(), key.as_str())
+                .map_err(BindingsError::OCamlError)?
+        )
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -110,8 +124,11 @@ where
 {
     trace!("read_value({})", key.as_str());
     let code = unsafe {
-        ocaml_imports::layer2_store__read_durable_value(&gc(), evm_tree.clone(), key.as_str())
-            .map_err(BindingsError::OCamlError)?
+        otel_trace!(
+            "store_read_all",
+            ocaml_imports::layer2_store__read_durable_value(&gc(), evm_tree.clone(), key.as_str())
+                .map_err(BindingsError::OCamlError)?
+        )
     };
 
     code.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -123,138 +140,133 @@ where
 {
     trace!("mem_tree({})", key.as_str());
     let mem = unsafe {
-        ocaml_imports::layer2_store__mem_tree(&gc(), evm_tree.clone(), key.as_str())
-            .map_err(BindingsError::OCamlError)?
+        otel_trace!(
+            "store_exists",
+            ocaml_imports::layer2_store__mem_tree(&gc(), evm_tree.clone(), key.as_str())
+                .map_err(BindingsError::OCamlError)?
+        )
     };
 
     mem.map_err(|i| BindingsError::HostFuncError(i as i32))
 }
 
-pub fn store_has<K>(
-    scope: &OpenTelemetryScope,
-    evm_tree: &EvmTree,
-    key: K,
-) -> Result<isize, BindingsError>
+pub fn store_has<K>(evm_tree: &EvmTree, key: K) -> Result<isize, BindingsError>
 where
     K: Key,
 {
     trace!("store_has({})", key.as_str());
     let mem = unsafe {
-        ocaml_imports::layer2_store__store_has(&gc(), scope, evm_tree.clone(), key.as_str())
-            .map_err(BindingsError::OCamlError)?
+        otel_trace!(
+            "store_has",
+            ocaml_imports::layer2_store__store_has(&gc(), evm_tree.clone(), key.as_str())
+                .map_err(BindingsError::OCamlError)?
+        )
     };
 
     mem.map_err(|i| BindingsError::HostFuncError(i as i32))
 }
 
-pub fn store_delete<K>(
-    scope: &OpenTelemetryScope,
-    evm_tree: &EvmTree,
-    key: K,
-    is_value: bool,
-) -> Result<EvmTree, BindingsError>
+pub fn store_delete<K>(evm_tree: &EvmTree, key: K, is_value: bool) -> Result<EvmTree, BindingsError>
 where
     K: Key,
 {
     trace!("store_delete({}, is_value:{})", key.as_str(), is_value);
+
     let mem = unsafe {
-        ocaml_imports::layer2_store__store_delete(
-            &gc(),
-            scope,
-            evm_tree.clone(),
-            key.as_str(),
-            is_value,
+        otel_trace!(
+            if is_value {
+                "store_delete_value"
+            } else {
+                "store_delete"
+            },
+            ocaml_imports::layer2_store__store_delete(
+                &gc(),
+                evm_tree.clone(),
+                key.as_str(),
+                is_value
+            )
+            .map_err(BindingsError::OCamlError)?
         )
-        .map_err(BindingsError::OCamlError)?
     };
 
     mem.map_err(|i| BindingsError::HostFuncError(i as i32))
 }
 
-pub fn store_copy<K>(
-    scope: &OpenTelemetryScope,
-    evm_tree: &EvmTree,
-    from: K,
-    to: K,
-) -> Result<EvmTree, BindingsError>
+pub fn store_copy<K>(evm_tree: &EvmTree, from: K, to: K) -> Result<EvmTree, BindingsError>
 where
     K: Key,
 {
     trace!("store_copy({}, {})", from.as_str(), to.as_str());
     let res = unsafe {
-        ocaml_imports::layer2_store__store_copy(
-            &gc(),
-            scope,
-            evm_tree.clone(),
-            from.as_str(),
-            to.as_str(),
+        otel_trace!(
+            "store_copy",
+            ocaml_imports::layer2_store__store_copy(
+                &gc(),
+                evm_tree.clone(),
+                from.as_str(),
+                to.as_str()
+            )
+            .map_err(BindingsError::OCamlError)?
         )
-        .map_err(BindingsError::OCamlError)?
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
 }
 
-pub fn store_move<K>(
-    scope: &OpenTelemetryScope,
-    evm_tree: &EvmTree,
-    from: K,
-    to: K,
-) -> Result<EvmTree, BindingsError>
+pub fn store_move<K>(evm_tree: &EvmTree, from: K, to: K) -> Result<EvmTree, BindingsError>
 where
     K: Key,
 {
     trace!("store_move({}, {})", from.as_str(), to.as_str());
     let res = unsafe {
-        ocaml_imports::layer2_store__store_move(
-            &gc(),
-            scope,
-            evm_tree.clone(),
-            from.as_str(),
-            to.as_str(),
+        otel_trace!(
+            "store_move",
+            ocaml_imports::layer2_store__store_move(
+                &gc(),
+                evm_tree.clone(),
+                from.as_str(),
+                to.as_str()
+            )
+            .map_err(BindingsError::OCamlError)?
         )
-        .map_err(BindingsError::OCamlError)?
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
 }
 
-pub fn store_list_size<K>(
-    scope: &OpenTelemetryScope,
-    evm_tree: &EvmTree,
-    key: K,
-) -> Result<isize, BindingsError>
+pub fn store_list_size<K>(evm_tree: &EvmTree, key: K) -> Result<isize, BindingsError>
 where
     K: Key,
 {
     trace!("store_list_size({})", key.as_str());
     let res = unsafe {
-        ocaml_imports::layer2_store__store_list_size(&gc(), scope, evm_tree.clone(), key.as_str())
-            .map_err(BindingsError::OCamlError)?
+        otel_trace!(
+            "store_count_subkeys",
+            ocaml_imports::layer2_store__store_list_size(&gc(), evm_tree.clone(), key.as_str())
+                .map_err(BindingsError::OCamlError)?
+        )
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
 }
 
-pub fn store_value_size<K>(
-    scope: &OpenTelemetryScope,
-    evm_tree: &EvmTree,
-    key: K,
-) -> Result<isize, BindingsError>
+pub fn store_value_size<K>(evm_tree: &EvmTree, key: K) -> Result<isize, BindingsError>
 where
     K: Key,
 {
     trace!("store_value_size({})", key.as_str());
     let res = unsafe {
-        ocaml_imports::layer2_store__store_value_size(&gc(), scope, evm_tree.clone(), key.as_str())
-            .map_err(BindingsError::OCamlError)?
+        otel_trace!(
+            "store_value_size",
+            ocaml_imports::layer2_store__store_value_size(&gc(), evm_tree.clone(), key.as_str())
+                .map_err(BindingsError::OCamlError)?
+        )
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
 }
 
 pub fn store_read<K>(
-    scope: &OpenTelemetryScope,
     evm_tree: &EvmTree,
     key: K,
     offset: usize,
@@ -270,22 +282,23 @@ where
         num_bytes
     );
     let res = unsafe {
-        ocaml_imports::layer2_store__store_read(
-            &gc(),
-            scope,
-            evm_tree.clone(),
-            key.as_str(),
-            offset,
-            num_bytes,
+        otel_trace!(
+            "store_read",
+            ocaml_imports::layer2_store__store_read(
+                &gc(),
+                evm_tree.clone(),
+                key.as_str(),
+                offset,
+                num_bytes,
+            )
+            .map_err(BindingsError::OCamlError)?
         )
-        .map_err(BindingsError::OCamlError)?
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
 }
 
 pub fn store_write<K>(
-    scope: &OpenTelemetryScope,
     evm_tree: &EvmTree,
     key: K,
     offset: usize,
@@ -296,15 +309,17 @@ where
 {
     trace!("store_write({}, offset:{})", key.as_str(), offset);
     let res = unsafe {
-        ocaml_imports::layer2_store__store_write(
-            &gc(),
-            scope,
-            evm_tree.clone(),
-            key.as_str(),
-            offset,
-            bytes,
+        otel_trace!(
+            "store_write",
+            ocaml_imports::layer2_store__store_write(
+                &gc(),
+                evm_tree.clone(),
+                key.as_str(),
+                offset,
+                bytes,
+            )
+            .map_err(BindingsError::OCamlError)?
         )
-        .map_err(BindingsError::OCamlError)?
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -319,7 +334,6 @@ pub fn check_reboot_flag(evm_tree: &EvmTree) -> Result<(bool, EvmTree), Bindings
 }
 
 pub fn store_write_all<K>(
-    scope: &OpenTelemetryScope,
     evm_tree: &EvmTree,
     key: K,
     bytes: &[u8],
@@ -329,36 +343,19 @@ where
 {
     trace!("store_write_all({})", key.as_str());
     let res = unsafe {
-        ocaml_imports::layer2_store__store_write_all(
-            &gc(),
-            scope,
-            evm_tree.clone(),
-            key.as_str(),
-            bytes,
+        otel_trace!(
+            "store_write_all",
+            ocaml_imports::layer2_store__store_write_all(
+                &gc(),
+                evm_tree.clone(),
+                key.as_str(),
+                bytes
+            )
+            .map_err(BindingsError::OCamlError)?
         )
-        .map_err(BindingsError::OCamlError)?
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
-}
-
-pub fn open_span(
-    s: &OpenTelemetryScope,
-    top_span_name: &str,
-) -> Result<OpenTelemetryScope, BindingsError> {
-    let s = unsafe {
-        ocaml_imports::open_span(&gc(), s, top_span_name).map_err(BindingsError::OCamlError)?
-    };
-
-    Ok(s)
-}
-
-pub fn close_span(s: &OpenTelemetryScope) -> Result<(), BindingsError> {
-    unsafe {
-        ocaml_imports::close_span(&gc(), s).map_err(BindingsError::OCamlError)?;
-    }
-
-    Ok(())
 }
 
 pub fn init_spans(s: &OpenTelemetryScope, span_name: &str) -> Result<(), BindingsError> {
