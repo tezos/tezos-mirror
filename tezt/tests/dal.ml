@@ -1892,8 +1892,7 @@ let check_get_commitment dal_node ~slot_level check_result slots_info =
     (fun (slot_index, commitment') ->
       let* response =
         Dal_RPC.(
-          call_raw dal_node
-          @@ get_level_index_commitment ~slot_index ~slot_level)
+          call_raw dal_node @@ get_level_slot_commitment ~slot_index ~slot_level)
       in
       return @@ check_result commitment' response)
     slots_info
@@ -1919,7 +1918,7 @@ let check_stored_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
         let* response =
           Dal_RPC.(
             call_raw dal_node
-            @@ get_level_index_commitment ~slot_level:pub_level ~slot_index)
+            @@ get_level_slot_commitment ~slot_level:pub_level ~slot_index)
         in
         match response.code with
         | 200 -> return (accu + 1)
@@ -1938,7 +1937,7 @@ let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
     =
   let test (slot_index, commitment) =
     let* commitment_is_stored =
-      let rpc = Dal_RPC.get_level_index_commitment ~slot_level ~slot_index in
+      let rpc = Dal_RPC.get_level_slot_commitment ~slot_level ~slot_index in
       let* response = Dal_RPC.call_raw dal_node rpc in
       match response.code with
       | 200 ->
@@ -2058,7 +2057,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
     Lwt_list.filter_map_s
       (fun slot_index ->
         let commitment_rpc =
-          Dal_RPC.get_level_index_commitment ~slot_level:pub_level ~slot_index
+          Dal_RPC.get_level_slot_commitment ~slot_level:pub_level ~slot_index
         in
         let* response = Dal_RPC.call_raw dal_node commitment_rpc in
         match response.code with
