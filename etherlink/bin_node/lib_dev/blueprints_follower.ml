@@ -40,7 +40,18 @@ let local_head_too_old ?remote_head ~multichain ~evm_node_endpoint
     (Qty next_blueprint_number) =
   let open Lwt_result_syntax in
   let open Rpc_encodings in
-  let is_too_old ~remote ~next = Z.Compare.(next <= remote) in
+  let is_too_old ~remote ~next =
+    (* We verify that we are close enough to the head of the remote node. 10 is
+       arbitrary. It is small enough to make sure that connecting to the
+       streamed RPC will not make the node hang. As a reminder, when the
+       difference is too big, the node spends too much time decoding blueprints
+       ahead of time.
+
+       Being too strict (e.g., forcing the node to be up-to-date with its
+       remote counterpart) means network lags can prevent the bootstrapping
+       mechanism to end if the sequencer produces blocks too often. *)
+    Z.(Compare.(next + ~$10 <= remote))
+  in
   let* (Qty remote_head_number) =
     match remote_head with
     | Some (Qty remote_head)

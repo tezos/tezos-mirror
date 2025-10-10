@@ -29,7 +29,9 @@
 
 * Caps the number of native threads used by the node to prevent runtime errors.
   (!19479)
-- Supports executing Ebisu natively. (!)
+- Supports executing Ebisu natively. (!19563)
+- Relaxes the condition for completing the EVM node's bootstrap phase to be
+  more tolerant to network delays. (!19562)
 
 ### Storage changes
 
