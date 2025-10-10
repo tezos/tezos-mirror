@@ -920,7 +920,9 @@ let test_staking =
   and* _ = Node.wait_for_level node_2 node_3_final_level
   and* _ = Node.wait_for_level node_3 node_3_final_level in
 
-  log_step 20 "Check denunciation is in the last block." ;
+  log_step
+    20
+    "Check denunciation is in the last block, and culprit is now forbidden." ;
   (* Getting the operations of the current head. *)
   let* ops = Client.RPC.call client_1 @@ RPC.get_chain_block_operations () in
   let* () = Accuser.terminate accuser_3 in
@@ -929,13 +931,19 @@ let test_staking =
     else Test.fail "Double baking evidence was not found"
   in
 
-  (* Bootstrap2 has been denounced, check it is not forbidden *)
+  (* Bootstrap2 has been denounced, check it is forbidden. *)
   let* is_forbidden =
     Client.RPC.call client_1
     @@ RPC.get_chain_block_context_delegate_is_forbidden
          Constant.bootstrap2.public_key_hash
   in
   assert is_forbidden ;
+
+  log_step
+    21
+    "Bake until the slashing is applied at the end of the next cycle, and \
+     check that the block receipt contains the expected slashed and rewarded \
+     amounts." ;
 
   (* Bake a cycle to wait for the slashing *)
   let* () =
@@ -949,18 +957,8 @@ let test_staking =
   let* bu = Operation_receipt.get_block_metadata client_1 in
   let* bu = Operation_receipt.Balance_updates.from_result [bu] in
 
-  (* check slashed and rewarded amounts *)
-  let global_limit_of_staking_over_baking = 9 in
-  (* It's critical that the rewarded amount cannot exceed the amount
-     slashed from the baker's own deposits; otherwise, the baker may
-     actually gain tez by purposefully double signing and denuncing
-     itself. Therefore, the rewarded part is set to 1 /
-     (global_limit_of_staking_over_baking + 2) of the slashed
-     amount. *)
-  let reward_denominator = global_limit_of_staking_over_baking + 2 in
-
   (* slashed stakers (including baker) unstake deposit *)
-  let amount_slashed_from_unstake_stakers_deposits =
+  let amount_slashed_from_unstake_requests =
     if Protocol.(number protocol > number S023) then
       (* From T on, when activating the protocol from Genesis, the
          initialization of consensus rights for the first cycles is
@@ -970,47 +968,50 @@ let test_staking =
       50_000_004
     else 50_000_003
   in
-  let amount_rewarded_from_unstake_stakers_deposits =
-    amount_slashed_from_unstake_stakers_deposits / reward_denominator
-  in
-  let amount_burned_from_unstake_stakers_deposits =
-    amount_slashed_from_unstake_stakers_deposits
-    - amount_rewarded_from_unstake_stakers_deposits
-  in
 
   (* slashed stake *)
-  let amount_slashed_from_stakers_deposits =
-    if Protocol.(number protocol > number S023) then 50_248_756 else 50_248_756
-  in
-  let amount_rewarded_from_stakers_deposits =
-    amount_slashed_from_stakers_deposits / reward_denominator
-  in
-  let amount_burned_from_stakers_deposits =
-    amount_slashed_from_stakers_deposits - amount_rewarded_from_stakers_deposits
-  in
-
-  (* slashing baker (bootstrap2) stake*)
-  let amount_slashed_from_baker_deposits =
+  let amount_slashed_from_own_staked =
     if Protocol.(number protocol > number S023) then 10_049_785_808
     else 10_049_764_732
   in
-
-  let amount_rewarded_from_baker_deposits =
-    amount_slashed_from_baker_deposits / reward_denominator
-  in
-  let amount_burned_from_baker_deposits =
-    amount_slashed_from_baker_deposits - amount_rewarded_from_baker_deposits
+  let amount_slashed_from_external_staked =
+    if Protocol.(number protocol > number S023) then 50_248_756 else 50_248_756
   in
 
-  (* total amounts *)
+  (* Compute rewarded vs burned amounts. *)
+  let global_limit_of_staking_over_baking = 9 in
+  (* It's critical that the rewarded amount cannot exceed the amount
+     slashed from the baker's own deposits; otherwise, the baker may
+     actually gain tez by purposefully double signing and denuncing
+     itself. Therefore, the rewarded part is set to 1 /
+     (global_limit_of_staking_over_baking + 2) of the slashed
+     amount. *)
+  let reward_denominator = global_limit_of_staking_over_baking + 2 in
+  let amount_rewarded_from_unstake_requests =
+    amount_slashed_from_unstake_requests / reward_denominator
+  in
+  let amount_burned_from_unstake_requests =
+    amount_slashed_from_unstake_requests - amount_rewarded_from_unstake_requests
+  in
+  let amount_rewarded_from_own_staked =
+    amount_slashed_from_own_staked / reward_denominator
+  in
+  let amount_burned_from_own_staked =
+    amount_slashed_from_own_staked - amount_rewarded_from_own_staked
+  in
+  let amount_rewarded_from_external_staked =
+    amount_slashed_from_external_staked / reward_denominator
+  in
+  let amount_burned_from_external_staked =
+    amount_slashed_from_external_staked - amount_rewarded_from_external_staked
+  in
   let total_amount_rewarded =
-    amount_rewarded_from_unstake_stakers_deposits
-    + amount_rewarded_from_stakers_deposits
-    + amount_rewarded_from_baker_deposits
+    amount_rewarded_from_unstake_requests + amount_rewarded_from_external_staked
+    + amount_rewarded_from_own_staked
   in
   let total_amount_burned =
-    amount_burned_from_unstake_stakers_deposits
-    + amount_burned_from_stakers_deposits + amount_burned_from_baker_deposits
+    amount_burned_from_unstake_requests + amount_burned_from_external_staked
+    + amount_burned_from_own_staked
   in
 
   let check_opr ~kind ~category ~change ~staker ~msg ~delayed_operation_hash =
@@ -1027,14 +1028,13 @@ let test_staking =
       msg;
     }
   in
-
   check_balance_updates
     bu
     [
       check_opr
         ~kind:"freezer"
         ~category:(Some "unstaked_deposits")
-        ~change:(-amount_burned_from_unstake_stakers_deposits)
+        ~change:(-amount_burned_from_unstake_requests)
         ~staker:
           (Some
              (Delegate
@@ -1047,7 +1047,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "deposits")
-        ~change:(-amount_burned_from_baker_deposits)
+        ~change:(-amount_burned_from_own_staked)
         ~staker:
           (Some (Baker_own_stake {baker = Constant.bootstrap2.public_key_hash}))
         ~msg:"Slashed from baker deposits"
@@ -1055,7 +1055,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "deposits")
-        ~change:(-amount_burned_from_stakers_deposits)
+        ~change:(-amount_burned_from_external_staked)
         ~staker:
           (Some
              (Delegate
@@ -1075,7 +1075,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "unstaked_deposits")
-        ~change:(-amount_rewarded_from_unstake_stakers_deposits)
+        ~change:(-amount_rewarded_from_unstake_requests)
         ~staker:
           (Some
              (Delegate
@@ -1088,7 +1088,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "deposits")
-        ~change:(-amount_rewarded_from_baker_deposits)
+        ~change:(-amount_rewarded_from_own_staked)
         ~staker:
           (Some (Baker_own_stake {baker = Constant.bootstrap2.public_key_hash}))
         ~delayed_operation_hash:(Some denunciation_oph)
@@ -1096,7 +1096,7 @@ let test_staking =
       check_opr
         ~kind:"freezer"
         ~category:(Some "deposits")
-        ~change:(-amount_rewarded_from_stakers_deposits)
+        ~change:(-amount_rewarded_from_external_staked)
         ~staker:
           (Some
              (Delegate
@@ -1118,7 +1118,7 @@ let test_staking =
       };
     ] ;
 
-  log_step 21 "Test finalize_unstake" ;
+  log_step 22 "Test finalize_unstake" ;
   let* balance = Client.get_balance_for ~account:staker0.alias client_1 in
   Log.info
     "Balance of %s before unstake: spendable : %s"
