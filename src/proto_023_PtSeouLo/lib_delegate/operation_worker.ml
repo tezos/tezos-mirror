@@ -36,14 +36,24 @@ module Events = struct
 
   let pp_int = Format.pp_print_int
 
-  let loop_failed =
+  let node_unreachable_crash =
+    declare_0
+      ~section
+      ~name:"node_unreachable_crash"
+      ~level:Error
+      ~msg:
+        "Node unreachable via the monitor_operations RPC. Unable to monitor \
+         quorum. Shutting down baker..."
+      ()
+
+  let monitor_operations_retry =
     declare_1
       ~section
-      ~name:"loop_failed"
-      ~level:Error
-      ~msg:"loop failed with {trace}"
-      ~pp1:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
+      ~name:"monitor_operations_retry"
+      ~level:Warning
+      ~msg:"{msg}"
+      ~pp1:Format.pp_print_string
+      ("msg", Data_encoding.string)
 
   let ended =
     declare_1
@@ -733,13 +743,17 @@ let run ?(monitor_node_operations = true) ~constants
       (* If the call to [monitor_operations] RPC fails, retry 5 times during 25
          seconds before crashing the worker . *)
       Utils.retry
-        ~emit:(cctxt#message "%s")
+        ~emit:Events.(emit monitor_operations_retry)
         ~max_delay:10.
         ~delay:1.
         ~factor:2.
-        ~tries:5
+        ~tries:10
         ~is_error:(function _ -> true)
-        ~msg:(fun _ -> "unable to call monitor operations RPC.")
+        ~msg:(fun errs ->
+          Format.asprintf
+            "Failed to reach the node via the monitor_operations RPC@,%a"
+            pp_print_trace
+            errs)
         (fun () ->
           (monitor_operations
              cctxt
@@ -747,7 +761,13 @@ let run ?(monitor_node_operations = true) ~constants
         ()
     in
     match result with
-    | Error err -> Events.(emit loop_failed err)
+    | Error _ ->
+        (* The baker failed to reach the node via the monitor_operations
+           RPC after multiple retries. Because it can no longer monitor the
+           consensus, it is unable to attest or bake. Rather than remain in this
+           degraded state or retry indefinitely, we shut it down explicitly. *)
+        let* () = Events.(emit node_unreachable_crash ()) in
+        Lwt_exit.exit_and_raise (*ECONNREFUSED*) 111
     | Ok (head, operation_stream, op_stream_stopper) ->
         () [@profiler.stop] ;
         ()
@@ -804,16 +824,11 @@ let run ?(monitor_node_operations = true) ~constants
         (loop
            () [@profiler.record_s {verbosity = Notice} "operations processing"])
   in
-  Lwt.dont_wait
-    (fun () ->
-      Lwt.finalize
-        (fun () ->
-          if state.monitor_node_operations then worker_loop () else return_unit)
-        (fun () ->
-          let* _ = shutdown_worker state in
-          return_unit))
-    (fun exn ->
-      Events.(emit__dont_wait__use_with_care ended (Printexc.to_string exn))) ;
+  if state.monitor_node_operations then
+    Lwt.dont_wait
+      (fun () -> worker_loop ())
+      (fun exn ->
+        Events.(emit__dont_wait__use_with_care ended (Printexc.to_string exn))) ;
   return state
 
 let retrieve_pending_operations cctxt state =
