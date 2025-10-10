@@ -245,7 +245,7 @@ module Simulation = struct
     Process.check_error
       value
       ~exit_code:1
-      ~msg:(rex "--gas-limit option is required")
+      ~msg:(rex "--default-gas-limit option is required")
 
   let register protocol =
     successful protocol ;
