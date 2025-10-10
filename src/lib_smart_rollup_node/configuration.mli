@@ -131,6 +131,7 @@ type t = {
   l1_blocks_cache_size : int;
   l2_blocks_cache_size : int;
   prefetch_blocks : int option;
+  l1_monitor_finalized : bool;
   l1_rpc_timeout : float;
   loop_retry_delay : float;
       (** Delay in seconds to retry the main loop and the refutation loop after
@@ -324,6 +325,7 @@ module Cli : sig
     bail_on_disagree:bool ->
     profiling:bool option ->
     force_etherlink:bool ->
+    l1_monitor_finalized:bool ->
     t tzresult Lwt.t
 
   val create_or_read_config :
@@ -361,5 +363,6 @@ module Cli : sig
     bail_on_disagree:bool ->
     profiling:bool option ->
     force_etherlink:bool ->
+    l1_monitor_finalized:bool ->
     t tzresult Lwt.t
 end

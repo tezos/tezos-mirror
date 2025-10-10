@@ -127,6 +127,8 @@ type 'a t = {
   global_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
       (** Watcher for the L2 chain, which enables RPC services to access
           a stream of L2 blocks. *)
+  finalized_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
+      (** Watcher for the finalized L2 blocks. *)
   sync : sync_info;  (** Synchronization status with respect to the L1 node.  *)
 }
   constraint 'a = < store : 'store ; context : 'context >

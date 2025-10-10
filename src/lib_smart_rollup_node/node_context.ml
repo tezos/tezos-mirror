@@ -110,6 +110,7 @@ type 'a t = {
   finaliser : unit -> unit Lwt.t;
   current_protocol : current_protocol Reference.rw;
   global_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
+  finalized_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
   sync : sync_info;
 }
   constraint 'a = < store : 'store ; context : 'context >
@@ -266,14 +267,6 @@ let is_processed {store; _} head =
 
 let last_processed_head_opt {store; _} = Store.L2_blocks.find_head store
 
-let set_finalized {store; _} hash level =
-  Store.State.Finalized_level.set store (hash, level)
-
-let get_finalized_level {store; _} =
-  let open Lwt_result_syntax in
-  let+ f = Store.State.Finalized_level.get store in
-  match f with None -> 0l | Some (_h, l) -> l
-
 let find_l2_block {store; _} block_hash = Store.L2_blocks.find store block_hash
 
 let get_l2_block node_ctxt block_hash =
@@ -296,6 +289,19 @@ let find_l2_block_by_level node_ctxt level =
   match block_hash with
   | None -> return_none
   | Some block_hash -> find_l2_block node_ctxt block_hash
+
+let set_finalized node_ctxt hash level =
+  let open Lwt_result_syntax in
+  let* () = Store.State.Finalized_level.set node_ctxt.store (hash, level) in
+  let+ finalized_block = find_l2_block node_ctxt hash in
+  Option.iter
+    (Lwt_watcher.notify node_ctxt.finalized_block_watcher)
+    finalized_block
+
+let get_finalized_level {store; _} =
+  let open Lwt_result_syntax in
+  let+ f = Store.State.Finalized_level.get store in
+  match f with None -> 0l | Some (_h, l) -> l
 
 let get_finalized_head_opt {store; _} = Store.L2_blocks.find_finalized store
 

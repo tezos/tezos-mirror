@@ -127,7 +127,7 @@ let register_outbox_messages (module Plugin : Protocol_plugin_sig.S) node_ctxt
 (* Process a L1 that we have never seen and for which we have processed the
    predecessor. *)
 let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
-    (head : Layer1.header) =
+    ~finalized (head : Layer1.header) =
   let open Lwt_result_syntax in
   let level = head.level in
   Octez_telemetry.Trace.with_tzresult "process_unseen_block" @@ fun scope ->
@@ -204,10 +204,13 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
     Sc_rollup_block.{header; content = (); num_ticks; initial_tick}
   in
   let* () =
-    assert (node_ctxt.block_finality_time = 2) ;
-    let finalized_level = Int32.pred predecessor.header.level in
-    let finalized_hash = predecessor.header.predecessor in
-    Node_context.set_finalized node_ctxt finalized_hash finalized_level
+    if finalized then
+      Node_context.set_finalized node_ctxt header.block_hash header.level
+    else (
+      assert (node_ctxt.block_finality_time = 2) ;
+      let finalized_level = Int32.pred predecessor.header.level in
+      let finalized_hash = predecessor.header.predecessor in
+      Node_context.set_finalized node_ctxt finalized_hash finalized_level)
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
   let end_timestamp = Time.System.now () in
@@ -218,7 +221,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       Metrics.Inbox.set_total_time total_time) ;
   return l2_block
 
-let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
+let rec process_l1_block ({node_ctxt; _} as state) ~catching_up ~finalized
     (head : Layer1.header) =
   let open Lwt_result_syntax in
   if is_before_origination node_ctxt head then return `Nothing
@@ -233,15 +236,20 @@ let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
         let*! () = Daemon_event.head_processing head.hash head.level in
         let* predecessor = Node_context.get_predecessor_header node_ctxt head in
         let* () =
-          update_l2_chain state ~catching_up:true ~recurse_pred:true predecessor
+          update_l2_chain
+            state
+            ~catching_up:true
+            ~recurse_pred:true
+            ~finalized
+            predecessor
         in
         let* l2_head =
-          process_unseen_head state ~catching_up ~predecessor head
+          process_unseen_head state ~catching_up ~predecessor ~finalized head
         in
         return (`New l2_head)
 
 and update_l2_chain ({node_ctxt; _} as state) ~catching_up
-    ?(recurse_pred = false) (head : Layer1.header) =
+    ?(recurse_pred = false) ~finalized (head : Layer1.header) =
   let open Lwt_result_syntax in
   let start_timestamp = Time.System.now () in
   let* () =
@@ -249,7 +257,7 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
       node_ctxt
       {Layer1.hash = head.hash; level = head.level}
   in
-  let* done_ = process_l1_block state ~catching_up head in
+  let* done_ = process_l1_block state ~catching_up ~finalized head in
   match done_ with
   | `Nothing -> return_unit
   | `Already_processed l2_block ->
@@ -282,12 +290,12 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
       let* () = Node_context.gc node_ctxt ~level:head.level in
       return_unit
 
-let update_l2_chain state ~catching_up head =
+let update_l2_chain state ~catching_up ~finalized head =
   Lwt_lock_file.with_lock
     ~when_locked:`Block
     ~filename:
       (Node_context.processing_lockfile_path ~data_dir:state.node_ctxt.data_dir)
-  @@ fun () -> update_l2_chain state ~catching_up head
+  @@ fun () -> update_l2_chain state ~catching_up ~finalized head
 
 let missing_data_error trace =
   TzTrace.fold
@@ -331,7 +339,8 @@ let notify_synchronization (node_ctxt : _ Node_context.t) head_level =
 
 (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
    also processes any missing blocks that were not processed. *)
-let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
+let on_layer_1_head ({node_ctxt; _} as state) ~finalized (head : Layer1.header)
+    =
   let open Lwt_result_syntax in
   Octez_telemetry.Trace.with_tzresult "on_layer1_head" @@ fun scope ->
   Opentelemetry.Scope.add_attrs scope (fun () ->
@@ -386,7 +395,7 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
           to_prefetch ;
         let* header = get_header block in
         let catching_up = block.level < head.level in
-        update_l2_chain state ~catching_up header)
+        update_l2_chain state ~catching_up ~finalized header)
       new_chain_prefetching
   in
   notify_synchronization node_ctxt head.level ;
@@ -402,10 +411,19 @@ let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   return_unit
 
 let daemonize state =
-  Layer1.iter_heads
-    ~name:"daemon"
-    state.node_ctxt.l1_ctxt
-    (on_layer_1_head state)
+  if state.configuration.l1_monitor_finalized then
+    Layer1.iter_finalized_heads
+      ~name:"daemon"
+      state.node_ctxt.l1_ctxt
+      (on_layer_1_head ~finalized:true state)
+      ~prefetch:(fun l1_ctxt head ->
+        let module Plugin = (val state.plugin) in
+        Plugin.Layer1_helpers.prefetch_tezos_blocks l1_ctxt [head])
+  else
+    Layer1.iter_heads
+      ~name:"daemon"
+      state.node_ctxt.l1_ctxt
+      (on_layer_1_head ~finalized:false state)
 
 let simple_refutation_loop head =
   Refutation_coordinator.process (Layer1.head_of_header head)
@@ -1048,6 +1066,7 @@ module Replay = struct
         ~bail_on_disagree:false
         ~profiling
         ~force_etherlink:false
+        ~l1_monitor_finalized:false
     in
     let* cleanup = setup_opentelemetry ~data_dir configuration in
     let* node_ctxt =

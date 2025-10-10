@@ -123,6 +123,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       Event.kernel_debug
   in
   let global_block_watcher = Lwt_watcher.create_input () in
+  let finalized_block_watcher = Lwt_watcher.create_input () in
   let private_info =
     Option.map
       (fun (message_index, outbox_level) ->
@@ -168,6 +169,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
       finaliser = kernel_debug_finaliser;
       current_protocol = Reference.new_ current_protocol;
       global_block_watcher;
+      finalized_block_watcher;
       sync;
     }
   in
@@ -244,6 +246,7 @@ module For_snapshots = struct
           index_buffer_size = Some index_buffer_size;
           irmin_cache_size = Some irmin_cache_size;
           prefetch_blocks = None;
+          l1_monitor_finalized = false;
           log_kernel_debug = false;
           log_kernel_debug_file = None;
           no_degraded = false;
@@ -279,6 +282,7 @@ module For_snapshots = struct
       Lwt_unix.openfile (Filename.temp_file "lock" "") [] 0o644
     in
     let global_block_watcher = Lwt_watcher.create_input () in
+    let finalized_block_watcher = Lwt_watcher.create_input () in
     let sync = create_sync_info () in
     let*? unsafe_patches =
       Pvm_patches.make
@@ -309,6 +313,7 @@ module For_snapshots = struct
         finaliser = Lwt.return;
         current_protocol = Reference.new_ current_protocol;
         global_block_watcher;
+        finalized_block_watcher;
         sync;
       }
 end
@@ -360,6 +365,7 @@ module Internal_for_tests = struct
           index_buffer_size = Some index_buffer_size;
           irmin_cache_size = Some irmin_cache_size;
           prefetch_blocks = None;
+          l1_monitor_finalized = false;
           l1_rpc_timeout;
           loop_retry_delay = 10.;
           log_kernel_debug = false;
@@ -402,6 +408,7 @@ module Internal_for_tests = struct
         ]
     in
     let global_block_watcher = Lwt_watcher.create_input () in
+    let finalized_block_watcher = Lwt_watcher.create_input () in
     let sync = create_sync_info () in
     let*? unsafe_patches = Pvm_patches.make kind rollup_address [] in
     return
@@ -427,6 +434,7 @@ module Internal_for_tests = struct
         kernel_debug_logger = Event.kernel_debug;
         finaliser = (fun () -> Lwt.return_unit);
         global_block_watcher;
+        finalized_block_watcher;
         sync;
       }
 
