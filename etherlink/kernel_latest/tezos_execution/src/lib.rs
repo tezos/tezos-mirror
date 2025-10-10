@@ -151,26 +151,21 @@ fn burn_tez(
     Ok(new_balance)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn execute_internal_operations<'a, Host: Runtime>(
-    host: &mut Host,
-    context: &context::Context,
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a>,
     block_ctx: &BlockCtx,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
     sender_account: &TezlinkOriginatedAccount,
     parser: &'a Parser<'a>,
-    source_account: &TezlinkImplicitAccount,
-    gas: &mut Gas,
-    operation_counter: &mut u128,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
-    origination_nonce: &mut OriginationNonce,
 ) -> Result<(), ApplyOperationError> {
     let mut failed = None;
     for (index, OperationInfo { operation, counter }) in
         internal_operations.into_iter().enumerate()
     {
         log!(
-            host,
+            tc_ctx.host,
             Debug,
             "Executing internal operation {:?} with counter {:?}",
             operation,
@@ -212,8 +207,8 @@ fn execute_internal_operations<'a, Host: Runtime>(
                     })
                 } else {
                     let receipt = transfer(
-                        host,
-                        context,
+                        tc_ctx,
+                        operation_ctx,
                         block_ctx,
                         sender_account,
                         &content.amount,
@@ -224,11 +219,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
                             .map_or(&Entrypoint::default(), |param| &param.entrypoint),
                         value,
                         parser,
-                        source_account,
-                        gas,
-                        operation_counter,
                         all_internal_receipts,
-                        origination_nonce,
                     );
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
@@ -275,10 +266,10 @@ fn execute_internal_operations<'a, Host: Runtime>(
                     })
                 } else {
                     let receipt = originate_contract(
-                        host,
-                        context,
+                        tc_ctx.host,
+                        tc_ctx.context,
                         address,
-                        source_account,
+                        operation_ctx.source,
                         sender_account,
                         &amount,
                         &script.code,
@@ -314,7 +305,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
             }
         };
         log!(
-            host,
+            tc_ctx.host,
             Debug,
             "Internal operation executed successfully: {:?}",
             internal_receipt
@@ -323,7 +314,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
     }
     if let Some(index) = failed {
         log!(
-            host,
+            tc_ctx.host,
             Debug,
             "Internal operation execution failed at index {}",
             index
@@ -339,8 +330,8 @@ fn execute_internal_operations<'a, Host: Runtime>(
 /// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
 #[allow(clippy::too_many_arguments)]
 fn transfer<'a, Host: Runtime>(
-    host: &mut Host,
-    context: &context::Context,
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a>,
     block_ctx: &BlockCtx,
     sender_account: &impl TezlinkAccount,
     amount: &Narith,
@@ -348,11 +339,7 @@ fn transfer<'a, Host: Runtime>(
     entrypoint: &Entrypoint,
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
-    source_account: &TezlinkImplicitAccount,
-    gas: &mut Gas,
-    operation_counter: &mut u128,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
-    origination_nonce: &mut OriginationNonce,
 ) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
@@ -364,27 +351,31 @@ fn transfer<'a, Host: Runtime>(
                 return Err(TransferError::EmptyImplicitTransfer);
             };
 
-            let dest_account = TezlinkImplicitAccount::from_public_key_hash(context, pkh)
-                .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+            let dest_account =
+                TezlinkImplicitAccount::from_public_key_hash(tc_ctx.context, pkh)
+                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             // Allocated is not being used on purpose (see below the comment on the allocated_destination_contract field)
             let _allocated = dest_account
-                .allocate(host)
+                .allocate(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToAllocateDestination)?;
-            transfer_tez(host, sender_account, amount, &dest_account).map(|success| {
-                TransferSuccess {
-                    // This boolean is kept at false on purpose to maintain compatibility with TZKT.
-                    // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
-                    // This incurs a cost, and TZKT expects balance updates in the operation receipt representing this cost.
-                    // So, as long as we don't have balance updates to represent this cost, we keep this boolean false.
-                    allocated_destination_contract: false,
-                    ..success
-                }
-            })
+            transfer_tez(tc_ctx.host, sender_account, amount, &dest_account).map(
+                |success| {
+                    TransferSuccess {
+                        // This boolean is kept at false on purpose to maintain compatibility with TZKT.
+                        // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
+                        // This incurs a cost, and TZKT expects balance updates in the operation receipt representing this cost.
+                        // So, as long as we don't have balance updates to represent this cost, we keep this boolean false.
+                        allocated_destination_contract: false,
+                        ..success
+                    }
+                },
+            )
         }
         Contract::Originated(kt1) => {
-            let dest_account = TezlinkOriginatedAccount::from_kt1(context, kt1)
+            let dest_account = TezlinkOriginatedAccount::from_kt1(tc_ctx.context, kt1)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            let receipt = transfer_tez(host, sender_account, amount, &dest_account)?;
+            let receipt =
+                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?;
             let sender = address_from_contract(sender_account.contract());
             let amount = amount.0.clone().try_into().map_err(
                 |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
@@ -393,7 +384,7 @@ fn transfer<'a, Host: Runtime>(
             )?;
             let self_address = address_from_contract(dest_contract.clone());
             let balance = dest_account
-                .balance(host)
+                .balance(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
             let balance = balance.0.try_into().map_err(
                 |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
@@ -401,51 +392,42 @@ fn transfer<'a, Host: Runtime>(
                 },
             )?;
             let code = dest_account
-                .code(host)
+                .code(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
             let storage = dest_account
-                .storage(host)
+                .storage(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
             let mut ctx = Ctx {
-                tc_ctx: TcCtx { host, context, gas },
+                tc_ctx,
                 sender,
                 amount,
                 self_address,
                 big_map_diff: BTreeMap::new(),
                 balance,
                 block_ctx,
-                operation_ctx: &mut OperationCtx {
-                    source: source_account,
-                    counter: operation_counter,
-                    origination_nonce,
-                },
+                operation_ctx,
             };
             let (internal_operations, new_storage) = execute_smart_contract(
                 code, storage, entrypoint, param, parser, &mut ctx,
             )?;
-            let host = ctx.tc_ctx.host;
-            let gas = ctx.tc_ctx.gas;
             dest_account
-                .set_storage(host, &new_storage)
+                .set_storage(ctx.host(), &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
             execute_internal_operations(
-                host,
-                context,
+                ctx.tc_ctx,
+                ctx.operation_ctx,
                 block_ctx,
                 internal_operations,
                 &dest_account,
                 parser,
-                source_account,
-                gas,
-                ctx.operation_ctx.counter,
                 all_internal_receipts,
-                ctx.operation_ctx.origination_nonce,
             )
             .map_err(|err| {
                 TransferError::FailedToExecuteInternalOperation(err.to_string())
             })?;
-            log!(host, Debug, "Transfer operation succeeded");
-            let lazy_storage_diff = convert_big_map_diff(ctx.big_map_diff);
+            log!(ctx.host(), Debug, "Transfer operation succeeded");
+            let lazy_storage_diff =
+                convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff));
             Ok(TransferSuccess {
                 storage: Some(new_storage),
                 lazy_storage_diff,
@@ -483,28 +465,25 @@ fn get_contract_entrypoint(
 
 // Handles manager transfer operations.
 #[allow(clippy::too_many_arguments)]
-fn transfer_external<Host: Runtime>(
-    host: &mut Host,
-    context: &context::Context,
+fn transfer_external<'a, Host: Runtime>(
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a>,
     block_ctx: &BlockCtx,
-    source_account: &TezlinkImplicitAccount,
     amount: &Narith,
     dest: &Contract,
     parameter: &Option<Parameter>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
-    origination_nonce: &mut OriginationNonce,
+    parser: &'a Parser<'a>,
 ) -> Result<TransferTarget, TransferError> {
     log!(
-        host,
+        tc_ctx.host,
         Debug,
         "Applying an external transfer operation from {} to {:?} of {:?} mutez with parameters {:?}",
-        source_account.pkh(),
+        operation_ctx.source.pkh(),
         dest,
         amount,
         parameter
     );
-
-    let parser = Parser::new();
     let (entrypoint, value) = match parameter {
         Some(param) => (
             &param.entrypoint,
@@ -514,20 +493,16 @@ fn transfer_external<Host: Runtime>(
     };
 
     transfer(
-        host,
-        context,
+        tc_ctx,
+        operation_ctx,
         block_ctx,
-        source_account,
+        operation_ctx.source,
         amount,
         dest,
         entrypoint,
         value,
-        &parser,
-        source_account,
-        &mut mir::gas::Gas::default(),
-        &mut 0,
+        parser,
         all_internal_receipts,
-        origination_nonce,
     )
     .map(Into::into)
 }
@@ -906,7 +881,6 @@ fn apply_batch<Host: Runtime>(
     (receipts, true)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &Context,
@@ -916,6 +890,7 @@ fn apply_operation<Host: Runtime>(
     block_ctx: &BlockCtx,
 ) -> OperationResultSum {
     let mut internal_operations_receipts = Vec::new();
+    let parser = Parser::new();
     match &validated_operation.content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(host, source_account, pk);
@@ -931,16 +906,25 @@ fn apply_operation<Host: Runtime>(
             destination,
             parameters,
         }) => {
-            let transfer_result = transfer_external(
+            let mut tc_ctx = TcCtx {
                 host,
                 context,
+                gas: &mut mir::gas::Gas::default(),
+            };
+            let mut operation_ctx = OperationCtx {
+                source: source_account,
+                counter: &mut 0u128,
+                origination_nonce,
+            };
+            let transfer_result = transfer_external(
+                &mut tc_ctx,
+                &mut operation_ctx,
                 block_ctx,
-                source_account,
                 amount,
                 destination,
                 parameters,
                 &mut internal_operations_receipts,
-                origination_nonce,
+                &parser,
             );
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,

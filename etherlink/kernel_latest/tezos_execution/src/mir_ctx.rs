@@ -31,10 +31,10 @@ use tezos_tezlink::lazy_storage_diff::{
 };
 use typed_arena::Arena;
 
-pub struct TcCtx<Host, Context, Gas> {
-    pub host: Host,
-    pub context: Context,
-    pub gas: Gas,
+pub struct TcCtx<'operation, Host: Runtime> {
+    pub host: &'operation mut Host,
+    pub context: &'operation Context,
+    pub gas: &'operation mut Gas,
 }
 
 pub struct OperationCtx<'operation> {
@@ -47,14 +47,15 @@ pub struct OperationCtx<'operation> {
     pub counter: &'operation mut u128,
 }
 
-pub struct Ctx<'block, 'operation, Host, Context, Gas> {
-    pub tc_ctx: TcCtx<Host, Context, Gas>,
+pub struct Ctx<'a, 'block, 'operation, Host: Runtime> {
+    pub tc_ctx: &'a mut TcCtx<'operation, Host>,
     pub sender: AddressHash,
     pub amount: i64,
     pub self_address: AddressHash,
     pub balance: i64,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
-    pub operation_ctx: &'operation mut OperationCtx<'operation>,
+
+    pub operation_ctx: &'a mut OperationCtx<'operation>,
     pub block_ctx: &'block BlockCtx<'block>,
 }
 
@@ -92,12 +93,13 @@ macro_rules! make_default_ctx {
             .unwrap(),
             origination_nonce: &mut origination_nonce,
         };
+        let mut tc_ctx = TcCtx {
+            host: $host,
+            context: $context,
+            gas: &mut gas,
+        };
         let mut $ctx = Ctx {
-            tc_ctx: TcCtx {
-                host: $host,
-                context: $context,
-                gas: &mut gas,
-            },
+            tc_ctx: &mut tc_ctx,
             block_ctx: &block_ctx,
             operation_ctx: &mut operation_ctx,
             balance: 0,
@@ -109,9 +111,7 @@ macro_rules! make_default_ctx {
     };
 }
 
-impl<'a, Host: Runtime> TypecheckingCtx<'a>
-    for TcCtx<&mut Host, &Context, &mut mir::gas::Gas>
-{
+impl<'a, Host: Runtime> TypecheckingCtx<'a> for TcCtx<'a, Host> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.gas
     }
@@ -148,9 +148,7 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a>
     }
 }
 
-impl<'a, Host: Runtime> TypecheckingCtx<'a>
-    for Ctx<'_, '_, &mut Host, &Context, &mut mir::gas::Gas>
-{
+impl<'a, Host: Runtime> TypecheckingCtx<'a> for Ctx<'_, '_, '_, Host> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.tc_ctx.gas()
     }
@@ -170,9 +168,7 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a>
     }
 }
 
-impl<'a, Host: Runtime> CtxTrait<'a>
-    for Ctx<'_, '_, &mut Host, &Context, &mut mir::gas::Gas>
-{
+impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, '_, '_, Host> {
     fn sender(&self) -> AddressHash {
         self.sender.clone()
     }
@@ -234,7 +230,7 @@ impl<'a, Host: Runtime> CtxTrait<'a>
     }
 }
 
-impl<Host: Runtime> Ctx<'_, '_, &mut Host, &Context, &mut Gas> {
+impl<Host: Runtime> Ctx<'_, '_, '_, Host> {
     pub fn host(&mut self) -> &mut Host {
         self.tc_ctx.host
     }
@@ -320,7 +316,7 @@ pub fn convert_big_map_diff(
     }
 }
 
-impl<'a, Host: Runtime> LazyStorage<'a> for Ctx<'_, '_, &mut Host, &Context, &mut Gas> {
+impl<'a, Host: Runtime> LazyStorage<'a> for Ctx<'_, '_, '_, Host> {
     fn big_map_get(
         &mut self,
         arena: &'a Arena<Micheline<'a>>,
@@ -459,7 +455,7 @@ mod tests {
     }
 
     fn assert_big_map_eq<'a, Host: Runtime>(
-        ctx: &mut Ctx<&mut Host, &Context, &mut Gas>,
+        ctx: &mut Ctx<'_, '_, '_, Host>,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key_type: Type,
