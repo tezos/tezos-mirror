@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -47,15 +48,12 @@ let expect_ok msg = function Ok res -> res | Error _ -> Test.fail msg
 
 let run f = Lwt_preemptive.detach f ()
 
-let scope = Wasm_runtime_callbacks.root_scope None
-
 let init_durable_storage l =
   let rec set_next_key tree = function
     | [] -> return tree
     | (key, value) :: rst ->
         let* tree =
-          run @@ fun () ->
-          store_write scope tree key 0 Bytes.(unsafe_of_string value)
+          run @@ fun () -> store_write tree key 0 Bytes.(unsafe_of_string value)
         in
         let tree, _ =
           expect_ok "Could not initialize the durable storage" tree
@@ -68,19 +66,19 @@ let test_store_has () =
   register ~tags:["store_has"] ~title:"store_has host function" @@ fun () ->
   let* tree = init_durable_storage [("/test/a", ""); ("/test/a/b", "")] in
 
-  let* res = run @@ fun () -> store_has scope tree "/test/c" in
+  let* res = run @@ fun () -> store_has tree "/test/c" in
   let res = expect_ok "should be able to call store_has" res in
   Check.((res = 0) int ~error_msg:"Expected %R (unknown key), got %L") ;
 
-  let* res = run @@ fun () -> store_has scope tree "/test/a/b" in
+  let* res = run @@ fun () -> store_has tree "/test/a/b" in
   let res = expect_ok "should be able to call store_has" res in
   Check.((res = 1) int ~error_msg:"Expected %R (only value), got %L") ;
 
-  let* res = run @@ fun () -> store_has scope tree "/test" in
+  let* res = run @@ fun () -> store_has tree "/test" in
   let res = expect_ok "should be able to call store_has" res in
   Check.((res = 2) int ~error_msg:"Expected %R (directory), got %L") ;
 
-  let* res = run @@ fun () -> store_has scope tree "/test/a" in
+  let* res = run @@ fun () -> store_has tree "/test/a" in
   let res = expect_ok "should be able to call store_has" res in
   Check.((res = 3) int ~error_msg:"Expected %R (directories and value), got %L") ;
 
@@ -111,7 +109,7 @@ let test_store_copy () =
   @@ fun () ->
   let* tree = init_durable_storage [("/test/a", "")] in
 
-  let* tree = run @@ fun () -> store_copy scope tree "/test/a" "/test/b" in
+  let* tree = run @@ fun () -> store_copy tree "/test/a" "/test/b" in
   let tree = expect_ok "should be able to copy /test/a" tree in
 
   let* res = run @@ fun () -> mem_tree tree "/test/b" in
@@ -127,7 +125,7 @@ let test_store_copy () =
       string
       ~error_msg:"/test/b is not equal to /test/a") ;
 
-  let* tree = run @@ fun () -> store_copy scope tree "/test/c" "/test/b" in
+  let* tree = run @@ fun () -> store_copy tree "/test/c" "/test/b" in
   let error = expect_error "should be able to copy /test/a" tree in
 
   Check.(
@@ -147,7 +145,7 @@ let test_store_move () =
   let* res = run @@ fun () -> store_get_hash tree "/test/a" in
   let a_hash = expect_ok "should be able to call store_get_hash" res in
 
-  let* tree = run @@ fun () -> store_move scope tree "/test/a" "/test/b" in
+  let* tree = run @@ fun () -> store_move tree "/test/a" "/test/b" in
   let tree = expect_ok "should be able to move /test/a" tree in
 
   let* res = run @@ fun () -> mem_tree tree "/test/a" in
@@ -165,7 +163,7 @@ let test_store_move () =
       string
       ~error_msg:"/test/b is not equal to former /test/a") ;
 
-  let* tree = run @@ fun () -> store_move scope tree "/test/c" "/test/b" in
+  let* tree = run @@ fun () -> store_move tree "/test/c" "/test/b" in
   let error = expect_error "should be able to move /test/a" tree in
 
   Check.(
@@ -186,7 +184,7 @@ let test_delete () =
   let a_exists = expect_ok "should be able to test if /test/a exists" res in
   Check.((a_exists = true) bool ~error_msg:"/test/a should exist") ;
 
-  let* res = run @@ fun () -> store_delete scope tree "/test" false in
+  let* res = run @@ fun () -> store_delete tree "/test" false in
   let tree_test_deleted = expect_ok "should be able to delete /test" res in
 
   let* res = run @@ fun () -> mem_tree tree_test_deleted "/test/a" in
@@ -206,30 +204,28 @@ let test_store_value_size () =
   @@ fun () ->
   let* tree = init_durable_storage [("/test/a", hello_world)] in
 
-  let* res = run @@ fun () -> store_value_size scope tree "/test/a" in
+  let* res = run @@ fun () -> store_value_size tree "/test/a" in
   let size = expect_ok "should be able to test if /test/a exists" res in
   Check.(
     (size = String.length hello_world)
       int
       ~error_msg:"/test/a is %R character long, got %L") ;
 
-  let* res =
-    run @@ fun () -> store_write scope tree "/test/a" 0 !!lorem_ipsum
-  in
+  let* res = run @@ fun () -> store_write tree "/test/a" 0 !!lorem_ipsum in
   let tree, len = expect_ok "should be able to write in /test/a" res in
 
-  let* res = run @@ fun () -> store_value_size scope tree "/test/a" in
+  let* res = run @@ fun () -> store_value_size tree "/test/a" in
   let size = expect_ok "should be able to get the size of /test/a" res in
   Check.((size = len) int ~error_msg:"/test/a is %R character long, got %L") ;
 
-  let* res = run @@ fun () -> store_value_size scope tree "/test/b" in
+  let* res = run @@ fun () -> store_value_size tree "/test/b" in
   let error = expect_error "should not be able fetch /test/b’s size" res in
   Check.(
     (error = Error_code.store_not_a_value)
       error_code
       ~error_msg:"store_value_size should have failed with %R (got %L)") ;
 
-  let* res = run @@ fun () -> store_value_size scope tree "/test" in
+  let* res = run @@ fun () -> store_value_size tree "/test" in
   let error = expect_error "should not be able to fetch /test’s size" res in
   Check.(
     (error = Error_code.store_not_a_value)
@@ -247,31 +243,31 @@ let test_store_list_size () =
     init_durable_storage [("/test/a", ""); ("/test/b", ""); ("/test/c", "")]
   in
 
-  let* res = run @@ fun () -> store_list_size scope tree "/test" in
+  let* res = run @@ fun () -> store_list_size tree "/test" in
   let size =
     expect_ok "should be able to count the number of children /test" res
   in
   Check.((size = 3) int ~error_msg:"/test should have %R children, got %L") ;
 
-  let* res = run @@ fun () -> store_delete scope tree "/test/a" false in
+  let* res = run @@ fun () -> store_delete tree "/test/a" false in
   let tree = expect_ok "should be able to delete in /test/a" res in
 
-  let* res = run @@ fun () -> store_list_size scope tree "/test" in
+  let* res = run @@ fun () -> store_list_size tree "/test" in
   let size =
     expect_ok "should be able to count the number of children /test" res
   in
   Check.((size = 2) int ~error_msg:"/test should have %R children, got %L") ;
 
-  let* res = run @@ fun () -> store_write scope tree "/test/d" 0 Bytes.empty in
+  let* res = run @@ fun () -> store_write tree "/test/d" 0 Bytes.empty in
   let tree, _ = expect_ok "should be able to write in /test/d" res in
 
-  let* res = run @@ fun () -> store_list_size scope tree "/test" in
+  let* res = run @@ fun () -> store_list_size tree "/test" in
   let size =
     expect_ok "should be able to count the number of children /test" res
   in
   Check.((size = 3) int ~error_msg:"/test should have %R children, got %L") ;
 
-  let* res = run @@ fun () -> store_list_size scope tree "/test/foo" in
+  let* res = run @@ fun () -> store_list_size tree "/test/foo" in
   let size =
     expect_ok
       "should be able to count the number of children /test/foo even if it \
@@ -304,7 +300,7 @@ let test_check_reboot_flag () =
       ~error_msg:"Incorrect result from check_reboot_flag (expected %R)") ;
 
   let* res =
-    run @@ fun () -> store_write scope tree "/kernel/env/reboot" 0 Bytes.empty
+    run @@ fun () -> store_write tree "/kernel/env/reboot" 0 Bytes.empty
   in
   let tree, _ = expect_ok "should be able to write the reboot flag" res in
 
