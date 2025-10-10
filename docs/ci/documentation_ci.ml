@@ -109,16 +109,7 @@ let job_odoc =
          ["docs/_build/api/odoc/"; "docs/odoc.log"])
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [
-      "eval $(opam env)";
-      "export OPAMFETCH='wget'";
-      "opam remote add default https://opam.ocaml.org/";
-      "opam repo add archive \
-       git+https://github.com/ocaml/opam-repository-archive";
-      "opam update";
-      "opam install --yes odoc.2.4.4";
-      "make -C docs " ^ target;
-    ]
+    ["eval $(opam env)"; "make -C docs " ^ target]
 
 let job_manuals =
   Cacio.parameterize @@ fun executables_to_use ->
