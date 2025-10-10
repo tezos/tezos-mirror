@@ -2367,7 +2367,7 @@ pub(crate) fn typecheck_contract_address<'a>(
             // Check if we have a contract at the address_hash of the given address.
             // and we have found a valid entrypoint to use.
             let contract_entrypoints = _ctx
-                .lookup_contract(&address.hash)
+                .lookup_entrypoints(&address.hash)
                 .ok_or(TcError::NoSuchContract)?;
 
             // Do we have the entrypoint for the call in the entrypoints parsed

@@ -121,7 +121,7 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a> for TcCtx<'a, Host> {
         &mut self.gas.current_gas
     }
 
-    fn lookup_contract(
+    fn lookup_entrypoints(
         &self,
         address: &AddressHash,
     ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
@@ -162,11 +162,11 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a> for Ctx<'_, '_, Host> {
         self.tc_ctx.gas()
     }
 
-    fn lookup_contract(
+    fn lookup_entrypoints(
         &self,
         address: &AddressHash,
     ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
-        self.tc_ctx.lookup_contract(address)
+        self.tc_ctx.lookup_entrypoints(address)
     }
 
     fn big_map_get_type(

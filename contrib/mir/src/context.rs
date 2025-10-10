@@ -21,7 +21,7 @@ use tezos_crypto_rs::{hash::OperationHash, public_key_hash::PublicKeyHash};
 pub trait TypecheckingCtx<'a> {
     fn gas(&mut self) -> &mut Gas;
 
-    fn lookup_contract(
+    fn lookup_entrypoints(
         &self,
         address: &AddressHash,
     ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>>;
@@ -47,7 +47,7 @@ impl<'a, 'b> TypecheckingCtx<'a> for PushableTypecheckingContext<'b> {
         self.gas
     }
 
-    fn lookup_contract(
+    fn lookup_entrypoints(
         &self,
         _address: &AddressHash,
     ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
@@ -131,7 +131,7 @@ pub struct Ctx<'a> {
     /// exist, or [`Some(entrypoints)`] with the map of its entrypoints. See
     /// also [Self::set_known_contracts]. Defaults to returning [None] for any
     /// address.
-    pub lookup_contract: Box<dyn Fn(&AddressHash) -> Option<Entrypoints>>,
+    pub lookup_entrypoints: Box<dyn Fn(&AddressHash) -> Option<Entrypoints>>,
     /// A function that maps public key hashes (i.e. effectively implicit
     /// account addresses) to their corresponding voting powers. Note that if
     /// you provide a custom function here, you also must define
@@ -178,7 +178,7 @@ impl<'a> Ctx<'a> {
     /// something that can convert to [`HashMap<AddressHash, Entrypoints>`].
     pub fn set_known_contracts(&mut self, v: impl Into<HashMap<AddressHash, Entrypoints>>) {
         let map = v.into();
-        self.lookup_contract = Box::new(move |ah| map.get(ah).cloned());
+        self.lookup_entrypoints = Box::new(move |ah| map.get(ah).cloned());
     }
 
     /// Set a resonable implementation for [Self::big_map_storage] by providing
@@ -228,7 +228,7 @@ impl Default for Ctx<'_> {
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
-            lookup_contract: Box::new(|_| None),
+            lookup_entrypoints: Box::new(|_| None),
             voting_powers: Box::new(|_| 0u32.into()),
             total_voting_power: 0u32.into(),
             big_map_storage: InMemoryLazyStorage::new(),
@@ -251,11 +251,11 @@ impl<'a> TypecheckingCtx<'a> for Ctx<'a> {
         &mut self.gas
     }
 
-    fn lookup_contract(
+    fn lookup_entrypoints(
         &self,
         address: &AddressHash,
     ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
-        (self.lookup_contract)(address)
+        (self.lookup_entrypoints)(address)
     }
 
     fn big_map_get_type(
