@@ -40,7 +40,6 @@ COPY --chown=tezos:nogroup vendors tezos/vendors
 COPY --chown=tezos:nogroup rust-toolchain tezos/rust-toolchain
 COPY --chown=tezos:nogroup websocket tezos/websocket
 COPY --chown=tezos:nogroup lwt_domain tezos/lwt_domain
-COPY --chown=tezos:nogroup opentelemetry tezos/opentelemetry
 COPY --chown=tezos:nogroup resto tezos/resto
 COPY --chown=tezos:nogroup prometheus tezos/prometheus
 COPY --chown=tezos:nogroup teztale tezos/teztale
