@@ -2323,6 +2323,25 @@ pub(crate) fn typecheck_instruction<'a>(
             no_overload!(CREATE_CONTRACT, len 3)
         }
         (App(CREATE_CONTRACT, expect_args!(1), _), _) => unexpected_micheline!(),
+        (App(VIEW, [name, return_ty], _), [.., T::Address, _arg_type]) => {
+            let name = match name {
+                Micheline::String(s) => {
+                    check_view_name(s)?;
+                    s.clone()
+                }
+                _ => return Err(TcError::UnexpectedMicheline(format!("{:?}", name))),
+            };
+            let _arg_type = pop!();
+            pop!();
+            let return_type = parse_ty(gas, return_ty)?;
+            return_type.ensure_prop(gas, TypeProperty::ViewOutput)?;
+            stack.push(Type::new_option(return_type.clone()));
+            I::IView { name, return_type }
+        }
+        (App(VIEW, [_, _], _), [.., _, _]) => no_overload!(VIEW),
+        (App(VIEW, [_, _], _), [] | [_]) => no_overload!(VIEW, len 2),
+        (App(VIEW, expect_args!(2), _), _) => unexpected_micheline!(),
+
         (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
             Err(TcError::TodoInstr(*prim))?
         }

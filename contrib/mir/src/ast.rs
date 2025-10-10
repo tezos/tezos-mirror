@@ -670,6 +670,10 @@ pub enum Instruction<'a> {
     },
     CreateContract(Rc<ContractScript<'a>>, &'a Micheline<'a>),
     Map(overloads::Map, Vec<Self>),
+    IView {
+        name: String,
+        return_type: Type,
+    },
 }
 
 /// An untyped view, as it appears in a script

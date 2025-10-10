@@ -1832,6 +1832,12 @@ fn interpret_one<'a>(
             ))
         }
         I::Seq(nested) => interpret(nested, ctx, arena, stack)?,
+        I::IView {
+            name: _,
+            return_type: _,
+        } => {
+            ctx.gas().consume(interpret_cost::VIEW)?;
+        }
     }
     Ok(())
 }

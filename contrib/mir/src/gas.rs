@@ -393,6 +393,7 @@ pub mod interpret_cost {
     pub const LOOP_LEFT_ENTER: u32 = 10; // corresponds to KLoop_in_left in the Tezos protocol
     pub const LOOP_EXIT: u32 = 10;
     pub const CREATE_CONTRACT: u32 = 60;
+    pub const VIEW: u32 = 1460; // corresponds to cost_N_IView_synthesized in the Tezos protocol
 
     pub fn join_tickets(t1: &Ticket, t2: &Ticket) -> Result<u32, OutOfGas> {
         compare(&t1.content, &t2.content)?;
