@@ -3896,6 +3896,13 @@ mod tests {
             },
         });
 
+        // op-5 transfer: self-transfer 1ꜩ is skipped
+        let transfer_content = OperationContent::Transfer(TransferContent {
+            amount: 1.into(),
+            destination: src_acc.contract(),
+            parameters: None,
+        });
+
         let batch = make_operation(
             5,
             1,
@@ -3907,6 +3914,7 @@ mod tests {
                 origination_content_1,
                 origination_content_2,
                 origination_content_3,
+                transfer_content,
             ],
         );
 
@@ -4096,6 +4104,11 @@ mod tests {
                 ),
                 internal_operation_results: vec![],
             }),
+            OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![],
+                result: ContentResult::Skipped,
+                internal_operation_results: vec![],
+            }),
         ];
         assert_eq!(
             receipts, expected_receipts,
@@ -4104,14 +4117,14 @@ mod tests {
         // Check the balances
         assert_eq!(
             src_acc.balance(&host).unwrap(),
-            399980.into(),
+            399975.into(),
             "Source account balance should be 399980ꜩ after the operations"
         );
 
         // Check the counters
         assert_eq!(
             src_acc.counter(&host).unwrap(),
-            4.into(),
+            5.into(),
             "Source account counter should be 4 after the operations"
         );
 
