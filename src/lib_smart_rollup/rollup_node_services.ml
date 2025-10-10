@@ -1016,6 +1016,13 @@ module Global = struct
       ~query:Tezos_rpc.Query.empty
       ~output:Sc_rollup_block.encoding
       (path / "monitor_blocks")
+
+  let finalized_block_watcher =
+    Tezos_rpc.Service.get_service
+      ~description:"Monitor and streaming the L2 finalized blocks"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Sc_rollup_block.encoding
+      (path / "monitor_finalized_blocks")
 end
 
 module Block = struct
