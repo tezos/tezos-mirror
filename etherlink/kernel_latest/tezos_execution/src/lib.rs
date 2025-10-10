@@ -146,7 +146,6 @@ fn burn_tez(
 fn execute_internal_operations<'a, Host: Runtime>(
     tc_ctx: &mut TcCtx<'a, Host>,
     operation_ctx: &mut OperationCtx<'a>,
-    block_ctx: &BlockCtx,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
     sender_account: &TezlinkOriginatedAccount,
     parser: &'a Parser<'a>,
@@ -201,7 +200,6 @@ fn execute_internal_operations<'a, Host: Runtime>(
                     let receipt = transfer(
                         tc_ctx,
                         operation_ctx,
-                        block_ctx,
                         sender_account,
                         &content.amount,
                         &content.destination,
@@ -323,7 +321,6 @@ fn execute_internal_operations<'a, Host: Runtime>(
 fn transfer<'a, Host: Runtime>(
     tc_ctx: &mut TcCtx<'a, Host>,
     operation_ctx: &mut OperationCtx<'a>,
-    block_ctx: &BlockCtx,
     sender_account: &impl TezlinkAccount,
     amount: &Narith,
     dest_contract: &Contract,
@@ -378,7 +375,6 @@ fn transfer<'a, Host: Runtime>(
             let mut ctx = Ctx {
                 tc_ctx,
                 exec_ctx,
-                block_ctx,
                 operation_ctx,
             };
             let (internal_operations, new_storage) = execute_smart_contract(
@@ -390,7 +386,6 @@ fn transfer<'a, Host: Runtime>(
             execute_internal_operations(
                 ctx.tc_ctx,
                 ctx.operation_ctx,
-                block_ctx,
                 internal_operations,
                 &dest_account,
                 parser,
@@ -438,11 +433,9 @@ fn get_contract_entrypoint(
 }
 
 // Handles manager transfer operations.
-#[allow(clippy::too_many_arguments)]
 fn transfer_external<'a, Host: Runtime>(
     tc_ctx: &mut TcCtx<'a, Host>,
     operation_ctx: &mut OperationCtx<'a>,
-    block_ctx: &BlockCtx,
     amount: &Narith,
     dest: &Contract,
     parameter: &Option<Parameter>,
@@ -469,7 +462,6 @@ fn transfer_external<'a, Host: Runtime>(
     transfer(
         tc_ctx,
         operation_ctx,
-        block_ctx,
         operation_ctx.source,
         amount,
         dest,
@@ -892,11 +884,13 @@ fn apply_operation<Host: Runtime>(
                 source: source_account,
                 counter: &mut 0u128,
                 origination_nonce,
+                level: block_ctx.level,
+                now: block_ctx.now,
+                chain_id: block_ctx.chain_id,
             };
             let transfer_result = transfer_external(
                 &mut tc_ctx,
                 &mut operation_ctx,
-                block_ctx,
                 amount,
                 destination,
                 parameters,

@@ -49,6 +49,11 @@ pub struct OperationCtx<'operation> {
     pub source: &'operation TezlinkImplicitAccount,
     pub origination_nonce: &'operation mut OriginationNonce,
     pub counter: &'operation mut u128,
+    // 'level', 'now' and 'chain_id' should outlive operation in reality
+    // So having them downcast to 'operation is not a problem
+    pub level: &'operation BlockNumber,
+    pub now: &'operation Timestamp,
+    pub chain_id: &'operation ChainId,
 }
 
 pub struct ExecCtx {
@@ -58,11 +63,10 @@ pub struct ExecCtx {
     pub balance: i64,
 }
 
-pub struct Ctx<'a, 'block, 'operation, Host: Runtime> {
+pub struct Ctx<'a, 'operation, Host: Runtime> {
     pub tc_ctx: &'a mut TcCtx<'operation, Host>,
     pub exec_ctx: ExecCtx,
     pub operation_ctx: &'a mut OperationCtx<'operation>,
-    pub block_ctx: &'block BlockCtx<'block>,
 }
 
 pub struct BlockCtx<'block> {
@@ -146,7 +150,7 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a> for TcCtx<'a, Host> {
     }
 }
 
-impl<'a, Host: Runtime> TypecheckingCtx<'a> for Ctx<'_, '_, '_, Host> {
+impl<'a, Host: Runtime> TypecheckingCtx<'a> for Ctx<'_, '_, Host> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.tc_ctx.gas()
     }
@@ -166,7 +170,7 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a> for Ctx<'_, '_, '_, Host> {
     }
 }
 
-impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, '_, 'a, Host> {
+impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, 'a, Host> {
     fn sender(&self) -> AddressHash {
         self.exec_ctx.sender.clone()
     }
@@ -188,7 +192,7 @@ impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, '_, 'a, Host> {
     }
 
     fn level(&self) -> BigUint {
-        self.block_ctx.level.block_number.into()
+        self.operation_ctx.level.block_number.into()
     }
 
     fn min_block_time(&self) -> BigUint {
@@ -196,7 +200,7 @@ impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, '_, 'a, Host> {
     }
 
     fn chain_id(&self) -> mir::ast::ChainId {
-        self.block_ctx.chain_id.clone()
+        self.operation_ctx.chain_id.clone()
     }
 
     fn voting_power(&self, _: &PublicKeyHash) -> BigUint {
@@ -204,7 +208,7 @@ impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, '_, 'a, Host> {
     }
 
     fn now(&self) -> num_bigint::BigInt {
-        i64::from(*self.block_ctx.now).into()
+        i64::from(*self.operation_ctx.now).into()
     }
 
     fn total_voting_power(&self) -> BigUint {
@@ -228,7 +232,7 @@ impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, '_, 'a, Host> {
     }
 }
 
-impl<Host: Runtime> Ctx<'_, '_, '_, Host> {
+impl<Host: Runtime> Ctx<'_, '_, Host> {
     pub fn host(&mut self) -> &mut Host {
         self.tc_ctx.host
     }
@@ -429,7 +433,7 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
     }
 }
 
-impl<'a, Host: Runtime> LazyStorage<'a> for Ctx<'_, '_, 'a, Host> {
+impl<'a, Host: Runtime> LazyStorage<'a> for Ctx<'_, 'a, Host> {
     fn big_map_get(
         &mut self,
         arena: &'a Arena<Micheline<'a>>,
@@ -490,15 +494,6 @@ mod tests {
             let mut operation_counter = 0;
             let mut origination_nonce =
                 OriginationNonce::initial(OperationHash(H256::zero()));
-            let block_ctx = BlockCtx {
-                level: &0u32.into(),
-                now: &0i64.into(),
-                // default chain id NetXynUjJNZm7wi
-                chain_id: &tezos_crypto_rs::hash::ChainId::try_from(vec![
-                    0xf3, 0xd4, 0x85, 0x54,
-                ])
-                .unwrap(),
-            };
             let mut operation_ctx = OperationCtx {
                 counter: &mut operation_counter,
                 source: &TezlinkImplicitAccount::from_public_key_hash(
@@ -510,6 +505,13 @@ mod tests {
                 )
                 .unwrap(),
                 origination_nonce: &mut origination_nonce,
+                level: &0u32.into(),
+                now: &0i64.into(),
+                // default chain id NetXynUjJNZm7wi
+                chain_id: &tezos_crypto_rs::hash::ChainId::try_from(vec![
+                    0xf3, 0xd4, 0x85, 0x54,
+                ])
+                .unwrap(),
             };
             let mut tc_ctx = TcCtx {
                 host: $host,
@@ -525,7 +527,6 @@ mod tests {
             };
             let mut $ctx = Ctx {
                 tc_ctx: &mut tc_ctx,
-                block_ctx: &block_ctx,
                 operation_ctx: &mut operation_ctx,
                 exec_ctx,
             };
@@ -543,7 +544,7 @@ mod tests {
     }
 
     fn assert_big_map_eq<'a, Host: Runtime>(
-        ctx: &mut Ctx<'_, '_, 'a, Host>,
+        ctx: &mut Ctx<'_, 'a, Host>,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key_type: Type,
