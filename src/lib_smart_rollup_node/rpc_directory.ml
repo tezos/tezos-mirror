@@ -171,8 +171,12 @@ let () =
     | Some {header = {timestamp; _}; _} ->
         Time.Protocol.diff Time.System.(to_protocol @@ now ()) timestamp > 60L
   in
+  let l1_lateness_threshold =
+    if node_ctxt.config.l1_monitor_finalized then 3l else 1l
+  in
   let healthy =
-    (not degraded) && l1_connection = `Connected && l1_blocks_late <= 1l
+    (not degraded) && l1_connection = `Connected
+    && l1_blocks_late <= l1_lateness_threshold
     && (not l1_likely_late)
     && List.for_all (fun (_name, st) -> st = `Running) active_workers
   in
