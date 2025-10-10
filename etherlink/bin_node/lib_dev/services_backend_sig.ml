@@ -207,13 +207,17 @@ module type Tx_container = sig
     raw_tx:Ethereum_types.hex ->
     (Ethereum_types.hash, string) result tzresult Lwt.t
 
+  (* REVIEW NOTE: Temporary return type change, to avoid a gargantuan MR
+      Impact is none, Tezlink and Etherlink now share the same type in tx obj and legacy *)
+
   (** [find hash] returns the transaction_object found in tx
       container. *)
-  val find : Ethereum_types.hash -> transaction_object option tzresult Lwt.t
+  val find :
+    Ethereum_types.hash -> legacy_transaction_object option tzresult Lwt.t
 
   (** [content ()] returns all the transactions found in tx
       container. *)
-  val content : unit -> Ethereum_types.txpool tzresult Lwt.t
+  val content : unit -> Transaction_object.txqueue_content tzresult Lwt.t
 
   (** [shutdown ()] stops the tx container, waiting for the ongoing request
     to be processed. *)
@@ -286,8 +290,7 @@ type 'f tx_container =
   | Evm_tx_container :
       (module Tx_container
          with type address = Ethereum_types.address
-          and type legacy_transaction_object =
-            Ethereum_types.legacy_transaction_object
+          and type legacy_transaction_object = Transaction_object.t
           and type transaction_object = Transaction_object.t)
       -> L2_types.evm_chain_family tx_container
   | Michelson_tx_container :

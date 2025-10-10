@@ -308,7 +308,7 @@ struct
       | Lock_transactions : (unit, tztrace) t
       | Unlock_transactions : (unit, tztrace) t
       | Is_locked : (bool, tztrace) t
-      | Content : (Ethereum_types.txpool, tztrace) t
+      | Content : (Transaction_object.txqueue_content, tztrace) t
       | Size_info : (Metrics.Tx_pool.size_info, tztrace) t
       | Pop_transactions : {
           validation_state : 'a;
@@ -1164,15 +1164,9 @@ struct
 
   let find txn_hash =
     let open Lwt_result_syntax in
-    let* legacy_tx_object =
-      let*? w = Lazy.force worker in
-      Worker.Queue.push_request_and_wait w (Find {txn_hash})
-      |> handle_request_error
-    in
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7747
-       We should instrument the TX queue to return the real
-       transaction objects. *)
-    return (Option.map Tx.transaction_object_from_legacy legacy_tx_object)
+    let*? w = Lazy.force worker in
+    Worker.Queue.push_request_and_wait w (Find {txn_hash})
+    |> handle_request_error
 
   let content () =
     let open Lwt_result_syntax in

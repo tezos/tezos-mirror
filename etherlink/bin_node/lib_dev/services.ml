@@ -906,7 +906,10 @@ let dispatch_request (type f) ~websocket
                     Octez_telemetry.Trace.(
                       add_attrs (fun () ->
                           Telemetry.Attributes.
-                            [Transaction.hash transaction_object.hash])) ;
+                            [
+                              Transaction.hash
+                              @@ Transaction_object.hash transaction_object;
+                            ])) ;
 
                     let* (module Tx_container) =
                       match tx_container with
@@ -1169,18 +1172,19 @@ let dispatch_private_request (type f) ~websocket
         build ~f module_ parameters
     | Method (Inject_transaction.Method, module_) ->
         let open Lwt_result_syntax in
-        let f
-            ( (transaction_object : Ethereum_types.legacy_transaction_object),
-              raw_txn ) =
+        let f ((transaction_object : Transaction_object.t), raw_txn) =
           Octez_telemetry.Trace.(
             add_attrs (fun () ->
-                Telemetry.Attributes.[Transaction.hash transaction_object.hash])) ;
+                Telemetry.Attributes.
+                  [
+                    Transaction.hash (Transaction_object.hash transaction_object);
+                  ])) ;
 
           let* is_valid =
             let get_nonce () =
               let* next_nonce =
                 Backend_rpc.Etherlink.nonce
-                  transaction_object.from
+                  (Transaction_object.sender transaction_object)
                   (Block_parameter Latest)
               in
               let next_nonce =

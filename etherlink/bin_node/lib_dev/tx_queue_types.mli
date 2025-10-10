@@ -33,20 +33,18 @@ module type L2_transaction = sig
 
   val nonce_of_tx_object : legacy -> nonce
 
-  val transaction_object_from_legacy : legacy -> t
-
   module AddressMap : Map.S with type key = address
 
   val make_txpool :
     pending:legacy Ethereum_types.NonceMap.t AddressMap.t ->
     queued:legacy Ethereum_types.NonceMap.t AddressMap.t ->
-    Ethereum_types.txpool
+    Transaction_object.txqueue_content
 end
 
 module Eth_transaction_object :
   L2_transaction
     with type t = Transaction_object.t
-     and type legacy = Ethereum_types.legacy_transaction_object
+     and type legacy = Transaction_object.t
      and type address = Ethereum_types.address
      and type nonce = Ethereum_types.quantity
      and module AddressMap = Ethereum_types.AddressMap

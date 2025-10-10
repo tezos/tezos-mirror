@@ -9,7 +9,7 @@ open Ethereum_types
 
 module type TxEncoder = sig
   (* Transactions to be encoded *)
-  type transactions = (string * legacy_transaction_object) list
+  type transactions = (string * Transaction_object.t) list
 
   (* Encoded messages to be injected *)
   type messages

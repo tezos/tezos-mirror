@@ -274,7 +274,9 @@ module Get_estimate_gas :
      and type output = Ethereum_types.quantity
 
 module Txpool_content :
-  METHOD with type input = unit and type output = Ethereum_types.txpool
+  METHOD
+    with type input = unit
+     and type output = Transaction_object.txqueue_content
 
 module Web3_clientVersion :
   METHOD with type input = unit and type output = string
@@ -305,7 +307,7 @@ module Produce_proposal :
 
 module Inject_transaction :
   METHOD
-    with type input = Ethereum_types.legacy_transaction_object * string
+    with type input = Transaction_object.t * string
      and type output = Ethereum_types.hash
 
 module Inject_tezlink_operation :

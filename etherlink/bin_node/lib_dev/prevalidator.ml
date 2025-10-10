@@ -202,7 +202,7 @@ end
 
 type prevalidation_result = {
   next_nonce : quantity;
-  transaction_object : legacy_transaction_object;
+  transaction_object : Transaction_object.t;
 }
 
 module Request = struct
@@ -261,35 +261,41 @@ let ( let**? ) v f =
   let open Lwt_result_syntax in
   match v with Ok v -> f v | Error err -> return (Error err)
 
-let validate_chain_id chain_id (transaction : Transaction.transaction) :
+let validate_chain_id chain_id (transaction : Transaction_object.t) :
     (unit, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
-  match transaction.chain_id with
-  | None -> return (Ok ())
-  | Some transaction_chain_id ->
+  match Transaction_object.chain_id transaction with
+  | Ok None -> return (Ok ())
+  | Ok (Some (Qty transaction_chain_id)) ->
       if Z.equal transaction_chain_id chain_id then return (Ok ())
       else return (Error "Invalid chain id")
+  | Error msg -> Lwt_syntax.return (Error msg)
 
 let validate_nonce ~next_nonce:(Qty next_nonce)
-    (transaction : Transaction.transaction) =
+    (transaction : Transaction_object.t) =
   let open Lwt_result_syntax in
-  if transaction.nonce >= next_nonce then return (Ok ())
-  else return (Error "Nonce too low")
+  let (Qty nonce) = Transaction_object.nonce transaction in
+  if nonce >= next_nonce then return (Ok ()) else return (Error "Nonce too low")
 
-let validate_gas_limit session (transaction : Transaction.transaction) :
+let validate_gas_limit session (transaction : Transaction_object.t) :
     (unit, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* Computing the execution gas limit validates that the gas limit is
      sufficient to cover the inclusion fees. *)
+  let access_list = Transaction_object.access_list transaction in
+  let (Qty gas_limit) = Transaction_object.gas transaction in
+  let data =
+    Transaction_object.input transaction |> Ethereum_types.encode_hex
+  in
   let**? execution_gas_limit =
     (* since Dionysus, the execution gas limit is always computed from the
        minimum base fee per gas *)
     Fees.execution_gas_limit
       ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
-      ~access_list:transaction.access_list
+      ~access_list
       ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
-      ~gas_limit:transaction.gas_limit
-      transaction.data
+      ~gas_limit
+      data
   in
   if session.storage_version < 34 then
     if
@@ -309,10 +315,10 @@ let validate_gas_limit session (transaction : Transaction.transaction) :
               execution_gas_limit))
   else return (Ok ())
 
-let validate_authorizations (type state) ~session ~chain_id ~caller
-    Transaction.{transaction_type; authorization_list; _} =
+let validate_authorizations (type state) ~session ~chain_id ~caller txn =
   let open Lwt_result_syntax in
-  if transaction_type != Transaction.Eip7702 then return (Ok ())
+  let authorization_list = Transaction_object.authorization_list txn in
+  if not (Transaction_object.is_eip7702 txn) then return (Ok ())
   else if List.is_empty authorization_list then
     return (Error "Authorization list cannot be empty per EIP-7702.")
   else
@@ -326,10 +332,12 @@ let validate_authorizations (type state) ~session ~chain_id ~caller
         address
       |> lwt_map_error (fun _ -> "Couldn't retrieve address' nonce")
     in
-    let check_auth (item : Transaction.authorization_list_item) =
-      if chain_id != item.chain_id then fail "Authorization chain id mismatch"
+    let check_auth (item : Transaction_object.authorization_item) =
+      let (Qty tx_chain_id) = item.chain_id in
+      if not (Z.equal chain_id tx_chain_id) then
+        fail "Authorization chain id mismatch"
       else
-        let*? signer_address = Transaction.auth_signer item in
+        let*? signer_address = Transaction_object.authorization_signer item in
         let* current_nonce = read_nonce signer_address in
         let current_nonce =
           match current_nonce with
@@ -345,7 +353,8 @@ let validate_authorizations (type state) ~session ~chain_id ~caller
           if Address.equal caller signer_address then Z.succ current_nonce
           else current_nonce
         in
-        if Z.equal nonce_check item.nonce then return_unit
+        let (Qty nonce) = item.nonce in
+        if Z.equal nonce_check nonce then return_unit
         else fail "Authorization nonce mismatch"
     in
     let*! opt_err =
@@ -376,21 +385,19 @@ let validate_sender_not_a_contract (type state) session caller :
   else return (Error "Sender is a contract which is not possible")
 
 let validate_max_fee_per_gas ~base_fee_per_gas:(Qty base_fee_per_gas)
-    (transaction : Transaction.transaction) =
+    (transaction : Transaction_object.t) =
   let open Lwt_result_syntax in
-  if transaction.max_fee_per_gas >= base_fee_per_gas then return (Ok ())
+  let (Qty gas_price) = Transaction_object.max_fee_per_gas transaction in
+  if gas_price >= base_fee_per_gas then return (Ok ())
   else return (Error "Max gas fee too low")
 
-let validate_balance_is_enough (transaction : Transaction.transaction) ~balance
-    =
+let validate_balance_is_enough (transaction : Transaction_object.t) ~balance =
   let open Lwt_result_syntax in
-  let gas = transaction.gas_limit in
-  let gas_price = transaction.max_fee_per_gas in
+  let (Qty gas) = Transaction_object.gas transaction in
+  let (Qty gas_price) = Transaction_object.max_fee_per_gas transaction in
+  let (Qty value) = Transaction_object.value transaction in
   let gas_cost = Z.mul gas gas_price in
-  let total_cost =
-    let value = transaction.value in
-    Z.add gas_cost value
-  in
+  let total_cost = Z.add gas_cost value in
   if gas_cost > balance then return (Error "Cannot prepay transaction.")
   else if total_cost > balance then return (Error "Not enough funds")
   else return (Ok total_cost)
@@ -413,21 +420,26 @@ let is_contract_creation calldata to_ authorization_list =
   && List.is_empty authorization_list
 
 let validate_tx_data_size ~max_number_of_chunks
-    (transaction : Transaction.transaction) =
+    (transaction : Transaction_object.t) =
   let open Lwt_result_syntax in
-  let tx_data = transaction.data in
+  let tx_data =
+    Transaction_object.input transaction |> Ethereum_types.encode_hex
+  in
   if tx_data_size_limit_reached ~max_number_of_chunks ~tx_data then
     return @@ Error "Transaction data exceeded the allowed size."
   else return (Ok ())
 
-let initial_tx_gas_computation ~(transaction : Transaction.transaction)
+let initial_tx_gas_computation ~(transaction : Transaction_object.t)
     ~is_prague_enabled =
+  let data =
+    Transaction_object.input transaction |> Ethereum_types.hex_to_real_bytes
+  in
   let zero_bytes, nonzero_bytes =
     Bytes.fold_left
       (fun (zeros, nonzeros) c ->
         if c = '\x00' then (zeros + 1, nonzeros) else (zeros, nonzeros + 1))
       (0, 0)
-      transaction.data
+      data
   in
   let tokens_in_calldata =
     zero_bytes + (nonzero_bytes * K.non_zero_byte_multiplier)
@@ -435,10 +447,11 @@ let initial_tx_gas_computation ~(transaction : Transaction.transaction)
   let base_calldata_cost = tokens_in_calldata * K.standard_token_cost in
   let access_list_accounts, access_list_storages =
     List.fold_left
-      (fun (accounts, storages) (_, storage_slots) ->
-        (accounts + 1, storages + List.length storage_slots))
+      (fun (accounts, storages)
+           ({address = _; storage_keys} : Transaction_object.access)
+         -> (accounts + 1, storages + List.length storage_keys))
       (0, 0)
-      transaction.access_list
+      (Transaction_object.access_list transaction)
   in
   let access_list_accounts_cost =
     access_list_accounts * K.access_list_address
@@ -446,15 +459,16 @@ let initial_tx_gas_computation ~(transaction : Transaction.transaction)
   let access_list_storages_costs =
     access_list_storages * K.access_list_storage_key
   in
+  let authorization_list = Transaction_object.authorization_list transaction in
   let creation_cost =
     if
       is_contract_creation
-        transaction.data
-        transaction.to_
-        transaction.authorization_list
+        data
+        (Transaction_object.to_ transaction)
+        authorization_list
     then
       let calldata_words =
-        let calldata_size = Bytes.length transaction.data in
+        let calldata_size = Bytes.length data in
         (* Ensures rounding up when `calldata_size` is not a multiple of `K.word_size`. *)
         (calldata_size + K.word_size - 1) / K.word_size
       in
@@ -464,8 +478,7 @@ let initial_tx_gas_computation ~(transaction : Transaction.transaction)
   let prague_init_gas_cost, prague_floor_gas_cost =
     if is_prague_enabled then
       let prague_init_gas_cost =
-        List.length transaction.authorization_list
-        * K.eip7702_empty_account_cost
+        List.length authorization_list * K.eip7702_empty_account_cost
       in
       let prague_floor_gas_cost =
         (tokens_in_calldata * K.total_cost_floor_per_token)
@@ -484,7 +497,7 @@ let initial_tx_gas_computation ~(transaction : Transaction.transaction)
 (* Validation logic was taken from:
    https://github.com/bluealloy/revm/blob/0ca6564f02004976f533cacf8821fed09d801e0a/crates/handler/src/validation.rs#L221 *)
 let validate_minimum_gas_requirement ~session
-    ~(transaction : Transaction.transaction) =
+    ~(transaction : Transaction_object.t) =
   let open Lwt_result_syntax in
   let is_prague_enabled =
     is_prague_enabled ~storage_version:session.storage_version
@@ -492,13 +505,16 @@ let validate_minimum_gas_requirement ~session
   let initial_gas, floor_gas =
     initial_tx_gas_computation ~transaction ~is_prague_enabled
   in
+  let data =
+    Transaction_object.input transaction |> Ethereum_types.encode_hex
+  in
   let da_inclusion_fees =
     Fees.da_fees_gas_limit_overhead
       ~da_fee_per_byte:(Qty session.etherlink_infos.da_fee_per_bytes)
       ~minimum_base_fee_per_gas:session.etherlink_infos.minimum_base_fee_per_gas
-      transaction.Transaction.data
+      data
   in
-  let gas_limit = transaction.gas_limit in
+  let (Qty gas_limit) = Transaction_object.gas transaction in
   let* () =
     let minimum_gas_limit_required =
       Z.(of_int initial_gas + da_inclusion_fees)
@@ -517,8 +533,8 @@ let validate_minimum_gas_requirement ~session
   in
   return (Ok ())
 
-let minimal_validation ~next_nonce ~max_number_of_chunks ctxt transaction
-    ~caller =
+let minimal_validation ~next_nonce ~max_number_of_chunks ctxt
+    (transaction : Transaction_object.t) ~caller =
   let open Lwt_result_syntax in
   let (Session session) = ctxt.session in
   let (Chain_id chain_id) = ctxt.chain_id in
@@ -576,14 +592,13 @@ let full_validation ~next_nonce ~max_number_of_chunks ~caller ctxt transaction =
   in
   return (Ok ())
 
-let valid_transaction_object (type state) ctxt session mode hash txn =
+let valid_transaction_object (type state) ctxt session mode txn =
   let open Lwt_result_syntax in
   let (module Backend_rpc : Services_backend_sig.S
         with type Reader.state = state) =
     session.state_backend
   in
-  let**? transaction_object = Transaction.to_transaction_object ~hash txn in
-  let caller = transaction_object.from in
+  let caller = Transaction_object.sender txn in
   let* next_nonce =
     Etherlink_durable_storage.nonce
       (Backend_rpc.Reader.read session.state)
@@ -610,7 +625,7 @@ let valid_transaction_object (type state) ctxt session mode hash txn =
           txn
   in
 
-  return (Ok {next_nonce; transaction_object})
+  return (Ok next_nonce)
 
 module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
@@ -636,15 +651,17 @@ module Handlers = struct
           with type Reader.state = state) =
       session.state_backend
     in
-    let hash = Ethereum_types.hash_raw_tx raw_transaction in
-    let**? txn = Transaction.decode raw_transaction in
+    let*? transaction_object = Transaction_object.decode raw_transaction in
     let* () =
       when_
-        (txn.transaction_type = Transaction.Eip7702
+        (Transaction_object.is_eip7702 transaction_object
         && not (is_prague_enabled ~storage_version:session.storage_version))
       @@ fun () -> tzfail Prague_not_enabled
     in
-    valid_transaction_object ctxt session ctxt.mode hash txn
+    let** next_nonce =
+      valid_transaction_object ctxt session ctxt.mode transaction_object
+    in
+    return (Ok {next_nonce; transaction_object})
 
   let refresh_state (type state) ctxt session =
     let open Lwt_result_syntax in
@@ -830,9 +847,10 @@ type validation_state = {
 }
 
 let validate_balance_gas_nonce_with_validation_state validation_state
-    ~(caller : Ethereum_types.address) (transaction : Transaction.transaction) :
+    (transaction : Transaction_object.t) :
     (validation_state, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
+  let caller = Transaction_object.sender transaction in
   let (Address (Hex caller_str)) = caller in
   let* next_nonce =
     let nonce = String.Map.find caller_str validation_state.addr_nonce in
@@ -845,7 +863,7 @@ let validate_balance_gas_nonce_with_validation_state validation_state
         | None -> return Z.zero)
   in
   let** () =
-    let tx_nonce = transaction.nonce in
+    let (Qty tx_nonce) = Transaction_object.nonce transaction in
     if Z.equal tx_nonce next_nonce then return (Ok ())
     else return (Error "Transaction nonce is not the expected nonce.")
   in
@@ -866,10 +884,10 @@ let validate_balance_gas_nonce_with_validation_state validation_state
       ~from_balance:(Qty from_balance)
   in
   let* addr_balance =
-    match transaction.to_ with
+    match Transaction_object.to_ transaction with
     | None -> return validation_state.addr_balance
     | Some to_ ->
-        let (`Hex to_) = Hex.of_bytes to_ in
+        let (Address (Hex to_)) = to_ in
         let to_balance = String.Map.find to_ validation_state.addr_balance in
         let* to_balance =
           match to_balance with
@@ -880,9 +898,10 @@ let validate_balance_gas_nonce_with_validation_state validation_state
               in
               return balance
         in
-        let new_to_balance = Z.add transaction.value to_balance in
+        let (Qty value) = Transaction_object.value transaction in
+        let new_balance = Z.add value to_balance in
         let addr_balance =
-          String.Map.add to_ new_to_balance validation_state.addr_balance
+          String.Map.add to_ new_balance validation_state.addr_balance
         in
         return addr_balance
   in
