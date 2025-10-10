@@ -312,6 +312,12 @@ let test_staking =
   in
 
   let* _proto_hash, endpoint, client_1, node_1 = init ~overrides protocol in
+  let* constants =
+    Client.RPC.call client_1 @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_rights_delay =
+    JSON.(constants |-> "consensus_rights_delay" |> as_int)
+  in
 
   log_step 1 "Prepare second node for double baking" ;
   Log.info "Starting second node" ;
@@ -791,7 +797,7 @@ let test_staking =
     Client.spawn_unstake (Tez.of_int 500000) ~staker:staker0.alias client_1
   in
 
-  let* _ = Helpers.bake_n_cycles bake 2 client_1 in
+  let* _ = Helpers.bake_n_cycles bake consensus_rights_delay client_1 in
 
   let* () = Process.check ~expect_failure:false unstake0 in
 
