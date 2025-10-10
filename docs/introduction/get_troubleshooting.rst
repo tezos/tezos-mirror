@@ -72,12 +72,12 @@ If you have recently updated to a new version of MacOS, you may need to reinstal
 Also, if you have built Octez before, ``brew`` may be linked to an older version of PostgreSQL.
 In this case, you can force ``brew`` to update its link to the newer version by running ``brew link --overwrite postgresql@15``, for example.
 
-Running ouf of Memory
+Running out of Memory
 ~~~~~~~~~~~~~~~~~~~~~
 
 Compiling the sources can be memory demanding.
-On Linux-based operating systems, depending on the the memory allocation on the machine, the available memory might not suffice to compile the sources; resulting in crash during the compilation process.
-For this, we describe below how to augment the swap on a Linux distribution and solve the aforementioned problem.
+On Linux-based operating systems, depending on the memory allocation on the machine, the available memory might not suffice to compile the sources; resulting in a crash during the compilation process.
+To address this, we describe below how to increase the swap space on a Linux distribution and solve the aforementioned problem.
 
 .. note::
    The following steps were tested on a Debian-based distribution. 
@@ -99,7 +99,7 @@ It can be implemented as a **file** (e.g., ``/swapfile``) or as a
 How Much Swap Memory Is Required for Tezos?
 '''''''''''''''''''''''''''''''''''''''''''
 
-Swap memory is essential for compiling Tezos, particularly during
+Swap memory is essential for compiling the Octez suite, particularly during
 critical stages such as:
 - Compiling Rust dependencies (``wasm-toolchain``, ``cargo``).
 - Linking OCaml binaries (``ocamlopt``).
