@@ -8,7 +8,7 @@
 
 type mode = Sequencer | Observer | Proxy | Rpc of {evm_node_endpoint : Uri.t}
 
-type supported_network = Mainnet | Testnet | Braeburn
+type supported_network = Mainnet | Testnet | Shadownet
 
 let pp_supported_network fmt network =
   Format.pp_print_string
@@ -16,7 +16,7 @@ let pp_supported_network fmt network =
     (match network with
     | Mainnet -> "mainnet"
     | Testnet -> "testnet"
-    | Braeburn -> "braeburn")
+    | Shadownet -> "shadownet")
 
 let positive_encoding = Data_encoding.ranged_int 0 ((1 lsl 30) - 1)
 
@@ -78,7 +78,7 @@ let chain_id network =
        (match network with
        | Mainnet -> 0xa729
        | Testnet -> 0x1f47b
-       | Braeburn -> 0x1F34F))
+       | Shadownet -> 0x1F34F))
 
 let chain_id_encoding : L2_types.chain_id Data_encoding.t =
   let open L2_types in
@@ -380,7 +380,7 @@ let default_preimages_endpoint = function
       Uri.of_string "https://snapshots.tzinit.org/etherlink-mainnet/wasm_2_0_0"
   | Testnet ->
       Uri.of_string "https://snapshots.tzinit.org/etherlink-ghostnet/wasm_2_0_0"
-  | Braeburn ->
+  | Shadownet ->
       Uri.of_string
         "https://snapshots.tzinit.org/etherlink-shadownet/wasm_2_0_0"
 
@@ -562,7 +562,7 @@ let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks ?sequencer
 let observer_evm_node_endpoint = function
   | Mainnet -> "https://relay.mainnet.etherlink.com"
   | Testnet -> "https://relay.ghostnet.etherlink.com"
-  | Braeburn -> "https://relay.braeburn.etherlink.com"
+  | Shadownet -> "https://relay.shadownet.etherlink.com"
 
 let observer_config_dft ~evm_node_endpoint ?rollup_node_tracking () =
   {

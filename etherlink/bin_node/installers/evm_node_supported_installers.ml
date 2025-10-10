@@ -7,4 +7,4 @@
 
 let mainnet = Option.get (Installers.read "mainnet-installer.wasm")
 
-let braeburn = Option.get (Installers.read "braeburn-installer.wasm")
+let shadownet = Option.get (Installers.read "shadownet-installer.wasm")

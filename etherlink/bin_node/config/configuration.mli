@@ -12,7 +12,7 @@ open Evm_node_lib_dev_encoding
 type mode = Sequencer | Observer | Proxy | Rpc of {evm_node_endpoint : Uri.t}
 
 (** A list of network officially supported by the EVM node. *)
-type supported_network = Mainnet | Testnet | Braeburn
+type supported_network = Mainnet | Testnet | Shadownet
 
 val pp_supported_network : Format.formatter -> supported_network -> unit
 
