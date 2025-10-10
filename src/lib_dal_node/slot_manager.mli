@@ -187,7 +187,7 @@ val update_selected_slot_headers_statuses :
 *)
 val get_slot_status :
   slot_id:Types.slot_id ->
-  Store.t ->
+  Node_context.t ->
   (Types.header_status, [Errors.other | Errors.not_found]) result Lwt.t
 
 (** [get_slot_shard store slot_id shard_index] returns the shard at
