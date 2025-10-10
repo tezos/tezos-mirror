@@ -7,7 +7,7 @@
 use std::{fs, path::PathBuf};
 
 use crate::{
-    bindings::{self, BindingsError, Key},
+    bindings::{self, end_span, start_span, BindingsError, Key},
     reveal::{self, RevealPreimageError},
 };
 
@@ -380,6 +380,7 @@ fn reveal_metadata(
     max_bytes: u32,
 ) -> Result<i32, RuntimeError> {
     trace!("reveal_metadata");
+    start_span("reaveal_metadata");
     let (runtime_env, store) = env.data_and_store_mut();
     let memory = runtime_env.memory();
     let memory_view = memory.view(&store);
@@ -403,6 +404,7 @@ fn reveal_metadata(
         )?;
     }
 
+    end_span();
     Ok(to_write as i32)
 }
 

@@ -12,6 +12,16 @@ use std::{
     fmt::{Display, Formatter},
 };
 
+#[macro_export]
+macro_rules! otel_trace {
+    ($name:expr, $expr:expr) => {{
+        crate::bindings::start_span($name);
+        let __otel_result = { $expr };
+        crate::bindings::end_span();
+        __otel_result
+    }};
+}
+
 pub trait Key {
     fn as_str(&self) -> &str;
 }
@@ -84,8 +94,11 @@ pub fn fetch_preimage_from_remote(
         hash_hex
     );
     unsafe {
-        ocaml_imports::fetch_preimage_from_remote(&gc(), preimages_endpoint, hash_hex)
-            .map_err(BindingsError::OCamlError)
+        otel_trace!(
+            "reveal_preimage",
+            ocaml_imports::fetch_preimage_from_remote(&gc(), preimages_endpoint, hash_hex)
+                .map_err(BindingsError::OCamlError)
+        )
     }
 }
 
@@ -95,8 +108,11 @@ where
 {
     trace!("store_get_hash({})", key.as_str());
     let res = unsafe {
-        ocaml_imports::layer2_store__store_get_hash(&gc(), evm_tree.clone(), key.as_str())
-            .map_err(BindingsError::OCamlError)?
+        otel_trace!(
+            "__internal_store_get_hash",
+            ocaml_imports::layer2_store__store_get_hash(&gc(), evm_tree.clone(), key.as_str())
+                .map_err(BindingsError::OCamlError)?
+        )
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -108,8 +124,11 @@ where
 {
     trace!("read_value({})", key.as_str());
     let code = unsafe {
-        ocaml_imports::layer2_store__read_durable_value(&gc(), evm_tree.clone(), key.as_str())
-            .map_err(BindingsError::OCamlError)?
+        otel_trace!(
+            "store_read_all",
+            ocaml_imports::layer2_store__read_durable_value(&gc(), evm_tree.clone(), key.as_str())
+                .map_err(BindingsError::OCamlError)?
+        )
     };
 
     code.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -121,8 +140,11 @@ where
 {
     trace!("mem_tree({})", key.as_str());
     let mem = unsafe {
-        ocaml_imports::layer2_store__mem_tree(&gc(), evm_tree.clone(), key.as_str())
-            .map_err(BindingsError::OCamlError)?
+        otel_trace!(
+            "store_exists",
+            ocaml_imports::layer2_store__mem_tree(&gc(), evm_tree.clone(), key.as_str())
+                .map_err(BindingsError::OCamlError)?
+        )
     };
 
     mem.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -134,8 +156,11 @@ where
 {
     trace!("store_has({})", key.as_str());
     let mem = unsafe {
-        ocaml_imports::layer2_store__store_has(&gc(), evm_tree.clone(), key.as_str())
-            .map_err(BindingsError::OCamlError)?
+        otel_trace!(
+            "store_has",
+            ocaml_imports::layer2_store__store_has(&gc(), evm_tree.clone(), key.as_str())
+                .map_err(BindingsError::OCamlError)?
+        )
     };
 
     mem.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -146,9 +171,22 @@ where
     K: Key,
 {
     trace!("store_delete({}, is_value:{})", key.as_str(), is_value);
+
     let mem = unsafe {
-        ocaml_imports::layer2_store__store_delete(&gc(), evm_tree.clone(), key.as_str(), is_value)
+        otel_trace!(
+            if is_value {
+                "store_delete_value"
+            } else {
+                "store_delete"
+            },
+            ocaml_imports::layer2_store__store_delete(
+                &gc(),
+                evm_tree.clone(),
+                key.as_str(),
+                is_value
+            )
             .map_err(BindingsError::OCamlError)?
+        )
     };
 
     mem.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -160,8 +198,16 @@ where
 {
     trace!("store_copy({}, {})", from.as_str(), to.as_str());
     let res = unsafe {
-        ocaml_imports::layer2_store__store_copy(&gc(), evm_tree.clone(), from.as_str(), to.as_str())
+        otel_trace!(
+            "store_copy",
+            ocaml_imports::layer2_store__store_copy(
+                &gc(),
+                evm_tree.clone(),
+                from.as_str(),
+                to.as_str()
+            )
             .map_err(BindingsError::OCamlError)?
+        )
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -173,8 +219,16 @@ where
 {
     trace!("store_move({}, {})", from.as_str(), to.as_str());
     let res = unsafe {
-        ocaml_imports::layer2_store__store_move(&gc(), evm_tree.clone(), from.as_str(), to.as_str())
+        otel_trace!(
+            "store_move",
+            ocaml_imports::layer2_store__store_move(
+                &gc(),
+                evm_tree.clone(),
+                from.as_str(),
+                to.as_str()
+            )
             .map_err(BindingsError::OCamlError)?
+        )
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -186,8 +240,11 @@ where
 {
     trace!("store_list_size({})", key.as_str());
     let res = unsafe {
-        ocaml_imports::layer2_store__store_list_size(&gc(), evm_tree.clone(), key.as_str())
-            .map_err(BindingsError::OCamlError)?
+        otel_trace!(
+            "store_count_subkeys",
+            ocaml_imports::layer2_store__store_list_size(&gc(), evm_tree.clone(), key.as_str())
+                .map_err(BindingsError::OCamlError)?
+        )
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -199,8 +256,11 @@ where
 {
     trace!("store_value_size({})", key.as_str());
     let res = unsafe {
-        ocaml_imports::layer2_store__store_value_size(&gc(), evm_tree.clone(), key.as_str())
-            .map_err(BindingsError::OCamlError)?
+        otel_trace!(
+            "store_value_size",
+            ocaml_imports::layer2_store__store_value_size(&gc(), evm_tree.clone(), key.as_str())
+                .map_err(BindingsError::OCamlError)?
+        )
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -222,14 +282,17 @@ where
         num_bytes
     );
     let res = unsafe {
-        ocaml_imports::layer2_store__store_read(
-            &gc(),
-            evm_tree.clone(),
-            key.as_str(),
-            offset,
-            num_bytes,
+        otel_trace!(
+            "store_read",
+            ocaml_imports::layer2_store__store_read(
+                &gc(),
+                evm_tree.clone(),
+                key.as_str(),
+                offset,
+                num_bytes,
+            )
+            .map_err(BindingsError::OCamlError)?
         )
-        .map_err(BindingsError::OCamlError)?
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -246,14 +309,17 @@ where
 {
     trace!("store_write({}, offset:{})", key.as_str(), offset);
     let res = unsafe {
-        ocaml_imports::layer2_store__store_write(
-            &gc(),
-            evm_tree.clone(),
-            key.as_str(),
-            offset,
-            bytes,
+        otel_trace!(
+            "store_write",
+            ocaml_imports::layer2_store__store_write(
+                &gc(),
+                evm_tree.clone(),
+                key.as_str(),
+                offset,
+                bytes,
+            )
+            .map_err(BindingsError::OCamlError)?
         )
-        .map_err(BindingsError::OCamlError)?
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
@@ -277,8 +343,16 @@ where
 {
     trace!("store_write_all({})", key.as_str());
     let res = unsafe {
-        ocaml_imports::layer2_store__store_write_all(&gc(), evm_tree.clone(), key.as_str(), bytes)
+        otel_trace!(
+            "store_write_all",
+            ocaml_imports::layer2_store__store_write_all(
+                &gc(),
+                evm_tree.clone(),
+                key.as_str(),
+                bytes
+            )
             .map_err(BindingsError::OCamlError)?
+        )
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
