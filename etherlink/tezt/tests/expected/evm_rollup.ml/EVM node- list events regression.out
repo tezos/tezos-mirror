@@ -1482,6 +1482,36 @@ performance_profile:
     { /* performance_profile version 0 */
       "performance_profile.v0": "performance" | "default" }
   
+preconfirmation:
+  description: received preconfirmation for the transaction {txn_hash}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* preconfirmation version 0 */
+      "preconfirmation.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+preconfirmation_timestamp:
+  description: received timestamp of the next block {timestamp}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* preconfirmation_timestamp version 0 */
+      "preconfirmation_timestamp.v0": $timestamp.protocol }
+    $timestamp.protocol:
+      /* A timestamp as seen by the protocol: second-level precision, epoch
+         based. */
+      $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 predownload_kernel:
   description: kernel {version} successfully predownloaded
   level: notice

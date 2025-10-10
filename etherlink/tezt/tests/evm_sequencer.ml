@@ -2661,6 +2661,62 @@ let test_observer_applies_blueprint =
 
   unit
 
+let test_observer_receives_preconfirmations =
+  register_test
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "observer"; "sub_block"; "preconfirmation"]
+    ~title:"Observer receives preconfirmations"
+    ~kernel:Latest
+    ~enable_dal:false
+    ~enable_multichain:false
+  @@ fun {sequencer; observer; _} _protocol ->
+  (*
+    To avoid updating all the tooling.
+    This experimental feature will be deprecated in the short future.
+  *)
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ~preconfirmation_stream_enabled:true
+      ()
+  in
+  let* () = Evm_node.terminate sequencer in
+  let* () = Evm_node.terminate observer in
+  let* () = Evm_node.Config_file.update sequencer patch_config in
+  let* () = Evm_node.Config_file.update observer patch_config in
+  let p = Evm_node.wait_for_start_history_mode observer in
+  let* () = Evm_node.run sequencer in
+  let* () = Evm_node.run observer in
+  let* _ = p in
+
+  (* 
+    1. Observer receives the transaction
+    2. Transaction is added to the transaction queue
+    3. Transaction is forwarded to the sequencer
+    4. Sequencer validates the transaction
+    5. Sequencer streams the result back to the observer
+  *)
+  let event = Evm_node.wait_for_preconfirmation observer in
+  let p =
+    Eth_cli.transaction_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~to_public_key:Eth_account.bootstrap_accounts.(1).address
+      ~value:(Wei.of_eth_int 10)
+      ~endpoint:(Evm_node.endpoint observer)
+      ()
+  in
+  let* _ = Evm_node.wait_for_tx_queue_add_transaction sequencer in
+  let* _ = produce_block sequencer in
+  let* streamed_txn_hash = event in
+  let* txn_hash = p in
+  Check.(
+    (txn_hash = streamed_txn_hash)
+      string
+      ~error_msg:
+        "txn hash received through the preconfirmation stream does not match \
+         expected value") ;
+  unit
+
 let test_observer_applies_blueprint_dont_track_rollup_node =
   register_all
     ~__FILE__
@@ -14113,6 +14169,7 @@ let () =
   test_observer_applies_blueprint_from_rpc_node protocols ;
   test_observer_applies_blueprint_when_restarted protocols ;
   test_observer_applies_blueprint_when_sequencer_restarted protocols ;
+  test_observer_receives_preconfirmations protocols ;
   test_observer_forwards_transaction protocols ;
   test_observer_timeout_when_necessary protocols ;
   test_sequencer_is_reimbursed protocols ;

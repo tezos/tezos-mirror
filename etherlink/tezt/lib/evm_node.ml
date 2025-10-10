@@ -713,6 +713,10 @@ let wait_for_blueprint_injection_failure ?timeout ?level evm_node =
       if json |-> "level" |> as_int = expected_level then Some () else None
   | None -> Some ()
 
+let wait_for_preconfirmation ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"preconfirmation.v0" @@ fun json ->
+  Some (JSON.as_string json)
+
 let mode_with_new_private_rpc (mode : mode) =
   match mode with
   | Observer
@@ -1322,7 +1326,8 @@ let update_or_create_json ~origin key f json =
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
-    ?rpc_server ?spawn_rpc ?periodic_snapshot_path ?l2_chains () =
+    ?rpc_server ?spawn_rpc ?periodic_snapshot_path ?l2_chains
+    ?(preconfirmation_stream_enabled = false) () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1356,6 +1361,10 @@ let patch_config_with_experimental_feature
                     ("chain_family", `String l2_chain_family);
                   ])
               l2_chains))
+  |> conditional_json_put
+       preconfirmation_stream_enabled
+       ~name:"preconfirmation_stream_enabled"
+       (`Bool true)
 
 let patch_config_websockets_if_enabled ?max_message_length
     ?(monitor_heartbeat = true) ?rate_limit =

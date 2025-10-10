@@ -108,6 +108,13 @@ let message_watcher_service =
     ~output:Broadcast.message_encoding
     Path.(evm_services_root / "messages")
 
+let preconfirmation_service =
+  Service.get_service
+    ~description:"Watch for preconfirmed transactions"
+    ~query:Query.empty
+    ~output:Broadcast.preconfirmation_message_encoding
+    Path.(evm_services_root / "preconfirmations")
+
 let create_blueprint_stream get_next_blueprint_number find_blueprint from_level
     create_stream return_blueprint =
   let open Lwt_syntax in
@@ -155,6 +162,13 @@ let create_broadcast_service get_next_blueprint_number find_blueprint from_level
     from_level
     Broadcast.create_broadcast_stream
     (fun b -> Lwt_syntax.return_some @@ Broadcast.Blueprint b)
+
+let create_preconfirmation_service () =
+  let open Lwt_syntax in
+  let stream, stopper = Broadcast.create_preconfirmation_stream () in
+  let shutdown () = Lwt_watcher.shutdown stopper in
+  let next = fun () -> Lwt_stream.get stream in
+  return (Lwt_stream.from next, shutdown)
 
 let register_get_smart_rollup_address_service smart_rollup_address dir =
   Evm_directory.register0 dir get_smart_rollup_address_service (fun () () ->
@@ -214,6 +228,10 @@ let register_broadcast_service find_blueprint get_next_blueprint_number dir =
   Evm_directory.streamed_register0 dir message_watcher_service (fun level () ->
       create_broadcast_service get_next_blueprint_number find_blueprint level)
 
+let register_preconfirmation_service () dir =
+  Evm_directory.streamed_register0 dir preconfirmation_service (fun () ->
+      create_preconfirmation_service)
+
 let register get_next_blueprint_number find_blueprint_legacy find_blueprint
     smart_rollup_address time_between_blocks dir =
   register_get_smart_rollup_address_service smart_rollup_address dir
@@ -228,6 +246,7 @@ let register get_next_blueprint_number find_blueprint_legacy find_blueprint
        get_next_blueprint_number
   |> register_get_time_between_block_service time_between_blocks
   |> register_broadcast_service find_blueprint get_next_blueprint_number
+  |> register_preconfirmation_service ()
 
 let get_smart_rollup_address ~keep_alive ~evm_node_endpoint =
   Rollup_services.call_service
@@ -336,6 +355,23 @@ let monitor_messages ~evm_node_endpoint Ethereum_types.(Qty level) =
       ~on_close
       ()
       (Z.to_int64 level)
+      ()
+  in
+  return {stream; closefn}
+
+let monitor_preconfirmations ~evm_node_endpoint =
+  let open Lwt_result_syntax in
+  let stream, push = Lwt_stream.create () in
+  let on_chunk v = push (Some v) and on_close () = push None in
+  let* closefn =
+    Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
+      [Media_type.octet_stream]
+      ~base:evm_node_endpoint
+      preconfirmation_service
+      ~on_chunk
+      ~on_close
+      ()
+      ()
       ()
   in
   return {stream; closefn}

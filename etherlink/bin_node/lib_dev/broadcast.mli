@@ -38,3 +38,23 @@ val notify_finalized_levels :
   start_l2_level:Ethereum_types.quantity ->
   end_l2_level:Ethereum_types.quantity ->
   unit
+
+(** Represents a message related to preconfirmed transactions *)
+type preconfirmation_message =
+  | Block_timestamp of Time.Protocol.t
+      (** Timestamp of the next created block *)
+  | Preconfirmed_transaction of Transaction_object.t
+      (** Indicates that the transaction
+      has been validated and is ready for pre-execution *)
+
+val preconfirmation_message_encoding : preconfirmation_message Data_encoding.t
+
+(** [create_preconfirmation_stream ()] returns a stream that emits every preconfirmation
+    message as soon as it is notified via [notify_new_block_timestamp] and [notify_preconfirmation].  
+    This allows subscribers to monitor the sequence and timing of preconfirmed transactions. *)
+val create_preconfirmation_stream :
+  unit -> preconfirmation_message Lwt_stream.t * Lwt_watcher.stopper
+
+val notify_new_block_timestamp : Time.Protocol.t -> unit
+
+val notify_preconfirmation : Transaction_object.t -> unit

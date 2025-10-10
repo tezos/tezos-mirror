@@ -27,7 +27,8 @@
     "rpc_server": "resto",
     "spawn_rpc": null,
     "l2_chains": null,
-    "periodic_snapshot_path": null
+    "periodic_snapshot_path": null,
+    "preconfirmation_stream_enabled": false
   },
   "proxy": {
     "ignore_block_param": false
@@ -114,7 +115,8 @@
     "rpc_server": "resto",
     "spawn_rpc": null,
     "l2_chains": null,
-    "periodic_snapshot_path": null
+    "periodic_snapshot_path": null,
+    "preconfirmation_stream_enabled": false
   },
   "proxy": {
     "ignore_block_param": false
@@ -205,7 +207,8 @@
     "rpc_server": "resto",
     "spawn_rpc": null,
     "l2_chains": null,
-    "periodic_snapshot_path": null
+    "periodic_snapshot_path": null,
+    "preconfirmation_stream_enabled": false
   },
   "proxy": {
     "evm_node_endpoint": "hidden",
