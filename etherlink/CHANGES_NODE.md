@@ -28,6 +28,9 @@
 
 ### Execution changes
 
+- Use the rollup node RPC `/global/monitor_finalized_blocks` when
+  available. (!19569)
+
 ### Storage changes
 
 ### Documentation changes
