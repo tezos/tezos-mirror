@@ -316,7 +316,6 @@ module Profile_handlers = struct
   let warn_missing_shards store attester published_level
       expected_number_of_shards number_of_stored_shards_per_slot =
     let open Lwt_syntax in
-    let statuses_store = Store.slot_header_statuses store in
     let* problems =
       List.filter_map_s
         (fun (Types.Slot_id.{slot_index; _}, num_stored) ->
@@ -324,8 +323,8 @@ module Profile_handlers = struct
             Lwt.return_some (`Ok (slot_index, num_stored))
           else
             let* res =
-              Store.Statuses.get_slot_status
-                statuses_store
+              Slot_manager.get_slot_status
+                store
                 ~slot_id:{slot_level = published_level; slot_index}
             in
             match res with
