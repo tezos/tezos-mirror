@@ -1,14 +1,19 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 
 //! Implementation of the `write_debug` function based on Rust login crate. Isolated in its own
 //! module to more easily control if it should be displayed or not.
 
 use log::{debug, error, info, warn};
 
+use crate::bindings::{end_span, start_span};
+
 const INFO_TAG: &'static str = "[Info] ";
 const DEBUG_TAG: &'static str = "[Debug] ";
 const ERROR_TAG: &'static str = "[Error] ";
 const FATAL_TAG: &'static str = "[Fatal] ";
+const OTEL_START_TAG: &'static str = "[OTel] [start] ";
+const OTAL_END_TAG: &'static str = "[OTel] [end] ";
 
 fn trim_log<'a, 'b>(tag: &'a str, msg: &'b str) -> &'b str {
     msg[tag.len()..].trim()
@@ -20,6 +25,13 @@ pub fn write_debug(msg: &[u8]) {
         Ok(log) if log.starts_with(DEBUG_TAG) => debug!("{}", trim_log(DEBUG_TAG, log)),
         Ok(log) if log.starts_with(ERROR_TAG) => warn!("{}", trim_log(ERROR_TAG, log)),
         Ok(log) if log.starts_with(FATAL_TAG) => error!("{}", trim_log(FATAL_TAG, log)),
+        Ok(log) if log.starts_with(OTEL_START_TAG) => {
+            let scope_name = trim_log(OTEL_START_TAG, log);
+            start_span(scope_name);
+        }
+        Ok(log) if log.starts_with(OTAL_END_TAG) => {
+            end_span();
+        }
         _ => (),
     }
 }

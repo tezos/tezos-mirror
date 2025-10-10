@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -30,6 +31,75 @@ let prepare_span_for_host_function = function
       None
   | Root {scope = Some scope; _} | Started {scope; _} ->
       Some (scope.trace_id, scope.span_id)
+
+(*
+  Rationale:
+  The purpose of this design is to maintain a separate workflow context for each domain.
+  Since callbacks can be executed from different domains, we cannot rely on shared
+  global state for managing the list of scopes. Instead, we associate each domain with
+  its own Domain-Local Storage (DLS) key, stored in the `domain_admin` hashtable.
+
+  This DLS key holds a list of scopes representing the current execution context
+  within that domain. When a domain is reused, its DLS is automatically reset, ensuring
+  that scope data does not leak between runs. This approach guarantees thread safety
+  and enables safe parallel execution, as each domain accesses and updates only its
+  own scope list.
+*)
+let domain_admin : (Domain.id, scope list Domain.DLS.key) Stdlib.Hashtbl.t =
+  Stdlib.Hashtbl.create 8
+
+let domain_admin_lock = Mutex.create ()
+
+let init_dls_key () =
+  let domain_id = Domain.self () in
+  let dls_key = Domain.DLS.new_key (fun () -> []) in
+  Mutex.protect domain_admin_lock @@ fun () ->
+  Stdlib.Hashtbl.replace domain_admin domain_id dls_key
+
+let add_dls_scope scope =
+  let domain_id = Domain.self () in
+  let dls_key =
+    Mutex.protect domain_admin_lock @@ fun () ->
+    Stdlib.Hashtbl.find domain_admin domain_id
+  in
+  let scopes = Domain.DLS.get dls_key in
+  Domain.DLS.set dls_key (scope :: scopes)
+
+let latest_dls_scope () =
+  let domain_id = Domain.self () in
+  let dls_key =
+    Mutex.protect domain_admin_lock @@ fun () ->
+    Stdlib.Hashtbl.find domain_admin domain_id
+  in
+  List.hd @@ Domain.DLS.get dls_key
+
+let pop_latest_dls_scope () =
+  let domain_id = Domain.self () in
+  let dls_key =
+    Mutex.protect domain_admin_lock @@ fun () ->
+    Stdlib.Hashtbl.find domain_admin domain_id
+  in
+  match Domain.DLS.get dls_key with
+  | hd :: tl ->
+      Domain.DLS.set dls_key tl ;
+      hd
+  | [] -> Root {scope = None; trace_host_funs = false}
+
+let create_scope scope scope_name =
+  let trace_id, parent, trace_host_funs = prepare_new_span scope in
+  let span_id = Opentelemetry.Span_id.create () in
+  let scope = Opentelemetry.Scope.make ~trace_id ~span_id () in
+  let scope =
+    Started
+      {
+        parent;
+        scope;
+        name = scope_name;
+        start_time = Opentelemetry.Timestamp_ns.now_unix_ns ();
+        trace_host_funs;
+      }
+  in
+  add_dls_scope scope
 
 module Key_parser = struct
   let max_key_length = 250 - String.length "/durable" - String.length "/@"
@@ -261,6 +331,34 @@ module Impl = struct
             name
         in
         Opentelemetry.Trace.emit ~service_name:"Wasm_runtime" [span]
+
+  let init_spans scope scope_name =
+    init_dls_key () ;
+    create_scope scope scope_name
+
+  let start_span scope_name =
+    Option.iter
+      (fun dls_scope -> create_scope dls_scope scope_name)
+      (latest_dls_scope ())
+
+  let end_span () =
+    match pop_latest_dls_scope () with
+    | Root _ -> (* No started scope to close *) ()
+    | Started {parent; scope; name; start_time; _} ->
+        let end_time = Opentelemetry.Timestamp_ns.now_unix_ns () in
+        let span, _ =
+          Opentelemetry.Span.create
+            ~links:(Opentelemetry.Scope.links scope)
+            ~attrs:(Opentelemetry.Scope.attrs scope)
+            ~events:(Opentelemetry.Scope.events scope)
+            ?parent
+            ~id:scope.span_id
+            ~trace_id:scope.trace_id
+            ~start_time
+            ~end_time
+            name
+        in
+        Opentelemetry.Trace.emit ~service_name:"Wasm_runtime" [span]
 end
 
 include Impl
@@ -288,7 +386,10 @@ let register () =
 
   (* Opentelemetry *)
   Callback.register "open_span" open_span ;
-  Callback.register "close_span" close_span
+  Callback.register "close_span" close_span ;
+  Callback.register "init_spans" init_spans ;
+  Callback.register "start_span" start_span ;
+  Callback.register "end_span" end_span
 
 module Internal_for_tests = struct
   include Impl

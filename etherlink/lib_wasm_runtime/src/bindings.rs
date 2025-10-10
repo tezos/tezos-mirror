@@ -66,6 +66,9 @@ mod ocaml_imports {
 
         pub fn open_span(parent_scope: &OpenTelemetryScope, span_name: &str) -> OpenTelemetryScope;
         pub fn close_span(scope: &OpenTelemetryScope) -> ();
+        pub fn init_spans(scope: &OpenTelemetryScope, span_nem: &str);
+        pub fn start_span(span_name: &str);
+        pub fn end_span();
     }
 }
 
@@ -354,6 +357,24 @@ pub fn close_span(s: &OpenTelemetryScope) -> Result<(), BindingsError> {
     unsafe {
         ocaml_imports::close_span(&gc(), s).map_err(BindingsError::OCamlError)?;
     }
+
+    Ok(())
+}
+
+pub fn init_spans(s: &OpenTelemetryScope, span_name: &str) -> Result<(), BindingsError> {
+    unsafe { ocaml_imports::init_spans(&gc(), s, span_name).map_err(BindingsError::OCamlError)? };
+
+    Ok(())
+}
+
+pub fn start_span(span_name: &str) -> Result<(), BindingsError> {
+    unsafe { ocaml_imports::start_span(&gc(), span_name).map_err(BindingsError::OCamlError)? };
+
+    Ok(())
+}
+
+pub fn end_span() -> Result<(), BindingsError> {
+    unsafe { ocaml_imports::end_span(&gc()).map_err(BindingsError::OCamlError)? };
 
     Ok(())
 }

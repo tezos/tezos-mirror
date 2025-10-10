@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2023-2025 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -16,6 +17,7 @@ pub enum Level {
     Info,
     Debug,
     Benchmarking,
+    OTel,
 }
 
 impl TryFrom<u8> for Level {
@@ -45,6 +47,7 @@ impl std::fmt::Display for Level {
             Level::Fatal => write!(f, "Fatal"),
             Level::Debug => write!(f, "Debug"),
             Level::Benchmarking => write!(f, "Benchmarking"),
+            Level::OTel => write!(f, "OTel"),
         }
     }
 }
@@ -62,6 +65,23 @@ macro_rules! log {
             $crate::debug_str!($host, &msg);
         }
     };
+}
+
+#[cfg(feature = "alloc")]
+#[macro_export]
+macro_rules! otel_trace {
+    ($host:expr, $name:expr, $expr:expr) => {{
+        {
+            let msg = format!("[{}] [start] {}", tezos_evm_logging::Level::OTel, $name);
+            $crate::debug_str!($host, &msg);
+        }
+        let __otel_result = { $expr };
+        {
+            let msg = format!("[{}] [end] {}", tezos_evm_logging::Level::OTel, $name);
+            $crate::debug_str!($host, &msg);
+        }
+        __otel_result
+    }};
 }
 
 // When the `tracing` feature is enabled, export tracing macros
