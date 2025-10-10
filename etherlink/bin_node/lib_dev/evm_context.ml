@@ -1614,6 +1614,7 @@ module State = struct
       | _ -> return_unit
     in
     Evm_node_state.load
+      (module Irmin_context)
       ~cache_size:100_000
       ~async_domain:true
       Read_write
@@ -2334,9 +2335,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
     | Some b -> return b
     | None -> failwith "Rollup node has no finalized l2 block"
   in
-  let checkpoint =
-    Evm_node_state.hash_of_context_hash final_l2_block.header.context
-  in
+  let checkpoint = final_l2_block.header.context in
   let rollup_node_context_dir =
     Filename.Infix.(rollup_node_data_dir // "context")
   in
@@ -2365,6 +2364,7 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
   in
   let* evm_node_index =
     Evm_node_state.load
+      (module Irmin_context)
       ~cache_size:100_000
       ~async_domain:true
       Read_write

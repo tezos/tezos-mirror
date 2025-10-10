@@ -37,7 +37,7 @@ let test_wasm_runtime_id () =
            "../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm")
   in
   let tree = expect_ok "Should be able to create an initial state" tree in
-  let tree = Evm_node_state.Wasm_internal.to_irmin tree in
+  let tree = Evm_node_state.Wasm_internal.to_irmin_exn tree in
   Log.info "Run kernel_run" ;
   let* tree =
     Wasm_runtime.run

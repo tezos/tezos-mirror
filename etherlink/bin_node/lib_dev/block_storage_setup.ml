@@ -65,9 +65,11 @@ let enable ~keep_alive ?evm_node_endpoint store =
   let tmp_world_state_path = tmp_path ^ world_state_path in
   let store_get_hash tree key =
     let open Lwt_syntax in
+    let evm_node_state = Evm_node_state.Wasm_internal.of_irmin tree in
     let enable_fallback =
       match
-        Lwt_domain.run_in_main @@ fun () -> Evm_state.storage_version tree
+        Lwt_domain.run_in_main @@ fun () ->
+        Evm_state.storage_version evm_node_state
       with
       | Ok storage_version ->
           (* See case [StorageVersion::V17] in [migration::migrate_to] *)
@@ -85,7 +87,7 @@ let enable ~keep_alive ?evm_node_endpoint store =
       let* pred =
         Evm_state.current_block_height
           ~root:Durable_storage_path.etherlink_root
-          tree
+          evm_node_state
       in
       let n = Ethereum_types.Qty.next pred in
       let+ block = get_block_exn n in
@@ -98,15 +100,12 @@ let enable ~keep_alive ?evm_node_endpoint store =
       let* pred =
         Evm_state.current_block_height
           ~root:Durable_storage_path.etherlink_root
-          tree
+          evm_node_state
       in
       let n = Ethereum_types.Qty.next pred in
       let+ block = get_block_exn n in
       let s = Ethereum_types.hash_to_bytes block.transactionRoot in
       Ok (Bytes.unsafe_of_string s)
-    else
-      Wasm_runtime_callbacks.store_get_hash
-        (Evm_node_state.Wasm_internal.to_irmin tree)
-        key
+    else Wasm_runtime_callbacks.store_get_hash tree key
   in
   Callback.register "layer2_store__store_get_hash" store_get_hash
