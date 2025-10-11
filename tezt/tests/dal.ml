@@ -5774,6 +5774,36 @@ module History_rpcs = struct
       (!at_least_one_attested_status = true)
         bool
         ~error_msg:"No cell with the 'attested' status has been visited") ;
+
+    let rec call_cells_of_level level =
+      if level > last_confirmed_published_level then unit
+      else
+        let* cells =
+          Node.RPC.call node
+          @@ RPC.get_chain_block_context_dal_cells_of_level
+               ~block:(string_of_int level)
+               ()
+        in
+        let cells = JSON.as_list cells in
+        let num_cells = List.length cells in
+        let expected_num_cells = if level < lag then 0 else 32 in
+        Check.(
+          (num_cells = expected_num_cells)
+            int
+            ~error_msg:"Unexpected number of cells: got %L, expected %R") ;
+        let* () =
+          Lwt_list.iter_s
+            (fun hash_cell_tuple ->
+              let cell = JSON.geti 1 hash_cell_tuple in
+              check_cell cell ~check_level:(Some level))
+            cells
+        in
+        call_cells_of_level (level + 1)
+    in
+    Log.info
+      "Call cells_of_level on each relevant level, and check the number of \
+       cells returned" ;
+    let* () = call_cells_of_level 1 in
     unit
 
   let test_commitments_history_rpcs protocols =
