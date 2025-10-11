@@ -5804,6 +5804,31 @@ module History_rpcs = struct
       "Call cells_of_level on each relevant level, and check the number of \
        cells returned" ;
     let* () = call_cells_of_level 1 in
+
+    let rec call_get_commitment level =
+      if level > last_confirmed_published_level then unit
+      else
+        let* commitment =
+          Dal_RPC.(
+            call dal_node
+            @@ get_level_slot_commitment ~slot_level:level ~slot_index)
+        in
+        let expected_commitment =
+          match Map_int.find_opt level commitments with
+          | Some c -> c
+          | None -> Test.fail "Commitment not found at level %d" level
+        in
+        Check.(
+          (commitment = expected_commitment)
+            string
+            ~error_msg:
+              (let msg = sf "Unexpected commitment at level %d: " level in
+               msg ^ ": got %L, expected %R")) ;
+        call_get_commitment (level + 1)
+    in
+    Log.info "Check fetching commitments from the skip-list store" ;
+    let* () = call_get_commitment 2 in
+
     unit
 
   let test_commitments_history_rpcs protocols =
