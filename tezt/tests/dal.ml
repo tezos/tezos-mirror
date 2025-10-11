@@ -5574,9 +5574,16 @@ module History_rpcs = struct
       ~first_dal_level ~last_confirmed_published_level protocol dal_parameters
       client node dal_node =
     let module Map_int = Map.Make (Int) in
-    Log.info "slot_index = %d" slot_index ;
+    Log.info "slot_index = %d first_dal_level = %d" slot_index first_dal_level ;
     let client = Client.with_dal_node client ~dal_node in
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let lag = dal_parameters.attestation_lag in
+    let number_of_slots = dal_parameters.number_of_slots in
+    Log.info
+      "attestation_lag = %d, number_of_slots = %d, slot_size = %d"
+      lag
+      number_of_slots
+      slot_size ;
     let* starting_level = Client.level client in
 
     let rec publish ~max_level level commitments =
@@ -5597,10 +5604,6 @@ module History_rpcs = struct
           @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
         in
         let* () = wait_mempool_injection in
-        Log.info
-          "Publish commitment %s at published_level %d@."
-          commitment
-          published_level ;
         let* () = bake_for client in
         let* _level = Node.wait_for_level node (level + 1) in
         publish
@@ -5608,29 +5611,43 @@ module History_rpcs = struct
           (level + 1)
           (Map_int.add published_level commitment commitments)
     in
-    Log.info "Publishing some commitments in the previous protocol@." ;
+    Log.info
+      "Publishing commitments in the previous protocol, from published level \
+       %d to %d"
+      (starting_level + 1)
+      (migration_level + 1) ;
     let* commitments =
       publish ~max_level:migration_level starting_level Map_int.empty
     in
 
-    let* dal_parameters = Dal.Parameters.from_client client in
-    let lag = dal_parameters.attestation_lag in
-
-    let number_of_slots = dal_parameters.number_of_slots in
-    Log.info "attestation_lag = %d, number_of_slots = %d" lag number_of_slots ;
+    Log.info "Migrated to the next protocol." ;
 
     let last_attested_level = last_confirmed_published_level + lag in
-    (* The maximum level that needs to be reached (we use +2 to make last
-       attested level final). *)
-    let max_level = last_attested_level + 2 in
 
     let wait_for_dal_node =
       wait_for_layer1_final_block dal_node last_attested_level
     in
 
-    let* first_level_new_proto = Client.level client in
-    Log.info "Publishing some commitments in the new protocol@." ;
-    let* commitments = publish ~max_level first_level_new_proto commitments in
+    let* second_level_new_proto = Client.level client in
+    assert (second_level_new_proto = migration_level + 1) ;
+    Log.info
+      "Publish commitments in the new protocol, from published level %d to %d"
+      (second_level_new_proto + 1)
+      (last_confirmed_published_level + 1) ;
+    let* commitments =
+      publish
+        ~max_level:last_confirmed_published_level
+        second_level_new_proto
+        commitments
+    in
+    let* () =
+      (* The maximum level that needs to be reached (we use +2 to make last
+       attested level final). *)
+      let max_level = last_attested_level + 2 in
+      let* current_level = Node.get_level node in
+      let count = max_level + 1 - current_level in
+      bake_for ~count client
+    in
 
     let module SeenIndexes = Set.Make (struct
       type t = int
@@ -5750,7 +5767,9 @@ module History_rpcs = struct
         check_history (level + 1)
     in
     let* () = wait_for_dal_node in
+    Log.info "Check skip-list using commitments_history RPCs" ;
     let* () = check_history first_dal_level in
+
     Check.(
       (!at_least_one_attested_status = true)
         bool
@@ -12102,7 +12121,7 @@ let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:4 ~migrate_from ~migrate_to ;
   History_rpcs.test_commitments_history_rpcs_with_migration
-    ~migration_level:10
+    ~migration_level:11
     ~migrate_from
     ~migrate_to ;
   tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
