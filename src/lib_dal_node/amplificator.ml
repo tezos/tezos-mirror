@@ -185,25 +185,28 @@ end = struct
     in
     return proved_shards_encoded
 
+  (* Utility function to reply on successfully validated shards. *)
   let reply_success ~oc ~query_id ~proved_shards_encoded =
-    let open Lwt_result_syntax in
+    let open Lwt_syntax in
     (* Sends back the proved_shards_encoded to the main dal process *)
-    let*! () = Event.emit_crypto_process_sending_reply ~query_id in
-    let*! () = Lwt_io.write_int oc query_id in
-    let*! _ = Process_worker.write_message oc (Bytes.of_string "OK") in
-    let*! _ = Process_worker.write_message oc proved_shards_encoded in
-    Lwt.return_unit
+    let* () = Event.emit_crypto_process_sending_reply ~query_id in
+    let* () = Lwt_io.write_int oc query_id in
+    let* _ = Process_worker.write_message oc (Bytes.of_string "OK") in
+    let* _ = Process_worker.write_message oc proved_shards_encoded in
+    return_unit
 
+  (* Utility function to reply on unsuccessful validated shard. *)
   let reply_error_query ~oc ~query_id ~error =
-    let open Lwt_result_syntax in
+    let open Lwt_syntax in
     (* Sends back the proved_shards_encoded to the main dal process *)
-    let*! () = Event.emit_crypto_process_sending_reply_error ~query_id in
-    let*! () = Lwt_io.write_int oc query_id in
-    let*! _ = Process_worker.write_message oc (Bytes.of_string "ERR") in
+    let* () = Event.emit_crypto_process_sending_reply_error ~query_id in
+    let* () = Lwt_io.write_int oc query_id in
+    let* _ = Process_worker.write_message oc (Bytes.of_string "ERR") in
     let bytes = Bytes.of_string error in
-    let*! _ = Process_worker.write_message oc bytes in
-    Lwt.return_unit
+    let* _ = Process_worker.write_message oc bytes in
+    return_unit
 
+  (* Utility function to trigger a shard reconstruction. *)
   let process_query query_id ic cryptobox shards_proofs_precomputation =
     let open Lwt_result_syntax in
     (* Read query from main dal process *)
@@ -297,8 +300,7 @@ end = struct
               let*! () = Event.emit_crypto_process_error ~msg in
               fail [error_of_exn exn])
     in
-    let* () = loop () in
-    return_unit
+    loop ()
 end
 
 (* Serialize queries to crypto worker process while the query queue is not
