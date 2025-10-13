@@ -469,12 +469,9 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string) ~(rpc_port : int)
       cloud
       agent
   in
-  let tezlink_sandbox_endpoint =
-    build_endpoint ~path:"/tezlink" ~runner:(Agent.runner agent) rpc_port
-  in
   let () = toplog "Launching the sandbox L2 node: done" in
   let* () = add_prometheus_source ~evm_node cloud agent name in
-  return tezlink_sandbox_endpoint
+  unit
 
 let rec loop n =
   let n = n + 1 in
@@ -538,7 +535,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             Agent.next_available_port tezlink_sequencer_agent
       in
       let () = toplog "Starting Tezlink sequencer" in
-      let* tezlink_sandbox_endpoint =
+      let* () =
         init_tezlink_sequencer
           cloud
           name
@@ -546,6 +543,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           Cli.verbose
           Cli.time_between_blocks
           tezlink_sequencer_agent
+      in
+      let tezlink_sandbox_endpoint =
+        build_endpoint
+          ~path:"/tezlink"
+          ~runner:(Agent.runner tezlink_sequencer_agent)
+          internal_port
       in
       let tezlink_proxy_endpoint =
         match tezlink_sandbox_endpoint with
