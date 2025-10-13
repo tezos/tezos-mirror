@@ -144,9 +144,15 @@ let proved_shards_encoding =
     (req "shards" (list Cryptobox.shard_encoding))
     (req "proofs" shards_proofs_encoding)
 
-(* This module contains the logic for a shard proving process worker running in
-   background. It communicates with the main dal process via pipe ipc. *)
-module Reconstruction_process_worker = struct
+(* This module contains the logic for a shard-proving process worker running in
+   background. It communicates with the main DAL process via pipe ipc. *)
+module Reconstruction_process_worker : sig
+  val reconstruct_process_worker :
+    Lwt_io.input Lwt_io.channel ->
+    Lwt_io.output Lwt_io.channel ->
+    Cryptobox.t * Cryptobox.shards_proofs_precomputation ->
+    (unit, error trace) result Lwt.t
+end = struct
   let read_init_message_from_parent ic =
     let open Lwt_result_syntax in
     let* () =
@@ -179,6 +185,52 @@ module Reconstruction_process_worker = struct
     in
     return proved_shards_encoded
 
+  let reply_success ~oc ~query_id ~proved_shards_encoded =
+    let open Lwt_result_syntax in
+    (* Sends back the proved_shards_encoded to the main dal process *)
+    let*! () = Event.emit_crypto_process_sending_reply ~query_id in
+    let*! () = Lwt_io.write_int oc query_id in
+    let*! _ = Process_worker.write_message oc (Bytes.of_string "OK") in
+    let*! _ = Process_worker.write_message oc proved_shards_encoded in
+    Lwt.return_unit
+
+  let reply_error_query ~oc ~query_id ~error =
+    let open Lwt_result_syntax in
+    (* Sends back the proved_shards_encoded to the main dal process *)
+    let*! () = Event.emit_crypto_process_sending_reply_error ~query_id in
+    let*! () = Lwt_io.write_int oc query_id in
+    let*! _ = Process_worker.write_message oc (Bytes.of_string "ERR") in
+    let bytes = Bytes.of_string error in
+    let*! _ = Process_worker.write_message oc bytes in
+    Lwt.return_unit
+
+  let process_query query_id ic cryptobox shards_proofs_precomputation =
+    let open Lwt_result_syntax in
+    (* Read query from main dal process *)
+    let* bytes_shards =
+      let* r = Process_worker.read_message ic in
+      match r with
+      | `End_of_file ->
+          fail
+            [
+              Reconstruction_process_worker_error
+                "Incomplete message received. Terminating.";
+            ]
+      | `Message msg -> return msg
+    in
+    let shards =
+      Data_encoding.(
+        Binary.of_bytes_exn (list Cryptobox.shard_encoding) bytes_shards)
+      |> List.to_seq
+    in
+    let*! () = Event.emit_crypto_process_received_query ~query_id in
+    (* Crypto computation *)
+    let* proved_shards_encoded =
+      reconstruct cryptobox shards_proofs_precomputation shards
+      |> Lwt.return |> Errors.to_tzresult
+    in
+    return proved_shards_encoded
+
   (* The main function that is run in the [Process_worker.t].
      Initialization phase:
        receive init message: proto_parameters
@@ -190,53 +242,10 @@ module Reconstruction_process_worker = struct
   let reconstruct_process_worker ic oc (cryptobox, shards_proofs_precomputation)
       =
     let open Lwt_result_syntax in
-    let reply_success ~oc ~query_id ~proved_shards_encoded =
-      (* Sends back the proved_shards_encoded to the main dal process *)
-      let*! () = Event.emit_crypto_process_sending_reply ~query_id in
-      let*! () = Lwt_io.write_int oc query_id in
-      let*! _ = Process_worker.write_message oc (Bytes.of_string "OK") in
-      let*! _ = Process_worker.write_message oc proved_shards_encoded in
-      Lwt.return_unit
-    in
-    let reply_error_query ~oc ~query_id ~error =
-      (* Sends back the proved_shards_encoded to the main dal process *)
-      let*! () = Event.emit_crypto_process_sending_reply_error ~query_id in
-      let*! () = Lwt_io.write_int oc query_id in
-      let*! _ = Process_worker.write_message oc (Bytes.of_string "ERR") in
-      let bytes = Bytes.of_string error in
-      let*! _ = Process_worker.write_message oc bytes in
-      Lwt.return_unit
-    in
     (* Read init message from parent with parameters required to initialize
        cryptobox *)
     let* () = read_init_message_from_parent ic in
     let*! () = Event.emit_crypto_process_started ~pid:(Unix.getpid ()) in
-    let process_query query_id =
-      (* Read query from main dal process *)
-      let* bytes_shards =
-        let* r = Process_worker.read_message ic in
-        match r with
-        | `End_of_file ->
-            fail
-              [
-                Reconstruction_process_worker_error
-                  "Incomplete message received. Terminating.";
-              ]
-        | `Message msg -> return msg
-      in
-      let shards =
-        Data_encoding.(
-          Binary.of_bytes_exn (list Cryptobox.shard_encoding) bytes_shards)
-        |> List.to_seq
-      in
-      let*! () = Event.emit_crypto_process_received_query ~query_id in
-      (* Crypto computation *)
-      let* proved_shards_encoded =
-        reconstruct cryptobox shards_proofs_precomputation shards
-        |> Lwt.return |> Errors.to_tzresult
-      in
-      return proved_shards_encoded
-    in
     let rec loop () =
       Lwt.catch
         (fun () ->
@@ -245,7 +254,13 @@ module Reconstruction_process_worker = struct
           let* () =
             Lwt.catch
               (fun () ->
-                let*! r = process_query query_id in
+                let*! r =
+                  process_query
+                    query_id
+                    ic
+                    cryptobox
+                    shards_proofs_precomputation
+                in
                 match r with
                 | Ok proved_shards_encoded ->
                     let*! () =
