@@ -22,6 +22,8 @@ let group_by n =
   in
   bis [] [] n
 
+let encapsulate_in_code_block strings = ("```" :: strings) @ ["```"]
+
 let pp_delegate fmt delegate_pkh =
   match Hashtbl.find_opt Metrics.aliases delegate_pkh with
   | None -> Format.fprintf fmt "%s" delegate_pkh
@@ -571,7 +573,6 @@ module Tasks = struct
         nb
         (stake *. 100.)
     in
-    let encapsulate_in_code_block strings = ("```" :: strings) @ ["```"] in
     let display catch_phrase printer bakers =
       if bakers = [] then []
       else
