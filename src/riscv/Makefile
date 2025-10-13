@@ -28,13 +28,20 @@ NIGHTLY_VERSION = nightly-2025-01-30
 # Prefix for downloading assets from the riscv-pvm repo
 RISCV_PVM_REPO = https://raw.githubusercontent.com/tezos/riscv-pvm/refs/heads/main
 
+ASSETS := \
+  assets/riscv-dummy.elf \
+  assets/jstz \
+  assets/jstz_proof_initial \
+  assets/etherlink \
+  assets/etherlink_proof_initial
+
 .PHONY: build
 build:
 	@cargo build --release --workspace $(NATIVE_OPT) $(EXTRA_FLAGS)
 
 # Update checked-in binaries and regression files
-.PHONY: update-assets
-update-assets: assets/riscv-dummy.elf assets/jstz assets/jstz_proof_initial
+.PHONY: update-assets $(ASSETS)
+update-assets: $(ASSETS)
 
 # Update to the latest version of `riscv-pvm`. Assets will be updated accordingly.
 .PHONY: update-riscv-pvm
@@ -51,9 +58,18 @@ assets/jstz assets/jstz.checksum::
 	@curl -L -o $@ $(RISCV_PVM_REPO)/assets/jstz
 	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/assets/jstz.checksum
 
+# Update the compiled Etherlink kernel used in CI tests
+assets/etherlink assets/etherlink.checksum::
+	@curl -L -o $@ $(RISCV_PVM_REPO)/assets/etherlink
+	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/assets/etherlink.checksum
+
 # Update the serialised proof for the initial tick of jstz used in the CI tests
 assets/jstz_proof_initial:
 	@curl -L -o $@ $(RISCV_PVM_REPO)/src/riscv/lib/tests/expected/jstz/proof_initial
+
+# Update the serialised proof for the initial tick of Etherlink used in the CI tests
+assets/etherlink_proof_initial:
+	@curl -L -o $@ $(RISCV_PVM_REPO)/src/riscv/lib/tests/expected/etherlink/proof_initial
 
 .PHONY: build-deps
 build-deps:
