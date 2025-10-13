@@ -1,3 +1,4 @@
 scripts/ci/docker_rust_sdk_bindings_build.sh
 images/rust-sdk-bindings
 images/create_image.sh
+scripts/kiss-fetch.sh
