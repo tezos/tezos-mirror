@@ -62,7 +62,7 @@ depends: [
   "terminal"
   "uutf"
   "eio"
-  "eio_main"
+  "eio_posix"
   "lwt_eio"
   "ppxlib" { >= "0.34.0" }
   "opentelemetry" { >= "0.12" }

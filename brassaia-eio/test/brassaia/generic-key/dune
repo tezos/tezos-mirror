@@ -11,7 +11,7 @@
   octez-libs.base.unix
   octez-libs.brassaia_eio_test_helpers
   octez-libs.brassaia_eio.mem
-  eio_main
+  eio_posix
   vector
   octez-libs.stdlib-unix
   octez-libs.test-helpers
