@@ -43,12 +43,14 @@ pub fn prepare_host_with_buffer(execution_buffer: Vec<u8>) -> EvalHost {
 macro_rules! write_host {
     ($host: expr, $($args: expr),*) => {
         {
-            extern crate alloc;
-            writeln!(
-                $host.buffer.borrow_mut(),
-                "{}",
-                { &alloc::format!($($args), *) },
-            ).unwrap()
+            if cfg!(not(feature = "disable-file-logs")) {
+                extern crate alloc;
+                writeln!(
+                    $host.buffer.borrow_mut(),
+                    "{}",
+                    { &alloc::format!($($args), *) },
+                ).unwrap()
+            }
         }
     };
 }
@@ -57,21 +59,22 @@ macro_rules! write_host {
 macro_rules! write_out {
     ($output_file: expr, $($args: expr),*) => {
         {
-            extern crate alloc;
-            if let Some(ref mut output) = $output_file {
-                use std::io::Write;
-                writeln!(
-                    output,
-                    "{}",
-                    { &alloc::format!($($args), *) },
-                ).unwrap()
-            } else {
-                println!(
-                    "{}",
-                    { &alloc::format!($($args), *) }
-                )
+            if cfg!(not(feature = "disable-file-logs")) {
+                extern crate alloc;
+                if let Some(ref mut output) = $output_file {
+                    use std::io::Write;
+                    writeln!(
+                        output,
+                        "{}",
+                        { &alloc::format!($($args), *) },
+                    ).unwrap()
+                } else {
+                    println!(
+                        "{}",
+                        { &alloc::format!($($args), *) }
+                    )
+                }
             }
-
         }
     };
 }

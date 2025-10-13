@@ -22,3 +22,8 @@ tezos-smart-rollup-core.workspace = true
 
 # Evaluation specific deps
 serde_json = { version = "1.0.145", features = ["preserve_order"] }
+structopt = "0.3.26"
+
+[features]
+default = []
+disable-file-logs = []

@@ -24,7 +24,9 @@ use std::{
     ffi::OsStr,
     fs::{self, File, OpenOptions},
     path::Path,
+    process::exit,
 };
+use structopt::StructOpt;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
 use tezos_evm_runtime::runtime::Runtime;
 
@@ -32,6 +34,19 @@ mod deserializer;
 mod evalhost;
 mod fixture;
 mod helpers;
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "revm-evaluation", about = "Evaluate REVM's engine semantic.")]
+pub struct Opt {
+    #[structopt(
+        short = "d",
+        long = "test-cases",
+        default_value = "etherlink/kernel_latest/revm_evaluation/fixtures",
+        about = "Specify the directory path of fixtures files. By default it will be \
+                 'etherlink/kernel_latest/revm_evaluation/fixtures'."
+    )]
+    test_cases_path: String,
+}
 
 fn skip_dir(dir_name: &OsStr) -> bool {
     let dir_name = dir_name.to_str().unwrap();
@@ -312,22 +327,24 @@ struct Report {
 }
 
 pub fn main() {
+    let opt = Opt::from_args();
     let mut report = Report::default();
-    let fixtures = read_all_fixtures(
-        "etherlink/kernel_latest/revm_evaluation/fixtures",
-        &mut report,
-    );
+    let fixtures = read_all_fixtures(opt.test_cases_path, &mut report);
     // TODO: this is an option so that when we have the ability to print on the standard
     // output, we just have to replace it by None. The feature will be implemented soon.
-    let mut output_file = Some(
-        OpenOptions::new()
-            .write(true)
-            .append(false)
-            .truncate(true)
-            .create(true)
-            .open("revm_evaluation.logs")
-            .unwrap(),
-    );
+    let mut output_file = if cfg!(feature = "disable-file-logs") {
+        None
+    } else {
+        Some(
+            OpenOptions::new()
+                .write(true)
+                .append(false)
+                .truncate(true)
+                .create(true)
+                .open("revm_evaluation.logs")
+                .unwrap(),
+        )
+    };
 
     let mut host = prepare_host();
 
@@ -450,4 +467,15 @@ pub fn main() {
         report.failure,
         report.skipped_invest
     );
+
+    if report.failure > 0 {
+        eprintln!(
+            "The execution isn't 100% compatible anymore. \
+             Use the revm evaluation assessor to output debug \
+             traces and find the issue."
+        );
+        exit(1)
+    } else {
+        exit(0)
+    }
 }
