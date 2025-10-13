@@ -6543,7 +6543,7 @@ module Garbage_collection = struct
         else None)
 
   let wait_for_first_shard ~published_level ~slot_index node =
-    Dal_node.wait_for node "dal_stored_slot_shard.v0" (fun event ->
+    Dal_node.wait_for node "dal_cached_slot_shard.v0" (fun event ->
         let actual_published_level =
           JSON.(event |-> "published_level" |> as_int)
         in
@@ -6899,7 +6899,7 @@ module Garbage_collection = struct
     let* () =
       Dal_node.init_config ~attester_profiles:bootstrap_pkhs ~peers attester
     in
-    let* () = Dal_node.run ~wait_ready:true attester in
+    let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug attester in
     let client = Client.with_dal_node client ~dal_node:attester in
 
     Log.info "attester DAL node ready" ;
@@ -6921,7 +6921,7 @@ module Garbage_collection = struct
     let* () =
       Dal_node.init_config ~observer_profiles:[slot_index] ~peers observer
     in
-    let* () = Dal_node.run ~wait_ready:true observer in
+    let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug observer in
 
     (* Check that the DAL nodes have the expected profiles. *)
     let* () =
@@ -7002,7 +7002,9 @@ module Garbage_collection = struct
         wait_for_first_shard ~published_level ~slot_index attester
       in
       let* shard_index_observer = wait_for_first_shard_observer_promise in
+      Log.info "Shards were received by the observer" ;
       let* shard_index_attester = wait_for_first_shard_attester_promise in
+      Log.info "Shards were received by the attester" ;
       return (shard_index_observer, shard_index_attester)
     in
 
@@ -7030,8 +7032,11 @@ module Garbage_collection = struct
       @@ Helpers.make_slot ~slot_size "content"
     in
     let* () = wait_for_producer in
+    Log.info "Producer reached expected level" ;
     let* () = wait_for_observer in
+    Log.info "Observer reached expected level" ;
     let* () = wait_for_attester in
+    Log.info "Attester reached expected level" ;
 
     Log.info "RPC first shard observer" ;
     let* _shard_observer =
@@ -11184,7 +11189,7 @@ let baker_at_round_n ?level round client : string Lwt.t =
      - [node2]: B (on top of A2)
    After reconnecting the nodes, node1 switches to the A2 -> B branch (due to
    higher fitness).
-   Then, test that shards are propagated after one level is baked on top of 
+   Then, test that shards are propagated after one level is baked on top of
    the block which included the commitment publication, at (n+1). *)
 let test_dal_one_level_reorg protocol dal_parameters _cryptobox node1 client1
     dal_bootstrap =
