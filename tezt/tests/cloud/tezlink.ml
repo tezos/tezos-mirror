@@ -266,7 +266,7 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
       ~port:api_port_arg
       ()
   in
-  return (build_endpoint ~runner tzkt_api_port)
+  unit
 
 let create_config_file ~agent destination format =
   let temp_file = Temp.file "config" in
@@ -588,12 +588,17 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           let internal_tzkt_api_port =
             port_of_option tezlink_sequencer_agent internal_tzkt_api_port
           in
-          let* tzkt_api =
+          let* () =
             init_tzkt
               ~tzkt_api_port:internal_tzkt_api_port
               ~agent:tezlink_sequencer_agent
               ~tezlink_sandbox_endpoint
               ~time_between_blocks:Cli.time_between_blocks
+          in
+          let tzkt_api =
+            build_endpoint
+              ~runner:(Agent.runner tezlink_sequencer_agent)
+              internal_tzkt_api_port
           in
           let* () =
             add_service
