@@ -113,8 +113,8 @@ let git_clone agent ?branch repo_url directory =
     @ (match branch with None -> [] | Some branch -> ["-b"; branch])
     @ [repo_url; directory])
 
-let build_endpoint ?path ~runner port =
-  let host = Runner.address runner in
+let build_endpoint ?path ~runner ~dns_domain port =
+  let host = Option.value ~default:(Runner.address runner) dns_domain in
   Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme:"http" ~port ())
 
 let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
@@ -279,7 +279,8 @@ let create_config_file ~agent destination format =
     (Format.formatter_of_out_channel ch)
     format
 
-let init_faucet_backend ~agent ~tezlink_sandbox_endpoint ~faucet_private_key =
+let init_faucet_backend ~agent ~tezlink_sandbox_endpoint ~faucet_private_key
+    ~dns_domain =
   let faucet_api_port = Agent.next_available_port agent in
   let faucet_backend_dir = "faucet-backend" in
   (* Clone faucet backend from personal fork because upstream depends on a RPC which we don't yet support (forge_operation). *)
@@ -322,10 +323,10 @@ DIFFICULTY=4
   in
   let runner = Agent.runner agent in
   let* () = Faucet_backend_process.run ?runner ~path:faucet_backend_dir () in
-  return (build_endpoint ~runner faucet_api_port)
+  return (build_endpoint ~runner ~dns_domain faucet_api_port)
 
 let init_faucet_frontend ~faucet_api ~agent ~tezlink_sandbox_endpoint
-    ~faucet_pkh ~tzkt_api =
+    ~faucet_pkh ~tzkt_api ~dns_domain =
   let faucet_frontend_port = Agent.next_available_port agent in
   let faucet_frontend_dir = "faucet-frontend" in
   (* Clone faucet frontend from personal fork because upstream does
@@ -381,7 +382,7 @@ let init_faucet_frontend ~faucet_api ~agent ~tezlink_sandbox_endpoint
       ~port:faucet_frontend_port
       ()
   in
-  return (build_endpoint ~runner faucet_frontend_port)
+  return (build_endpoint ~runner ~dns_domain faucet_frontend_port)
 
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string) ~(rpc_port : int)
     (verbose : bool) (time_between_blocks : Evm_node.time_between_blocks) agent
@@ -507,6 +508,12 @@ let proxy_internal_endpoint proxy_info =
   let {path; port} = proxy_internal_info proxy_info in
   Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme ~port ())
 
+let proxy_external_endpoint ~runner ~dns_domain = function
+  | No_proxy {port; path} -> build_endpoint ?path ~runner ~dns_domain port
+  | Https_proxy {dns_domain; external_port; internal_info = _} ->
+      Client.Foreign_endpoint
+        (Endpoint.make ~host:dns_domain ~scheme:"https" ~port:external_port ())
+
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
   let name = "tezlink-sequencer" in
@@ -530,6 +537,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             else Test.fail ~__LOC__ "Agent not found: %s" name
         | Some agent -> agent
       in
+      let runner = Agent.runner tezlink_sequencer_agent in
       let public_rpc_port =
         port_of_option tezlink_sequencer_agent Cli.public_rpc_port
       in
@@ -573,16 +581,13 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           Cli.time_between_blocks
           tezlink_sequencer_agent
       in
+      (* The proxy endpoint is the https endpoint we want to provide
+         to the external world, it has no /tezlink path. *)
       let tezlink_sandbox_endpoint =
         proxy_internal_endpoint sequencer_proxy_info
       in
       let tezlink_proxy_endpoint =
-        match tezlink_sandbox_endpoint with
-        | Node _ ->
-            failwith "Tezlink end-point should not be a full-fledged node."
-        | Foreign_endpoint {host; scheme; port = _; path = _} ->
-            Client.Foreign_endpoint
-              (Endpoint.make ~host ~scheme ~port:public_rpc_port ())
+        proxy_external_endpoint ~runner ~dns_domain sequencer_proxy_info
       in
       let* () =
         add_service
@@ -624,6 +629,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           let tzkt_api =
             build_endpoint
               ~runner:(Agent.runner tezlink_sequencer_agent)
+              ~dns_domain
               internal_tzkt_api_port
           in
           let* () =
@@ -660,8 +666,9 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               let* faucet_api =
                 init_faucet_backend
                   ~agent:tezlink_sequencer_agent
-                  ~tezlink_sandbox_endpoint
+                  ~tezlink_sandbox_endpoint:tezlink_proxy_endpoint
                   ~faucet_private_key
+                  ~dns_domain
               in
               let* () =
                 add_service
@@ -682,6 +689,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                   ~tezlink_sandbox_endpoint
                   ~faucet_pkh
                   ~tzkt_api
+                  ~dns_domain
               in
               add_service
                 cloud
