@@ -3997,6 +3997,58 @@ etherlink.unit_tests:
     when: always
   retry: 2
 
+etherlink.test_revm_compatibility:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - etherlink.mk
+    - etherlink/kernel_latest/revm/**/*
+    - etherlink/kernel_latest/revm_evaluation/**/*
+    - images/create_image.sh
+    - images/rust-toolchain/**/*
+    - images/scripts/install_datadog_static.sh
+    - scripts/version.sh
+    when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - trigger
+  - oc.build_kernels
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs revm-evaluation-assessor
+  - git clone --depth 1 https://github.com/functori/evm-fixtures evm_fixtures
+  - ./revm-evaluation-assessor --test-cases ./evm_fixtures/
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+
 etherlink.test_evm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
@@ -4006,7 +4058,7 @@ etherlink.test_evm_compatibility:
   - changes:
     - etherlink.mk
     - etherlink/kernel_latest/evm_evaluation/**/*
-    - etherlink/kernel_latest/evm_execution/**/*
+    - etherlink/kernel_latest/revm/**/*
     - images/create_image.sh
     - images/rust-toolchain/**/*
     - images/scripts/install_datadog_static.sh
