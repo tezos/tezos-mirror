@@ -43,10 +43,10 @@ Michelson
 Gas improvements
 ----------------
 
-Breaking Changes
-----------------
+RPC Changes
+-----------
 
-- Updated RPC ``GET
+- **Breaking change** Updated RPC ``GET
   /chains/<chain_id>/blocks/<block_id>/helpers/validators`` to group
   delegates by level. The returned list contains one element for each
   queried level (by default, only the current level), and contains
@@ -61,17 +61,13 @@ Breaking Changes
   level, and ``attestation_slot``, their slot for the given level.
   (MRs :gl:`!18931`, :gl:`!18959`, :gl:`!18984`)
 
-- Updated RPC ``GET
+- **Breaking change** Updated RPC ``GET
   /chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance``.
   Output field ``baking_reward_bonus_per_slot`` has been replaced with
   ``baking_reward_bonus_per_block``, and ``attesting_reward_per_slot``
   with ``attesting_reward_per_block``. Their respective values are
   consequently 7000 times as high as before (since there are 7000
   slots per block). (MR :gl:`!18959`)
-
-
-RPC Changes
------------
 
 - Added a new RPC ``GET
   /chains/<chain_id>/blocks/<block_id>/helpers/stake_info``. It
@@ -94,8 +90,9 @@ RPC Changes
 Blocks and block receipts
 -------------------------
 
-- Removed obsolete field ``adaptive_issuance_vote`` from the block
-  header, and fields ``adaptive_issuance_vote_ema`` and
+- **Breaking change** Removed obsolete field
+  ``adaptive_issuance_vote`` from the block header, and fields
+  ``adaptive_issuance_vote_ema`` and
   ``adaptive_issuance_activation_cycle`` from the block metadata. Note
   that the adaptive issuance activation cycle (which is 748 on
   mainnet) can still be queried via the RPC ``GET
@@ -120,10 +117,10 @@ Protocol parameters
 6s Block Time (MRs :gl:`!19045`, :gl:`!19473`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Block time has been reduced from 8 seconds to 6 seconds on mainnet (on
-ghostnet, it remains unchanged at 4 seconds). That is, a block can be
-produced with a delay of 6 seconds with respect to the previous block,
-if the latter is at round 0.
+**Breaking change** Block time has been reduced from 8 seconds to 6
+seconds on mainnet (on ghostnet, it remains unchanged at 4
+seconds). That is, a block can be produced with a delay of 6 seconds
+with respect to the previous block, if the latter is at round 0.
 
 This reduced block time comes with the updates of multiple related
 protocol parameters:
@@ -202,10 +199,10 @@ Feature flags
 Bug Fixes
 ---------
 
-- Updated cache functions to include the context when
-  needed. Previously backtracked gas costs for some cache calls are
-  now properly accounted for, increasing by at most 2 units of gas per
-  function call. (MR :gl:`!19134`)
+- **Breaking change** Updated cache functions to include the context
+  when needed. Previously backtracked gas costs for some cache calls
+  are now properly accounted for, increasing by at most 2 units of gas
+  per function call. (MR :gl:`!19134`)
 
 
 Minor Changes
