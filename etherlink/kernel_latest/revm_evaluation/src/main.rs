@@ -128,18 +128,22 @@ fn skip_investigation_test(test_name: &str) -> bool {
 }
 
 // See [SKIP-INVEST] comment.
-fn skip_investigation_file(file_name: &OsStr) -> bool {
+fn skip_investigation_file(file_name: &OsStr, report: &mut Report) -> bool {
     let file_name = file_name.to_str().unwrap();
-    matches!(
+    let skip = matches!(
         file_name,
         "ext_code_on_chain_delegating_set_code.json"
             | "tx_into_chain_delegating_set_code.json"
             | "tx_into_self_delegating_set_code.json"
             | "delegation_clearing_and_set.json"
-    )
+    );
+    if skip {
+        report.skipped_invest += 1;
+    }
+    skip
 }
 
-fn find_fixture(path: &Path, acc: &mut Fixtures) {
+fn find_fixture(path: &Path, acc: &mut Fixtures, report: &mut Report) {
     if path.is_dir() {
         if path.file_name().map(skip_dir).unwrap_or(false) {
             return;
@@ -150,12 +154,12 @@ fn find_fixture(path: &Path, acc: &mut Fixtures) {
             let entry_path = entry.path();
 
             if entry_path.is_dir() {
-                find_fixture(&entry_path, acc);
+                find_fixture(&entry_path, acc, report);
             } else if entry_path.is_file()
                 && !entry_path
                     .file_name()
                     .map(|file_name| {
-                        skip_file(file_name) || skip_investigation_file(file_name)
+                        skip_file(file_name) || skip_investigation_file(file_name, report)
                     })
                     .unwrap_or(false)
             {
@@ -171,9 +175,9 @@ fn find_fixture(path: &Path, acc: &mut Fixtures) {
     }
 }
 
-fn read_all_fixtures<P: AsRef<Path>>(fixtures_dir: P) -> Fixtures {
+fn read_all_fixtures<P: AsRef<Path>>(fixtures_dir: P, report: &mut Report) -> Fixtures {
     let mut fixtures = Vec::new();
-    find_fixture(fixtures_dir.as_ref(), &mut fixtures);
+    find_fixture(fixtures_dir.as_ref(), &mut fixtures, report);
     fixtures
 }
 
@@ -304,11 +308,15 @@ fn extract_gas_refunded(
 struct Report {
     success: u64,
     failure: u64,
+    skipped_invest: u64,
 }
 
 pub fn main() {
     let mut report = Report::default();
-    let fixtures = read_all_fixtures("etherlink/kernel_latest/revm_evaluation/fixtures");
+    let fixtures = read_all_fixtures(
+        "etherlink/kernel_latest/revm_evaluation/fixtures",
+        &mut report,
+    );
     // TODO: this is an option so that when we have the ability to print on the standard
     // output, we just have to replace it by None. The feature will be implemented soon.
     let mut output_file = Some(
@@ -340,7 +348,12 @@ pub fn main() {
         {
             let test_name = extract_brackets(&test_name);
 
-            if skip_test(test_name) || skip_investigation_test(test_name) {
+            if skip_test(test_name) {
+                continue;
+            }
+
+            if skip_investigation_test(test_name) {
+                report.skipped_invest += 1;
                 continue;
             }
 
@@ -430,9 +443,11 @@ pub fn main() {
         output_file,
         "\n@================== FINAL REPORT ==================@\n            \
             Successful test(s): {}\n            \
-            Failing test(s): {}\n\
+            Failing test(s): {}\n     \
+            Skipped but need investigation test(s): {}\n\
            @==================================================@",
         report.success,
-        report.failure
+        report.failure,
+        report.skipped_invest
     );
 }
