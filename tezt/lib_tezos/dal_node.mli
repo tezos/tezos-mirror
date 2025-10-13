@@ -113,7 +113,7 @@ val identity_file : t -> string
     [true] by default.
 
     [event_level] allows to determine the printed levels. By default,
-    it is set to [`Debug]. *)
+    it is set to [`Info]. *)
 val run :
   ?wait_ready:bool ->
   ?env:string String_map.t ->
