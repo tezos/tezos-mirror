@@ -6686,7 +6686,7 @@ module Garbage_collection = struct
     let* () =
       Dal_node.init_config ~attester_profiles:bootstrap_pkhs ~peers attester
     in
-    let* () = Dal_node.run ~wait_ready:true attester in
+    let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug attester in
     Log.info "attester DAL node ready" ;
 
     let slot_producer = Dal_node.create ~name:"producer" ~node () in
@@ -6699,7 +6699,7 @@ module Garbage_collection = struct
     let wait_for_connections_of_producer_promise =
       Dal_node.wait_for_connections slot_producer 2
     in
-    let* () = Dal_node.run ~wait_ready:true slot_producer in
+    let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug slot_producer in
 
     (* Check that the DAL nodes have the expected profiles. *)
     let* () =
