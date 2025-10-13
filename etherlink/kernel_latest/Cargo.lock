@@ -2568,6 +2568,7 @@ dependencies = [
  "revm-etherlink",
  "serde",
  "serde_json",
+ "structopt",
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
  "tezos-smart-rollup-core",
