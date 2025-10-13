@@ -49,9 +49,12 @@ URL="https://github.com/mozilla/sccache/releases/download/$SCCACHE_RELEASE/$ARCH
 echo "Downloading $ARCHIVE_NAME..."
 echo "From $URL"
 
-# Download sccache
-echo "Downloading sccache-$SCCACHE_RELEASE for $PLATFORM..."
-curl -L -o "$TMP_FILE" "https://github.com/mozilla/sccache/releases/download/$SCCACHE_RELEASE/sccache-$SCCACHE_RELEASE-$ARCH-unknown-linux-musl.tar.gz"
+if command -v kiss-fetch.sh > /dev/null 2>&1; then
+  kiss-fetch.sh "$URL" -o "$TMP_FILE"
+else
+  echo "Warning: Kiss-fetch.sh missing"
+  curl -L -Ss --fail "$URL" -o "$TMP_FILE"
+fi
 
 # Validate checksum
 DOWNLOADED_SHA256=$(sha256sum "$TMP_FILE" | cut -d ' ' -f1)
