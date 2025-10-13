@@ -114,6 +114,8 @@ Errors
 Protocol parameters
 -------------------
 
+.. _6s_block_time_parameters_alpha:
+
 6s Block Time (MRs :gl:`!19045`, :gl:`!19473`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

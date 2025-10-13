@@ -14,6 +14,82 @@ that may be breaking.
 
 In the particular case of RPC changes, you may consult complementary information on :ref:`RPC versioning <rpc_versioning>`, covering how new versions are introduced, the deprecation policy, and a concrete calendar of RPCs planned to be removed.
 
+
+
+Protocol alpha
+--------------
+
+:doc:`Full Protocol alpha Changelog<../protocols/alpha>`
+
+
+6s Block Time
+~~~~~~~~~~~~~
+
+Block time has been reduced from 8 seconds to 6 seconds on
+mainnet. That is, a block can be produced with a delay of 6 seconds
+with respect to the previous block, if the latter is at round 0.
+
+Multiple protocol and smart rollup parameters have been updated in
+consequence, to ensure that their duration in terms of
+minutes/hours/weeks remains the same as in protocol Seoul. A full list
+of affected parameters with their old and new values can be found
+:ref:`here<6s_block_time_parameters_alpha>`.
+
+Unlike other parameters, the value
+``smart_rollup_max_active_outbox_levels`` in term of blocks has not
+been updated for technical reasons. This means that the actual
+duration of the maximal allowed period of withdrawal has decreased
+from ~14 days to ~10 days.
+
+
+Breaking changes to RPCs
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Updated RPC ``GET
+  /chains/<chain_id>/blocks/<block_id>/helpers/validators`` to group
+  delegates by level. The returned list contains one element for each
+  queried level (by default, only the current level), and contains
+  four fields: the ``level`` itself, the ``consensus_threshold``
+  required for the current level, the ``consensus_committee`` of the
+  current level, and ``delegates`` which is the list of validators for
+  that level. Each element of this last list contains the fields
+  present in the previous version of this RPC: ``delegate``, "slots"
+  which have been renamed to ``rounds``, ``consensus_key``, and
+  ``companion_key`` (optional).  Also include new fields for
+  delegates, ``attesting_power``, with their attesting power for the
+  level, and ``attestation_slot``, their slot for the given level.
+
+- Updated RPC ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance``.
+  Output field ``baking_reward_bonus_per_slot`` has been replaced with
+  ``baking_reward_bonus_per_block``, and ``attesting_reward_per_slot``
+  with ``attesting_reward_per_block``. Their respective values are
+  consequently 7000 times as high as before (since there are 7000
+  slots per block).
+
+
+Removed obsolete fields from the block header and block receipts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The obsolete field ``adaptive_issuance_vote`` has been removed from
+the block header, and fields ``adaptive_issuance_vote_ema`` and
+``adaptive_issuance_activation_cycle`` from the block metadata.
+
+Note that the adaptive issuance activation cycle (which is 748 on
+mainnet) can still be queried via the RPC ``GET
+/chains/<chain>/blocks/<block>/context/adaptive_issuance_launch_cycle``.
+
+
+Very slight increase in gas cost when calling smart contracts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Protocol alpha fixes a minor bug that caused some gas costs to be
+omitted in cache functions. As a result, gas costs for smart contract
+calls has increased by at most 2 units of gas each time the cache is
+accessed.
+
+
+
 .. _operation_encodings_s:
 
 Operation encoding changes in Seoul
