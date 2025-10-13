@@ -192,10 +192,9 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
   (* Get available port for the API and indexer.
      (or given port for the API). *)
   let indexer_port = Agent.next_available_port agent in
-  let api_port = port_of_option agent tzkt_api_port in
   (* Print a log for the tezt-cloud user to retrieve the port of the indexer or API *)
   let () = toplog "Tzkt indexer will be available at port %d" indexer_port in
-  let () = toplog "Tzkt API will be available at port %d" api_port in
+  let () = toplog "Tzkt API will be available at port %d" tzkt_api_port in
 
   (* Prepare multiple argument for Tzkt indexer and API start. *)
   (* Set our endpoint for Tzkt instead of the default "https://rpc.tzkt.io/mainnet/".*)
@@ -229,7 +228,7 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
   let api_port_arg =
     tzkt_arg
       ["Kestrel"; "Endpoints"; "Http"; "Url"]
-      [sf "http://0.0.0.0:%d" api_port]
+      [sf "http://0.0.0.0:%d" tzkt_api_port]
   in
   let polling_args =
     [
@@ -267,7 +266,7 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
       ~port:api_port_arg
       ()
   in
-  return (build_endpoint ~runner api_port)
+  return (build_endpoint ~runner tzkt_api_port)
 
 let create_config_file ~agent destination format =
   let temp_file = Temp.file "config" in
@@ -582,6 +581,9 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                    Note that it will be publicy exposed, it's just that we don't
                    need to share this one. *)
                 (Cli.tzkt_api_port, None)
+          in
+          let internal_tzkt_api_port =
+            port_of_option tezlink_sequencer_agent internal_tzkt_api_port
           in
           let* tzkt_api =
             init_tzkt
