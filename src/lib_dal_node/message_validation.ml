@@ -283,6 +283,92 @@ let triage ctxt head_level proto_parameters batch =
   in
   {to_check_in_batch; not_valid}
 
+module Batches_stats =
+  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+    (struct
+      include Int32
+
+      let hash = Hashtbl.hash
+    end)
+
+type stat = {total_shards : int; total_duration : float; batches_count : int}
+
+let batches_stats_tbl = Batches_stats.create 5
+
+let last_stat_level = ref None
+
+let update_batches_stats number_of_slots cryptobox batch_size head_level batch_l
+    duration =
+  let {Cryptobox.number_of_shards; _} = Cryptobox.parameters cryptobox in
+  let shard_distribution = Array.init number_of_slots (fun _ -> 0) in
+  List.iter
+    (fun ({slot_index; _}, elems) ->
+      shard_distribution.(slot_index) <- List.length elems)
+    batch_l ;
+  let shard_percentage =
+    float_of_int (Array.fold_left ( + ) 0 shard_distribution)
+    /. (float_of_int number_of_shards *. float_of_int number_of_slots)
+    *. 100.
+  in
+  let s = Batches_stats.find_opt batches_stats_tbl head_level in
+  let batch_id =
+    match s with
+    | None ->
+        Batches_stats.replace
+          batches_stats_tbl
+          head_level
+          {
+            total_shards = batch_size;
+            total_duration = duration;
+            batches_count = 1;
+          } ;
+        1
+    | Some v ->
+        let batch_id = v.batches_count in
+        Batches_stats.replace
+          batches_stats_tbl
+          head_level
+          {
+            total_shards = v.total_shards + batch_size;
+            total_duration = v.total_duration +. duration;
+            batches_count = v.batches_count + 1;
+          } ;
+        batch_id
+  in
+  Event.emit_dont_wait__batch_validation_stats
+    ~batch_id
+    ~head_level
+    ~number_of_shards:batch_size
+    ~shard_percentage
+    ~duration ;
+  Event.emit_dont_wait__batch_validation_distribution_stats
+    ~batch_id
+    ~head_level
+    ~shard_distribution
+
+let may_finalize_batch_stats last_stat_level head_level =
+  match !last_stat_level with
+  | None -> last_stat_level := Some head_level
+  | Some last_level ->
+      (* When a new head is received, we assume the completion of the validation
+         of the shards of the previous level. This might be an incorrect
+         assumption when the shard distribution and validation duration exceed
+         the block time but it is good enough to observe the overall
+         behaviour. *)
+      if last_level != head_level then
+        match Batches_stats.find_opt batches_stats_tbl head_level with
+        | None -> ()
+        | Some {total_shards; total_duration; batches_count} ->
+            let () =
+              Event.emit_dont_wait__batch_validation_completion_stats
+                ~level:last_level
+                ~total_shard_processed:total_shards
+                ~total_batches_processed:batches_count
+                ~duration:total_duration
+            in
+            last_stat_level := Some head_level
+      else ()
+
 let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
     =
   if Node_context.is_bootstrap_node ctxt then
@@ -409,5 +495,16 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
                   :: ({level; slot_index}, second_half)
                   :: remaining_to_treat))
     in
-    treat_batch (Batch_tbl.to_seq to_check_in_batch |> List.of_seq) ;
+    let batch_l = Batch_tbl.to_seq to_check_in_batch |> List.of_seq in
+    let s = Unix.gettimeofday () in
+    treat_batch batch_l ;
+    let duration = Unix.gettimeofday () -. s in
+    update_batches_stats
+      proto_parameters.number_of_slots
+      cryptobox
+      batch_size
+      head_level
+      batch_l
+      duration ;
+    let () = may_finalize_batch_stats last_stat_level head_level in
     Array.to_list result
