@@ -5,7 +5,10 @@
 
 use revm::{
     bytecode::Bytecode,
-    context::JournalInner,
+    context::{
+        journaled_state::{AccountInfoLoad, JournalLoadError},
+        JournalInner,
+    },
     context_interface::{
         context::{SStoreResult, SelfDestructResult, StateLoad},
         journaled_state::{AccountLoad, JournalCheckpoint, JournalTr, TransferError},
@@ -86,7 +89,22 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         address: Address,
         key: StorageKey,
     ) -> Result<StateLoad<StorageValue>, <Self::Database as Database>::Error> {
-        self.inner.sload(&mut self.database, address, key)
+        self.sload_skip_cold_load(address, key, false)
+            .map_err(JournalLoadError::unwrap_db_error)
+    }
+
+    #[inline]
+    fn sload_skip_cold_load(
+        &mut self,
+        address: Address,
+        key: StorageKey,
+        skip_cold_load: bool,
+    ) -> Result<
+        StateLoad<StorageValue>,
+        JournalLoadError<<Self::Database as Database>::Error>,
+    > {
+        self.inner
+            .sload(&mut self.database, address, key, skip_cold_load)
     }
 
     fn sstore(
@@ -95,7 +113,23 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         key: StorageKey,
         value: StorageValue,
     ) -> Result<StateLoad<SStoreResult>, <Self::Database as Database>::Error> {
-        self.inner.sstore(&mut self.database, address, key, value)
+        self.sstore_skip_cold_load(address, key, value, false)
+            .map_err(JournalLoadError::unwrap_db_error)
+    }
+
+    #[inline]
+    fn sstore_skip_cold_load(
+        &mut self,
+        address: Address,
+        key: StorageKey,
+        value: StorageValue,
+        skip_cold_load: bool,
+    ) -> Result<
+        StateLoad<SStoreResult>,
+        JournalLoadError<<Self::Database as Database>::Error>,
+    > {
+        self.inner
+            .sstore(&mut self.database, address, key, value, skip_cold_load)
     }
 
     fn tload(&mut self, address: Address, key: StorageKey) -> StorageValue {
@@ -145,12 +179,15 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         address: Address,
         storage_keys: impl IntoIterator<Item = StorageKey>,
     ) -> Result<(), <Self::Database as Database>::Error> {
-        self.inner.load_account_optional(
-            &mut self.database,
-            address,
-            false,
-            storage_keys,
-        )?;
+        self.inner
+            .load_account_optional(
+                &mut self.database,
+                address,
+                false,
+                storage_keys,
+                false,
+            )
+            .map_err(JournalLoadError::unwrap_db_error)?;
         Ok(())
     }
 
@@ -167,6 +204,16 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         balance: U256,
     ) -> Result<Option<TransferError>, DB::Error> {
         self.inner.transfer(&mut self.database, from, to, balance)
+    }
+
+    #[inline]
+    fn transfer_loaded(
+        &mut self,
+        from: Address,
+        to: Address,
+        balance: U256,
+    ) -> Option<TransferError> {
+        self.inner.transfer_loaded(from, to, balance)
     }
 
     #[inline]
@@ -284,6 +331,31 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
     fn finalize(&mut self) -> Self::State {
         self.database.commit(self.layered_state.finalize());
         self.inner.finalize()
+    }
+
+    fn load_account_info_skip_cold_load(
+        &mut self,
+        address: Address,
+        load_code: bool,
+        skip_cold_load: bool,
+    ) -> Result<AccountInfoLoad<'_>, JournalLoadError<<Self::Database as Database>::Error>>
+    {
+        let spec = self.inner.spec;
+        self.inner
+            .load_account_optional(
+                &mut self.database,
+                address,
+                load_code,
+                [],
+                skip_cold_load,
+            )
+            .map(|a| {
+                AccountInfoLoad::new(
+                    &a.data.info,
+                    a.is_cold,
+                    a.state_clear_aware_is_empty(spec),
+                )
+            })
     }
 }
 
