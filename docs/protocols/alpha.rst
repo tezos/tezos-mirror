@@ -14,6 +14,8 @@ branch of Octez and the full documentation in :doc:`this page <../alpha/index>`.
 Environment Version
 -------------------
 
+Protocol alpha uses the same environment version V15 as protocol
+Seoul.
 
 
 Smart Rollups
