@@ -92,12 +92,59 @@ accessed.
 
 
 
+Octez Version 23
+----------------
+
+:doc:`Full Octez Version 23 Changelog<../releases/version-23>`
+
+Operation encoding changes
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Multiple client commands and RPCs in Octez v23 are affected by the
+:ref:`operation encoding changes in protocol Seoul described
+below<operation_encodings_s>`. It is recommended to update any tool
+producing or processing reveal operations to a Seoul-compatible
+version.
+
+
+Unique baker executable and unique accuser executable
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Starting with Octez v23, the single executable ``octez-baker``
+(previously named ``octez-experimental-agnostic-baker``) is no longer
+experimental, and should be preferred over the protocol-suffixed
+executables ``octez-baker-<proto-hash>``, which will be deprecated in
+``v24``, and will be removed in a later version.
+
+Similarly, Octez v23 also introduces a single executable
+``octez-accuser`` meant to gradually replace the protocol-suffixed
+executables ``octez-accuser-<proto-hash>``.
+
+
+Stricter validation for JSON configuration files
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Previously, the parser would silently ignore any content that appeared
+after the first valid JSON object. Now, any extraneous data in a
+configuration file will cause the function to return an error.
+
+This change affects the configuration files of the node, client,
+signer, baker, accuser, smart rollup node, and DAL node.
+
+
+
+Protocol Seoul
+--------------
+
+:doc:`Full Protocol Seoul Changelog<../protocols/023_seoul>`
+
 .. _operation_encodings_s:
 
-Operation encoding changes in Seoul
------------------------------------
+Operation encoding changes
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Protocol S adds new operations and changes the encoding of some existing operations, for instance by adding new fields.
+Protocol Seoul adds new operations and changes the encoding of some
+existing operations, for instance by adding new fields.
 These changes are related to the support for tz4 BLS addresses and their aggregated signatures.
 
 Backward compatibility
@@ -132,6 +179,10 @@ All existing tz4 addresses are being unrevealed when protocol S is adopted, and 
 This proof may be generated using the client command::
 
 	octez-client create bls proof for <alias>
+
+
+Older Octez versions and protocols
+==================================
 
 Attestations
 ------------
@@ -276,16 +327,3 @@ In Octez ``v21.3``, this option is not mandatory and will only trigger a warning
 Starting from Octez ``v22``, launching a baker daemon requires an explicit mention of the DAL.
 The recommended approach is to run a DAL node and start the baker using the ``--dal-node <uri>`` option.
 If you do not wish to use a DAL node, you can opt-out by using the ``--without-dal`` option.
-
-Unique baker executable
------------------------
-
-Starting with Octez ``v23``, the single executable ``octez-baker`` (previously named ``octez-experimental-agnostic-baker``) is no longer experimental, and should be preferred over the protocol-suffixed executables ``octez-baker-<proto-hash>``, which will be deprecated in ``v24``, and will be removed in a later version.
-
-Upcoming changes
-================
-
-Unique accuser executable
--------------------------
-
-Similarly to the unique baker executable, Octez ``v23`` also introduces a single executable ``octez-accuser`` meant to gradually replace the protocol-suffixed executables ``octez-accuser-<proto-hash>``.
