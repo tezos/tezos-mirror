@@ -19,7 +19,7 @@ use crate::parsing::{
 
 use crate::sequencer_blueprint::UnsignedSequencerBlueprint;
 use crate::storage::{
-    chunked_hash_transaction_path, chunked_transaction_num_chunks,
+    chunked_transaction_hash_exists, chunked_transaction_num_chunks,
     chunked_transaction_path, clear_events, create_chunked_transaction, read_l1_level,
     read_last_info_per_level_timestamp, remove_chunked_transaction, remove_sequencer,
     store_l1_level, store_last_info_per_level_timestamp, store_transaction_chunk,
@@ -307,9 +307,7 @@ fn handle_transaction_chunk<Host: Runtime>(
     }
     // Check if the chunk hash is part of the announced chunked hashes.
     let chunked_transaction_path = chunked_transaction_path(&tx_hash)?;
-    let chunk_hash_path =
-        chunked_hash_transaction_path(&chunk_hash, &chunked_transaction_path)?;
-    if host.store_read(&chunk_hash_path, 0, 0).is_err() {
+    if !chunked_transaction_hash_exists(host, &chunked_transaction_path, &chunk_hash)? {
         return Ok(None);
     }
     // Sanity check to verify that the transaction chunk uses the maximum
