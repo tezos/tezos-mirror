@@ -9,6 +9,19 @@
 (* time interval in hours at which to submit report *)
 let report_interval = 6
 
+(* `group_by n l` outputs the list of lists with the same elements as `l`
+    but with `n` elements per list (except the last one).
+    For instance
+    `group_by 4 [a_1, ..., a_10] = [[a_1, ..., a_4], [a_5, ..., a_8],  [a_9, a_10]]`
+*)
+let group_by n =
+  let rec bis local_acc main_acc k = function
+    | [] -> List.rev (List.rev local_acc :: main_acc)
+    | l when k = 0 -> bis [] (List.rev local_acc :: main_acc) n l
+    | hd :: tl -> bis (hd :: local_acc) main_acc (k - 1) tl
+  in
+  bis [] [] n
+
 let pp_delegate fmt delegate_pkh =
   match Hashtbl.find_opt Metrics.aliases delegate_pkh with
   | None -> Format.fprintf fmt "%s" delegate_pkh
@@ -545,19 +558,6 @@ module Tasks = struct
         dal_on
     in
     let dal_off = List.sort stake_descending dal_off in
-    (* `group_by n l` outputs the list of lists with the same elements as `l`
-       but with `n` elements per list (except the last one).
-       For instance
-       `group_by 4 [a_1, ..., a_10] = [[a_1, ..., a_4], [a_5, ..., a_8],  [a_9, a_10]]`
-    *)
-    let group_by n =
-      let rec bis local_acc main_acc k = function
-        | [] -> List.rev (List.rev local_acc :: main_acc)
-        | l when k = 0 -> bis [] (List.rev local_acc :: main_acc) n l
-        | hd :: tl -> bis (hd :: local_acc) main_acc (k - 1) tl
-      in
-      bis [] [] n
-    in
     let agglomerate_infos bakers =
       let nb, stake =
         List.fold_left
