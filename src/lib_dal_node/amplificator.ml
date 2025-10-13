@@ -164,10 +164,8 @@ module Reconstruction_process_worker = struct
     return_unit
 
   let reconstruct cryptobox precomputation shards =
-    let open Lwt_result_syntax in
-    let* polynomial =
-      Slot_manager.polynomial_from_shards cryptobox shards |> Errors.to_tzresult
-    in
+    let open Result_syntax in
+    let* polynomial = Slot_manager.polynomial_from_shards cryptobox shards in
     let shards =
       Cryptobox.shards_from_polynomial cryptobox polynomial |> List.of_seq
     in
@@ -231,12 +229,11 @@ module Reconstruction_process_worker = struct
           Binary.of_bytes_exn (list Cryptobox.shard_encoding) bytes_shards)
         |> List.to_seq
       in
-
       let*! () = Event.emit_crypto_process_received_query ~query_id in
-
-      (* crypto computation *)
+      (* Crypto computation *)
       let* proved_shards_encoded =
         reconstruct cryptobox shards_proofs_precomputation shards
+        |> Lwt.return |> Errors.to_tzresult
       in
       return proved_shards_encoded
     in

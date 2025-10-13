@@ -174,12 +174,12 @@ let commit cryptobox polynomial =
 
 let polynomial_from_shards cryptobox shards =
   match Cryptobox.polynomial_from_shards cryptobox shards with
-  | Ok p -> Lwt.return_ok p
+  | Ok p -> Ok p
   | Error
       ( `Not_enough_shards msg
       | `Shard_index_out_of_range msg
       | `Invalid_shard_length msg ) ->
-      Lwt.return_error (Errors.other [Merging_failed msg])
+      Error (Errors.other [Merging_failed msg])
 
 let get_slot_content_from_shards cryptobox store slot_id =
   let open Lwt_result_syntax in
@@ -201,7 +201,7 @@ let get_slot_content_from_shards cryptobox store slot_id =
       | Error _ -> loop acc (shard_id + 1) remaining
   in
   let* shards = loop Seq.empty 0 minimal_number_of_shards in
-  let* polynomial = polynomial_from_shards cryptobox shards in
+  let*? polynomial = polynomial_from_shards cryptobox shards in
   let slot = Cryptobox.polynomial_to_slot cryptobox polynomial in
   (* Store the slot so that next calls don't require a reconstruction. *)
   let* () = Store.Slots.add_slot (Store.slots store) ~slot_size slot slot_id in

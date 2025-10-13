@@ -61,7 +61,7 @@ val get_slot_pages :
 val polynomial_from_shards :
   Cryptobox.t ->
   Cryptobox.shard Seq.t ->
-  (Cryptobox.polynomial, [> Errors.other]) result Lwt.t
+  (Cryptobox.polynomial, [> Errors.other]) result
 
 type error +=
   | Invalid_slot_size of {provided : int; expected : int}
