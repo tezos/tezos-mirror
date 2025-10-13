@@ -471,10 +471,7 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
       agent
   in
   let tezlink_sandbox_endpoint =
-    Client.(
-      Foreign_endpoint
-        Endpoint.
-          {(Evm_node.rpc_endpoint_record evm_node) with path = "/tezlink"})
+    build_endpoint ~path:"/tezlink" ~runner:(Agent.runner agent) rpc_port
   in
   let () = toplog "Launching the sandbox L2 node: done" in
   let* () = add_prometheus_source ~evm_node cloud agent name in
