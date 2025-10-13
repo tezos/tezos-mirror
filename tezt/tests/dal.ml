@@ -6682,7 +6682,6 @@ module Garbage_collection = struct
       |> Seq.map (fun account -> account.Account.public_key_hash)
       |> List.of_seq
     in
-    Dal_node.log_events attester ;
     let* () =
       Dal_node.init_config ~attester_profiles:bootstrap_pkhs ~peers attester
     in
@@ -6690,7 +6689,6 @@ module Garbage_collection = struct
     Log.info "attester DAL node ready" ;
 
     let slot_producer = Dal_node.create ~name:"producer" ~node () in
-    Dal_node.log_events slot_producer ;
     let* () =
       Dal_node.init_config ~operator_profiles:[slot_index] ~peers slot_producer
     in
