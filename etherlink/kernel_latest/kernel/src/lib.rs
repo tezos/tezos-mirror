@@ -242,7 +242,7 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
             return Ok(());
         }
         Ok(MigrationStatus::Done) => {
-            // If a migrtion was finished, we update the kernel version
+            // If a migration was finished, we update the kernel version
             // in the storage.
             set_kernel_version(host)?;
             host.mark_for_reboot()?;

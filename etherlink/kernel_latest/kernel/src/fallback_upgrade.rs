@@ -29,13 +29,21 @@ pub fn backup_current_kernel(host: &mut impl Runtime) -> Result<(), RuntimeError
     // If there is a kernel root hash (which is not mandatory after origination,
     // we copy it to the backup, otherwise we just copy empty bytes to have
     // something to fallback on.
-    if host.store_has(&KERNEL_ROOT_HASH)?.is_some() {
-        host.store_copy(&KERNEL_ROOT_HASH, &BACKUP_KERNEL_ROOT_HASH)?;
-    } else {
-        host.store_write_all(&BACKUP_KERNEL_ROOT_HASH, &[0; PREIMAGE_HASH_SIZE])?;
-    }
+    match host.store_read(&KERNEL_ROOT_HASH, 0, PREIMAGE_HASH_SIZE) {
+        Ok(root_hash) => {
+            host.store_write(&BACKUP_KERNEL_ROOT_HASH, &root_hash, 0)?;
+        }
+        Err(RuntimeError::PathNotFound) => {
+            host.store_write(&BACKUP_KERNEL_ROOT_HASH, &[0; PREIMAGE_HASH_SIZE], 0)?;
+        }
+        Err(e) => return Err(e),
+    };
 
-    host.store_copy(&KERNEL_BOOT_PATH, &BACKUP_KERNEL_BOOT_PATH)
+    match host.store_read_all(&KERNEL_BOOT_PATH) {
+        Ok(kernel) => host.store_write_all(&BACKUP_KERNEL_BOOT_PATH, &kernel),
+        Err(RuntimeError::PathNotFound) => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 pub fn fallback_backup_kernel(host: &mut impl Runtime) -> Result<(), RuntimeError> {
@@ -45,6 +53,9 @@ pub fn fallback_backup_kernel(host: &mut impl Runtime) -> Result<(), RuntimeErro
         "Something went wrong, fallback mechanism is triggered."
     );
 
-    host.store_copy(&BACKUP_KERNEL_ROOT_HASH, &KERNEL_ROOT_HASH)?;
-    host.store_copy(&BACKUP_KERNEL_BOOT_PATH, &KERNEL_BOOT_PATH)
+    let backup_kernel_root_hash = host.store_read_all(&BACKUP_KERNEL_ROOT_HASH)?;
+    host.store_write_all(&KERNEL_ROOT_HASH, &backup_kernel_root_hash)?;
+
+    let backup_kernel_boot = host.store_read_all(&BACKUP_KERNEL_BOOT_PATH)?;
+    host.store_write_all(&KERNEL_BOOT_PATH, &backup_kernel_boot)
 }
