@@ -704,31 +704,49 @@ module Alert = struct
     let data =
       let header =
         Format.sprintf
-          "*[lost-dal-rewards]* On network `%s`, delegates have lost DAL \
+          "*[lost-dal-rewards]* On network `%s`, %d delegates have lost DAL \
            rewards at cycle `%d`, level `%d`. \
            <https://%s.tzkt.io/%d/implicit_operations/dal_attestation_reward \
            |See online>"
           (Network.to_string network)
+          (List.length lost_dal_rewards)
           cycle
           level
           (Network.to_string network)
           level
       in
-      let content =
-        List.map
-          (fun (`delegate delegate, `change change) ->
-            Format.asprintf
-              ":black_small_square: %a has missed ~%.1f tez DAL attestation \
-               rewards"
-              pp_delegate
-              delegate
-              (float_of_int change /. 1_000_000.))
-          lost_dal_rewards
-      in
-      Format_app.section (header :: content) ()
+      Format_app.section [header] ()
     in
-    let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
-    Lwt.return_unit
+    let* ts = post_message ~slack_channel_id ~slack_bot_token data in
+    (* Lost DAL rewards are sorted to get the biggest amount first. *)
+    let lost_dal_rewards =
+      List.sort
+        (fun (_, `change c1) (_, `change c2) -> -Int.compare c1 c2)
+        lost_dal_rewards
+    in
+    let lost_dal_rewards =
+      List.map
+        encapsulate_in_code_block
+        (group_by
+           15
+           (List.map
+              (fun (`delegate delegate, `change change) ->
+                Format.asprintf
+                  "%a has missed ~%.2f tez"
+                  pp_delegate
+                  delegate
+                  (float_of_int change /. 1_000_000.))
+              lost_dal_rewards))
+    in
+    Lwt_list.iter_s
+      (fun to_post ->
+        let data =
+          let open Format_app in
+          section to_post ()
+        in
+        let* _ts = post_message ~ts ~slack_channel_id ~slack_bot_token data in
+        unit)
+      lost_dal_rewards
 
   let check_for_lost_dal_rewards ~cloud ~network ~metadata =
     match Cloud.notifier cloud with
