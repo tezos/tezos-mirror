@@ -483,6 +483,30 @@ let add_service cloud ~name ~url =
   let () = toplog "New service: %s: %s" name url in
   Cloud.add_service cloud ~name ~url
 
+(* The sequencer and the TzKT API may be proxified by a Nginx
+   reverse-proxy to support HTTPS and, in the case of the sequencer,
+   add a /tezlink path prefix. *)
+type proxy_internal_info = {port : int; path : string option}
+
+type proxy_info =
+  | No_proxy of proxy_internal_info
+  | Https_proxy of {
+      dns_domain : string;
+      external_port : int;
+      internal_info : proxy_internal_info;
+    }
+
+let proxy_internal_info = function
+  | No_proxy internal_info | Https_proxy {internal_info; _} -> internal_info
+
+let proxy_internal_port proxy_info = (proxy_internal_info proxy_info).port
+
+let proxy_internal_endpoint proxy_info =
+  let host = "127.0.0.1" in
+  let scheme = "http" in
+  let {path; port} = proxy_internal_info proxy_info in
+  Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme ~port ())
+
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
   let name = "tezlink-sequencer" in
@@ -523,32 +547,34 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                  command line."
             else Some dns_domain
       in
-      let internal_port =
+      let sequencer_proxy_info =
+        let path = Some "/tezlink" in
         match dns_domain with
-        | None ->
-            (* No DNS so no proxy, so we must use the public RPC port. *)
-            public_rpc_port
-        | Some _ ->
-            (* We let the system choose a fresh internal RPC node port.
-               Note that it will be publicy exposed, it's just that we don't need
-               to share this one. *)
-            Agent.next_available_port tezlink_sequencer_agent
+        | None -> No_proxy {port = public_rpc_port; path}
+        | Some dns_domain ->
+            let internal_port =
+              Agent.next_available_port tezlink_sequencer_agent
+            in
+            let external_port = public_rpc_port in
+            Https_proxy
+              {
+                internal_info = {port = internal_port; path};
+                external_port;
+                dns_domain;
+              }
       in
       let () = toplog "Starting Tezlink sequencer" in
       let* () =
         init_tezlink_sequencer
           cloud
           name
-          ~rpc_port:internal_port
+          ~rpc_port:(proxy_internal_port sequencer_proxy_info)
           Cli.verbose
           Cli.time_between_blocks
           tezlink_sequencer_agent
       in
       let tezlink_sandbox_endpoint =
-        build_endpoint
-          ~path:"/tezlink"
-          ~runner:(Agent.runner tezlink_sequencer_agent)
-          internal_port
+        proxy_internal_endpoint sequencer_proxy_info
       in
       let tezlink_proxy_endpoint =
         match tezlink_sandbox_endpoint with
