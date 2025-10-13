@@ -25,6 +25,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Invalid_slot of {level : Level_repr.t; slot : Slot_repr.t}
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"validate.invalid_slot"
+    ~title:"Invalid slot"
+    ~description:"The provided slot is not valid."
+    ~pp:(fun ppf (level, slot) ->
+      Format.fprintf
+        ppf
+        "Cannot provide the delegate for slot %a at level %a."
+        Slot_repr.pp
+        slot
+        Level_repr.pp
+        level)
+    Data_encoding.(
+      obj2 (req "level" Level_repr.encoding) (req "slot" Slot_repr.encoding))
+    (function Invalid_slot {level; slot} -> Some (level, slot) | _ -> None)
+    (fun (level, slot) -> Invalid_slot {level; slot})
+
 module Delegate_sampler_state = struct
   module Cache_client = struct
     type cached_value = Delegate_consensus_key.pk Sampler.t
@@ -146,8 +167,6 @@ module Random = struct
     return (c, pk)
 end
 
-let slot_owner c level slot = Random.owner c level (Slot_repr.to_int slot)
-
 let baking_rights_owner c (level : Level_repr.t) ~round =
   let open Lwt_result_syntax in
   (* This committee is used for rounds *)
@@ -188,6 +207,7 @@ let stake_info_for_cycle ctxt cycle =
     in
     return (ctxt, total_stake, stakes_pk)
   in
+  (* The returned list of delegates is already sorted *)
   Raw_context.stake_info_for_cycle ~read ctxt cycle
 
 let stake_info ctxt level =
@@ -200,6 +220,16 @@ let load_stake_info_for_cycle ctxt cycle =
     stake_info_for_cycle ctxt cycle
   in
   return ctxt
+
+let attestation_slot_owner ~all_bakers_attest_enabled ctxt level slot =
+  let open Lwt_result_syntax in
+  if all_bakers_attest_enabled then
+    let* ctxt, _, info = stake_info ctxt level in
+    let i = Slot_repr.to_int slot in
+    match List.nth info i with
+    | None -> tzfail (Invalid_slot {level; slot})
+    | Some (owner, _) -> return (ctxt, owner)
+  else Random.owner ctxt level (Slot_repr.to_int slot)
 
 let get_delegate_stake_from_staking_balance ctxt delegate staking_balance =
   let open Lwt_result_syntax in
@@ -330,7 +360,10 @@ let attesting_power ~all_bakers_attest_enabled ctxt level =
     in
     Slot_repr.Range.fold_es
       (fun (ctxt, map) slot ->
-        let* ctxt, consensus_pk = slot_owner ctxt level slot in
+        let* ctxt, consensus_pk =
+          (* all_bakers_attest_enabled = false *)
+          attestation_slot_owner ~all_bakers_attest_enabled ctxt level slot
+        in
         let map =
           Signature.Public_key_hash.Map.update
             consensus_pk.delegate

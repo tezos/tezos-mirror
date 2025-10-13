@@ -135,8 +135,8 @@ let attesting_rights (ctxt : t) level =
     Slot.Range.rev_fold_es
       (fun (ctxt, map) slot ->
         let*? round = Round.of_slot slot in
-        let* ctxt, consensus_pk =
-          Stake_distribution.slot_owner ctxt level slot
+        let* ctxt, _, consensus_pk =
+          Stake_distribution.baking_rights_owner ctxt level ~round
         in
         let map =
           Signature.Public_key_hash.Map.update
@@ -226,8 +226,9 @@ let attesting_rights_by_first_slot ctxt level :
   let* ctxt, (delegates_map, slots_map) =
     Slot.Range.fold_es
       (fun (ctxt, (delegates_map, slots_map)) slot ->
-        let+ ctxt, consensus_key =
-          Stake_distribution.slot_owner ctxt level slot
+        let*? round = Round.of_slot slot in
+        let+ ctxt, _, consensus_key =
+          Stake_distribution.baking_rights_owner ctxt level ~round
         in
         let initial_slot, delegates_map =
           match

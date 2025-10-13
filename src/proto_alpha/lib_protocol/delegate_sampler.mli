@@ -34,13 +34,16 @@
    This module is responsible for maintaining the table
    {!Storage.Delegate_sampler_state}. *)
 
+type error += Invalid_slot of {level : Level_repr.t; slot : Slot_repr.t}
+
 (** Participation slots potentially associated to accounts. The
    accounts that didn't place a deposit will be excluded from this
    list. This function should only be used to compute the deposits to
    freeze or initialize the protocol while stitching. RPCs can use this
    function to predict an approximation of long term future slot
    allocations. It shouldn't be used in the baker. *)
-val slot_owner :
+val attestation_slot_owner :
+  all_bakers_attest_enabled:bool ->
   Raw_context.t ->
   Level_repr.t ->
   Slot_repr.t ->

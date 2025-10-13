@@ -5288,7 +5288,7 @@ module Stake_distribution : sig
     round:Round.t ->
     (context * Slot.t * Consensus_key.pk) tzresult Lwt.t
 
-  val slot_owner :
+  val attestation_slot_owner :
     context -> Level.t -> Slot.t -> (context * Consensus_key.pk) tzresult Lwt.t
 
   val stake_info_for_cycle :

@@ -144,7 +144,6 @@ module Consensus = struct
         hash : Operation_hash.t;
       }
     | Empty_aggregation_committee
-    | All_bakers_attest_not_implemented
 
   let () =
     register_error_kind
@@ -465,17 +464,7 @@ module Consensus = struct
         Format.fprintf ppf "The aggregation committee is empty.")
       Data_encoding.empty
       (function Empty_aggregation_committee -> Some () | _ -> None)
-      (fun () -> Empty_aggregation_committee) ;
-    register_error_kind
-      `Permanent
-      ~id:"validate.all_bakers_attest_not_implemented"
-      ~title:"All bakers attest not implemented"
-      ~description:"All bakers attest is not implemented yet"
-      ~pp:(fun ppf () ->
-        Format.fprintf ppf "All bakers attest is not implemented yet")
-      Data_encoding.empty
-      (function All_bakers_attest_not_implemented -> Some () | _ -> None)
-      (fun () -> All_bakers_attest_not_implemented)
+      (fun () -> Empty_aggregation_committee)
 end
 
 module Voting = struct

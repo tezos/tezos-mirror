@@ -37,7 +37,10 @@ let shards ctxt ~level =
   let*? slots = Slot.Range.create ~min:0 ~count:number_of_shards in
   Slot.Range.rev_fold_es
     (fun (ctxt, map) slot ->
-      let* ctxt, consensus_pk = Stake_distribution.slot_owner ctxt level slot in
+      let*? round = Round.of_slot slot in
+      let* ctxt, _, consensus_pk =
+        Stake_distribution.baking_rights_owner ctxt level ~round
+      in
       let slot = Slot.to_int slot in
       let map =
         Signature.Public_key_hash.Map.update

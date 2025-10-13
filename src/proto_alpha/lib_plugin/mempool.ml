@@ -824,7 +824,7 @@ let get_context context ~(head : Tezos_base.Block_header.shell_header) =
 
 let sources_from_level_and_slot ctxt level slot =
   let open Lwt_syntax in
-  let* slot_owner = Stake_distribution.slot_owner ctxt level slot in
+  let* slot_owner = Stake_distribution.attestation_slot_owner ctxt level slot in
   match slot_owner with
   | Ok
       ( _ctxt,
