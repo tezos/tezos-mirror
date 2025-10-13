@@ -1273,6 +1273,44 @@ let aggregated_operations_retrival_from_block_content =
   in
   unit
 
+let unable_to_reach_node_mempool =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker shuts down when unable to reach the node mempool"
+    ~tags:[team; "operation_worker"; "shutdown"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+    ~supports:Protocol.(From_protocol 023)
+  @@ fun protocol ->
+  log_step 1 "Initialize a node with the mempool disabled" ;
+  let* node, client =
+    Client.init_with_protocol
+      ~nodes_args:[Connections 0; Synchronisation_threshold 0; Disable_mempool]
+      `Client
+      ~timestamp:Now
+      ~protocol
+      ()
+  in
+  log_step 2 "Run a baker" ;
+  let* baker = Agnostic_baker.init node client in
+  log_step 3 "Wait for baker termination" ;
+  let* outcome =
+    Lwt.choose
+      [
+        (let* () = Agnostic_baker.wait_for_termination baker in
+         return `Terminated);
+        (* Saves some CI time by failing after 2 minutes if the baker fails to
+           shut down as expected.*)
+        (let* () = Lwt_unix.sleep 120. in
+         return `Timeout);
+      ]
+  in
+  match outcome with
+  | `Terminated -> unit
+  | `Timeout ->
+      Test.fail
+        "The baker failed to shut down after being unable to reach the node \
+         mempool for 2 minutes"
+
 let register ~protocols =
   check_node_version_check_bypass_test protocols ;
   check_node_version_allowed_test protocols ;
@@ -1290,4 +1328,5 @@ let register ~protocols =
   prequorum_check_levels protocols ;
   attestations_aggregation_on_reproposal_local_context protocols ;
   attestations_aggregation_on_reproposal_remote_node protocols ;
-  aggregated_operations_retrival_from_block_content protocols
+  aggregated_operations_retrival_from_block_content protocols ;
+  unable_to_reach_node_mempool protocols

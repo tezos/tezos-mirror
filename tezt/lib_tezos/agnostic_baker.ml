@@ -321,6 +321,15 @@ let wait_for_ready agnostic_baker =
         resolver :: agnostic_baker.persistent_state.pending_ready ;
       check_event agnostic_baker "starting baker daemon" promise
 
+let wait_for_termination (baker : t) : unit Lwt.t =
+  match baker.status with
+  | Not_running -> Lwt.return_unit
+  | Running {event_loop_promise = Some p; _} -> p
+  | Running {event_loop_promise = None; _} ->
+      invalid_arg
+        "Agnostic_baker.wait_for_termination called before Agnostic_baker.run \
+         returned"
+
 let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
     ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])
     ?votefile ?liquidity_baking_toggle_vote ?force_apply_from_round ?remote_mode
