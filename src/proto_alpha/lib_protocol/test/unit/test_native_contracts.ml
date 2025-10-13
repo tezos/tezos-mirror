@@ -31,7 +31,19 @@ let test_unparse_ty loc ctxt expected ty =
       ty
   in
   if actual = expected then Ok ctxt
-  else Alcotest.failf "Unexpected error: %s" loc
+  else Alcotest.failf "Unexpected error: unparsing %s" loc
+
+let test_unparse_parameter_ty ctxt expected ty entrypoints =
+  let open Result_syntax in
+  let* actual, ctxt =
+    Script_ir_unparser.unparse_parameter_ty
+      ctxt
+      ~loc:Environment.Micheline.dummy_location
+      ty
+      ~entrypoints
+  in
+  if actual = expected then Ok ctxt
+  else Alcotest.failf "Unexpected error: unparsing parameter"
 
 let location = function
   | Environment.Micheline.Prim (loc, _, _, _)
@@ -40,6 +52,28 @@ let location = function
   | Bytes (loc, _)
   | Seq (loc, _) ->
       loc
+
+let test_parse_parameter_ty (type exp expc) ctxt node
+    (expected : (exp, expc) Script_typed_ir.ty) =
+  let open Result_wrap_syntax in
+  let@ result =
+    let* Ex_parameter_ty_and_entrypoints {arg_type; entrypoints = _}, ctxt =
+      Script_ir_translator.parse_parameter_ty_and_entrypoints
+        ctxt
+        ~legacy:true
+        node
+    in
+    let* eq, ctxt =
+      Gas_monad.run ctxt
+      @@ Script_ir_translator.ty_eq
+           ~error_details:(Informative (location node))
+           arg_type
+           expected
+    in
+    let+ Eq = eq in
+    ctxt
+  in
+  result
 
 let test_parse_ty (type exp expc) ctxt node
     (expected : (exp, expc) Script_typed_ir.ty) =
@@ -84,6 +118,7 @@ let test_native_contract_types kind () =
                 untyped = untyped_parameter_type;
                 typed = Script_typed_ir.Ty_ex_c parameter_type;
               },
+              parameter_entrypoints,
               {
                 untyped = untyped_storage_type;
                 typed = Script_typed_ir.Ty_ex_c storage_type;
@@ -91,9 +126,15 @@ let test_native_contract_types kind () =
     Script_native_types.Internal_for_tests.types_of_kind kind
   in
   let*?@ ctxt =
-    test_unparse_ty "parameter" ctxt untyped_parameter_type parameter_type
+    test_unparse_parameter_ty
+      ctxt
+      untyped_parameter_type
+      parameter_type
+      parameter_entrypoints
   in
-  let*? ctxt = test_parse_ty ctxt untyped_parameter_type parameter_type in
+  let*? ctxt =
+    test_parse_parameter_ty ctxt untyped_parameter_type parameter_type
+  in
   let*?@ ctxt =
     test_unparse_ty "storage" ctxt untyped_storage_type storage_type
   in
