@@ -24,6 +24,7 @@ use std::{
     ffi::OsStr,
     fs::{self, File, OpenOptions},
     path::Path,
+    process::exit,
 };
 use structopt::StructOpt;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
@@ -331,15 +332,19 @@ pub fn main() {
     let fixtures = read_all_fixtures(opt.test_cases_path, &mut report);
     // TODO: this is an option so that when we have the ability to print on the standard
     // output, we just have to replace it by None. The feature will be implemented soon.
-    let mut output_file = Some(
-        OpenOptions::new()
-            .write(true)
-            .append(false)
-            .truncate(true)
-            .create(true)
-            .open("revm_evaluation.logs")
-            .unwrap(),
-    );
+    let mut output_file = if cfg!(feature = "disable-file-logs") {
+        None
+    } else {
+        Some(
+            OpenOptions::new()
+                .write(true)
+                .append(false)
+                .truncate(true)
+                .create(true)
+                .open("revm_evaluation.logs")
+                .unwrap(),
+        )
+    };
 
     let mut host = prepare_host();
 
@@ -462,4 +467,15 @@ pub fn main() {
         report.failure,
         report.skipped_invest
     );
+
+    if report.failure > 0 {
+        eprintln!(
+            "The execution isn't 100% compatible anymore. \
+             Use the revm evaluation assessor to output debug \
+             traces and find the issue."
+        );
+        exit(1)
+    } else {
+        exit(0)
+    }
 }
