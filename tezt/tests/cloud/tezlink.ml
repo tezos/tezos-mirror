@@ -384,9 +384,9 @@ let init_faucet_frontend ~faucet_api ~agent ~tezlink_sandbox_endpoint
   in
   return (build_endpoint ~runner faucet_frontend_port)
 
-let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
-    ?(rpc_port : int option) (verbose : bool)
-    (time_between_blocks : Evm_node.time_between_blocks) agent =
+let init_tezlink_sequencer (cloud : Cloud.t) (name : string) ~(rpc_port : int)
+    (verbose : bool) (time_between_blocks : Evm_node.time_between_blocks) agent
+    =
   let chain_id = 1 in
   let () = toplog "Initializing the tezlink scenario" in
   let tezlink_config = Temp.file "l2-tezlink-config.yaml" in
@@ -465,7 +465,7 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
              ())
       ~name:"tezlink-sandboxed-sequencer"
       ~mode
-      ?rpc_port
+      ~rpc_port
       "http://dummy_rollup_endpoint"
       cloud
       agent
@@ -531,19 +531,19 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         match dns_domain with
         | None ->
             (* No DNS so no proxy, so we must use the public RPC port. *)
-            Some public_rpc_port
+            public_rpc_port
         | Some _ ->
             (* We let the system choose a fresh internal RPC node port.
                Note that it will be publicy exposed, it's just that we don't need
                to share this one. *)
-            None
+            Agent.next_available_port tezlink_sequencer_agent
       in
       let () = toplog "Starting Tezlink sequencer" in
       let* tezlink_sandbox_endpoint =
         init_tezlink_sequencer
           cloud
           name
-          ?rpc_port:internal_port
+          ~rpc_port:internal_port
           Cli.verbose
           Cli.time_between_blocks
           tezlink_sequencer_agent
