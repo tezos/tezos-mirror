@@ -13,11 +13,20 @@ let tests =
         ( "PVM advances the expected number of steps",
           `Quick,
           Test_backend.test_advance_dummy_kernel );
-        ( "Proofs produced via the OCaml API match those produced by the \
+        ( "Jstz: Proofs produced via the OCaml API match those produced by the \
            sandboxed RISC-V PVM",
           `Quick,
-          Test_backend.test_jstz_proof_regression );
-        ("Proofs are immutable", `Quick, Test_backend.test_proof_immutability);
+          Test_backend.test_proof_regression Utils.Jstz );
+        ( "Jstz: Proofs are immutable",
+          `Quick,
+          Test_backend.test_proof_immutability Utils.Jstz );
+        ( "Etherlink: Proofs produced via the OCaml API match those produced \
+           by the sandboxed RISC-V PVM",
+          `Quick,
+          Test_backend.test_proof_regression Utils.Etherlink );
+        ( "Etherlink: Proofs are immutable",
+          `Quick,
+          Test_backend.test_proof_immutability Utils.Etherlink );
       ] );
     ( "Storage",
       [

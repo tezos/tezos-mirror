@@ -25,17 +25,17 @@ let test_advance_dummy_kernel () =
       return_unit)
     step_counts
 
-let test_jstz_proof_regression () =
+let test_proof_regression kernel () =
   let open Lwt_syntax in
   let state = Storage.empty () in
-  let* kernel = Utils.read_riscv_jstz_kernel () in
-  let* state = Backend.install_boot_sector state kernel in
+  let* kernel_path = Utils.read_riscv_kernel kernel in
+  let* state = Backend.install_boot_sector state kernel_path in
 
   match Backend.produce_proof None state with
   | Some proof ->
       let proof_bytes = Backend.serialise_proof proof in
       let expected_proof_bytes =
-        Utils.read_riscv_jstz_proof_first_step () |> String.trim
+        Utils.read_riscv_proof_first_step kernel |> String.trim
       in
       assert (proof_bytes = Hex.to_bytes_exn (`Hex expected_proof_bytes)) ;
 
@@ -59,15 +59,15 @@ let test_jstz_proof_regression () =
       return_unit
   | None -> Lwt.fail_with "Could not produce proof"
 
-let test_proof_immutability () =
+let test_proof_immutability kernel () =
   let open Lwt_syntax in
   let state = Storage.empty () in
-  let* kernel = Utils.read_riscv_jstz_kernel () in
-  let* state = Backend.install_boot_sector state kernel in
+  let* kernel_path = Utils.read_riscv_kernel kernel in
+  let* state = Backend.install_boot_sector state kernel_path in
 
   match Backend.produce_proof None state with
   | Some proof ->
-      (* Unlike the jstz_proof_regression test, now we first call verify_proof
+      (* Unlike the proof_regression test, now we first call verify_proof
          to check proof immutability between proof_start_state & verify_proof functions *)
       let input_request = Backend.verify_proof None proof in
       assert (input_request = Some Backend.No_input_required) ;
