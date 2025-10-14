@@ -248,8 +248,22 @@ let extract_enum_from_record loc record string =
       Some ident
   | field -> Error.error loc Error.(Improper_field field)
 
+(** [extract_bool_from_record _ record field] checks that [field] exists
+      and that the associated value is a boolean.
+      If [field] is not present, returns [None] *)
+let extract_bool_from_record loc record string =
+  Option.bind (extract_field_from_record record string) @@ function
+  | (_, Ppxlib.{pexp_desc = Pexp_construct ({txt = Lident ident; _}, None); _})
+    as field -> (
+      match bool_of_string ident with
+      | b -> Some b
+      | exception Invalid_argument _ ->
+          Error.error loc Error.(Invalid_type ("bool", string, field)))
+  | field -> Error.error loc Error.(Invalid_type ("bool", string, field))
+
 let extract_from_record loc record =
   let verbosity = extract_enum_from_record loc record "verbosity" in
+  let cpu_profiling = extract_bool_from_record loc record "cpu_profiling" in
   let profiler_module = extract_enum_from_record loc record "profiler_module" in
   let metadata =
     (* Metadata can be any valid expression so we return the
@@ -276,7 +290,7 @@ let extract_from_record loc record =
           expr_list)
     |> Handled_drivers.of_list
   in
-  (verbosity, profiler_module, metadata, driver_ids)
+  (verbosity, cpu_profiling, profiler_module, metadata, driver_ids)
 
 let extract_key_from_payload loc payload =
   match payload with
@@ -293,7 +307,7 @@ let extract_key_from_payload loc payload =
       match item_list with
       | [(Nolabel, structure)] ->
           (* [@ppx {<other infos>} ...] *)
-          let verbosity, profiler_module, metadata, driver_ids =
+          let verbosity, cpu_profiling, profiler_module, metadata, driver_ids =
             extract_from_record loc record
           in
           (match (verbosity, profiler_module, metadata) with
@@ -303,6 +317,7 @@ let extract_key_from_payload loc payload =
           Key.
             {
               verbosity;
+              cpu_profiling;
               profiler_module;
               metadata;
               driver_ids;
@@ -314,6 +329,7 @@ let extract_key_from_payload loc payload =
       Key.
         {
           verbosity = None;
+          cpu_profiling = None;
           profiler_module = None;
           metadata = None;
           driver_ids = Handled_drivers.empty;
@@ -324,6 +340,7 @@ let extract_key_from_payload loc payload =
       Key.
         {
           verbosity = None;
+          cpu_profiling = None;
           profiler_module = None;
           metadata = None;
           driver_ids = Handled_drivers.empty;

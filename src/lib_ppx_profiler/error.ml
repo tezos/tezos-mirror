@@ -13,6 +13,7 @@ type error =
   | Invalid_record of Key.t
   | Invalid_span of Key.t
   | Invalid_stop of Key.t
+  | Invalid_type of string * string * (Ppxlib.longident_loc * Ppxlib.expression)
   | Invalid_wrap of Key.t
   | Invalid_list_of_driver_ids of Ppxlib.expression list
   | Improper_field of (Ppxlib.longident_loc * Ppxlib.expression)
@@ -38,7 +39,10 @@ let pp_accepted ppf () =
      - [@profiler.aggregate_* <record> <string or ident>]@,\
      - [@profiler.mark <record> [<list of strings or ident>]]@,\
      - [@profiler.record_* <record> <string or ident>]@,\
-     - [@profiler.span_* <record> <list of strings or ident>]"
+     - [@profiler.span_* <record> <list of strings or ident>]@,\
+     - [@profiler.wrap_* <record> <partial function application>]@,\
+     - [@profiler.overwrite <any expression>]@,\
+     - [@profiler.stop]"
 
 let error loc err =
   let msg, hint =
@@ -67,6 +71,7 @@ let error loc err =
                   "@[<v 2>With <record> containing the following optional \
                    fields:@,\
                    - verbosity@,\
+                   - cpu_profiling@,\
                    - profiler_module@,\
                    - metadata@,\
                    - drivers_ids@]@,"
@@ -111,6 +116,14 @@ let error loc err =
              Found: @[<v 0>%a@]@."
             Key.pp
             key )
+    | Invalid_type (expected, field_label, field_value) ->
+        ( "Invalid type.",
+          Format.asprintf
+            "@[<v 2>The %s field should be of type %s.@,Found: @[<v 0>%a@]@."
+            field_label
+            expected
+            pp_field
+            field_value )
     | Invalid_wrap key ->
         ( "Invalid wrap.",
           Format.asprintf
@@ -139,6 +152,7 @@ let error loc err =
              through the mandatory record but no option could be parsed out of \
              it. Possible options are:@,\
              - the verbosity@,\
+             - cpu_profiling@,\
              - the profiler_module@,\
              - the metadata@,\
              - the opt-in drivers_ids@,\
@@ -153,6 +167,7 @@ let error loc err =
           Format.asprintf
             "@[<v 2>Expecting a field specifying either:@,\
              - the verbosity@,\
+             - cpu_profiling@,\
              - the profiler_module@,\
              - the metadata@,\
              - the opt-in drivers_ids@,\

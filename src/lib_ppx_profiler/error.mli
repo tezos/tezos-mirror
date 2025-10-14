@@ -15,6 +15,7 @@ type error =
   | Invalid_record of Key.t
   | Invalid_span of Key.t
   | Invalid_stop of Key.t
+  | Invalid_type of string * string * (Ppxlib.longident_loc * Ppxlib.expression)
   | Invalid_wrap of Key.t
   | Invalid_list_of_driver_ids of Ppxlib.expression list
   | Improper_field of (Ppxlib.longident_loc * Ppxlib.expression)
