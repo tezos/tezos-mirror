@@ -72,7 +72,10 @@ let validate_and_add_tezlink_operation
       let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
       let* _ = Tx_container.add ~next_nonce transaction_object ~raw_tx in
       return_unit
-  | Error _ -> (* TODO probably add an event to advertise error *) return_unit
+  | Error reason ->
+      let hash = Operation_hash.hash_string [raw_tx] in
+      let*! () = Events.replicate_operation_dropped hash reason in
+      return_unit
 
 let validate_and_add_tx (type f)
     ~(tx_container : f Services_backend_sig.tx_container) :
