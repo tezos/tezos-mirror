@@ -8,9 +8,6 @@
 use alloy_sol_types::SolEvent;
 use primitive_types::{H160, H256, U256};
 use revm::context::result::{ExecutionResult, Output, SuccessReason};
-use revm::interpreter::gas::call_cost;
-use revm::interpreter::StateLoad;
-use revm::primitives::hardfork::SpecId;
 use revm::primitives::{Address, Bytes, Log, LogData, B256};
 use revm_etherlink::helpers::legacy::{h160_to_alloy, u256_to_alloy};
 use revm_etherlink::storage::world_state_handler::StorageAccount;
@@ -33,6 +30,13 @@ pub const DEPOSIT_EVENT_TOPIC: [u8; 32] = [
     211, 106, 47, 103, 208, 109, 40, 87, 134, 246, 26, 50, 176, 82, 185, 172, 230, 176,
     183, 171, 239, 81, 119, 181, 67, 88, 171, 220, 131, 160, 182, 155,
 ];
+
+// NB: The following value was obtain via:
+// `revm::interpreter::gas::call_cost(spec_id, true, StateLoad::default())`
+// which was available in { revm <= v29.0.0 }.
+// The value was an approximation and still remains one.
+// TODO: estimate how emitting an event influenced tick consumption
+const DEPOSIT_EXECUTION_GAS_COST: u64 = 9100;
 
 /// Native token bridge error
 #[derive(Debug, thiserror::Error)]
@@ -212,18 +216,15 @@ pub struct DepositResult {
 pub fn execute_deposit<Host: Runtime>(
     host: &mut Host,
     deposit: &Deposit,
-    spec_id: &SpecId,
 ) -> Result<DepositResult, revm_etherlink::Error> {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
     let mut to_account = StorageAccount::from_address(&h160_to_alloy(&deposit.receiver))?;
-    // TODO: estimate how emitting an event influenced tick consumption
-    let gas_used = call_cost(*spec_id, true, StateLoad::default());
 
     let result = match to_account.add_balance(host, u256_to_alloy(&deposit.amount)) {
         Ok(()) => ExecutionResult::Success {
             reason: SuccessReason::Return,
-            gas_used,
+            gas_used: DEPOSIT_EXECUTION_GAS_COST,
             gas_refunded: 0,
             logs: vec![deposit.event_log()],
             output: Output::Call(Bytes::from_static(&[1u8])),
@@ -231,7 +232,7 @@ pub fn execute_deposit<Host: Runtime>(
         Err(e) => {
             log!(host, Info, "Deposit failed because of {}", e);
             ExecutionResult::Revert {
-                gas_used,
+                gas_used: DEPOSIT_EXECUTION_GAS_COST,
                 output: Bytes::from_static(&[0u8]),
             }
         }
@@ -253,7 +254,6 @@ mod tests {
     use alloy_sol_types::SolEvent;
     use num_bigint::BigInt;
     use primitive_types::{H160, U256};
-    use revm::primitives::hardfork::SpecId;
     use rlp::Decodable;
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -375,8 +375,7 @@ mod tests {
 
         let deposit = dummy_deposit();
 
-        let DepositResult { outcome, .. } =
-            execute_deposit(&mut host, &deposit, &SpecId::default()).unwrap();
+        let DepositResult { outcome, .. } = execute_deposit(&mut host, &deposit).unwrap();
         let logs = outcome.result.logs();
         assert!(outcome.result.is_success());
         assert_eq!(logs.len(), 1);
@@ -398,12 +397,10 @@ mod tests {
         let mut deposit = dummy_deposit();
         deposit.amount = U256::MAX;
 
-        let DepositResult { outcome, .. } =
-            execute_deposit(&mut host, &deposit, &SpecId::default()).unwrap();
+        let DepositResult { outcome, .. } = execute_deposit(&mut host, &deposit).unwrap();
         assert!(outcome.result.is_success());
 
-        let DepositResult { outcome, .. } =
-            execute_deposit(&mut host, &deposit, &SpecId::default()).unwrap();
+        let DepositResult { outcome, .. } = execute_deposit(&mut host, &deposit).unwrap();
         assert!(!outcome.result.is_success());
         assert!(outcome.result.logs().is_empty());
     }

@@ -13,7 +13,7 @@ use revm::{
         result::{EVMError, ExecutionResult},
         transaction::AccessList,
     },
-    primitives::{hash_map::HashMap, Address, U256},
+    primitives::{Address, HashMap, U256},
     state::AccountInfo,
 };
 use revm_etherlink::{

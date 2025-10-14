@@ -77,7 +77,7 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
             withdrawals: vec![],
             caller,
             system,
-            original_account_infos: HashMap::with_capacity(2),
+            original_account_infos: HashMap::default(),
         })
     }
 }

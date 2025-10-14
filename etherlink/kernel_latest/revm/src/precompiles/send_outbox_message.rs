@@ -7,7 +7,7 @@ use alloy_sol_types::{sol, SolInterface, SolValue};
 use num_bigint::{BigInt, Sign};
 use revm::{
     context::{Block, ContextTr, Transaction},
-    interpreter::{Gas, InputsImpl, InstructionResult, InterpreterResult},
+    interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
     primitives::{Address, Bytes, FixedBytes, U256},
 };
 use tezos_crypto_rs::base58::FromBase58CheckError;
@@ -454,11 +454,9 @@ where
 }
 
 pub(crate) fn send_outbox_message_precompile<CTX, DB>(
-    input: &[u8],
+    calldata: &[u8],
     context: &mut CTX,
-    is_static: bool,
-    transfer: &InputsImpl,
-    gas_limit: u64,
+    inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     CTX: ContextTr,
@@ -468,16 +466,15 @@ where
     guard(
         SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
         &[WITHDRAWAL_SOL_ADDR, FA_BRIDGE_SOL_ADDR],
-        transfer,
-        is_static,
+        inputs,
     )?;
 
-    let mut gas = Gas::new(gas_limit);
+    let mut gas = Gas::new(inputs.gas_limit);
     if !gas.record_cost(SEND_OUTBOX_MESSAGE_BASE_COST) {
-        return Ok(out_of_gas(gas_limit));
+        return Ok(out_of_gas(inputs.gas_limit));
     }
 
-    let output = send_outbox_methods(input, context)?;
+    let output = send_outbox_methods(calldata, context)?;
 
     Ok(InterpreterResult {
         result: InstructionResult::Return,

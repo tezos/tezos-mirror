@@ -276,7 +276,7 @@ where
     fn step_end(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
         let depth = context.journal_mut().depth() as u16;
         if let Some(struct_log) = std::mem::take(&mut self.struct_log) {
-            self.gas_inspector.step_end(&mut interp.gas);
+            self.gas_inspector.step_end(&interp.gas);
             let error = interp
                 .bytecode
                 .action()
