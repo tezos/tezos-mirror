@@ -42,3 +42,7 @@ runtime-dionysus = { package = "tezos-evm-runtime-dionysus", path = "../kernel_d
 # Dionysus R1
 kernel-dionysus-r1 = { package = "evm_kernel_dionysus_r1", path = "../kernel_dionysus_r1/kernel", default-features = false }
 runtime-dionysus-r1 = { package = "tezos-evm-runtime-dionysus-r1", path = "../kernel_dionysus_r1/runtime", default-features = false }
+
+# Ebisu
+kernel-ebisu = { package = "evm_kernel_ebisu", path = "../kernel_ebisu/kernel", default-features = false }
+runtime-ebisu = { package = "tezos-evm-runtime-ebisu", path = "../kernel_ebisu/runtime", default-features = false }
