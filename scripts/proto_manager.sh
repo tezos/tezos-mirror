@@ -1268,6 +1268,43 @@ $0 ~ "let _octez_baker_" source " =" {
   ocamlformat -i tezt/lib_tezos/constant.ml
   commit_if_changes "tezt: add unused ${protocol_target} baker"
 
+  # add new protocol accuser
+  # this can be removed once https://gitlab.com/tezos/tezos/-/issues/7763 has been tackled
+  if [[ ${is_snapshot} == false ]]; then
+    awk -v source="$protocol_source" -v target="$protocol_target" '
+$0 ~ "let _octez_accuser_" source " =" {
+  orig1 = $0
+  getline
+  orig2 = $0
+  print gensub(source, target, "g", orig1)
+  print gensub(source, target, "g", orig2)
+  print ""
+  print orig1
+  print orig2
+  next
+}
+1
+' tezt/lib_tezos/constant.ml > tezt/lib_tezos/constant.ml.tmp
+    mv tezt/lib_tezos/constant.ml.tmp tezt/lib_tezos/constant.ml
+  else
+    lowercase_shorthash=$(echo "$short_hash" | tr '[:upper:]' '[:lower:]')
+    awk -v source="$protocol_source" -v short_hash="$short_hash" -v lowercase_shorthash="$lowercase_shorthash" '
+$0 ~ "let _octez_accuser_" source " =" {
+  print                  # line 1: unchanged
+  getline                # go to line 2
+  gsub("baker_" source, "baker_" lowercase_shorthash)
+  gsub("./octez-accuser-" source , "./octez-accuser-" short_hash)
+  print
+  next
+}
+1
+' tezt/lib_tezos/constant.ml > tezt/lib_tezos/constant.ml.tmp
+    mv tezt/lib_tezos/constant.ml.tmp tezt/lib_tezos/constant.ml
+  fi
+
+  ocamlformat -i tezt/lib_tezos/constant.ml
+  commit_if_changes "tezt: add unused ${protocol_target} accuser"
+
   # mkdir -p "tezt/tests/expected/check_proto_${label}_changes.ml"
   # rm -rf /tmp/tezos_proto_snapshot
   # mkdir -p /tmp/tezos_proto_snapshot
@@ -2097,6 +2134,16 @@ function hash() {
   sed -e "s/baker_${source_short_hash}/baker_${short_hash}/g" \
     -e "s/octez-baker-${source_short_hash}/octez-baker-${short_hash}/g" \
     -e "s/octez-baker-${tezos_protocol_source}/octez-baker-${new_tezos_protocol}/g" \
+    -i tezt/lib_tezos/constant.ml
+  ocamlformat -i tezt/lib_tezos/constant.ml
+  commit_if_changes "tezt: replace baker in constant.ml"
+
+  # fix tezt/lib_tezos/constants.ml
+  # replace short hash in Uses.make ~tag:"accuser_<uncapitalized short hash>" ~path:"./octez-accuser-<short hash>" ()
+  echo "Adding new protocol accuser"
+  sed -e "s/accuser_${source_short_hash}/accuser_${short_hash}/g" \
+    -e "s/octez-accuser-${source_short_hash}/octez-accuser-${short_hash}/g" \
+    -e "s/octez-accuser-${tezos_protocol_source}/octez-accuser-${new_tezos_protocol}/g" \
     -i tezt/lib_tezos/constant.ml
   ocamlformat -i tezt/lib_tezos/constant.ml
   commit_if_changes "tezt: replace baker in constant.ml"
