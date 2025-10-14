@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2025 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -31,11 +32,19 @@ module Files = struct
   let evm_compatibility =
     [
       "etherlink.mk";
-      "etherlink/kernel_latest/evm_execution/**/*";
+      "etherlink/kernel_latest/revm/**/*";
       "etherlink/kernel_latest/evm_evaluation/**/*";
     ]
 
-  (* [firehose] and [evm_compatibility] are already included in [node @ kernel] *)
+  let revm_compatibility =
+    [
+      "etherlink.mk";
+      "etherlink/kernel_latest/revm/**/*";
+      "etherlink/kernel_latest/revm_evaluation/**/*";
+    ]
+
+  (* [firehose], [evm_compatibility] and [revm_compatibility] are already included
+     in [node @ kernel] *)
   let all = sdks @ rust_toolchain_image @ lib_wasm_runtime_rust @ node @ kernel
 end
 
@@ -172,6 +181,28 @@ let job_test_evm_compatibility =
        ./etherlink/kernel_latest/evm_evaluation/resources/ -c";
     ]
 
+let job_test_revm_compatibility =
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "test_revm_compatibility"
+    ~__POS__
+    ~stage:Test
+    ~description:"Check and test REVM compatibility."
+    ~image:Tezos_ci.Images.rust_toolchain
+    ~only_if_changed:Files.(rust_toolchain_image @ revm_compatibility)
+    ~needs_legacy:
+      [(Job, Tezos_ci_jobs.Code_verification.job_build_kernels pipeline_type)]
+    ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    [
+      "make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs \
+       revm-evaluation-assessor";
+      "git clone --depth 1 https://github.com/functori/evm-fixtures \
+       evm_fixtures";
+      "./revm-evaluation-assessor --test-cases ./evm_fixtures/";
+    ]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -184,6 +215,7 @@ let register () =
       (Auto, job_test_kernel Before_merging);
       (Auto, job_test_firehose Before_merging);
       (Auto, job_test_evm_compatibility Before_merging);
+      (Auto, job_test_revm_compatibility Before_merging);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
@@ -198,5 +230,6 @@ let register () =
       (Auto, job_test_kernel Schedule_extended_test);
       (Auto, job_test_firehose Schedule_extended_test);
       (Auto, job_test_evm_compatibility Before_merging);
+      (Auto, job_test_revm_compatibility Before_merging);
     ] ;
   ()
