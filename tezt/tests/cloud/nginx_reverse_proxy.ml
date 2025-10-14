@@ -139,8 +139,8 @@ server {
   listen 0.0.0.0:<port> ssl;
   server_name <server_name>;
 
-    ssl_certificate <certificate>;
-    ssl_certificate_key <certificate_key>;
+  ssl_certificate <certificate>;
+  ssl_certificate_key <certificate_key>;
 
   location <location> {
     proxy_pass <proxy_pass>;
