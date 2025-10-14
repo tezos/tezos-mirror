@@ -115,6 +115,13 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- Added RPC ``GET /profiles/{pkh}/monitor/attestable_slots`` to open a monitoring
+  stream that emits a JSON ``slot_id`` each time a slot becomes attestable for the
+  given public key hash (``pkh``). A slot id is emitted when all shards assigned to
+  that ``pkh`` at the corresponding attestation level are available in the DAL
+  node's store. If traps are detected within the slot, then it should not be attested,
+  so the id is not sent via the stream. (MR :gl:`!19459`)
+
 - The DAL node now starts propagating shards one level after the inclusion of the 
   corresponding published slot header operation (i.e., when the operation is finalized),
   instead of two levels after, when the block is finalized. (MR :gl:`!19366`)
