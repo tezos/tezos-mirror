@@ -27,7 +27,7 @@ use crate::ast::michelson_address::entrypoint::Direction;
 use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
-use crate::context::CtxTrait;
+use crate::context::{CtxTrait, TypecheckingCtx};
 use crate::gas::{interpret_cost, OutOfGas};
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
@@ -161,7 +161,7 @@ impl<'a> ContractScript<'a> {
     /// Returns a `Result` containing the typechecked `TypedValue` if successful, or a `TcError` if the typechecking fails.
     pub fn typecheck_storage(
         &self,
-        ctx: &mut impl CtxTrait<'a>,
+        ctx: &mut impl TypecheckingCtx<'a>,
         storage: &Micheline<'a>,
     ) -> Result<TypedValue<'a>, TcError> {
         typecheck_value(storage, ctx, &self.storage)

@@ -15,17 +15,13 @@ use mir::{
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
-use primitive_types::H256;
 use std::collections::{BTreeMap, HashMap};
-use tezos_crypto_rs::{
-    hash::{ChainId, ContractKt1Hash},
-    PublicKeyWithHash,
-};
+use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
-use tezos_smart_rollup::types::{Contract, PublicKey, Timestamp};
-use tezos_tezlink::enc_wrappers::{BlockNumber, OperationHash};
+use tezos_smart_rollup::types::{Contract, PublicKey};
+use tezos_tezlink::enc_wrappers::OperationHash;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{Operation, OriginationContent, Script};
 use tezos_tezlink::operation_result::{
@@ -43,13 +39,13 @@ use tezos_tezlink::{
 };
 
 use crate::address::OriginationNonce;
-use crate::mir_ctx::{convert_big_map_diff, Ctx, TcCtx};
+use crate::mir_ctx::{convert_big_map_diff, BlockCtx, Ctx, ExecCtx, OperationCtx, TcCtx};
 
 extern crate alloc;
 pub mod account_storage;
 mod address;
 pub mod context;
-mod mir_ctx;
+pub mod mir_ctx;
 mod validate;
 
 fn reveal<Host: Runtime>(
@@ -95,13 +91,6 @@ fn contract_from_address(address: AddressHash) -> Result<Contract, TransferError
         AddressHash::Kt1(kt1) => Ok(Contract::Originated(kt1)),
         AddressHash::Implicit(pkh) => Ok(Contract::Implicit(pkh)),
         AddressHash::Sr1(_) => Err(TransferError::MirAddressUnsupportedError),
-    }
-}
-
-fn address_from_contract(contract: Contract) -> AddressHash {
-    match contract {
-        Contract::Originated(kt1) => AddressHash::Kt1(kt1),
-        Contract::Implicit(hash) => AddressHash::Implicit(hash),
     }
 }
 
@@ -154,28 +143,20 @@ fn burn_tez(
     Ok(new_balance)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn execute_internal_operations<'a, Host: Runtime>(
-    host: &mut Host,
-    context: &context::Context,
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a>,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
     sender_account: &TezlinkOriginatedAccount,
     parser: &'a Parser<'a>,
-    source_account: &TezlinkImplicitAccount,
-    gas: &mut Gas,
-    operation_counter: &mut u128,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
-    origination_nonce: &mut OriginationNonce,
-    level: &BlockNumber,
-    now: &Timestamp,
-    chain_id: &ChainId,
 ) -> Result<(), ApplyOperationError> {
     let mut failed = None;
     for (index, OperationInfo { operation, counter }) in
         internal_operations.into_iter().enumerate()
     {
         log!(
-            host,
+            tc_ctx.host,
             Debug,
             "Executing internal operation {:?} with counter {:?}",
             operation,
@@ -217,8 +198,8 @@ fn execute_internal_operations<'a, Host: Runtime>(
                     })
                 } else {
                     let receipt = transfer(
-                        host,
-                        context,
+                        tc_ctx,
+                        operation_ctx,
                         sender_account,
                         &content.amount,
                         &content.destination,
@@ -228,14 +209,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
                             .map_or(&Entrypoint::default(), |param| &param.entrypoint),
                         value,
                         parser,
-                        source_account,
-                        gas,
-                        operation_counter,
                         all_internal_receipts,
-                        origination_nonce,
-                        level,
-                        now,
-                        chain_id,
                     );
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
@@ -282,10 +256,9 @@ fn execute_internal_operations<'a, Host: Runtime>(
                     })
                 } else {
                     let receipt = originate_contract(
-                        host,
-                        context,
+                        tc_ctx,
                         address,
-                        source_account,
+                        operation_ctx.source,
                         sender_account,
                         &amount,
                         &script.code,
@@ -321,7 +294,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
             }
         };
         log!(
-            host,
+            tc_ctx.host,
             Debug,
             "Internal operation executed successfully: {:?}",
             internal_receipt
@@ -330,7 +303,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
     }
     if let Some(index) = failed {
         log!(
-            host,
+            tc_ctx.host,
             Debug,
             "Internal operation execution failed at index {}",
             index
@@ -346,22 +319,15 @@ fn execute_internal_operations<'a, Host: Runtime>(
 /// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
 #[allow(clippy::too_many_arguments)]
 fn transfer<'a, Host: Runtime>(
-    host: &mut Host,
-    context: &context::Context,
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a>,
     sender_account: &impl TezlinkAccount,
     amount: &Narith,
     dest_contract: &Contract,
     entrypoint: &Entrypoint,
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
-    source_account: &TezlinkImplicitAccount,
-    gas: &mut Gas,
-    operation_counter: &mut u128,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
-    origination_nonce: &mut OriginationNonce,
-    level: &BlockNumber,
-    now: &Timestamp,
-    chain_id: &ChainId,
 ) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
@@ -373,90 +339,64 @@ fn transfer<'a, Host: Runtime>(
                 return Err(TransferError::EmptyImplicitTransfer);
             };
 
-            let dest_account = TezlinkImplicitAccount::from_public_key_hash(context, pkh)
-                .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+            let dest_account =
+                TezlinkImplicitAccount::from_public_key_hash(tc_ctx.context, pkh)
+                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             // Allocated is not being used on purpose (see below the comment on the allocated_destination_contract field)
             let _allocated = dest_account
-                .allocate(host)
+                .allocate(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToAllocateDestination)?;
-            transfer_tez(host, sender_account, amount, &dest_account).map(|success| {
-                TransferSuccess {
-                    // This boolean is kept at false on purpose to maintain compatibility with TZKT.
-                    // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
-                    // This incurs a cost, and TZKT expects balance updates in the operation receipt representing this cost.
-                    // So, as long as we don't have balance updates to represent this cost, we keep this boolean false.
-                    allocated_destination_contract: false,
-                    ..success
-                }
-            })
+            transfer_tez(tc_ctx.host, sender_account, amount, &dest_account).map(
+                |success| {
+                    TransferSuccess {
+                        // This boolean is kept at false on purpose to maintain compatibility with TZKT.
+                        // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
+                        // This incurs a cost, and TZKT expects balance updates in the operation receipt representing this cost.
+                        // So, as long as we don't have balance updates to represent this cost, we keep this boolean false.
+                        allocated_destination_contract: false,
+                        ..success
+                    }
+                },
+            )
         }
         Contract::Originated(kt1) => {
-            let dest_account = TezlinkOriginatedAccount::from_kt1(context, kt1)
+            let dest_account = TezlinkOriginatedAccount::from_kt1(tc_ctx.context, kt1)
                 .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            let receipt = transfer_tez(host, sender_account, amount, &dest_account)?;
-            let sender = address_from_contract(sender_account.contract());
-            let amount = amount.0.clone().try_into().map_err(
-                |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
-                    TransferError::MirAmountToNarithError(err.to_string())
-                },
-            )?;
-            let self_address = address_from_contract(dest_contract.clone());
-            let balance = dest_account
-                .balance(host)
-                .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
-            let balance = balance.0.try_into().map_err(
-                |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
-                    TransferError::MirAmountToNarithError(err.to_string())
-                },
-            )?;
+            let receipt =
+                transfer_tez(tc_ctx.host, sender_account, amount, &dest_account)?;
             let code = dest_account
-                .code(host)
+                .code(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
             let storage = dest_account
-                .storage(host)
+                .storage(tc_ctx.host)
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
+            let exec_ctx =
+                ExecCtx::create(tc_ctx.host, sender_account, &dest_account, amount)?;
             let mut ctx = Ctx {
-                tc_ctx: TcCtx { host, context, gas },
-                source: source_account.pkh().clone(),
-                sender,
-                amount,
-                self_address,
-                big_map_diff: BTreeMap::new(),
-                balance,
-                operation_counter,
-                origination_nonce,
-                level: *level,
-                now: *now,
-                chain_id: chain_id.clone(),
+                tc_ctx,
+                exec_ctx,
+                operation_ctx,
             };
             let (internal_operations, new_storage) = execute_smart_contract(
                 code, storage, entrypoint, param, parser, &mut ctx,
             )?;
-            let host = ctx.tc_ctx.host;
-            let gas = ctx.tc_ctx.gas;
             dest_account
-                .set_storage(host, &new_storage)
+                .set_storage(ctx.host(), &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
             execute_internal_operations(
-                host,
-                context,
+                ctx.tc_ctx,
+                ctx.operation_ctx,
                 internal_operations,
                 &dest_account,
                 parser,
-                source_account,
-                gas,
-                ctx.operation_counter,
                 all_internal_receipts,
-                ctx.origination_nonce,
-                level,
-                now,
-                chain_id,
             )
             .map_err(|err| {
                 TransferError::FailedToExecuteInternalOperation(err.to_string())
             })?;
-            log!(host, Debug, "Transfer operation succeeded");
-            let lazy_storage_diff = convert_big_map_diff(ctx.big_map_diff);
+            log!(ctx.host(), Debug, "Transfer operation succeeded");
+            let lazy_storage_diff =
+                convert_big_map_diff(std::mem::take(ctx.tc_ctx.big_map_diff));
             Ok(TransferSuccess {
                 storage: Some(new_storage),
                 lazy_storage_diff,
@@ -493,31 +433,24 @@ fn get_contract_entrypoint(
 }
 
 // Handles manager transfer operations.
-#[allow(clippy::too_many_arguments)]
-fn transfer_external<Host: Runtime>(
-    host: &mut Host,
-    context: &context::Context,
-    source_account: &TezlinkImplicitAccount,
+fn transfer_external<'a, Host: Runtime>(
+    tc_ctx: &mut TcCtx<'a, Host>,
+    operation_ctx: &mut OperationCtx<'a>,
     amount: &Narith,
     dest: &Contract,
     parameter: &Option<Parameter>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
-    origination_nonce: &mut OriginationNonce,
-    level: &BlockNumber,
-    now: &Timestamp,
-    chain_id: &ChainId,
+    parser: &'a Parser<'a>,
 ) -> Result<TransferTarget, TransferError> {
     log!(
-        host,
+        tc_ctx.host,
         Debug,
         "Applying an external transfer operation from {} to {:?} of {:?} mutez with parameters {:?}",
-        source_account.pkh(),
+        operation_ctx.source.pkh(),
         dest,
         amount,
         parameter
     );
-
-    let parser = Parser::new();
     let (entrypoint, value) = match parameter {
         Some(param) => (
             &param.entrypoint,
@@ -527,30 +460,23 @@ fn transfer_external<Host: Runtime>(
     };
 
     transfer(
-        host,
-        context,
-        source_account,
+        tc_ctx,
+        operation_ctx,
+        operation_ctx.source,
         amount,
         dest,
         entrypoint,
         value,
-        &parser,
-        source_account,
-        &mut mir::gas::Gas::default(),
-        &mut 0,
+        parser,
         all_internal_receipts,
-        origination_nonce,
-        level,
-        now,
-        chain_id,
     )
     .map(Into::into)
 }
 
 /// This function typechecks both fields of a &Script: the code and the storage.
 /// It returns the typechecked storage.
-fn typecheck_code_and_storage<'a, Ctx: mir::context::CtxTrait<'a>>(
-    ctx: &mut Ctx,
+fn typecheck_code_and_storage<'a, Host: Runtime>(
+    ctx: &mut TcCtx<'a, Host>,
     parser: &'a Parser<'a>,
     script: &Script,
 ) -> Result<TypedValue<'a>, OriginationError> {
@@ -558,7 +484,7 @@ fn typecheck_code_and_storage<'a, Ctx: mir::context::CtxTrait<'a>>(
         .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
     let allow_lazy_storage_in_storage = true;
     let contract_typechecked = contract_micheline
-        .typecheck_script(ctx.gas(), allow_lazy_storage_in_storage)
+        .typecheck_script(ctx.gas, allow_lazy_storage_in_storage)
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Script : {e}")))?;
     let storage_micheline = Micheline::decode_raw(&parser.arena, &script.storage)
         .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
@@ -567,23 +493,22 @@ fn typecheck_code_and_storage<'a, Ctx: mir::context::CtxTrait<'a>>(
         .map_err(|e| OriginationError::MirTypecheckingError(format!("Storage : {e}")))
 }
 
-fn handle_storage_with_big_maps<Host: Runtime>(
-    host: &mut Host,
-    context: &Context,
-    mut storage: TypedValue<'_>,
+fn handle_storage_with_big_maps<'a, Host: Runtime>(
+    ctx: &mut TcCtx<'a, Host>,
+    mut storage: TypedValue<'a>,
 ) -> Result<(Vec<u8>, Option<LazyStorageDiffList>), OriginationError> {
     let parser = Parser::new();
-    make_default_ctx!(ctx, host, context);
+
     let mut big_maps = vec![];
     storage.view_big_maps_mut(&mut big_maps);
 
     // Dump big_map allocation, starting with empty big_maps
-    mir::ast::big_map::dump_big_map_updates(&mut ctx, &[], &mut big_maps)
+    mir::ast::big_map::dump_big_map_updates(ctx, &[], &mut big_maps)
         .map_err(|err| OriginationError::MirBigMapAllocation(err.to_string()))?;
     let storage = storage
         .into_micheline_optimized_legacy(&parser.arena)
         .encode();
-    let lazy_storage_diff = convert_big_map_diff(ctx.big_map_diff);
+    let lazy_storage_diff = convert_big_map_diff(std::mem::take(ctx.big_map_diff));
     Ok((storage, lazy_storage_diff))
 }
 
@@ -594,29 +519,27 @@ const ORIGINATION_COST: u64 = ORIGINATION_SIZE * COST_PER_BYTES;
 
 /// Originate a contract deployed by the public key hash given in parameter. For now
 /// the origination is not correctly implemented.
-#[allow(clippy::too_many_arguments)]
-fn originate_contract<Host: Runtime>(
-    host: &mut Host,
-    context: &Context,
+fn originate_contract<'a, Host: Runtime>(
+    ctx: &mut TcCtx<'a, Host>,
     contract: ContractKt1Hash,
     source_account: &TezlinkImplicitAccount,
     sender_account: &impl TezlinkAccount,
     initial_balance: &Narith,
     script_code: &[u8],
-    script_storage: TypedValue<'_>,
+    script_storage: TypedValue<'a>,
 ) -> Result<OriginationSuccess, OriginationError> {
     // If the origination is internal the big map are handled by the first transfer
     // The big_maps vector will be filled only if the origination is "external"
 
     let (new_storage, lazy_storage_diff) =
-        handle_storage_with_big_maps(host, context, script_storage)?;
+        handle_storage_with_big_maps(ctx, script_storage)?;
 
     // Set the storage of the contract
-    let smart_contract = TezlinkOriginatedAccount::from_kt1(context, &contract)
+    let smart_contract = TezlinkOriginatedAccount::from_kt1(ctx.context, &contract)
         .map_err(|_| OriginationError::FailedToFetchOriginated)?;
 
     let total_size = smart_contract
-        .init(host, script_code, &new_storage)
+        .init(ctx.host, script_code, &new_storage)
         .map_err(|_| OriginationError::CantInitContract)?;
 
     // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
@@ -648,10 +571,15 @@ fn originate_contract<Host: Runtime>(
     balance_updates.extend(origination_fees_balance_updates);
 
     // Apply the balance change, accordingly to the balance updates computed
-    apply_balance_changes(host, sender_account, &smart_contract, &initial_balance.0)
-        .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
+    apply_balance_changes(
+        ctx.host,
+        sender_account,
+        &smart_contract,
+        &initial_balance.0,
+    )
+    .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
-    let _ = burn_tez(host, source_account, &(ORIGINATION_COST + storage_fees))
+    let _ = burn_tez(ctx.host, source_account, &(ORIGINATION_COST + storage_fees))
         .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
     let dummy_origination_sucess = OriginationSuccess {
@@ -798,9 +726,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     context: &context::Context,
     hash: OperationHash,
     operation: Operation,
-    level: &BlockNumber,
-    now: &Timestamp,
-    chain_id: &ChainId,
+    block_ctx: &BlockCtx,
 ) -> Result<Vec<OperationResultSum>, OperationError> {
     let mut safe_host = SafeStorage {
         host,
@@ -837,9 +763,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         context,
         &mut origination_nonce,
         validation_info,
-        level,
-        now,
-        chain_id,
+        block_ctx,
     );
 
     log!(safe_host, Debug, "Receipts: {:#?}", receipts);
@@ -869,9 +793,7 @@ fn apply_batch<Host: Runtime>(
     context: &Context,
     origination_nonce: &mut OriginationNonce,
     validation_info: validate::ValidatedBatch,
-    level: &BlockNumber,
-    now: &Timestamp,
-    chain_id: &ChainId,
+    block_ctx: &BlockCtx,
 ) -> (Vec<OperationResultSum>, bool) {
     let validate::ValidatedBatch {
         source_account,
@@ -906,9 +828,7 @@ fn apply_batch<Host: Runtime>(
                 origination_nonce,
                 &source_account,
                 validated_operation,
-                level,
-                now,
-                chain_id,
+                block_ctx,
             )
         };
 
@@ -929,18 +849,22 @@ fn apply_batch<Host: Runtime>(
     (receipts, true)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     origination_nonce: &mut OriginationNonce,
     source_account: &TezlinkImplicitAccount,
     validated_operation: validate::ValidatedOperation,
-    level: &BlockNumber,
-    now: &Timestamp,
-    chain_id: &ChainId,
+    block_ctx: &BlockCtx,
 ) -> OperationResultSum {
     let mut internal_operations_receipts = Vec::new();
+    let mut tc_ctx = TcCtx {
+        host,
+        context,
+        gas: &mut mir::gas::Gas::default(),
+        big_map_diff: &mut BTreeMap::new(),
+    };
+    let parser = Parser::new();
     match &validated_operation.content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(host, source_account, pk);
@@ -956,18 +880,22 @@ fn apply_operation<Host: Runtime>(
             destination,
             parameters,
         }) => {
+            let mut operation_ctx = OperationCtx {
+                source: source_account,
+                counter: &mut 0u128,
+                origination_nonce,
+                level: block_ctx.level,
+                now: block_ctx.now,
+                chain_id: block_ctx.chain_id,
+            };
             let transfer_result = transfer_external(
-                host,
-                context,
-                source_account,
+                &mut tc_ctx,
+                &mut operation_ctx,
                 amount,
                 destination,
                 parameters,
                 &mut internal_operations_receipts,
-                origination_nonce,
-                level,
-                now,
-                chain_id,
+                &parser,
             );
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,
@@ -982,14 +910,11 @@ fn apply_operation<Host: Runtime>(
             ref script,
         }) => {
             let address = origination_nonce.generate_kt1();
-            let parser = Parser::new();
-            make_default_ctx!(ctx, host, context);
             let typechecked_storage =
-                typecheck_code_and_storage(&mut ctx, &parser, script);
+                typecheck_code_and_storage(&mut tc_ctx, &parser, script);
             let origination_result = match typechecked_storage {
                 Ok(storage) => originate_contract(
-                    ctx.host(),
-                    context,
+                    &mut tc_ctx,
                     address,
                     source_account,
                     source_account,
@@ -1013,13 +938,13 @@ fn apply_operation<Host: Runtime>(
 mod tests {
     use crate::{
         account_storage::TezlinkOriginatedAccount, address::OriginationNonce,
-        TezlinkImplicitAccount,
+        mir_ctx::BlockCtx, TezlinkImplicitAccount,
     };
     use mir::ast::{Entrypoint, Micheline};
     use num_traits::ops::checked::CheckedSub;
     use pretty_assertions::assert_eq;
     use primitive_types::H256;
-    use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash, HashTrait, SecretKeyEd25519};
+    use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait, SecretKeyEd25519};
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
@@ -1048,6 +973,16 @@ mod tests {
         account_storage::{Manager, TezlinkAccount},
         context, validate_and_apply_operation, OperationError,
     };
+
+    macro_rules! block_ctx {
+        () => {
+            BlockCtx {
+                level: &0u32.into(),
+                now: &0i64.into(),
+                chain_id: &HashTrait::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            }
+        };
+    }
 
     #[derive(Clone)]
     struct Bootstrap {
@@ -1395,9 +1330,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         );
 
         let expected_error =
@@ -1429,9 +1362,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         );
 
         let expected_error =
@@ -1463,9 +1394,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         );
 
         let expected_error =
@@ -1511,9 +1440,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1574,9 +1501,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1632,9 +1557,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         );
 
         let expected_error = OperationError::Validation(ValidityError::InvalidSignature);
@@ -1675,9 +1598,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1748,9 +1669,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1825,9 +1744,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1913,9 +1830,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2026,9 +1941,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect("validate_and_apply_operation should not have failed with a kernel error")
         .remove(0);
@@ -2157,9 +2070,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2268,9 +2179,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2348,9 +2257,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2412,9 +2319,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2493,9 +2398,7 @@ mod tests {
             &ctx,
             OperationHash(H256::zero()),
             batch,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .unwrap();
 
@@ -2663,9 +2566,7 @@ mod tests {
             &ctx,
             OperationHash(H256::zero()),
             batch,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         );
 
         let expected_error =
@@ -2758,9 +2659,7 @@ mod tests {
             &context::Context::init_context(),
             OperationHash(H256::zero()),
             batch,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .unwrap();
 
@@ -2873,9 +2772,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3088,9 +2985,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3252,9 +3147,7 @@ mod tests {
             &context::Context::init_context(),
             operation.hash().unwrap(),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3316,9 +3209,7 @@ mod tests {
             &context::Context::init_context(),
             operation.hash().unwrap(),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3384,9 +3275,7 @@ mod tests {
             &context::Context::init_context(),
             operation.hash().unwrap(),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3463,9 +3352,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3664,9 +3551,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3891,9 +3776,7 @@ mod tests {
             &ctx,
             OperationHash(H256::zero()),
             batch,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .unwrap();
 
@@ -4157,9 +4040,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4233,9 +4114,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4275,9 +4154,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4318,9 +4195,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4369,9 +4244,7 @@ mod tests {
             &context,
             OperationHash(H256::zero()),
             operation,
-            &0u32.into(),
-            &0i64.into(),
-            &ChainId::try_from_bytes(&[0, 0, 0, 0]).unwrap(),
+            &block_ctx!(),
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",

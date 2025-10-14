@@ -4,6 +4,9 @@
 
 use std::collections::BTreeMap;
 
+use crate::account_storage::{
+    TezlinkAccount, TezlinkImplicitAccount, TezlinkOriginatedAccount,
+};
 use crate::address::OriginationNonce;
 use crate::context::{big_maps::*, Context};
 use crate::get_contract_entrypoint;
@@ -20,74 +23,97 @@ use num_bigint::BigUint;
 use primitive_types::H256;
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::ChainId;
-use tezos_data_encoding::types::Zarith;
+use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::Timestamp;
+use tezos_smart_rollup::types::{Contract, Timestamp};
 use tezos_storage::{read_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
 use tezos_tezlink::lazy_storage_diff::{
     Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
 };
+use tezos_tezlink::operation_result::TransferError;
 use typed_arena::Arena;
 
-pub struct TcCtx<Host, Context, Gas> {
-    pub host: Host,
-    pub context: Context,
-    pub gas: Gas,
+pub struct TcCtx<'operation, Host: Runtime> {
+    pub host: &'operation mut Host,
+    pub context: &'operation Context,
+    pub gas: &'operation mut Gas,
+    pub big_map_diff: &'operation mut BTreeMap<Zarith, StorageDiff>,
 }
 
-pub struct Ctx<Host, Context, Gas, OpCounter, OrigNonce> {
-    pub tc_ctx: TcCtx<Host, Context, Gas>,
+pub struct OperationCtx<'operation> {
+    // In reality, 'source' and 'origination_nonce' have
+    // a 'batch lifetime. Downgrade it to an 'operation
+    // lifetime is not a problem for the compiler.
+    // However, it could be misleading in terms of comprehension
+    pub source: &'operation TezlinkImplicitAccount,
+    pub origination_nonce: &'operation mut OriginationNonce,
+    pub counter: &'operation mut u128,
+    // 'level', 'now' and 'chain_id' should outlive operation in reality
+    // So having them downcast to 'operation is not a problem
+    pub level: &'operation BlockNumber,
+    pub now: &'operation Timestamp,
+    pub chain_id: &'operation ChainId,
+}
 
+pub struct ExecCtx {
     pub sender: AddressHash,
     pub amount: i64,
     pub self_address: AddressHash,
     pub balance: i64,
-    pub level: BlockNumber,
-    pub now: Timestamp,
-    pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
-    pub chain_id: ChainId,
-
-    pub source: PublicKeyHash,
-    pub operation_counter: OpCounter,
-    pub origination_nonce: OrigNonce,
 }
 
-#[macro_export]
-macro_rules! make_default_ctx {
-    ($ctx:ident, $host: expr, $context: expr) => {
-        let mut gas = Gas::default();
-        let mut operation_counter = 0;
-        let mut origination_nonce =
-            OriginationNonce::initial(OperationHash(H256::zero()));
-        let mut $ctx = Ctx {
-            tc_ctx: TcCtx {
-                host: $host,
-                context: $context,
-                gas: &mut gas,
+pub struct Ctx<'a, 'operation, Host: Runtime> {
+    pub tc_ctx: &'a mut TcCtx<'operation, Host>,
+    pub exec_ctx: ExecCtx,
+    pub operation_ctx: &'a mut OperationCtx<'operation>,
+}
+
+pub struct BlockCtx<'block> {
+    pub level: &'block BlockNumber,
+    pub now: &'block Timestamp,
+    pub chain_id: &'block ChainId,
+}
+
+fn address_from_contract(contract: Contract) -> AddressHash {
+    match contract {
+        Contract::Originated(kt1) => AddressHash::Kt1(kt1),
+        Contract::Implicit(hash) => AddressHash::Implicit(hash),
+    }
+}
+
+impl ExecCtx {
+    pub fn create(
+        host: &mut impl Runtime,
+        sender_account: &impl TezlinkAccount,
+        dest_account: &TezlinkOriginatedAccount,
+        amount: &Narith,
+    ) -> Result<Self, TransferError> {
+        let sender = address_from_contract(sender_account.contract());
+        let amount = amount.0.clone().try_into().map_err(
+            |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
+                TransferError::MirAmountToNarithError(err.to_string())
             },
-            balance: 0,
-            amount: 0,
-            level: 0u32.into(),
-            now: 0i64.into(),
-            // default chain id NetXynUjJNZm7wi
-            chain_id: tezos_crypto_rs::hash::ChainId::try_from(vec![
-                0xf3, 0xd4, 0x85, 0x54,
-            ])
-            .unwrap(),
-            big_map_diff: BTreeMap::new(),
-            self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
-            sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
-            source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
-            operation_counter: &mut operation_counter,
-            origination_nonce: &mut origination_nonce,
-        };
-    };
+        )?;
+        let self_address = address_from_contract(dest_account.contract());
+        let balance = dest_account
+            .balance(host)
+            .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
+        let balance = balance.0.try_into().map_err(
+            |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
+                TransferError::MirAmountToNarithError(err.to_string())
+            },
+        )?;
+        Ok(Self {
+            sender,
+            amount,
+            self_address,
+            balance,
+        })
+    }
 }
 
-impl<'a, Host: Runtime> TypecheckingCtx<'a>
-    for TcCtx<&mut Host, &Context, &mut mir::gas::Gas>
-{
+impl<'a, Host: Runtime> TypecheckingCtx<'a> for TcCtx<'a, Host> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.gas
     }
@@ -124,9 +150,7 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a>
     }
 }
 
-impl<'a, Host: Runtime> TypecheckingCtx<'a>
-    for Ctx<&mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
-{
+impl<'a, Host: Runtime> TypecheckingCtx<'a> for Ctx<'_, '_, Host> {
     fn gas(&mut self) -> &mut mir::gas::Gas {
         self.tc_ctx.gas()
     }
@@ -146,31 +170,29 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a>
     }
 }
 
-impl<'a, Host: Runtime> CtxTrait<'a>
-    for Ctx<&mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
-{
+impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, 'a, Host> {
     fn sender(&self) -> AddressHash {
-        self.sender.clone()
+        self.exec_ctx.sender.clone()
     }
 
     fn source(&self) -> PublicKeyHash {
-        self.source.clone()
+        self.operation_ctx.source.pkh().clone()
     }
 
     fn amount(&self) -> i64 {
-        self.amount
+        self.exec_ctx.amount
     }
 
     fn self_address(&self) -> AddressHash {
-        self.self_address.clone()
+        self.exec_ctx.self_address.clone()
     }
 
     fn balance(&self) -> i64 {
-        self.balance
+        self.exec_ctx.balance
     }
 
     fn level(&self) -> BigUint {
-        self.level.block_number.into()
+        self.operation_ctx.level.block_number.into()
     }
 
     fn min_block_time(&self) -> BigUint {
@@ -178,7 +200,7 @@ impl<'a, Host: Runtime> CtxTrait<'a>
     }
 
     fn chain_id(&self) -> mir::ast::ChainId {
-        self.chain_id.clone()
+        self.operation_ctx.chain_id.clone()
     }
 
     fn voting_power(&self, _: &PublicKeyHash) -> BigUint {
@@ -186,7 +208,7 @@ impl<'a, Host: Runtime> CtxTrait<'a>
     }
 
     fn now(&self) -> num_bigint::BigInt {
-        i64::from(self.now).into()
+        i64::from(*self.operation_ctx.now).into()
     }
 
     fn total_voting_power(&self) -> BigUint {
@@ -194,31 +216,29 @@ impl<'a, Host: Runtime> CtxTrait<'a>
     }
 
     fn operation_group_hash(&self) -> [u8; 32] {
-        self.origination_nonce.operation.0 .0
+        self.operation_ctx.origination_nonce.operation.0 .0
     }
 
     fn origination_counter(&mut self) -> u32 {
-        let c: &mut u32 = &mut self.origination_nonce.index;
+        let c: &mut u32 = &mut self.operation_ctx.origination_nonce.index;
         *c += 1;
         *c
     }
 
     fn operation_counter(&mut self) -> u128 {
-        let c: &mut u128 = self.operation_counter;
+        let c: &mut u128 = self.operation_ctx.counter;
         *c += 1;
         *c
     }
 }
 
-impl<Host: Runtime> Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce> {
+impl<Host: Runtime> Ctx<'_, '_, Host> {
     pub fn host(&mut self) -> &mut Host {
         self.tc_ctx.host
     }
+}
 
-    pub fn context(&self) -> &Context {
-        self.tc_ctx.context
-    }
-
+impl<Host: Runtime> TcCtx<'_, Host> {
     /// Insert in the context a big_map diff that represents an allocation
     fn big_map_diff_alloc(&mut self, id: Zarith, key_type: Vec<u8>, value_type: Vec<u8>) {
         let allocation = StorageDiff::Alloc(Alloc {
@@ -296,25 +316,23 @@ pub fn convert_big_map_diff(
     }
 }
 
-impl<'a, Host: Runtime> LazyStorage<'a>
-    for Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce>
-{
+impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
     fn big_map_get(
         &mut self,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
-        let value_path = value_path(self.context(), id, &hash_key(key.clone()))?;
-        if self.host().store_has(&value_path)?.is_none() {
+        let value_path = value_path(self.context, id, &hash_key(key.clone()))?;
+        if self.host.store_has(&value_path)?.is_none() {
             return Ok(None);
         }
 
-        let value_type_path = value_type_path(self.context(), id)?;
-        let encoded_value_type = self.host().store_read_all(&value_type_path)?;
+        let value_type_path = value_type_path(self.context, id)?;
+        let encoded_value_type = self.host.store_read_all(&value_type_path)?;
         let value_type = Micheline::decode_raw(arena, &encoded_value_type)?;
 
-        let encoded_value = self.host().store_read_all(&value_path)?;
+        let encoded_value = self.host.store_read_all(&value_path)?;
         let value = Micheline::decode_raw(arena, &encoded_value)?;
         Ok(Some(value.typecheck_value(self, &value_type)?))
     }
@@ -324,8 +342,8 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         id: &BigMapId,
         key: &TypedValue,
     ) -> Result<bool, LazyStorageError> {
-        let path = value_path(self.context(), id, &hash_key(key.clone()))?;
-        Ok(self.host().store_has(&path)?.is_some())
+        let path = value_path(self.context, id, &hash_key(key.clone()))?;
+        Ok(self.host.store_has(&path)?.is_some())
     }
 
     fn big_map_update(
@@ -337,11 +355,11 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         let parser = Parser::new();
         let key_encoded = key.into_micheline_optimized_legacy(&parser.arena).encode();
         let key_hashed = digest_256(&key_encoded);
-        let value_path = value_path(self.context(), id, &key_hashed)?;
+        let value_path = value_path(self.context, id, &key_hashed)?;
         match value {
             None => {
-                if self.host().store_has(&value_path)?.is_some() {
-                    self.host().store_delete(&value_path)?;
+                if self.host.store_has(&value_path)?.is_some() {
+                    self.host.store_delete(&value_path)?;
                 }
 
                 // Write the update in the big_map_diff
@@ -351,7 +369,7 @@ impl<'a, Host: Runtime> LazyStorage<'a>
             Some(v) => {
                 let arena = Arena::new();
                 let encoded = v.into_micheline_optimized_legacy(&arena).encode();
-                self.host().store_write_all(&value_path, &encoded)?;
+                self.host.store_write_all(&value_path, &encoded)?;
 
                 // Write the update in the big_map_diff
                 self.big_map_diff_update(
@@ -371,18 +389,18 @@ impl<'a, Host: Runtime> LazyStorage<'a>
         value_type: &Type,
     ) -> Result<BigMapId, LazyStorageError> {
         let arena = Arena::new();
-        let next_id_path = next_id_path(self.context())?;
-        let id: BigMapId = read_nom_value(self.host(), &next_id_path).unwrap_or(0.into());
-        let key_type_path = key_type_path(self.context(), &id)?;
-        let value_type_path = value_type_path(self.context(), &id)?;
+        let next_id_path = next_id_path(self.context)?;
+        let id: BigMapId = read_nom_value(self.host, &next_id_path).unwrap_or(0.into());
+        let key_type_path = key_type_path(self.context, &id)?;
+        let value_type_path = value_type_path(self.context, &id)?;
         let key_type_encoded = key_type.into_micheline_optimized_legacy(&arena).encode();
         let value_type_encoded =
             value_type.into_micheline_optimized_legacy(&arena).encode();
-        self.host()
+        self.host
             .store_write_all(&value_type_path, &value_type_encoded)?;
-        self.host()
+        self.host
             .store_write_all(&key_type_path, &key_type_encoded)?;
-        store_bin(&id.succ(), self.host(), &next_id_path)
+        store_bin(&id.succ(), self.host, &next_id_path)
             .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
 
         // Write in the diff that there was an allocation
@@ -391,13 +409,13 @@ impl<'a, Host: Runtime> LazyStorage<'a>
     }
 
     fn big_map_copy(&mut self, id: &BigMapId) -> Result<BigMapId, LazyStorageError> {
-        let src_path = big_map_path(self.context(), id)?;
-        let next_id_path = next_id_path(self.context())?;
-        let dest_id: BigMapId = read_nom_value(self.host(), &next_id_path)
+        let src_path = big_map_path(self.context, id)?;
+        let next_id_path = next_id_path(self.context)?;
+        let dest_id: BigMapId = read_nom_value(self.host, &next_id_path)
             .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
-        let dest_path = big_map_path(self.context(), &dest_id)?;
-        self.host().store_copy(&src_path, &dest_path)?;
-        store_bin(&dest_id.succ(), self.host(), &next_id_path)
+        let dest_path = big_map_path(self.context, &dest_id)?;
+        self.host.store_copy(&src_path, &dest_path)?;
+        store_bin(&dest_id.succ(), self.host, &next_id_path)
             .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
 
         // Write in the diff that there was a copy
@@ -406,12 +424,56 @@ impl<'a, Host: Runtime> LazyStorage<'a>
     }
 
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
-        let big_map_path = big_map_path(self.context(), id)?;
-        self.host().store_delete(&big_map_path)?;
+        let big_map_path = big_map_path(self.context, id)?;
+        self.host.store_delete(&big_map_path)?;
 
         // Write in the diff that there was a remove
         self.big_map_diff_remove(id.value.clone());
         Ok(())
+    }
+}
+
+impl<'a, Host: Runtime> LazyStorage<'a> for Ctx<'_, 'a, Host> {
+    fn big_map_get(
+        &mut self,
+        arena: &'a Arena<Micheline<'a>>,
+        id: &BigMapId,
+        key: &TypedValue,
+    ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
+        self.tc_ctx.big_map_get(arena, id, key)
+    }
+
+    fn big_map_mem(
+        &mut self,
+        id: &BigMapId,
+        key: &TypedValue,
+    ) -> Result<bool, LazyStorageError> {
+        self.tc_ctx.big_map_mem(id, key)
+    }
+
+    fn big_map_update(
+        &mut self,
+        id: &BigMapId,
+        key: TypedValue<'a>,
+        value: Option<TypedValue<'a>>,
+    ) -> Result<(), LazyStorageError> {
+        self.tc_ctx.big_map_update(id, key, value)
+    }
+
+    fn big_map_new(
+        &mut self,
+        key_type: &Type,
+        value_type: &Type,
+    ) -> Result<BigMapId, LazyStorageError> {
+        self.tc_ctx.big_map_new(key_type, value_type)
+    }
+
+    fn big_map_copy(&mut self, id: &BigMapId) -> Result<BigMapId, LazyStorageError> {
+        self.tc_ctx.big_map_copy(id)
+    }
+
+    fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
+        self.tc_ctx.big_map_remove(id)
     }
 }
 
@@ -426,6 +488,51 @@ mod tests {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_tezlink::enc_wrappers::OperationHash;
 
+    macro_rules! make_default_ctx {
+        ($ctx:ident, $host: expr, $context: expr) => {
+            let mut gas = Gas::default();
+            let mut operation_counter = 0;
+            let mut origination_nonce =
+                OriginationNonce::initial(OperationHash(H256::zero()));
+            let mut operation_ctx = OperationCtx {
+                counter: &mut operation_counter,
+                source: &TezlinkImplicitAccount::from_public_key_hash(
+                    $context,
+                    &tezos_crypto_rs::public_key_hash::PublicKeyHash::from_b58check(
+                        "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP",
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+                origination_nonce: &mut origination_nonce,
+                level: &0u32.into(),
+                now: &0i64.into(),
+                // default chain id NetXynUjJNZm7wi
+                chain_id: &tezos_crypto_rs::hash::ChainId::try_from(vec![
+                    0xf3, 0xd4, 0x85, 0x54,
+                ])
+                .unwrap(),
+            };
+            let mut tc_ctx = TcCtx {
+                host: $host,
+                context: $context,
+                gas: &mut gas,
+                big_map_diff: &mut BTreeMap::new(),
+            };
+            let exec_ctx = ExecCtx {
+                balance: 0,
+                amount: 0,
+                self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
+                sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
+            };
+            let mut $ctx = Ctx {
+                tc_ctx: &mut tc_ctx,
+                operation_ctx: &mut operation_ctx,
+                exec_ctx,
+            };
+        };
+    }
+
     #[track_caller]
     fn check_is_dumped_map(map: BigMap, id: BigMapId) {
         match map.content {
@@ -437,7 +544,7 @@ mod tests {
     }
 
     fn assert_big_map_eq<'a, Host: Runtime>(
-        ctx: &mut Ctx<&mut Host, &Context, &mut Gas, &mut u128, &mut OriginationNonce>,
+        ctx: &mut Ctx<'_, 'a, Host>,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key_type: Type,
@@ -452,9 +559,9 @@ mod tests {
         assert_eq!(stored_key_type, key_type);
         assert_eq!(stored_value_type, value_type);
 
-        let big_map_path = big_map_path(ctx.context(), id).unwrap();
+        let big_map_path = big_map_path(ctx.tc_ctx.context, id).unwrap();
         let nb_passed_keys = content.len();
-        let nb_stored_keys = ctx.host().store_count_subkeys(&big_map_path).unwrap();
+        let nb_stored_keys = ctx.tc_ctx.host.store_count_subkeys(&big_map_path).unwrap();
         // The big_map storage contains the key_type and value_type subkeys followed by the other keys corresponding to values
         assert_eq!(nb_passed_keys + 2, nb_stored_keys.try_into().unwrap());
 
