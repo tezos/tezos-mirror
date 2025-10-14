@@ -35,11 +35,11 @@ minutes/hours/weeks remains the same as in protocol Seoul. A full list
 of affected parameters with their old and new values can be found
 :ref:`here<6s_block_time_parameters_t024>`.
 
-Unlike other parameters, the value
-``smart_rollup_max_active_outbox_levels`` in term of blocks has not
-been updated for technical reasons. This means that the actual
-duration of the maximal allowed period of withdrawal has decreased
-from ~14 days to ~10 days.
+Unlike other parameters, the value of parameter
+``smart_rollup_max_active_outbox_levels`` remains unchanged in terms
+of blocks. This means that the actual duration of the maximal allowed
+period of withdrawal has decreased from ~14 days in protocol Seoul to
+~10 days in protocol T024.
 
 
 Breaking changes to RPCs
