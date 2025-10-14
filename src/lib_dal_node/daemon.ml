@@ -325,7 +325,7 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
           proto_parameters.cryptobox_parameters.number_of_shards
         in
         update_metric_and_emit_event (fun () ->
-            IntSet.of_list (0 -- total_number_of_shards))
+            IntSet.of_list (0 -- (total_number_of_shards - 1)))
     | Controller profile when Controller_profiles.has_attester profile ->
         (* If one is not observing the slot but is an attester, then they expect
            a number of shards depending of the committee draw. *)
