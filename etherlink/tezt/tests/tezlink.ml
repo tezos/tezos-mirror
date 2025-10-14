@@ -1699,6 +1699,138 @@ let test_tezlink_forge_operations =
   Check.((res = expected_res) string ~error_msg:"Expected %R but got %L") ;
   unit
 
+let test_tezlink_prevalidation =
+  register_tezlink_test
+    ~title:"Test Tezlink prevalidation"
+    ~tags:["kernel"; "prevalidation"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client_tezlink = Client.init ~endpoint () in
+  (* - Setup - *)
+  (* An implicit address completely unknown from network*)
+  let* unknown = Client.gen_and_show_keys ~sig_alg:"p256" client_tezlink in
+  (* An implicit address with funds but unrevealed *)
+  let* unrevealed = Client.gen_and_show_keys ~sig_alg:"p256" client_tezlink in
+  let* _ =
+    Operation.inject_transfer
+      ~source:Constant.bootstrap1
+      ~dest:unrevealed
+      ~fee:2000
+      client_tezlink
+  in
+
+  let*@ _ = produce_block sequencer in
+
+  (* - Tests - *)
+  (* case unknown source*)
+  let* op_unknown_source =
+    Operation.Manager.(
+      operation [make ~fee:1000 ~source:unknown (transfer ())] client)
+  in
+  let unknown_rex = rex "Empty implicit contract" in
+  let* _ =
+    Operation.inject
+      ~error:unknown_rex
+      ~dont_wait:true
+      op_unknown_source
+      client_tezlink
+  in
+  (* case unrevealed source*)
+  let* op_unrevealed =
+    Operation.Manager.(
+      operation [make ~fee:1000 ~source:unrevealed (transfer ())] client)
+  in
+  let unrevealed_rex =
+    rex
+      (sf "Unrevealed manager key for contract %s." unrevealed.public_key_hash)
+  in
+  let* _ =
+    Operation.inject
+      ~error:unrevealed_rex
+      ~dont_wait:true
+      op_unrevealed
+      client_tezlink
+  in
+
+  let block_payload_hash =
+    "vh2jSMcbbWrJ39CqQ87CfK8BPrPsnCgmxWLSmgrDFFgaiCVnKDcL"
+  in
+  let* op_not_manager =
+    Operation.Consensus.(
+      operation
+        ~signer:Constant.bootstrap1
+        (consensus
+           ~kind:(Attestation {with_dal = false; companion_key = None})
+           ~slot:0
+           ~level:0
+           ~round:0
+           ~block_payload_hash)
+        client)
+  in
+  (* This error comes from the Operation.decode function. The test will need to be adapted when decoding is simplified to not include any validation. *)
+  let not_manager_rex = rex "Not a manager operation" in
+  let* _ =
+    Operation.inject
+      ~error:not_manager_rex
+      ~dont_wait:true
+      op_not_manager
+      client_tezlink
+  in
+
+  (* case wrong key *)
+  let inconsistent_hash_rex =
+    rex
+      (sf
+         "The hash of the manager public key %s is not %s as announced but %s"
+         Constant.bootstrap2.public_key
+         Constant.bootstrap2.public_key_hash
+         unrevealed.public_key_hash)
+    (* According to the protocol error, the first hash is the one of the public
+       key, the second one is the unrevealed manager key. *)
+  in
+  let* op_inconsistent =
+    Operation.Manager.(
+      operation
+        [make ~fee:1000 ~source:unrevealed (reveal Constant.bootstrap2 ())]
+        client)
+  in
+  let* _ =
+    Operation.inject
+      ~error:inconsistent_hash_rex
+      ~dont_wait:true
+      op_inconsistent
+      client_tezlink
+  in
+
+  (* case already revealed *)
+  let previously_revealed_rex = rex (sf "") in
+  let* op_previously_revealed =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~source:Constant.bootstrap1
+            (reveal Constant.bootstrap1 ());
+        ])
+      client
+  in
+  let* _ =
+    Operation.inject
+      ~error:previously_revealed_rex
+      ~dont_wait:true
+      op_previously_revealed
+      client_tezlink
+  in
+
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -1737,5 +1869,6 @@ let () =
   test_tezlink_sandbox () ;
   test_tezlink_internal_operation [Alpha] ;
   test_tezlink_internal_receipts [Alpha] ;
+  test_tezlink_prevalidation [Alpha] ;
   test_tezlink_origination [Alpha] ;
   test_tezlink_forge_operations [Alpha]
