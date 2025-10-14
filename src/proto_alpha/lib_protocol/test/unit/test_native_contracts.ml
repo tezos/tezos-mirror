@@ -140,6 +140,44 @@ let test_parse_contract kind expected_kind () =
   let* kind_with_storage, _ = get_native_contract ctxt contract_hash kind in
   check_parse_contract ctxt kind_with_storage expected_kind
 
+let execute_native_contract ctxt contract_hash kind parameter =
+  let open Lwt_result_wrap_syntax in
+  let* kind_with_storage, ctxt = get_native_contract ctxt contract_hash kind in
+  let*@ res, ctxt =
+    Script_interpreter.execute
+      ctxt
+      Readable
+      Contract_helpers.default_step_constants
+      ~script:(Script.Native kind_with_storage)
+      ~cached_script:None
+      ~entrypoint:Entrypoint.default
+      ~parameter
+      ~internal:false
+  in
+  return (res, ctxt)
+
+let test_call_native_contract kind parameter expected_storage () =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = test_context () in
+  let*@ contract_hash =
+    Contract.Internal_for_tests.get_accumulator_contract_hash ctxt
+  in
+  let* res, _ctxt = execute_native_contract ctxt contract_hash kind parameter in
+  if res.storage <> expected_storage then Test.fail "Unexpected storage" ;
+  return_unit
+
+let int_param i = Environment.Micheline.(Int (dummy_location, Z.of_int i))
+
+let int_int_param x y =
+  Environment.Micheline.(
+    Prim
+      ( dummy_location,
+        Michelson_v1_primitives.D_Pair,
+        [int_param x; int_param y],
+        [] ))
+
+let strip_location = Environment.Micheline.strip_locations
+
 let register_test ~title ?additional_tags ?slow test =
   let unwrap f () =
     let* res = f () in
@@ -165,4 +203,10 @@ let () =
     ~title:"Check parsing native contract"
     (test_parse_contract
        Script.Accumulator
-       Script_native_types.Accumulator_kind)
+       Script_native_types.Accumulator_kind) ;
+  register_test
+    ~title:"Check executing native contract"
+    (test_call_native_contract
+       Script.Accumulator
+       (strip_location (int_param 10))
+       (strip_location (int_int_param 10 1)))
