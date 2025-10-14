@@ -1,10 +1,12 @@
-Breaking changes
+Breaking Changes
 ================
 
-This section presents the breaking changes that users can encounter between
-different Protocols or Octez versions. It complements the "Breaking changes"
-sections in the development changelogs by providing more context and/or less
-fragmented mentions.
+This section presents the breaking changes that users may encounter
+between successive protocols or successive Octez versions. It
+complements the respective :ref:`protocol changelogs
+<protocol_changelogs>` and :doc:`Octez changelog <../CHANGES>` by
+gathering all breaking changes in one place and providing more context
+when appropriate.
 
 For each change, there may be subsections ``Deprecation`` and ``Breaking
 changes``. The former subsection will explain what changes can be made during a
