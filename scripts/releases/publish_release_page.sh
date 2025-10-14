@@ -14,15 +14,10 @@ if [ -z "${DISTRIBUTION_ID:-}" ]; then
   exit 1
 fi
 
-# We use a file to list versions so that we can control what is actually displayed.
-versions_list_filename="versions.json"
-
 if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
   echo "The AWS credentials are not found. Make sure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are set."
   exit 1
 fi
-
-aws s3 cp s3://"${S3_BUCKET}""${BUCKET_PATH}"/"$versions_list_filename" "./$versions_list_filename"
 
 # If it's a release, we actually push the assets to the s3 bucket
 if [ -n "${CI_COMMIT_TAG}" ]; then
@@ -39,17 +34,25 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
 
     announcement="https://octez.tezos.com/docs/releases/version-${gitlab_release_major_version}.html"
 
-    # Add the new version to the $versions_list_filename JSON file.
-    # Since jq cannot modify the file in-place, we write to a temporary file first.
+    # Add the new version using version_manager
     # [gitlab_release_rc_version], [gitlab_release_major_version] and [gitlab_release_minor_version] defined in [./scripts/releases/octez-release.sh]
-    if [ -n "${gitlab_release_rc_version}" ]; then
-      rc="${gitlab_release_rc_version}"
-      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version},\"rc\":${rc},\"announcement\":\"${announcement}\"}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
-    else
-      # This is a release, we assume it's the latest.
-      # All the others are marked [latest = false].
-      jq 'map(.latest = false)' "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
-      jq ". += [{\"major\":${gitlab_release_major_version}, \"minor\":${gitlab_release_minor_version}, \"latest\":true, \"announcement\":\"${announcement}\"}]" "./${versions_list_filename}" > "./tmp.json" && mv "./tmp.json" "./${versions_list_filename}"
+    echo "Adding version ${gitlab_release} to release page..."
+    dune exec ./ci/bin_release_page/version_manager.exe -- \
+      --path "${S3_BUCKET}${BUCKET_PATH}" \
+      add \
+      --major "${gitlab_release_major_version}" \
+      --minor "${gitlab_release_minor_version}" \
+      ${gitlab_release_rc_version:+--rc "${gitlab_release_rc_version}"} \
+      --announcement "${announcement}"
+
+    # Mark as latest only if not an RC
+    if [ -z "${gitlab_release_rc_version}" ]; then
+      echo "Marking version as latest..."
+      dune exec ./ci/bin_release_page/version_manager.exe -- \
+        --path "${S3_BUCKET}${BUCKET_PATH}" \
+        set-latest \
+        --major "${gitlab_release_major_version}" \
+        --minor "${gitlab_release_minor_version}"
     fi
 
     # Upload binaries to S3 bucket
@@ -85,9 +88,6 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
 else
   echo "No tag found. No asset will be added to the release page."
 fi
-
-echo "Syncing $versions_list_filename to remote s3 bucket"
-aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"
 
 echo "Building release page"
 dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
