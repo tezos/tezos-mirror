@@ -498,7 +498,7 @@ apt_repo_debian:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
-  - ./scripts/ci/install-gsutil.sh
+  - images/scripts/install-gsutil-apt.sh
   - apt install -y apt-utils debsigs jq
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
@@ -613,7 +613,7 @@ apt_repo_ubuntu:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
-  - ./scripts/ci/install-gsutil.sh
+  - images/scripts/install-gsutil-apt.sh
   - apt install -y apt-utils debsigs jq
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
