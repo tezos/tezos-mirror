@@ -1,18 +1,24 @@
 # Changelog
 
-## Unreleased
+## Version 0.44 (2025-10-14)
 
-### Breaking changes
+This release most notably adds support for the Ebisu kernel (Etherlink 5.0),
+which was successfully voted through a governance vote by the Tezos bakers. We
+strongly encourage node operators to upgrade to this version to maximize
+performances of their deployment when the new kernel activates on October 15,
+6:30 UTC.
 
-### Configuration changes
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
 
 ### RPCs changes
 
 - Add new GET `/mode` RPC endpoint to expose the current
   operating mode of the EVM node. This enables external monitoring
   tools to query and track node configuration. (!19486)
-- Outputs of `txpool_content` and inputs of `injectTransaction` RPCs no longer downcast
-  transactions to the legacy format; eip `2930`, `1559` and `7702` are now available.
+- Outputs of `txpool_content` and inputs of `injectTransaction` RPCs no longer
+  downcast transactions to the legacy format; eip `2930`, `1559` and `7702` are
+  now available. (!19494)
 
 ### Monitoring changes
 
@@ -32,17 +38,6 @@
 - Supports executing Ebisu natively. (!19563)
 - Relaxes the condition for completing the EVM node's bootstrap phase to be
   more tolerant to network delays. (!19562)
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.43 (2025-09-30)
 
