@@ -1458,9 +1458,11 @@ let commands_rw () =
         in
         let*! () =
           if force && not simulation then
-            let*! () = check_force_dependency "--gas-limit" gas_limit in
-            let*! () = check_force_dependency "--storage-limit" storage_limit in
-            check_force_dependency "--fee" fee
+            let*! () = check_force_dependency "--default-gas-limit" gas_limit in
+            let*! () =
+              check_force_dependency "--default-storage-limit" storage_limit
+            in
+            check_force_dependency "--default-fee" fee
           else Lwt.return_unit
         in
         let prepare i =
