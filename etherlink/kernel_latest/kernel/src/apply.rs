@@ -507,12 +507,11 @@ fn apply_deposit<Host: Runtime>(
     deposit: &Deposit,
     transaction: &Transaction,
     tracer_input: Option<TracerInput>,
-    spec_id: &SpecId,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
     let DepositResult {
         outcome: execution_outcome,
         estimated_ticks_used,
-    } = execute_deposit(host, deposit, spec_id).map_err(|e| {
+    } = execute_deposit(host, deposit).map_err(|e| {
         Error::InvalidRunTransaction(revm_etherlink::Error::Custom(e.to_string()))
     })?;
 
@@ -789,7 +788,7 @@ pub fn apply_transaction<Host: Runtime>(
         )?,
         TransactionContent::Deposit(deposit) => {
             log!(host, Benchmarking, "Transaction type: DEPOSIT");
-            apply_deposit(host, deposit, transaction, tracer_input, spec_id)?
+            apply_deposit(host, deposit, transaction, tracer_input)?
         }
         TransactionContent::FaDeposit(fa_deposit) => {
             log!(host, Benchmarking, "Transaction type: FA_DEPOSIT");
