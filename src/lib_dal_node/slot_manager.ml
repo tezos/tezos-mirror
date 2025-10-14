@@ -367,8 +367,7 @@ let try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
   let* cell_bytes_opt =
     Store.Skip_list_cells.find_by_slot_id_opt
       (Node_context.get_store ctxt)
-      ~published_level:slot_id.Types.Slot_id.slot_level
-      ~slot_index:slot_id.slot_index
+      slot_id
   in
   match cell_bytes_opt with
   | None -> return_none

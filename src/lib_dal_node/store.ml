@@ -907,12 +907,11 @@ module Skip_list_cells = struct
       t.skip_list_cells_store
       skip_list_hash
 
-  let find_by_slot_id_opt ?conn t ~published_level ~slot_index =
+  let find_by_slot_id_opt ?conn t slot_id =
     Dal_store_sqlite3.Skip_list_cells.find_by_slot_id_opt
       ?conn
       t.skip_list_cells_store
-      ~published_level
-      ~slot_index
+      slot_id
 
   let find_by_level ?conn t ~published_level =
     Dal_store_sqlite3.Skip_list_cells.find_by_level

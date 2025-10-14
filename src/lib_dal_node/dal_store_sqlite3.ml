@@ -249,9 +249,13 @@ module Skip_list_cells = struct
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.find_opt skip_list_hash
 
-  let find_by_slot_id_opt ?conn store ~published_level ~slot_index =
+  let find_by_slot_id_opt ?conn store slot_id =
     with_connection store conn @@ fun conn ->
-    Sqlite.Db.find_opt conn Q.find_by_slot_id_opt (published_level, slot_index)
+    Sqlite.Db.find_opt
+      conn
+      Q.find_by_slot_id_opt
+      ( slot_id.Tezos_dal_node_services.Types.Slot_id.slot_level,
+        slot_id.slot_index )
 
   let find_by_level ?conn store ~published_level =
     with_connection store conn @@ fun conn ->
