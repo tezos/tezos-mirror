@@ -144,10 +144,24 @@ server {
 
   location <location> {
     proxy_pass <proxy_pass>;
+    proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 3600;
+    proxy_send_timeout 3600;
   }
 }
+The
+    proxy_http_version 1.1;
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 3600;
+    proxy_send_timeout 3600;
+part enables streamed RPCs.
 *)
 let simple_ssl_node ~server_name ~port ~location ~proxy_pass ~certificate
     ~certificate_key =
@@ -163,8 +177,14 @@ let simple_ssl_node ~server_name ~port ~location ~proxy_pass ~certificate
             ( sf "location %s" location,
               [
                 Directive (sf "proxy_pass %s" proxy_pass);
+                Directive "proxy_http_version 1.1";
                 Directive "proxy_set_header Host $host";
                 Directive "proxy_set_header X-Real-IP $remote_addr";
+                Directive "proxy_buffering off";
+                Directive "proxy_request_buffering off";
+                Directive "proxy_cache off";
+                Directive "proxy_read_timeout 3600";
+                Directive "proxy_send_timeout 3600";
               ] );
         ] );
   ]
