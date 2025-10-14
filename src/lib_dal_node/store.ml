@@ -991,9 +991,11 @@ let add_slot_headers ~number_of_slots ~block_level slot_headers t =
         in
         (* This invariant should hold. *)
         assert (Int32.equal published_level block_level) ;
-        let index = Types.Slot_id.{slot_level = published_level; slot_index} in
+        let slot_id =
+          Types.Slot_id.{slot_level = published_level; slot_index}
+        in
         let () =
-          Statuses_cache.add_status statuses_cache `Waiting_attestation index
+          Statuses_cache.add_status statuses_cache `Waiting_attestation slot_id
         in
         Slot_id_cache.add ~number_of_slots t.finalized_commitments slot_header ;
         return (SI.add slot_index waiting))
@@ -1002,6 +1004,12 @@ let add_slot_headers ~number_of_slots ~block_level slot_headers t =
   in
   List.iter
     (fun i ->
-      Dal_metrics.slot_waiting_for_attestation ~set:(SI.mem i waiting) i)
+      let i_is_waiting_for_attestation = SI.mem i waiting in
+      Dal_metrics.slot_waiting_for_attestation
+        ~set:i_is_waiting_for_attestation
+        i ;
+      let slot_id = Types.Slot_id.{slot_level = block_level; slot_index = i} in
+      if not i_is_waiting_for_attestation then
+        Statuses_cache.add_status statuses_cache `Unpublished slot_id)
     (0 -- (number_of_slots - 1)) ;
   return_unit
