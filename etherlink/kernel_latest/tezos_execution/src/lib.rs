@@ -34,9 +34,7 @@ use tezos_tezlink::operation_result::{
     TransferTarget,
 };
 use tezos_tezlink::{
-    operation::{
-        ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
-    },
+    operation::{OperationContent, Parameter, RevealContent, TransferContent},
     operation_result::{
         produce_operation_result, Balance, BalanceTooLow, BalanceUpdate, OperationError,
         OperationResultSum, OriginationError, RevealError, RevealSuccess, TransferError,
@@ -671,32 +669,6 @@ fn originate_contract<Host: Runtime>(
     Ok(dummy_origination_sucess)
 }
 
-/// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
-fn compute_fees_balance_updates(
-    source: &TezlinkImplicitAccount,
-    amount: &Narith,
-) -> Result<
-    (BalanceUpdate, BalanceUpdate),
-    num_bigint::TryFromBigIntError<num_bigint::BigInt>,
-> {
-    let source_delta = BigInt::from_biguint(num_bigint::Sign::Minus, amount.into());
-    let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
-
-    let source_update = BalanceUpdate {
-        balance: Balance::Account(source.contract()),
-        changes: source_delta.try_into()?,
-        update_origin: UpdateOrigin::BlockApplication,
-    };
-
-    let block_fees = BalanceUpdate {
-        balance: Balance::BlockFees,
-        changes: block_fees.try_into()?,
-        update_origin: UpdateOrigin::BlockApplication,
-    };
-
-    Ok((source_update, block_fees))
-}
-
 /// Prepares balance updates in the format expected by the Tezos operation.
 fn compute_balance_updates(
     giver: &impl TezlinkAccount,
@@ -896,30 +868,25 @@ fn apply_batch<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     origination_nonce: &mut OriginationNonce,
-    validation_info: validate::ValidationInfo,
+    validation_info: validate::ValidatedBatch,
     level: &BlockNumber,
     now: &Timestamp,
     chain_id: &ChainId,
 ) -> (Vec<OperationResultSum>, bool) {
-    let validate::ValidationInfo {
+    let validate::ValidatedBatch {
         source_account,
-        balance_updates,
         validated_operations,
     } = validation_info;
     let mut first_failure: Option<usize> = None;
     let mut receipts = Vec::with_capacity(validated_operations.len());
 
-    for (index, (content, balance_update)) in validated_operations
-        .into_iter()
-        .zip(balance_updates)
-        .enumerate()
-    {
+    for (index, validated_operation) in validated_operations.into_iter().enumerate() {
         log!(
             host,
             Debug,
             "Applying operation #{} in the batch with counter {:?}.",
             index,
-            content.counter
+            validated_operation.content.counter
         );
         let receipt = if first_failure.is_some() {
             log!(
@@ -928,15 +895,17 @@ fn apply_batch<Host: Runtime>(
                 "Skipping this operation because we already failed on {:?}.",
                 first_failure
             );
-            produce_skipped_receipt(&content, balance_update)
+            produce_skipped_receipt(
+                &validated_operation.content,
+                validated_operation.balance_updates,
+            )
         } else {
             apply_operation(
                 host,
                 context,
                 origination_nonce,
-                &content,
                 &source_account,
-                balance_update,
+                validated_operation,
                 level,
                 now,
                 chain_id,
@@ -965,19 +934,18 @@ fn apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     origination_nonce: &mut OriginationNonce,
-    content: &ManagerOperation<OperationContent>,
     source_account: &TezlinkImplicitAccount,
-    balance_updates: Vec<BalanceUpdate>,
+    validated_operation: validate::ValidatedOperation,
     level: &BlockNumber,
     now: &Timestamp,
     chain_id: &ChainId,
 ) -> OperationResultSum {
     let mut internal_operations_receipts = Vec::new();
-    match &content.operation {
+    match &validated_operation.content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(host, source_account, pk);
             let manager_result = produce_operation_result(
-                balance_updates,
+                validated_operation.balance_updates,
                 reveal_result.map_err(Into::into),
                 internal_operations_receipts,
             );
@@ -1002,7 +970,7 @@ fn apply_operation<Host: Runtime>(
                 chain_id,
             );
             let manager_result = produce_operation_result(
-                balance_updates,
+                validated_operation.balance_updates,
                 transfer_result.map_err(Into::into),
                 internal_operations_receipts,
             );
@@ -1032,7 +1000,7 @@ fn apply_operation<Host: Runtime>(
                 Err(err) => Err(err),
             };
             let manager_result = produce_operation_result(
-                balance_updates,
+                validated_operation.balance_updates,
                 origination_result.map_err(|e| e.into()),
                 internal_operations_receipts,
             );

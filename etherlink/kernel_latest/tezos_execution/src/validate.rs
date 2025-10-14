@@ -2,13 +2,19 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_data_encoding::types::Narith;
+use num_bigint::{BigInt, Sign, TryFromBigIntError};
+use num_traits::ops::checked::CheckedSub;
+use tezos_crypto_rs::PublicKeySignatureVerifier;
+use tezos_data_encoding::{enc::BinError, types::Narith};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::PublicKey;
+use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::{
-    operation::{ManagerOperation, OperationContent, RevealContent},
-    operation_result::{CounterError, ValidityError},
+    operation::{
+        serialize_unsigned_operation, ManagerOperation, Operation, OperationContent,
+        RevealContent,
+    },
+    operation_result::{Balance, CounterError, UpdateOrigin, ValidityError},
 };
 
 use crate::{
@@ -17,68 +23,68 @@ use crate::{
     BalanceUpdate,
 };
 
-impl TezlinkImplicitAccount {
-    /// Inspired from `contract_storage.ml` in the Tezos protocol
-    /// This function verifies that the counter given in argument is the
-    /// successor of the stored counter. If not, it returns the appropriate
-    /// error.
-    fn check_counter_increment(
-        &self,
-        host: &impl Runtime,
-        counter: &Narith,
-    ) -> Result<(), ValidityError> {
-        let contract_counter = self
-            .counter(host)
-            .map_err(|_| ValidityError::FailedToFetchCounter)?;
-        // The provided counter value must be the successor of the manager's counter.
-        let expected_counter = Narith(&contract_counter.0 + 1_u64);
-
-        if &expected_counter == counter {
-            log!(
-                host,
-                Debug,
-                "Validation: OK - Operation has the expected counter {:?}.",
-                expected_counter
-            );
-            Ok(())
-        } else if expected_counter.0 > counter.0 {
-            let error = CounterError {
-                expected: expected_counter,
-                found: counter.clone(),
-            };
-            log!(
-                host,
-                tezos_evm_logging::Level::Debug,
-                "Invalid operation: Source counter is in the past"
-            );
-            Err(ValidityError::CounterInThePast(error))
-        } else {
-            let error = CounterError {
-                expected: expected_counter,
-                found: counter.clone(),
-            };
-            log!(
-                host,
-                tezos_evm_logging::Level::Debug,
-                "Invalid operation: Source counter is in the future"
-            );
-            Err(ValidityError::CounterInTheFuture(error))
-        }
+/// Inspired from `contract_storage.ml` in the Tezos protocol
+/// This function verifies that the counter given in argument is the
+/// successor of the stored counter. If not, it returns the appropriate
+/// error.
+fn check_counter_increment(
+    host: &impl Runtime,
+    account_counter: &Narith,
+    operation_counter: &Narith,
+) -> Result<(), ValidityError> {
+    // The provided counter value must be the successor of the manager's counter.
+    let expected_counter = Narith(&account_counter.0 + 1_u64);
+    if &expected_counter == operation_counter {
+        log!(
+            host,
+            Debug,
+            "Validation: OK - Operation has the expected counter {:?}.",
+            expected_counter
+        );
+        return Ok(());
     }
-
-    fn get_manager_key(
-        &self,
-        host: &impl Runtime,
-    ) -> Result<Result<PublicKey, ValidityError>, tezos_storage::error::Error> {
-        let manager = self.manager(host).ok();
-        match manager {
-            None => Ok(Err(ValidityError::MissingManagerContract)),
-            Some(Manager::NotRevealed(public_key_hash)) => {
-                Ok(Err(ValidityError::UnrevealedManagerKey(public_key_hash)))
-            }
-            Some(Manager::Revealed(public_key)) => Ok(Ok(public_key)),
-        }
+    let error = CounterError {
+        expected: expected_counter,
+        found: operation_counter.clone(),
+    };
+    if error.expected > error.found {
+        log!(
+            host,
+            tezos_evm_logging::Level::Debug,
+            "Invalid operation: Source counter is in the past"
+        );
+        Err(ValidityError::CounterInThePast(error))
+    } else {
+        log!(
+            host,
+            tezos_evm_logging::Level::Debug,
+            "Invalid operation: Source counter is in the future"
+        );
+        Err(ValidityError::CounterInTheFuture(error))
     }
+}
+
+/// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
+fn compute_fees_balance_updates(
+    source: &PublicKeyHash,
+    amount: &Narith,
+) -> Result<(BalanceUpdate, BalanceUpdate), TryFromBigIntError<BigInt>> {
+    let source_delta = BigInt::from_biguint(Sign::Minus, amount.into());
+    let block_fees = BigInt::from_biguint(Sign::Plus, amount.into());
+
+    let source_update = BalanceUpdate {
+        balance: Balance::Account(Contract::Implicit(source.clone())),
+        changes: source_delta.try_into()?,
+        update_origin: UpdateOrigin::BlockApplication,
+    };
+
+    let block_fees = BalanceUpdate {
+        balance: Balance::BlockFees,
+        changes: block_fees.try_into()?,
+        update_origin: UpdateOrigin::BlockApplication,
+    };
+
+    Ok((source_update, block_fees))
 }
 
 /// In order to validate an operation, we need to check its signature,
@@ -95,9 +101,17 @@ fn get_revealed_key<Host: Runtime>(
 ) -> Result<PublicKey, ValidityError> {
     match first_content {
         OperationContent::Reveal(RevealContent { pk, proof: _ }) => Ok(pk.clone()),
-        _ => account
-            .get_manager_key(host)
-            .map_err(|_| ValidityError::FailedToFetchManagerKey)?,
+        _ => {
+            let manager = account
+                .manager(host)
+                .map_err(|_| ValidityError::FailedToFetchManagerKey)?;
+            match manager {
+                Manager::Revealed(public_key) => Ok(public_key),
+                Manager::NotRevealed(public_key_hash) => {
+                    Err(ValidityError::UnrevealedManagerKey(public_key_hash))
+                }
+            }
+        }
     }
 }
 
@@ -130,10 +144,6 @@ fn validate_source<Host: Runtime>(
     context: &Context,
     content: &Vec<ManagerOperation<OperationContent>>,
 ) -> Result<(PublicKey, TezlinkImplicitAccount), ValidityError> {
-    if content.is_empty() {
-        return Err(ValidityError::EmptyBatch);
-    }
-
     let source = &content[0].source;
 
     for c in content {
@@ -160,10 +170,12 @@ fn validate_source<Host: Runtime>(
 
 fn validate_individual_operation<Host: Runtime>(
     host: &Host,
-    account: &TezlinkImplicitAccount,
     content: &ManagerOperation<OperationContent>,
+    account_pkh: &PublicKeyHash,
+    account_balance: &Narith,
+    account_counter: &Narith,
 ) -> Result<(Narith, Vec<BalanceUpdate>), ValidityError> {
-    account.check_counter_increment(host, &content.counter)?;
+    check_counter_increment(host, account_counter, &content.counter)?;
 
     // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
     let hard_gas_limit = 1040000_u64;
@@ -188,68 +200,105 @@ fn validate_individual_operation<Host: Runtime>(
     );
 
     // The manager account must be solvent to pay the announced fees.
-    let new_balance = match account.simulate_spending(host, &content.fee) {
-        Ok(Some(new_balance)) => new_balance,
-        Ok(None) => {
-            return Err(ValidityError::CantPayFees(content.fee.clone()));
-        }
-        Err(_) => return Err(ValidityError::FailedToFetchBalance),
-    };
+    let new_balance = account_balance
+        .0
+        .checked_sub(&content.fee.0)
+        .ok_or(ValidityError::CantPayFees(content.fee.clone()))?
+        .into();
+
     log!(
         host,
         Debug,
         "Validation: OK - the source can pay {:?} in fees, being left with a new balance of {:?}.",
         &content.fee,
-        new_balance
+        account_balance
     );
 
-    let (src_delta, block_fees) =
-        crate::compute_fees_balance_updates(account, &content.fee)
-            .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
+    let (src_delta, block_fees) = compute_fees_balance_updates(account_pkh, &content.fee)
+        .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
 
     Ok((new_balance, vec![src_delta, block_fees]))
 }
 
-pub struct ValidationInfo {
+pub struct ValidatedOperation {
+    pub balance_updates: Vec<BalanceUpdate>,
+    pub content: ManagerOperation<OperationContent>,
+}
+
+pub struct ValidatedBatch {
     pub source_account: TezlinkImplicitAccount,
-    pub balance_updates: Vec<Vec<BalanceUpdate>>,
-    pub validated_operations: Vec<ManagerOperation<OperationContent>>,
+    pub validated_operations: Vec<ValidatedOperation>,
+}
+
+pub fn verify_signature(operation: Operation, pk: &PublicKey) -> Result<bool, BinError> {
+    let serialized_unsigned_operation =
+        serialize_unsigned_operation(&operation.branch, &operation.content)?;
+    let signature = &operation.signature.into();
+    // The verify_signature function never returns false. If the verification
+    // is incorrect the function will return an Error and it's up to us to
+    // transform that into a `false` boolean if we want.
+    let check = pk
+        .verify_signature(signature, &serialized_unsigned_operation)
+        .unwrap_or(false);
+    Ok(check)
 }
 
 pub fn execute_validation<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     operation: tezos_tezlink::operation::Operation,
-) -> Result<ValidationInfo, ValidityError> {
-    let unvalidated_operation = operation
+) -> Result<ValidatedBatch, ValidityError> {
+    if operation.content.is_empty() {
+        return Err(ValidityError::EmptyBatch);
+    }
+
+    let mut validated_operations = Vec::new();
+    let unvalidated_operation: Vec<ManagerOperation<OperationContent>> = operation
         .content
         .clone()
         .into_iter()
         .map(Into::into)
         .collect();
+
     let (pk, source_account) = validate_source(host, context, &unvalidated_operation)?;
-    let mut balance_updates = vec![];
-    for c in &unvalidated_operation {
-        let (new_source_balance, op_balance_updates) =
-            validate_individual_operation(host, &source_account, c)?;
-
-        source_account
-            .set_balance(host, &new_source_balance)
-            .map_err(|_| ValidityError::FailedToUpdateBalance)?;
-
-        source_account
-            .increment_counter(host)
-            .map_err(|_| ValidityError::FailedToIncrementCounter)?;
-
-        balance_updates.push(op_balance_updates);
+    match verify_signature(operation, &pk) {
+        Ok(true) => log!(host, Debug, "Validation: OK - Signature is valid."),
+        _ => return Err(ValidityError::InvalidSignature),
     }
 
-    match operation.verify_signature(&pk) {
-        Ok(true) => Ok(ValidationInfo {
-            source_account,
+    let mut source_balance = source_account
+        .balance(host)
+        .map_err(|_| ValidityError::FailedToFetchBalance)?;
+    let mut source_counter = source_account
+        .counter(host)
+        .map_err(|_| ValidityError::FailedToFetchCounter)?;
+
+    for content in unvalidated_operation {
+        let (source_balance_after_fees, balance_updates) = validate_individual_operation(
+            host,
+            &content,
+            source_account.pkh(),
+            &source_balance,
+            &source_counter,
+        )?;
+        source_counter = Narith(&source_counter.0 + 1_u64);
+        source_balance = source_balance_after_fees;
+        validated_operations.push(ValidatedOperation {
             balance_updates,
-            validated_operations: unvalidated_operation,
-        }),
-        _ => Err(ValidityError::InvalidSignature),
+            content,
+        });
     }
+
+    source_account
+        .set_balance(host, &source_balance)
+        .map_err(|_| ValidityError::FailedToUpdateBalance)?;
+
+    source_account
+        .increment_counter(host, validated_operations.len())
+        .map_err(|_| ValidityError::FailedToIncrementCounter)?;
+
+    Ok(ValidatedBatch {
+        source_account,
+        validated_operations,
+    })
 }

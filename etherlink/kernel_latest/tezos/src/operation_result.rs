@@ -40,8 +40,6 @@ pub enum ValidityError {
     CounterInThePast(CounterError),
     #[error("Counter in the future: {0:?}.")]
     CounterInTheFuture(CounterError),
-    #[error("Missing manager contract.")]
-    MissingManagerContract,
     #[error("The manager key for {0} has not been revealed yet.")]
     UnrevealedManagerKey(PublicKeyHash),
     #[error("Cannot pay {0:?} in fees.")]

@@ -11,7 +11,6 @@ use primitive_types::H256;
 use rlp::Decodable;
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::{BlsSignature, SecretKeyEd25519, UnknownSignature};
-use tezos_crypto_rs::PublicKeySignatureVerifier;
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
     enc::{BinError, BinWriter},
@@ -100,19 +99,6 @@ impl Operation {
         let serialized_op = self.to_bytes()?;
         let op_hash = digest_256(&serialized_op);
         Ok(OperationHash(H256::from_slice(&op_hash)))
-    }
-
-    pub fn verify_signature(self, pk: &PublicKey) -> Result<bool, BinError> {
-        let serialized_unsigned_operation =
-            serialize_unsigned_operation(&self.branch, &self.content)?;
-        let signature = &self.signature.into();
-        // The verify_signature function never returns false. If the verification
-        // is incorrect the function will return an Error and it's up to us to
-        // transform that into a `false` boolean if we want.
-        let check = pk
-            .verify_signature(signature, &serialized_unsigned_operation)
-            .unwrap_or(false);
-        Ok(check)
     }
 }
 
