@@ -7,7 +7,7 @@ use alloy_sol_types::{sol, SolInterface, SolValue};
 use primitive_types::{H256, U256};
 use revm::{
     context::ContextTr,
-    interpreter::{Gas, InputsImpl, InstructionResult, InterpreterResult},
+    interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
     primitives::Bytes,
 };
 
@@ -61,29 +61,22 @@ sol! {
 }
 
 pub(crate) fn table_precompile<CTX, DB>(
-    input: &[u8],
+    calldata: &[u8],
     context: &mut CTX,
-    is_static: bool,
-    transfer: &InputsImpl,
-    gas_limit: u64,
+    inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     DB: DatabasePrecompileStateChanges,
     CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
 {
-    guard(
-        TABLE_PRECOMPILE_ADDRESS,
-        &[FA_BRIDGE_SOL_ADDR],
-        transfer,
-        is_static,
-    )?;
+    guard(TABLE_PRECOMPILE_ADDRESS, &[FA_BRIDGE_SOL_ADDR], inputs)?;
 
-    let mut gas = Gas::new(gas_limit);
+    let mut gas = Gas::new(inputs.gas_limit);
     if !gas.record_cost(TICKET_TABLE_BASE_COST) {
-        return Ok(out_of_gas(gas_limit));
+        return Ok(out_of_gas(inputs.gas_limit));
     }
 
-    let interface = match Table::TableCalls::abi_decode(input) {
+    let interface = match Table::TableCalls::abi_decode(calldata) {
         Ok(data) => data,
         Err(e) => return Ok(revert(e, gas)),
     };

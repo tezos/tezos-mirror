@@ -6,7 +6,7 @@
 use alloy_sol_types::{sol, SolInterface};
 use revm::{
     context::{Block, ContextTr},
-    interpreter::{Gas, InputsImpl, InstructionResult, InterpreterResult},
+    interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
     primitives::{alloy_primitives::IntoLogData, Bytes, Log, U256},
 };
 use tezos_crypto_rs::{
@@ -46,42 +46,40 @@ sol! {
 }
 
 pub(crate) fn change_sequencer_key_precompile<CTX, DB>(
-    input: &[u8],
+    calldata: &[u8],
     context: &mut CTX,
-    is_static: bool,
-    transfer: &InputsImpl,
-    gas_limit: u64,
+    inputs: &CallInputs,
 ) -> Result<InterpreterResult, CustomPrecompileError>
 where
     CTX: ContextTr,
     CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
     DB: DatabasePrecompileStateChanges,
 {
-    if Some(transfer.target_address) != transfer.bytecode_address {
+    if inputs.target_address != inputs.bytecode_address {
         return Err(CustomPrecompileError::Revert(
             "DELEGATECALLs and CALLCODEs are not allowed".to_string(),
         ));
     }
 
-    if transfer.target_address != CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS {
+    if inputs.target_address != CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS {
         return Err(CustomPrecompileError::Revert(String::from(
             "invalid transfer target address",
         )));
     }
 
-    if is_static {
+    if inputs.is_static {
         return Err(CustomPrecompileError::Revert(String::from(
             "STATICCALLs are not allowed",
         )));
     }
 
-    let mut gas = Gas::new(gas_limit);
+    let mut gas = Gas::new(inputs.gas_limit);
 
     if !gas.record_cost(UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST) {
-        return Ok(out_of_gas(gas_limit));
+        return Ok(out_of_gas(inputs.gas_limit));
     }
 
-    let Ok(function_call) = ChangeSequencerKeyCalls::abi_decode(input) else {
+    let Ok(function_call) = ChangeSequencerKeyCalls::abi_decode(calldata) else {
         return Err(CustomPrecompileError::Revert(String::from(
             "invalid input encoding",
         )));

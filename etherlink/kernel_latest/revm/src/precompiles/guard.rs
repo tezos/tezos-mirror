@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use revm::{
-    interpreter::{Gas, InputsImpl, InstructionResult, InterpreterResult},
+    interpreter::{CallInputs, Gas, InstructionResult, InterpreterResult},
     primitives::{Address, Bytes},
 };
 use std::fmt::Display;
@@ -14,25 +14,24 @@ use crate::precompiles::error::CustomPrecompileError;
 pub(crate) fn guard(
     current: Address,
     authorized: &[Address],
-    transfer: &InputsImpl,
-    is_static: bool,
+    inputs: &CallInputs,
 ) -> Result<(), CustomPrecompileError> {
-    if Some(transfer.target_address) != transfer.bytecode_address {
+    if inputs.target_address != inputs.bytecode_address {
         return Err(CustomPrecompileError::Revert(
             "DELEGATECALLs and CALLCODEs are not allowed".to_string(),
         ));
     }
-    if transfer.target_address != current {
+    if inputs.target_address != current {
         return Err(CustomPrecompileError::Revert(
             "invalid transfer target address".to_string(),
         ));
     }
-    if is_static {
+    if inputs.is_static {
         return Err(CustomPrecompileError::Revert(
             "STATICCALLs are not allowed".to_string(),
         ));
     }
-    if !authorized.contains(&transfer.caller_address) {
+    if !authorized.contains(&inputs.caller) {
         return Err(CustomPrecompileError::Revert(
             "unauthorized caller".to_string(),
         ));

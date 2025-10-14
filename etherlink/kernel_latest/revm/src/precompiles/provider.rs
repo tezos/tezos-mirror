@@ -6,7 +6,7 @@
 use revm::{
     context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
-    interpreter::{CallInput, Gas, InputsImpl, InterpreterResult},
+    interpreter::{CallInput, CallInputs, Gas, InterpreterResult},
     primitives::Address,
 };
 
@@ -52,10 +52,7 @@ impl EtherlinkPrecompiles {
     fn run_custom_precompile<CTX, DB>(
         &mut self,
         context: &mut CTX,
-        address: &Address,
-        inputs: &InputsImpl,
-        is_static: bool,
-        gas_limit: u64,
+        inputs: &CallInputs,
     ) -> Result<Option<InterpreterResult>, Error>
     where
         DB: DatabasePrecompileStateChanges,
@@ -63,7 +60,7 @@ impl EtherlinkPrecompiles {
     {
         // NIT: can probably do this more efficiently by keeping an immutable
         // reference on the slice but next mutable call makes it nontrivial
-        let input_bytes = match &inputs.input {
+        let calldata = match &inputs.input {
             CallInput::SharedBuffer(range) => {
                 if let Some(slice) =
                     context.local().shared_memory_buffer_slice(range.clone())
@@ -76,38 +73,24 @@ impl EtherlinkPrecompiles {
             CallInput::Bytes(bytes) => bytes.to_vec(),
         };
 
-        let result = match *address {
-            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS => send_outbox_message_precompile(
-                &input_bytes,
-                context,
-                is_static,
-                inputs,
-                gas_limit,
-            ),
-            TABLE_PRECOMPILE_ADDRESS => {
-                table_precompile(&input_bytes, context, is_static, inputs, gas_limit)
+        let result = match inputs.bytecode_address {
+            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS => {
+                send_outbox_message_precompile(&calldata, context, inputs)
             }
-            GLOBAL_COUNTER_PRECOMPILE_ADDRESS => global_counter_precompile(
-                &input_bytes,
-                context,
-                is_static,
-                inputs,
-                gas_limit,
-            ),
-            CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS => change_sequencer_key_precompile(
-                &input_bytes,
-                context,
-                is_static,
-                inputs,
-                gas_limit,
-            ),
+            TABLE_PRECOMPILE_ADDRESS => table_precompile(&calldata, context, inputs),
+            GLOBAL_COUNTER_PRECOMPILE_ADDRESS => {
+                global_counter_precompile(&calldata, context, inputs)
+            }
+            CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS => {
+                change_sequencer_key_precompile(&calldata, context, inputs)
+            }
             _ => return Ok(None),
         };
 
         let interpreter_result = match result {
             Ok(interpreter_result) => interpreter_result,
             Err(CustomPrecompileError::Revert(reason)) => {
-                revert(reason, Gas::new_spent(gas_limit))
+                revert(reason, Gas::new_spent(inputs.gas_limit))
             }
             Err(CustomPrecompileError::Abort(runtime)) => {
                 return Err(Error::Runtime(runtime))
@@ -132,20 +115,16 @@ where
     fn run(
         &mut self,
         context: &mut CTX,
-        address: &Address,
-        inputs: &InputsImpl,
-        is_static: bool,
-        gas_limit: u64,
+        inputs: &CallInputs,
     ) -> Result<Option<Self::Output>, String> {
         if let Some(custom_result) = self
-            .run_custom_precompile(context, address, inputs, is_static, gas_limit)
+            .run_custom_precompile(context, inputs)
             .map_err(|e| e.to_string())?
         {
             return Ok(Some(custom_result));
         }
 
-        self.builtins
-            .run(context, address, inputs, is_static, gas_limit)
+        self.builtins.run(context, inputs)
     }
 
     fn warm_addresses(&self) -> Box<impl Iterator<Item = Address>> {
