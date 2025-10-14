@@ -1891,6 +1891,26 @@ let octez_base_unix =
     ~inline_tests_libraries:[bls12_381_archive]
     ~inline_tests_link_flags:["-cclib"; "-lblst"]
 
+(* Alcotezt process isolation library - defined here after octez_base/octez_base_unix
+   to avoid dependency cycles. Tests that need process isolation with tzresult support
+   should depend on this library. *)
+let alcotezt_process =
+  octez_lib
+    "alcotezt-process"
+    ~path:"tezt/lib_alcotezt_process"
+    ~synopsis:
+      "Process-isolated test execution for Alcotezt with Tezos error monad \
+       support"
+    ~deps:
+      [
+        tezt_core_lib;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_error_monad |> open_;
+        lwt_unix;
+        lwt_eio;
+      ]
+
 let octez_lib_upnp =
   public_lib
     "octez-lib-upnp"
@@ -2660,6 +2680,7 @@ let _octez_bees_tests =
         octez_test_helpers |> open_;
         octez_base_test_helpers |> open_;
         alcotezt;
+        alcotezt_process;
       ]
 
 let octez_merkle_proof_encoding =

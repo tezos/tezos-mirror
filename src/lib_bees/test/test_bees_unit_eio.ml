@@ -199,11 +199,14 @@ let test_random_requests create_queue =
   let actual =
     List.map
       (fun l ->
-        let w = create_queue "random_worker" in
-        match w with
+        match create_queue "random_worker" with
         | Ok w ->
-            let r = push_multiple_requests w l in
-            let () = Worker.shutdown_eio w in
+            let r =
+              Fun.protect
+                ~finally:(fun () -> Worker.shutdown_eio w)
+                (fun () -> push_multiple_requests w l)
+            in
+            assert_status w "Closed" ;
             r
         | Error _ -> [])
       series
@@ -293,54 +296,39 @@ let test_async_dropbox () =
         ())
       "dropbox_worker"
   in
-  let rq = RqA 1 in
-  let n = 10 in
-  (* First request is sent *)
-  Worker.Dropbox.put_request w rq ;
-  (* Sleep in order to make sure that the first request is handled
-     before the others one are sent *)
-  sleep 0.1 ;
-  (* While the first request is handled, n other requests are sent *)
-  (* These requests should be merged into one *)
-  for _i = 1 to n do
-    Worker.Dropbox.put_request w rq
-  done ;
-  Eio.Promise.resolve u_each () ;
-  Eio.Promise.await t_end ;
-  (* Hence the expected result being two requests, the first blocking one *)
-  (* and the second being the result of the merge *)
-  let expected = build_expected_history [Box (RqA 1); Box (RqA n)] in
-  let actual = get_history w in
-  assert_history actual expected ;
-  return_unit
+  Fun.protect
+    ~finally:(fun () ->
+      Worker.shutdown_eio w ;
+      assert_status w "Closed")
+    (fun () ->
+      let rq = RqA 1 in
+      let n = 10 in
+      (* First request is sent *)
+      Worker.Dropbox.put_request w rq ;
+      (* Sleep in order to make sure that the first request is handled
+         before the others one are sent *)
+      sleep 0.1 ;
+      (* While the first request is handled, n other requests are sent *)
+      (* These requests should be merged into one *)
+      for _i = 1 to n do
+        Worker.Dropbox.put_request w rq
+      done ;
+      Eio.Promise.resolve u_each () ;
+      Eio.Promise.await t_end ;
+      (* Hence the expected result being two requests, the first blocking one *)
+      (* and the second being the result of the merge *)
+      let expected = build_expected_history [Box (RqA 1); Box (RqA n)] in
+      let actual = get_history w in
+      assert_history actual expected ;
+      return_unit)
 
 let wrap_qcheck test () =
   let _ = QCheck_alcotest.to_alcotest test in
   Result_syntax.return_unit
 
-(** Because our tests might be ran in the same process as other tests,
-    we need to run our tests in a child process or next tests ran
-    will fail if using [Unix.fork].
-*)
-let tztest label fn =
-  Alcotest.test_case label `Quick @@ fun () ->
-  match Lwt_unix.fork () with
-  | 0 -> (
-      (* FIXME: do we want to use [Tezos_base_unix.Event_loop.main_run_eio]?
-         If so, the tests block at some point. *)
-      match
-        Tezos_base_unix.Event_loop.main_run ~process_name:label ~eio:true
-        @@ fun () -> Lwt_eio.run_eio fn
-      with
-      | Ok () -> exit 0
-      | Error _ -> exit 1)
-  | pid -> (
-      let _, status = Unix.waitpid [] pid in
-      match status with
-      | Unix.WEXITED 0 -> ()
-      | _ ->
-          let msg = Format.sprintf "Error in %s." label in
-          raise (Alcotest.fail msg))
+(** Tests run in fresh processes via [Alcotezt_process] so we do not fork after
+    Eio/domains have been initialised within the current Tezt worker. *)
+let tztest label fn = Alcotezt_process.test_case label `Quick fn
 
 let tests_history =
   ( "Queue history",
@@ -364,7 +352,7 @@ let tests_buffer =
   ("Buffer handling", [tztest "Dropbox/Async (eio handlers)" test_async_dropbox])
 
 let () =
-  Alcotest.run
+  Alcotezt_process.run
     ~__FILE__
     "Bees_workers (eio handlers)"
     [tests_history; tests_status; tests_buffer]

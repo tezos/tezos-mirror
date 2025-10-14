@@ -36,7 +36,7 @@ conflicts: [
   "octez-smart-rollup-node-alpha" { != version }
 ]
 build: [
-  ["rm" "-r" "vendors" "contrib"]
+  ["rm" "-rf" "vendors" "contrib"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]

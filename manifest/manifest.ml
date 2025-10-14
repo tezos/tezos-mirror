@@ -3504,7 +3504,7 @@ let generate_opam ?release for_package (internals : Target.internal list) :
       |> List.concat_map make_runtest
     in
     {
-      Opam.command = [S "rm"; S "-r"; S "vendors"; S "contrib"];
+      Opam.command = [S "rm"; S "-rf"; S "vendors"; S "contrib"];
       with_test = Never;
     }
     :: build :: runtests
