@@ -62,11 +62,6 @@ Compiling the sources
 
 These issues concern installing by :ref:`compiling the sources <build_from_sources>`.
 
-Currently, the ``CONFIG_SITE`` environment variable must not be
-set during the installation process, or the ``stdcompat`` package
-may be installed incorrectly. See `thierry-martinez/stdcompat#13
-<https://github.com/thierry-martinez/stdcompat/issues/13>`__.
-
 If you have trouble **compiling on MacOS**, update ``brew`` packages and development tools such as Xcode.
 If you have recently updated to a new version of MacOS, you may need to reinstall these tools.
 Also, if you have built Octez before, ``brew`` may be linked to an older version of PostgreSQL.
@@ -80,7 +75,7 @@ On Linux-based operating systems, depending on the memory allocation on the mach
 To address this, we describe below how to increase the swap space on a Linux distribution and solve the aforementioned problem.
 
 .. note::
-   The following steps were tested on a Debian-based distribution. 
+   The following steps were tested on a Debian-based distribution.
    They can usually be adapted to other Linux distributions, though details may differ.
    For example, Fedora uses Btrfs as its default filesystem (since version 33), which requires special handling for swap files (disabling copy-on-write and compression).
    Note that these commands require root privileges and direct access to the host system; they will not normally work inside standard container environments.
