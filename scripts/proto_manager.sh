@@ -1235,7 +1235,7 @@ function update_tezt_tests() {
   # this can be removed once https://gitlab.com/tezos/tezos/-/issues/7763 has been tackled
   if [[ ${is_snapshot} == false ]]; then
     awk -v source="$protocol_source" -v target="$protocol_target" '
-$0 ~ "let octez_baker_" source " =" {
+$0 ~ "let _octez_baker_" source " =" {
   orig1 = $0
   getline
   orig2 = $0
@@ -1252,7 +1252,7 @@ $0 ~ "let octez_baker_" source " =" {
   else
     lowercase_shorthash=$(echo "$short_hash" | tr '[:upper:]' '[:lower:]')
     awk -v source="$protocol_source" -v short_hash="$short_hash" -v lowercase_shorthash="$lowercase_shorthash" '
-$0 ~ "let octez_baker_" source " =" {
+$0 ~ "let _octez_baker_" source " =" {
   print                  # line 1: unchanged
   getline                # go to line 2
   gsub("baker_" source, "baker_" lowercase_shorthash)
