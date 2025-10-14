@@ -1885,6 +1885,40 @@ let test_tezlink_prevalidation =
       client_tezlink
   in
 
+  (* case balance too low *)
+  let counter = 2 in
+  let* balance =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  let balance = Tez.to_mutez balance in
+  let fee = 10000 in
+  (* the second transfer should put us over the balance *)
+  let fee2 = balance - fee + 1 in
+  let* op_balance_too_low =
+    Operation.Manager.(
+      operation
+        [
+          make ~fee ~counter ~source:Constant.bootstrap1 (transfer ~amount:1 ());
+          make
+            ~fee:fee2
+            ~counter:(counter + 1)
+            ~source:Constant.bootstrap1
+            (transfer ~amount:1 ());
+        ]
+        client)
+  in
+  let balance_too_low_rex =
+    rex
+      (sf "Balance of contract %s too low" Constant.bootstrap1.public_key_hash)
+  in
+  let* _ =
+    Operation.inject
+      ~error:balance_too_low_rex
+      ~dont_wait:true
+      op_balance_too_low
+      client_tezlink
+  in
+
   unit
 
 let () =

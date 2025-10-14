@@ -157,6 +157,22 @@ let validate_source ~ctxt second_source =
          Inconsistent_sources
            {expected_source = ctxt.source; source = second_source})
 
+let validate_balance ~ctxt ~fee =
+  let open Lwt_result_syntax in
+  match Tez.sub_opt ctxt.balance_left fee with
+  | Some balance_left -> return (Ok balance_left)
+  | None ->
+      let tezrep_of t =
+        let open Imported_protocol in
+        t |> Tez.to_mutez |> Tez_repr.of_mutez
+        |> Option.value ~default:Tez_repr.zero
+        (* The conversion should not fail so the zero value won't be used *)
+      in
+      tzfail_p
+      @@ Imported_protocol.Contract_storage.(
+           Balance_too_low
+             (Implicit ctxt.source, tezrep_of ctxt.balance_left, tezrep_of fee))
+
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
   let open Lwt_result_syntax in
@@ -165,19 +181,12 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       tzfail_p
       @@ Imported_protocol.Validate_errors.Manager.Incorrect_reveal_position
   | Manager_operation
-      {
-        source;
-        fee = _;
-        counter = _;
-        operation;
-        gas_limit = _;
-        storage_limit = _;
-      } ->
+      {source; fee; counter = _; operation; gas_limit = _; storage_limit = _} ->
       let** () = validate_supported_operation ~ctxt operation in
       let** () = validate_source ~ctxt source in
       (* TODO check counter is ok *)
       (* TODO check gas limit high enough *)
-      (* TODO check manager solvent for fees *)
+      let** balance_left = validate_balance ~ctxt ~fee in
       (* the update will be updated during the validation steps *)
       return
         (Ok
@@ -185,6 +194,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
              ctxt with
              next_counter = Manager_counter.succ ctxt.next_counter;
              length = ctxt.length + 1;
+             balance_left;
            })
   | _ -> tzfail @@ Not_a_manager_operation ctxt.error_clue
 
