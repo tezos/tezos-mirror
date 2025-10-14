@@ -27,3 +27,15 @@ val execute :
   'storage ->
   ((Script_typed_ir.operation Script_list.t, 'storage) pair * context) tzresult
   Lwt.t
+
+module Internal_for_tests : sig
+  (* Types maintained internally to build the native contracts types and
+     entrypoints. *)
+  type 'a ty_node = {untyped : Script.node; typed : 'a ty_ex_c}
+
+  type ('arg, 'storage) tys = 'arg ty_node * 'storage ty_node
+
+  type ex_ty_node = Ex : ('arg, 'storage) tys -> ex_ty_node
+
+  val types_of_kind : Script_native_repr.t -> ex_ty_node tzresult
+end

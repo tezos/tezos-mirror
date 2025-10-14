@@ -6566,6 +6566,11 @@ end = struct
             ("test_staking_operations", N.(number >= 021));
             ("test_consecutive_round_zero", N.(number >= 022));
             ("test_address_registry", N.(number >= 024));
+            ( "test_native_contracts",
+              N.(number >= 025 && name_dash <> "024-PsD5wVTJ")
+              (* This condition is temporary: as proto_024 is still in `dev`
+                 it doesn't have a number and it would be targeted as valid. *)
+            );
           ]
           |> conditional_list
         in

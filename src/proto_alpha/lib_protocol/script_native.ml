@@ -74,3 +74,22 @@ let execute (type arg storage) (ctxt, step_constants)
   match kind with
   | Accumulator_kind ->
       Accumulator_contract.execute (ctxt, step_constants) arg storage
+
+module Internal_for_tests = struct
+  type 'a ty_node = 'a Helpers.ty_node = {
+    untyped : Script.node;
+    typed : 'a ty_ex_c;
+  }
+
+  type ('arg, 'storage) tys = 'arg Helpers.ty_node * 'storage Helpers.ty_node
+
+  type ex_ty_node = Ex : ('arg, 'storage) tys -> ex_ty_node
+
+  let types_of_kind =
+    let open Result_syntax in
+    function
+    | Script_native_repr.Accumulator ->
+        let arg_type = Accumulator_contract.arg_type in
+        let* storage_type = Accumulator_contract.storage_type in
+        return (Ex (arg_type, storage_type))
+end
