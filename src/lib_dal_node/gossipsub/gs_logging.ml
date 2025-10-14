@@ -152,7 +152,7 @@ module Events = struct
       ~prefix_name_with_section:true
       ~name:"ping"
       ~msg:"Process Ping from {peer}"
-      ~level:Info
+      ~level:Debug
       ~pp1:P2p_peer.Id.pp
       ("peer", P2p_peer.Id.encoding)
 
