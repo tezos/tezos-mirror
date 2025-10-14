@@ -14,6 +14,7 @@
 *)
 
 open Protocol
+open Alpha_context
 
 let test_context () =
   let open Lwt_result_syntax in
@@ -99,6 +100,46 @@ let test_native_contract_types kind () =
   let*? _ctxt = test_parse_ty ctxt untyped_storage_type storage_type in
   return_unit
 
+let get_native_contract ctxt contract_hash kind =
+  let open Lwt_result_wrap_syntax in
+  let*@ _ctxt, contract = Contract.get_script ctxt contract_hash in
+  match contract with
+  | Some (Native kind_with_storage) when kind_with_storage.kind = kind ->
+      return (kind_with_storage, ctxt)
+  | Some (Native _) -> Test.fail "Native contract has the wrong kind"
+  | None -> Test.fail "Native contract not found"
+  | Some (Script _) -> Test.fail "Contract should be of native kind"
+
+let check_parse_contract ctxt kind_with_storage expected_kind =
+  let open Lwt_result_wrap_syntax in
+  let allow_forged_tickets_in_storage = true in
+  let allow_forged_lazy_storage_id_in_storage = true in
+  let*@ Ex_script (Script script), _ =
+    Script_ir_translator.parse_script
+      ctxt
+      ~elab_conf:(Script_ir_translator_config.make ~legacy:true ())
+      ~allow_forged_tickets_in_storage
+      ~allow_forged_lazy_storage_id_in_storage
+      (Native kind_with_storage)
+  in
+  match script.implementation with
+  | Native {kind}
+    when Script_native_types.Internal_for_tests.eq_native_kind
+           kind
+           expected_kind ->
+      return_unit
+  | Native _ -> Test.fail "Unexpected parsed kind"
+  | Lambda _ -> Test.fail "Native contract kind parsed as contract with code"
+
+let test_parse_contract kind expected_kind () =
+  let open Lwt_result_wrap_syntax in
+  let* ctxt = test_context () in
+  let*@ contract_hash =
+    Contract.Internal_for_tests.get_accumulator_contract_hash ctxt
+  in
+  let* kind_with_storage, _ = get_native_contract ctxt contract_hash kind in
+  check_parse_contract ctxt kind_with_storage expected_kind
+
 let register_test ~title ?additional_tags ?slow test =
   let unwrap f () =
     let* res = f () in
@@ -119,4 +160,9 @@ let register_test ~title ?additional_tags ?slow test =
 let () =
   register_test
     ~title:"check native contract types"
-    (test_native_contract_types Script_native_repr.Accumulator)
+    (test_native_contract_types Script.Accumulator) ;
+  register_test
+    ~title:"Check parsing native contract"
+    (test_parse_contract
+       Script.Accumulator
+       Script_native_types.Accumulator_kind)

@@ -1924,6 +1924,9 @@ module Contract : sig
     val originated_contract : Origination_nonce.Internal_for_tests.t -> t
 
     val paid_storage_space : context -> t -> Z.t tzresult Lwt.t
+
+    val get_accumulator_contract_hash :
+      context -> (Contract_hash.t, error trace) result Lwt.t
   end
 
   (** Functions used exclusively for RPC calls *)

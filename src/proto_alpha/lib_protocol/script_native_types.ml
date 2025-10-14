@@ -17,3 +17,9 @@ end
 
 type ('arg, 'storage) kind =
   | Accumulator_kind : (Accumulator_types.arg, Accumulator_types.storage) kind
+
+module Internal_for_tests = struct
+  let eq_native_kind (type arg arg' storage storage')
+      (kind : (arg, storage) kind) (kind' : (arg', storage') kind) =
+    match (kind, kind') with Accumulator_kind, Accumulator_kind -> true
+end

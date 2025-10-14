@@ -483,6 +483,9 @@ module Contract = struct
   module Internal_for_tests = struct
     include Contract_repr
     include Contract_storage
+
+    let get_accumulator_contract_hash ctxt =
+      Storage.Contract.Native_contracts.Accumulator.get ctxt
   end
 end
 
