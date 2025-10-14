@@ -317,7 +317,7 @@ module Baker_helpers = struct
               bakers
           in
           let* bakers_info =
-            Lwt_list.filter_map_p
+            Lwt_list.map_s
               (fun RPC.{delegate; baking_power} ->
                 let* attest_infos =
                   fetch_baker_info
@@ -327,8 +327,7 @@ module Baker_helpers = struct
                 let stake_fraction =
                   float_of_int baking_power /. float_of_int total_baking_power
                 in
-                Lwt.return_some
-                  {address = PKH delegate; attest_infos; stake_fraction})
+                return {address = PKH delegate; attest_infos; stake_fraction})
               bakers
           in
           current_cycle := cycle ;
