@@ -23,7 +23,7 @@ Protocol T024
 
 
 6s Block Time
-~~~~~~~~~~~~~
+^^^^^^^^^^^^^
 
 Block time has been reduced from 8 seconds to 6 seconds on
 mainnet. That is, a block can be produced with a delay of 6 seconds
@@ -43,7 +43,7 @@ period of withdrawal has decreased from ~14 days in protocol Seoul to
 
 
 Breaking changes to RPCs
-~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 - Updated RPC ``GET
   /chains/<chain_id>/blocks/<block_id>/helpers/validators`` to group
@@ -69,7 +69,7 @@ Breaking changes to RPCs
 
 
 Removed obsolete fields from the block header and block receipts
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The obsolete field ``adaptive_issuance_vote`` has been removed from
 the block header, and fields ``adaptive_issuance_vote_ema`` and
@@ -81,7 +81,7 @@ mainnet) can still be queried via the RPC ``GET
 
 
 Very slight increase in gas cost when calling smart contracts
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Protocol T024 fixes a minor bug that caused some gas costs to be
 omitted in cache functions. As a result, gas costs for smart contract
@@ -147,7 +147,7 @@ These changes are transparent for users of the different kinds of Octez distribu
 They only impact software developers directly relying on Opam packages within the Octez repository (i.e. using them as dependencies).
 
 New architecture
-~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^
 
 Some Octez libraries which used to be distributed as their own Opam package have been aggregated into fewer and coarser Opam packages.
 
@@ -165,7 +165,7 @@ Octez is now distributed as the following set of Opam packages:
 To have a better understanding of the packages and the complete description of them, you might want to follow the :doc:`OCaml API documentation <../api/api-inline>`.
 
 Note on library renaming
-""""""""""""""""""""""""
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 In aggregated packages, redundant suffixes and prefixes have been removed.
 Specifically, all the sub-libraries prefixed with ``tezos-`` or ``octez-`` are now renamed without the prefix.
@@ -176,7 +176,7 @@ For instance, ``Tezos-client-017-PtNairob`` is now the sub-library ``Client`` of
 
 
 Backward compatibility
-~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^
 
 One can install the Octez suite directly by using the command:
 
@@ -193,7 +193,7 @@ Alternatively, each Octez package can be installed separately:
 	opam install package-name
 
 Breaking changes
-~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^
 
 Opam packages can be used as dependencies for software development.
 Contrary to the previous section, the rework of the Octez Opam packages will require you to adapt how your
@@ -224,7 +224,7 @@ One detail of the rights computation has changed: which values are considered fo
 Previously, the considered values corresponded to a notion of stake snapshots, recorderd regularly by the protocol.
 
 Breaking changes
-~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^
 
 Since :doc:`protocol Paris <../protocols/020_paris>`, there are no more stake snapshots, so the protocol no longer relies on stake snapshots to compute the rights.
 
@@ -243,7 +243,7 @@ A new safer version of Timelocks was developed to address this issue, and the fe
 Fortunately, **no contracts using the legacy format of chest keys are deployed on Tezos mainnet**.
 
 Breaking changes
-~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^
 
 However, this change may impact old contracts on the Ghostnet test network.
 For example, one (trivial) `chest key demo contract <https://ghostnet.tzkt.io/KT19AtusZuLVAKEXTEERNkfL7LmzuhkXwze1/code>`__ was originated a long time ago on Ghostnet and uses the legacy format for chest keys.
