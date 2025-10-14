@@ -12,8 +12,9 @@ ENV APT_PROXY=${APT_PROXY:-false}
 RUN echo "Acquire::http::Proxy::deb.debian.org \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy
 
 COPY scripts/kiss-fetch.sh /usr/local/bin/
-# install datadog static binary
-COPY images/scripts/install_datadog_static.sh /tmp
+# install datadog and gcloud static binary
+COPY images/scripts/install_datadog_static.sh \
+     images/scripts/install-gsutil.sh /tmp/
 
 ENV PATH=/usr/local/bin:$PATH
 
@@ -22,4 +23,6 @@ RUN apt-get update && \
   apt-get -y install curl jq && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* && \
-  /tmp/install_datadog_static.sh
+  /tmp/install-gsutil.sh && \
+  /tmp/install_datadog_static.sh && \
+  rm /tmp/install_datadog_static.sh /tmp/install-gsutil.sh
