@@ -817,7 +817,7 @@ function update_protocol_tests() {
     ocamlformat -i src/lib_scoru_wasm/test/test_protocol_migration.ml
 
     sed -e "s/let proto_${protocol_source}_name = .*/let proto_${label}_name = \"${label}_${version}\"/" -i.old src/lib_scoru_wasm/constants.ml
-    ocamlformat -i src/lib_scoru_wasm/constant.ml
+    ocamlformat -i src/lib_scoru_wasm/constants.ml
 
     sed -e "s/${capitalized_source}/ ${capitalized_label}/g" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
     sed -e "s/${capitalized_source}/ ${capitalized_label}/g" -i.old src/lib_scoru_wasm/pvm_input_kind.mli
