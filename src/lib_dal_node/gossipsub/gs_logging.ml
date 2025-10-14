@@ -174,7 +174,7 @@ module Events = struct
       ~prefix_name_with_section:true
       ~name:"graft"
       ~msg:"Process Graft {peer} for {topic}"
-      ~level:Info
+      ~level:Debug
       ~pp1:P2p_peer.Id.pp
       ~pp2:GS.Topic.pp
       ("peer", P2p_peer.Id.encoding)
@@ -186,7 +186,7 @@ module Events = struct
       ~prefix_name_with_section:true
       ~name:"prune"
       ~msg:"Process Prune {peer} for {topic} with backoff {backoff} and px {px}"
-      ~level:Info
+      ~level:Debug
       ~pp1:P2p_peer.Id.pp
       ~pp2:GS.Topic.pp
       ~pp3:Types.Span.pp
