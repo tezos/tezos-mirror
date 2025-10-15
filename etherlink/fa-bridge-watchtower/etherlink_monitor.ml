@@ -17,6 +17,7 @@ type ctx = {
   whitelist : Config.whitelist_item list option;
   mutable nonce : Ethereum_types.quantity;
   block_timeout : float;
+  rpc_timeout : Websocket_client.timeout option;
 }
 
 module Craft = struct
@@ -657,6 +658,7 @@ let rec get_logs ?(n = 1) ctx ~block =
   let filter = Deposit.filter ctx.whitelist in
   let*! logs =
     Websocket_client.send_jsonrpc
+      ?timeout:ctx.rpc_timeout
       ctx.ws_client
       (Call
          ( (module Rpc_encodings.Get_logs),
@@ -692,10 +694,11 @@ let claim_selector =
 
 let is_claim_input = String.starts_with ~prefix:claim_selector
 
-let handle_confirmed_txs {db; ws_client; _} number =
+let handle_confirmed_txs {db; ws_client; rpc_timeout; _} number =
   let open Lwt_result_syntax in
   let* b =
     Websocket_client.send_jsonrpc
+      ?timeout:rpc_timeout
       ws_client
       (Call ((module Rpc_encodings.Get_block_by_number), (Number number, true)))
   in
@@ -725,6 +728,7 @@ let handle_confirmed_txs {db; ws_client; _} number =
          in
          let* receipt =
            Websocket_client.send_jsonrpc
+             ?timeout:rpc_timeout
              ws_client
              (Call ((module Rpc_encodings.Get_transaction_receipt), tx_hash))
          in
@@ -773,6 +777,7 @@ let claim_deposits ctx =
       let*! () = Event.(emit unclaimed_deposits) (List.length deposits) in
       let* nonce =
         Websocket_client.send_jsonrpc
+          ?timeout:ctx.rpc_timeout
           ctx.ws_client
           (Call
              ( (module Rpc_encodings.Get_transaction_count),
@@ -813,10 +818,13 @@ let monitor_heads ctx =
   let open Lwt_result_syntax in
   let* head =
     Websocket_client.send_jsonrpc
+      ?timeout:ctx.rpc_timeout
       ctx.ws_client
       (Call ((module Rpc_encodings.Block_number), ()))
   and* heads_subscription =
-    Websocket_client.subscribe_newHeadNumbers ctx.ws_client
+    Websocket_client.subscribe_newHeadNumbers
+      ?timeout:ctx.rpc_timeout
+      ctx.ws_client
   in
   let* stopped =
     lwt_stream_iter_es_with_timeout
@@ -852,7 +860,7 @@ let monitor_heads ctx =
       let*! () = Websocket_client.disconnect ctx.ws_client in
       return_unit
 
-let init_db_pointers db ws_client ~first_block =
+let init_db_pointers db ws_client timeout ~first_block =
   let open Lwt_result_syntax in
   let* l2_head = Db.Pointers.L2_head.find db in
   let* () =
@@ -866,6 +874,7 @@ let init_db_pointers db ws_client ~first_block =
             (* TODO: log *)
             let* latest =
               Websocket_client.send_jsonrpc
+                ?timeout
                 ws_client
                 (Call
                    ((module Rpc_encodings.Get_block_by_number), (Latest, false)))
@@ -876,8 +885,9 @@ let init_db_pointers db ws_client ~first_block =
 
 let reconnection_delay = 10.
 
-let get_chain_id ws_client =
+let get_chain_id ?timeout ws_client =
   Websocket_client.send_jsonrpc
+    ?timeout
     ws_client
     (Call ((module Rpc_encodings.Chain_id), ()))
 
@@ -941,8 +951,8 @@ let start db ~config ~notify_ws_change ~first_block =
     in
     tx_queue_endpoint := Services_backend_sig.Websocket ws_client ;
     notify_ws_change ws_client ;
-    let* () = init_db_pointers db ws_client ~first_block in
-    let* chain_id = get_chain_id ws_client in
+    let* () = init_db_pointers db ws_client config.rpc_timeout ~first_block in
+    let* chain_id = get_chain_id ?timeout:config.rpc_timeout ws_client in
     (* We checked that it exists in main.ml *)
     let secret_key = Stdlib.Option.get config.Config.secret_key in
     let public_key = Public_key.(to_address (from_sk secret_key)) in
@@ -959,6 +969,7 @@ let start db ~config ~notify_ws_change ~first_block =
           (if config.monitor_all_deposits then None else config.whitelist);
         nonce = Ethereum_types.Qty.zero;
         block_timeout = config.block_timeout;
+        rpc_timeout = config.rpc_timeout;
       }
     in
     monitor_heads ctx
