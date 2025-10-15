@@ -8129,6 +8129,8 @@ let hash = Protocol.hash
 
   let _023_PtSeouLo = active (Name.v "PtSeouLo" 023)
 
+  let _tallinn = active (Name.dev "tallinn")
+
   let alpha = active (Name.dev "alpha")
 
   let all = List.rev !all_rev
