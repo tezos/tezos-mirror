@@ -5,6 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type transaction_object_t =
+  | Evm of Transaction_object.t
+  | Michelson of Tezos_types.Operation.t
+
 module type L2_transaction = sig
   type t
 
@@ -29,6 +33,8 @@ module type L2_transaction = sig
   val nonce_to_z_opt : nonce -> Z.t option
 
   val nonce_of_tx_object : t -> nonce
+
+  val to_transaction_object_t : t -> transaction_object_t
 
   module AddressMap : Map.S with type key = address
 
@@ -71,6 +77,8 @@ module Eth_transaction_object :
 
   let nonce_of_tx_object (tx_object : t) = Transaction_object.nonce tx_object
 
+  let to_transaction_object_t t = Evm t
+
   module AddressMap = AddressMap
 
   let make_txpool ~pending ~queued : Transaction_object.txqueue_content =
@@ -111,6 +119,8 @@ module Tezlink_operation :
 
   let nonce_of_tx_object (op : Tezos_types.Operation.t) =
     {first = op.first_counter; length = op.length}
+
+  let to_transaction_object_t t = Michelson t
 
   module AddressMap = Map.Make (Signature.Public_key_hash)
 

@@ -36,11 +36,6 @@ type pending_request = {
 
 type callback = all_variant variant_callback
 
-(** Inject transactions with either RPCs or on a websocket connection. *)
-type endpoint = Services_backend_sig.endpoint =
-  | Rpc of Uri.t
-  | Websocket of Websocket_client.t
-
 module Address_nonce = struct
   module S = String.Hashtbl
 
@@ -298,7 +293,10 @@ struct
           address : Tx.address;
         }
           -> (Ethereum_types.quantity, tztrace) t
-      | Tick : {evm_node_endpoint : endpoint} -> (unit, tztrace) t
+      | Tick : {
+          evm_node_endpoint : Services_backend_sig.endpoint;
+        }
+          -> (unit, tztrace) t
       | Injection_confirmation : {
           txn_hash : Ethereum_types.hash;
           status : [`Accepted | `Refused];
@@ -345,7 +343,10 @@ struct
     let endpoint_encoding =
       let open Data_encoding in
       conv
-        (function Rpc uri -> Uri.to_string uri | Websocket _ -> "[websocket]")
+        (function
+          | Services_backend_sig.Rpc uri -> Uri.to_string uri
+          | Websocket _ -> "[websocket]"
+          | Block_producer -> "[block_producer]")
         (fun _ -> assert false)
         string
 
@@ -508,61 +509,129 @@ struct
 
     let uuid_seed = Random.get_state ()
 
-    let send_transactions_batch ~evm_node_endpoint ~keep_alive self transactions
+    let build_batch transactions =
+      let module M = Map.Make (String) in
+      let module Srt = Rpc_encodings.Send_raw_transaction in
+      let rev_batch, hashes =
+        Seq.fold_left
+          (fun (rev_batch, hashes) {hash; payload; _} ->
+            Octez_telemetry.Trace.add_event (fun () ->
+                tx_queue_event
+                  ~attrs:Telemetry.Attributes.[Transaction.hash hash]
+                  "selected_transaction") ;
+            let req_id =
+              Uuidm.(v4_gen uuid_seed () |> to_string ~upper:false)
+            in
+            let txn =
+              Rpc_encodings.JSONRPC.
+                {
+                  method_ = Srt.method_;
+                  parameters =
+                    Some
+                      (Data_encoding.Json.construct Srt.input_encoding payload);
+                  id = Some (Id_string req_id);
+                }
+            in
+
+            (txn :: rev_batch, M.add req_id hash hashes))
+          ([], M.empty)
+          transactions
+      in
+      (List.rev rev_batch, hashes)
+
+    let check_missed_transactions ~self ~hashes ~responses =
+      let open Lwt_result_syntax in
+      let module M = Map.Make (String) in
+      let* missed_transactions =
+        List.fold_left_es
+          (fun hashes (response : Rpc_encodings.JSONRPC.response) ->
+            match response with
+            | {id = Some (Id_string req); value} -> (
+                match (value, M.find_opt req hashes) with
+                | value, Some txn_hash ->
+                    let* () =
+                      match value with
+                      | Ok _hash_encoded ->
+                          let*! (_pushed : bool) =
+                            Worker.Queue.push_request
+                              self
+                              (Injection_confirmation
+                                 {txn_hash; status = `Accepted})
+                          in
+                          return_unit
+                      | Error error ->
+                          let*! () = Tx_queue_events.rpc_error error in
+                          let*! (_pushed : bool) =
+                            Worker.Queue.push_request
+                              self
+                              (Injection_confirmation
+                                 {txn_hash; status = `Refused})
+                          in
+                          return_unit
+                    in
+                    return (M.remove req hashes)
+                | _ -> return hashes)
+            | _ -> failwith "Inconsistent response from the server")
+          hashes
+          responses
+      in
+      assert (M.is_empty missed_transactions) ;
+      return_unit
+
+    let build_sequencer_batch ~(state : Types.state) (seq : queue_request Seq.t)
         =
+      let open Lwt_result_syntax in
+      let rec select rev_selected seq =
+        match seq () with
+        | Seq.Nil -> return rev_selected
+        | Seq.Cons ({hash; payload; queue_callback}, rest) -> (
+            let raw_tx = Ethereum_types.hex_to_bytes payload in
+            match Transaction_objects.find state.tx_object hash with
+            | None ->
+                let*! () = Tx_queue_events.missing_tx_object hash in
+                let*! () = queue_callback `Refused in
+                select rev_selected rest
+            | Some tx_object ->
+                select
+                  ((raw_tx, Tx.to_transaction_object_t tx_object)
+                  :: rev_selected)
+                  rest)
+      in
+      let* rev_selected = select [] seq in
+      return @@ List.rev rev_selected
+
+    let send_transactions_batch ~evm_node_endpoint ~keep_alive ~state self
+        transactions =
       let open Lwt_result_syntax in
       let module M = Map.Make (String) in
       let module Srt = Rpc_encodings.Send_raw_transaction in
       if Seq.is_empty transactions then return_unit
       else
-        let rev_batch, hashes =
-          Seq.fold_left
-            (fun (rev_batch, hashes) {hash; payload; _} ->
-              Octez_telemetry.Trace.add_event (fun () ->
-                  tx_queue_event
-                    ~attrs:Telemetry.Attributes.[Transaction.hash hash]
-                    "selected_transaction") ;
-              let req_id =
-                Uuidm.(v4_gen uuid_seed () |> to_string ~upper:false)
-              in
-              let txn =
-                Rpc_encodings.JSONRPC.
-                  {
-                    method_ = Srt.method_;
-                    parameters =
-                      Some
-                        (Data_encoding.Json.construct
-                           Srt.input_encoding
-                           payload);
-                    id = Some (Id_string req_id);
-                  }
-              in
-
-              (txn :: rev_batch, M.add req_id hash hashes))
-            ([], M.empty)
-            transactions
-        in
-        let batch = List.rev rev_batch in
-
-        let*! () = Tx_queue_events.injecting_transactions (List.length batch) in
-
-        let* responses =
-          match evm_node_endpoint with
-          | Rpc base ->
-              let* batch_response =
-                Rollup_services.call_service
-                  ~keep_alive
-                  ~base
-                  (Batch.dispatch_batch_service ~path:Resto.Path.root)
-                  ()
-                  ()
-                  (Batch batch)
-              in
-              return
-                (match batch_response with
-                | Singleton r -> [r]
-                | Batch rs -> rs)
-          | Websocket ws_client ->
+        match evm_node_endpoint with
+        | Services_backend_sig.Rpc base ->
+            let batch, hashes = build_batch transactions in
+            let*! () =
+              Tx_queue_events.injecting_transactions (List.length batch)
+            in
+            let* batch_response =
+              Rollup_services.call_service
+                ~keep_alive
+                ~base
+                (Batch.dispatch_batch_service ~path:Resto.Path.root)
+                ()
+                ()
+                (Batch batch)
+            in
+            let responses =
+              match batch_response with Singleton r -> [r] | Batch rs -> rs
+            in
+            check_missed_transactions ~self ~hashes ~responses
+        | Websocket ws_client ->
+            let batch, hashes = build_batch transactions in
+            let*! () =
+              Tx_queue_events.injecting_transactions (List.length batch)
+            in
+            let* responses =
               List.map_ep
                 (fun req ->
                   let*! response =
@@ -570,44 +639,11 @@ struct
                   in
                   return Rpc_encodings.JSONRPC.{value = response; id = req.id})
                 batch
-        in
-
-        let* missed_transactions =
-          List.fold_left_es
-            (fun hashes (response : Rpc_encodings.JSONRPC.response) ->
-              match response with
-              | {id = Some (Id_string req); value} -> (
-                  match (value, M.find_opt req hashes) with
-                  | value, Some txn_hash ->
-                      let* () =
-                        match value with
-                        | Ok _hash_encoded ->
-                            let*! (_pushed : bool) =
-                              Worker.Queue.push_request
-                                self
-                                (Injection_confirmation
-                                   {txn_hash; status = `Accepted})
-                            in
-                            return_unit
-                        | Error error ->
-                            let*! () = Tx_queue_events.rpc_error error in
-                            let*! (_pushed : bool) =
-                              Worker.Queue.push_request
-                                self
-                                (Injection_confirmation
-                                   {txn_hash; status = `Refused})
-                            in
-                            return_unit
-                      in
-                      return (M.remove req hashes)
-                  | _ -> return hashes)
-              | _ -> failwith "Inconsistent response from the server")
-            hashes
-            responses
-        in
-
-        assert (M.is_empty missed_transactions) ;
-        return_unit
+            in
+            check_missed_transactions ~self ~hashes ~responses
+        | Block_producer ->
+            let* batch = build_sequencer_batch ~state transactions in
+            Block_producer.preconfirm_transactions ~transactions:batch
 
     (** clear values and keep the allocated space *)
     let clear
@@ -882,7 +918,13 @@ struct
                  (Seq.map
                     (fun ({hash; _} as txn : queue_request) -> (hash, txn))
                     transactions_to_inject)) ;
-          state.queue <- Queue.of_seq remaining_transactions ;
+          (* Remove once produce block request uses preconfirmed transactions *)
+          let () =
+            match evm_node_endpoint with
+            | Rpc _ | Websocket _ ->
+                state.queue <- Queue.of_seq remaining_transactions
+            | Block_producer -> ()
+          in
           let txns =
             Pending_transactions.drop
               ~max_lifespan:(Ptime.Span.of_int_s state.config.max_lifespan_s)
@@ -903,6 +945,7 @@ struct
                 send_transactions_batch
                   ~keep_alive:state.keep_alive
                   ~evm_node_endpoint
+                  ~state
                   self
                   transactions_to_inject
               in

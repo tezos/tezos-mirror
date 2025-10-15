@@ -28,6 +28,13 @@ val produce_block :
   timestamp:Time.Protocol.t ->
   [`Block_produced of int | `No_block] tzresult Lwt.t
 
+(** [preconfirm_transactions ~transactions] validates each transaction in
+    [transactions] and streams every successfully validated one to the
+    preconfirmation pipeline. *)
+val preconfirm_transactions :
+  transactions:(string * Tx_queue_types.transaction_object_t) list ->
+  unit tzresult Lwt.t
+
 module Internal_for_tests : sig
   val produce_block :
     with_delayed_transactions:bool ->

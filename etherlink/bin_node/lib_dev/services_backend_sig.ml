@@ -177,8 +177,13 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
     | _ -> tzfail Node_error.Unexpected_multichain
 end
 
-(** Inject transactions with either RPCs or on a websocket connection. *)
-type endpoint = Rpc of Uri.t | Websocket of Websocket_client.t
+(** Represents the different ways transactions can be injected into the system *)
+type endpoint =
+  | Rpc of Uri.t
+    (* Send transactions through standard RPC calls to the node at uri *)
+  | Websocket of Websocket_client.t
+    (* Use an active websocket client to push transactions in real time *)
+  | Block_producer (* Inject transactions directly into the block producer. *)
 
 (** [Tx_container] is the signature of the module that deals with
     storing and forwarding transactions. the module type is used by

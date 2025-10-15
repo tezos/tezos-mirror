@@ -5,6 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type transaction_object_t =
+  | Evm of Transaction_object.t
+  | Michelson of Tezos_types.Operation.t
+
 module type L2_transaction = sig
   type t
 
@@ -30,6 +34,8 @@ module type L2_transaction = sig
   val nonce_to_z_opt : nonce -> Z.t option
 
   val nonce_of_tx_object : t -> nonce
+
+  val to_transaction_object_t : t -> transaction_object_t
 
   module AddressMap : Map.S with type key = address
 

@@ -887,7 +887,6 @@ let dispatch_request (type f) ~websocket
             in
             build_with_input ~f module_ parameters
         | Send_raw_transaction.Method ->
-            Format.printf "log 1@." ;
             if not config.experimental_features.enable_send_raw_transaction then
               Telemetry.Jsonrpc.return_error
               @@ Rpc_errors.transaction_rejected
