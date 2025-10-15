@@ -1,20 +1,20 @@
-Protocol Alpha
-==============
+Protocol Tallinn
+=================
 
-This page lists the changes brought by protocol Alpha with respect
+This page lists the changes brought by protocol Tallinn with respect
 to Seoul (see :ref:`naming_convention`).
 For the list of changes brought by Seoul with respect to Rio, see :doc:`./023_seoul`.
 
 For a higher-level overview of the most salient new features see the
 `announcement blog <https://research-development.nomadic-labs.com/blog.html>`__.
 
-The code can be found in directory :src:`src/proto_alpha` of the ``master``
-branch of Octez and the full documentation in :doc:`this page <../alpha/index>`.
+The code can be found in directory :src:`src/proto_tallinn` of the ``master``
+branch of Octez and the full documentation in :doc:`this page <../tallinn/index>`.
 
 Environment Version
 -------------------
 
-Protocol alpha uses the same environment version V15 as protocol
+Protocol tallinn uses the same environment version V15 as protocol
 Seoul.
 
 
@@ -114,7 +114,7 @@ Errors
 Protocol parameters
 -------------------
 
-.. _6s_block_time_parameters_alpha:
+.. _6s_block_time_parameters_tallinn:
 
 6s Block Time (MRs :gl:`!19045`, :gl:`!19473`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -195,7 +195,7 @@ Feature flags
   ``all_bakers_attest_activation_threshold``. This causes
   all-bakers-attest to activate as soon as the ratio of bakers that
   use a tz4 consensus keys exceeds the specified threshold, set to 50%
-  in protocol alpha. (MR :gl:`!19093`)
+  in protocol tallinn. (MR :gl:`!19093`)
 
 
 Bug Fixes
