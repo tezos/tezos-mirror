@@ -107,7 +107,10 @@ module Operation_metadata = struct
         | Unsupported_operation_kind message -> Some message | _ -> None)
       (fun message -> Unsupported_operation_kind message)
 
-  let consumed_gas = Gas.Arith.zero
+  let hard_gas_limit_per_operation =
+    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
+
+  let consumed_gas = Gas.Arith.fp hard_gas_limit_per_operation
 
   let manager_op_result (type kind) (hash : Operation_hash.t)
       (contents : kind manager_operation) :
