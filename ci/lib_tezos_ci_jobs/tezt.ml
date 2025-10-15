@@ -64,90 +64,76 @@ let common_needs =
    If you want to change it, use [~global_timeout: (Minutes 60)].
    The [tezt_job] function will compute the rest. *)
 
+(* Specialization of Cacio's [tezt_job] with defaults that are specific
+   to Tezt jobs defined in this module / the [Shared] component. *)
+let tezt_job ?(retry_tests = 1) ?(needs_legacy = common_needs) =
+  CI.tezt_job
+    ~fetch_records_from:"schedule_extended_test"
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~needs_legacy
+    ~retry_tests
+
 let job_tezt =
   Cacio.parameterize @@ fun pipeline ->
-  CI.tezt_job
+  tezt_job
     ""
     ~pipeline
     ~description:"Run normal Tezt tests."
-    ~fetch_records_from:"schedule_extended_test"
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
-    ~needs_legacy:common_needs
     ~test_coverage:true
     ~test_selection:(tests_tag_selector [Not (Has_tag "flaky")])
     ~parallel_jobs:50
     ~parallel_tests:6
     ~retry_jobs:2
-    ~retry_tests:1
 
 let job_tezt_time_sensitive =
   Cacio.parameterize @@ fun pipeline ->
-  CI.tezt_job
+  tezt_job
     "time-sensitive"
     ~pipeline
     ~description:"Run Tezt tests tagged as time_sensitive."
-    ~fetch_records_from:"schedule_extended_test"
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
-    ~needs_legacy:common_needs
     ~test_coverage:true
     ~test_selection:(tests_tag_selector ~time_sensitive:true [])
     ~retry_jobs:2
-    ~retry_tests:1
 
 let job_tezt_riscv_slow_sequential =
   Cacio.parameterize @@ fun pipeline ->
-  CI.tezt_job
+  tezt_job
     "riscv-slow-sequential"
     ~pipeline
     ~description:"Run Tezt tests tagged as riscv_slow_sequential."
-    ~fetch_records_from:"schedule_extended_test"
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
-    ~needs_legacy:common_needs
     ~test_selection:(Tezt_core.TSL_AST.Has_tag "riscv_slow_sequential")
     ~test_timeout:No_timeout
     ~retry_jobs:2
-    ~retry_tests:1
 
 let job_tezt_slow =
   Cacio.parameterize @@ fun pipeline ->
-  CI.tezt_job
+  tezt_job
     "slow"
     ~pipeline
     ~description:"Run Tezt tests tagged as slow."
-    ~fetch_records_from:"schedule_extended_test"
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
-    ~needs_legacy:common_needs
     ~test_selection:(tests_tag_selector ~slow:true [])
     ~test_timeout:No_timeout
     ~parallel_jobs:20
     ~parallel_tests:3
     ~retry_jobs:2
-    ~retry_tests:1
 
 let job_tezt_extra =
   Cacio.parameterize @@ fun pipeline ->
-  CI.tezt_job
+  tezt_job
     "extra"
     ~pipeline
     ~description:"Run Tezt tests tagged as extra and not flaky."
-    ~fetch_records_from:"schedule_extended_test"
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
-    ~needs_legacy:common_needs
     ~test_selection:(tests_tag_selector ~extra:true [Not (Has_tag "flaky")])
     ~parallel_jobs:10
     ~parallel_tests:6
     ~retry_jobs:2
-    ~retry_tests:1
 
 let job_tezt_flaky =
   Cacio.parameterize @@ fun pipeline ->
-  CI.tezt_job
+  tezt_job
     "flaky"
     ~pipeline
     ~description:"Run Tezt tests tagged as flaky."
-    ~fetch_records_from:"schedule_extended_test"
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
-    ~needs_legacy:common_needs
     ~test_coverage:true
     ~allow_failure:Yes
     ~test_selection:(tests_tag_selector [Has_tag "flaky"])
@@ -156,28 +142,25 @@ let job_tezt_flaky =
 
 let job_tezt_static_binaries =
   Cacio.parameterize @@ fun pipeline ->
-  CI.tezt_job
+  tezt_job
     "static-binaries"
     ~pipeline
     ~description:
       "Run Tezt tests tagged as cli and not flaky, using static executables."
     ~cpu:Normal
-    ~fetch_records_from:"schedule_extended_test"
-    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~needs_legacy:
       [
         (* The static job should actually be taken from Code_verification,
            but it is only defined at toplevel in Master_branch.
            Since we only need the name, this is fine.
            We did the same in the docs/ci. *)
-        (Cacio.Artifacts, Master_branch.job_static_x86_64);
+        (Artifacts, Master_branch.job_static_x86_64);
         (Artifacts, Code_verification.job_build_x86_64_extra_exp Before_merging);
         (Artifacts, Code_verification.job_build_x86_64_extra_dev Before_merging);
         (* No need for kernels for this job. *)
       ]
     ~test_selection:(tests_tag_selector [Has_tag "cli"; Not (Has_tag "flaky")])
     ~parallel_tests:3
-    ~retry_tests:1
     ~before_script:["mv octez-binaries/x86_64/octez-* ."]
 
 let register () =
