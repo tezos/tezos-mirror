@@ -384,6 +384,35 @@ let init_faucet_frontend ~faucet_api ~agent ~tezlink_sandbox_endpoint
   in
   return (build_endpoint ~runner ~dns_domain faucet_frontend_port)
 
+let umami_patch ~rpc_url ~tzkt_api_url =
+  (* The Tezlink TzKT explorer requires some URL parameters suffixed to the
+     different paths (block, contract, etc.), so it doesn't plug well into Umami
+     for now. *)
+  sf
+    {|diff --git a/packages/tezos/src/Network.ts b/packages/tezos/src/Network.ts
+index 1d28850f..5c3058c4 100644
+--- a/packages/tezos/src/Network.ts
++++ b/packages/tezos/src/Network.ts
+@@ -16,6 +16,14 @@ export const GHOSTNET: Network = {
+   buyTezUrl: "https://faucet.ghostnet.teztnets.com/",
+ };
+
++export const TEZLINK: Network = {
++  name: "Tezlink",
++  rpcUrl: "%s",
++  tzktApiUrl: "%s",
++  tzktExplorerUrl: "",
++  buyTezUrl: "",
++};
++
+ export const isDefault = (network: Network) => !!DefaultNetworks.find(n => n.name === network.name);
+
+-export const DefaultNetworks: Network[] = [MAINNET, GHOSTNET];
++export const DefaultNetworks: Network[] = [TEZLINK];
+|}
+    rpc_url
+    tzkt_api_url
+
 let init_umami _agent ~tezlink_proxy_endpoint:_ ~external_tzkt_api_endpoint:_ =
   unit
 
