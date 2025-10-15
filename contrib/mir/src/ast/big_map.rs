@@ -667,7 +667,7 @@ impl<'a> TypedValue<'a> {
 /// guaranteed to be empty and all [BigMap::id]s are guaranteed to be non-None.
 /// Also, some [BigMap::id] fields may change to avoid duplications.
 pub fn dump_big_map_updates<'a>(
-    storage: &mut impl LazyStorage<'a>,
+    storage: &mut (impl LazyStorage<'a> + ?Sized),
     started_with_map_ids: &[BigMapId],
     finished_with_maps: &mut [&mut BigMap<'a>],
 ) -> Result<(), LazyStorageError> {

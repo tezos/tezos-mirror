@@ -229,6 +229,10 @@ impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, 'a, Host> {
         *c += 1;
         *c
     }
+
+    fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {
+        Box::new(self.tc_ctx)
+    }
 }
 
 impl<Host: Runtime> Ctx<'_, '_, Host> {

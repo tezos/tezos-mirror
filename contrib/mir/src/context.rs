@@ -64,7 +64,7 @@ impl<'a, 'b> TypecheckingCtx<'a> for PushableTypecheckingContext<'b> {
 }
 
 #[allow(missing_docs)]
-pub trait CtxTrait<'a>: TypecheckingCtx<'a> + LazyStorage<'a> {
+pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
     fn amount(&self) -> i64;
 
     fn balance(&self) -> i64;
@@ -92,6 +92,8 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> + LazyStorage<'a> {
     fn origination_counter(&mut self) -> u32;
 
     fn operation_counter(&mut self) -> u128;
+
+    fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>>;
 }
 
 /// [Ctx] includes "outer context" required for typechecking and interpreting
@@ -322,6 +324,10 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
     fn operation_counter(&mut self) -> u128 {
         self.operation_counter += 1;
         self.operation_counter
+    }
+
+    fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {
+        Box::new(&mut self.big_map_storage)
     }
 }
 
