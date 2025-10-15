@@ -39,13 +39,15 @@ let tag_arm64 = "gcp_arm64"
     one release, and one architecture. *)
 let debian_package_release_matrix ?(ramfs = false) = function
   | Partial -> [[("RELEASE", ["bookworm"]); ("TAGS", [tag_amd64 ~ramfs])]]
-  | Full | Release ->
+  | Full ->
       [
         [
           ("RELEASE", ["unstable"; "bookworm"]);
           ("TAGS", [tag_amd64 ~ramfs; tag_arm64]);
         ];
       ]
+  | Release ->
+      [[("RELEASE", ["bookworm"]); ("TAGS", [tag_amd64 ~ramfs; tag_arm64])]]
 
 (** These are the set of Ubuntu release-architecture combinations for
     which we build deb packages in the job
