@@ -384,6 +384,9 @@ let init_faucet_frontend ~faucet_api ~agent ~tezlink_sandbox_endpoint
   in
   return (build_endpoint ~runner ~dns_domain faucet_frontend_port)
 
+let init_umami _agent ~tezlink_proxy_endpoint:_ ~external_tzkt_api_endpoint:_ =
+  unit
+
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string) ~(rpc_port : int)
     (verbose : bool) (time_between_blocks : Evm_node.time_between_blocks) agent
     =
@@ -674,6 +677,14 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~agent:tezlink_sequencer_agent
                 ~tezlink_sandbox_endpoint
                 ~time_between_blocks:Cli.time_between_blocks
+            and* () =
+              let external_tzkt_api_endpoint =
+                proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
+              in
+              init_umami
+                tezlink_sequencer_agent
+                ~tezlink_proxy_endpoint
+                ~external_tzkt_api_endpoint
             and* () =
               if Cli.faucet then
                 let () = toplog "Starting faucet" in
