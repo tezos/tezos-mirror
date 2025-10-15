@@ -8129,7 +8129,7 @@ let hash = Protocol.hash
 
   let _023_PtSeouLo = active (Name.v "PtSeouLo" 023)
 
-  let _tallinn = active (Name.dev "tallinn")
+  let _024_PsU87LFi = active (Name.v "PsU87LFi" 024)
 
   let alpha = active (Name.dev "alpha")
 
