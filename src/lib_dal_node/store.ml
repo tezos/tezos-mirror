@@ -131,11 +131,11 @@ module Version = struct
       (fun () -> Data_encoding.Json.destruct encoding json |> return)
       (fun _ -> tzfail (Could_not_read_data_dir_version file_path))
 
-  let write_version_file ~base_dir =
+  let write_version_file ~version ~base_dir =
     let version_file = version_file_path ~base_dir in
     Lwt_utils_unix.Json.write_file
       version_file
-      (Data_encoding.Json.construct encoding current_version)
+      (Data_encoding.Json.construct encoding version)
     |> trace (Could_not_write_version_file version_file)
 end
 
@@ -890,12 +890,35 @@ let cache_entry node_store commitment slot shares shard_proofs =
     commitment
     (slot, shares, shard_proofs)
 
+let upgrade_from_v2_to_v3 ~base_dir =
+  let open Lwt_result_syntax in
+  let*! () =
+    Event.emit_store_upgrade_start
+      ~old_version:(Version.make 2)
+      ~new_version:(Version.make 3)
+  in
+  let file_path = Filename.concat base_dir "status_store" in
+  let*! exists = Lwt_unix.file_exists file_path in
+  let*! () =
+    if exists then Lwt_utils_unix.remove_dir file_path else Lwt.return_unit
+  in
+  Version.write_version_file ~base_dir ~version:3
+
+(* [upgradable old_version new_version] returns an upgrade function if
+   the store is upgradable from [old_version] to [new_version]. Otherwise it
+   returns [None]. *)
+let upgradable old_version new_version :
+    (base_dir:string -> unit tzresult Lwt.t) option =
+  match (old_version, new_version) with
+  | 2, 3 -> Some upgrade_from_v2_to_v3
+  | _ -> None
+
 (* Checks the version of the store with the respect to the current
    version. Returns [None] if the store does not need an upgrade and [Some
    upgrade] if the store is upgradable, where [upgrade] is a function that can
    be used to upgrade the store. It returns an error if the version is
    incompatible with the current one. *)
-let check_version_and_may_upgrade base_dir =
+let rec check_version_and_may_upgrade base_dir =
   let open Lwt_result_syntax in
   let file_path = Version.version_file_path ~base_dir in
   let*! exists = Lwt_unix.file_exists file_path in
@@ -904,15 +927,26 @@ let check_version_and_may_upgrade base_dir =
     else
       (* In the absence of a version file, we use an heuristic to determine the
          version. *)
-      let*! exists = Lwt_unix.file_exists (Filename.concat base_dir "index") in
-      return
-      @@ if exists then Version.make 0 else Version.make Version.current_version
+      let*! index = Lwt_unix.file_exists (Filename.concat base_dir "index") in
+      if index then return (Version.make 0)
+      else
+        let*! status =
+          Lwt_unix.file_exists (Filename.concat base_dir "status_store")
+        in
+        if status then return (Version.make 2)
+        else return (Version.make Version.current_version)
   in
   if Version.(equal version current_version) then return_unit
   else
-    tzfail
-      (Version.Invalid_data_dir_version
-         {actual = version; expected = Version.current_version})
+    match upgradable version Version.current_version with
+    | Some upgrade ->
+        let* () = upgrade ~base_dir in
+        (* Now that we upgraded, check version again *)
+        check_version_and_may_upgrade base_dir
+    | None ->
+        tzfail
+          (Version.Invalid_data_dir_version
+             {actual = version; expected = Version.current_version})
 
 let init config profile_ctxt proto_parameters =
   let open Lwt_result_syntax in
@@ -923,7 +957,7 @@ let init config profile_ctxt proto_parameters =
     Shards.init ~profile_ctxt ~proto_parameters base_dir Stores_dirs.shard
   in
   let* slots = Slots.init base_dir Stores_dirs.slot in
-  let* () = Version.write_version_file ~base_dir in
+  let* () = Version.(write_version_file ~base_dir ~version:current_version) in
   let traps = Traps.create ~capacity:Constants.traps_cache_size in
   let* chain_id = Chain_id.init ~root_dir:base_dir in
   let* last_processed_level = Last_processed_level.init ~root_dir:base_dir in
