@@ -77,55 +77,12 @@ module Operation = struct
     raw : bytes;
   }
 
-  let decode raw =
-    let open Result_syntax in
-    let* op =
-      match
-        Data_encoding.Binary.of_bytes_opt
-          Tezlink_imports.Alpha_context.Operation.encoding
-          raw
-      with
-      | None -> error_with "Can't parse the operation"
-      | Some op -> return op
-    in
-    let source_and_counter_from_contents (type kind)
-        (contents : kind Tezlink_imports.Alpha_context.contents) :
-        (Signature.public_key_hash * Z.t) tzresult =
-      match contents with
-      | Tezlink_imports.Alpha_context.Manager_operation {source; counter; _} ->
-          let* counter =
-            convert_using_serialization
-              ~name:"counter"
-              ~dst:Data_encoding.n
-              ~src:
-                Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
-              counter
-          in
-          return (source, counter)
-      | _ -> error_with "Not a manager operation"
-    in
-    let source_and_first_counter_from_contents_list (type kind)
-        (contents_list : kind Tezlink_imports.Alpha_context.contents_list) :
-        (Signature.public_key_hash * Z.t) tzresult =
-      match contents_list with
-      | Single contents -> source_and_counter_from_contents contents
-      | Cons (first_contents, _) ->
-          source_and_counter_from_contents first_contents
-    in
-    let rec contents_list_length : type kind.
-        kind Tezlink_imports.Alpha_context.contents_list -> int -> int =
-     fun contents_list acc ->
-      match contents_list with
-      | Single _ -> 1 + acc
-      | Cons (_, remaining) -> contents_list_length remaining (1 + acc)
-    in
-    let (Operation_data op_data) = op.protocol_data in
-    let l = op_data.contents in
-    let* source, first_counter =
-      source_and_first_counter_from_contents_list l
-    in
-    let length = contents_list_length l 0 in
-    return {source; first_counter; length; op; raw}
+  let counter_to_z counter =
+    convert_using_serialization
+      ~name:"counter"
+      ~dst:Data_encoding.n
+      ~src:Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
+      counter
 
   let encoding : t Data_encoding.t =
     let open Data_encoding in

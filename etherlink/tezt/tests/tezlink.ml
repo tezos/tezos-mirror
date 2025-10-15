@@ -1774,7 +1774,7 @@ let test_tezlink_prevalidation =
         client)
   in
   (* This error comes from the Operation.decode function. The test will need to be adapted when decoding is simplified to not include any validation. *)
-  let not_manager_rex = rex "Not a manager operation" in
+  let not_manager_rex = rex "not_a_manager_operation" in
   let* _ =
     Operation.inject
       ~error:not_manager_rex
