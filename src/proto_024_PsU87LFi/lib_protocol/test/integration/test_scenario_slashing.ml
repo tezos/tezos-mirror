@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Adaptive Issuance, Slashing
-    Invocation:   dune exec src/proto_tallinn/lib_protocol/test/integration/main.exe \
+    Invocation:   dune exec src/proto_024_PsU87LFi/lib_protocol/test/integration/main.exe \
                    -- --file test_scenario_slashing.ml
     Subject:      Test slashing scenarios in the protocol.
 *)

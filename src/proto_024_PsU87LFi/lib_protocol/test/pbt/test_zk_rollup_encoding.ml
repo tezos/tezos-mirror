@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_tallinn/lib_protocol/test/pbt/main.exe \
+    Invocation:   dune exec src/proto_024_PsU87LFi/lib_protocol/test/pbt/main.exe \
                   -- --file test_zk_rollup_encoding.ml
     Subject:      Zk rollup encodings
 *)

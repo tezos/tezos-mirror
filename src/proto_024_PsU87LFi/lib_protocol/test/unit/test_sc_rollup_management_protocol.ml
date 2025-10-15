@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Rollup Management Protocol)
-    Invocation: dune exec src/proto_tallinn/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_024_PsU87LFi/lib_protocol/test/unit/main.exe \
                   -- --file test_sc_rollup_management_protocol.ml
     Subject:    Sanity checks for the Rollup Management Protocol module.
 *)

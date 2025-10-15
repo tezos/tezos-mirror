@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (combined operations)
-    Invocation: dune exec src/proto_tallinn/lib_protocol/test/integration/operations/main.exe \
+    Invocation: dune exec src/proto_024_PsU87LFi/lib_protocol/test/integration/operations/main.exe \
                   -- --file test_combined_operations.ml
 
     Subject:    Multiple manager operations can be grouped in one

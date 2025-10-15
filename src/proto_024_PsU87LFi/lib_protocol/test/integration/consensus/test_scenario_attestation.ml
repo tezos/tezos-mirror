@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Protocol ((pre)attestations)
-    Invocation:   dune exec src/proto_tallinn/lib_protocol/test/integration/consensus/main.exe \
+    Invocation:   dune exec src/proto_024_PsU87LFi/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_scenario_attestation.ml
 
     Subject:      Test various scenarios with attestations, preattestations, aggregation, DAL bitset,

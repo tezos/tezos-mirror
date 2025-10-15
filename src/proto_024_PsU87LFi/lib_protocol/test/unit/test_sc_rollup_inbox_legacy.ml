@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (smart contract rollup inbox)
-    Invocation: dune exec src/proto_tallinn/lib_protocol/test/unit/main.exe
+    Invocation: dune exec src/proto_024_PsU87LFi/lib_protocol/test/unit/main.exe
     Subject:    These unit tests check the off-line inbox implementation for
                 smart contract rollups
 *)

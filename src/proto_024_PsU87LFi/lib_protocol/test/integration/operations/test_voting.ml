@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:  Protocol (voting)
-    Invocation: dune exec src/proto_tallinn/lib_protocol/test/integration/operations/main.exe \
+    Invocation: dune exec src/proto_024_PsU87LFi/lib_protocol/test/integration/operations/main.exe \
                   -- --file test_voting.ml
     Subject:    On the voting process.
 
