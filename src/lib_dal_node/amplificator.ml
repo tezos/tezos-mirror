@@ -388,7 +388,6 @@ let reply_receiver_job {process; query_store; _} node_context =
   Lwt.catch loop (function exn ->
       (* Unknown exception *)
       let err = [error_of_exn exn] in
-      let*! () = Event.emit_crypto_process_fatal ~msg:"Unexpected error" in
       Lwt.return (Error err))
 
 let determine_amplification_delays node_ctxt =
@@ -464,7 +463,12 @@ let make node_ctxt =
     let*! r = query_sender_job amplificator in
     match r with
     | Ok () -> return_unit
+    | Error [Exn Lwt.Canceled] -> (* Graceful cancellation *) return_unit
     | Error e ->
+        let msg =
+          Format.asprintf "Unexpected error: %a" Error_monad.pp_print_trace e
+        in
+        let*! () = Event.emit_crypto_process_fatal ~msg in
         Lwt_result_syntax.fail
           (Amplification_query_sender_job "Error running query sender job" :: e)
   in
@@ -473,7 +477,12 @@ let make node_ctxt =
     let*! r = reply_receiver_job amplificator node_ctxt in
     match r with
     | Ok () -> return_unit
+    | Error [Exn Lwt.Canceled] -> (* Graceful cancellation *) return_unit
     | Error e ->
+        let msg =
+          Format.asprintf "Unexpected error: %a" Error_monad.pp_print_trace e
+        in
+        let*! () = Event.emit_crypto_process_fatal ~msg in
         Lwt_result_syntax.fail
           (Amplification_reply_receiver_job "Error in reply receiver job" :: e)
   in

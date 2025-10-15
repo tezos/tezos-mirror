@@ -795,6 +795,7 @@ open struct
       ~msg:"cryptographic child process terminated unexpectedly: #{error}."
       ~level:Error
       ("error", Data_encoding.string)
+      ~pp1:Format.pp_print_string
 
   let crypto_process_error =
     declare_1
