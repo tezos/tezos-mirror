@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = S023 | Alpha
+type t = Tallinn | S023 | Alpha
 
 val encoding : t Data_encoding.t
 
