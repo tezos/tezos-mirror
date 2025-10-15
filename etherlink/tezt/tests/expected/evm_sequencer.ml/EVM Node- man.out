@@ -57,7 +57,8 @@ Run commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -128,7 +129,8 @@ Run commands:
       `fatal`, `error`, `info`, `debug`.
     --network <network>: The network the EVM node will be connecting to. Can
       be `mainnet`, `testnet` or `shadownet`.
-      If set, defaults to the value of EVM_NODE_NETWORK.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_NETWORK`.
     --init-from-snapshot [snapshot url or file path]: Automatically download
       and import a recent snapshot for supported networks on fresh data
       directories. If no snapshot provider is given e.g.
@@ -172,7 +174,8 @@ Run commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -261,7 +264,8 @@ Run commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -337,7 +341,8 @@ Run commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -413,7 +418,8 @@ Run commands:
       is allowed to send blueprints.
     --sunset-sec <SEC>: Number of seconds prior to a sequencer operator
       upgrade before which the current sequencer stops producing blocks
-      If set, defaults to the value of EVM_NODE_SEQUENCER_SUNSET_SEC.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_SEQUENCER_SUNSET_SEC`.
   
   run observer [--data-dir <data-dir>] [--config-file <path>]
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
@@ -437,7 +443,8 @@ Run commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -512,7 +519,8 @@ Run commands:
     --network <network>: The network the EVM node will be connecting to. Can
       be `mainnet`, `testnet` or `shadownet`. If set, additional sanity
       checks are performed on the node’s startup.
-      If set, defaults to the value of EVM_NODE_NETWORK.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_NETWORK`.
   
   experimental run rpc [--data-dir <data-dir>] [--config-file <path>]
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
@@ -533,7 +541,8 @@ Run commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -597,7 +606,8 @@ Run commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --omit-delayed-tx-events: Don't populate the delayed transactions in the
       store of the EVM node. This is necessary when creating the data dir for
       an observer EVM node because delayed transactions are going to be
@@ -635,7 +645,8 @@ Configuration commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --rpc-addr <ADDR>: The EVM node server rpc address.
     --rpc-port <PORT>: The EVM node server rpc port.
     --rpc-batch-limit <PORT>: A limit on the number of requests allowed in a
@@ -717,10 +728,12 @@ Configuration commands:
     --network <network>: The network the EVM node will be connecting to. Can
       be `mainnet`, `testnet` or `shadownet`. If set, some configuration
       options defaults to well-known values for the selected network.
-      If set, defaults to the value of EVM_NODE_NETWORK.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_NETWORK`.
     --sunset-sec <SEC>: Number of seconds prior to a sequencer operator
       upgrade before which the current sequencer stops producing blocks
-      If set, defaults to the value of EVM_NODE_SEQUENCER_SUNSET_SEC.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_SEQUENCER_SUNSET_SEC`.
   
   check config [--data-dir <data-dir>] [--config-file <path>] [-p --print]
       [--network <network>]
@@ -731,13 +744,15 @@ Configuration commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     -p --print: Print the full configuration to the standard output.
     --network <network>: The network the EVM node will be connecting to. Can
       be `mainnet`, `testnet` or `shadownet`. If set, check as if `--network
       N` is set when running the node (as it turns some required
       configuration fields into optional ones).
-      If set, defaults to the value of EVM_NODE_NETWORK.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_NETWORK`.
   
   describe config
     Prints the JSON schema of the configuration file to the standard output.
@@ -756,7 +771,8 @@ Snapshots commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     -s --snapshot-file <path>: Path to the snapshot file to create, with
       string interpolation. %r is replaced by the short form of the Smart
       Rollup address, %R by the complete Smart Rollup address, %l by the
@@ -791,7 +807,8 @@ Storage commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
 
 Keys commands:
 
@@ -801,7 +818,8 @@ Keys commands:
       gcpkms://project/region/keyring/key/version.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --data-dir <data-dir>: The path to the EVM node data directory.
       Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
       if it exists, or `$HOME/.octez-evm-node` otherwise.
@@ -821,7 +839,8 @@ Kernel commands:
       filename and can contain a list of data separated by a whitespace.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --data-dir <data-dir>: The path to the EVM node data directory.
       Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
       if it exists, or `$HOME/.octez-evm-node` otherwise.
@@ -861,7 +880,8 @@ Kernel commands:
     <sequencer-key>: Key to sign the blueprints.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --data-dir <data-dir>: The path to the EVM node data directory.
       Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
       if it exists, or `$HOME/.octez-evm-node` otherwise.
@@ -882,7 +902,8 @@ Kernel commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --block-number <N>: If provided, the state resulting in the application
       of the requested block will be used instead of the latest state. In
       that case, the patch will only impact replays of the successor block
@@ -1022,7 +1043,8 @@ Kernel commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages
       directory.
     --preimages-endpoint <url>: The address of a service which provides
@@ -1056,7 +1078,8 @@ Debug commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages
       directory.
     --preimages-endpoint <url>: The address of a service which provides
@@ -1088,7 +1111,8 @@ Debug commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages
       directory.
     --preimages-endpoint <url>: The address of a service which provides
@@ -1127,7 +1151,8 @@ Debug commands:
       if it exists, or `$HOME/.octez-evm-node` otherwise.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
-      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_CONFIG_FILE`.
     --block-number <N>: If provided, the state resulting in the application
       of the requested block will be used instead of the latest state.
     -f --force: Force patching the state.
