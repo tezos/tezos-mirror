@@ -9,8 +9,8 @@
   octez-shell-libs.store
   tezos-protocol-023-PtSeouLo.protocol
   octez-protocol-023-PtSeouLo-libs.client
-  tezos-protocol-tallinn.protocol
-  octez-protocol-tallinn-libs.client
+  tezos-protocol-024-PsU87LFi.protocol
+  octez-protocol-024-PsU87LFi-libs.client
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.client)
  (library_flags (:standard -linkall))

@@ -18,12 +18,12 @@ depends: [
   "octez-protocol-023-PtSeouLo-libs" {with-test}
   "octez-smart-rollup-node-PtSeouLo" {with-test}
   "octez-alcotezt" {with-test}
+  "tezos-protocol-024-PsU87LFi" {with-test}
+  "octez-protocol-024-PsU87LFi-libs" {with-test}
+  "octez-smart-rollup-node-PsU87LFi" {with-test}
   "tezos-protocol-alpha" {with-test}
   "octez-protocol-alpha-libs" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}
-  "tezos-protocol-tallinn" {with-test}
-  "octez-protocol-tallinn-libs" {with-test}
-  "octez-smart-rollup-node-tallinn" {with-test}
 ]
 build: [
   ["rm" "-rf" "vendors" "contrib"]

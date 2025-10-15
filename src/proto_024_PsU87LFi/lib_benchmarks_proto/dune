@@ -1,0 +1,51 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmarks_proto_024_PsU87LFi)
+ (public_name tezos-benchmarks-proto-024-PsU87LFi)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  str
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
+  tezos-protocol-024-PsU87LFi.parameters
+  octez-libs.lazy-containers
+  tezos-benchmark
+  tezos-benchmark-024-PsU87LFi
+  tezos-benchmark-type-inference-024-PsU87LFi
+  tezos-protocol-024-PsU87LFi.protocol
+  octez-libs.crypto
+  octez-shell-libs.shell-benchmarks
+  octez-libs.micheline
+  octez-protocol-024-PsU87LFi-libs.test-helpers
+  octez-libs.tezos-sapling
+  octez-protocol-024-PsU87LFi-libs.client
+  octez-protocol-024-PsU87LFi-libs.plugin
+  octez-proto-libs.protocol-environment)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_error_monad
+  -open Tezos_protocol_024_PsU87LFi_parameters
+  -open Tezos_lazy_containers
+  -open Tezos_benchmark
+  -open Tezos_benchmark_024_PsU87LFi
+  -open Tezos_benchmark_type_inference_024_PsU87LFi
+  -open Tezos_protocol_024_PsU87LFi
+  -open Tezos_protocol_024_PsU87LFi.Protocol
+  -open Tezos_micheline
+  -open Tezos_024_PsU87LFi_test_helpers
+  -open Tezos_client_024_PsU87LFi
+  -open Tezos_protocol_plugin_024_PsU87LFi))
+
+(rule
+ (targets signature.ml)
+ (action
+  (write-file
+   %{targets}
+   "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V2")))

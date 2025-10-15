@@ -16,6 +16,7 @@ depends: [
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
   "octez-protocol-023-PtSeouLo-libs" { = version }
+  "octez-protocol-024-PsU87LFi-libs" { = version }
 ]
 depopts: [
   "tezos-client-genesis"
@@ -43,7 +44,6 @@ depopts: [
   "octez-protocol-020-PsParisC-libs"
   "octez-protocol-021-PsQuebec-libs"
   "octez-protocol-022-PsRiotum-libs"
-  "octez-protocol-tallinn-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
@@ -72,7 +72,6 @@ conflicts: [
   "octez-protocol-020-PsParisC-libs" { != version }
   "octez-protocol-021-PsQuebec-libs" { != version }
   "octez-protocol-022-PsRiotum-libs" { != version }
-  "octez-protocol-tallinn-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

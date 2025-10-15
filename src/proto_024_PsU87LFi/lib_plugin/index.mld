@@ -1,17 +1,17 @@
-{0 Octez-protocol-tallinn-libs: octez protocol tallinn libraries}
+{0 Octez-protocol-024-PsU87LFi-libs: octez protocol 024-PsU87LFi libraries}
 
-This is a package containing some libraries related to the Tezos tallinn protocol.
+This is a package containing some libraries related to the Tezos 024-PsU87LFi protocol.
 
 It contains the following libraries:
 
-- {{!module-Tezos_agnostic_baker_tallinn}Tezos_agnostic_baker_tallinn}: Protocol specific library for the Agnostic Baker
-- {{!module-Tezos_baking_tallinn}Tezos_baking_tallinn}: Base library for `tezos-baker/accuser`
-- {{!module-Tezos_baking_tallinn_commands}Tezos_baking_tallinn_commands}: Protocol-specific commands for baking
-- {{!module-Tezos_client_tallinn}Tezos_client_tallinn}: Protocol specific library for `octez-client`
-- {{!module-Tezos_dal_tallinn}Tezos_dal_tallinn}: Protocol specific library for the Data availability Layer
-- {{!module-Tezos_layer2_utils_tallinn}Tezos_layer2_utils_tallinn}: Protocol specific library for Layer 2 utils
-- {{!module-Tezos_protocol_plugin_tallinn}Tezos_protocol_plugin_tallinn}: Protocol plugin
-- {{!module-Tezos_protocol_plugin_tallinn_registerer}Tezos_protocol_plugin_tallinn_registerer}: Protocol plugin registerer
-- {{!module-Tezos_smart_rollup_layer2_tallinn}Tezos_smart_rollup_layer2_tallinn}: Protocol specific library for `tezos-smart-rollup`
-- {{!module-Tezos_smart_rollup_tallinn}Tezos_smart_rollup_tallinn}: Protocol specific library of helpers for `tezos-smart-rollup`
-- {{!module-Tezos_tallinn_test_helpers}Tezos_tallinn_test_helpers}: Protocol testing framework
+- {{!module-Tezos_024_PsU87LFi_test_helpers}Tezos_024_PsU87LFi_test_helpers}: Protocol testing framework
+- {{!module-Tezos_agnostic_baker_024_PsU87LFi}Tezos_agnostic_baker_024_PsU87LFi}: Protocol specific library for the Agnostic Baker
+- {{!module-Tezos_baking_024_PsU87LFi}Tezos_baking_024_PsU87LFi}: Base library for `tezos-baker/accuser`
+- {{!module-Tezos_baking_024_PsU87LFi_commands}Tezos_baking_024_PsU87LFi_commands}: Protocol-specific commands for baking
+- {{!module-Tezos_client_024_PsU87LFi}Tezos_client_024_PsU87LFi}: Protocol specific library for `octez-client`
+- {{!module-Tezos_dal_024_PsU87LFi}Tezos_dal_024_PsU87LFi}: Protocol specific library for the Data availability Layer
+- {{!module-Tezos_layer2_utils_024_PsU87LFi}Tezos_layer2_utils_024_PsU87LFi}: Protocol specific library for Layer 2 utils
+- {{!module-Tezos_protocol_plugin_024_PsU87LFi}Tezos_protocol_plugin_024_PsU87LFi}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_024_PsU87LFi_registerer}Tezos_protocol_plugin_024_PsU87LFi_registerer}: Protocol plugin registerer
+- {{!module-Tezos_smart_rollup_024_PsU87LFi}Tezos_smart_rollup_024_PsU87LFi}: Protocol specific library of helpers for `tezos-smart-rollup`
+- {{!module-Tezos_smart_rollup_layer2_024_PsU87LFi}Tezos_smart_rollup_layer2_024_PsU87LFi}: Protocol specific library for `tezos-smart-rollup`
