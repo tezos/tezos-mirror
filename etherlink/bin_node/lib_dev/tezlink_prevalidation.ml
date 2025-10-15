@@ -25,6 +25,7 @@ type error +=
   | Parsing_failure of clue * Data_encoding.Binary.read_error
   | Not_a_manager_operation of clue
   | Unsupported_manager_operation of clue
+  | Oversized_operation of clue * int * int
 
 let () =
   register_error_kind
@@ -80,7 +81,28 @@ let () =
         op)
     Data_encoding.(obj1 (req "operation" clue_encoding))
     (function Unsupported_manager_operation op -> Some op | _ -> None)
-    (fun op -> Unsupported_manager_operation op)
+    (fun op -> Unsupported_manager_operation op) ;
+  register_error_kind
+    `Temporary
+    ~id:"evm_node.dev.tezlink.too_big"
+    ~title:"Failed to prevalidate an operation: too big."
+    ~description:
+      "Prevalidation of the operation failed because the operation is too big."
+    ~pp:(fun ppf (op, size, max) ->
+      Format.fprintf
+        ppf
+        "Failed to prevalidate an operation: oversized operation %a (size: %d, \
+         max: %d)"
+        pp_clue
+        op
+        size
+        max)
+    Data_encoding.(
+      obj3 (req "operation" clue_encoding) (req "size" int31) (req "max" int31))
+    (function
+      | Oversized_operation (clue, size, max) -> Some (clue, size, max)
+      | _ -> None)
+    (fun (clue, size, max) -> Oversized_operation (clue, size, max))
 
 let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
   let open Lwt_result_syntax in
@@ -207,12 +229,22 @@ let rec validate_batch ~(ctxt : batch_validation_context)
       let** ctxt = validate_operation_in_batch ~ctxt c in
       (validate_batch [@ocaml.tailcall]) ~ctxt rest
 
+let validate_size ~raw ~error_clue =
+  let open Lwt_result_syntax in
+  let open Tezlink_imports.Alpha_context in
+  let length = Bytes.length raw in
+  if length <= Constants.max_operation_data_length then return (Ok ())
+  else
+    tzfail
+    @@ Oversized_operation
+         (error_clue, length, Constants.max_operation_data_length)
+
 let validate_tezlink_operation ~read raw =
   let open Tezlink_imports.Alpha_context in
   let open Lwt_result_syntax in
-  (* TODO check size *)
   let raw = Bytes.of_string raw in
   let error_clue = Operation_hash.hash_bytes [raw] in
+  let** () = validate_size ~raw ~error_clue in
   let* op =
     match
       Data_encoding.Binary.of_bytes
