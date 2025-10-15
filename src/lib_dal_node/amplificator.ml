@@ -263,14 +263,18 @@ end = struct
             (* send a reply with the error, and continue *)
             let () = reply_error_query ~output ~query_id ~error in
             loop ()
-      with exn ->
-        let error = Printexc.to_string exn in
-        let () =
+      with
+      | Eio.Cancel.Cancelled _ ->
           Tezos_bees.Hive.async_lwt (fun () ->
-              Event.emit_crypto_process_error ~msg:error)
-        in
-        let () = reply_error_query ~output ~query_id ~error in
-        raise exn
+              Event.emit_crypto_process_stopped ())
+      | exn ->
+          let error = Printexc.to_string exn in
+          let () =
+            Tezos_bees.Hive.async_lwt (fun () ->
+                Event.emit_crypto_process_error ~msg:error)
+          in
+          let () = reply_error_query ~output ~query_id ~error in
+          raise exn
     in
     loop ()
 end
