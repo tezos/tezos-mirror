@@ -307,7 +307,25 @@ let job_tezt_flaky =
     ~retry_jobs:2
     ~retry_tests:3
 
+let job_republish_docker_image =
+  Cacio.parameterize @@ fun arch ->
+  CI.job
+    ("republish-docker-image:"
+    ^ Tezos_ci.Runner.Arch.(show_easy_to_distinguish arch))
+    ~__POS__
+    ~description:
+      ("Republish the latest released docker image for arch "
+      ^ Tezos_ci.Runner.Arch.(show_easy_to_distinguish arch))
+    ~arch
+    ~stage:Build
+    ~image:Tezos_ci.Images_external.docker
+    [
+      ("etherlink/scripts/build_docker_release.sh "
+      ^ Tezos_ci.Runner.Arch.(show_easy_to_distinguish arch));
+    ]
+
 let register () =
+  let open Tezos_ci.Runner.Arch in
   CI.register_before_merging_jobs
     [
       (Manual, job_build_evm_node_static Amd64);
@@ -324,6 +342,11 @@ let register () =
       (Manual, job_tezt_slow `merge_request);
       (Manual, job_tezt_extra `merge_request);
       (Manual, job_tezt_flaky `merge_request);
+    ] ;
+  CI.register_master_jobs
+    [
+      (Manual, job_republish_docker_image Amd64);
+      (Manual, job_republish_docker_image Arm64);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
