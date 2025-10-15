@@ -471,6 +471,10 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_proxy ~faucet_pkh
     ~port:faucet_frontend_port
     ()
 
+(* It's not ideal, but the path to Umami is set in the dockerfile. We have to be
+   careful if we ever update it. *)
+let remote_umami_path = "/tmp/umami-v2"
+
 let umami_patch ~rpc_url ~tzkt_api_url =
   (* The Tezlink TzKT explorer requires some URL parameters suffixed to the
      different paths (block, contract, etc.), so it doesn't plug well into Umami
@@ -539,10 +543,8 @@ let init_umami agent ~sequencer_proxy ~tzkt_proxy =
   let patch_dst = "/tmp/umami.patch" in
   let* _ = Agent.copy ~destination:patch_dst ~source:patch_filename agent in
   let* () = Process.spawn "rm" [patch_filename] |> Process.check in
-  (* Apply the patch.
-     It's not ideal, but the path to Umami is set in the dockerfile. We have to
-     be careful if we ever update it.*)
-  run_cmd agent (sf "cd /tmp/umami-v2 && git apply %s" patch_dst)
+  (* Apply the patch. *)
+  run_cmd agent (sf "cd %s && git apply %s" remote_umami_path patch_dst)
 
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
     ~(sequencer_proxy : proxy_info) (verbose : bool)
