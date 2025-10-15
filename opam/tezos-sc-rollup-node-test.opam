@@ -21,6 +21,9 @@ depends: [
   "tezos-protocol-alpha" {with-test}
   "octez-protocol-alpha-libs" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}
+  "tezos-protocol-tallinn" {with-test}
+  "octez-protocol-tallinn-libs" {with-test}
+  "octez-smart-rollup-node-tallinn" {with-test}
 ]
 build: [
   ["rm" "-rf" "vendors" "contrib"]

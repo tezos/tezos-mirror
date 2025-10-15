@@ -1,0 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_agnostic_baker_tallinn)
+ (public_name octez-protocol-tallinn-libs.agnostic-baker)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-protocol-tallinn-libs.client
+  tezos-protocol-tallinn.protocol
+  octez-protocol-tallinn-libs.baking
+  octez-protocol-tallinn-libs.baking-commands
+  octez-baker-lib)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_tallinn
+  -open Tezos_protocol_tallinn
+  -open Tezos_baking_tallinn
+  -open Tezos_baking_tallinn_commands
+  -open Octez_agnostic_baker))

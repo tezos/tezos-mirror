@@ -18,10 +18,12 @@ depends: [
 ]
 depopts: [
   "tezos-injector-023-PtSeouLo"
+  "tezos-injector-tallinn"
   "tezos-injector-alpha"
 ]
 conflicts: [
   "tezos-injector-023-PtSeouLo" { != version }
+  "tezos-injector-tallinn" { != version }
   "tezos-injector-alpha" { != version }
 ]
 build: [

@@ -53,11 +53,13 @@ kaitai-of-data-encoding: client-libs/lib_kaitai_of_data_encoding, client-libs/li
 octez-accuser: src/bin_agnostic_accuser
 octez-accuser-PtSeouLo: src/proto_023_PtSeouLo/bin_accuser
 octez-accuser-alpha: src/proto_alpha/bin_accuser
+octez-accuser-tallinn: src/proto_tallinn/bin_accuser
 octez-alcotezt: tezt/lib_alcotezt
 octez-baker: src/bin_agnostic_baker
 octez-baker-PtSeouLo: src/proto_023_PtSeouLo/bin_baker
 octez-baker-alpha: src/proto_alpha/bin_baker
 octez-baker-lib: src/lib_agnostic_baker
+octez-baker-tallinn: src/proto_tallinn/bin_baker
 octez-baking-common-lib: src/lib_baking_common
 octez-client: src/bin_client
 octez-codec: src/bin_codec
@@ -111,6 +113,7 @@ octez-protocol-023-PtSeouLo-libs: src/proto_023_PtSeouLo/lib_agnostic_baker, src
 octez-protocol-alpha-libs: src/proto_alpha/lib_agnostic_baker, src/proto_alpha/lib_client, src/proto_alpha/lib_client/test, src/proto_alpha/lib_client_commands, src/proto_alpha/lib_client_sapling, src/proto_alpha/lib_dal, src/proto_alpha/lib_dal/test, src/proto_alpha/lib_delegate, src/proto_alpha/lib_delegate/test, src/proto_alpha/lib_delegate/test/mockup_simulator, src/proto_alpha/lib_delegate/test/tenderbrute, src/proto_alpha/lib_delegate/test/tenderbrute/lib, src/proto_alpha/lib_layer2_utils, src/proto_alpha/lib_plugin, src/proto_alpha/lib_plugin/test, src/proto_alpha/lib_protocol/test/helpers, src/proto_alpha/lib_sc_rollup, src/proto_alpha/lib_sc_rollup_layer2
 octez-protocol-compiler: src/lib_protocol_compiler, src/lib_protocol_compiler/bin, src/lib_protocol_compiler/hashes, src/lib_protocol_compiler/registerer
 octez-protocol-compiler-compat: src/lib_protocol_compiler/compat
+octez-protocol-tallinn-libs: src/proto_tallinn/lib_agnostic_baker, src/proto_tallinn/lib_client, src/proto_tallinn/lib_client/test, src/proto_tallinn/lib_client_commands, src/proto_tallinn/lib_client_sapling, src/proto_tallinn/lib_dal, src/proto_tallinn/lib_dal/test, src/proto_tallinn/lib_delegate, src/proto_tallinn/lib_delegate/test, src/proto_tallinn/lib_delegate/test/mockup_simulator, src/proto_tallinn/lib_delegate/test/tenderbrute, src/proto_tallinn/lib_delegate/test/tenderbrute/lib, src/proto_tallinn/lib_layer2_utils, src/proto_tallinn/lib_plugin, src/proto_tallinn/lib_plugin/test, src/proto_tallinn/lib_protocol/test/helpers, src/proto_tallinn/lib_sc_rollup, src/proto_tallinn/lib_sc_rollup_layer2
 octez-requester-tests: src/lib_requester/test
 octez-riscv-api: src/lib_riscv/api
 octez-riscv-pvm: src/lib_riscv/pvm
@@ -132,6 +135,7 @@ octez-smart-rollup-node-PtParisB: src/proto_019_PtParisB/lib_sc_rollup_node
 octez-smart-rollup-node-PtSeouLo: src/proto_023_PtSeouLo/lib_sc_rollup_node
 octez-smart-rollup-node-alpha: src/proto_alpha/lib_sc_rollup_node
 octez-smart-rollup-node-lib: src/lib_smart_rollup_node
+octez-smart-rollup-node-tallinn: src/proto_tallinn/lib_sc_rollup_node
 octez-smart-rollup-wasm-debugger: src/bin_wasm_debugger
 octez-smart-rollup-wasm-debugger-lib: src/lib_wasm_debugger
 octez-smart-rollup-wasm-debugger-plugin: src/bin_wasm_debugger/plugin
@@ -146,17 +150,21 @@ tezos-benchmark: src/lib_benchmark
 tezos-benchmark-023-PtSeouLo: src/proto_023_PtSeouLo/lib_benchmark, src/proto_023_PtSeouLo/lib_benchmark/test
 tezos-benchmark-alpha: src/proto_alpha/lib_benchmark, src/proto_alpha/lib_benchmark/test
 tezos-benchmark-examples: src/lib_benchmark/example
+tezos-benchmark-tallinn: src/proto_tallinn/lib_benchmark, src/proto_tallinn/lib_benchmark/test
 tezos-benchmark-tests: src/lib_benchmark/test
 tezos-benchmark-type-inference-023-PtSeouLo: src/proto_023_PtSeouLo/lib_benchmark/lib_benchmark_type_inference, src/proto_023_PtSeouLo/lib_benchmark/lib_benchmark_type_inference/test
 tezos-benchmark-type-inference-alpha: src/proto_alpha/lib_benchmark/lib_benchmark_type_inference, src/proto_alpha/lib_benchmark/lib_benchmark_type_inference/test
+tezos-benchmark-type-inference-tallinn: src/proto_tallinn/lib_benchmark/lib_benchmark_type_inference, src/proto_tallinn/lib_benchmark/lib_benchmark_type_inference/test
 tezos-benchmarks-proto-023-PtSeouLo: src/proto_023_PtSeouLo/lib_benchmarks_proto
 tezos-benchmarks-proto-alpha: src/proto_alpha/lib_benchmarks_proto
+tezos-benchmarks-proto-tallinn: src/proto_tallinn/lib_benchmarks_proto
 tezos-client-demo-counter: src/proto_demo_counter/lib_client
 tezos-client-genesis: src/proto_genesis/lib_client
 tezos-dal-node-lib: src/lib_dal_node, src/lib_dal_node/gossipsub, src/lib_dal_node/test/
 tezos-dal-node-services: src/lib_dal_node_services
 tezos-injector-023-PtSeouLo: src/proto_023_PtSeouLo/lib_injector
 tezos-injector-alpha: src/proto_alpha/lib_injector
+tezos-injector-tallinn: src/proto_tallinn/lib_injector
 tezos-lazy-containers-tests: src/lib_lazy_containers/test
 tezos-micheline-rewriting: src/lib_benchmark/lib_micheline_rewriting, src/lib_benchmark/lib_micheline_rewriting/test
 tezos-openapi: src/lib_openapi
@@ -192,7 +200,9 @@ tezos-protocol-alpha-tests: src/proto_alpha/lib_protocol/test/integration, src/p
 tezos-protocol-demo-counter: src/proto_demo_counter/lib_protocol
 tezos-protocol-demo-noops: src/proto_demo_noops/lib_protocol
 tezos-protocol-genesis: src/proto_genesis/lib_protocol
-tezos-sc-rollup-node-test: src/proto_023_PtSeouLo/lib_sc_rollup_node/test, src/proto_alpha/lib_sc_rollup_node/test
+tezos-protocol-tallinn: src/proto_tallinn/lib_parameters, src/proto_tallinn/lib_protocol
+tezos-protocol-tallinn-tests: src/proto_tallinn/lib_protocol/test/integration, src/proto_tallinn/lib_protocol/test/integration/consensus, src/proto_tallinn/lib_protocol/test/integration/gas, src/proto_tallinn/lib_protocol/test/integration/michelson, src/proto_tallinn/lib_protocol/test/integration/operations, src/proto_tallinn/lib_protocol/test/integration/validate, src/proto_tallinn/lib_protocol/test/pbt, src/proto_tallinn/lib_protocol/test/regression, src/proto_tallinn/lib_protocol/test/unit
+tezos-sc-rollup-node-test: src/proto_023_PtSeouLo/lib_sc_rollup_node/test, src/proto_alpha/lib_sc_rollup_node/test, src/proto_tallinn/lib_sc_rollup_node/test
 tezos-scoru-wasm-regressions: src/lib_scoru_wasm/regressions
 tezos-smart-rollup-node-lib-test: src/lib_smart_rollup_node/test/
 tezos-tooling: devtools/benchmarks-tools/occupy_memory, devtools/benchmarks-tools/purge_disk_cache, devtools/gas_parameter_diff/bin, devtools/git-gas-diff/bin, src/tooling

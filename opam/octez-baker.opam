@@ -20,11 +20,13 @@ depends: [
 depopts: [
   "octez-protocol-021-PsQuebec-libs"
   "octez-protocol-022-PsRiotum-libs"
+  "octez-protocol-tallinn-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
   "octez-protocol-021-PsQuebec-libs" { != version }
   "octez-protocol-022-PsRiotum-libs" { != version }
+  "octez-protocol-tallinn-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

@@ -18,9 +18,11 @@ depends: [
   "octez-protocol-023-PtSeouLo-libs" { = version }
 ]
 depopts: [
+  "octez-protocol-tallinn-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
+  "octez-protocol-tallinn-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [
