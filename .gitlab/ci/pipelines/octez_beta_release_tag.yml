@@ -400,7 +400,6 @@ oc.docker-build-debian-dependencies:
   parallel:
     matrix:
     - RELEASE:
-      - unstable
       - bookworm
       TAGS:
       - gcp_very_high_cpu
@@ -447,7 +446,6 @@ oc.build-debian:
   parallel:
     matrix:
     - RELEASE:
-      - unstable
       - bookworm
       TAGS:
       - gcp_very_high_cpu_ramfs
