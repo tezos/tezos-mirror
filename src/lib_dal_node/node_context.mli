@@ -257,6 +257,11 @@ module Attestable_slots : sig
   val drop_published_at_migration :
     t -> published_level:int32 -> (bool, tztrace) result
 
+  (** Let M = migration level (last block of the old protocol). Then, for levels
+      A included in [M + 1 .. M + lag] (inclusively), we do not ATTEST any slots,
+      because the corresponding published levels would fall in the old protocol. *)
+  val drop_attested_at_migration : t -> attested_level:int32 -> bool tzresult
+
   (** [may_notify ctxt ~slot_id] checks, for each subscribed [pkh], whether all shards
       assigned to [pkh] at the attestation level corresponding to [~slot_id] are available;
       if so, it emits [~slot_id] to that [pkh]’s stream. *)

@@ -337,6 +337,19 @@ module Attestable_slots = struct
        && Int32.sub migration_level old_lag < published_level
        && published_level <= migration_level)
 
+  let drop_attested_at_migration ctxt ~attested_level =
+    let open Result_syntax in
+    let migration_level = get_last_migration_level ctxt in
+    let* new_lag = get_attestation_lag ctxt ~level:attested_level in
+    let* old_lag =
+      let published_level = Int32.(sub attested_level new_lag) in
+      get_attestation_lag ctxt ~level:published_level
+    in
+    return
+      (old_lag > new_lag
+      && migration_level < attested_level
+      && attested_level <= Int32.add migration_level new_lag)
+
   let may_notify ctxt ~(slot_id : Types.slot_id) =
     let open Lwt_result_syntax in
     let module T = Types.Attestable_slots_watcher_table in

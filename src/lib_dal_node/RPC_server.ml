@@ -493,47 +493,22 @@ module Profile_handlers = struct
           return (Types.Attestable_slots {slots = flags; published_level})
     in
 
-    (* Decide whether to short-circuit attestation computation at attested level [L]
-       because of a protocol migration that decreased [attestation_lag].
-
-       - M = migration level (first level of the new protocol);
-       - new_lag = attestation_lag at attested level L (new protocol);
-       - published_level = L - new_lag 
-       
-       If published_level is still in the old protocol and the old lag > new lag,
-       then for L in [M .. M + new_lag - 1] the corresponding published data belongs
-       to the old protocol and should be ignored for attestation purposes. *)
-    let should_drop_due_to_migration last_known_parameters =
-      let open Lwt_result_syntax in
-      let migration_level = Node_context.get_last_migration_level ctxt in
-      let new_lag = Int32.of_int last_known_parameters.Types.attestation_lag in
-      let published_level = Int32.(sub attested_level new_lag) in
-      let* published_level_parameters =
-        Node_context.get_proto_parameters ctxt ~level:(`Level published_level)
-        |> Lwt.return
-        |> lwt_map_error (fun e -> `Other e)
-      in
-      let old_lag =
-        Int32.of_int published_level_parameters.Types.attestation_lag
-      in
-      return
-        (old_lag > new_lag
-        && migration_level <= attested_level
-        && attested_level < Int32.add migration_level new_lag)
-    in
-
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/8064 *)
     let get_attestable_slots ~shard_indices store last_known_parameters
         ~attested_level =
       let open Lwt_result_syntax in
       let* should_drop_due_to_migration =
-        should_drop_due_to_migration last_known_parameters
+        Node_context.Attestable_slots.drop_attested_at_migration
+          ctxt
+          ~attested_level
+        |> Lwt.return
+        |> lwt_map_error (fun e -> `Other e)
       in
       if should_drop_due_to_migration then
         let*! () = Event.emit_skip_attesting_shards ~level:attested_level in
 
         let slots =
-          Stdlib.List.init last_known_parameters.number_of_slots (fun _ ->
+          Stdlib.List.init last_known_parameters.Types.number_of_slots (fun _ ->
               false)
         in
         return (Types.Attestable_slots {slots; published_level = 0l})
