@@ -3259,7 +3259,7 @@ tezt-slow:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 20
+  parallel: 14
 
 tezt-riscv-slow-sequential:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -3465,4 +3465,4 @@ tezt:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 50
+  parallel: 33

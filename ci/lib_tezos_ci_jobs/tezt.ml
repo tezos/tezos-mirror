@@ -81,7 +81,7 @@ let job_tezt =
     ~description:"Run normal Tezt tests."
     ~test_coverage:true
     ~test_selection:(tests_tag_selector [Not (Has_tag "flaky")])
-    ~parallel_jobs:50
+    ~parallel_jobs:33
     ~parallel_tests:6
     ~retry_jobs:2
 
@@ -113,7 +113,7 @@ let job_tezt_slow =
     ~description:"Run Tezt tests tagged as slow."
     ~test_selection:(tests_tag_selector ~slow:true [])
     ~test_timeout:No_timeout
-    ~parallel_jobs:20
+    ~parallel_jobs:14
     ~parallel_tests:3
     ~retry_jobs:2
 

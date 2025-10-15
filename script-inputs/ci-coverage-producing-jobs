@@ -4,4 +4,6 @@ oc.unit:non-proto-x86_64
 tezt
 tezt-time-sensitive
 tezt-flaky
+etherlink.tezt
+etherlink.tezt-flaky
 etherlink.unit_tests
