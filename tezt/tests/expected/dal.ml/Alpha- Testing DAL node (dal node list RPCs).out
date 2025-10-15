@@ -23,7 +23,7 @@ Available services:
     - GET /levels/<int32>/slots/<int>/shards/<int>/content
         Fetch shard as bytes 
     - GET /levels/<int32>/slots/<int>/status
-        Return the status for the given slot. 
+        Return the status for the given slot. For operator nodes only. 
   - GET /monitor/synchronized
       Returns the stream of synchronization statuses of the DAL node with the
       L1 node. 
