@@ -956,7 +956,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) Tallinn (* Alpha predecessor *)
+  | (* Alpha predecessor *) T024 (* Alpha predecessor *)
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -973,8 +973,8 @@ let check_and_update_protocol_version ctxt =
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
         else if Compare.String.(s = "alpha_current") then return (Alpha, ctxt)
-        else if (* Alpha predecessor *) Compare.String.(s = "tallinn") then
-          return (Tallinn, ctxt) (* Alpha predecessor *)
+        else if (* Alpha predecessor *) Compare.String.(s = "t024_024") then
+          return (T024, ctxt) (* Alpha predecessor *)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -1334,9 +1334,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         return (ctxt, Some c)
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | Tallinn ->
+    | T024 ->
         (*
-            FIXME chain_id is used for Q to Tallinn migration and nomore after.
+            FIXME chain_id is used for Q to T024 migration and nomore after.
             We ignored for automatic stabilisation, should it be removed in
             Beta?
         *)
