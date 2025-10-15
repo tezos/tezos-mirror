@@ -315,7 +315,7 @@ impl From<TransferTarget> for TransferSuccess {
 
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub struct RevealSuccess {
-    pub consumed_gas: Narith,
+    pub consumed_milligas: Narith,
 }
 
 // PlaceHolder Type for temporary unused fields
@@ -386,7 +386,7 @@ pub struct OriginationSuccess {
     pub balance_updates: Vec<BalanceUpdate>,
     #[encoding(dynamic, list)]
     pub originated_contracts: Vec<Originated>,
-    pub consumed_gas: Narith,
+    pub consumed_milligas: Narith,
     pub storage_size: Zarith,
     pub paid_storage_size_diff: Zarith,
     pub lazy_storage_diff: Option<LazyStorageDiffList>,
@@ -404,7 +404,7 @@ pub struct TransferSuccess {
     // TODO: Placeholder for originated contracts issue : #8018
     #[encoding(dynamic, bytes)]
     pub originated_contracts: Vec<u8>,
-    pub consumed_gas: Narith,
+    pub consumed_milligas: Narith,
     pub storage_size: Zarith,
     pub paid_storage_size_diff: Zarith,
     pub allocated_destination_contract: bool,
@@ -768,7 +768,7 @@ mod tests {
                             TransferSuccess { storage: None, lazy_storage_diff: None, balance_updates: vec![
                             BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap())), changes: -42000000,update_origin : UpdateOrigin::BlockApplication },
                             BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap())), changes: 42000000,update_origin : UpdateOrigin::BlockApplication}
-                            ], ticket_receipt: vec![], originated_contracts: vec![], consumed_gas: 2169000.into(), storage_size: 0.into(), paid_storage_size_diff: 0.into(), allocated_destination_contract: false }
+                            ], ticket_receipt: vec![], originated_contracts: vec![], consumed_milligas: 2169000.into(), storage_size: 0.into(), paid_storage_size_diff: 0.into(), allocated_destination_contract: false }
                             ))
 
                         , internal_operation_results: vec![] })
@@ -816,7 +816,7 @@ mod tests {
                                         BalanceUpdate { balance: Balance::Account(Contract::from_b58check("KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe").unwrap()) , changes: 1000000, update_origin: UpdateOrigin::BlockApplication },
                                     ],
                                     originated_contracts:vec![Originated {contract: ContractKt1Hash::from_base58_check("KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe").unwrap()}],
-                                    consumed_gas:578755_u64.into(),
+                                    consumed_milligas:578755_u64.into(),
                                     storage_size:46_u64.into(),
                                     paid_storage_size_diff:46_u64.into(),
                                     lazy_storage_diff: None,
@@ -930,7 +930,7 @@ mod tests {
                 ],
                 ticket_receipt: vec![],
                 originated_contracts: vec![],
-                consumed_gas: 100000.into(),
+                consumed_milligas: 100000.into(),
                 storage_size: 0.into(),
                 paid_storage_size_diff: 0.into(),
                 allocated_destination_contract: false,
@@ -987,7 +987,7 @@ mod tests {
                     ],
                     ticket_receipt: vec![],
                     originated_contracts: vec![],
-                    consumed_gas: 100000.into(),
+                    consumed_milligas: 100000.into(),
                     storage_size: 0.into(),
                     paid_storage_size_diff: 0.into(),
                     allocated_destination_contract: false,
