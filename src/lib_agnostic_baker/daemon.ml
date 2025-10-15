@@ -118,6 +118,7 @@ module Make_daemon (Agent : AGENT) :
     keep_alive : bool;
     command : command;
     cctxt : Tezos_client_base.Client_context.full;
+    head_stream : string Lwt_stream.t;
   }
 
   type t = state
@@ -276,72 +277,47 @@ module Make_daemon (Agent : AGENT) :
     - Shut down an old baker it its time has come;
     - Spawn and "hot-swap" to a new baker if the next protocol hash is different.
     The voting period information is used for logging purposes. *)
-  let monitor_voting_periods ~state head_stream =
+  let monitor_voting_periods ~state =
     let open Lwt_result_syntax in
     let node_addr = state.node_endpoint in
-    let rec loop () =
-      let*! v = Lwt_stream.get head_stream in
-      match v with
-      | None -> tzfail Lost_node_connection
-      | Some _tick ->
-          let* block_hash =
-            (Rpc_services.get_block_hash
-               ~node_addr
-             [@profiler.record_s {verbosity = Notice} "get_block_hash"])
-          in
-          ()
-          [@profiler.reset_block_section
-            {profiler_module = Profiler} block_hash] ;
-          let* period_kind, remaining =
-            (Rpc_services.get_current_period
-               ~node_addr
-             [@profiler.record_s {verbosity = Notice} "get_current_period"])
-          in
-          let*! () =
-            Events.(emit period_status) (block_hash, period_kind, remaining)
-          in
-          let* () =
-            (maybe_kill_old_baker
-               state
-               node_addr
-             [@profiler.record_s {verbosity = Notice} "maybe_kill_old_baker"])
-          in
-          let* next_protocol_hash =
-            (Rpc_services.get_next_protocol_hash
-               ~node_addr
-             [@profiler.record_s {verbosity = Notice} "get_next_protocol_hash"])
-          in
-          let current_protocol_hash = state.current_baker.protocol_hash in
-          let* () =
-            if
-              not (Protocol_hash.equal current_protocol_hash next_protocol_hash)
-            then
-              let* head_level =
-                (Rpc_services.get_level
-                   ~node_addr
-                 [@profiler.record_s {verbosity = Notice} "get_level"])
-              in
-              (hot_swap_baker
-                 ~state
-                 ~current_protocol_hash
-                 ~next_protocol_hash
-                 ~level_to_kill_old_baker:
-                   (head_level + Parameters.extra_levels_for_old_baker)
-               [@profiler.record_s {verbosity = Notice} "hot_swap_baker"])
-            else return_unit
-          in
-          loop ()
+    let* block_hash =
+      (Rpc_services.get_block_hash
+         ~node_addr [@profiler.record_s {verbosity = Notice} "get_block_hash"])
     in
-    loop ()
-
-  (** [baker_thread ~state] monitors the current baker thread for any potential error, and
-    it propagates any error that can appear. *)
-  let baker_thread ~state =
-    let open Lwt_result_syntax in
-    let*! res = state.current_baker.process.thread in
-    match res with
-    | Ok () -> return_unit
-    | Error err -> fail (Agent_process_error Agent.name :: err)
+    () [@profiler.reset_block_section {profiler_module = Profiler} block_hash] ;
+    let* period_kind, remaining =
+      (Rpc_services.get_current_period
+         ~node_addr
+       [@profiler.record_s {verbosity = Notice} "get_current_period"])
+    in
+    let*! () =
+      Events.(emit period_status) (block_hash, period_kind, remaining)
+    in
+    let* () =
+      (maybe_kill_old_baker
+         state
+         node_addr
+       [@profiler.record_s {verbosity = Notice} "maybe_kill_old_baker"])
+    in
+    let* next_protocol_hash =
+      (Rpc_services.get_next_protocol_hash
+         ~node_addr
+       [@profiler.record_s {verbosity = Notice} "get_next_protocol_hash"])
+    in
+    let current_protocol_hash = state.current_baker.protocol_hash in
+    if not (Protocol_hash.equal current_protocol_hash next_protocol_hash) then
+      let* head_level =
+        (Rpc_services.get_level
+           ~node_addr [@profiler.record_s {verbosity = Notice} "get_level"])
+      in
+      (hot_swap_baker
+         ~state
+         ~current_protocol_hash
+         ~next_protocol_hash
+         ~level_to_kill_old_baker:
+           (head_level + Parameters.extra_levels_for_old_baker)
+       [@profiler.record_s {verbosity = Notice} "hot_swap_baker"])
+    else return_unit
 
   (* ---- Agnostic Baker Bootstrap ---- *)
 
@@ -408,6 +384,55 @@ module Make_daemon (Agent : AGENT) :
           backends
     | None -> ()
 
+  type event =
+    | New_head
+    | Head_stream_ended
+    | Old_baker_stopped
+    | Current_baker_stopped
+
+  let rec main_loop state =
+    let open Lwt_result_syntax in
+    let current_baker =
+      Lwt_result.map
+        (fun () -> Current_baker_stopped)
+        state.current_baker.process.thread
+    in
+    let old_baker =
+      match state.old_baker with
+      | Some old_baker ->
+          Lwt_result.map
+            (fun () -> Old_baker_stopped)
+            old_baker.baker.process.thread
+      | None -> Lwt_utils.never_ending ()
+    in
+    let head_stream =
+      Lwt.map
+        (function None -> Ok Head_stream_ended | Some _head -> Ok New_head)
+        (Lwt_stream.get state.head_stream)
+    in
+    let* pick = Lwt.choose [current_baker; old_baker; head_stream] in
+    match pick with
+    | New_head ->
+        let* () = monitor_voting_periods ~state in
+        main_loop state
+    | Head_stream_ended -> tzfail Lost_node_connection
+    | Old_baker_stopped -> (
+        match state.old_baker with
+        | None -> assert false
+        | Some old_baker ->
+            let* head_level =
+              (Rpc_services.get_level
+                 ~node_addr:state.node_endpoint
+               [@profiler.record_s {verbosity = Notice} "get_level"])
+            in
+            if head_level >= old_baker.level_to_kill then
+              (* The old baker is expired, it is expected. *)
+              main_loop state
+            else return_unit)
+    | Current_baker_stopped ->
+        (* It's not supposed to stop. *)
+        return_unit
+
   let run ~keep_alive ~command cctxt =
     let open Lwt_result_syntax in
     () [@profiler.overwrite may_start_profiler cctxt#get_base_dir] ;
@@ -426,36 +451,23 @@ module Make_daemon (Agent : AGENT) :
           (fun () -> may_start_initial_baker cctxt command ~node_addr)
       else may_start_initial_baker cctxt command ~node_addr
     in
-    let state =
-      {
-        node_endpoint = node_addr;
-        current_baker;
-        old_baker = None;
-        keep_alive;
-        command;
-        cctxt;
-      }
-    in
-    let monitor_voting_periods () =
-      let* head_stream = monitor_heads ~node_addr in
-      monitor_voting_periods ~state head_stream
-    in
-    (* Monitoring voting periods through heads monitoring to avoid
-       missing UAUs. *)
-    let* () =
-      Lwt.pick
-        [
-          (* We do not care if --keep-alive is provided, if the baker thread doesn't
-             have the argument it'll abort the process anyway. *)
-          retry_on_disconnection
-            ~emit:(fun _ -> Lwt.return_unit)
-            node_addr
-            monitor_voting_periods;
-          baker_thread ~state;
-        ]
-    in
-    let*! () = Lwt_utils.never_ending () in
-    return_unit
+    retry_on_disconnection
+      ~emit:(fun _ -> Lwt.return_unit)
+      node_addr
+      (fun () ->
+        let* head_stream = monitor_heads ~node_addr in
+        let state =
+          {
+            node_endpoint = node_addr;
+            current_baker;
+            old_baker = None;
+            keep_alive;
+            command;
+            cctxt;
+            head_stream;
+          }
+        in
+        main_loop state)
 end
 
 module Baker : AGNOSTIC_DAEMON with type command = Baker_agent.command =
