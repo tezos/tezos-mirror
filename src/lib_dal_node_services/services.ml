@@ -399,6 +399,28 @@ let get_attestable_slots :
       open_root / "profiles" /: Signature.Public_key_hash.rpc_arg
       / "attested_levels" /: Tezos_rpc.Arg.int32 / "attestable_slots")
 
+let monitor_attestable_slots :
+    < meth : [`GET]
+    ; input : unit
+    ; output : Types.slot_id
+    ; prefix : unit
+    ; params : unit * Signature.public_key_hash
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Stream attestable slot ids for a given public key hash [pkh]. A slot is \
+       attestable for attested level L if it was published at (L - \
+       attestation_lag) and *all* shards assigned at level L to [pkh] are \
+       available in the DAL node's store. If some shards of the slot are \
+       detected as traps for the baker, the slot should not be attested, so \
+       the id is not sent via the stream."
+    ~query:Tezos_rpc.Query.empty
+    ~output:Types.slot_id_encoding
+    Tezos_rpc.Path.(
+      open_root / "profiles" /: Signature.Public_key_hash.rpc_arg / "monitor"
+      / "attestable_slots")
+
 let get_traps :
     < meth : [`GET]
     ; input : unit
