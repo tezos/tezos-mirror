@@ -113,9 +113,9 @@ let git_clone agent ?branch repo_url directory =
     @ (match branch with None -> [] | Some branch -> ["-b"; branch])
     @ [repo_url; directory])
 
-let build_endpoint ~runner port =
-  Client.Foreign_endpoint
-    (Endpoint.make ~host:(Runner.address runner) ~scheme:"http" ~port ())
+let build_endpoint ?path ~runner ~dns_domain port =
+  let host = Option.value ~default:(Runner.address runner) dns_domain in
+  Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme:"http" ~port ())
 
 let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
     ~time_between_blocks =
@@ -192,10 +192,9 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
   (* Get available port for the API and indexer.
      (or given port for the API). *)
   let indexer_port = Agent.next_available_port agent in
-  let api_port = port_of_option agent tzkt_api_port in
   (* Print a log for the tezt-cloud user to retrieve the port of the indexer or API *)
   let () = toplog "Tzkt indexer will be available at port %d" indexer_port in
-  let () = toplog "Tzkt API will be available at port %d" api_port in
+  let () = toplog "Tzkt API will be available at port %d" tzkt_api_port in
 
   (* Prepare multiple argument for Tzkt indexer and API start. *)
   (* Set our endpoint for Tzkt instead of the default "https://rpc.tzkt.io/mainnet/".*)
@@ -229,7 +228,7 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
   let api_port_arg =
     tzkt_arg
       ["Kestrel"; "Endpoints"; "Http"; "Url"]
-      [sf "http://0.0.0.0:%d" api_port]
+      [sf "http://0.0.0.0:%d" tzkt_api_port]
   in
   let polling_args =
     [
@@ -267,7 +266,7 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
       ~port:api_port_arg
       ()
   in
-  return (build_endpoint ~runner api_port)
+  unit
 
 let create_config_file ~agent destination format =
   let temp_file = Temp.file "config" in
@@ -280,7 +279,8 @@ let create_config_file ~agent destination format =
     (Format.formatter_of_out_channel ch)
     format
 
-let init_faucet_backend ~agent ~tezlink_sandbox_endpoint ~faucet_private_key =
+let init_faucet_backend ~agent ~tezlink_sandbox_endpoint ~faucet_private_key
+    ~dns_domain =
   let faucet_api_port = Agent.next_available_port agent in
   let faucet_backend_dir = "faucet-backend" in
   (* Clone faucet backend from personal fork because upstream depends on a RPC which we don't yet support (forge_operation). *)
@@ -323,10 +323,10 @@ DIFFICULTY=4
   in
   let runner = Agent.runner agent in
   let* () = Faucet_backend_process.run ?runner ~path:faucet_backend_dir () in
-  return (build_endpoint ~runner faucet_api_port)
+  return (build_endpoint ~runner ~dns_domain faucet_api_port)
 
 let init_faucet_frontend ~faucet_api ~agent ~tezlink_sandbox_endpoint
-    ~faucet_pkh ~tzkt_api =
+    ~faucet_pkh ~tzkt_api ~dns_domain =
   let faucet_frontend_port = Agent.next_available_port agent in
   let faucet_frontend_dir = "faucet-frontend" in
   (* Clone faucet frontend from personal fork because upstream does
@@ -382,18 +382,11 @@ let init_faucet_frontend ~faucet_api ~agent ~tezlink_sandbox_endpoint
       ~port:faucet_frontend_port
       ()
   in
-  return
-    Client.(
-      Foreign_endpoint
-        (Endpoint.make
-           ~host:(Runner.address runner)
-           ~scheme:"http"
-           ~port:faucet_frontend_port
-           ()))
+  return (build_endpoint ~runner ~dns_domain faucet_frontend_port)
 
-let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
-    ?(rpc_port : int option) (verbose : bool)
-    (time_between_blocks : Evm_node.time_between_blocks) agent =
+let init_tezlink_sequencer (cloud : Cloud.t) (name : string) ~(rpc_port : int)
+    (verbose : bool) (time_between_blocks : Evm_node.time_between_blocks) agent
+    =
   let chain_id = 1 in
   let () = toplog "Initializing the tezlink scenario" in
   let tezlink_config = Temp.file "l2-tezlink-config.yaml" in
@@ -472,20 +465,14 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
              ())
       ~name:"tezlink-sandboxed-sequencer"
       ~mode
-      ?rpc_port
+      ~rpc_port
       "http://dummy_rollup_endpoint"
       cloud
       agent
   in
-  let tezlink_sandbox_endpoint =
-    Client.(
-      Foreign_endpoint
-        Endpoint.
-          {(Evm_node.rpc_endpoint_record evm_node) with path = "/tezlink"})
-  in
   let () = toplog "Launching the sandbox L2 node: done" in
   let* () = add_prometheus_source ~evm_node cloud agent name in
-  return tezlink_sandbox_endpoint
+  unit
 
 let rec loop n =
   let n = n + 1 in
@@ -496,6 +483,36 @@ let rec loop n =
 let add_service cloud ~name ~url =
   let () = toplog "New service: %s: %s" name url in
   Cloud.add_service cloud ~name ~url
+
+(* The sequencer and the TzKT API may be proxified by a Nginx
+   reverse-proxy to support HTTPS and, in the case of the sequencer,
+   add a /tezlink path prefix. *)
+type proxy_internal_info = {port : int; path : string option}
+
+type proxy_info =
+  | No_proxy of proxy_internal_info
+  | Https_proxy of {
+      dns_domain : string;
+      external_port : int;
+      internal_info : proxy_internal_info;
+    }
+
+let proxy_internal_info = function
+  | No_proxy internal_info | Https_proxy {internal_info; _} -> internal_info
+
+let proxy_internal_port proxy_info = (proxy_internal_info proxy_info).port
+
+let proxy_internal_endpoint proxy_info =
+  let host = "127.0.0.1" in
+  let scheme = "http" in
+  let {path; port} = proxy_internal_info proxy_info in
+  Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme ~port ())
+
+let proxy_external_endpoint ~runner ~dns_domain = function
+  | No_proxy {port; path} -> build_endpoint ?path ~runner ~dns_domain port
+  | Https_proxy {dns_domain; external_port; internal_info = _} ->
+      Client.Foreign_endpoint
+        (Endpoint.make ~host:dns_domain ~scheme:"https" ~port:external_port ())
 
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
@@ -520,6 +537,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             else Test.fail ~__LOC__ "Agent not found: %s" name
         | Some agent -> agent
       in
+      let runner = Agent.runner tezlink_sequencer_agent in
       let public_rpc_port =
         port_of_option tezlink_sequencer_agent Cli.public_rpc_port
       in
@@ -537,34 +555,39 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                  command line."
             else Some dns_domain
       in
-      let internal_port =
+      let sequencer_proxy_info =
+        let path = Some "/tezlink" in
         match dns_domain with
-        | None ->
-            (* No DNS so no proxy, so we must use the public RPC port. *)
-            Some public_rpc_port
-        | Some _ ->
-            (* We let the system choose a fresh internal RPC node port.
-               Note that it will be publicy exposed, it's just that we don't need
-               to share this one. *)
-            None
+        | None -> No_proxy {port = public_rpc_port; path}
+        | Some dns_domain ->
+            let internal_port =
+              Agent.next_available_port tezlink_sequencer_agent
+            in
+            let external_port = public_rpc_port in
+            Https_proxy
+              {
+                internal_info = {port = internal_port; path};
+                external_port;
+                dns_domain;
+              }
       in
       let () = toplog "Starting Tezlink sequencer" in
-      let* tezlink_sandbox_endpoint =
+      let* () =
         init_tezlink_sequencer
           cloud
           name
-          ?rpc_port:internal_port
+          ~rpc_port:(proxy_internal_port sequencer_proxy_info)
           Cli.verbose
           Cli.time_between_blocks
           tezlink_sequencer_agent
       in
+      (* The proxy endpoint is the https endpoint we want to provide
+         to the external world, it has no /tezlink path. *)
+      let tezlink_sandbox_endpoint =
+        proxy_internal_endpoint sequencer_proxy_info
+      in
       let tezlink_proxy_endpoint =
-        match tezlink_sandbox_endpoint with
-        | Node _ ->
-            failwith "Tezlink end-point should not be a full-fledged node."
-        | Foreign_endpoint {host; scheme; port = _; path = _} ->
-            Client.Foreign_endpoint
-              (Endpoint.make ~host ~scheme ~port:public_rpc_port ())
+        proxy_external_endpoint ~runner ~dns_domain sequencer_proxy_info
       in
       let* () =
         add_service
@@ -579,38 +602,62 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           ~url:
             (sf "%s/version" (Client.string_of_endpoint tezlink_proxy_endpoint))
       in
-      let* tzkt_api_info_opt =
+      let* tzkt_proxy =
         if Cli.tzkt then
           let () = toplog "Starting TzKT" in
-          let proxy_tzkt_api_port, internal_tzkt_api_port =
+          let tzkt_proxy =
+            let path = None in
             match dns_domain with
             | None ->
                 (* No DNS so no proxy, so we must use the public API port. *)
-                (None, Cli.tzkt_api_port)
-            | Some _ ->
+                No_proxy
+                  {
+                    port =
+                      port_of_option tezlink_sequencer_agent Cli.tzkt_api_port;
+                    path;
+                  }
+            | Some dns_domain ->
                 (* We let the system choose a fresh internal API node port.
                    Note that it will be publicy exposed, it's just that we don't
                    need to share this one. *)
-                (Cli.tzkt_api_port, None)
+                let internal_port =
+                  Agent.next_available_port tezlink_sequencer_agent
+                in
+                let external_port =
+                  port_of_option tezlink_sequencer_agent Cli.tzkt_api_port
+                in
+                Https_proxy
+                  {
+                    internal_info = {port = internal_port; path};
+                    dns_domain;
+                    external_port;
+                  }
           in
-          let* tzkt_api =
+          let internal_tzkt_api_port = proxy_internal_port tzkt_proxy in
+          let* () =
             init_tzkt
               ~tzkt_api_port:internal_tzkt_api_port
               ~agent:tezlink_sequencer_agent
               ~tezlink_sandbox_endpoint
               ~time_between_blocks:Cli.time_between_blocks
           in
+          let external_tzkt_api_endpoint =
+            proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
+          in
           let* () =
             add_service
               cloud
               ~name:"TzKT API"
-              ~url:(Client.string_of_endpoint tzkt_api)
+              ~url:(Client.string_of_endpoint external_tzkt_api_endpoint)
           in
           let* () =
             add_service
               cloud
               ~name:"Check TzKT API"
-              ~url:(sf "%s/v1/head" (Client.string_of_endpoint tzkt_api))
+              ~url:
+                (sf
+                   "%s/v1/head"
+                   (Client.string_of_endpoint external_tzkt_api_endpoint))
           in
           let* () =
             add_service
@@ -619,7 +666,8 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               ~url:
                 (sf
                    "http://sandbox.tzkt.io/blocks?tzkt_api_url=%s"
-                   (Client.url_encoded_string_of_endpoint tzkt_api))
+                   (Client.url_encoded_string_of_endpoint
+                      external_tzkt_api_endpoint))
           in
           let* () =
             if Cli.faucet then
@@ -634,8 +682,9 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               let* faucet_api =
                 init_faucet_backend
                   ~agent:tezlink_sequencer_agent
-                  ~tezlink_sandbox_endpoint
+                  ~tezlink_sandbox_endpoint:tezlink_proxy_endpoint
                   ~faucet_private_key
+                  ~dns_domain
               in
               let* () =
                 add_service
@@ -655,7 +704,8 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                   ~faucet_api
                   ~tezlink_sandbox_endpoint
                   ~faucet_pkh
-                  ~tzkt_api
+                  ~tzkt_api:external_tzkt_api_endpoint
+                  ~dns_domain
               in
               add_service
                 cloud
@@ -663,7 +713,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~url:(Client.string_of_endpoint faucet_frontend)
             else unit
           in
-          some (tzkt_api, proxy_tzkt_api_port)
+          some tzkt_proxy
         else none
       in
       let* () =
@@ -686,18 +736,22 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                   ~certificate_key:ssl.key
               in
               let tzkt_nginx_config =
-                match tzkt_api_info_opt with
-                | None -> []
-                | Some (endpoint, port) ->
-                    let port = port_of_option tezlink_sequencer_agent port in
+                match tzkt_proxy with
+                | None | Some (No_proxy _) -> []
+                | Some
+                    (Https_proxy {internal_info = _; external_port; dns_domain}
+                     as tzkt_proxy) ->
+                    let internal_endpoint =
+                      proxy_internal_endpoint tzkt_proxy
+                    in
                     let proxy_pass =
                       (* The trailing / is mandatory, otherwise the reverse proxy
                          won't be able to serve services with a path. *)
-                      Client.string_of_endpoint endpoint ^ "/"
+                      Client.string_of_endpoint internal_endpoint ^ "/"
                     in
                     Nginx_reverse_proxy.simple_ssl_node
-                      ~server_name:full_name
-                      ~port
+                      ~server_name:dns_domain
+                      ~port:external_port
                       ~location:"/"
                       ~proxy_pass
                       ~certificate:ssl.certificate
