@@ -33,7 +33,7 @@ Multiple protocol and smart rollup parameters have been updated in
 consequence, to ensure that their duration in terms of
 minutes/hours/weeks remains the same as in protocol Seoul. A full list
 of affected parameters with their old and new values can be found
-:ref:`here<6s_block_time_parameters_alpha>`.
+:ref:`here<6s_block_time_parameters_t024>`.
 
 Unlike other parameters, the value
 ``smart_rollup_max_active_outbox_levels`` in term of blocks has not
