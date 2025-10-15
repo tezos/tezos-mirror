@@ -339,6 +339,25 @@ let () =
     ~description:"Health endpoint to check watchtower is running"
   @@ fun _ _ _ -> Lwt_result_syntax.return_unit
 
+let () =
+  register
+    `GET
+    "/version"
+    Data_encoding.(
+      obj2
+        (req
+           "commit"
+           string
+           ~description:"Git commit hash of the watchtower binary")
+        (req
+           "date"
+           string
+           ~description:"Date of the git commit of the watchtower binary"))
+    ~description:"Version of the FA bridge watchtower (git commit)"
+  @@ fun _ _ _ ->
+  let open Tezos_version_value.Current_git_info in
+  Lwt_result.return (abbreviated_commit_hash, committer_date)
+
 let json_remove_path p json = Ezjsonm.update json p None
 
 let () =
