@@ -197,14 +197,15 @@ module Per_block_votes = struct
       ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
-  let unused_config_adaptive_issuance_vote =
+  let deprecated_adaptive_issuance_vote_field =
     declare_0
       ~section
-      ~name:"unused_config_adaptive_issuance_vote"
+      ~name:"deprecated_adaptive_issuance_vote_field"
       ~level:Warning
       ~msg:
-        "Adaptive issuance is now enabled, voting is no longer necessary. \
-         Please remove the vote from your configuration vote file."
+        "DEPRECATED CONFIG: The 'adaptive_issuance_vote' field of the vote \
+         configuration file is deprecated. It is already ignored by the baker, \
+         and will be removed in the next major version of Octez."
       ()
 end
 

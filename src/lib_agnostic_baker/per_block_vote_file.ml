@@ -86,6 +86,7 @@ let read_per_block_votes_no_fail ~default ~per_block_vote_file =
         liquidity_baking_toggle_vote;
         adaptive_issuance_vote_opt = Some adaptive_issuance_vote;
       } ->
+      let* () = Events.(emit deprecated_adaptive_issuance_vote_field ()) in
       return
         Per_block_votes.
           {
@@ -120,7 +121,7 @@ let load_per_block_votes_config ~default_liquidity_baking_vote
             } ->
             let*! () =
               if Option.is_some adaptive_issuance_vote_opt then
-                Events.(emit unused_config_adaptive_issuance_vote ())
+                Events.(emit deprecated_adaptive_issuance_vote_field ())
               else Lwt.return_unit
             in
             return
