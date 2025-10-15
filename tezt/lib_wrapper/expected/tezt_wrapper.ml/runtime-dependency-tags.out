@@ -12,11 +12,13 @@ accuser: octez-accuser
 accuser_psriotum: octez-accuser-PsRiotum
 accuser_ptseoulo: octez-accuser-PtSeouLo
 accuser_alpha: octez-accuser-alpha
+accuser_tallinn: octez-accuser-tallinn
 admin_client: octez-admin-client
 agnostic_baker: octez-baker
 baker_psriotum: octez-baker-PsRiotum
 baker_ptseoulo: octez-baker-PtSeouLo
 baker_alpha: octez-baker-alpha
+baker_tallinn: octez-baker-tallinn
 client: octez-client
 codec: octez-codec
 dac_client: octez-dac-client
