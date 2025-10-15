@@ -430,8 +430,10 @@ module Attestable_slots_watcher_table : sig
       bucket size of [~initial_size] (which is an initial estimation). *)
   val create : initial_size:int -> t
 
-  (** [get_or_init t pkh] returns (creating if absent) the watcher entry for [pkh] in [t]. *)
-  val get_or_init : t -> Signature.public_key_hash -> watcher
+  (** [get_or_init t pkh proto_params] returns (creating if absent) the watcher entry for
+      [pkh] in [t].*)
+  val get_or_init :
+    t -> Signature.public_key_hash -> proto_parameters option -> watcher
 
   (** [notify t pkh ~slot_id] pushes [slot_id] to the stream for [pkh] if present. *)
   val notify : t -> Signature.public_key_hash -> slot_id:slot_id -> unit

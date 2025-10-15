@@ -312,7 +312,13 @@ module Attestable_slots = struct
 
   let subscribe ctxt ~pkh =
     let module T = Types.Attestable_slots_watcher_table in
-    let watcher = T.get_or_init ctxt.attestable_slots_watcher_table pkh in
+    let proto_params =
+      Result.to_option
+      @@ get_proto_parameters ctxt ~level:(`Level ctxt.last_finalized_level)
+    in
+    let watcher =
+      T.get_or_init ctxt.attestable_slots_watcher_table pkh proto_params
+    in
     let stream, stopper = Lwt_watcher.create_stream (T.get_stream watcher) in
     let next () = Lwt_stream.get stream in
     let shutdown () =

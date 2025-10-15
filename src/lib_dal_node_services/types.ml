@@ -761,15 +761,28 @@ module Health = struct
       checks
 end
 
+module SlotIdSet =
+  Aches.Vache.Set (Aches.Vache.LRU_Sloppy) (Aches.Vache.Strong)
+    (struct
+      type t = Slot_id.t
+
+      let equal = Slot_id.equal
+
+      let hash = Slot_id.hash
+    end)
+
 module Attestable_slots_watcher_table = struct
   (** A watcher used to stream newly-attestable slots for a given delegate (pkh).
       - [stream] is the push endpoint used by the DAL node to notify consumers
         (RPC layer / baker) that a specific [slot_id] has become attestable.
       - [num_subscribers] is the number of active consumers currently subscribed to
-        this pkh’s stream. *)
+        this pkh’s stream.
+      - [notified_slots] is an LRU set of slot ids already notified, so that we avoid
+        sending duplicates in the stream. *)
   type watcher = {
     stream : slot_id Lwt_watcher.input;
     mutable num_subscribers : int;
+    notified_slots : SlotIdSet.t;
   }
 
   let get_stream watcher = watcher.stream
@@ -782,14 +795,28 @@ module Attestable_slots_watcher_table = struct
 
   let create ~initial_size = Signature.Public_key_hash.Table.create initial_size
 
-  let get_or_init t pkh =
+  let get_or_init t pkh proto_params =
     match Signature.Public_key_hash.Table.find t pkh with
     | Some watcher ->
         watcher.num_subscribers <- watcher.num_subscribers + 1 ;
         watcher
     | None ->
+        (* We only need to remember slot ids from their publication level until the
+           attestation window closes ([attestation_lag] levels later). There can be
+           at most [number_of_slots] distinct slot ids per level across that window.
+           We allow a small (2 levels) additional window for safety. *)
+        let capacity =
+          match proto_params with
+          | Some {number_of_slots; attestation_lag; _} ->
+              number_of_slots * (attestation_lag + 2)
+          | None -> 320 (* 32 * (8 + 2) - hardcoded values as of protocol T *)
+        in
         let watcher =
-          {stream = Lwt_watcher.create_input (); num_subscribers = 1}
+          {
+            stream = Lwt_watcher.create_input ();
+            num_subscribers = 1;
+            notified_slots = SlotIdSet.create capacity;
+          }
         in
         Signature.Public_key_hash.Table.add t pkh watcher ;
         watcher
@@ -797,7 +824,10 @@ module Attestable_slots_watcher_table = struct
   let notify t pkh ~slot_id =
     match Signature.Public_key_hash.Table.find t pkh with
     | None -> ()
-    | Some watcher -> Lwt_watcher.notify watcher.stream slot_id
+    | Some watcher ->
+        if not @@ SlotIdSet.mem watcher.notified_slots slot_id then (
+          SlotIdSet.add watcher.notified_slots slot_id ;
+          Lwt_watcher.notify watcher.stream slot_id)
 
   let remove = Signature.Public_key_hash.Table.remove
 
