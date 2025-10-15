@@ -1,7 +1,7 @@
-From 5b7c443c326f1695f218bcfb7b5153ea228bf582 Mon Sep 17 00:00:00 2001
-From: Marina Polubelova <marina.polubelova@nomadic-labs.com>
-Date: Wed, 8 Oct 2025 16:46:52 +0200
-Subject: [PATCH 1/1] Patch alpha
+From 480ed0cc216a7057e29565588c3490787e5cff82 Mon Sep 17 00:00:00 2001
+From: Pierrick Couderc <pierrick.couderc@nomadic-labs.com>
+Date: Wed, 15 Oct 2025 14:18:06 +0200
+Subject: [PATCH 1/1] Profiler: patch Alpha
 
 ---
  src/proto_alpha/lib_protocol/apply.ml         | 17 ++--
@@ -16,7 +16,7 @@ Subject: [PATCH 1/1] Patch alpha
  9 files changed, 149 insertions(+), 62 deletions(-)
 
 diff --git a/src/proto_alpha/lib_protocol/apply.ml b/src/proto_alpha/lib_protocol/apply.ml
-index a394f7dff8..4918ee79ad 100644
+index 0078267eca..a301359869 100644
 --- a/src/proto_alpha/lib_protocol/apply.ml
 +++ b/src/proto_alpha/lib_protocol/apply.ml
 @@ -2497,7 +2497,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
@@ -32,7 +32,7 @@ index a394f7dff8..4918ee79ad 100644
    let gas_cost_for_sig_check =
      let algo =
        Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key_hash source
-@@ -2772,11 +2776,12 @@ let may_start_new_cycle ctxt =
+@@ -2774,11 +2778,12 @@ let may_start_new_cycle ctxt =
    match Level.dawn_of_a_new_cycle ctxt with
    | None -> return (ctxt, [], [])
    | Some last_cycle ->
@@ -51,7 +51,7 @@ index a394f7dff8..4918ee79ad 100644
  let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
    let open Lwt_result_syntax in
 diff --git a/src/proto_alpha/lib_protocol/baking.ml b/src/proto_alpha/lib_protocol/baking.ml
-index 8964820680..ef1a8909ab 100644
+index 1388bc3ea7..ae55ed9ae2 100644
 --- a/src/proto_alpha/lib_protocol/baking.ml
 +++ b/src/proto_alpha/lib_protocol/baking.ml
 @@ -110,7 +110,7 @@ type ordered_slots = {
@@ -197,10 +197,10 @@ index 7fea31a9fe..75d43668c3 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index e199b40739..342a0f410b 100644
+index 2eeb17665d..1202879935 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
-@@ -224,22 +224,38 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+@@ -221,31 +221,55 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
          (* Start of Alpha stitching. Comment used for automatic snapshot *)
      | Alpha ->
          let* ctxt =
@@ -223,7 +223,7 @@ index e199b40739..342a0f410b 100644
          return (ctxt, [])
          (* End of Alpha stitching. Comment used for automatic snapshot *)
          (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-     | S023 ->
+     | T024 ->
          let* ctxt =
 -          Storage.Tenderbake.First_level_of_protocol.update ctxt level
 +          (Storage.Tenderbake.First_level_of_protocol.update
@@ -241,9 +241,7 @@ index e199b40739..342a0f410b 100644
 +             {verbosity = Notice}
 +               "Sc_rollup_refutation_storage.migrate_clean_refutation_games"])
          in
-         let*! ctxt =
-           (* Decrease the voting period to one cycle on Shadownet *)
-@@ -254,10 +270,18 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+         return (ctxt, [])
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
    in
    let* ctxt =
@@ -265,10 +263,10 @@ index e199b40739..342a0f410b 100644
    in
    return ctxt
 diff --git a/src/proto_alpha/lib_protocol/raw_context.ml b/src/proto_alpha/lib_protocol/raw_context.ml
-index ac38078107..9fd7a2fb82 100644
+index c501d7fc16..00e5338465 100644
 --- a/src/proto_alpha/lib_protocol/raw_context.ml
 +++ b/src/proto_alpha/lib_protocol/raw_context.ml
-@@ -1817,12 +1817,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
+@@ -1628,12 +1628,12 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
    in
    let+ ctxt =

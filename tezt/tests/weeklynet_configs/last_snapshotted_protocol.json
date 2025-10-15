@@ -159,5 +159,6 @@
     "direct_ticket_spending_enable": false,
     "aggregate_attestation": true,
     "allow_tz4_delegate_enable": true,
-    "all_bakers_attest_activation_level": null
+    "all_bakers_attest_activation_threshold":
+      { "numerator": 1, "denominator": 2 }
 }

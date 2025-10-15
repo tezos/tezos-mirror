@@ -44,6 +44,10 @@
   octez-protocol-023-PtSeouLo-libs.client
   octez-protocol-023-PtSeouLo-libs.client.commands
   tezos-protocol-023-PtSeouLo.protocol
+  octez-protocol-024-PsU87LFi-libs.baking
+  octez-protocol-024-PsU87LFi-libs.client
+  octez-protocol-024-PsU87LFi-libs.client.commands
+  tezos-protocol-024-PsU87LFi.protocol
   octez-protocol-alpha-libs.baking
   octez-protocol-alpha-libs.client
   octez-protocol-alpha-libs.client.commands
@@ -59,7 +63,7 @@
   -open Tezos_store
   -open Tezos_store_shared
   -open Tezos_context_ops)
- (modules sigs tool_023_PtSeouLo tool_alpha))
+ (modules sigs tool_023_PtSeouLo tool_024_PsU87LFi tool_alpha))
 
 (executable
  (name simulation_scenario)

@@ -1,0 +1,8 @@
+{ parameter bool ;
+  storage unit ;
+  code { CAR ;
+         { IF {} { { UNIT ; FAILWITH } } } ;
+         UNIT ;
+         NIL operation ;
+         PAIR } }
+

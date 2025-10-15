@@ -18,8 +18,10 @@
   re
   tezos-protocol-genesis.embedded-protocol
   tezos-protocol-023-PtSeouLo.embedded-protocol
+  tezos-protocol-024-PsU87LFi.embedded-protocol
   tezos-protocol-alpha.embedded-protocol
   octez-protocol-023-PtSeouLo-libs.plugin-registerer
+  octez-protocol-024-PsU87LFi-libs.plugin-registerer
   octez-protocol-alpha-libs.plugin-registerer)
  (link_flags
   (:standard)

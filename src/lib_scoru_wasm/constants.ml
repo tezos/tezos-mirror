@@ -83,4 +83,6 @@ let proto_r022_name = "r022_022"
 
 let proto_s023_name = "s023_023"
 
+let proto_t024_name = "t024_024"
+
 let proto_alpha_name = "alpha_current"

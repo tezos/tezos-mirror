@@ -1,0 +1,54 @@
+
+./octez-client --wait none set consensus key for bootstrap1 to consensus_key --consensus-key-pop '[BLS_SIGNATURE]'
+Node is bootstrapped.
+Estimated gas: 1744.502 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000559
+    Expected counter: 1
+    Gas limit: 1845
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000559
+      payload fees(the block proposer) ....... +ꜩ0.000559
+    Update_consensus_key:
+      Public key hash: [PUBLIC_KEY_HASH]
+      Proof of possession: [BLS_SIGNATURE]
+      This consensus key update was successfully applied
+      Consumed gas: 1744.436
+
+
+./octez-client --wait none set companion key for bootstrap1 to companion_key --companion-key-pop '[BLS_SIGNATURE]'
+Node is bootstrapped.
+Estimated gas: 1744.502 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000559
+    Expected counter: 2
+    Gas limit: 1845
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000559
+      payload fees(the block proposer) ....... +ꜩ0.000559
+    Update_companion_key:
+      Public key hash: [PUBLIC_KEY_HASH]
+      Proof of possession: [BLS_SIGNATURE]
+      This companion key update was successfully applied
+      Consumed gas: 1744.436
+

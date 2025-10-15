@@ -1,0 +1,48 @@
+
+trace
+  - CAR (interp) @ location: 16
+    [ (Pair (Left (Pair True False)) None) ]
+  - CAR (entry) @ location: 16
+    [ (Pair (Left (Pair True False)) None) ]
+    - log/IF_LEFT (exit) @ location: 16
+      [ (Left (Pair True False)) ]
+  - IF_LEFT (entry) @ location: 17
+    [ (Left (Pair True False)) ]
+    - log/UNPAIR (exit) @ location: 17
+      [ (Pair True False) ]
+  - UNPAIR (entry) @ location: 19
+    [ (Pair True False) ]
+    - log/XOR (exit) @ location: 19
+      [ True
+        False ]
+  - XOR (entry) @ location: 20
+    [ True
+      False ]
+    - log/LEFT (exit) @ location: 20
+      [ True ]
+  - LEFT (entry) @ location: 21
+    [ True ]
+    - log/[halt] (exit) @ location: 21
+      [ (Left True) ]
+  - [halt] (entry) @ location: 28
+    [ (Left True) ]
+    - control: KCons
+    - log/SOME (exit) @ location: 17
+      [ (Left True) ]
+  - SOME (entry) @ location: 28
+    [ (Left True) ]
+    - log/NIL (exit) @ location: 28
+      [ (Some (Left True)) ]
+  - NIL (entry) @ location: 29
+    [ (Some (Left True)) ]
+    - log/PAIR (exit) @ location: 29
+      [ {}
+        (Some (Left True)) ]
+  - PAIR (entry) @ location: 31
+    [ {}
+      (Some (Left True)) ]
+    - log/[halt] (exit) @ location: 31
+      [ (Pair {} (Some (Left True))) ]
+  - [halt] (entry) @ location: 15
+    [ (Pair {} (Some (Left True))) ]
+    - control: KNil

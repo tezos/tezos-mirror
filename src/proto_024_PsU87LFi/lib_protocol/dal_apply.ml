@@ -1,0 +1,159 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(* Every function of this file should check the feature flag. *)
+
+open Alpha_context
+open Dal_errors
+
+let slot_of_int_e ~number_of_slots n =
+  let open Result_syntax in
+  match Dal.Slot_index.of_int_opt ~number_of_slots n with
+  | None ->
+      tzfail
+      @@ Dal_slot_index_above_hard_limit
+           {given = n; limit = number_of_slots - 1}
+  | Some slot_index -> return slot_index
+
+(* Use this function to select the pkh used in the DAL committee. As long as an
+   epoch does not span across multiple cycles, we could use as well the pkh of
+   the consensus key. *)
+let pkh_of_consensus_key (consensus_key : Consensus_key.pk) =
+  consensus_key.delegate
+
+let validate_attestation ctxt level slot consensus_key attestation =
+  let open Lwt_result_syntax in
+  let*? () = Dal.assert_feature_enabled ctxt in
+  let number_of_slots = Constants.dal_number_of_slots ctxt in
+  let*? max_index = number_of_slots - 1 |> slot_of_int_e ~number_of_slots in
+  let maximum_size = Dal.Attestation.expected_size_in_bits ~max_index in
+  let size = Dal.Attestation.occupied_size_in_bits attestation in
+  let*? () =
+    error_unless
+      Compare.Int.(size <= maximum_size)
+      (Dal_attestation_size_limit_exceeded {maximum_size; got = size})
+  in
+  let number_of_shards = Constants.dal_number_of_shards ctxt in
+  fail_when
+    Compare.Int.(Slot.to_int slot >= number_of_shards)
+    (let attester = pkh_of_consensus_key consensus_key in
+     Dal_data_availibility_attester_not_in_committee {attester; level; slot})
+
+let apply_attestation ctxt attestation ~tb_slot ~power =
+  let open Result_syntax in
+  let* () = Dal.assert_feature_enabled ctxt in
+  let ctxt =
+    Dal.only_if_incentives_enabled
+      ctxt
+      ~default:(fun ctxt -> ctxt)
+      (fun ctxt -> Dal.Attestation.record_attestation ctxt ~tb_slot attestation)
+  in
+  return
+    (Dal.Attestation.record_number_of_attested_shards ctxt attestation power)
+
+(* This function should fail if we don't want the operation to be
+   propagated over the L1 gossip network. Because this is a manager
+   operation, there are already checks to ensure the source of
+   operation has enough fees. Among the various checks, there are
+   checks that cannot fail unless the source of the operation is
+   malicious (or if there is a bug). In that case, it is better to
+   ensure fees will be taken. *)
+let validate_publish_commitment ctxt _operation =
+  Dal.assert_feature_enabled ctxt
+
+let apply_publish_commitment ctxt operation ~source =
+  let open Result_syntax in
+  let* ctxt = Gas.consume ctxt Dal_costs.cost_Dal_publish_commitment in
+  let number_of_slots = Constants.dal_number_of_slots ctxt in
+  let* ctxt, cryptobox = Dal.make ctxt in
+  let current_level = (Level.current ctxt).level in
+  let* slot_header =
+    Dal.Operations.Publish_commitment.slot_header
+      ~cryptobox
+      ~number_of_slots
+      ~current_level
+      operation
+  in
+  let* ctxt = Dal.Slot.register_slot_header ctxt slot_header ~source in
+  return (ctxt, slot_header)
+
+let record_participation ctxt delegate tb_slot ~dal_power dal_attestation =
+  let open Lwt_result_syntax in
+  let*? () = Dal.assert_feature_enabled ctxt in
+  Dal.only_if_incentives_enabled
+    ctxt
+    ~default:(fun ctxt -> return ctxt)
+    (fun ctxt ->
+      if Compare.Int.(dal_power = 0) then
+        (* the delegate is not in the DAL committee, there is no need to update
+           the participation *)
+        return ctxt
+      else
+        let number_of_slots_attested_by_delegate =
+          match
+            Slot.Map.find_opt tb_slot (Dal.Attestation.attestations ctxt)
+          with
+          | None -> 0
+          | Some delegate_attestation ->
+              Dal.Attestation.(
+                intersection dal_attestation delegate_attestation
+                |> number_of_attested_slots)
+        in
+        let number_of_protocol_attested_slots =
+          Dal.Attestation.number_of_attested_slots dal_attestation
+        in
+        Delegate.record_dal_participation
+          ctxt
+          ~delegate
+          ~number_of_slots_attested_by_delegate
+          ~number_of_protocol_attested_slots)
+
+let finalisation ctxt =
+  let open Lwt_result_syntax in
+  Dal.only_if_feature_enabled
+    ctxt
+    ~default:(fun ctxt -> return (ctxt, Dal.Attestation.empty))
+    (fun ctxt ->
+      let*! ctxt = Dal.Slot.finalize_current_slot_headers ctxt in
+      (* The fact that slots confirmation is done at finalization is very
+         important for the assumptions made by the Dal refutation game. In fact:
+         - {!Dal.Slot.finalize_current_slot_headers} updates the Dal skip list
+         at block finalization, by inserting newly confirmed slots;
+         - {!Sc_rollup.Game.initial}, called when applying a manager operation
+         that starts a refutation game, makes a snapshot of the Dal skip list
+         to use it as a reference if the refutation proof involves a Dal input.
+
+         If confirmed Dal slots are inserted into the skip list during operations
+         application, adapting how refutation games are made might be needed
+         to e.g.,
+         - use the same snapshotted skip list as a reference by L1 and rollup-node;
+         - disallow proofs involving pages of slots that have been confirmed at the
+           level where the game started.
+      *)
+      let number_of_slots = Constants.dal_number_of_slots ctxt in
+      let+ ctxt, attestation =
+        Dal.Slot.finalize_pending_slot_headers ctxt ~number_of_slots
+      in
+      (ctxt, attestation))

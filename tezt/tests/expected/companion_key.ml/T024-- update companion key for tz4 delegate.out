@@ -1,0 +1,27 @@
+
+./octez-client --wait none set companion key for delegate to companion_key
+Node is bootstrapped.
+Estimated gas: 3249.100 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000743
+    Expected counter: 5
+    Gas limit: 3350
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000743
+      payload fees(the block proposer) ....... +ꜩ0.000743
+    Update_companion_key:
+      Public key hash: [PUBLIC_KEY_HASH]
+      Proof of possession: [BLS_SIGNATURE]
+      This companion key update was successfully applied
+      Consumed gas: 3249.030
+

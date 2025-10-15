@@ -10,11 +10,13 @@ mainnet_kernel: etherlink/kernel_latest/kernel/tests/resources/mainnet_kernel.wa
 evm_kernel: evm_kernel.wasm
 accuser: octez-accuser
 accuser_psriotum: octez-accuser-PsRiotum
+accuser_tallinn: octez-accuser-PsU87LFi
 accuser_ptseoulo: octez-accuser-PtSeouLo
 accuser_alpha: octez-accuser-alpha
 admin_client: octez-admin-client
 agnostic_baker: octez-baker
 baker_psriotum: octez-baker-PsRiotum
+baker_psu87lfi: octez-baker-PsU87LFi
 baker_ptseoulo: octez-baker-PtSeouLo
 baker_alpha: octez-baker-alpha
 client: octez-client

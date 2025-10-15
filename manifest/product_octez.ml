@@ -6017,7 +6017,8 @@ end = struct
         not
           (String.for_all
              (function
-               | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' -> true | _ -> false)
+               | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '_' -> true
+               | _ -> false)
              name)
       then
         invalid_arg
@@ -6030,11 +6031,14 @@ end = struct
         | Dev | Other -> name
         | V number -> sf "%03d%c%s" number sep name
       in
-      let name_dash = make_full_name '-' name in
+      let short_hash = Str.replace_first (Str.regexp "^[0-9]+_") "" name in
+      let name_dash =
+        make_full_name '-' (String.map (function '_' -> '-' | c -> c) name)
+      in
       let name_underscore =
         make_full_name '_' (String.map (function '-' -> '_' | c -> c) name)
       in
-      {short_hash = name; number; name_dash; name_underscore}
+      {short_hash; number; name_dash; name_underscore}
 
     let v name number = make name (V number)
 
@@ -8128,6 +8132,8 @@ let hash = Protocol.hash
   let _022_PsRiotum = frozen (Name.v "PsRiotum" 022)
 
   let _023_PtSeouLo = active (Name.v "PtSeouLo" 023)
+
+  let _024_PsU87LFi = active (Name.dev "024_PsU87LFi")
 
   let alpha = active (Name.dev "alpha")
 

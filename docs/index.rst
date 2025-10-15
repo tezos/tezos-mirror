@@ -196,6 +196,7 @@ You may also access this whole documentation as a single `text file <https://oct
    :hidden:
 
    Seoul Protocol Reference <active/index>
+   T024 Protocol Reference <t024/index>
    Alpha Dev Protocol Reference <alpha/index>
 
 .. toctree::
@@ -223,6 +224,7 @@ You may also access this whole documentation as a single `text file <https://oct
 
    protocols/naming
    protocols/023_seoul
+   protocols/024_t024
    protocols/alpha
    protocols/history
 
