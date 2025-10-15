@@ -242,6 +242,25 @@ module Attestable_slots : sig
     int trace ->
     Types.slot_id ->
     (bool, [> Errors.not_found | Errors.other]) result Lwt.t
+
+  (** [subscribe ctxt ~pkh] opens a [Resto_directory.Answer] stream that yields
+      [Types.slot_id] values whenever a slot becomes attestable for [~pkh]. The stream
+      only emits items produced after subscription. *)
+  val subscribe :
+    t ->
+    pkh:Signature.public_key_hash ->
+    Types.slot_id Resto_directory.Answer.stream
+
+  (** Let M = migration level (last block of the old protocol). Then, for levels
+      P included in [M - lag + 1 .. M] (inclusively), we do not PUBLISH any slots,
+      because the corresponding attested levels would fall in the new protocol. *)
+  val drop_published_at_migration :
+    t -> published_level:int32 -> (bool, tztrace) result
+
+  (** [may_notify ctxt ~slot_id] checks, for each subscribed [pkh], whether all shards
+      assigned to [pkh] at the attestation level corresponding to [~slot_id] are available;
+      if so, it emits [~slot_id] to that [pkh]’s stream. *)
+  val may_notify : t -> slot_id:Types.slot_id -> unit tzresult Lwt.t
 end
 
 (** Module for P2P-related accessors.  *)

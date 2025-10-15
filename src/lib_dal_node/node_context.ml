@@ -47,6 +47,8 @@ type t = {
   disable_shard_validation : bool;
   ignore_pkhs : Signature.Public_key_hash.Set.t;
   mutable last_migration_level : int32;
+  mutable attestable_slots_watcher_table :
+    Types.Attestable_slots_watcher_table.t;
 }
 
 let init config ~network_name profile_ctxt cryptobox
@@ -74,6 +76,8 @@ let init config ~network_name profile_ctxt cryptobox
     disable_shard_validation;
     ignore_pkhs;
     last_migration_level = 0l;
+    attestable_slots_watcher_table =
+      Types.Attestable_slots_watcher_table.create ~initial_size:5;
   }
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
@@ -266,6 +270,11 @@ let get_disable_shard_validation ctxt = ctxt.disable_shard_validation
 
 let get_last_migration_level ctxt = ctxt.last_migration_level
 
+let get_attestation_lag ctxt ~level =
+  let open Result_syntax in
+  let+ params = get_proto_parameters ctxt ~level:(`Level level) in
+  Int32.of_int params.attestation_lag
+
 module Attestable_slots = struct
   let is_slot_attestable_with_traps shards_store traps_fraction pkh
       assigned_shard_indexes slot_id =
@@ -300,6 +309,95 @@ module Attestable_slots = struct
             in
             return_false)
       assigned_shard_indexes
+
+  let subscribe ctxt ~pkh =
+    let module T = Types.Attestable_slots_watcher_table in
+    let watcher = T.get_or_init ctxt.attestable_slots_watcher_table pkh in
+    let stream, stopper = Lwt_watcher.create_stream (T.get_stream watcher) in
+    let next () = Lwt_stream.get stream in
+    let shutdown () =
+      (* stop this stream, then possibly remove the whole watcher if last subscriber *)
+      Lwt_watcher.shutdown stopper ;
+      T.set_num_subscribers watcher (T.get_num_subscribers watcher - 1) ;
+      if T.get_num_subscribers watcher <= 0 then
+        T.remove ctxt.attestable_slots_watcher_table pkh
+    in
+    Resto_directory.Answer.{next; shutdown}
+
+  let drop_published_at_migration ctxt ~published_level =
+    let open Result_syntax in
+    let migration_level = ctxt.last_migration_level in
+    let* old_lag = get_attestation_lag ctxt ~level:published_level in
+    let* new_lag =
+      let attested_level = Int32.(add published_level old_lag) in
+      get_attestation_lag ctxt ~level:attested_level
+    in
+    return
+    @@ (old_lag > new_lag
+       && Int32.sub migration_level old_lag < published_level
+       && published_level <= migration_level)
+
+  let may_notify ctxt ~(slot_id : Types.slot_id) =
+    let open Lwt_result_syntax in
+    let module T = Types.Attestable_slots_watcher_table in
+    let attestable_slots_watcher_table = ctxt.attestable_slots_watcher_table in
+    let subscribers = T.elements attestable_slots_watcher_table in
+    if Seq.is_empty subscribers then return_unit
+    else
+      let published_level = slot_id.slot_level in
+      let*? lag = get_attestation_lag ctxt ~level:published_level in
+      let attested_level = Int32.(add published_level lag) in
+      let attestation_level = Int32.pred attested_level in
+      let*? should_drop = drop_published_at_migration ctxt ~published_level in
+      if should_drop then return_unit
+      else
+        let*? last_known_parameters =
+          get_proto_parameters ctxt ~level:(`Level attested_level)
+        in
+        let shards_store = Store.shards (get_store ctxt) in
+        (* For each subscribed pkh, if it has assigned shards for that level,
+         check if all those shards are available for [slot_id] and notify watcher,
+         accordingly. *)
+        let notify_if_attestable pkh =
+          (* For retrieving the assigned shard indexes, we consider the committee
+           at [attestation_level], because the (DAL) attestations in the blocks
+           at level [attested_level] refer to the predecessor level. *)
+          let* shard_indices =
+            fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
+          in
+          let number_of_assigned_shards = List.length shard_indices in
+          if number_of_assigned_shards = 0 then return_unit
+          else if published_level < 1l then return_unit
+          else
+            let* number_stored_shards =
+              Store.Shards.number_of_shards_available
+                shards_store
+                slot_id
+                shard_indices
+            in
+            let all_stored = number_stored_shards = number_of_assigned_shards in
+            if not last_known_parameters.incentives_enable then (
+              if all_stored then
+                T.notify attestable_slots_watcher_table pkh ~slot_id ;
+              return_unit)
+            else if not all_stored then return_unit
+            else
+              let* is_slot_attestable_with_traps =
+                is_slot_attestable_with_traps
+                  shards_store
+                  last_known_parameters.traps_fraction
+                  pkh
+                  shard_indices
+                  slot_id
+                |> Errors.to_option_tzresult
+              in
+              (match is_slot_attestable_with_traps with
+              | Some true ->
+                  T.notify attestable_slots_watcher_table pkh ~slot_id
+              | _ -> ()) ;
+              return_unit
+        in
+        Seq.iter_ep notify_if_attestable subscribers
 end
 
 module P2P = struct

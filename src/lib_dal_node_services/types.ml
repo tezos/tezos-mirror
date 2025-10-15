@@ -760,3 +760,46 @@ module Health = struct
            Format.fprintf fmt "(%s: %a)" name pp_status status))
       checks
 end
+
+module Attestable_slots_watcher_table = struct
+  (** A watcher used to stream newly-attestable slots for a given delegate (pkh).
+      - [stream] is the push endpoint used by the DAL node to notify consumers
+        (RPC layer / baker) that a specific [slot_id] has become attestable.
+      - [num_subscribers] is the number of active consumers currently subscribed to
+        this pkh’s stream. *)
+  type watcher = {
+    stream : slot_id Lwt_watcher.input;
+    mutable num_subscribers : int;
+  }
+
+  let get_stream watcher = watcher.stream
+
+  let get_num_subscribers watcher = watcher.num_subscribers
+
+  let set_num_subscribers watcher value = watcher.num_subscribers <- value
+
+  type t = watcher Signature.Public_key_hash.Table.t
+
+  let create ~initial_size = Signature.Public_key_hash.Table.create initial_size
+
+  let get_or_init t pkh =
+    match Signature.Public_key_hash.Table.find t pkh with
+    | Some watcher ->
+        watcher.num_subscribers <- watcher.num_subscribers + 1 ;
+        watcher
+    | None ->
+        let watcher =
+          {stream = Lwt_watcher.create_input (); num_subscribers = 1}
+        in
+        Signature.Public_key_hash.Table.add t pkh watcher ;
+        watcher
+
+  let notify t pkh ~slot_id =
+    match Signature.Public_key_hash.Table.find t pkh with
+    | None -> ()
+    | Some watcher -> Lwt_watcher.notify watcher.stream slot_id
+
+  let remove = Signature.Public_key_hash.Table.remove
+
+  let elements = Signature.Public_key_hash.Table.to_seq_keys
+end

@@ -409,3 +409,37 @@ module Health : sig
 
   val pp : Format.formatter -> t -> unit
 end
+
+module Attestable_slots_watcher_table : sig
+  type watcher
+
+  (** Returns the stream currently stored in the watcher. *)
+  val get_stream : watcher -> slot_id Lwt_watcher.input
+
+  (** Returns the number of subscribers to the stream currently stored in the watcher. *)
+  val get_num_subscribers : watcher -> shard_index
+
+  (** Sets the value for the number of subscribers to the stream in the watcher. *)
+  val set_num_subscribers : watcher -> shard_index -> unit
+
+  (** Table where we lazily create a watcher on first subscription for a pkh. When the last
+      subscriber calls [shutdown], the watcher is removed from the table to avoid leaks. *)
+  type t = watcher Signature.Public_key_hash.Table.t
+
+  (** [create t ~initial_size] creates an empty table of watchers with an initial
+      bucket size of [~initial_size] (which is an initial estimation). *)
+  val create : initial_size:int -> t
+
+  (** [get_or_init t pkh] returns (creating if absent) the watcher entry for [pkh] in [t]. *)
+  val get_or_init : t -> Signature.public_key_hash -> watcher
+
+  (** [notify t pkh ~slot_id] pushes [slot_id] to the stream for [pkh] if present. *)
+  val notify : t -> Signature.public_key_hash -> slot_id:slot_id -> unit
+
+  (** [remove t pkh] removes the watcher entry for [pkh] from [t] if present. *)
+  val remove : t -> Signature.public_key_hash -> unit
+
+  (** [elements t] returns the current set of pkhs that have an active monitoring
+      subscription in [t]. *)
+  val elements : t -> Signature.public_key_hash Seq.t
+end
