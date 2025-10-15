@@ -121,7 +121,7 @@ pub fn wasm_runtime_new_context() -> Pointer<Context> {
 
 #[ocaml::func]
 #[ocaml::sig(
-    "context -> string -> string option -> bool -> string -> Wasm_runtime_callbacks.scope -> Irmin_context.tree -> bytes -> int32 -> string list -> Irmin_context.tree"
+    "context -> string -> string option -> bool -> string -> Wasm_runtime_callbacks.scope -> bool -> Irmin_context.tree -> bytes -> int32 -> string list -> Irmin_context.tree"
 )]
 pub fn wasm_runtime_run(
     mut ctxt: Pointer<Context>,
@@ -130,6 +130,7 @@ pub fn wasm_runtime_run(
     native_execution: bool,
     entrypoint: OCamlString,
     otel_scope: OpenTelemetryScope,
+    trace_host_funs: bool,
     mut tree: EvmTree,
     rollup_address: SmartRollupAddress,
     level: u32,

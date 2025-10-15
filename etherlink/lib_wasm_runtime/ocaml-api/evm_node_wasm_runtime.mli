@@ -11,6 +11,7 @@ external wasm_runtime_new_context : unit -> context = "wasm_runtime_new_context"
 
 val wasm_runtime_run :
   scope:Wasm_runtime_callbacks.scope ->
+  trace_host_funs:bool ->
   context:context ->
   preimages_dir:string ->
   ?preimages_endpoint:string ->
