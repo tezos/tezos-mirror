@@ -98,6 +98,7 @@ impl TezlinkOperationGas {
     }
 }
 
+#[cfg(test)]
 impl Default for TezlinkOperationGas {
     /// Constructs [Gas] with [MAX_GAS_UNIT_AMOUNT] gas remaining.
     fn default() -> Self {
