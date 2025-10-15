@@ -221,8 +221,8 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt = Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt in
         let* ctxt = Address_registry_storage.init ctxt in
         return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
-        (* Start of Alpha stitching. Comment used for automatic snapshot *)
-    | Alpha ->
+        (* Start of Tallinn stitching. Comment used for automatic snapshot *)
+    | Tallinn ->
         let* ctxt =
           Storage.Tenderbake.First_level_of_protocol.update ctxt level
         in
@@ -231,7 +231,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
         return (ctxt, [])
-        (* End of Alpha stitching. Comment used for automatic snapshot *)
+        (* End of Tallinn stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
     | S023 ->
         let* ctxt =
