@@ -770,13 +770,13 @@ open struct
       ()
 
   let crypto_process_started =
-    declare_1
+    declare_0
       ~section:(section @ ["crypto"])
       ~prefix_name_with_section:true
       ~name:"crypto_process_started"
-      ~msg:"cryptographic child process started (pid: {pid})"
+      ~msg:"cryptographic child process started"
       ~level:Notice
-      ("pid", Data_encoding.int31)
+      ()
 
   let crypto_process_stopped =
     declare_0
@@ -1490,7 +1490,7 @@ let emit_store_upgraded ~old_version ~new_version =
 
 let emit_store_upgrade_error () = emit store_upgrade_error ()
 
-let emit_crypto_process_started ~pid = emit crypto_process_started pid
+let emit_crypto_process_started () = emit crypto_process_started ()
 
 let emit_crypto_process_stopped () = emit crypto_process_stopped ()
 

@@ -1000,8 +1000,8 @@ let run subcommand cli_options =
 
 let main_run subcommand cli_options =
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Tezos_base_unix.Event_loop.main_run ~process_name:"dal node" @@ fun () ->
-  wrap_with_error @@ run subcommand cli_options
+  Tezos_base_unix.Event_loop.main_run ~eio:true ~process_name:"dal node"
+  @@ fun () -> wrap_with_error @@ run subcommand cli_options
 
 let commands =
   let run subcommand data_dir config_file rpc_addr expected_pow listen_addr
