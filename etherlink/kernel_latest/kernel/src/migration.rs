@@ -514,11 +514,6 @@ fn migrate_to<Host: Runtime>(
                 Ok(MigrationStatus::None)
             }
         }
-        // ///////////////////////////////////////////////////////////////////////////////// //
-        // PREVIOUS MIGRATIONS SHOULD NOT BE CHANGED AS THEY HAVE BEEN DEPLOYED ON ETHERLINK //
-        //                                      MAINNET                                      //
-        //          REMEMBER TO MOVE THIS COMMENT ONCE NEW VERSIONS LAND ON MAINNET          //
-        // ///////////////////////////////////////////////////////////////////////////////// //
         StorageVersion::V34 => {
             // Dummy migration allowing to version-gate the gas limit
             // validation in the EVM node
@@ -557,7 +552,11 @@ fn migrate_to<Host: Runtime>(
         StorageVersion::V38 => {
             // Dummy migration for the new gas price
             Ok(MigrationStatus::Done)
-        }
+        } // ///////////////////////////////////////////////////////////////////////////////// //
+          // PREVIOUS MIGRATIONS SHOULD NOT BE CHANGED AS THEY HAVE BEEN DEPLOYED ON ETHERLINK //
+          //                                      MAINNET                                      //
+          //          REMEMBER TO MOVE THIS COMMENT ONCE NEW VERSIONS LAND ON MAINNET          //
+          // ///////////////////////////////////////////////////////////////////////////////// //
     }
 }
 
