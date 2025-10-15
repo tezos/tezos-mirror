@@ -153,7 +153,7 @@ module Reconstruction_process_worker : sig
     Cryptobox.t * Cryptobox.shards_proofs_precomputation ->
     (unit, error trace) result Lwt.t
 end = struct
-  let read_init_message_from_parent ic =
+  let welcome_handshake ic =
     let open Lwt_result_syntax in
     let* () =
       let* r = Process_worker.read_message ic in
@@ -247,7 +247,7 @@ end = struct
     let open Lwt_result_syntax in
     (* Read init message from parent with parameters required to initialize
        cryptobox *)
-    let* () = read_init_message_from_parent ic in
+    let* () = welcome_handshake ic in
     let*! () = Event.emit_crypto_process_started ~pid:(Unix.getpid ()) in
     let rec loop () =
       Lwt.catch
@@ -509,6 +509,19 @@ let start_amplificator node_ctxt =
   in
   return amplificator
 
+let welcome_handshake amplificator =
+  let open Lwt_result_syntax in
+  let oc = Process_worker.output_channel amplificator.process in
+  let* r = Process_worker.write_message oc welcome in
+  match r with
+  | `End_of_file ->
+      fail
+        [
+          Reconstruction_process_worker_error
+            "Impossible to write init message. Terminating.";
+        ]
+  | `Write_ok -> return_unit
+
 let make node_ctxt =
   let open Lwt_result_syntax in
   let* amplificator = start_amplificator node_ctxt in
@@ -536,18 +549,7 @@ let make node_ctxt =
         let () = Lwt.cancel amplificator_reply_receiver_job in
         Lwt.return_unit)
   in
-  let* () =
-    let oc = Process_worker.output_channel amplificator.process in
-    let* r = Process_worker.write_message oc welcome in
-    match r with
-    | `End_of_file ->
-        fail
-          [
-            Reconstruction_process_worker_error
-              "Impossible to write init message. Terminating.";
-          ]
-    | `Write_ok -> return_unit
-  in
+  let* () = welcome_handshake amplificator in
   return amplificator
 
 let enqueue_job_shards_proof amplificator commitment slot_id proto_parameters
