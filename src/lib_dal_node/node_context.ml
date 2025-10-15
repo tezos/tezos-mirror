@@ -266,6 +266,42 @@ let get_disable_shard_validation ctxt = ctxt.disable_shard_validation
 
 let get_last_migration_level ctxt = ctxt.last_migration_level
 
+module Attestable_slots = struct
+  let is_slot_attestable_with_traps shards_store traps_fraction pkh
+      assigned_shard_indexes slot_id =
+    let open Lwt_result_syntax in
+    List.for_all_es
+      (fun shard_index ->
+        let* {index = _; share} =
+          Store.Shards.read shards_store slot_id shard_index
+        in
+        (* Note: here [pkh] should identify the baker using its delegate key
+           (not the consensus key) *)
+        let trap_res = Trap.share_is_trap pkh share ~traps_fraction in
+        match trap_res with
+        | Ok true ->
+            let*! () =
+              Event.emit_cannot_attest_slot_because_of_trap
+                ~pkh
+                ~published_level:slot_id.slot_level
+                ~slot_index:slot_id.slot_index
+                ~shard_index
+            in
+            return_false
+        | Ok false -> return_true
+        | Error _ ->
+            (* assume the worst, that it is a trap *)
+            let*! () =
+              Event.emit_trap_check_failure
+                ~published_level:slot_id.Types.Slot_id.slot_level
+                ~slot_index:slot_id.slot_index
+                ~shard_index
+                ~delegate:pkh
+            in
+            return_false)
+      assigned_shard_indexes
+end
+
 module P2P = struct
   let connect {transport_layer; _} ?timeout point =
     Gossipsub.Transport_layer.connect transport_layer ?timeout point

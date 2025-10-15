@@ -418,40 +418,6 @@ module Profile_handlers = struct
         ~current_baker_level
     else Lwt.return_unit
 
-  let is_slot_attestable_with_traps shards_store traps_fraction pkh
-      assigned_shard_indexes slot_id =
-    let open Lwt_result_syntax in
-    List.for_all_es
-      (fun shard_index ->
-        let* {index = _; share} =
-          Store.Shards.read shards_store slot_id shard_index
-        in
-        (* Note: here [pkh] should identify the baker using its delegate key
-           (not the consensus key) *)
-        let trap_res = Trap.share_is_trap pkh share ~traps_fraction in
-        match trap_res with
-        | Ok true ->
-            let*! () =
-              Event.emit_cannot_attest_slot_because_of_trap
-                ~pkh
-                ~published_level:slot_id.slot_level
-                ~slot_index:slot_id.slot_index
-                ~shard_index
-            in
-            return_false
-        | Ok false -> return_true
-        | Error _ ->
-            (* assume the worst, that it is a trap *)
-            let*! () =
-              Event.emit_trap_check_failure
-                ~published_level:slot_id.Types.Slot_id.slot_level
-                ~slot_index:slot_id.slot_index
-                ~shard_index
-                ~delegate:pkh
-            in
-            return false)
-      assigned_shard_indexes
-
   let get_attestable_slots ctxt pkh attested_level () () =
     let get_attestable_slots ~shard_indices store last_known_parameters
         ~attested_level =
@@ -507,7 +473,7 @@ module Profile_handlers = struct
                   return all_stored
                 else if not all_stored then return false
                 else
-                  is_slot_attestable_with_traps
+                  Node_context.Attestable_slots.is_slot_attestable_with_traps
                     shards_store
                     last_known_parameters.traps_fraction
                     pkh

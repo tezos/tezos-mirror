@@ -227,6 +227,23 @@ val get_disable_shard_validation : t -> bool
     [Proto_plugins.get_plugin_and_parameters_for_level] for more clarifications. *)
 val get_last_migration_level : t -> int32
 
+module Attestable_slots : sig
+  (** [is_slot_attestable_with_traps shards_store traps_fraction pkh
+      assigned_shard_indexes slot_id] checks whether the slot identified by [slot_id]
+      is attestable for delegate [pkh] with respect to the traps mechanism.
+
+      The function iterates over the delegate’s [assigned_shard_indexes], reads each
+      corresponding stored shard share from [shards_store], and evaluates
+      [Trap.share_is_trap] on it using [traps_fraction].  *)
+  val is_slot_attestable_with_traps :
+    Store.Shards.t ->
+    Q.t ->
+    Signature.public_key_hash ->
+    int trace ->
+    Types.slot_id ->
+    (bool, [> Errors.not_found | Errors.other]) result Lwt.t
+end
+
 (** Module for P2P-related accessors.  *)
 module P2P : sig
   (** [connect t ?timeout point] initiates a connection to the point
