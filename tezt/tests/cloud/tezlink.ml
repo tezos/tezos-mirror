@@ -632,15 +632,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                     external_port;
                   }
           in
-          let internal_tzkt_api_port = proxy_internal_port tzkt_proxy in
-          let* () =
-            let () = toplog "Starting TzKT" in
-            init_tzkt
-              ~tzkt_api_port:internal_tzkt_api_port
-              ~agent:tezlink_sequencer_agent
-              ~tezlink_sandbox_endpoint
-              ~time_between_blocks:Cli.time_between_blocks
-          in
           let external_tzkt_api_endpoint =
             proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
           in
@@ -676,6 +667,15 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         match tzkt_proxy with
         | None -> unit
         | Some tzkt_proxy ->
+            let internal_tzkt_api_port = proxy_internal_port tzkt_proxy in
+            let* () =
+              let () = toplog "Starting TzKT" in
+              init_tzkt
+                ~tzkt_api_port:internal_tzkt_api_port
+                ~agent:tezlink_sequencer_agent
+                ~tezlink_sandbox_endpoint
+                ~time_between_blocks:Cli.time_between_blocks
+            in
             let* () =
               if Cli.faucet then
                 let () = toplog "Starting faucet" in
