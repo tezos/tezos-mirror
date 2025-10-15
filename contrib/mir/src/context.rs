@@ -12,6 +12,7 @@ use crate::ast::big_map::{BigMapId, InMemoryLazyStorage, LazyStorage, LazyStorag
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
 use crate::ast::Type;
+use crate::ast::View;
 use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
@@ -27,7 +28,6 @@ pub trait TypecheckingCtx<'a> {
     ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>>;
 
     /// Get key and value types of the map.
-    ///
     /// This returns None if the map with such ID is not present in the storage.
     fn big_map_get_type(&mut self, id: &BigMapId)
         -> Result<Option<(Type, Type)>, LazyStorageError>;
@@ -132,6 +132,9 @@ pub struct Ctx<'a> {
     /// also [Self::set_known_contracts]. Defaults to returning [None] for any
     /// address.
     pub lookup_entrypoints: Box<dyn Fn(&AddressHash) -> Option<Entrypoints>>,
+    /// A map of contract addresses to their views. It only
+    /// needs to work with smart contract, defaulting to [None] otherwise.
+    pub views: HashMap<AddressHash, HashMap<String, View<'a>>>,
     /// A function that maps public key hashes (i.e. effectively implicit
     /// account addresses) to their corresponding voting powers. Note that if
     /// you provide a custom function here, you also must define
@@ -232,6 +235,7 @@ impl Default for Ctx<'_> {
             voting_powers: Box::new(|_| 0u32.into()),
             total_voting_power: 0u32.into(),
             big_map_storage: InMemoryLazyStorage::new(),
+            views: HashMap::new(),
             operation_counter: 0,
             operation_group_hash: OperationHash::from_base58_check(
                 "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
