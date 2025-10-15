@@ -827,6 +827,12 @@ let monitor_heads ctx =
         let expected_level = Ethereum_types.Qty.next last_l2_head in
         let* () =
           unless Ethereum_types.Qty.(number = expected_level) @@ fun () ->
+          let*! () =
+            Event.(emit catch_up)
+              (Z.sub
+                 (Ethereum_types.Qty.to_z number)
+                 (Ethereum_types.Qty.to_z expected_level))
+          in
           catch_up
             ctx
             ~from_block:expected_level
