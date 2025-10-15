@@ -128,7 +128,8 @@ let () =
   register
     "before_merging"
     If.(on_tezos_namespace && merge_request && not merge_train)
-    ~jobs:(Code_verification.jobs Before_merging @ !Hooks.before_merging)
+    ~jobs:
+      (Code_verification.jobs Before_merging @ Cacio.get_before_merging_jobs ())
     ~description:
       "Lints code in merge requests, checks that it compiles and runs tests.\n\n\
        This pipeline is created on each push to a branch with an associated \
@@ -139,7 +140,7 @@ let () =
     "merge_train"
     ~auto_cancel:{on_job_failure = true; on_new_commit = false}
     If.(on_tezos_namespace && merge_request && merge_train)
-    ~jobs:(Code_verification.jobs Merge_train @ !Hooks.before_merging)
+    ~jobs:(Code_verification.jobs Merge_train @ Cacio.get_before_merging_jobs ())
     ~description:
       "A merge-train-specific version of 'before_merging'.\n\n\
        This pipeline contains the same set of jobs as 'before_merging' but \
@@ -153,7 +154,7 @@ let () =
   register
     "master_branch"
     If.(on_tezos_namespace && push && on_branch "master")
-    ~jobs:(Master_branch.jobs @ !Hooks.master)
+    ~jobs:(Master_branch.jobs @ Cacio.get_master_jobs ())
     ~description:
       "Publishes artifacts (docs, static binaries) from master on each merge.\n\n\
        This pipeline publishes the documentation at tezos.gitlab.io, builds \
@@ -209,7 +210,7 @@ let () =
           octez_smart_rollup_node_release_tag_re;
           Sdk_bindings_ci.Release.tag_re;
         ]
-      @ !Hooks.release_tags
+      @ Cacio.get_release_tag_rexes ()
     in
     If.(Predefined_vars.ci_commit_tag != null && not (has_any_tag release_tags))
   in
@@ -338,7 +339,7 @@ let () =
     ~jobs:
       ((Code_verification.jobs Schedule_extended_test
        |> List.map (with_interruptible false))
-      @ !Hooks.schedule_extended_test)
+      @ Cacio.get_schedule_extended_test_jobs ())
     ~description:
       "Scheduled, full version of 'before_merging', daily on 'master'.\n\n\
        This pipeline unconditionally executes all jobs in 'before_merging' \
@@ -480,7 +481,7 @@ let () =
          Tezos_ci.job_datadog_pipeline_trace;
          Release_tag.job_release_page ~test:true ();
        ]
-      @ !Hooks.global_test_publish_release_page)
+      @ Cacio.get_global_test_publish_release_page_jobs ())
     ~description:"Pipeline that updates and publishes the test release page." ;
   register
     "publish_release_page"
@@ -490,7 +491,7 @@ let () =
          Tezos_ci.job_datadog_pipeline_trace;
          Release_tag.job_release_page ~test:false ();
        ]
-      @ !Hooks.global_publish_release_page)
+      @ Cacio.get_global_publish_release_page_jobs ())
     ~description:"Pipeline that updates and publishes the release page."
 
 (** {2 Entry point of the generator binary} *)

@@ -651,6 +651,60 @@ module type COMPONENT_API = sig
   val register_dedicated_test_release_pipeline : (trigger * job) list -> unit
 end
 
+(* Some jobs are to be added to shared pipelines.
+   We must only call [convert_jobs] once we know all of them,
+   otherwise some jobs (such as [select_tezts]) could be added twice. *)
+let before_merging_jobs = ref []
+
+let get_before_merging_jobs () =
+  convert_jobs ~with_condition:true !before_merging_jobs
+
+let schedule_extended_test_jobs = ref []
+
+let get_schedule_extended_test_jobs () =
+  convert_jobs
+    ~interruptible_pipeline:false
+    ~with_condition:false
+    !schedule_extended_test_jobs
+
+let custom_extended_test_jobs = ref []
+
+let get_custom_extended_test_jobs () =
+  convert_jobs ~with_condition:false !custom_extended_test_jobs
+
+let master_jobs = ref []
+
+let get_master_jobs () = convert_jobs ~with_condition:false !master_jobs
+
+let global_release_jobs = ref []
+
+let get_global_release_jobs () =
+  convert_jobs ~with_condition:false !global_release_jobs
+
+let global_test_release_jobs = ref []
+
+let get_global_test_release_jobs () =
+  convert_jobs ~with_condition:false !global_test_release_jobs
+
+let global_scheduled_test_release_jobs = ref []
+
+let get_global_scheduled_test_release_jobs () =
+  convert_jobs ~with_condition:false !global_scheduled_test_release_jobs
+
+let global_publish_release_page_jobs = ref []
+
+let get_global_publish_release_page_jobs () =
+  convert_jobs ~with_condition:false !global_publish_release_page_jobs
+
+let global_test_publish_release_page_jobs = ref []
+
+let get_global_test_publish_release_page_jobs () =
+  convert_jobs ~with_condition:false !global_test_publish_release_page_jobs
+
+let release_tag_rexes = ref []
+
+let get_release_tag_rexes () = !release_tag_rexes
+
 (* [job_select_tezts] will be initialized further down. *)
 let job_select_tezts = ref None
 
@@ -1028,8 +1082,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           in
           (trigger, job)
     in
-    let jobs = convert_jobs ~with_condition:true jobs in
-    Tezos_ci.Hooks.before_merging := jobs @ !Tezos_ci.Hooks.before_merging
+    before_merging_jobs := jobs @ !before_merging_jobs
 
   let register_schedule_extended_test_jobs jobs =
     match Component.name with
@@ -1038,12 +1091,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           "register_schedule_extended_test_jobs can only be used from the \
            Shared component; regular components should define their own \
            schedule pipelines with register_scheduled_pipeline"
-    | None ->
-        let jobs =
-          convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
-        in
-        Tezos_ci.Hooks.schedule_extended_test :=
-          jobs @ !Tezos_ci.Hooks.schedule_extended_test
+    | None -> schedule_extended_test_jobs := jobs @ !schedule_extended_test_jobs
 
   let register_custom_extended_test_jobs jobs =
     match Component.name with
@@ -1051,14 +1099,9 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         failwith
           "register_custom_extended_test_jobs can only be used from the Shared \
            component to migrate old custom extended test jobs"
-    | None ->
-        let jobs = convert_jobs ~with_condition:false jobs in
-        Tezos_ci.Hooks.custom_extended_test :=
-          jobs @ !Tezos_ci.Hooks.custom_extended_test
+    | None -> custom_extended_test_jobs := jobs @ !custom_extended_test_jobs
 
-  let register_master_jobs jobs =
-    let jobs = convert_jobs ~with_condition:false jobs in
-    Tezos_ci.Hooks.master := jobs @ !Tezos_ci.Hooks.master
+  let register_master_jobs jobs = master_jobs := jobs @ !master_jobs
 
   (* Helper for other functions below, that is not exposed to users of this module.
      It is responsible for:
@@ -1088,31 +1131,24 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           scheduled && var "TZ_SCHEDULE_KIND" == str (make_name name)))
 
   let register_global_release_jobs jobs =
-    let jobs = convert_jobs ~with_condition:false jobs in
-    Tezos_ci.Hooks.global_release := jobs @ !Tezos_ci.Hooks.global_release
+    global_release_jobs := jobs @ !global_release_jobs
 
   let register_global_test_release_jobs jobs =
-    let jobs = convert_jobs ~with_condition:false jobs in
-    Tezos_ci.Hooks.global_test_release :=
-      jobs @ !Tezos_ci.Hooks.global_test_release
+    global_test_release_jobs := jobs @ !global_test_release_jobs
 
   let register_global_scheduled_test_release_jobs jobs =
-    let jobs = convert_jobs ~with_condition:false jobs in
-    Tezos_ci.Hooks.global_scheduled_test_release :=
-      jobs @ !Tezos_ci.Hooks.global_scheduled_test_release
+    global_scheduled_test_release_jobs :=
+      jobs @ !global_scheduled_test_release_jobs
 
   let register_global_publish_release_page_jobs jobs =
-    let jobs = convert_jobs ~with_condition:false jobs in
-    Tezos_ci.Hooks.global_publish_release_page :=
-      jobs @ !Tezos_ci.Hooks.global_publish_release_page
+    global_publish_release_page_jobs := jobs @ !global_publish_release_page_jobs
 
   let register_global_test_publish_release_page_jobs jobs =
-    let jobs = convert_jobs ~with_condition:false jobs in
-    Tezos_ci.Hooks.global_test_publish_release_page :=
-      jobs @ !Tezos_ci.Hooks.global_test_publish_release_page
+    global_test_publish_release_page_jobs :=
+      jobs @ !global_test_publish_release_page_jobs
 
   (* Use this function to get the release tag regular expression,
-     as it makes sure that it is registered with [Hooks.release_tags] only once. *)
+     as it makes sure that it is registered only once. *)
   let get_release_tag_rex =
     let tag = ref None in
     fun component_name ->
@@ -1123,7 +1159,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
             "/^" ^ String.lowercase_ascii component_name ^ "-v\\d+\\.\\d+$/"
           in
           tag := Some result ;
-          Tezos_ci.Hooks.release_tags := result :: !Tezos_ci.Hooks.release_tags ;
+          release_tag_rexes := result :: !release_tag_rexes ;
           result
 
   (* Wrap a function with this function to make sure

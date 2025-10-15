@@ -446,6 +446,45 @@ module Make (_ : COMPONENT) : COMPONENT_API
     Add a comment next to your job definitions to justify this reason. *)
 module Shared : COMPONENT_API
 
+(** {2 Listing registered jobs and more} *)
+
+(** Only call these functions after all jobs are registered.
+    They are meant to be called from [ci/bin/main.ml]
+    when registering the pipelines with CIAO. *)
+
+(** Jobs for [before_merging]. *)
+val get_before_merging_jobs : unit -> Tezos_ci.tezos_job list
+
+(** Jobs for [schedule_extended_test]. *)
+val get_schedule_extended_test_jobs : unit -> Tezos_ci.tezos_job list
+
+(** Jobs for [custom_extended_test]. *)
+val get_custom_extended_test_jobs : unit -> Tezos_ci.tezos_job list
+
+(** Jobs for [master]. *)
+val get_master_jobs : unit -> Tezos_ci.tezos_job list
+
+(** Jobs for the global release pipeline. *)
+val get_global_release_jobs : unit -> Tezos_ci.tezos_job list
+
+(** Jobs for the global test release pipeline. *)
+val get_global_test_release_jobs : unit -> Tezos_ci.tezos_job list
+
+(** Jobs for the global scheduled test release pipeline. *)
+val get_global_scheduled_test_release_jobs : unit -> Tezos_ci.tezos_job list
+
+(** Jobs for the publish release pages pipeline. *)
+val get_global_publish_release_page_jobs : unit -> Tezos_ci.tezos_job list
+
+(** Jobs for the publish release pages test pipeline. *)
+val get_global_test_publish_release_page_jobs : unit -> Tezos_ci.tezos_job list
+
+(** Regular expressions that match release tags.
+
+    To be used in [ci/bin/main.ml] to define the [non_release_tag]
+    and [non_release_tag_test] pipelines. *)
+val get_release_tag_rexes : unit -> string list
+
 (** {2 Future work} *)
 
 (** One idea would be to have Cacio provide a dedicated function to create Tezt jobs.

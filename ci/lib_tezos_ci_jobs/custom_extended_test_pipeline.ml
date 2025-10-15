@@ -43,7 +43,7 @@ let job_build_x86_64_extra_dev =
 let jobs () =
   (* The jobs we want to run are a subset of the Tezt jobs that run
      in the schedule_extended_test pipeline. They are defined in [tezt.ml]. *)
-  !Hooks.custom_extended_test
+  Cacio.get_custom_extended_test_jobs ()
   @ [
       job_build_x86_64_release;
       job_build_x86_64_extra_dev;
