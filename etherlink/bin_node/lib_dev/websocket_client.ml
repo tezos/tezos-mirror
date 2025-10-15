@@ -45,6 +45,11 @@ type 'a subscription = {
   unsubscribe : unit -> bool tzresult Lwt.t;
 }
 
+type timeout = {
+  timeout : float;
+  on_timeout : [`Retry of int | `Retry_forever | `Fail];
+}
+
 exception Timeout of float
 
 exception Connection_closed
@@ -466,7 +471,41 @@ let connect ?monitoring media uri =
 
 let disconnect {conn; _} = disconnect conn
 
-let send_jsonrpc_request client (request : JSONRPC.request) =
+let simple_write conn opcode content =
+  Websocket_lwt_unix.write conn (Websocket.Frame.create ~opcode ~content ())
+
+let retry_write_until ~timeout ~on_timeout response conn opcode content =
+  let open Lwt_syntax in
+  let rec retry on_timeout =
+    let* () = simple_write conn opcode content in
+    let timeout_p =
+      let+ () = Lwt_unix.sleep timeout in
+      Error `Timeout
+    in
+    let response =
+      let+ res = response in
+      Ok res
+    in
+    let* res = Lwt.choose [response; timeout_p] in
+    match res with
+    | Ok res ->
+        Lwt.cancel timeout_p ;
+        return res
+    | Error `Timeout -> (
+        match on_timeout with
+        | `Fail -> raise (Timeout timeout)
+        | `Retry n when n <= 0 -> raise (Timeout timeout)
+        | (`Retry _ | `Retry_forever) as r ->
+            let on_timeout =
+              match r with
+              | `Retry_forever -> `Retry_forever
+              | `Retry n -> `Retry (n - 1)
+            in
+            retry on_timeout)
+  in
+  retry on_timeout
+
+let send_jsonrpc_request client ?timeout (request : JSONRPC.request) =
   let open Lwt_syntax in
   let message = client.media.construct JSONRPC.request_encoding request in
   let opcode = if client.binary then Websocket.Frame.Opcode.Binary else Text in
@@ -475,12 +514,20 @@ let send_jsonrpc_request client (request : JSONRPC.request) =
     client.pending_requests
     request.id
     (Lwt.wakeup_later_result resolver) ;
-  let* () =
-    Websocket_lwt_unix.write
-      client.conn
-      (Websocket.Frame.create ~opcode ~content:message ())
+  let* response =
+    match timeout with
+    | None ->
+        let* () = simple_write client.conn opcode message in
+        response
+    | Some {timeout; on_timeout} ->
+        retry_write_until
+          ~timeout
+          ~on_timeout
+          response
+          client.conn
+          opcode
+          message
   in
-  let* response in
   Request_table.remove client.pending_requests request.id ;
   return response
 
@@ -491,8 +538,8 @@ type (_, _) call =
       -> ('input, 'output) call
 
 let send_jsonrpc : type input output.
-    t -> (input, output) call -> output tzresult Lwt.t =
- fun client (Call ((module M), input)) ->
+    t -> ?timeout:timeout -> (input, output) call -> output tzresult Lwt.t =
+ fun client ?timeout (Call ((module M), input)) ->
   let open Lwt_result_syntax in
   let id = new_id client in
   let request =
@@ -503,17 +550,17 @@ let send_jsonrpc : type input output.
         id = Some id;
       }
   in
-  let*! response = send_jsonrpc_request client request in
+  let*! response = send_jsonrpc_request client ?timeout request in
   match response with
   | Error e -> tzfail (Request_failed (request, e))
   | Ok response ->
       return @@ Data_encoding.Json.destruct M.output_encoding response
 
-let subscribe' client ~output_encoding (kind : Ethereum_types.Subscription.kind)
-    =
+let subscribe' client ?timeout ~output_encoding
+    (kind : Ethereum_types.Subscription.kind) =
   let open Lwt_result_syntax in
   let* subscription_id =
-    send_jsonrpc client (Call ((module Subscribe), kind))
+    send_jsonrpc client ?timeout (Call ((module Subscribe), kind))
   in
   let stream, push = Lwt_stream.create () in
   let push x =
@@ -552,9 +599,9 @@ let subscribe =
     ~output_encoding:
       (Ethereum_types.Subscription.output_encoding Transaction_object.encoding)
 
-let subscribe_filter client kind filter =
+let subscribe_filter client ?timeout kind filter =
   let open Lwt_result_syntax in
-  let+ {stream; unsubscribe} = subscribe client kind in
+  let+ {stream; unsubscribe} = subscribe ?timeout client kind in
   let stream =
     Lwt_stream.filter_map
       (function
@@ -564,8 +611,8 @@ let subscribe_filter client kind filter =
   in
   {stream; unsubscribe}
 
-let subscribe_newHeads client =
-  subscribe_filter client NewHeads @@ function
+let subscribe_newHeads ?timeout client =
+  subscribe_filter ?timeout client NewHeads @@ function
   | Ethereum_types.Subscription.NewHeads h -> Some h
   | _ -> None
 
@@ -574,25 +621,30 @@ let block_just_number_encoding =
   conv (fun n -> (n, ())) (fun (n, ()) -> n)
   @@ merge_objs (obj1 (req "number" Ethereum_types.quantity_encoding)) unit
 
-let subscribe_newHeadNumbers client =
-  subscribe' client NewHeads ~output_encoding:block_just_number_encoding
+let subscribe_newHeadNumbers ?timeout client =
+  subscribe'
+    ?timeout
+    client
+    NewHeads
+    ~output_encoding:block_just_number_encoding
 
-let subscribe_newPendingTransactions client =
-  subscribe_filter client NewPendingTransactions @@ function
+let subscribe_newPendingTransactions ?timeout client =
+  subscribe_filter ?timeout client NewPendingTransactions @@ function
   | Ethereum_types.Subscription.NewPendingTransactions tx -> Some tx
   | _ -> None
 
-let subscribe_syncing client =
-  subscribe_filter client Syncing @@ function
+let subscribe_syncing ?timeout client =
+  subscribe_filter ?timeout client Syncing @@ function
   | Ethereum_types.Subscription.Syncing s -> Some s
   | _ -> None
 
-let subscribe_logs ?address ?topics client =
-  subscribe_filter client (Logs {address; topics}) @@ function
+let subscribe_logs ?address ?topics ?timeout client =
+  subscribe_filter ?timeout client (Logs {address; topics}) @@ function
   | Ethereum_types.Subscription.Logs log -> Some log
   | _ -> None
 
-let subscribe_l1_l2_levels ?start_l1_level client =
-  subscribe_filter client (Etherlink (L1_L2_levels start_l1_level)) @@ function
+let subscribe_l1_l2_levels ?start_l1_level ?timeout client =
+  subscribe_filter ?timeout client (Etherlink (L1_L2_levels start_l1_level))
+  @@ function
   | Ethereum_types.Subscription.(Etherlink (L1_l2_levels l)) -> Some l
   | _ -> None
