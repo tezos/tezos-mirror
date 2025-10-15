@@ -1,0 +1,8 @@
+
+./octez-client --mode mockup run script michelson_test_scripts/mini_scenarios/groth16.tz on storage 0 and input 0xf7ef66f95c90b2f953eb0555af65f22095d4f54b40ea8c6dcc2014740e8662c16bb8786723
+Ill typed data: 1: 0 is not an expression of type unit
+At line 1 characters 0 to 1, value 0 is invalid for type unit.
+At line 1 characters 0 to 1, unexpected int, only a primitive
+can be used here.
+Fatal error:
+  error running script

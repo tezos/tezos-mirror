@@ -1,0 +1,222 @@
+
+./octez-client rpc list
+
+Available services:
+  
+  - POST /
+      JSONRPC endpoint 
+  - GET /configuration
+      configuration 
+  + evm/
+    - GET /evm/blueprint/<uint63>
+        Fetch the contents of a blueprint 
+    - GET /evm/blueprints
+        Watch for new blueprints 
+    - GET /evm/blueprints/range
+        Fetch a sequence of consecutive blueprints, starting from (and
+        containing at least the blueprint for) a given level 
+    - GET /evm/messages
+        Watch for new messages 
+    - GET /evm/smart_rollup_address
+        Get the address of the smart rollup hosting the chain 
+    - GET /evm/time_between_blocks
+        Get the maximum time between two blocks 
+    - GET /evm/v2/blueprint/<uint63>
+        Fetch the contents of a blueprint with a complete list of events,
+        including sequencer upgrades 
+    - GET /evm/v2/blueprints/range
+        Fetch a sequence of consecutive blueprints with a complete list of
+        events, including sequencer upgrades, starting from (and containing
+        at least the blueprint for) a given level 
+  - GET /health_check
+      Assess the health of the RPC server 
+  - GET /mode
+      Expose the operating mode of the EVM node 
+  + tezlink/
+    + chains/<chain_id>/
+      - /tezlink/chains/<chain_id>/blocks/<block_id> <dynamic>
+      - GET /tezlink/chains/<chain_id>/chain_id
+          The chain unique identifier. 
+      - GET /tezlink/chains/<chain_id>/is_bootstrapped
+          The bootstrap status of a chain 
+    - GET /tezlink/describe
+        RPCs documentation and input/output schema 
+    - POST /tezlink/injection/operation
+        Inject an operation in node and broadcast it. Returns the ID of the
+        operation. The `signedOperationContents` should be constructed using
+        contextual RPCs from the latest block and signed by the client. The
+        injection of the operation will apply it on the current mempool
+        context. This context may change at each operation injection or
+        operation reception from peers. By default, the RPC will wait for the
+        operation to be (pre-)validated before returning. However, if ?async
+        is true, the function returns immediately. The optional ?chain
+        parameter can be used to specify whether to inject on the test chain
+        or the main chain. 
+    - GET /tezlink/monitor/bootstrapped
+        Wait for the node to have synchronized its chain with a few peers
+        (configured by the node's administrator), streaming head updates that
+        happen during the bootstrapping process, and closing the stream at
+        the end. If the node was already bootstrapped, returns the current
+        head immediately. 
+    - GET /tezlink/monitor/heads/<chain_id>
+        Monitor all blocks that are successfully validated and applied by the
+        node and selected as the new head of the given chain. 
+    - GET /tezlink/version
+        Get information on the node version 
+  - GET /version
+      version 
+
+
+Dynamic parameter description:
+  
+  <block_id>
+      A block identifier. This can take one of the following
+      values:
+	1.Block-hash - Hash in Base58Check notation.
+	2.Alias - One of
+      the following:'genesis/ head/ caboose/ savepoint/
+      checkpoint'.
+	3.Block-level - index(integer) in the chain.
+	One can
+      also specify the relative positions of block with respect to above
+      three block identifiers. For ex. 'checkpoint~N' or checkpoint+N, where
+      N is an integer, denotes the Nth block before(~) or after (+) the
+      checkpoint. 
+  <chain_id>
+      A chain identifier. This is either a chain hash in Base58Check notation
+      or a one the predefined aliases: 'main', 'test'. 
+  uint63
+  uint63
+
+Warning:
+  Failed to acquire the protocol version from the node
+  Did not find service: GET http://[HOST]:[PORT]/chains/main/blocks/head/protocols
+
+
+./octez-client rpc list
+
+Available services:
+  
+  + chains/<chain_id>/
+    - /chains/<chain_id>/blocks/<block_id> <dynamic>
+    - GET /chains/<chain_id>/chain_id
+        The chain unique identifier. 
+    - GET /chains/<chain_id>/is_bootstrapped
+        The bootstrap status of a chain 
+  - POST /injection/operation
+      Inject an operation in node and broadcast it. Returns the ID of the
+      operation. The `signedOperationContents` should be constructed using
+      contextual RPCs from the latest block and signed by the client. The
+      injection of the operation will apply it on the current mempool
+      context. This context may change at each operation injection or
+      operation reception from peers. By default, the RPC will wait for the
+      operation to be (pre-)validated before returning. However, if ?async is
+      true, the function returns immediately. The optional ?chain parameter
+      can be used to specify whether to inject on the test chain or the main
+      chain. 
+  - GET /monitor/bootstrapped
+      Wait for the node to have synchronized its chain with a few peers
+      (configured by the node's administrator), streaming head updates that
+      happen during the bootstrapping process, and closing the stream at the
+      end. If the node was already bootstrapped, returns the current head
+      immediately. 
+  - GET /monitor/heads/<chain_id>
+      Monitor all blocks that are successfully validated and applied by the
+      node and selected as the new head of the given chain. 
+  - GET /version
+      Get information on the node version 
+
+
+Dynamic parameter description:
+  
+  <block_id>
+      A block identifier. This can take one of the following
+      values:
+	1.Block-hash - Hash in Base58Check notation.
+	2.Alias - One of
+      the following:'genesis/ head/ caboose/ savepoint/
+      checkpoint'.
+	3.Block-level - index(integer) in the chain.
+	One can
+      also specify the relative positions of block with respect to above
+      three block identifiers. For ex. 'checkpoint~N' or checkpoint+N, where
+      N is an integer, denotes the Nth block before(~) or after (+) the
+      checkpoint. 
+  <chain_id>
+      A chain identifier. This is either a chain hash in Base58Check notation
+      or a one the predefined aliases: 'main', 'test'. 
+
+
+./octez-client rpc list chains/main/blocks/head
+
+Available services:
+  
+  + chains/main/blocks/head/
+    + context/
+      - GET /chains/main/blocks/head/context/constants
+          All constants 
+      + contracts/<contract_id>/
+        - GET /chains/main/blocks/head/context/contracts/<contract_id>/balance
+            The spendable balance of a contract (in mutez), also known as
+            liquid balance. Corresponds to tez owned by the contract that are
+            neither staked, nor in unstaked requests, nor in frozen bonds.
+            Identical to the 'spendable' RPC. 
+        - GET /chains/main/blocks/head/context/contracts/<contract_id>/counter
+            Access the counter of a contract, if any. 
+        - GET /chains/main/blocks/head/context/contracts/<contract_id>/entrypoints
+            Return the list of entrypoints of the contract 
+        - GET /chains/main/blocks/head/context/contracts/<contract_id>/manager_key
+            Access the manager of an implicit contract. 
+        - POST /chains/main/blocks/head/context/contracts/<contract_id>/storage/normalized
+            Access the data of the contract and normalize it using the
+            requested unparsing mode. 
+      - GET /chains/main/blocks/head/context/issuance/expected_issuance
+          Returns the expected issued tez for the provided block and the next
+          'consensus_rights_delay' cycles (in mutez) 
+      - GET /chains/main/blocks/head/context/raw/json/cycle/<block_cycle>
+          Returns the cycle <i>. This RPC is a mock as there's no cycle
+          notion in Tezlink and doesn't represent what's in the context of a
+          block 
+    - GET /chains/main/blocks/head/hash
+        The block's hash, its unique identifier. 
+    - GET /chains/main/blocks/head/header
+        The whole block header. 
+    - GET /chains/main/blocks/head/header/shell
+        The shell-specific fragment of the block header. 
+    + helpers/
+      - GET /chains/main/blocks/head/helpers/current_level
+          Returns the level of the interrogated block, or the one of a block
+          located `offset` blocks after it in the chain. For instance, the
+          next block if `offset` is 1. The offset cannot be negative. 
+      - POST /chains/main/blocks/head/helpers/forge/operations
+          Forge an operation 
+      - POST /chains/main/blocks/head/helpers/preapply/operations
+          Simulate the application of the operations with the context of the
+          given block and return the result of each operation application. 
+      - POST /chains/main/blocks/head/helpers/scripts/simulate_operation
+          Simulate running an operation at some future moment (based on the
+          number of blocks given in the `latency` argument), and return the
+          operation application result. The result is the same as
+          run_operation except for the consumed gas, which depends on the
+          contents of the cache at that future moment. This RPC estimates
+          future gas consumption by trying to predict the state of the cache
+          using some heuristics. 
+    - GET /chains/main/blocks/head/operation_hashes
+        The hashes of all the operations included in the block. 
+    - GET /chains/main/blocks/head/operations/<list_offset>/<operation_offset>
+        The `m-th` operation in the `n-th` validation pass of the block. 
+    - GET /chains/main/blocks/head/protocols
+        Current and next protocol. 
+
+
+Dynamic parameter description:
+  
+  <operation_offset>
+      Index `m` of the requested operation in its validation pass. 
+  <list_offset>
+      Index `n` of the requested validation pass. 
+  <block_cycle>
+      A cycle integer 
+  <contract_id>
+      A contract identifier encoded in b58check. 
+

@@ -1,0 +1,12 @@
+{ parameter (pair int int) ;
+  storage unit ;
+  code { CAR ;
+         DUP ;
+         CAR ;
+         DIP { CDR } ;
+         COMPARE ;
+         { LT ; IF {} { { UNIT ; FAILWITH } } } ;
+         UNIT ;
+         NIL operation ;
+         PAIR } }
+

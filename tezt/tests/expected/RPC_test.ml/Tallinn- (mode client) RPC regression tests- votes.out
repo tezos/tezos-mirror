@@ -1,0 +1,78 @@
+
+./octez-client rpc get /chains/main/blocks/head/votes/ballot_list
+[]
+
+./octez-client rpc get /chains/main/blocks/head/votes/ballots
+{ "yay": "0", "nay": "0", "pass": "0" }
+
+./octez-client rpc get /chains/main/blocks/head/votes/current_period
+{ "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
+  "position": 1, "remaining": 2 }
+
+./octez-client rpc get /chains/main/blocks/head/votes/current_proposal
+null
+
+./octez-client rpc get /chains/main/blocks/head/votes/current_quorum
+5500
+
+./octez-client rpc get /chains/main/blocks/head/votes/listings
+[ { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" } ]
+
+./octez-client rpc get /chains/main/blocks/head/votes/proposals
+[ [ "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp", "4000000000000" ] ]
+
+./octez-client rpc get /chains/main/blocks/head/votes/successor_period
+{ "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
+  "position": 2, "remaining": 1 }
+
+./octez-client rpc get /chains/main/blocks/head/votes/total_voting_power
+"20000000000000"
+
+./octez-client rpc get /chains/main/blocks/head/votes/ballot_list
+[ { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "nay" },
+  { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "pass" },
+  { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "yay" } ]
+
+./octez-client rpc get /chains/main/blocks/head/votes/ballots
+{ "yay": "4000001617576", "nay": "4000000000000", "pass": "4000000000000" }
+
+./octez-client rpc get /chains/main/blocks/head/votes/current_period
+{ "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
+  "position": 0, "remaining": 3 }
+
+./octez-client rpc get /chains/main/blocks/head/votes/current_proposal
+"ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
+
+./octez-client rpc get /chains/main/blocks/head/votes/current_quorum
+5500
+
+./octez-client rpc get /chains/main/blocks/head/votes/listings
+[ { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000001617576" } ]
+
+./octez-client rpc get /chains/main/blocks/head/votes/proposals
+[]
+
+./octez-client rpc get /chains/main/blocks/head/votes/successor_period
+{ "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
+  "position": 1, "remaining": 2 }
+
+./octez-client rpc get /chains/main/blocks/head/votes/total_voting_power
+"20000001617576"

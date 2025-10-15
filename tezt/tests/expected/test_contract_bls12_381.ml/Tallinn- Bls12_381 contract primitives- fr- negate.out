@@ -1,0 +1,108 @@
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/neg_bls12_381_fr.tz on storage None and input 0x0100000000000000000000000000000000000000000000000000000000000000
+storage
+  (Some 0x00000000fffffffffe5bfeff02a4bd5305d8a10908d83933487d9d2953a7ed73)
+emitted operations
+  
+big_map diff
+  
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/neg_bls12_381_fr.tz on storage None and input 0x0000000000000000000000000000000000000000000000000000000000000000
+storage
+  (Some 0x0000000000000000000000000000000000000000000000000000000000000000)
+emitted operations
+  
+big_map diff
+  
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/neg_bls12_381_fr.tz on storage None and input 0x40d44207fdb54ce012d93f1490fbbb6e570eaa6fe88c673eccebcebeb45b5645
+storage
+  (Some 0xc12bbdf8014ab31fec82beeb72a801e5adc9f7991f4bd2f47b91ce6a9e4b972e)
+emitted operations
+  
+big_map diff
+  
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/neg_bls12_381_fr.tz on storage None and input 0xd7de118acb15cff6199ef15946ab6e0e01504cdc9a3058d3c2ed13e03819ba08
+storage
+  (Some 0x2a21ee7533ea3009e5bd0ca6bcf84e450488552d6da7e15f858f89491a8e336b)
+emitted operations
+  
+big_map diff
+  
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/neg_bls12_381_fr.tz on storage None and input 0x20e195b8a0fd4e0004035ebf96940f70152b1f5f6dbb70b2afaf06542610820c
+storage
+  (Some 0xe11e6a475e02b1fffa58a0406c0faee3efac82aa9a1cc98098cd96d52c976b67)
+emitted operations
+  
+big_map diff
+  
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/neg_bls12_381_fr.tz on storage None and input 0x92f4f87d685a2cdba5bf08086f0684f809de36487da7dced5332845308d20501
+storage
+  (Some 0x6f0b078296a5d324599cf5f7939d395bfbf96ac18a305d45f44a19d64ad5e772)
+emitted operations
+  
+big_map diff
+  
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/neg_bls12_381_fr.tz on storage None and input 0xf135547ce51c70ec01213b052874901a320be7db3bc0abed18db1fa94d8cd02b
+storage
+  (Some 0x10caab8319e38f13fd3ac3fada2f2d39d3ccba2dcc178e452fa27d80051b1d48)
+emitted operations
+  
+big_map diff
+  
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/neg_bls12_381_fr.tz on storage None and input 0xe73cbd206a9cfd5474d21453eaea8da48982e05656c2ff2f8b4e8bf0fb3ecb2d
+storage
+  (Some 0x1ac342df946302ab8a89e9ac18b92faf7b55c1b2b1153a03bd2e123957682246)
+emitted operations
+  
+big_map diff
+  
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/neg_bls12_381_fr.tz on storage None and input 0x336df5c8cb4b6d9a60a985d14f3a8456854cde52cae5c49eca2d7043ddc4e671
+storage
+  (Some 0xce920a3733b492659eb2782eb36939fd7f8bc3b63df274947d4f2de675e20602)
+emitted operations
+  
+big_map diff
+  
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/neg_bls12_381_fr.tz on storage None and input 0xc90765c96de9f5af397630eeb952d473a56d5c61a1ba281feb036d0b7617c61d
+storage
+  (Some 0x38f89a3691160a50c5e5cd114951e9df5f6a45a8661d11145d79301edd8f2756)
+emitted operations
+  
+big_map diff
+  
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/neg_bls12_381_fr.tz on storage None and input 0x61fe3395bba16a5fd4dd17f797407d40a8851da490c56994c4c87e25271b383b
+storage
+  (Some 0xa001cc6a435e95a02a7ee6086b6340135d5284657712d09e83b41e042c8cb538)
+emitted operations
+  
+big_map diff
+  
+
+
+./octez-client --mode mockup run script michelson_test_scripts/opcodes/neg_bls12_381_fr.tz on storage None and input 0x485b307a5af68f7f03151a90591c838f132ade82c2f4a216d40e0201d3ba2934
+storage
+  (Some 0xb9a4cf85a4097080fb46e46fa9873ac4f1adc38645e3961c746e9b2880ecc33f)
+emitted operations
+  
+big_map diff
+  
+
