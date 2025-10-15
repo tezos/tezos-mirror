@@ -16,7 +16,7 @@ using shell commands such as (:ref:`indicating the appropriate protocol <octez_c
 	The protocol-independent tools are documented :doc:`here <../shell/cli-commands>`.
 
 
-.. _client_manual_alpha:
+.. _client_manual_tallinn:
 
 Client manual
 =============
