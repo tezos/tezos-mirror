@@ -662,8 +662,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           Cli.verbose
           Cli.time_between_blocks
           tezlink_sequencer_agent
-      in
-      let* () =
+      and* () =
         match tzkt_proxy with
         | None -> unit
         | Some tzkt_proxy ->
@@ -675,8 +674,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~agent:tezlink_sequencer_agent
                 ~tezlink_sandbox_endpoint
                 ~time_between_blocks:Cli.time_between_blocks
-            in
-            let* () =
+            and* () =
               if Cli.faucet then
                 let () = toplog "Starting faucet" in
                 let faucet_account = Constant.bootstrap1 in
