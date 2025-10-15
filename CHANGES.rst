@@ -37,14 +37,8 @@ Signer
 Baker
 -----
 
-Agnostic Baker
---------------
-
 Accuser
 -------
-
-Agnostic Accuser
-----------------
 
 Proxy Server
 ------------
