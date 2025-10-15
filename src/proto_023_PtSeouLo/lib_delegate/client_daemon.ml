@@ -176,7 +176,11 @@ module Accuser = struct
           Protocol.hash
       in
       let* valid_blocks_stream, _ =
-        Client_baking_blocks.monitor_applied_blocks cctxt ~chains:[chain] ()
+        Client_baking_blocks.monitor_applied_blocks
+          ~next_protocols:(Some [Protocol.hash])
+          cctxt
+          ~chains:[chain]
+          ()
       in
       let canceler = Lwt_canceler.create () in
       let _ =
