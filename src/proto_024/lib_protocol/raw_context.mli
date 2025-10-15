@@ -36,11 +36,11 @@
     block but not persisted across blocks, always stored in
     RAM. The gas counter is here.
 
-    [Tallinn_context.t] is actually implemented as [Raw_context.t].
-    The difference is that Tallinn_context.mli does not expose this
-    so functions manipulating an Tallinn_context.t are guaranteed
+    [T024_context.t] is actually implemented as [Raw_context.t].
+    The difference is that T024_context.mli does not expose this
+    so functions manipulating an T024_context.t are guaranteed
     to only access the context through the storage modules
-    exposed in Tallinn_context.mli. These modules are in charge of
+    exposed in T024_context.mli. These modules are in charge of
     maintaining invariants over the structure of the context. *)
 
 (** {1 Errors} *)
@@ -95,8 +95,8 @@ val prepare :
 
 type previous_protocol =
   | Genesis of Parameters_repr.t
-  | Tallinn
-  | (* Tallinn predecessor *) S023 (* Tallinn predecessor *)
+  | T024
+  | (* T024 predecessor *) S023 (* T024 predecessor *)
 
 (** Prepares the context for the first block of the protocol.
 
