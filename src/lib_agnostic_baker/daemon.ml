@@ -113,7 +113,7 @@ module Make_daemon (Agent : AGENT) :
 
   type state = {
     node_endpoint : string;
-    mutable current_baker : baker option;
+    mutable current_baker : baker;
     mutable old_baker : baker_to_kill option;
     keep_alive : bool;
     command : command;
@@ -128,7 +128,7 @@ module Make_daemon (Agent : AGENT) :
     let open Lwt_result_syntax in
     let*! result = f () in
     match result with
-    | Ok () -> return_unit
+    | Ok res -> return res
     | Error (Lost_node_connection :: _ | Cannot_connect_to_node _ :: _) ->
         let* _level =
           Utils.retry
@@ -143,11 +143,12 @@ module Make_daemon (Agent : AGENT) :
         retry_on_disconnection ~emit node_addr f
     | Error trace -> fail trace
 
-  (** [run_thread ~protocol_hash ~cancel_promise ~init_sapling_params state] returns the
-      main running thread for the baker given its protocol [~protocol_hash] and
-      cancellation [~cancel_promise]. It can optionally initialise sapling parameters,
-      as requested by [~init_sapling_params]. *)
-  let run_thread ~protocol_hash ~cancel_promise ~init_sapling_params state =
+  (** [run_thread ~protocol_hash ~cancel_promise ~init_sapling_params cctxt
+      command] returns the main running thread for the baker given its protocol
+      [~protocol_hash] and cancellation [~cancel_promise]. It can optionally
+      initialise sapling parameters, as requested by [~init_sapling_params]. *)
+  let run_thread ~protocol_hash ~cancel_promise ~init_sapling_params cctxt
+      command =
     let plugin =
       match
         Protocol_plugins.proto_plugin_for_protocol
@@ -177,11 +178,12 @@ module Make_daemon (Agent : AGENT) :
       Tezos_sapling.Core.Validator.init_params ()
     else () ;
 
-    let agent_thread = Agent.run_command plugin state.cctxt state.command in
+    let agent_thread = Agent.run_command plugin cctxt command in
     Lwt.pick [agent_thread; cancel_promise]
 
-  (** [spawn_baker protocol_hash] spawns a new baker process for the given [protocol_hash]. *)
-  let spawn_baker state protocol_hash =
+  (** [spawn_baker cctxt command protocol_hash] spawns a new baker process for
+      the given [protocol_hash]. *)
+  let spawn_baker cctxt command protocol_hash =
     let open Lwt_result_syntax in
     let*! () = Events.(emit starting_agent) (Agent.name, protocol_hash) in
     let cancel_promise, canceller = Lwt.wait () in
@@ -190,7 +192,8 @@ module Make_daemon (Agent : AGENT) :
         ~protocol_hash
         ~cancel_promise
         ~init_sapling_params:Agent.init_sapling_params
-        state
+        cctxt
+        command
     in
     let*! () = Events.(emit agent_running) (Agent.name, protocol_hash) in
     return {protocol_hash; process = {thread; canceller}}
@@ -201,11 +204,6 @@ module Make_daemon (Agent : AGENT) :
   let hot_swap_baker ~state ~current_protocol_hash ~next_protocol_hash
       ~level_to_kill_old_baker =
     let open Lwt_result_syntax in
-    let* current_baker =
-      match state.current_baker with
-      | Some baker -> return baker
-      | None -> tzfail (Missing_current_agent Agent.name)
-    in
     let next_proto_status = Parameters.protocol_status next_protocol_hash in
     let*! () =
       Events.(emit protocol_encountered) (next_proto_status, next_protocol_hash)
@@ -215,10 +213,10 @@ module Make_daemon (Agent : AGENT) :
         (Agent.name, current_protocol_hash, level_to_kill_old_baker)
     in
     state.old_baker <-
-      Some {baker = current_baker; level_to_kill = level_to_kill_old_baker} ;
-    state.current_baker <- None ;
-    let* new_baker = spawn_baker state next_protocol_hash in
-    state.current_baker <- Some new_baker ;
+      Some
+        {baker = state.current_baker; level_to_kill = level_to_kill_old_baker} ;
+    let* new_baker = spawn_baker state.cctxt state.command next_protocol_hash in
+    state.current_baker <- new_baker ;
     return_unit
 
   (** [maybe_kill_old_baker state node_addr] checks whether the [old_baker] process
@@ -313,11 +311,7 @@ module Make_daemon (Agent : AGENT) :
                ~node_addr
              [@profiler.record_s {verbosity = Notice} "get_next_protocol_hash"])
           in
-          let* current_protocol_hash =
-            match state.current_baker with
-            | None -> tzfail (Missing_current_agent Agent.name)
-            | Some baker -> return baker.protocol_hash
-          in
+          let current_protocol_hash = state.current_baker.protocol_hash in
           let* () =
             if
               not (Protocol_hash.equal current_protocol_hash next_protocol_hash)
@@ -344,26 +338,21 @@ module Make_daemon (Agent : AGENT) :
     it propagates any error that can appear. *)
   let baker_thread ~state =
     let open Lwt_result_syntax in
-    let*! res =
-      match state.current_baker with
-      | Some baker -> baker.process.thread
-      | None -> return_unit
-    in
+    let*! res = state.current_baker.process.thread in
     match res with
     | Ok () -> return_unit
     | Error err -> fail (Agent_process_error Agent.name :: err)
 
   (* ---- Agnostic Baker Bootstrap ---- *)
 
-  (** [may_start_initial_baker state] recursively waits for an [active] protocol
-    and spawns a baker for it. If the protocol is [frozen] (not [active] anymore), it
-    waits for a head with an [active] protocol. *)
-  let may_start_initial_baker state =
+  (** [may_start_initial_baker cctxt command ~node_addr] recursively waits
+      for an [active] protocol and spawns a baker for it. If the protocol is
+      [frozen] (not [active] anymore), it waits for a head with an [active]
+      protocol. *)
+  let may_start_initial_baker cctxt command ~node_addr =
     let open Lwt_result_syntax in
     let rec may_start ?last_known_proto ~head_stream () =
-      let* protocol_hash =
-        Rpc_services.get_next_protocol_hash ~node_addr:state.node_endpoint
-      in
+      let* protocol_hash = Rpc_services.get_next_protocol_hash ~node_addr in
       let proto_status = Parameters.protocol_status protocol_hash in
       let*! () =
         match last_known_proto with
@@ -375,9 +364,8 @@ module Make_daemon (Agent : AGENT) :
       in
       match proto_status with
       | Active ->
-          let* current_baker = spawn_baker state protocol_hash in
-          state.current_baker <- Some current_baker ;
-          return_unit
+          let* current_baker = spawn_baker cctxt command protocol_hash in
+          return current_baker
       | Frozen -> (
           let* head_stream =
             match head_stream with
@@ -388,7 +376,7 @@ module Make_daemon (Agent : AGENT) :
                     (proto_status, protocol_hash)
                 in
                 let*! () = Events.(emit waiting_for_active_protocol) () in
-                monitor_heads ~node_addr:state.node_endpoint
+                monitor_heads ~node_addr
           in
           let*! v = Lwt_stream.get head_stream in
           match v with
@@ -422,31 +410,31 @@ module Make_daemon (Agent : AGENT) :
 
   let run ~keep_alive ~command cctxt =
     let open Lwt_result_syntax in
-    let state =
-      {
-        node_endpoint = Uri.to_string cctxt#base;
-        current_baker = None;
-        old_baker = None;
-        keep_alive;
-        command;
-        cctxt;
-      }
-    in
     () [@profiler.overwrite may_start_profiler cctxt#get_base_dir] ;
-    let node_addr = state.node_endpoint in
+    let node_addr = Uri.to_string cctxt#base in
     let*! () = Events.(emit starting_daemon) Agent.name in
     let _ccid =
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
           let*! () = Events.(emit stopping_daemon) Agent.name in
           Lwt.return_unit)
     in
-    let* () =
-      if state.keep_alive then
+    let* current_baker =
+      if keep_alive then
         retry_on_disconnection
           ~emit:(Events.emit Events.cannot_connect)
           node_addr
-          (fun () -> may_start_initial_baker state)
-      else may_start_initial_baker state
+          (fun () -> may_start_initial_baker cctxt command ~node_addr)
+      else may_start_initial_baker cctxt command ~node_addr
+    in
+    let state =
+      {
+        node_endpoint = node_addr;
+        current_baker;
+        old_baker = None;
+        keep_alive;
+        command;
+        cctxt;
+      }
     in
     let monitor_voting_periods () =
       let* head_stream = monitor_heads ~node_addr in
