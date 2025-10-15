@@ -128,8 +128,8 @@ impl CodeStorage {
             let number_reference = code.decrement_code_usage(host)?;
             // This was the last smart contract using this code
             if number_reference == 0 {
-                host.store_delete_value(&concat(&code.path, &CODE_PATH)?)?;
-                host.store_delete_value(&concat(&code.path, &REFERENCE_PATH)?)?;
+                host.store_delete(&concat(&code.path, &CODE_PATH)?)?;
+                host.store_delete(&concat(&code.path, &REFERENCE_PATH)?)?;
             };
         };
         Ok(())
