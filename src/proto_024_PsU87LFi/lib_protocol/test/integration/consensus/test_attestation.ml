@@ -670,7 +670,8 @@ let test_attester_with_no_assigned_shards () =
   let n = 10 in
   let bootstrap_balances = bal_low :: Stdlib.List.init n (fun _ -> bal_high) in
   let dal =
-    Tezos_protocol_tallinn_parameters.Default_parameters.constants_sandbox.dal
+    Tezos_protocol_024_PsU87LFi_parameters.Default_parameters.constants_sandbox
+      .dal
   in
   let dal =
     (* We need to take a small number of shards to be sure there is a
