@@ -1,0 +1,121 @@
+{
+  "contents": [
+    {
+      "kind": "origination",
+      "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+      "fee": "343",
+      "counter": "1",
+      "gas_limit": "679",
+      "storage_limit": "323",
+      "balance": "1000000",
+      "script": {
+        "code": [
+          {
+            "prim": "parameter",
+            "args": [
+              {
+                "prim": "string"
+              }
+            ]
+          },
+          {
+            "prim": "storage",
+            "args": [
+              {
+                "prim": "string"
+              }
+            ]
+          },
+          {
+            "prim": "code",
+            "args": [
+              [
+                {
+                  "prim": "CAR"
+                },
+                {
+                  "prim": "NIL",
+                  "args": [
+                    {
+                      "prim": "operation"
+                    }
+                  ]
+                },
+                {
+                  "prim": "PAIR"
+                }
+              ]
+            ]
+          }
+        ],
+        "storage": {
+          "string": "hello"
+        }
+      },
+      "metadata": {
+        "balance_updates": [
+          {
+            "kind": "contract",
+            "contract": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+            "change": "-343",
+            "origin": "block"
+          },
+          {
+            "kind": "accumulator",
+            "category": "block fees",
+            "change": "343",
+            "origin": "block"
+          }
+        ],
+        "operation_result": {
+          "status": "applied",
+          "balance_updates": [
+            {
+              "kind": "contract",
+              "contract": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+              "change": "-11500",
+              "origin": "block"
+            },
+            {
+              "kind": "burned",
+              "category": "storage fees",
+              "change": "11500",
+              "origin": "block"
+            },
+            {
+              "kind": "contract",
+              "contract": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+              "change": "-64250",
+              "origin": "block"
+            },
+            {
+              "kind": "burned",
+              "category": "storage fees",
+              "change": "64250",
+              "origin": "block"
+            },
+            {
+              "kind": "contract",
+              "contract": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+              "change": "-1000000",
+              "origin": "block"
+            },
+            {
+              "kind": "contract",
+              "contract": "KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe",
+              "change": "1000000",
+              "origin": "block"
+            }
+          ],
+          "originated_contracts": [
+            "KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe"
+          ],
+          "consumed_milligas": "578755",
+          "storage_size": "46",
+          "paid_storage_size_diff": "46"
+        }
+      }
+    }
+  ],
+  "signature": "sigjUkDaz4jjfp7EvsPGryCBoGKZ1B3FiAn4kX9adpwmcKUEpobhkNJjbYqjxB1mgBe7wGGGQp4T8MPzithFpbBMCN2L5RUa"
+}
