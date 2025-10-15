@@ -25,13 +25,12 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Tallinn | S023 | Alpha
+type t = T024 | S023 | Alpha
 
-let all = [Tallinn; S023; Alpha]
+let all = [T024; S023; Alpha]
 
 let encoding =
-  Data_encoding.string_enum
-    [("alpha", Alpha); ("tallinn", Tallinn); ("s023", S023)]
+  Data_encoding.string_enum [("alpha", Alpha); ("t024", T024); ("s023", S023)]
 
 type constants =
   | Constants_sandbox
@@ -45,13 +44,13 @@ let constants_to_string = function
   | Constants_mainnet_with_chain_id -> "mainnet-with-chain-id"
   | Constants_test -> "test"
 
-let name = function Alpha -> "Alpha" | Tallinn -> "Tallinn" | S023 -> "S023"
+let name = function Alpha -> "Alpha" | T024 -> "T024" | S023 -> "S023"
 
-let number = function S023 -> 023 | Tallinn -> 024 | Alpha -> 025
+let number = function S023 -> 023 | T024 -> 024 | Alpha -> 025
 
 let directory = function
   | Alpha -> "proto_alpha"
-  | Tallinn -> "proto_tallinn"
+  | T024 -> "proto_024_PsU87LFi"
   | S023 -> "proto_023_PtSeouLo"
 
 (* Test tags must be lowercase. *)
@@ -60,7 +59,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | S023 -> "PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh"
-  | Tallinn -> "Psbm9fXge5noCDc2pcwtjnUs4FuAuxmRh6ts8kyPk3CpJVFFQhN"
+  | T024 -> "PsU87LFiQKMFspfnufwsWQ4NSWwR3fH8M2xneJEyAj61M6NNLew"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let short_hash protocol_hash =
@@ -83,7 +82,6 @@ let parameter_file ?(constants = default_constants) protocol =
 
 let encoding_prefix = function
   | Alpha -> "alpha"
-  | Tallinn -> "tallinn"
   | p -> sf "%03d-%s" (number p) (String.sub (hash p) 0 8)
 
 type parameter_overrides =
@@ -258,8 +256,8 @@ let write_parameter_file :
   Lwt.return output_file
 
 let previous_protocol = function
-  | Alpha -> Some Tallinn
-  | Tallinn -> Some S023
+  | Alpha -> Some T024
+  | T024 -> Some S023
   | S023 -> None
 
 let has_predecessor p = previous_protocol p <> None
