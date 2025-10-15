@@ -17,14 +17,16 @@ RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
 NAMED_PROTOS  = seoul
-PROTOCOLS     = $(NAMED_PROTOS) alpha
+PROTOCOLS     = $(NAMED_PROTOS) alpha tallinn
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
 seoul_long     = PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh
+tallinn_long   = Psbm9fXge5noCDc2pcwtjnUs4FuAuxmRh6ts8kyPk3CpJVFFQhN
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 seoul_short    = PtSeouLo
+tallinn_short = tallinn
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -141,6 +143,7 @@ redirectcheck:
 # - on each other protocol including alpha, also checking label defs (option -l)
 .PHONY: xrefscheck
 xrefscheck:
+	$(CHECKXREFS) -l tallinn
 	$(CHECKXREFS) seoul
 	$(CHECKXREFS) -l alpha
 
@@ -187,7 +190,7 @@ user/default-acl.json: $(RPCDOCEXE)
 
 .PHONY: rpc
 rpc: user/default-acl.json shell/rpc.rst \
-	alpha/rpc.rst
+	alpha/rpc.rst tallinn/rpc.rst
 
 # To be triggered manually when needed
 .PHONY: rpc-protocols
@@ -313,6 +316,6 @@ fmt: black
 clean:
 	@-rm -Rf "$(BUILDDIR)" "$(BUILDDIRTXT)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
-	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv $(BUILDDIR)/octezdoc.txt
-	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html seoul/octez-*.html
+	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst tallinn/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv $(BUILDDIR)/octezdoc.txt
+	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html tallinn/octez-*.html seoul/octez-*.html
 	@-rm -Rf ../openapi-tmp
