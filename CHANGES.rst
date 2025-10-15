@@ -87,6 +87,10 @@ Data Availability Layer (DAL)
 DAL node
 ~~~~~~~~
 
+- **Breaking change** The ``/levels/<slot_level>/slots/<slot_index>/status``
+  RPC now answers with ``unpublished`` status for unpublished slots instead
+  of a 404 empty response. (MR :gl:`!19613`)
+
 - Added RPC ``GET /profiles/{pkh}/monitor/attestable_slots`` to open a monitoring
   stream that emits a JSON ``slot_id`` each time a slot becomes attestable for the
   given public key hash (``pkh``). A slot id is emitted when all shards assigned to
