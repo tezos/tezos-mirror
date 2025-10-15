@@ -1898,14 +1898,17 @@ let check_get_commitment dal_node ~slot_level check_result slots_info =
     slots_info
 
 let get_commitment_succeeds expected_commitment response =
-  let commitment =
-    JSON.(parse ~origin:__LOC__ response.RPC_core.body |> as_string)
-  in
-  Check.(commitment = expected_commitment)
-    Check.string
-    ~error_msg:
-      "The value of a stored commitment should match the one computed locally \
-       (current = %L, expected = %R)"
+  match response.RPC_core.code with
+  | 200 ->
+      let commitment =
+        JSON.(parse ~origin:__LOC__ response.RPC_core.body |> as_string)
+      in
+      Check.(commitment = expected_commitment)
+        Check.string
+        ~error_msg:
+          "The value of a stored commitment should match the one computed \
+           locally (current = %L, expected = %R)"
+  | code -> Test.fail ~__LOC__ "Unexpected HTTP response code %d" code
 
 let get_commitment_not_found _commit r =
   RPC_core.check_string_response ~code:404 r
@@ -1935,25 +1938,10 @@ let check_stored_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
 
 let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
     =
-  let test (slot_index, commitment) =
-    let* commitment_is_stored =
-      let rpc = Dal_RPC.get_level_slot_commitment ~slot_level ~slot_index in
-      let* response = Dal_RPC.call_raw dal_node rpc in
-      match response.code with
-      | 200 ->
-          let published_commitment =
-            rpc.decode @@ JSON.parse ~origin:"RPC response" response.body
-          in
-          return (commitment = published_commitment)
-      | _ -> return false
-    in
-    match (commitment_is_stored, expected_status) with
-    | false, None -> unit
-    | true, None ->
-        Test.fail
-          ~__LOC__
-          "It was expected that the given commitment is not stored, but it is."
-    | true, Some expected_status ->
+  let test (slot_index, _commitment) =
+    match expected_status with
+    | None -> unit
+    | Some expected_status ->
         let* status =
           Dal_RPC.(
             call dal_node @@ get_level_slot_status ~slot_level ~slot_index)
@@ -1965,10 +1953,6 @@ let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
             "The value of the fetched status should match the expected one \
              (current = %L, expected = %R)" ;
         unit
-    | false, Some _ ->
-        Test.fail
-          ~__LOC__
-          "It was expected that the given commitment is stored, but it is not."
   in
   Lwt_list.iter_s test slots_info
 
@@ -2050,38 +2034,10 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   let ok = [slot0; slot1; slot2_b] in
   let ko = slot3 :: slot4 :: List.map (fun (i, c) -> (i + 100, c)) ok in
   let* () =
-    (* There are 3 published slots: slot0, slot1, and slot2_b *)
-    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
+    (* There are 3 published slots: slot0, slot1, and slot2_b. But the attestation
+       period is not over, so they are not yet present in the skip-list. *)
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
-  let* slot_headers =
-    Lwt_list.filter_map_s
-      (fun slot_index ->
-        let commitment_rpc =
-          Dal_RPC.get_level_slot_commitment ~slot_level:pub_level ~slot_index
-        in
-        let* response = Dal_RPC.call_raw dal_node commitment_rpc in
-        match response.code with
-        | 200 ->
-            let commitment =
-              commitment_rpc.decode
-              @@ JSON.parse ~origin:"RPC response" response.body
-            in
-            let* status =
-              Dal_RPC.(
-                call dal_node
-                @@ get_level_slot_status ~slot_level:pub_level ~slot_index)
-            in
-            if status = "waiting_attestation" then some (slot_index, commitment)
-            else none
-        | 404 -> none
-        | code -> Test.fail ~__LOC__ "Unexpected HTTP response code %d" code)
-      (List.init number_of_slots Fun.id)
-  in
-  Check.(slot_headers = ok)
-    Check.(list (tuple2 int string))
-    ~error_msg:
-      "Published header is different from stored header (current = %L, \
-       expected = %R)" ;
   let check_slot_status ?expected_status l =
     check_slot_status ?expected_status dal_node ~slot_level:pub_level l
   in
@@ -2090,7 +2046,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   in
 
   (* Slots waiting for attestation. *)
-  let* () = check_get_commitment get_commitment_succeeds ok in
+  let* () = check_get_commitment get_commitment_not_found ok in
   let* () =
     check_slot_status ~__LOC__ ~expected_status:"waiting_attestation" ok
   in
@@ -2121,8 +2077,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   let* () = bake_for ~count:2 client in
   let* () = wait_block_processing3 in
   let* () =
-    (* The unattested slot has been removed. *)
-    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:2
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
 
   Log.info "Check that the store is as expected" ;
@@ -2149,7 +2104,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
       ~number_of_headers:0
   in
   let* () =
-    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:2
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
   check_stored_level_headers
     ~__LOC__
