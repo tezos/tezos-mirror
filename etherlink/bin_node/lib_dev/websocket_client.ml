@@ -144,6 +144,34 @@ module Event = struct
       ~level:Warning
       ("message", Data_encoding.string)
       ~pp1:Format.pp_print_string
+
+  let timeout_send_recv =
+    declare_2
+      ~section
+      ~name:"websocket_client_timeout_send_recv"
+      ~msg:
+        "websocket client did not receive a response after {timeout}s for \
+         request {message}"
+      ~level:Warning
+      ("message", Data_encoding.string)
+      ("timeout", Data_encoding.float)
+      ~pp1:Format.pp_print_string
+
+  let timeout_retry =
+    declare_1
+      ~section
+      ~name:"websocket_client_timeout_retry"
+      ~msg:"websocket client will retry sending request {remaining_attempts}"
+      ~level:Warning
+      ( "remaining_attempts",
+        Data_encoding.(
+          conv
+            (function `Retry n -> Some n | `Retry_forever -> None)
+            (function None -> `Retry_forever | Some n -> `Retry n)
+            (option int31)) )
+      ~pp1:(fun ppf -> function
+        | `Retry n -> Format.fprintf ppf "with %d remaining attempts" n
+        | `Retry_forever -> ())
 end
 
 type error +=
@@ -492,6 +520,7 @@ let retry_write_until ~timeout ~on_timeout response conn opcode content =
         Lwt.cancel timeout_p ;
         return res
     | Error `Timeout -> (
+        let* () = Event.(emit timeout_send_recv) (content, timeout) in
         match on_timeout with
         | `Fail -> raise (Timeout timeout)
         | `Retry n when n <= 0 -> raise (Timeout timeout)
@@ -501,6 +530,7 @@ let retry_write_until ~timeout ~on_timeout response conn opcode content =
               | `Retry_forever -> `Retry_forever
               | `Retry n -> `Retry (n - 1)
             in
+            let* () = Event.(emit timeout_retry) on_timeout in
             retry on_timeout)
   in
   retry on_timeout
