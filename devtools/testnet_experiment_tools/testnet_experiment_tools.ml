@@ -95,11 +95,6 @@ let protocol_alpha_parameters_template =
 
 let network_activation_parameters_templates protocol_hash =
   match protocol_hash with
-  | Tezt_tezos.Protocol.R022 ->
-      Some
-        (Filename.concat
-           network_parameters_templates_dir
-           "proto_022_PsRiotum_mainnet.json")
   | Tezt_tezos.Protocol.S023 ->
       Some
         (Filename.concat
@@ -373,7 +368,7 @@ let () =
     ~__FILE__
     ~title:"Generate Network Activation Parameters"
     ~tags:["generate_activation_parameters"]
-    (Local.generate_network_activation_parameters Protocol.R022) ;
+    (Local.generate_network_activation_parameters Protocol.S023) ;
   register
     ~__FILE__
     ~title:"Partition bakers by node"

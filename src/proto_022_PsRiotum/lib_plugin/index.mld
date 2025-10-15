@@ -4,10 +4,6 @@ This is a package containing some libraries related to the Tezos 022-PsRiotum pr
 
 It contains the following libraries:
 
-- {{!module-Tezos_022_PsRiotum_test_helpers}Tezos_022_PsRiotum_test_helpers}: Protocol testing framework
-- {{!module-Tezos_agnostic_baker_022_PsRiotum}Tezos_agnostic_baker_022_PsRiotum}: Protocol specific library for the Agnostic Baker
-- {{!module-Tezos_baking_022_PsRiotum}Tezos_baking_022_PsRiotum}: Base library for `tezos-baker/accuser`
-- {{!module-Tezos_baking_022_PsRiotum_commands}Tezos_baking_022_PsRiotum_commands}: Protocol-specific commands for baking
 - {{!module-Tezos_client_022_PsRiotum}Tezos_client_022_PsRiotum}: Protocol specific library for `octez-client`
 - {{!module-Tezos_dal_022_PsRiotum}Tezos_dal_022_PsRiotum}: Protocol specific library for the Data availability Layer
 - {{!module-Tezos_layer2_utils_022_PsRiotum}Tezos_layer2_utils_022_PsRiotum}: Protocol specific library for Layer 2 utils

@@ -15,15 +15,16 @@ depends: [
   "bls12-381" { = version }
   "octez-shell-libs" { = version }
   "octez-baker-lib" { = version }
-  "octez-protocol-022-PsRiotum-libs" { = version }
   "octez-protocol-023-PtSeouLo-libs" { = version }
 ]
 depopts: [
   "octez-protocol-021-PsQuebec-libs"
+  "octez-protocol-022-PsRiotum-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
   "octez-protocol-021-PsQuebec-libs" { != version }
+  "octez-protocol-022-PsRiotum-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

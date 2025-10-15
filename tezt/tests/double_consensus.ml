@@ -57,7 +57,7 @@ let double_consensus_already_denounced_waiter accuser oph =
 
 let get_double_consensus_denounciation_hash protocol consensus_name client =
   let double_consensus_kind =
-    if Protocol.(number protocol > number R022) then
+    if Protocol.(number protocol > 22) then
       "double_consensus_operation_evidence"
     else sf "double_%s_evidence" consensus_name
   in
