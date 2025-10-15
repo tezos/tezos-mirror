@@ -34,7 +34,7 @@ One can easily compute the value of the per block subsidy by taking into account
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
 
-.. _toggle_tallinn:
+.. _toggle_t024:
 
 Toggle vote
 ~~~~~~~~~~~

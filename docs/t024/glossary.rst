@@ -18,7 +18,7 @@ _`Block`
     The header itself decomposes into a :ref:`shell header<shell_header>` (common to all Tezos economic protocols), and a protocol-specific header.
     The shell header contains protocol-agnostic data such as the predecessor's block hash and the block's timestamp.
 
-.. _def_context_tallinn:
+.. _def_context_t024:
 
 _`Context`
     The state of the blockchain. The context is defined by the
@@ -44,7 +44,7 @@ _`Fitness` (a.k.a. score, weight)
 _`Height`
     See level_.
 
-.. _def_level_tallinn:
+.. _def_level_t024:
 
 _`Level` (a.k.a. block height)
     The position of a block_ in the blockchain, that is, the number of blocks
@@ -53,7 +53,7 @@ _`Level` (a.k.a. block height)
 _`Mempool`
    A pool (set) of operation_\ s maintained by a node_ and not yet included in a block_.
 
-.. _def_metadata_tallinn:
+.. _def_metadata_t024:
 
 _`Metadata`
     A (block or operation) metadata is a piece of data
@@ -101,7 +101,7 @@ _`Weight`
 Protocol terms
 --------------
 
-.. _def_accuser_tallinn:
+.. _def_accuser_t024:
 
 _`Accuser`
     When a delegate_ attempts `double signing`_ (or when it tries
@@ -113,7 +113,7 @@ _`Accuser`
     When using :ref:`Octez <octez>`, accusation operations are emitted by the
     accuser daemon. Note that this daemon is not associated to a delegate: accusation operations are anonymous, and any delegate can include them in a block.
 
-.. _def_account_tallinn:
+.. _def_account_t024:
 
 _`Account`
     An account is an address managed by the protocol.
@@ -185,7 +185,7 @@ _`Burn`
 _`Constant`
     Protocols are parameterized by several parameters called protocol constants, which may vary from one protocol to another or from one network to another.
 
-.. _def_cycle_tallinn:
+.. _def_cycle_t024:
 
 _`Cycle`
     A cycle is a sequence of consecutive block_\ s of fixed length (given by a protocol constant_). E.g., cycle 12 started at block
@@ -212,7 +212,7 @@ _`Data Availability Layer`
     The Data Availability Layer (DAL) is a companion peer-to-peer network for Tezos that distributes data to Smart Rollups.
     See :doc:`../shell/dal`.
 
-.. _def_delegate_tallinn:
+.. _def_delegate_t024:
 
 _`Delegate`
     A `user account`_ that can participate in consensus, in governance, and in the DAL.
@@ -226,7 +226,7 @@ _`Delegation`
     its `baking rights`_ and `attesting rights`_; it also increases its `voting power`_. However, the delegate_ does not control the funds of
     the delegating account_, e.g., it can not spend them.
 
-.. _def_double_signing_tallinn:
+.. _def_double_signing_t024:
 
 _`Double signing`
     The situation when a baker_ signs two different block_\ s at the same level and same round,
@@ -235,29 +235,29 @@ _`Double signing`
     The same goes for signing two different attestations at the same level and the same round.
     As such, double signing (i.e., double baking or double attesting) is punished by the
     network: an accuser_ can provide proof of the double signing to be awarded
-    part of the double signer's deposit -- see :ref:`Slashing<slashing_tallinn>`.
+    part of the double signer's deposit -- see :ref:`Slashing<slashing_t024>`.
 
 _`Failing Noop`
     The ``Failing_noop`` operation implements a *No-op*, which always
-    fails at :ref:`application time<operation_validity_tallinn>`, and
+    fails at :ref:`application time<operation_validity_t024>`, and
     should never appear in :ref:`applied
-    blocks<full_application_tallinn>`. This operation allows end-users to
-    :ref:`sign arbitrary messages<failing_noop_tallinn>` which have no
+    blocks<full_application_t024>`. This operation allows end-users to
+    :ref:`sign arbitrary messages<failing_noop_t024>` which have no
     computational semantics.
 
-.. _def_fee_tallinn:
+.. _def_fee_t024:
 
 _`Fee`
     To ensure responsible use of computation resources of other nodes, and also to encourage active participation in the consensus protocol,
     users pay fees to bakers for including their operation_\ s in block_\ s.
     For example, fees are paid to a baker for operations such as a transaction_ or a revelation of a public key.
 
-    Currently, only :ref:`manager operations<manager_operations_tallinn>`
+    Currently, only :ref:`manager operations<manager_operations_t024>`
     require collecting fees from its sender account_.
 
     See also `burn`_.
 
-.. _def_gas_tallinn:
+.. _def_gas_t024:
 
 _`Gas`
     A measure of the number of elementary steps performed during
@@ -284,7 +284,7 @@ _`Layer 2`
 _`Michelson`
     The built-in language used by a `smart contract`_.
 
-.. _def_minimal_stake_tallinn:
+.. _def_minimal_stake_t024:
 
 _`Minimal stake`
     An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a
@@ -299,7 +299,7 @@ _`Operation kinds`
 _`Originated account`
     See `smart contract`_.
 
-.. _def_origination_tallinn:
+.. _def_origination_t024:
 
 _`Origination`
     A manager operation_ whose purpose is to create -- that
@@ -365,7 +365,7 @@ _`Rollup outbox`
    cemented (hence, at least two weeks after the actual execution of
    the operation).
 
-.. _def_round_tallinn:
+.. _def_round_t024:
 
 _`Round`
     An attempt to reach consensus on a block at a given level.
@@ -393,13 +393,13 @@ _`Smart Rollup`
     (e.g., an EVM-compatible one), or an application-specific DApp.
     See :doc:`smart_rollups`.
 
-.. _def_staker_tallinn:
+.. _def_staker_t024:
 
 _`Staker`
     A `user account`_ that made a security deposit.
     The user account must have set a delegate.
     The security deposit accrues to the stake of the user account's delegate and is
-    subject to slashing in case the delegate misbehaves -- see :ref:`Slashing<slashing_tallinn>`.
+    subject to slashing in case the delegate misbehaves -- see :ref:`Slashing<slashing_t024>`.
 
 _`Tenderbake`
    The algorithm that Tezos uses to create consensus from bakers' proposals and attestations of blocks.
@@ -416,7 +416,7 @@ _`Trap`
    A DAL shard_ that is treated specially by the protocol for a particular attester to ensure that attesters are honestly downloading and attesting to data.
    If a DAL attester attests to a trap, that attester will not receive DAL rewards.
 
-.. _def_user_account_tallinn:
+.. _def_user_account_t024:
 
 _`User account`
     An account_ that is linked to a public key. Contrary to a `smart
@@ -435,7 +435,7 @@ _`Validation pass`
     An index (a natural number) associated with a particular kind of
     operations, allowing to group them into classes. Validation passes
     enable prioritizing the :ref:`validation and
-    application<operation_validity_tallinn>` of certain classes of
+    application<operation_validity_t024>` of certain classes of
     operations.
 
 _`Voting period`
@@ -447,7 +447,7 @@ _`Voting power`
     The amount of tokens that determines a delegate_'s weight in the
     voting process. A delegate's voting power is computed from the
     delegate's own tokens and the sum of tokens delegated to
-    it. See :ref:`voting_power_tallinn` for details.
+    it. See :ref:`voting_power_t024` for details.
 
 _`Voting listings`
     The list calculated at the beginning of each `voting period`_ that contains
