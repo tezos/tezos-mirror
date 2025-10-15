@@ -555,7 +555,6 @@ index 1d28850f..fbd54ed7 100644
     tzkt_api_url
 
 let init_umami agent ~sequencer_proxy ~tzkt_proxy ~umami_proxy =
-  ignore umami_proxy ;
   let runner = Agent.runner agent in
   let external_tzkt_api_endpoint = proxy_external_endpoint ~runner tzkt_proxy in
   let tezlink_proxy_endpoint =
@@ -575,7 +574,12 @@ let init_umami agent ~sequencer_proxy ~tzkt_proxy ~umami_proxy =
   let* _ = Agent.copy ~destination:patch_dst ~source:patch_filename agent in
   let* () = Process.spawn "rm" [patch_filename] |> Process.check in
   (* Apply the patch. *)
-  run_cmd agent (sf "cd %s && git apply %s" remote_umami_path patch_dst)
+  let* () =
+    run_cmd agent (sf "cd %s && git apply %s" remote_umami_path patch_dst)
+  in
+  (* Run Umami. *)
+  let port = proxy_internal_port umami_proxy in
+  Umami_process.run ?runner ~port ()
 
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
     ~(sequencer_proxy : proxy_info) (verbose : bool)
