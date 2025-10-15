@@ -94,13 +94,13 @@ let check_skip_list_store dal_node ~number_of_slots ~expected_levels =
     sf "%s/store/skip_list_store/store.sqlite" (Dal_node.data_dir dal_node)
   in
   let db = Sqlite3.db_open path in
-  let attested_levels = ref [] in
-  let query = "SELECT attested_level FROM skip_list_slots;" in
+  let published_levels = ref [] in
+  let query = "SELECT published_level FROM skip_list_slots;" in
   let res =
     Sqlite3.exec_not_null_no_headers
       ~cb:(fun row ->
-        let attested_level = row.(0) in
-        attested_levels := attested_level :: !attested_levels)
+        let published_level = row.(0) in
+        published_levels := published_level :: !published_levels)
       db
       query
   in
@@ -113,7 +113,7 @@ let check_skip_list_store dal_node ~number_of_slots ~expected_levels =
           (Sqlite3.Rc.to_string err)
   in
   Check.(
-    List.sort_uniq String.compare !attested_levels
+    List.sort_uniq String.compare !published_levels
     = List.sort String.compare expected_levels)
     ~__LOC__
     Check.(list string)
@@ -4861,10 +4861,9 @@ let test_restart_dal_node _protocol dal_parameters _cryptobox node client
   let* () = wait_for_dal_node in
   if profile <> Dal_RPC.Bootstrap then
     let expected_levels =
-      let offset = dal_parameters.attestation_lag + 1 in
       List.init
-        (last_finalized_level - offset + 1)
-        (fun i -> string_of_int (offset + i))
+        (last_finalized_level - dal_parameters.attestation_lag)
+        (fun i -> string_of_int (i + 1))
     in
     check_skip_list_store
       dal_node
@@ -7191,7 +7190,7 @@ module Garbage_collection = struct
           check_skip_list_store
             dal_node
             ~number_of_slots
-            ~expected_levels:[string_of_int (lag + 1)]
+            ~expected_levels:[string_of_int 1]
         in
         (* We just want to observe the GC taking effect, so we need to bake at
            least [non_gc_period] blocks. *)
@@ -7209,10 +7208,9 @@ module Garbage_collection = struct
            = 9, and it injects at level 19. So we have cells for level 10 to
            19, that is, 10 levels. *)
         let expected_levels =
-          (* The first level with stored cells is [last_final_level -
-             non_gc_period + 1 = lag + 2]. *)
-          let offset = lag + 2 in
-          List.init non_gc_period (fun i -> string_of_int (offset + i))
+          (* The first published level with stored cells is [last_final_level -
+             non_gc_period + 1 - lag = 2]. *)
+          List.init non_gc_period (fun i -> string_of_int (i + 2))
         in
         check_skip_list_store dal_node ~number_of_slots ~expected_levels)
       protocols
