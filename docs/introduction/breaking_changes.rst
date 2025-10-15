@@ -16,10 +16,10 @@ In the particular case of RPC changes, you may consult complementary information
 
 
 
-Protocol alpha
---------------
+Protocol T024
+-------------
 
-:doc:`Full Protocol alpha Changelog<../protocols/alpha>`
+:doc:`Full Protocol T024 Changelog<../protocols/024_t024>`
 
 
 6s Block Time
@@ -83,7 +83,7 @@ mainnet) can still be queried via the RPC ``GET
 Very slight increase in gas cost when calling smart contracts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Protocol alpha fixes a minor bug that caused some gas costs to be
+Protocol T024 fixes a minor bug that caused some gas costs to be
 omitted in cache functions. As a result, gas costs for smart contract
 calls has increased by at most 2 units of gas each time the cache is
 accessed.
