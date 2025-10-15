@@ -604,7 +604,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       in
       let* tzkt_proxy =
         if Cli.tzkt then
-          let () = toplog "Starting TzKT" in
           let tzkt_proxy =
             let path = None in
             match dns_domain with
@@ -635,6 +634,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           in
           let internal_tzkt_api_port = proxy_internal_port tzkt_proxy in
           let* () =
+            let () = toplog "Starting TzKT" in
             init_tzkt
               ~tzkt_api_port:internal_tzkt_api_port
               ~agent:tezlink_sequencer_agent
