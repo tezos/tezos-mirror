@@ -200,22 +200,29 @@ module Name = struct
   let equal () () = true
 end
 
-type prevalidation_result = {
-  next_nonce : quantity;
-  transaction_object : Transaction_object.t;
-}
+type 'a prevalidation_result = {next_nonce : quantity; transaction_object : 'a}
 
 module Request = struct
   type (_, _) t =
     | Prevalidate_raw_transaction : {
         raw_transaction : string;
       }
-        -> ((prevalidation_result, string) result, tztrace) t
+        -> ( (Transaction_object.t prevalidation_result, string) result,
+             tztrace )
+           t
     | Refresh_state : (unit, tztrace) t
+    | Prevalidate_raw_transaction_tezlink : {
+        raw_transaction : string;
+      }
+        -> ( (Tezos_types.Operation.t prevalidation_result, string) result,
+             tztrace )
+           t
 
   let name : type a err. (a, err) t -> string = function
     | Prevalidate_raw_transaction _ -> "Prevalidate_raw_transaction"
     | Refresh_state -> "Refresh_state"
+    | Prevalidate_raw_transaction_tezlink _ ->
+        "Prevalidate_raw_transaction_tezlink"
 
   type view = View : _ t -> view
 
@@ -244,6 +251,19 @@ module Request = struct
           (obj1 (req "request" (constant "replace_state")))
           (function View Refresh_state -> Some () | _ -> None)
           (fun () ->
+            (* Only used for logging *)
+            assert false);
+        case
+          ~title:"Prevalidate_raw_transaction_tezlink"
+          Json_only
+          (obj2
+             (req "request" (constant "prevalidate_raw_transaction_tezlink"))
+             (req "raw_transaction" (string' Hex)))
+          (function
+            | View (Prevalidate_raw_transaction_tezlink {raw_transaction}) ->
+                Some ((), raw_transaction)
+            | _ -> None)
+          (fun ((), _) ->
             (* Only used for logging *)
             assert false);
       ]
@@ -645,7 +665,8 @@ module Handlers = struct
         : Types.state)
 
   let is_tx_valid (type state) ctxt session raw_transaction :
-      (prevalidation_result, string) result tzresult Lwt.t =
+      (Transaction_object.t prevalidation_result, string) result tzresult Lwt.t
+      =
     let open Lwt_result_syntax in
     let (module Backend_rpc : Services_backend_sig.S
           with type Reader.state = state) =
@@ -676,6 +697,23 @@ module Handlers = struct
     ctxt.session <- session ;
     return_unit
 
+  let is_tezlink_tx_valid (type state) _ctxt session raw_transaction :
+      (Tezos_types.Operation.t prevalidation_result, string) result tzresult
+      Lwt.t =
+    let open Lwt_result_syntax in
+    (* We build a `read` function from the session. It's the only part of the
+       backend we should rely on: the other helpers in the backend rely on the
+       internal state, not the state in the session. *)
+    let (module Backend_rpc : Services_backend_sig.S
+          with type Reader.state = state) =
+      session.state_backend
+    in
+    let read = Backend_rpc.Reader.read session.state in
+    let** op =
+      Tezlink_prevalidation.validate_tezlink_operation ~read raw_transaction
+    in
+    return (Ok {next_nonce = Qty op.first_counter; transaction_object = op})
+
   let on_request : type r err.
       self -> (r, err) Request.t -> (r, err) result Lwt.t =
    fun self request ->
@@ -685,6 +723,8 @@ module Handlers = struct
     | Prevalidate_raw_transaction {raw_transaction} ->
         is_tx_valid ctxt session raw_transaction
     | Refresh_state -> refresh_state ctxt session
+    | Prevalidate_raw_transaction_tezlink {raw_transaction} ->
+        is_tezlink_tx_valid ctxt session raw_transaction
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -829,6 +869,10 @@ let prevalidate_raw_transaction raw_transaction =
     (Request.Prevalidate_raw_transaction {raw_transaction})
 
 let refresh_state () = worker_add_request ~request:Request.Refresh_state
+
+let prevalidate_raw_transaction_tezlink raw_transaction =
+  worker_wait_for_request
+    (Request.Prevalidate_raw_transaction_tezlink {raw_transaction})
 
 type validation_config = {
   minimum_base_fee_per_gas : Ethereum_types.quantity;

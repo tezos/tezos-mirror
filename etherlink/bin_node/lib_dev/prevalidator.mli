@@ -23,11 +23,11 @@ type mode =
             - balance is enough
             - max_fee_per_gas is inferior to current gas price *)
 
-type prevalidation_result = {
+type 'a prevalidation_result = {
   next_nonce : Ethereum_types.quantity;
       (** The next nonce expected for the given caller, which is lesser than or
           equal to the nonce of the prevalidated transaction. *)
-  transaction_object : Transaction_object.t;
+  transaction_object : 'a;
       (** Decoded informations about the prevalidated transaction. *)
 }
 
@@ -52,7 +52,8 @@ val start :
     If the worker failed to start, a new initialization attempt will be
     performed. *)
 val prevalidate_raw_transaction :
-  string -> (prevalidation_result, string) result tzresult Lwt.t
+  string ->
+  (Transaction_object.t prevalidation_result, string) result tzresult Lwt.t
 
 (** [refresh_state ()] sends a refresh request to the worker, to be processed
     in the background.
@@ -60,6 +61,15 @@ val prevalidate_raw_transaction :
     If the worker failed to start, a new initialization attempt will be
     performed. *)
 val refresh_state : unit -> unit tzresult Lwt.t
+
+(** [prevalidate_raw_transaction_tezlink raw_txn] sends a prevalidation request
+    to the worker, and waits for the result.
+
+    If the worker failed to start, a new initialization attempt will be
+    performed. *)
+val prevalidate_raw_transaction_tezlink :
+  string ->
+  (Tezos_types.Operation.t prevalidation_result, string) result tzresult Lwt.t
 
 type validation_config = {
   minimum_base_fee_per_gas : Ethereum_types.quantity;

@@ -203,3 +203,7 @@ val import_snapshot_archive_in_progress :
 (** [replicate_transaction_dropped hash reason] advertises that the transaction
     [hash] was dropped because it is now invalid in the sandbox. *)
 val replicate_transaction_dropped : Ethereum_types.hash -> string -> unit Lwt.t
+
+(** [replicate_operation_dropped hash reason] advertises that the operation
+    [hash] was dropped because it is now invalid in the sandbox. *)
+val replicate_operation_dropped : Operation_hash.t -> string -> unit Lwt.t

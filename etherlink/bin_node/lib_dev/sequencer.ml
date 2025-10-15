@@ -66,17 +66,16 @@ let validate_and_add_tezlink_operation
     =
   let open Lwt_result_syntax in
   let (Michelson_tx_container (module Tx_container)) = tx_container in
-  let*? (op : Tezos_types.Operation.t) =
-    raw_tx |> Bytes.of_string |> Tezos_types.Operation.decode
-  in
-  let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
-  let* _ =
-    Tx_container.add
-      ~next_nonce:(Ethereum_types.Qty op.first_counter)
-      op
-      ~raw_tx
-  in
-  return_unit
+  let* res = Prevalidator.prevalidate_raw_transaction_tezlink raw_tx in
+  match res with
+  | Ok Prevalidator.{next_nonce; transaction_object} ->
+      let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
+      let* _ = Tx_container.add ~next_nonce transaction_object ~raw_tx in
+      return_unit
+  | Error reason ->
+      let hash = Operation_hash.hash_string [raw_tx] in
+      let*! () = Events.replicate_operation_dropped hash reason in
+      return_unit
 
 let validate_and_add_tx (type f)
     ~(tx_container : f Services_backend_sig.tx_container) :

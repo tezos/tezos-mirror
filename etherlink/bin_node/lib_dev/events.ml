@@ -246,6 +246,16 @@ let replicate_transaction_dropped =
     ("hash", Ethereum_types.hash_encoding)
     ("reason", Data_encoding.string)
 
+let replicate_operation_dropped =
+  Internal_event.Simple.declare_2
+    ~section
+    ~name:"replicate_operation_dropped"
+    ~msg:"operation {hash} was dropped because it is now invalid ({reason})"
+    ~level:Warning
+    ~pp1:Operation_hash.pp
+    ("hash", Operation_hash.encoding)
+    ("reason", Data_encoding.string)
+
 type kernel_log_kind = Application | Simulation
 
 type kernel_log_level = Debug | Info | Error | Fatal
@@ -628,3 +638,6 @@ let import_snapshot_archive_in_progress ~archive_name ~elapsed_time =
 
 let replicate_transaction_dropped hash reason =
   emit replicate_transaction_dropped (hash, reason)
+
+let replicate_operation_dropped hash reason =
+  emit replicate_operation_dropped (hash, reason)
