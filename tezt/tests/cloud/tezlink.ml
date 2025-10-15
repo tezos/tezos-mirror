@@ -571,16 +571,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 dns_domain;
               }
       in
-      let () = toplog "Starting Tezlink sequencer" in
-      let* () =
-        init_tezlink_sequencer
-          cloud
-          name
-          ~rpc_port:(proxy_internal_port sequencer_proxy_info)
-          Cli.verbose
-          Cli.time_between_blocks
-          tezlink_sequencer_agent
-      in
       (* The proxy endpoint is the https endpoint we want to provide
          to the external world, it has no /tezlink path. *)
       let tezlink_sandbox_endpoint =
@@ -662,6 +652,16 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           in
           some tzkt_proxy
         else none
+      in
+      let () = toplog "Starting Tezlink sequencer" in
+      let* () =
+        init_tezlink_sequencer
+          cloud
+          name
+          ~rpc_port:(proxy_internal_port sequencer_proxy_info)
+          Cli.verbose
+          Cli.time_between_blocks
+          tezlink_sequencer_agent
       in
       let* () =
         match tzkt_proxy with
