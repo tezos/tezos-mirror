@@ -128,9 +128,6 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
 
 (* Please add here any code that should be removed at the next automatic protocol snapshot *)
 
-let remove_ai_ema_for_protocol_t ctxt =
-  Raw_context.remove ctxt ["adaptive_issuance_ema"]
-
 (* End of code to remove at next automatic protocol snapshot *)
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
@@ -233,7 +230,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         return (ctxt, [])
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | S023 ->
+    | Tallinn ->
         let* ctxt =
           Storage.Tenderbake.First_level_of_protocol.update ctxt level
         in
@@ -241,15 +238,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
-        let*! ctxt =
-          (* Decrease the voting period to one cycle on Shadownet *)
-          if Chain_id.equal chain_id Constants_repr.shadownet_id then
-            Raw_context.patch_constants ctxt (fun c ->
-                {c with cycles_per_voting_period = 1l})
-          else Lwt.return ctxt
-        in
-        let*! ctxt = remove_ai_ema_for_protocol_t ctxt in
-        let* ctxt = Address_registry_storage.init ctxt in
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in
