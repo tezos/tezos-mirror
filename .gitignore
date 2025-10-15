@@ -203,3 +203,6 @@ etherlink/scripts/docker-compose/mainnet-docker-compose/.etherlink-mainnet-data/
 
 # Etherlink benchmarks
 node_modules/
+
+# Cache directories for GitLab runners
+.cache_external
