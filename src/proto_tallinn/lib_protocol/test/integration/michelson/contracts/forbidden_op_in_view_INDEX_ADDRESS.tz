@@ -1,5 +1,0 @@
-{ parameter unit ;
-  storage unit ;
-  code { CDR ; NIL operation; PAIR } ;
-  view "v" address nat { CAR; INDEX_ADDRESS }
-}
