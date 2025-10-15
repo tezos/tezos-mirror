@@ -180,6 +180,23 @@ impl IndexableStorage {
         let new_index = self.get_length_and_increment(host)?;
         self.store_index(host, new_index, value)
     }
+
+    pub fn clear<Host: Runtime>(
+        &self,
+        host: &mut Host,
+    ) -> Result<(), IndexableStorageError> {
+        let length = self.length(host)?;
+        for index in 0..length {
+            let key_path = self.value_path(index)?;
+            host.store_delete(&key_path)?;
+        }
+        let length_path = concat(&self.path, &LENGTH)?;
+        match host.store_delete(&length_path) {
+            Ok(()) => Ok(()),
+            Err(RuntimeError::PathNotFound) if length == 0 => Ok(()),
+            Err(err) => Err(IndexableStorageError::Runtime(err)),
+        }
+    }
 }
 
 #[cfg(test)]
