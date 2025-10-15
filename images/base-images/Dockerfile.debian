@@ -9,7 +9,11 @@ ENV TZ=Etc/UTC
 # Setup proxy
 ARG APT_PROXY
 ENV APT_PROXY=${APT_PROXY:-false}
-RUN echo "Acquire::http::Proxy::deb.debian.org \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy
+RUN echo "Acquire::http::Proxy::deb.debian.org \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::http::Proxy::security.debian.org \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::http::Proxy::archive.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::http::Proxy::ports.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy && \
+    echo "Acquire::http::Proxy::security.ubuntu.com \"$APT_PROXY\";" >> /etc/apt/apt.conf.d/01proxy
 
 COPY scripts/kiss-fetch.sh /usr/local/bin/
 # install datadog static binary
