@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:  Protocol (quantities)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_tallinn/lib_protocol/test/unit/main.exe \
                   -- --file test_percentage.ml
     Subject:    On percentages.
 *)
