@@ -1037,10 +1037,11 @@ module Config_file = struct
     write node config
 end
 
-let spawn_init_config_minimal ~data_dir ?config_file
+let spawn_init_config_minimal ?data_dir ?config_file
     ?(path = Uses.(path Constant.octez_evm_node)) ?(extra_arguments = []) () =
   Process.spawn ~name:"evm_node_init_config" path
-  @@ ["init"; "config"; "--data-dir"; data_dir]
+  @@ ["init"; "config"]
+  @ Cli_arg.optional_arg "data-dir" Fun.id data_dir
   @ Cli_arg.optional_arg "config-file" Fun.id config_file
   @ extra_arguments
 

@@ -180,13 +180,13 @@ let activate_tezlink chain_id =
   in
   return_unit
 
-let main ~data_dir ~cctxt ?(genesis_timestamp = Misc.now ())
+let main ~cctxt ?(genesis_timestamp = Misc.now ())
     ~(configuration : Configuration.t) ?kernel ?sandbox_config () =
   let open Lwt_result_syntax in
   let open Configuration in
   let* telemetry_cleanup =
     Octez_telemetry.Opentelemetry_setup.setup
-      ~data_dir
+      ~data_dir:configuration.data_dir
       ~service_namespace:"evm_node"
       ~service_name:"sequencer"
       ~version:Tezos_version_value.Bin_version.octez_evm_node_version_string
@@ -248,7 +248,6 @@ let main ~data_dir ~cctxt ?(genesis_timestamp = Misc.now ())
     Evm_context.start
       ~configuration
       ?kernel_path:kernel
-      ~data_dir
       ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:Read_write
       ~signer
@@ -379,7 +378,6 @@ let main ~data_dir ~cctxt ?(genesis_timestamp = Misc.now ())
       ~pool
       ?network:(Option.bind sandbox_config (fun config -> config.network))
       ~smart_rollup_address:smart_rollup_address_typed
-      ~data_dir
       configuration
   in
   let* () = Evm_ro_context.preload_known_kernels ro_ctxt in
@@ -487,7 +485,6 @@ let main ~data_dir ~cctxt ?(genesis_timestamp = Misc.now ())
       ~evm_services:
         Evm_ro_context.(
           evm_services_methods ro_ctxt sequencer_config.time_between_blocks)
-      ~data_dir
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
          else Rpc_types.Single_chain_node_rpc_server chain_family)
@@ -521,7 +518,7 @@ let main ~data_dir ~cctxt ?(genesis_timestamp = Misc.now ())
           ~exposed_port:configuration.public_rpc.port
           ~protected_endpoint
           ?private_endpoint
-          ~data_dir
+          ~data_dir:configuration.data_dir
           ())
       configuration.experimental_features.spawn_rpc
   in

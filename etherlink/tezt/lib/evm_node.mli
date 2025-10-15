@@ -307,12 +307,12 @@ end
     with arguments found in the state. *)
 val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
 
-(** [spawn_init_config_minimal ~data_dir ?path ?extra_arguments ()] creates a
+(** [spawn_init_config_minimal ?data_dir ?path ?extra_arguments ()] creates a
     minimal config with no cli argument populated as [spawn_init_config].
 
     Unlike [spawn_init_config], does not require a [Evm_node.t] instance. *)
 val spawn_init_config_minimal :
-  data_dir:string ->
+  ?data_dir:string ->
   ?config_file:string ->
   ?path:string ->
   ?extra_arguments:string list ->

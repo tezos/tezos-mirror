@@ -256,12 +256,12 @@ let container_forward_request (type f) ~(chain_family : f L2_types.chain_family)
                          Tezlink case"
                   end))
 
-let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
+let main ~evm_node_endpoint ?evm_node_private_endpoint
     ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
   let* telemetry_cleanup =
     Octez_telemetry.Opentelemetry_setup.setup
-      ~data_dir
+      ~data_dir:config.data_dir
       ~service_namespace:"evm_node"
       ~service_name:"rpc"
       ~version:Tezos_version_value.Bin_version.octez_evm_node_version_string
@@ -278,7 +278,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
        the Irmin GC, and the rest for the RPCs. *)
     Lwt_domain.setup_pool (max 1 (Misc.domain_count_cap () - 3))
   in
-  let* ctxt = Evm_ro_context.load ~pool ~data_dir config in
+  let* ctxt = Evm_ro_context.load ~pool config in
   let* () = Evm_ro_context.preload_known_kernels ctxt in
 
   let* legacy_block_storage =
@@ -342,7 +342,6 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(evm_services_methods ctxt time_between_blocks)
-      ~data_dir
       ~rpc_server_family
       rpc_config
       tx_container

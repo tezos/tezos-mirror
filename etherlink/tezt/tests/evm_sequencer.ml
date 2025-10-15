@@ -11826,7 +11826,7 @@ let test_trace_block_txs_same_caller =
       ~error_msg:"Should not have a list of subcalls") ;
   unit
 
-let test_init_config_mainnet network =
+let test_init_config_network network =
   Regression.register
     ~__FILE__
     ~title:(sf "EVM Node: init config --network %s" network)
@@ -11837,14 +11837,15 @@ let test_init_config_mainnet network =
     ~uses_admin_client:false
   @@ fun () ->
   let data_dir = Temp.dir "fake-evm-node" in
+  let config_file = data_dir // "config.json" in
   let* () =
     Process.check
     @@ Evm_node.spawn_init_config_minimal
-         ~data_dir
+         ~config_file
          ~extra_arguments:["--network"; network]
          ()
   in
-  let config = read_file (data_dir // "config.json") in
+  let config = read_file config_file in
   Regression.capture config ;
   unit
 
@@ -14414,8 +14415,8 @@ let () =
   test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
   test_websocket_logs_event [Protocol.Alpha] ;
   test_node_correctly_uses_batcher_heap [Protocol.Alpha] ;
-  test_init_config_mainnet "mainnet" ;
-  test_init_config_mainnet "testnet" ;
+  test_init_config_network "mainnet" ;
+  test_init_config_network "testnet" ;
   test_estimate_gas_with_block_param protocols ;
   test_filling_max_slots_cant_lead_to_out_of_memory protocols ;
   test_rpc_getLogs_with_earliest_fail protocols ;

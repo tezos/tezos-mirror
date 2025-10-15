@@ -52,9 +52,10 @@ Run commands:
       [--replicate [url]]
     Start the EVM node in sandbox mode. The sandbox mode is a sequencer-like
     mode that produces blocks with a fake key and no rollup node connection.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -169,9 +170,10 @@ Run commands:
     Start the EVM node in tezlink sandbox mode. The sandbox mode is a
     sequencer-like mode that produces blocks with a fake key and no rollup
     node connection.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -259,9 +261,10 @@ Run commands:
       [--finalized-view] [--profiling [BOOL]] [--read-only]
       [--ignore-block-param] [--evm-node-endpoint <url>]
     Start the EVM node in proxy mode.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -336,9 +339,10 @@ Run commands:
       [-f --password-filename <filename>] [--dal-slots <slot indices>]
       [--sunset-sec <SEC>]
     Start the EVM node in sequencer mode.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -438,9 +442,10 @@ Run commands:
       [--no-sync] [--init-from-snapshot [snapshot url or file path]]
       [--history <archive | rolling:n | full:n>] [--network <network>]
     Start the EVM node in observer mode.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -536,9 +541,10 @@ Run commands:
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
     Start the EVM node in rpc mode.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -601,9 +607,10 @@ Run commands:
       [--config-file <path>] [--omit-delayed-tx-events]
     Initialises the EVM node data-dir using the data-dir of a rollup node.
     <rollup-node-data-dir>: The path to the rollup node data directory.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -640,9 +647,10 @@ Configuration commands:
     proxy mode. If the  <sequencer-key> is set,then adds the configuration
     for the sequencer mode. If the <evm-node-endpoint> is set then adds the
     configuration for the observer mode.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -739,9 +747,10 @@ Configuration commands:
       [--network <network>]
     Read and validate configuration files. By default, look for config.json
     in the data-dir. If --filename is used, check this config file instead.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -766,9 +775,10 @@ Snapshots commands:
   snapshot export [--data-dir <data-dir>] [--config-file <path>]
       [-s --snapshot-file <path>] [--compress-on-the-fly] [--uncompressed]
     Export a snapshot of the EVM node.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -789,9 +799,10 @@ Snapshots commands:
   snapshot import <snapshot> [--data-dir <data-dir>] [-f --force]
     Import a snapshot of the EVM node.
     <snapshot>: Snapshot archive file, URL or stdin (when given `-`).
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     -f --force: Allow importing snapshot in already populated data dir
       (previous contents is removed first, even if the snapshot is
       corrupted), or importing a legacy snapshot in an empty data dir.
@@ -802,9 +813,10 @@ Storage commands:
     Switch history mode of the node.
     <history>: History mode, either archive, rolling:n or full:n where n is
       the number of days of history to retain.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -820,9 +832,10 @@ Keys commands:
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
       `$EVM_NODE_CONFIG_FILE`.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
 
 Kernel commands:
 
@@ -841,9 +854,10 @@ Kernel commands:
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
       `$EVM_NODE_CONFIG_FILE`.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --rollup-address <sr1...>: The smart rollup address in Base58 encoding
       used to produce the chunked messages.
       Defaults to `[SMART_ROLLUP_HASH]`.
@@ -882,9 +896,10 @@ Kernel commands:
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
       `$EVM_NODE_CONFIG_FILE`.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     -d --wallet-dir <path>: The directory where the Tezos client stores all
       its wallet data.
       Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR`
@@ -897,9 +912,10 @@ Kernel commands:
     Etherlink main branch if the new kernel is not compatible with the one
     deployed on the network.
     <kernel_path>: Path to the kernel.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -1038,9 +1054,10 @@ Kernel commands:
     <kernel-id>: Either a root hash of the kernel to download, or the name of
       a supported kernel ("bifrost", "calypso", "calypso2", "dionysus",
       "dionysus-r1") or "ebisu".
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -1059,9 +1076,10 @@ Debug commands:
   reset at <level> [--data-dir <data-dir>] [-f --force]
     Reset evm node data-dir to a specific block level.
     <level>: Level to reset to state to.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     -f --force: Force suppression of data to reset state of sequencer to a
       specified l2 level.
   
@@ -1073,9 +1091,10 @@ Debug commands:
     Replay a range of block levels.
     <level>: First block to replay.
     <level>: Last block to replay.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -1106,9 +1125,10 @@ Debug commands:
       [--profile [minimal|flamegraph]] [--disable-da-fees]
     Replay a specific block level.
     <level>: Level to replay.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable
@@ -1146,9 +1166,10 @@ Debug commands:
     need to use the command `reset` to revert the changes.
     <path>: Durable storage path.
     <value>: Patched value.
-    --data-dir <data-dir>: The path to the EVM node data directory.
-      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
-      if it exists, or `$HOME/.octez-evm-node` otherwise.
+    --data-dir <data-dir>: The path to the EVM node data directory. Default
+      is $HOME/.octez-evm-node.
+      If set, defaults to the value of the environment variable
+      `$EVM_NODE_DATA_DIR`.
     --config-file <path>: Path to a configuration file. Defaults to
       `config.json` inside the data directory of the node.
       If set, defaults to the value of the environment variable

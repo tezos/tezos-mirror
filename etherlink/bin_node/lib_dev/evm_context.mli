@@ -28,9 +28,6 @@ type error += Cannot_apply_blueprint of {local_state_level : Z.t}
     [kernel_path] can be provided to cover the case where the context does not
     exist yet, and is ignored otherwise.
 
-    [data_dir] is the path to the data-dir of the node, notably containing the
-    SQLite store and the Irmin context.
-
     [smart_rollup_address] can be provided either when starting from a
     non-existing data-dir, or when starting a sandbox.
 
@@ -44,7 +41,6 @@ type error += Cannot_apply_blueprint of {local_state_level : Z.t}
 val start :
   configuration:Configuration.t ->
   ?kernel_path:Pvm_types.kernel ->
-  data_dir:string ->
   ?smart_rollup_address:string ->
   store_perm:Sqlite.perm ->
   ?signer:Signer.map ->
@@ -53,16 +49,14 @@ val start :
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 
-(** [init_from_rollup_node ~omit_delayed_tx_events ~data_dir
-    ~rollup_node_data_dir ()]
-    initialises the irmin context and metadata of the evm using the
-    latest known evm state of the given rollup node. if
-    [omit_delayed_tx_events] dont populate the delayed tx event from
-    the state into the db. *)
+(** [init_from_rollup_node ~omit_delayed_tx_events
+    ~rollup_node_data_dir ()] initialises the irmin context and
+    metadata of the evm using the latest known evm state of the given
+    rollup node. if [omit_delayed_tx_events] dont populate the delayed
+    tx event from the state into the db. *)
 val init_from_rollup_node :
   configuration:Configuration.t ->
   omit_delayed_tx_events:bool ->
-  data_dir:string ->
   rollup_node_data_dir:string ->
   tx_container:_ Services_backend_sig.tx_container ->
   unit ->

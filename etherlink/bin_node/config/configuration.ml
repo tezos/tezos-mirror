@@ -44,7 +44,7 @@ type blueprints_publisher_config = {
 type native_execution_policy = Always | Rpcs_only | Never
 
 type kernel_execution_config = {
-  preimages : string;
+  preimages : string option;
   preimages_endpoint : Uri.t option;
   native_execution_policy : native_execution_policy;
 }
@@ -250,6 +250,7 @@ type telemetry_config = {
 }
 
 type t = {
+  data_dir : string;
   public_rpc : rpc;
   private_rpc : rpc option;
   websockets : websockets_config option;
@@ -375,7 +376,14 @@ let default_db = {pool_size = 8; max_conn_reuse_count = None}
 let default_max_active_connections =
   Tezos_rpc_http_server.RPC_server.Max_active_rpc_connections.default
 
-let default_preimages data_dir = Filename.Infix.(data_dir // "wasm_2_0_0")
+let default_data_dir = Filename.concat (Sys.getenv "HOME") ".octez-evm-node"
+
+let get_data_dir ~data_dir = Option.value data_dir ~default:default_data_dir
+
+let config_filename ~data_dir ?config_file () =
+  match config_file with
+  | None -> Filename.concat (get_data_dir ~data_dir) "config.json"
+  | Some config_file -> config_file
 
 let default_preimages_endpoint = function
   | Mainnet ->
@@ -509,10 +517,10 @@ let restricted_rpcs_encoding =
 
 let default_native_execution_policy = Rpcs_only
 
-let kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint
+let kernel_execution_config_dft ?preimages ?preimages_endpoint
     ?native_execution_policy () =
   {
-    preimages = Option.value ~default:(default_preimages data_dir) preimages;
+    preimages;
     preimages_endpoint;
     native_execution_policy =
       Option.value
@@ -1379,7 +1387,7 @@ let native_execution_policy_encoding =
     @@ string_enum
          [("never", Never); ("rpcs_only", Rpcs_only); ("always", Always)])
 
-let kernel_execution_encoding ?network data_dir =
+let kernel_execution_encoding ?network () =
   Data_encoding.(
     let preimages_endpoint_field ~description name encoding =
       match network with
@@ -1397,13 +1405,12 @@ let kernel_execution_encoding ?network data_dir =
       (fun (preimages, preimages_endpoint, native_execution_policy) ->
         {preimages; preimages_endpoint; native_execution_policy})
       (obj3
-         (dft
+         (opt
             ~description:
               "Path to a directory containing the preimages the kernel can \
                reveal."
             "preimages"
-            string
-            (default_preimages data_dir))
+            string)
          (preimages_endpoint_field
             ~description:
               "Endpoint for downloading the preimages that cannot be found in \
@@ -1567,7 +1574,7 @@ let telemetry_config_encoding =
              default_telemetry_config.trace_host_functions))
        default_telemetry_config.trace_host_functions
 
-let encoding ?network data_dir : t Data_encoding.t =
+let encoding ?network () : t Data_encoding.t =
   let open Data_encoding in
   let observer_field name encoding =
     match network with
@@ -1584,6 +1591,7 @@ let encoding ?network data_dir : t Data_encoding.t =
   in
   conv
     (fun {
+           data_dir;
            public_rpc;
            private_rpc;
            websockets;
@@ -1606,7 +1614,7 @@ let encoding ?network data_dir : t Data_encoding.t =
            performance_profile;
          }
        ->
-      ( (log_filter, sequencer, observer),
+      ( (data_dir, log_filter, sequencer, observer),
         ( ( None,
             None,
             None,
@@ -1627,7 +1635,7 @@ let encoding ?network data_dir : t Data_encoding.t =
             opentelemetry,
             tx_queue,
             performance_profile ) ) ))
-    (fun ( (log_filter, sequencer, observer),
+    (fun ( (data_dir, log_filter, sequencer, observer),
            ( ( _tx_pool_timeout_limit,
                _tx_pool_addr_limit,
                _tx_pool_tx_per_addr_limit,
@@ -1650,6 +1658,7 @@ let encoding ?network data_dir : t Data_encoding.t =
                performance_profile ) ) )
        ->
       {
+        data_dir;
         public_rpc;
         private_rpc;
         websockets;
@@ -1672,7 +1681,12 @@ let encoding ?network data_dir : t Data_encoding.t =
         performance_profile;
       })
     (merge_objs
-       (obj3
+       (obj4
+          (dft
+             "data_dir"
+             ~description:"The path to the EVM node data directory."
+             string
+             default_data_dir)
           (dft
              "log_filter"
              log_filter_config_encoding
@@ -1729,11 +1743,10 @@ let encoding ?network data_dir : t Data_encoding.t =
           (obj10
              (dft
                 "kernel_execution"
-                (kernel_execution_encoding ?network data_dir)
+                (kernel_execution_encoding ?network ())
                 (kernel_execution_config_dft
                    ?preimages_endpoint:
                      (Option.map default_preimages_endpoint network)
-                   ~data_dir
                    ()))
              (dft "public_rpc" rpc_encoding (default_rpc ()))
              (opt "private_rpc" rpc_encoding)
@@ -1771,18 +1784,18 @@ let encoding ?network data_dir : t Data_encoding.t =
                 performance_profile_encoding
                 default_performance_profile))))
 
-let pp_print_json ~data_dir fmt config =
+let pp_print_json fmt config =
   let json =
     Data_encoding.Json.construct
       ~include_default_fields:`Always
-      (encoding data_dir)
+      (encoding ())
       config
   in
   Data_encoding.Json.pp fmt json
 
-let save ~force ~data_dir config config_file =
+let save ~force config config_file =
   let open Lwt_result_syntax in
-  let json = Data_encoding.Json.construct (encoding data_dir) config in
+  let json = Data_encoding.Json.construct (encoding ()) config in
   let*! exists = Lwt_unix.file_exists config_file in
   if exists && not force then
     failwith
@@ -1958,16 +1971,15 @@ let migrate_stabilized_experimental_features json =
   |> migrate_experimental_feature ["tx_queue"] ~new_path:["tx_pool"]
   |> merge_tx_pool_values
 
-let load_file ?network ~data_dir path =
+let load_file ?network path =
   let open Lwt_result_syntax in
   let* json = Lwt_utils_unix.Json.read_file path in
   let* () = precheck json in
   let json = migrate_stabilized_experimental_features json in
-  let config = Data_encoding.Json.destruct (encoding ?network data_dir) json in
+  let config = Data_encoding.Json.destruct (encoding ?network ()) json in
   return config
 
-let load ?network ~data_dir config_file =
-  load_file ?network ~data_dir config_file
+let load ?network config_file = load_file ?network config_file
 
 let error_missing_config ~name = [error_of_fmt "missing %s config" name]
 
@@ -1983,6 +1995,9 @@ let evm_node_endpoint_resolved network evm_node_endpoint =
        (fun network -> Uri.of_string (observer_evm_node_endpoint network))
        network)
 
+let preimages_path {data_dir; kernel_execution = {preimages; _}; _} =
+  Option.value preimages ~default:Filename.Infix.(data_dir // "wasm_2_0_0")
+
 module Cli = struct
   let default ~data_dir ?evm_node_endpoint ?network () =
     let observer =
@@ -1992,11 +2007,11 @@ module Cli = struct
     in
     let kernel_execution =
       kernel_execution_config_dft
-        ~data_dir
         ?preimages_endpoint:(Option.map default_preimages_endpoint network)
         ()
     in
     {
+      data_dir = Option.value data_dir ~default:default_data_dir;
       public_rpc = default_rpc ();
       private_rpc = None;
       websockets = None;
@@ -2021,9 +2036,7 @@ module Cli = struct
 
   let patch_kernel_execution_config kernel_execution ?preimages
       ?preimages_endpoint ?native_execution_policy () =
-    let preimages =
-      Option.value preimages ~default:kernel_execution.preimages
-    in
+    let preimages = Option.either preimages kernel_execution.preimages in
     let preimages_endpoint =
       Option.either preimages_endpoint kernel_execution.preimages_endpoint
     in
@@ -2048,11 +2061,11 @@ module Cli = struct
         Option.value ~default:rpc.max_active_connections max_active_connections;
     }
 
-  let patch_configuration_from_args ?rpc_addr ?rpc_port ?rpc_batch_limit
-      ?cors_origins ?cors_headers ?enable_websocket ?tx_queue_max_lifespan
-      ?tx_queue_max_size ?tx_queue_tx_per_addr_limit ?keep_alive
-      ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?profiling
-      ?preimages ?preimages_endpoint ?native_execution_policy
+  let patch_configuration_from_args ~data_dir ?rpc_addr ?rpc_port
+      ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
+      ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
+      ?keep_alive ?rollup_node_endpoint ?dont_track_rollup_node ?verbose
+      ?profiling ?preimages ?preimages_endpoint ?native_execution_policy
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
       ?sequencer_keys ?evm_node_endpoint ?log_filter_max_nb_blocks
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
@@ -2235,6 +2248,7 @@ module Cli = struct
       }
     in
     {
+      data_dir = Option.value data_dir ~default:configuration.data_dir;
       public_rpc;
       private_rpc;
       websockets;
@@ -2270,6 +2284,7 @@ module Cli = struct
       =
     default ~data_dir ?network ?evm_node_endpoint ()
     |> patch_configuration_from_args
+         ~data_dir
          ?rpc_addr
          ?rpc_port
          ?rpc_batch_limit
@@ -2323,7 +2338,9 @@ module Cli = struct
        node *)
     let* () =
       let*! identity_file_in_data_dir_exists =
-        Lwt_unix.file_exists (data_dir // "identity.json")
+        match data_dir with
+        | Some data_dir -> Lwt_unix.file_exists (data_dir // "identity.json")
+        | None -> Lwt.return_false
       in
       if identity_file_in_data_dir_exists then
         failwith
@@ -2335,9 +2352,10 @@ module Cli = struct
     if exists_config then
       (* Read configuration from file and patch if user wanted to override
          some fields with values provided by arguments. *)
-      let* configuration = load ?network ~data_dir config_file in
+      let* configuration = load ?network config_file in
       let configuration =
         patch_configuration_from_args
+          ~data_dir
           ?rpc_addr
           ?rpc_port
           ?rpc_batch_limit
@@ -2422,5 +2440,4 @@ module Cli = struct
 end
 
 let describe () =
-  Data_encoding.Json.schema (encoding "DATA_DIR_PATH")
-  |> Format.printf "%a" Json_schema.pp
+  Data_encoding.Json.schema (encoding ()) |> Format.printf "%a" Json_schema.pp

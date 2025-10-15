@@ -135,13 +135,13 @@ let install_finalizer_observer ~rollup_node_tracking
   let* () = Evm_context.shutdown () in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
-let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
+let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
     ~init_from_snapshot () =
   let open Lwt_result_syntax in
   let open Configuration in
   let* telemetry_cleanup =
     Octez_telemetry.Opentelemetry_setup.setup
-      ~data_dir
+      ~data_dir:config.data_dir
       ~service_namespace:"evm_node"
       ~service_name:"observer"
       ~version:Tezos_version_value.Bin_version.octez_evm_node_version_string
@@ -187,7 +187,6 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   let* _loaded =
     Evm_context.start
       ~configuration:config
-      ~data_dir
       ?kernel_path
       ~smart_rollup_address:
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
@@ -201,7 +200,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
      for spawning processes, one for the Irmin GC and the rest of the RPCs. *)
   let pool = Lwt_domain.setup_pool (max 1 (Misc.domain_count_cap () - 4)) in
   let* ro_ctxt =
-    Evm_ro_context.load ~pool ?network ~smart_rollup_address ~data_dir config
+    Evm_ro_context.load ~pool ?network ~smart_rollup_address config
   in
   let* () = Evm_ro_context.preload_known_kernels ro_ctxt in
 
@@ -238,7 +237,6 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
-      ~data_dir
       ~rpc_server_family
       config
       tx_container
@@ -295,7 +293,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
           ~exposed_port:config.public_rpc.port
           ~protected_endpoint
           ?private_endpoint
-          ~data_dir
+          ~data_dir:config.data_dir
           ())
       config.experimental_features.spawn_rpc
   in
