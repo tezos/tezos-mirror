@@ -475,6 +475,36 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_proxy ~faucet_pkh
    careful if we ever update it. *)
 let remote_umami_path = "/tmp/umami-v2"
 
+module Umami_process = struct
+  module Parameters = struct
+    type persistent_state = unit
+
+    type session_state = unit
+
+    let base_default_name = "umami"
+
+    let default_colors = Evm_node.daemon_default_colors
+  end
+
+  include Daemon.Make (Parameters)
+
+  let run ?runner ~port () =
+    let daemon =
+      create ?runner ~name:Parameters.base_default_name ~path:"sh" ()
+    in
+    run
+      ?runner
+      daemon
+      ()
+      [
+        "-c";
+        sf
+          "cd %s/apps/web && turbo preview -- --host 127.0.0.1 --port %d"
+          remote_umami_path
+          port;
+      ]
+end
+
 let umami_patch ~rpc_url ~tzkt_api_url =
   (* The Tezlink TzKT explorer requires some URL parameters suffixed to the
      different paths (block, contract, etc.), so it doesn't plug well into Umami
