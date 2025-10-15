@@ -11,12 +11,11 @@
 use crate::ast::big_map::{BigMapId, InMemoryLazyStorage, LazyStorage, LazyStorageError};
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
-use crate::ast::{Micheline, Type, TypedValue};
+use crate::ast::Type;
 use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
 use tezos_crypto_rs::{hash::OperationHash, public_key_hash::PublicKeyHash};
-use typed_arena::Arena;
 
 #[allow(missing_docs)]
 pub trait TypecheckingCtx<'a> {
@@ -328,45 +327,5 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
 
     fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {
         Box::new(&mut self.big_map_storage)
-    }
-}
-
-impl<'a> LazyStorage<'a> for Ctx<'a> {
-    fn big_map_get(
-        &mut self,
-        arena: &'a Arena<Micheline<'a>>,
-        id: &BigMapId,
-        key: &TypedValue,
-    ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
-        self.big_map_storage.big_map_get(arena, id, key)
-    }
-
-    fn big_map_mem(&mut self, id: &BigMapId, key: &TypedValue) -> Result<bool, LazyStorageError> {
-        self.big_map_storage.big_map_mem(id, key)
-    }
-
-    fn big_map_update(
-        &mut self,
-        id: &BigMapId,
-        key: TypedValue<'a>,
-        value: Option<TypedValue<'a>>,
-    ) -> Result<(), LazyStorageError> {
-        self.big_map_storage.big_map_update(id, key, value)
-    }
-
-    fn big_map_new(
-        &mut self,
-        key_type: &Type,
-        value_type: &Type,
-    ) -> Result<BigMapId, LazyStorageError> {
-        self.big_map_storage.big_map_new(key_type, value_type)
-    }
-
-    fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
-        self.big_map_storage.big_map_remove(id)
-    }
-
-    fn big_map_copy(&mut self, copied_id: &BigMapId) -> Result<BigMapId, LazyStorageError> {
-        self.big_map_storage.big_map_copy(copied_id)
     }
 }

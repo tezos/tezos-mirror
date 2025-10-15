@@ -436,50 +436,6 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
     }
 }
 
-impl<'a, Host: Runtime> LazyStorage<'a> for Ctx<'_, 'a, Host> {
-    fn big_map_get(
-        &mut self,
-        arena: &'a Arena<Micheline<'a>>,
-        id: &BigMapId,
-        key: &TypedValue,
-    ) -> Result<Option<TypedValue<'a>>, LazyStorageError> {
-        self.tc_ctx.big_map_get(arena, id, key)
-    }
-
-    fn big_map_mem(
-        &mut self,
-        id: &BigMapId,
-        key: &TypedValue,
-    ) -> Result<bool, LazyStorageError> {
-        self.tc_ctx.big_map_mem(id, key)
-    }
-
-    fn big_map_update(
-        &mut self,
-        id: &BigMapId,
-        key: TypedValue<'a>,
-        value: Option<TypedValue<'a>>,
-    ) -> Result<(), LazyStorageError> {
-        self.tc_ctx.big_map_update(id, key, value)
-    }
-
-    fn big_map_new(
-        &mut self,
-        key_type: &Type,
-        value_type: &Type,
-    ) -> Result<BigMapId, LazyStorageError> {
-        self.tc_ctx.big_map_new(key_type, value_type)
-    }
-
-    fn big_map_copy(&mut self, id: &BigMapId) -> Result<BigMapId, LazyStorageError> {
-        self.tc_ctx.big_map_copy(id)
-    }
-
-    fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
-        self.tc_ctx.big_map_remove(id)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -487,52 +443,17 @@ mod tests {
     use mir::ast::big_map::{
         dump_big_map_updates, BigMap, BigMapContent, BigMapFromLazyStorage,
     };
-    use primitive_types::H256;
     use std::collections::BTreeMap;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_tezlink::enc_wrappers::OperationHash;
 
     macro_rules! make_default_ctx {
         ($ctx:ident, $host: expr, $context: expr) => {
             let mut gas = TezlinkOperationGas::default();
-            let mut operation_counter = 0;
-            let mut origination_nonce =
-                OriginationNonce::initial(OperationHash(H256::zero()));
-            let mut operation_ctx = OperationCtx {
-                counter: &mut operation_counter,
-                source: &TezlinkImplicitAccount::from_public_key_hash(
-                    $context,
-                    &tezos_crypto_rs::public_key_hash::PublicKeyHash::from_b58check(
-                        "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP",
-                    )
-                    .unwrap(),
-                )
-                .unwrap(),
-                origination_nonce: &mut origination_nonce,
-                level: &0u32.into(),
-                now: &0i64.into(),
-                // default chain id NetXynUjJNZm7wi
-                chain_id: &tezos_crypto_rs::hash::ChainId::try_from(vec![
-                    0xf3, 0xd4, 0x85, 0x54,
-                ])
-                .unwrap(),
-            };
-            let mut tc_ctx = TcCtx {
+            let mut $ctx = TcCtx {
                 host: $host,
                 context: $context,
                 gas: &mut gas,
                 big_map_diff: &mut BTreeMap::new(),
-            };
-            let exec_ctx = ExecCtx {
-                balance: 0,
-                amount: 0,
-                self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
-                sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
-            };
-            let mut $ctx = Ctx {
-                tc_ctx: &mut tc_ctx,
-                operation_ctx: &mut operation_ctx,
-                exec_ctx,
             };
         };
     }
@@ -548,7 +469,7 @@ mod tests {
     }
 
     fn assert_big_map_eq<'a, Host: Runtime>(
-        ctx: &mut Ctx<'_, 'a, Host>,
+        ctx: &mut TcCtx<'a, Host>,
         arena: &'a Arena<Micheline<'a>>,
         id: &BigMapId,
         key_type: Type,
@@ -563,9 +484,9 @@ mod tests {
         assert_eq!(stored_key_type, key_type);
         assert_eq!(stored_value_type, value_type);
 
-        let big_map_path = big_map_path(ctx.tc_ctx.context, id).unwrap();
+        let big_map_path = big_map_path(ctx.context, id).unwrap();
         let nb_passed_keys = content.len();
-        let nb_stored_keys = ctx.tc_ctx.host.store_count_subkeys(&big_map_path).unwrap();
+        let nb_stored_keys = ctx.host.store_count_subkeys(&big_map_path).unwrap();
         // The big_map storage contains the key_type and value_type subkeys followed by the other keys corresponding to values
         assert_eq!(nb_passed_keys + 2, nb_stored_keys.try_into().unwrap());
 
