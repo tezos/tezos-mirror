@@ -595,12 +595,12 @@ module type COMPONENT_API = sig
   type tezt_timeout = No_timeout | Minutes of int
 
   val tezt_job :
+    pipeline:[`merge_request | `scheduled] ->
     description:string ->
     ?provider:Tezos_ci.Runner.Provider.t ->
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
-    ?select_tezts:bool ->
     ?fetch_records_from:string ->
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
@@ -614,7 +614,6 @@ module type COMPONENT_API = sig
     ?parallel_tests:int ->
     ?retry_jobs:int ->
     ?retry_tests:int ->
-    ?keep_going:bool ->
     ?test_selection:Tezt_core.TSL_AST.t ->
     ?before_script:string list ->
     string ->
@@ -850,13 +849,15 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   type tezt_timeout = No_timeout | Minutes of int
 
-  let tezt_job ~description ?provider ?arch ?(cpu = Tezos_ci.Runner.CPU.Tezt)
-      ?storage ?(select_tezts = true) ?fetch_records_from ?only_if_changed
-      ?(needs = []) ?needs_legacy ?test_coverage ?allow_failure ?tezt_exe
-      ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
+  let tezt_job ~pipeline ~description ?provider ?arch
+      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?fetch_records_from
+      ?only_if_changed ?(needs = []) ?needs_legacy ?test_coverage ?allow_failure
+      ?tezt_exe ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
       ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
-      ?(keep_going = false) ?(test_selection = Tezt_core.TSL_AST.True)
-      ?(before_script = []) variant =
+      ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = []) variant =
+    let select_tezts =
+      match pipeline with `merge_request -> true | `scheduled -> false
+    in
     let record_dir =
       let dir =
         match Component.name with
@@ -983,7 +984,9 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           ["--retry"; "${TEZT_RETRY}"];
           ["--record-mem-peak"];
           ["--mem-warn"; "5_000_000_000"];
-          (if keep_going then ["--keep-going"] else []);
+          (match pipeline with
+          | `scheduled -> ["--keep-going"]
+          | `merge_request -> []);
           ( Fun.flip List.concat_map junit_tags @@ fun tag ->
             ["--junit-tag"; Printf.sprintf "'dd_tags[tezt-tag.%s]=%s'" tag tag]
           );

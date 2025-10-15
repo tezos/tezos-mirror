@@ -68,11 +68,8 @@ let job_tezt =
   Cacio.parameterize @@ fun pipeline ->
   CI.tezt_job
     ""
+    ~pipeline
     ~description:"Run normal Tezt tests."
-    ~select_tezts:
-      (match pipeline with `merge_request -> true | `scheduled -> false)
-    ~keep_going:
-      (match pipeline with `merge_request -> false | `scheduled -> true)
     ~fetch_records_from:"schedule_extended_test"
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~needs_legacy:common_needs
@@ -87,11 +84,8 @@ let job_tezt_time_sensitive =
   Cacio.parameterize @@ fun pipeline ->
   CI.tezt_job
     "time-sensitive"
+    ~pipeline
     ~description:"Run Tezt tests tagged as time_sensitive."
-    ~select_tezts:
-      (match pipeline with `merge_request -> true | `scheduled -> false)
-    ~keep_going:
-      (match pipeline with `merge_request -> false | `scheduled -> true)
     ~fetch_records_from:"schedule_extended_test"
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~needs_legacy:common_needs
@@ -104,11 +98,8 @@ let job_tezt_riscv_slow_sequential =
   Cacio.parameterize @@ fun pipeline ->
   CI.tezt_job
     "riscv-slow-sequential"
+    ~pipeline
     ~description:"Run Tezt tests tagged as riscv_slow_sequential."
-    ~select_tezts:
-      (match pipeline with `merge_request -> true | `scheduled -> false)
-    ~keep_going:
-      (match pipeline with `merge_request -> false | `scheduled -> true)
     ~fetch_records_from:"schedule_extended_test"
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~needs_legacy:common_needs
@@ -121,11 +112,8 @@ let job_tezt_slow =
   Cacio.parameterize @@ fun pipeline ->
   CI.tezt_job
     "slow"
+    ~pipeline
     ~description:"Run Tezt tests tagged as slow."
-    ~select_tezts:
-      (match pipeline with `merge_request -> true | `scheduled -> false)
-    ~keep_going:
-      (match pipeline with `merge_request -> false | `scheduled -> true)
     ~fetch_records_from:"schedule_extended_test"
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~needs_legacy:common_needs
@@ -140,11 +128,8 @@ let job_tezt_extra =
   Cacio.parameterize @@ fun pipeline ->
   CI.tezt_job
     "extra"
+    ~pipeline
     ~description:"Run Tezt tests tagged as extra and not flaky."
-    ~select_tezts:
-      (match pipeline with `merge_request -> true | `scheduled -> false)
-    ~keep_going:
-      (match pipeline with `merge_request -> false | `scheduled -> true)
     ~fetch_records_from:"schedule_extended_test"
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~needs_legacy:common_needs
@@ -158,11 +143,8 @@ let job_tezt_flaky =
   Cacio.parameterize @@ fun pipeline ->
   CI.tezt_job
     "flaky"
+    ~pipeline
     ~description:"Run Tezt tests tagged as flaky."
-    ~select_tezts:
-      (match pipeline with `merge_request -> true | `scheduled -> false)
-    ~keep_going:
-      (match pipeline with `merge_request -> false | `scheduled -> true)
     ~fetch_records_from:"schedule_extended_test"
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~needs_legacy:common_needs
@@ -176,13 +158,10 @@ let job_tezt_static_binaries =
   Cacio.parameterize @@ fun pipeline ->
   CI.tezt_job
     "static-binaries"
+    ~pipeline
     ~description:
       "Run Tezt tests tagged as cli and not flaky, using static executables."
     ~cpu:Normal
-    ~select_tezts:
-      (match pipeline with `merge_request -> true | `scheduled -> false)
-    ~keep_going:
-      (match pipeline with `merge_request -> false | `scheduled -> true)
     ~fetch_records_from:"schedule_extended_test"
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~needs_legacy:

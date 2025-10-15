@@ -297,13 +297,12 @@ module type COMPONENT_API = sig
       - [retry_tests] is Tezt's [--retry].
         It allows Tezt to re-run tests that failed.
         By default, there is no retry.
-      - [keep_going] is Tezt's [--keep-going].
-        It defaults to [false] (don't keep going).
+      - Tezt's [--keep-going] is set if, and only if [pipeline] is [`scheduled].
 
       Test selection:
-      - [select_tezts] controls whether to activate test selection using Manifezt.
-        It defaults to [true]. When active, it causes the job to depend
-        on the [select_tezts] job, which is automatically added to the pipeline if necessary.
+      - Manifezt is active if, and only if [pipeline] is [`merge_request].
+        When active, it causes the job to depend on the [select_tezts] job,
+        which is automatically added to the pipeline if necessary.
       - [fetch_records_from] is the name of a scheduled pipeline to fetch Tezt records from.
         This allows Tezt to better select test for auto-balancing
         when using [parallel_jobs > 1]. If specified, it causes the job to depend
@@ -316,12 +315,12 @@ module type COMPONENT_API = sig
 
       For other arguments, see the documentation of the [job] function above. *)
   val tezt_job :
+    pipeline:[`merge_request | `scheduled] ->
     description:string ->
     ?provider:Tezos_ci.Runner.Provider.t ->
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
-    ?select_tezts:bool ->
     ?fetch_records_from:string ->
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
@@ -335,7 +334,6 @@ module type COMPONENT_API = sig
     ?parallel_tests:int ->
     ?retry_jobs:int ->
     ?retry_tests:int ->
-    ?keep_going:bool ->
     ?test_selection:Tezt_core.TSL_AST.t ->
     ?before_script:string list ->
     string ->
