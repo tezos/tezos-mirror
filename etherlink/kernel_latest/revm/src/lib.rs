@@ -237,8 +237,10 @@ fn evm<'a, Host: Runtime>(
     precompiles: EtherlinkPrecompiles,
     chain_id: u64,
     spec_id: SpecId,
+    is_simulation: bool,
 ) -> EvmContext<'a, Host> {
-    let cfg = CfgEnv::new().with_chain_id(chain_id).with_spec(spec_id);
+    let mut cfg = CfgEnv::new().with_chain_id(chain_id).with_spec(spec_id);
+    cfg.disable_eip3607 = is_simulation;
 
     Context::<
         BlockEnv,
@@ -270,6 +272,7 @@ pub fn run_transaction<'a, Host: Runtime>(
     access_list: AccessList,
     authorization_list: Option<Vec<SignedAuthorization>>,
     tracer_input: Option<TracerInput>,
+    is_simulation: bool,
 ) -> Result<ExecutionOutcome, EVMError<Error>> {
     let block_env = block_env(block_constants)?;
     let tx = tx_env(
@@ -285,7 +288,7 @@ pub fn run_transaction<'a, Host: Runtime>(
         block_constants.chain_id.as_u64(),
     )?;
 
-    let db = EtherlinkVMDB::new(host, block_constants, caller)?;
+    let db = EtherlinkVMDB::new(host, block_constants)?;
 
     if let Some(tracer_input) = tracer_input {
         let inspector = get_inspector_from(tracer_input, precompiles.clone(), spec_id);
@@ -326,6 +329,7 @@ pub fn run_transaction<'a, Host: Runtime>(
             precompiles,
             block_constants.chain_id.as_u64(),
             spec_id,
+            is_simulation,
         );
 
         let execution_result = trace!("evm.transact_commit", evm.transact_commit(&tx))?;
@@ -501,6 +505,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         )
         .unwrap();
 
@@ -582,6 +587,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         )
         .unwrap();
 
@@ -648,6 +654,8 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+                        false,
+
         );
 
         match result {
@@ -728,6 +736,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         )
         .unwrap();
 
@@ -806,6 +815,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         )
         .unwrap();
 
@@ -867,6 +877,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         );
 
         let contract_address = match result_create {
@@ -896,6 +907,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         );
 
         match result_call {
@@ -935,6 +947,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         );
 
         let revert_contract_address = match result_create {
@@ -1015,6 +1028,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         )
         .unwrap();
 
@@ -1069,6 +1083,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         );
 
         let revert_contract_address = match result_create {
@@ -1106,6 +1121,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         )
         .unwrap();
 
@@ -1183,6 +1199,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         )
         .unwrap();
 
@@ -1238,6 +1255,7 @@ mod test {
             AccessList(vec![]),
             Some(vec![]),
             None,
+            false,
         );
 
         assert_eq!(
@@ -1282,6 +1300,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         )
         .unwrap();
 
@@ -1305,6 +1324,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
+            false,
         )
         .unwrap();
 
@@ -1477,6 +1497,7 @@ mod test {
                 AccessList(vec![]),
                 None,
                 None,
+                false,
             )
             .unwrap();
             if !outcome.result.is_success() {
@@ -1510,6 +1531,7 @@ mod test {
                 AccessList(vec![]),
                 None,
                 None,
+                false,
             )
             .unwrap()
         }
@@ -1546,6 +1568,7 @@ mod test {
                 AccessList(vec![]),
                 None,
                 None,
+                false,
             )
             .unwrap()
         }
@@ -1579,6 +1602,7 @@ mod test {
                 AccessList(vec![]),
                 None,
                 None,
+                false,
             );
 
             match result_create {

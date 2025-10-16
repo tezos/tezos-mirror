@@ -10,6 +10,7 @@
 ### Bug fixes
 
 - FA deposit events are now emitted by the FA bridge address: `0xff00000000000000000000000000000000000002` (!19239)
+- Disable [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) on simulation (`eth_call`). (!19643)
 
 ### Internal
 

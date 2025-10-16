@@ -312,6 +312,7 @@ pub fn revm_run_transaction<Host: Runtime>(
     authorization_list: Option<AuthorizationList>,
     spec_id: &SpecId,
     tracer_input: Option<TracerInput>,
+    is_simulation: bool,
 ) -> Result<ExecutionOutcome, anyhow::Error> {
     // Disclaimer:
     // The following code is over-complicated because we maintain
@@ -397,6 +398,7 @@ pub fn revm_run_transaction<Host: Runtime>(
             ),
             TracerInput::NoOp => revm_etherlink::inspectors::TracerInput::NoOp,
         }),
+        is_simulation,
     )
     .map_err(|err| {
         Error::InvalidRunTransaction(revm_etherlink::Error::Custom(format!(
@@ -450,6 +452,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         transaction.authorization_list.clone(),
         spec_id,
         tracer_input,
+        false,
     ) {
         Ok(outcome) => outcome,
         Err(err) => {
@@ -627,6 +630,7 @@ fn apply_fa_deposit<Host: Runtime>(
         None,
         spec_id,
         tracer_input,
+        false,
     ) {
         Ok(outcome) => outcome,
         Err(err) => {
