@@ -2689,7 +2689,7 @@ let test_observer_receives_preconfirmations =
   let* () = Evm_node.run observer in
   let* _ = p in
 
-  (* 
+  (*
     1. Observer receives the transaction
     2. Transaction is added to the transaction queue
     3. Transaction is forwarded to the sequencer
@@ -11743,6 +11743,89 @@ let test_trace_block =
       ~error_msg:"Should not have a list of subcalls") ;
   unit
 
+let test_trace_block_txs_same_caller =
+  register_all
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "trace"; "block"]
+    ~title:
+      "debug_traceBlockByNumber succeeds on block with transactions using same \
+       caller"
+    ~kernels:Kernel.all
+  @@ fun {client; sc_rollup_node; sequencer; proxy; evm_version; _} _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+  let endpoint = Evm_node.endpoint sequencer in
+  let sender_0 = Eth_account.bootstrap_accounts.(0) in
+  let* call_types = Solidity_contracts.call_types evm_version in
+  let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
+  let* address, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:sender_0.Eth_account.private_key
+         ~endpoint
+         ~abi:call_types.label
+         ~bin:call_types.bin)
+      sequencer
+  in
+  let* raw_tx_0 =
+    Cast.craft_tx
+      ~chain_id:1337
+      ~source_private_key:sender_0.private_key
+      ~nonce:1
+      ~gas_price:1_000_000_000
+      ~gas:300_000
+      ~value:Wei.zero
+      ~address
+      ~signature:"testProduceOpcodes()"
+      ()
+  in
+  let* raw_tx_1 =
+    Cast.craft_tx
+      ~chain_id:1337
+      ~source_private_key:sender_0.private_key
+      ~nonce:2
+      ~gas_price:1_000_000_000
+      ~gas:300_000
+      ~value:Wei.one
+      ~address:sender_0.address
+      ()
+  in
+  let*@ transaction_hash_0 =
+    Rpc.send_raw_transaction ~raw_tx:raw_tx_0 sequencer
+  in
+  let*@ transaction_hash_1 =
+    Rpc.send_raw_transaction ~raw_tx:raw_tx_1 sequencer
+  in
+  let*@ size = produce_block sequencer in
+  Check.((size = 2) int)
+    ~error_msg:"Expected 2 transactions in the block, got %L" ;
+  let*@ trace_result = Rpc.trace_block ~block:Rpc.Latest sequencer in
+  Check.(
+    (List.length trace_result = 2)
+      int
+      ~error_msg:"Wrong nb of traces, expected %R but got %L") ;
+  let t0 = List.nth trace_result 0 in
+  let t1 = List.nth trace_result 1 in
+  (* first tx is a contract call with internal calls *)
+  Check.(
+    JSON.(t0 |-> "txHash" |> as_string = transaction_hash_0)
+      string
+      ~error_msg:"Wrong hash, expected %R but got %L") ;
+  Check.(
+    JSON.(t0 |-> "result" |-> "calls" |> as_list <> [])
+      (list json)
+      ~error_msg:"Should have a list of subcalls") ;
+  (* second tx is a simple transfer *)
+  Check.(
+    JSON.(t1 |-> "txHash" |> as_string = transaction_hash_1)
+      string
+      ~error_msg:"Wrong hash, expected %R but got %L") ;
+  Check.(
+    JSON.(t1 |-> "result" |-> "calls" |> as_list = [])
+      (list json)
+      ~error_msg:"Should not have a list of subcalls") ;
+  unit
+
 let test_init_config_mainnet network =
   Regression.register
     ~__FILE__
@@ -14228,6 +14311,7 @@ let () =
   test_trace_call protocols ;
   test_trace_empty_block protocols ;
   test_trace_block protocols ;
+  test_trace_block_txs_same_caller protocols ;
   test_trace_block_struct_logger protocols ;
   test_patch_kernel protocols ;
   test_observer_finalized_view protocols ;
