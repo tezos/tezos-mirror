@@ -143,6 +143,88 @@ let finalize_slot_headers_for_published_level ctxt ~number_of_slots
   in
   return (ctxt, attestation)
 
+(* Handle the first block after an attestation_lag shrink (P1 -> P2).  We
+   "backfill" the missing published levels so the DAL skip-list has no gaps:
+   process the [prev_attestation_lag - curr_attestation_lag] intermediate
+   published levels in order, then the "normal" [target_published_level].
+
+   The function assumes that prev_attestation_lag > curr_attestation_lag.
+
+   Semantics during backfill: do NOT proto-attest slots. *)
+let finalize_slot_headers_at_lag_migration ctxt ~target_published_level
+    ~number_of_slots ~prev_attestation_lag ~curr_attestation_lag =
+  let open Lwt_result_syntax in
+  (* During migration, backfilled published levels must not be proto-attested.
+     We enforce a conservative attestation status (no proto attest, zero
+     shards). *)
+  let is_slot_attested slot =
+    let status =
+      Raw_context.Dal.is_slot_index_attested
+        ctxt
+        slot.Dal_slot_repr.Header.id.index
+    in
+    {status with attested_shards = 0; is_proto_attested = false}
+  in
+  (* Process published levels from oldest to newest:
+
+     - Set [current_gap = prev_attestation_lag - curr_attestation_lag]
+
+     - Start at [target_published_level - current_gap].
+
+     This is equal to [current_level - prev_attestation_lag], since
+     [target_published_level = current_level - curr_attestation_lag].
+
+     - Incrementally finalize each published level up to
+      [target_published_level] by reducing the gap
+
+     - Make sure to use the right (intermediate) attestation_lag for each
+     processed intermediate level (we'll decrease the lag from
+     [prev_attestation_lag] to [curr_attestation_lag] one by one).
+
+     Notes:
+     - [LevelHistories] is overwritten at each finalize; we collect the
+     per-level cells after each step and batch-write them once at the end.
+     - Only the final attestation bitset (for [target_published_level]) is
+     returned for inclusion in the block header. This should not be an issue, as
+     backfilled levels are non-attesting by design during migration. *)
+  let rec aux ctxt ~cells_of_pub_levels ~current_gap =
+    match Raw_level_repr.(sub target_published_level current_gap) with
+    | None ->
+        (* Defensive: not expected on our networks. *)
+        return (ctxt, Dal_attestation_repr.empty, cells_of_pub_levels)
+    | Some published_level ->
+        (* Finalize this published level. *)
+        let* ctxt, attestation_bitset =
+          finalize_slot_headers_for_published_level
+            ~attestation_lag:(curr_attestation_lag + current_gap)
+            ctxt
+            ~number_of_slots
+            ~is_slot_attested
+            published_level
+        in
+        (* Collect skip-list cells produced at this step. *)
+        let* cells_of_pub_levels =
+          let+ cells_of_this_pub_level = find_level_histories ctxt in
+          cells_of_this_pub_level :: cells_of_pub_levels
+        in
+        if Compare.Int.(current_gap = 0) then
+          (* Done: [target_published_level] processed. *)
+          return (ctxt, attestation_bitset, cells_of_pub_levels)
+        else aux ctxt ~cells_of_pub_levels ~current_gap:(current_gap - 1)
+  in
+  (* Main entry for processing several published levels at migration. *)
+  let current_gap = prev_attestation_lag - curr_attestation_lag in
+  let* ctxt, attestation_bitset, cells_of_pub_levels =
+    aux ctxt ~cells_of_pub_levels:[] ~current_gap
+  in
+  (* Persist all collected per-level cells in one write. *)
+  let*! ctxt =
+    List.(filter_map (fun e -> e) cells_of_pub_levels |> concat)
+    |> List.rev
+    |> Storage.Dal.Slot.LevelHistories.add ctxt
+  in
+  return (ctxt, attestation_bitset)
+
 let finalize_pending_slot_headers ctxt ~number_of_slots =
   let open Lwt_result_syntax in
   let {Level_repr.level = raw_level; _} = Raw_context.current_level ctxt in
@@ -179,7 +261,6 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
       let prev_attestation_lag =
         Dal_slot_repr.History.attestation_lag_value prev_attestation_lag
       in
-
       let reset_dummy_genesis =
         Dal_slot_repr.History.(equal sl_history_head genesis)
       in
@@ -211,4 +292,9 @@ let finalize_pending_slot_headers ctxt ~number_of_slots =
 
            We will backfill the missing [prev_attestation_lag -
            curr_attestation_lag] levels with 32 cells each. *)
-        failwith "TODO: implemented in next commits"
+        finalize_slot_headers_at_lag_migration
+          ~prev_attestation_lag
+          ~curr_attestation_lag
+          ctxt
+          ~target_published_level:published_level
+          ~number_of_slots
