@@ -1169,6 +1169,8 @@ module type Tezlink = sig
   val time_between_blocks : Tezos.Evm_node.time_between_blocks
 
   val activate_ssl : bool
+
+  val parent_dns_domain : string option
 end
 
 module Tezlink () : Tezlink = struct
@@ -1264,4 +1266,14 @@ module Tezlink () : Tezlink = struct
          services: sequencer RPC endpoint and TzKT API (if enabled). Requires \
          the dns-domain option."
       false
+
+  let parent_dns_domain =
+    Clap.optional_string
+      ~section
+      ~long:"parent-dns-domain"
+      ~description:
+        "When this option is set, it is used to compute the DNS of all \
+         services as subdomains of this parent domain. However, all used \
+         domains need to be registered with the dns-domain option."
+      ()
 end
