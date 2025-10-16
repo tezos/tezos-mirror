@@ -840,9 +840,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~site:"tezlink"
                 (rpc_nginx_node @ tzkt_nginx_config)
             in
-            let () =
-              toplog "SSL certificate: %s, SSL key: %s" ssl.certificate ssl.key
-            in
             unit
         | None -> unit
       in
