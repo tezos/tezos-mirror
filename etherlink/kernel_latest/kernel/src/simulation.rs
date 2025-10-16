@@ -799,6 +799,7 @@ mod tests {
             vec![].into(),
             None,
             None,
+            false,
         );
         assert!(
             outcome.is_ok(),
