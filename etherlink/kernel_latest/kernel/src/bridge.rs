@@ -54,6 +54,12 @@ alloy_sol_types::sol! {
     );
 }
 
+#[derive(Debug, PartialEq)]
+pub struct DepositInfo {
+    pub receiver: H160,
+    pub chain_id: Option<U256>,
+}
+
 /// Native token deposit
 #[derive(Debug, PartialEq, Clone, RlpEncodable)]
 pub struct Deposit {
@@ -73,21 +79,25 @@ impl Deposit {
     const RECEIVER_AND_CHAIN_ID_LENGTH: usize =
         Self::RECEIVER_LENGTH + std::mem::size_of::<U256>();
 
-    fn parse_receiver(
-        input: MichelsonBytes,
-    ) -> Result<(H160, Option<U256>), BridgeError> {
+    fn parse_deposit_info(input: MichelsonBytes) -> Result<DepositInfo, BridgeError> {
         let input_bytes = input.0;
         let input_length = input_bytes.len();
         if input_length == Self::RECEIVER_LENGTH {
             // Legacy format, input is exactly the receiver EVM address
             let receiver = H160::from_slice(&input_bytes);
-            Ok((receiver, None))
+            Ok(DepositInfo {
+                receiver,
+                chain_id: None,
+            })
         } else if input_length == Self::RECEIVER_AND_CHAIN_ID_LENGTH {
             // input is receiver followed by chain id
             let receiver = H160::from_slice(&input_bytes[..Self::RECEIVER_LENGTH]);
             let chain_id =
                 U256::from_little_endian(&input_bytes[Self::RECEIVER_LENGTH..]);
-            Ok((receiver, Some(chain_id)))
+            Ok(DepositInfo {
+                receiver,
+                chain_id: Some(chain_id),
+            })
         } else {
             Err(BridgeError::InvalidDepositReceiver(input_bytes))
         }
@@ -113,16 +123,16 @@ impl Deposit {
 
         // EVM address of the receiver and chain id both come from the
         // Michelson byte parameter.
-        let (receiver, chain_id) = Self::parse_receiver(receiver)?;
+        let info = Self::parse_deposit_info(receiver)?;
 
         Ok((
             Self {
                 amount,
-                receiver,
+                receiver: info.receiver,
                 inbox_level,
                 inbox_msg_id,
             },
-            chain_id,
+            info.chain_id,
         ))
     }
 
