@@ -29,7 +29,7 @@ use storage::{
     STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_evm_logging::{log, Level::*, Verbosity};
+use tezos_evm_logging::{log, otel_trace, Level::*, Verbosity};
 use tezos_evm_runtime::internal_runtime::InternalRuntime;
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
 use tezos_smart_rollup::entrypoint;
@@ -226,7 +226,7 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
 
     // We always start by doing the migration if needed.
-    match stage_zero(host) {
+    match otel_trace!(host, "stage_zero", stage_zero(host)) {
         Ok(MigrationStatus::None) => {
             // No migration in progress. However as we want to have the kernel
             // version written in the storage, we check for its existence
@@ -291,11 +291,15 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
-    if let StageOneStatus::Reboot = stage_one(
+    if let StageOneStatus::Reboot = otel_trace!(
         host,
-        smart_rollup_address,
-        &chain_configuration,
-        &mut configuration,
+        "stage_one",
+        stage_one(
+            host,
+            smart_rollup_address,
+            &chain_configuration,
+            &mut configuration,
+        )
     )
     .context("Failed during stage 1")?
     {
@@ -310,26 +314,30 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
         log!(host, Debug, "Entering stage two.");
-        if let block::ComputationResult::RebootNeeded = match chain_configuration {
-            chains::ChainConfig::Evm(chain_configuration) => block::produce(
-                host,
-                &*chain_configuration,
-                &mut configuration,
-                sequencer_pool_address,
-                trace_input,
-            ),
-            chains::ChainConfig::Michelson(chain_configuration) => block::produce(
-                host,
-                &chain_configuration,
-                &mut configuration,
-                sequencer_pool_address,
-                trace_input,
-            ),
-        }
-        .context("Failed during stage 2")?
-        {
-            host.mark_for_reboot()?;
-        }
+        otel_trace!(
+            host,
+            "stage_two",
+            if let block::ComputationResult::RebootNeeded = match chain_configuration {
+                chains::ChainConfig::Evm(chain_configuration) => block::produce(
+                    host,
+                    &*chain_configuration,
+                    &mut configuration,
+                    sequencer_pool_address,
+                    trace_input,
+                ),
+                chains::ChainConfig::Michelson(chain_configuration) => block::produce(
+                    host,
+                    &chain_configuration,
+                    &mut configuration,
+                    sequencer_pool_address,
+                    trace_input,
+                ),
+            }
+            .context("Failed during stage 2")?
+            {
+                host.mark_for_reboot()?;
+            }
+        )
     }
 
     #[cfg(feature = "benchmark-bypass-stage2")]

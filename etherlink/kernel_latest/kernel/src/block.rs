@@ -34,7 +34,7 @@ use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_evm_logging::{log, Level::*, Verbosity};
+use tezos_evm_logging::{log, otel_trace, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
@@ -168,17 +168,21 @@ fn compute<Host: Runtime>(
 
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
-        match apply_transaction(
+        match otel_trace!(
             host,
-            outbox_queue,
-            block_constants,
-            &transaction,
-            block_in_progress.index,
-            sequencer_pool_address,
-            tracer_input,
-            spec_id,
-            limits,
-        )? {
+            "apply_transaction",
+            apply_transaction(
+                host,
+                outbox_queue,
+                block_constants,
+                &transaction,
+                block_in_progress.index,
+                sequencer_pool_address,
+                tracer_input,
+                spec_id,
+                limits,
+            )?
+        ) {
             ExecutionResult::Valid(ExecutionInfo {
                 receipt_info,
                 object_info,
