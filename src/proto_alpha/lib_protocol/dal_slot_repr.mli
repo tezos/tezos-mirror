@@ -499,7 +499,11 @@ module History : sig
       attestation threshold of the commitment is used instead of the Protocol's
       flag to decide if the page's slot is attested. Furthermore, in case some
       publishers are provided in [restricted_commitments_publishers], we also
-      check if the commitment's publisher is whitelisted in that list. *)
+      check if the commitment's publisher is whitelisted in that list.
+
+      The returned result also contains the attestation lag used for the target
+      cell in the skip list so that refutation games use the correct value,
+      in particular across protocol migrations that decrease the lag. *)
   val produce_proof :
     parameters ->
     attestation_threshold_percent:int option ->
@@ -508,7 +512,7 @@ module History : sig
     page_info:(Page.content * Page.proof) option ->
     get_history:(hash -> t option Lwt.t) ->
     t ->
-    (proof * Page.content option) tzresult Lwt.t
+    (proof * Page.content option * attestation_lag_kind) tzresult Lwt.t
 
   (** [verify_proof dal_params page_id snapshot proof] verifies
       that the given [proof] is a valid proof to show that either:
@@ -520,8 +524,16 @@ module History : sig
       that could contain the page identified by [page_id].
 
       [dal_parameters] is used when verifying that/if the page is part of
-      the candidate slot (if any). *)
-  val verify_proof : parameters -> Page.t -> t -> proof -> bytes option tzresult
+      the candidate slot (if any).
+
+      In both cases, the attestation lag used for the target cell in the skip
+      list is returned, alongside the page's bytes if the slot is attested. *)
+  val verify_proof :
+    parameters ->
+    Page.t ->
+    t ->
+    proof ->
+    (bytes option * attestation_lag_kind) tzresult
 
   (** Given a DAL proof, this function returns the values of the fields
       [attestation_threshold_percent] [restricted_commitments_publishers] stored
