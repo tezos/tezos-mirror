@@ -384,6 +384,54 @@ let init_faucet_frontend ~faucet_api ~agent ~tezlink_sandbox_endpoint
   in
   return (build_endpoint ~runner ~dns_domain faucet_frontend_port)
 
+let umami_patch ~rpc_url ~tzkt_api_url =
+  (* The Tezlink TzKT explorer requires some URL parameters suffixed to the
+     different paths (block, contract, etc.), so it doesn't plug well into Umami
+     for now. *)
+  sf
+    {|diff --git a/packages/tezos/src/Network.ts b/packages/tezos/src/Network.ts
+index 1d28850f..5c3058c4 100644
+--- a/packages/tezos/src/Network.ts
++++ b/packages/tezos/src/Network.ts
+@@ -16,6 +16,14 @@ export const GHOSTNET: Network = {
+   buyTezUrl: "https://faucet.ghostnet.teztnets.com/",
+ };
+
++export const TEZLINK: Network = {
++  name: "Tezlink",
++  rpcUrl: "%s",
++  tzktApiUrl: "%s",
++  tzktExplorerUrl: "",
++  buyTezUrl: "",
++};
++
+ export const isDefault = (network: Network) => !!DefaultNetworks.find(n => n.name === network.name);
+
+-export const DefaultNetworks: Network[] = [MAINNET, GHOSTNET];
++export const DefaultNetworks: Network[] = [TEZLINK];
+|}
+    rpc_url
+    tzkt_api_url
+
+let init_umami agent ~tezlink_proxy_endpoint ~external_tzkt_api_endpoint =
+  let rpc_url = Client.string_of_endpoint tezlink_proxy_endpoint in
+  let tzkt_api_url = Client.string_of_endpoint external_tzkt_api_endpoint in
+  let patch = umami_patch ~rpc_url ~tzkt_api_url in
+  (* Create a local patch file with its contents. *)
+  let patch_filename = Temp.file "umami.patch" in
+  let out_chan = Stdlib.open_out patch_filename in
+  let patch_ppf = Format.formatter_of_out_channel out_chan in
+  Format.pp_print_string patch_ppf patch ;
+  close_out out_chan ;
+  (* Upload and delete the patch file. *)
+  let patch_dst = "/tmp/umami.patch" in
+  let* _ = Agent.copy ~destination:patch_dst ~source:patch_filename agent in
+  let* () = Process.spawn "rm" [patch_filename] |> Process.check in
+  (* Apply the patch.
+     It's not ideal, but the path to Umami is set in the dockerfile. We have to
+     be careful if we ever update it.*)
+  run_cmd agent (sf "cd /tmp/umami-v2 && git apply %s" patch_dst)
+
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string) ~(rpc_port : int)
     (verbose : bool) (time_between_blocks : Evm_node.time_between_blocks) agent
     =
@@ -674,6 +722,14 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~agent:tezlink_sequencer_agent
                 ~tezlink_sandbox_endpoint
                 ~time_between_blocks:Cli.time_between_blocks
+            and* () =
+              let external_tzkt_api_endpoint =
+                proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
+              in
+              init_umami
+                tezlink_sequencer_agent
+                ~tezlink_proxy_endpoint
+                ~external_tzkt_api_endpoint
             and* () =
               if Cli.faucet then
                 let () = toplog "Starting faucet" in
