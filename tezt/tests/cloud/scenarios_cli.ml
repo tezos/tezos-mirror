@@ -1102,6 +1102,8 @@ module type Tezlink = sig
   val verbose : bool
 
   val time_between_blocks : Tezos.Evm_node.time_between_blocks
+
+  val activate_ssl : bool
 end
 
 module Tezlink () : Tezlink = struct
@@ -1186,4 +1188,15 @@ module Tezlink () : Tezlink = struct
           (* `Tezos.Evm_node.Nothing` is a placeholder and will be ignored as we registered an error in Clap *)
           Tezos.Evm_node.Nothing
       | Some f -> Time_between_blocks f
+
+  let activate_ssl =
+    Clap.flag
+      ~section
+      ~set_long:"activate-ssl"
+      ~unset_long:"deactivate-ssl"
+      ~description:
+        "Generate SSL certificates and serve over HTTPS the following \
+         services: sequencer RPC endpoint and TzKT API (if enabled). Requires \
+         the dns-domain option."
+      false
 end
