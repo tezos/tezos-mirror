@@ -21,6 +21,9 @@ In some cases, this issue could cause bakers to lose consensus rewards or, in ce
 
 **For all other distributions, this version is the same as Octez v23.1**
 
+An overview of breaking changes and deprecations introduced in Octez
+v23 can be found :ref:`here<v23_breaking_changes>`.
+
 .. _protocol_support_v23:
 
 Protocol Support

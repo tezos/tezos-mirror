@@ -18,6 +18,8 @@ In the particular case of RPC changes, you may consult complementary information
 
 
 
+.. _t024_breaking_changes:
+
 Protocol T024
 -------------
 
@@ -92,6 +94,8 @@ accessed.
 
 
 
+.. _v23_breaking_changes:
+
 Octez Version 23
 ----------------
 
@@ -132,6 +136,8 @@ This change affects the configuration files of the node, client,
 signer, baker, accuser, smart rollup node, and DAL node.
 
 
+
+.. _seoul_breaking_changes:
 
 Protocol Seoul
 --------------
@@ -175,7 +181,7 @@ slot, that is, be either a standalone operation for this slot or an
 aggregate whose committee includes this slot.
 The receipts for these operations have also been reworked, see :ref:`seoul_receipts_changes`.
 
-All existing tz4 addresses are being unrevealed when protocol S is adopted, and they must provide a proof of possession to be revealed again, see :ref:`seoul_breaking_changes`.
+All existing tz4 addresses are being unrevealed when protocol S is adopted, and they must provide a proof of possession to be revealed again, see :ref:`seoul_changelog_breaking_changes`.
 This proof may be generated using the client command::
 
 	octez-client create bls proof for <alias>
