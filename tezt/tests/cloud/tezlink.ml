@@ -820,29 +820,21 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | Some full_name ->
             let* ssl = Ssl.generate tezlink_sequencer_agent full_name in
             let* () =
-              let proxy_pass =
-                (* The trailing / is mandatory, otherwise the reverse proxy
-                   won't be able to serve services with a path. *)
-                Client.string_of_endpoint tezlink_sandbox_endpoint ^ "/"
-              in
               let rpc_nginx_node =
-                Nginx_reverse_proxy.simple_ssl_node
-                  ~server_name:full_name
-                  ~port:public_rpc_port
-                  ~location:"/"
-                  ~proxy_pass
-                  ~certificate:ssl.certificate
-                  ~certificate_key:ssl.key
+                nginx_reverse_proxy_config ~ssl ~proxy:sequencer_proxy_info
               in
-              let tzkt_nginx_config =
-                match tzkt_proxy with
-                | None -> None
-                | Some proxy -> nginx_reverse_proxy_config ~ssl ~proxy
-              in
-              Nginx_reverse_proxy.init
-                ~agent:tezlink_sequencer_agent
-                ~site:"tezlink"
-                (rpc_nginx_node @ Option.value ~default:[] tzkt_nginx_config)
+              match rpc_nginx_node with
+              | None -> unit
+              | Some rpc_nginx_node ->
+                  let tzkt_nginx_config =
+                    match tzkt_proxy with
+                    | None -> None
+                    | Some proxy -> nginx_reverse_proxy_config ~ssl ~proxy
+                  in
+                  Nginx_reverse_proxy.init
+                    ~agent:tezlink_sequencer_agent
+                    ~site:"tezlink"
+                    (rpc_nginx_node @ Option.value ~default:[] tzkt_nginx_config)
             in
             unit
         | None -> unit
