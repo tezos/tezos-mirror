@@ -74,9 +74,13 @@ let remove_old_level_stored_data proto_parameters ctxt current_level =
            (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
               We may want to remove this check. *)
            if Node_context.supports_refutations ctxt then
-             let* res =
-               Store.Skip_list_cells.remove store ~attested_level:oldest_level
+             let published_level =
+               Int32.(
+                 sub
+                   oldest_level
+                   (of_int proto_parameters.Types.attestation_lag))
              in
+             let* res = Store.Skip_list_cells.remove store ~published_level in
              match res with
              | Ok () -> Event.emit_removed_skip_list_cells ~level:oldest_level
              | Error error ->
@@ -161,6 +165,11 @@ let may_update_topics ctxt proto_parameters ~block_level =
     (Node_context.get_gs_worker ctxt)
     committee
 
+(* Here [Plugin] and [dal_constants] should be the ones for the predecessor of
+   the [attested_level]. This is because if [attested_level] is the migration
+   level, then skip-list cells were build using the previous protocol's encoding
+   and parameters; while the plugin and parameters at [attested_level] are the
+   ones for the new protocol (given that the migration already occurred). *)
 let store_skip_list_cells ctxt cctxt dal_constants ~attested_level
     (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
@@ -194,7 +203,15 @@ let store_skip_list_cells ctxt cctxt dal_constants ~attested_level
       cells_of_level
   in
   let store = Node_context.get_store ctxt in
-  Store.Skip_list_cells.insert store ~attested_level cells_of_level
+  (* DAL/FIXME: use the lag and published_level returned by the cells_of_level
+     in https://gitlab.com/tezos/tezos/-/merge_requests/19512 *)
+  let attestation_lag = dal_constants.Types.attestation_lag in
+  let published_level = Int32.(sub attested_level (of_int attestation_lag)) in
+  Store.Skip_list_cells.insert
+    store
+    ~published_level
+    ~attestation_lag
+    cells_of_level
 
 (* This functions counts, for each slot, the number of shards attested by the bakers. *)
 let attested_shards_per_slot attestations slot_to_committee ~number_of_slots
@@ -408,8 +425,8 @@ let process_commitments ctxt cctxt store proto_parameters block_level
        [@profiler.aggregate_s {verbosity = Notice} "publish_slot_data"]))
     slot_headers
 
-let process_finalized_block_data ctxt cctxt store proto_parameters block_level
-    (module Plugin : Dal_plugin.T) =
+let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
+    ~proto_parameters block_level (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
   let* block_info =
     (Plugin.block_info
@@ -423,7 +440,7 @@ let process_finalized_block_data ctxt cctxt store proto_parameters block_level
       store_skip_list_cells
         ctxt
         cctxt
-        proto_parameters
+        prev_proto_parameters
         ~attested_level:block_level
         (module Plugin : Dal_plugin.T)
       [@profiler.record_s {verbosity = Notice} "store_skip_list_cells"]
@@ -436,7 +453,7 @@ let process_finalized_block_data ctxt cctxt store proto_parameters block_level
   let* () =
     (Slot_manager.update_selected_slot_headers_statuses
        ~block_level
-       ~attestation_lag:proto_parameters.attestation_lag
+       ~attestation_lag:proto_parameters.Types.attestation_lag
        ~number_of_slots:proto_parameters.number_of_slots
        (Plugin.is_attested dal_attestation)
        store
@@ -502,8 +519,8 @@ let process_block ctxt cctxt l1_crawler proto_parameters finalized_shell_header
   let store = Node_context.get_store ctxt in
   let block_level = finalized_shell_header.Block_header.level in
   let pred_level = Int32.pred block_level in
-  let*? (module Plugin) =
-    Node_context.get_plugin_for_level ctxt ~level:pred_level
+  let*? (module Plugin), prev_proto_parameters =
+    Node_context.get_plugin_and_parameters_for_level ctxt ~level:pred_level
   in
   let* () =
     if proto_parameters.Types.feature_enable then
@@ -513,7 +530,8 @@ let process_block ctxt cctxt l1_crawler proto_parameters finalized_shell_header
           ctxt
           cctxt
           store
-          proto_parameters
+          ~prev_proto_parameters
+          ~proto_parameters
           block_level
           (module Plugin)
         [@profiler.record_s {verbosity = Notice} "process_finalized_block_data"]

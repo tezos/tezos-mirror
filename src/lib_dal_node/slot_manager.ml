@@ -356,20 +356,18 @@ let try_get_commitment_of_slot_id_from_memory ctxt slot_id =
    skip list cell stored in the SQLite store.
 
    Steps:
-   - Fetch the skip list cell for the given [attested_level] and slot index from
-     the SQLite store.
+   - Fetch the skip list cell for the given [slot_id] from the SQLite store.
    - Decode the cell using the DAL plugin.
    - Return the extracted slot header, if available.
 
     Returns [None] if the cell is not found in the store. *)
 let try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
-    ctxt ~attested_level slot_id =
+    ctxt slot_id =
   let open Lwt_result_syntax in
   let* cell_bytes_opt =
     Store.Skip_list_cells.find_by_slot_id_opt
       (Node_context.get_store ctxt)
-      ~attested_level
-      ~slot_index:slot_id.Types.Slot_id.slot_index
+      slot_id
   in
   match cell_bytes_opt with
   | None -> return_none
@@ -386,7 +384,7 @@ let try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
    - Retrieve the skip list cells for [attested_level] using the plugin from L1.
    - Locate the one matching the [slot_index] of [slot_id].
    - Extract and return the slot header via the plugin. *)
-let try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
+let _try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
     ~dal_constants ~attested_level slot_id =
   let open Lwt_result_syntax in
   let Types.Slot_id.{slot_level; slot_index} = slot_id in
@@ -425,31 +423,33 @@ let try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
 
    Retrieval order:
     1. Attempt to get the header from the local SQLite skip list.
-    2. If not found, fall back to fetching it from the L1 skip list context.
+    2. ~~If not found, fall back to fetching it from the L1 skip list context.~~
 
     Returns [Some commitment] if found and matches the [slot_id], [None]
     otherwise. Performs assertions to ensure the returned slot header matches
     the requested [slot_id]. *)
-let try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt dal_constants
-    slot_id ~attested_level =
+let try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt slot_id =
   let open Lwt_result_syntax in
   let*! published_slot_header_opt =
     let*! from_sqlite =
-      try_get_slot_header_from_indexed_skip_list
-        dal_plugin
-        ctxt
-        ~attested_level
-        slot_id
+      try_get_slot_header_from_indexed_skip_list dal_plugin ctxt slot_id
     in
     match from_sqlite with
     | Ok (Some _header as res) -> return res
     | _ ->
-        try_get_slot_header_from_L1_skip_list
-          dal_plugin
-          ctxt
-          ~dal_constants
-          ~attested_level
-          slot_id
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8075
+         The attested level is wrong around migration!
+         Example: If [M] is the migration level, for [published_level = M-2],
+         [attested_lag = 8] in P1, and [attested_lag = 5] in P2, we get
+         [attested_level = M+6], but at this level skip-list cells for
+         [published_level = M+1] are found in the L1 context.  *)
+        (* try_get_slot_header_from_L1_skip_list *)
+        (*   dal_plugin *)
+        (*   ctxt *)
+        (*   ~dal_constants *)
+        (*   ~attested_level *)
+        (*   slot_id *)
+        failwith "Failed to retrieve slot id from skip-list store"
   in
   match published_slot_header_opt with
   | Ok (Some Dal_plugin.{published_level; slot_index; commitment}) ->
@@ -471,23 +471,26 @@ let get_commitment_from_slot_id ctxt slot_id =
   | Some res -> return res
   | None -> (
       let published_level = slot_id.Types.Slot_id.slot_level in
-      let*? dal_plugin, dal_constants =
-        Node_context.get_plugin_and_parameters_for_level
-          ctxt
-          ~level:published_level
+      let*? parameters =
+        Node_context.get_proto_parameters ctxt ~level:(`Level published_level)
       in
       let attested_level =
         Int32.add
           published_level
-          (Int32.of_int dal_constants.Types.attestation_lag)
+          (Int32.of_int parameters.Types.attestation_lag)
+      in
+      (* Note: the precise [attested_level] is not important; however, it is
+         important that we use the right plugin to decode cells in
+         [try_get_slot_header_from_indexed_skip_list]. Even if the
+         [attestation_lag] value decreases in protocol P2 wrt P1, we are sure to
+         get the right plugin, because [attested_level] is computed with the
+         (bigger) value from P1, so we are sure [attested_level] is in P2 when
+         needed. *)
+      let*? dal_plugin =
+        Node_context.get_plugin_for_level ctxt ~level:attested_level
       in
       let*! res =
-        try_get_commitment_of_slot_id_from_skip_list
-          dal_plugin
-          ctxt
-          dal_constants
-          slot_id
-          ~attested_level
+        try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt slot_id
       in
       match res with
       | Ok (Some res) -> return res

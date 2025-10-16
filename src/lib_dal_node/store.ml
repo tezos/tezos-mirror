@@ -907,31 +907,31 @@ module Skip_list_cells = struct
       t.skip_list_cells_store
       skip_list_hash
 
-  let find_by_slot_id_opt ?conn t ~attested_level ~slot_index =
+  let find_by_slot_id_opt ?conn t slot_id =
     Dal_store_sqlite3.Skip_list_cells.find_by_slot_id_opt
       ?conn
       t.skip_list_cells_store
-      ~attested_level
-      ~slot_index
+      slot_id
 
-  let find_by_level ?conn t ~attested_level =
+  let find_by_level ?conn t ~published_level =
     Dal_store_sqlite3.Skip_list_cells.find_by_level
       ?conn
       t.skip_list_cells_store
-      ~attested_level
+      ~published_level
 
-  let insert ?conn t ~attested_level items =
+  let insert ?conn t ~published_level ~attestation_lag items =
     Dal_store_sqlite3.Skip_list_cells.insert
       ?conn
       t.skip_list_cells_store
-      ~attested_level
+      ~published_level
+      ~attestation_lag
       items
 
-  let remove ?conn t ~attested_level =
+  let remove ?conn t ~published_level =
     Dal_store_sqlite3.Skip_list_cells.remove
       ?conn
       t.skip_list_cells_store
-      ~attested_level
+      ~published_level
 
   let schemas data_dir =
     let open Lwt_result_syntax in
