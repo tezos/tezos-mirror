@@ -3098,10 +3098,22 @@ module Dal : sig
   module Slots_history : sig
     type t
 
+    type attestation_lag_kind = Legacy
+
+    val attestation_lag_value : attestation_lag_kind -> int
+
+    val legacy_attestation_lag : int
+
+    type cell_id = {
+      header_id : Slot.Header.id;
+      attestation_lag : attestation_lag_kind;
+    }
+
     type cell_content = private
-      | Unpublished of Slot.Header.id
+      | Unpublished of cell_id
       | Published of {
           header : Slot.Header.t;
+          attestation_lag : attestation_lag_kind;
           publisher : Contract.t;
           is_proto_attested : bool;
           attested_shards : int;
@@ -3110,7 +3122,7 @@ module Dal : sig
 
     val content : t -> cell_content
 
-    val content_id : cell_content -> Slot.Header.id
+    val content_id : cell_content -> cell_id
 
     val pp : Format.formatter -> t -> unit
 

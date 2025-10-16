@@ -335,6 +335,34 @@ module History = struct
   (* History is represented via a skip list. The content of the cell
      is the hash of a merkle proof. *)
 
+  type attestation_lag_kind = Legacy
+
+  (** The legacy attestation lag used by mainnet, ghostnet and shadownet *)
+  let legacy_attestation_lag = 8
+
+  let attestation_lag_value = function Legacy -> legacy_attestation_lag
+
+  let attestation_lag_kind_equal lag1 lag2 =
+    match (lag1, lag2) with Legacy, Legacy -> true
+
+  let pp_attestation_lag_kind fmt = function
+    | Legacy -> Format.fprintf fmt "Legacy:%d" legacy_attestation_lag
+
+  type cell_id = {header_id : Header.id; attestation_lag : attestation_lag_kind}
+
+  let cell_id_equal cid1 cid2 =
+    attestation_lag_kind_equal cid1.attestation_lag cid2.attestation_lag
+    && Header.slot_id_equal cid1.header_id cid2.header_id
+
+  let pp_cell_id fmt {header_id; attestation_lag} =
+    Format.fprintf
+      fmt
+      "{slot_id:%a, lag:%a}"
+      Header.pp_id
+      header_id
+      pp_attestation_lag_kind
+      attestation_lag
+
   module Content_prefix = struct
     let (_prefix : string) = "dash1"
 
@@ -402,9 +430,10 @@ module History = struct
         kind of DAC using the DAL infra), the skip list will not require a
         migration. *)
     type t =
-      | Unpublished of Header.id
+      | Unpublished of cell_id
       | Published of {
           header : Header.t;
+          attestation_lag : attestation_lag_kind;
           publisher : Contract_repr.t;
           is_proto_attested : bool;
           attested_shards : int;
@@ -412,74 +441,82 @@ module History = struct
         }
 
     let content_id = function
-      | Unpublished slot_id -> slot_id
-      | Published {header = {id; _}; _} -> id
+      | Unpublished cell_id -> cell_id
+      | Published {attestation_lag; header = {id; _}; _} ->
+          {attestation_lag; header_id = id}
 
     let encoding =
       let open Data_encoding in
-      union
-        ~tag_size:`Uint8
-        [
-          case
-            ~title:"unpublished"
-            (Tag 2)
-            (merge_objs
-               (obj1 (req "kind" (constant "unpublished")))
-               Header.id_encoding)
-            (function
-              | Unpublished slot_id -> Some ((), slot_id) | Published _ -> None)
-            (fun ((), slot_id) -> Unpublished slot_id);
-          case
-            ~title:"published"
-            (Tag 3)
-            (merge_objs
-               (obj5
-                  (req "kind" (constant "published"))
-                  (req "publisher" Contract_repr.encoding)
-                  (req "is_proto_attested" bool)
-                  (req "attested_shards" uint16)
-                  (req "total_shards" uint16))
-               Header.encoding)
-            (function
-              | Unpublished _ -> None
-              | Published
-                  {
-                    header;
-                    publisher;
-                    is_proto_attested;
-                    attested_shards;
-                    total_shards;
-                  } ->
-                  Some
-                    ( ( (),
-                        publisher,
-                        is_proto_attested,
-                        attested_shards,
-                        total_shards ),
-                      header ))
-            (fun ( ( (),
-                     publisher,
-                     is_proto_attested,
-                     attested_shards,
-                     total_shards ),
-                   header )
-               ->
-              Published
+      let legacy_unpublished_case =
+        case
+          ~title:"unpublished"
+          (Tag 2)
+          (merge_objs
+             (obj1 (req "kind" (constant "unpublished")))
+             Header.id_encoding)
+          (function
+            | Unpublished {header_id; attestation_lag = Legacy} ->
+                Some ((), header_id)
+            | Published _ -> None)
+          (fun ((), header_id) ->
+            Unpublished {header_id; attestation_lag = Legacy})
+      in
+      let legacy_published_case =
+        case
+          ~title:"published"
+          (Tag 3)
+          (merge_objs
+             (obj5
+                (req "kind" (constant "published"))
+                (req "publisher" Contract_repr.encoding)
+                (req "is_proto_attested" bool)
+                (req "attested_shards" uint16)
+                (req "total_shards" uint16))
+             Header.encoding)
+          (function
+            | Unpublished _ -> None
+            | Published
                 {
                   header;
+                  attestation_lag = Legacy;
                   publisher;
                   is_proto_attested;
                   attested_shards;
                   total_shards;
-                });
-        ]
+                } ->
+                Some
+                  ( ( (),
+                      publisher,
+                      is_proto_attested,
+                      attested_shards,
+                      total_shards ),
+                    header ))
+          (fun ( ( (),
+                   publisher,
+                   is_proto_attested,
+                   attested_shards,
+                   total_shards ),
+                 header )
+             ->
+            Published
+              {
+                header;
+                attestation_lag = Legacy;
+                publisher;
+                is_proto_attested;
+                attested_shards;
+                total_shards;
+              })
+      in
+      union ~tag_size:`Uint8 [legacy_unpublished_case; legacy_published_case]
 
     let equal t1 t2 =
       match (t1, t2) with
-      | Unpublished sid1, Unpublished sid2 -> Header.slot_id_equal sid1 sid2
+      | Unpublished cid1, Unpublished cid2 -> cell_id_equal cid1 cid2
       | ( Published
             {
               header;
+              attestation_lag;
               publisher;
               is_proto_attested;
               attested_shards;
@@ -487,6 +524,7 @@ module History = struct
             },
           Published sh ) ->
           Header.equal header sh.header
+          && attestation_lag_kind_equal attestation_lag sh.attestation_lag
           && Contract_repr.equal publisher sh.publisher
           && Compare.Bool.equal is_proto_attested sh.is_proto_attested
           && Compare.Int.equal attested_shards sh.attested_shards
@@ -496,21 +534,33 @@ module History = struct
     let zero, zero_level =
       let zero_level = Raw_level_repr.root in
       let zero_index = Dal_slot_index_repr.zero in
-      ( Unpublished {published_level = zero_level; index = zero_index},
+      ( Unpublished
+          {
+            header_id = {published_level = zero_level; index = zero_index};
+            attestation_lag = Legacy;
+          },
         zero_level )
 
     let pp fmt = function
-      | Unpublished slot_id ->
-          Format.fprintf fmt "Unpublished (%a)" Header.pp_id slot_id
+      | Unpublished cid -> Format.fprintf fmt "Unpublished (%a)" pp_cell_id cid
       | Published
-          {header; publisher; is_proto_attested; attested_shards; total_shards}
-        ->
+          {
+            header;
+            attestation_lag;
+            publisher;
+            is_proto_attested;
+            attested_shards;
+            total_shards;
+          } ->
           Format.fprintf
             fmt
-            "Published { @[header: %a@] @[publisher: %a@] @[is_proto_attested: \
-             %b@] @[attested_shards: %d@] @[total_shards: %d@] }"
+            "Published { @[header: %a@] @[lag: %a@] @[publisher: %a@] \
+             @[is_proto_attested: %b@] @[attested_shards: %d@] @[total_shards: \
+             %d@] }"
             Header.pp
             header
+            pp_attestation_lag_kind
+            attestation_lag
             Contract_repr.pp
             publisher
             is_proto_attested
@@ -524,7 +574,7 @@ module History = struct
   module Mk_skip_list (Content : sig
     type t
 
-    val content_id : t -> Header.id
+    val content_id : t -> cell_id
   end) =
   struct
     include Skip_list.Make (Skip_list_parameters)
@@ -545,6 +595,10 @@ module History = struct
         guarantee that it can only be called with the adequate compare function.
     *)
     let next ~prev_cell ~prev_cell_ptr ~number_of_slots elt =
+      (* When migrating from protocol P1 to P2 and activate non-legacy
+         attestation lag, we ignore attestation_lag when pushing new
+         cells. We'll still use the existing invariant, which is expected to
+         hold after the lag reduction and with the planned migration process. *)
       let open Result_syntax in
       let well_ordered =
         (* For each cell we insert in the skip list, we ensure that it complies
@@ -555,10 +609,10 @@ module History = struct
              * The first inserted slot's index for the current level is 0
            - Or, levels are equal, but slot indices are successive. *)
         let Header.{published_level = l1; index = i1} =
-          content prev_cell |> Content.content_id
+          (content prev_cell |> Content.content_id).header_id
         in
         let Header.{published_level = l2; index = i2} =
-          Content.content_id elt
+          (Content.content_id elt).header_id
         in
         (Raw_level_repr.equal l2 (Raw_level_repr.succ l1)
         && Compare.Int.(Dal_slot_index_repr.to_int i1 = number_of_slots - 1)
@@ -574,12 +628,19 @@ module History = struct
       return @@ next ~prev_cell ~prev_cell_ptr elt
 
     let search =
+      (* When migrating from protocol P1 to P2 and activate non-legacy
+         attestation lag, we ignore attestation_lag when comparing
+         values. We'll still use the existing compare, which is expected to
+         behave as expected after the lag reduction and with the planned
+         migration process . *)
       let compare_with_slot_id (target_slot_id : Header.id)
           (content : Content.t) =
         let Header.{published_level = target_level; index = target_index} =
           target_slot_id
         in
-        let Header.{published_level; index} = Content.content_id content in
+        let Header.{published_level; index} =
+          (Content.content_id content).header_id
+        in
         let c = Raw_level_repr.compare published_level target_level in
         if Compare.Int.(c <> 0) then c
         else Dal_slot_index_repr.compare index target_index
@@ -684,7 +745,7 @@ module History = struct
       let open Result_syntax in
       let prev_cell_ptr = hash t in
       let Header.{published_level; _} =
-        Skip_list.content t |> Content.content_id
+        (Skip_list.content t |> Content.content_id).header_id
       in
       let* new_head =
         if Raw_level_repr.equal published_level genesis_level then
@@ -711,7 +772,7 @@ module History = struct
        in [attested_slot_headers], an unattested slot id is inserted in [l],
 
        - [l] is well sorted wrt. slots indices. *)
-    let fill_slot_headers ~number_of_slots ~published_level
+    let fill_slot_headers ~number_of_slots ~published_level ~attestation_lag
         slot_headers_with_statuses =
       let open Result_syntax in
       let module I = Dal_slot_index_repr in
@@ -719,7 +780,8 @@ module History = struct
         I.slots_range ~number_of_slots ~lower:0 ~upper:(number_of_slots - 1)
       in
       let mk_unpublished index =
-        Content.Unpublished Header.{published_level; index}
+        Content.Unpublished
+          {header_id = Header.{published_level; index}; attestation_lag}
       in
       (* Hypothesis: both lists are sorted in increasing order w.r.t. slots
          indices. *)
@@ -739,6 +801,7 @@ module History = struct
                   Published
                     {
                       header = s;
+                      attestation_lag;
                       publisher;
                       is_proto_attested;
                       attested_shards;
@@ -775,6 +838,7 @@ module History = struct
         fill_slot_headers
           ~number_of_slots
           ~published_level
+          ~attestation_lag:Legacy
           slot_headers_with_statuses
       in
       List.fold_left_e (add_cell ~number_of_slots) (t, cache) slot_headers
@@ -1386,7 +1450,7 @@ module History = struct
       let cell_content = Skip_list.content target_cell in
       (* We check that the target cell has the same level and index than the
          page we're about to prove. *)
-      let cell_id = Content.content_id cell_content in
+      let cell_id = (Content.content_id cell_content).header_id in
       let* () =
         error_when
           Raw_level_repr.(cell_id.published_level <> published_level)
@@ -1445,9 +1509,10 @@ module History = struct
           (attestation_threshold_percent, restricted_commitments_publishers)
 
     type cell_content = Content_v2.t =
-      | Unpublished of Header.id
+      | Unpublished of cell_id
       | Published of {
           header : Header.t;
+          attestation_lag : attestation_lag_kind;
           publisher : Contract_repr.t;
           is_proto_attested : bool;
           attested_shards : int;

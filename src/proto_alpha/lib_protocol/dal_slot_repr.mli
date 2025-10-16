@@ -279,17 +279,36 @@ module History : sig
        confirmed slot headers. *)
   type t
 
+  (** Storing attestation lag in the cells of skip-lists in a retro-compatible
+      way. This first step is to introduce the needed code for the extension. *)
+  type attestation_lag_kind = Legacy
+
+  (** Returns the value of attestation_lag parameter based on the given
+      attestation_lag_kind. *)
+  val attestation_lag_value : attestation_lag_kind -> int
+
+  (** Value of the attestation lag used by protocols prior to T. It's the same
+      on all the networks we upgrade (e.g., mainnet, ghostnet and shadownet). *)
+  val legacy_attestation_lag : int
+
+  (** Identify a cell not only by its published_level + slot_index (Header.id),
+      but also by the attestation lag that applied when it was attested. *)
+  type cell_id = {header_id : Header.id; attestation_lag : attestation_lag_kind}
+
   (** The content of a cell in the DAL skip list. We have [number_of_slots] new
       cells per level (one per slot index). For a given slot index in
       [0..number_of_slots-1], the commitment is either [Unpublished] or
       [Published]. In this second case, we attach extra information in addition
       to the id such as the commitment, the publisher, the number of attested
       shards and whether the commitment is attested from the point of view of
-      the protocol. *)
+      the protocol. In both cases, the content carries the attestation lag used
+      to push the cell into the skip list (as attested, unattested or
+      unpublished ). *)
   type cell_content = private
-    | Unpublished of Header.id
+    | Unpublished of cell_id
     | Published of {
         header : Header.t;
+        attestation_lag : attestation_lag_kind;
         publisher : Contract_repr.t;
         is_proto_attested : bool;
         attested_shards : int;
@@ -301,8 +320,9 @@ module History : sig
 
   val pp_content : Format.formatter -> cell_content -> unit
 
-  (** Returns the slot id of the cell whose content is given. *)
-  val content_id : cell_content -> Header.id
+  (** Returns the slot id and the attestation lag of the cell whose content is
+      given. *)
+  val content_id : cell_content -> cell_id
 
   module Pointer_hash : S.HASH
 
