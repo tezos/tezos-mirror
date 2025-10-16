@@ -577,6 +577,27 @@ let proxy_external_endpoint ~runner ~dns_domain = function
       Client.Foreign_endpoint
         (Endpoint.make ~host:dns_domain ~scheme:"https" ~port:external_port ())
 
+let nginx_reverse_proxy_config ~(ssl : Ssl.t) ~proxy =
+  match proxy with
+  | No_proxy _ -> None
+  | Https_proxy {internal_info = _; external_port; dns_domain} ->
+      let internal_endpoint = proxy_internal_endpoint proxy in
+      let proxy_pass =
+        (* The trailing / is mandatory, otherwise the reverse proxy
+           won't be able to serve services with a path. *)
+        Client.string_of_endpoint internal_endpoint ^ "/"
+      in
+      let config =
+        Nginx_reverse_proxy.simple_ssl_node
+          ~server_name:dns_domain
+          ~port:external_port
+          ~location:"/"
+          ~proxy_pass
+          ~certificate:ssl.certificate
+          ~certificate_key:ssl.key
+      in
+      Some config
+
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
   let name = "tezlink-sequencer" in
@@ -815,30 +836,13 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               in
               let tzkt_nginx_config =
                 match tzkt_proxy with
-                | None | Some (No_proxy _) -> []
-                | Some
-                    (Https_proxy {internal_info = _; external_port; dns_domain}
-                     as tzkt_proxy) ->
-                    let internal_endpoint =
-                      proxy_internal_endpoint tzkt_proxy
-                    in
-                    let proxy_pass =
-                      (* The trailing / is mandatory, otherwise the reverse proxy
-                         won't be able to serve services with a path. *)
-                      Client.string_of_endpoint internal_endpoint ^ "/"
-                    in
-                    Nginx_reverse_proxy.simple_ssl_node
-                      ~server_name:dns_domain
-                      ~port:external_port
-                      ~location:"/"
-                      ~proxy_pass
-                      ~certificate:ssl.certificate
-                      ~certificate_key:ssl.key
+                | None -> None
+                | Some proxy -> nginx_reverse_proxy_config ~ssl ~proxy
               in
               Nginx_reverse_proxy.init
                 ~agent:tezlink_sequencer_agent
                 ~site:"tezlink"
-                (rpc_nginx_node @ tzkt_nginx_config)
+                (rpc_nginx_node @ Option.value ~default:[] tzkt_nginx_config)
             in
             unit
         | None -> unit
