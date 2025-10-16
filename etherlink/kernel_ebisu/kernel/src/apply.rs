@@ -332,6 +332,7 @@ pub fn revm_run_transaction<Host: Runtime>(
     authorization_list: Option<AuthorizationList>,
     config: &Config,
     tracer_input: Option<TracerInput>,
+    is_simulation: bool,
 ) -> Result<Option<ExecutionOutcome>, anyhow::Error> {
     // Disclaimer:
     // The following code is over-complicated because we maintain
@@ -433,6 +434,7 @@ pub fn revm_run_transaction<Host: Runtime>(
                 },
             ),
         }),
+        is_simulation,
     ) {
         Ok(outcome) => {
             let gas_used = outcome.result.gas_used();
@@ -594,6 +596,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         transaction.authorization_list.clone(),
         evm_configuration,
         tracer_input,
+        false,
     ) {
         Ok(outcome) => outcome,
         Err(err) => {
