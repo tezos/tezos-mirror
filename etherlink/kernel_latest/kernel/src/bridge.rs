@@ -14,6 +14,7 @@ use revm_etherlink::storage::world_state_handler::StorageAccount;
 use revm_etherlink::ExecutionOutcome;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
+use tezos_ethereum::rlp_helpers::{decode_field_u256_le, decode_option_explicit};
 use tezos_ethereum::{
     rlp_helpers::{decode_field, next},
     wei::eth_from_mutez,
@@ -43,6 +44,8 @@ const DEPOSIT_EXECUTION_GAS_COST: u64 = 9100;
 pub enum BridgeError {
     #[error("Invalid deposit receiver address: {0:?}")]
     InvalidDepositReceiver(Vec<u8>),
+    #[error("Invalid RLP bytes: {0}")]
+    RlpError(DecoderError),
 }
 
 alloy_sol_types::sol! {
@@ -60,6 +63,32 @@ pub struct DepositInfo {
     pub chain_id: Option<U256>,
 }
 
+impl DepositInfo {
+    fn decode(bytes: &[u8]) -> Result<Self, DecoderError> {
+        let version = bytes[0];
+        let decoder = Rlp::new(&bytes[1..]);
+        if version == 1u8 {
+            if !decoder.is_list() {
+                return Err(DecoderError::RlpExpectedToBeList);
+            }
+            if decoder.item_count()? != 2 {
+                return Err(DecoderError::RlpIncorrectListLen);
+            }
+            let mut it = decoder.iter();
+            let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
+            let chain_id: Option<U256> = decode_option_explicit(
+                &next(&mut it)?,
+                "chain_id",
+                decode_field_u256_le,
+            )?;
+            Ok(Self { receiver, chain_id })
+        } else {
+            Err(DecoderError::Custom(
+                "Unexpected version for Deposit informations",
+            ))
+        }
+    }
+}
 /// Native token deposit
 #[derive(Debug, PartialEq, Clone, RlpEncodable)]
 pub struct Deposit {
@@ -99,7 +128,8 @@ impl Deposit {
                 chain_id: Some(chain_id),
             })
         } else {
-            Err(BridgeError::InvalidDepositReceiver(input_bytes))
+            // From now on, bytes are versionned rlp
+            DepositInfo::decode(&input_bytes).map_err(BridgeError::RlpError)
         }
     }
 
