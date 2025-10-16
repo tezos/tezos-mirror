@@ -29,7 +29,7 @@ Protocol T024
 6s Block Time
 ^^^^^^^^^^^^^
 
-Block time has been reduced from 8 seconds to 6 seconds on
+Protocol T024 reduces the block time from 8 seconds to 6 seconds on
 mainnet. That is, a block can be produced with a delay of 6 seconds
 with respect to the previous block, if the latter is at round 0.
 
@@ -48,6 +48,9 @@ period of withdrawal has decreased from ~14 days in protocol Seoul to
 
 Breaking changes to RPCs
 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+Among the :ref:`RPC changes<t024_RPC_changes>` brought by protocol
+T024, the following are potentially breaking:
 
 - Updated RPC ``GET
   /chains/<chain_id>/blocks/<block_id>/helpers/validators`` to group
@@ -76,7 +79,8 @@ Removed obsolete fields from the block header and block receipts
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The obsolete field ``adaptive_issuance_vote`` has been removed from
-the block header, and fields ``adaptive_issuance_vote_ema`` and
+the block header in protocol T024, and fields
+``adaptive_issuance_vote_ema`` and
 ``adaptive_issuance_activation_cycle`` from the block metadata.
 
 Note that the adaptive issuance activation cycle (which is 748 on
@@ -129,8 +133,9 @@ Stricter validation for JSON configuration files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Previously, the parser would silently ignore any content that appeared
-after the first valid JSON object. Now, any extraneous data in a
-configuration file will cause the function to return an error.
+after the first valid JSON object. Starting with Octez v23.0~rc2, any
+extraneous data in a configuration file will cause the function to
+return an error.
 
 This change affects the configuration files of the node, client,
 signer, baker, accuser, smart rollup node, and DAL node.
@@ -169,7 +174,7 @@ Most of the changes in the encodings of existing operations are either purely ad
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
-Starting in protocol S, the ``Double_preattestation_evidence`` and
+Starting in protocol Seoul, the ``Double_preattestation_evidence`` and
 ``Double_attestation_evidence`` operations are replaced with a
 new ``Double_consensus_operation_evidence`` operation,
 in order to enable denunciations of aggregated consensus operations. This new

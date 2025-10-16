@@ -50,6 +50,8 @@ Michelson
 Gas improvements
 ----------------
 
+.. _t024_RPC_changes:
+
 RPC Changes
 -----------
 
