@@ -6518,6 +6518,42 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn test_script_typechecking_with_different_storage_type_view() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage string;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "multiply_view" nat nat { UNPAIR ; MUL; };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut gas, true),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::MUL,
+                stack: stk![Type::String, Type::Nat],
+                reason: None,
+            })
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_non_seq_view() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage string;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "non_seq_view" nat nat UNPAIR;"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut gas, true),
+            Err(TcError::NonSeqViewInstrs("non_seq_view".into()))
+        );
+    }
+
+    #[test]
     fn test_contract_is_passable() {
         let mut gas = Gas::default();
         assert_eq!(
