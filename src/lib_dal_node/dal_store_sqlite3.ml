@@ -268,11 +268,14 @@ module Skip_list_cells = struct
     let* () = Sqlite.Db.exec conn Q.delete_skip_list_slot published_level in
     return_unit
 
-  let insert ?conn store ~published_level ~attestation_lag items =
+  let insert ?conn store ~attested_level items =
     let open Lwt_result_syntax in
     with_connection store conn @@ fun conn ->
     List.iter_es
-      (fun (cell_hash, cell, slot_index) ->
+      (fun (cell_hash, cell, slot_index, attestation_lag) ->
+        let published_level =
+          Int32.(sub attested_level (of_int attestation_lag))
+        in
         let* () =
           Sqlite.Db.exec
             conn

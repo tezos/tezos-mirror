@@ -403,10 +403,11 @@ let _try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
   in
   match
     List.find_all
-      (fun (_hash, _cell, cell_slot_index) -> cell_slot_index = slot_index)
+      (fun (_hash, _cell, cell_slot_index, _cell_attestation_lag) ->
+        cell_slot_index = slot_index)
       cells_of_level
   with
-  | [(_cell_hash, cell, _slot_index)] ->
+  | [(_cell_hash, cell, _slot_index, _cell_attestation_lag)] ->
       Plugin.Skip_list.slot_header_of_cell cell |> return
   | _ ->
       (* This should not happen (unless the slot index is not valid). In fact,

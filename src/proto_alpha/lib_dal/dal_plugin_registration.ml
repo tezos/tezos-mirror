@@ -411,10 +411,10 @@ module Plugin = struct
             let cell_id = H.(content cell |> content_id) in
             let slot_id = cell_id.H.header_id in
             let slot_index = Dal.Slot_index.to_int slot_id.index in
+            let attestation_lag =
+              H.attestation_lag_value cell_id.attestation_lag
+            in
             let* () =
-              let attestation_lag =
-                H.attestation_lag_value cell_id.attestation_lag
-              in
               let expected_attested_level =
                 Raw_level.(
                   add slot_id.published_level attestation_lag |> to_int32)
@@ -424,7 +424,7 @@ module Plugin = struct
                 (Attested_level_mismatch
                    {attested_level; published_level; attestation_lag})
             in
-            return (hash, cell, slot_index))
+            return (hash, cell, slot_index, attestation_lag))
           cells
 
     let slot_header_of_cell cell =

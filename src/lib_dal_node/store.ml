@@ -919,12 +919,11 @@ module Skip_list_cells = struct
       t.skip_list_cells_store
       ~published_level
 
-  let insert ?conn t ~published_level ~attestation_lag items =
+  let insert ?conn t ~attested_level items =
     Dal_store_sqlite3.Skip_list_cells.insert
       ?conn
       t.skip_list_cells_store
-      ~published_level
-      ~attestation_lag
+      ~attested_level
       items
 
   let remove ?conn t ~published_level =
