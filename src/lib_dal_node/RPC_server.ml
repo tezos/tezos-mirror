@@ -473,7 +473,7 @@ module Profile_handlers = struct
                   return all_stored
                 else if not all_stored then return false
                 else
-                  Node_context.Attestable_slots.is_slot_attestable_with_traps
+                  Attestable_slots.is_slot_attestable_with_traps
                     shards_store
                     last_known_parameters.traps_fraction
                     pkh
@@ -498,9 +498,7 @@ module Profile_handlers = struct
         ~attested_level =
       let open Lwt_result_syntax in
       let* should_drop_due_to_migration =
-        Node_context.Attestable_slots.drop_attested_at_migration
-          ctxt
-          ~attested_level
+        Attestable_slots.attested_just_after_migration ctxt ~attested_level
         |> Lwt.return
         |> lwt_map_error (fun e -> `Other e)
       in
@@ -549,7 +547,7 @@ module Profile_handlers = struct
 
   let monitor_attestable_slots ctxt pkh () () =
     let Resto_directory.Answer.{next; shutdown} =
-      Node_context.Attestable_slots.subscribe ctxt ~pkh
+      Attestable_slots.subscribe ctxt ~pkh
     in
     Tezos_rpc.Answer.return_stream {next; shutdown}
 end
