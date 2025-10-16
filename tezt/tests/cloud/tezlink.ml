@@ -571,16 +571,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 dns_domain;
               }
       in
-      let () = toplog "Starting Tezlink sequencer" in
-      let* () =
-        init_tezlink_sequencer
-          cloud
-          name
-          ~rpc_port:(proxy_internal_port sequencer_proxy_info)
-          Cli.verbose
-          Cli.time_between_blocks
-          tezlink_sequencer_agent
-      in
       (* The proxy endpoint is the https endpoint we want to provide
          to the external world, it has no /tezlink path. *)
       let tezlink_sandbox_endpoint =
@@ -604,7 +594,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       in
       let* tzkt_proxy =
         if Cli.tzkt then
-          let () = toplog "Starting TzKT" in
           let tzkt_proxy =
             let path = None in
             match dns_domain with
@@ -632,14 +621,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                     dns_domain;
                     external_port;
                   }
-          in
-          let internal_tzkt_api_port = proxy_internal_port tzkt_proxy in
-          let* () =
-            init_tzkt
-              ~tzkt_api_port:internal_tzkt_api_port
-              ~agent:tezlink_sequencer_agent
-              ~tezlink_sandbox_endpoint
-              ~time_between_blocks:Cli.time_between_blocks
           in
           let external_tzkt_api_endpoint =
             proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
@@ -669,52 +650,78 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                    (Client.url_encoded_string_of_endpoint
                       external_tzkt_api_endpoint))
           in
-          let* () =
-            if Cli.faucet then
-              let () = toplog "Starting faucet" in
-              let faucet_account = Constant.bootstrap1 in
-              let faucet_pkh = faucet_account.public_key_hash in
-              let faucet_private_key =
-                match Constant.bootstrap1.secret_key with
-                | Unencrypted key -> key
-                | _ -> assert false
-              in
-              let* faucet_api =
-                init_faucet_backend
-                  ~agent:tezlink_sequencer_agent
-                  ~tezlink_sandbox_endpoint:tezlink_proxy_endpoint
-                  ~faucet_private_key
-                  ~dns_domain
-              in
-              let* () =
-                add_service
-                  cloud
-                  ~name:"Faucet API"
-                  ~url:(Client.string_of_endpoint faucet_api)
-              in
-              let* () =
-                add_service
-                  cloud
-                  ~name:"Check Faucet API"
-                  ~url:(sf "%s/info" (Client.string_of_endpoint faucet_api))
-              in
-              let* faucet_frontend =
-                init_faucet_frontend
-                  ~agent:tezlink_sequencer_agent
-                  ~faucet_api
-                  ~tezlink_sandbox_endpoint
-                  ~faucet_pkh
-                  ~tzkt_api:external_tzkt_api_endpoint
-                  ~dns_domain
-              in
-              add_service
-                cloud
-                ~name:"Faucet"
-                ~url:(Client.string_of_endpoint faucet_frontend)
-            else unit
-          in
           some tzkt_proxy
         else none
+      in
+      let () = toplog "Starting Tezlink sequencer" in
+      let* () =
+        init_tezlink_sequencer
+          cloud
+          name
+          ~rpc_port:(proxy_internal_port sequencer_proxy_info)
+          Cli.verbose
+          Cli.time_between_blocks
+          tezlink_sequencer_agent
+      and* () =
+        match tzkt_proxy with
+        | None -> unit
+        | Some tzkt_proxy ->
+            let internal_tzkt_api_port = proxy_internal_port tzkt_proxy in
+            let* () =
+              let () = toplog "Starting TzKT" in
+              init_tzkt
+                ~tzkt_api_port:internal_tzkt_api_port
+                ~agent:tezlink_sequencer_agent
+                ~tezlink_sandbox_endpoint
+                ~time_between_blocks:Cli.time_between_blocks
+            and* () =
+              if Cli.faucet then
+                let () = toplog "Starting faucet" in
+                let faucet_account = Constant.bootstrap1 in
+                let faucet_pkh = faucet_account.public_key_hash in
+                let faucet_private_key =
+                  match Constant.bootstrap1.secret_key with
+                  | Unencrypted key -> key
+                  | _ -> assert false
+                in
+                let* faucet_api =
+                  init_faucet_backend
+                    ~agent:tezlink_sequencer_agent
+                    ~tezlink_sandbox_endpoint:tezlink_proxy_endpoint
+                    ~faucet_private_key
+                    ~dns_domain
+                in
+                let* () =
+                  add_service
+                    cloud
+                    ~name:"Faucet API"
+                    ~url:(Client.string_of_endpoint faucet_api)
+                in
+                let* () =
+                  add_service
+                    cloud
+                    ~name:"Check Faucet API"
+                    ~url:(sf "%s/info" (Client.string_of_endpoint faucet_api))
+                in
+                let external_tzkt_api_endpoint =
+                  proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
+                in
+                let* faucet_frontend =
+                  init_faucet_frontend
+                    ~agent:tezlink_sequencer_agent
+                    ~faucet_api
+                    ~tezlink_sandbox_endpoint
+                    ~faucet_pkh
+                    ~tzkt_api:external_tzkt_api_endpoint
+                    ~dns_domain
+                in
+                add_service
+                  cloud
+                  ~name:"Faucet"
+                  ~url:(Client.string_of_endpoint faucet_frontend)
+              else unit
+            in
+            unit
       in
       let* () =
         match dns_domain with
