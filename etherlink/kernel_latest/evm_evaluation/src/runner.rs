@@ -295,6 +295,7 @@ fn execute_transaction(
         // TODO: add authorization list when Prague tests are enabled.
         None,
         None,
+        false,
     )
 }
 

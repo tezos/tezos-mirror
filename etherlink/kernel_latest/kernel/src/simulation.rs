@@ -504,6 +504,7 @@ impl Evaluation {
             None,
             spec_id,
             tracer_input,
+            true,
         ) {
             Ok(outcome) if !self.with_da_fees => {
                 let result: SimulationResult<CallResult, String> =
