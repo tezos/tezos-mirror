@@ -20,7 +20,7 @@ use crate::{
     Error,
 };
 use revm::{
-    primitives::{Address, HashMap, StorageKey, StorageValue, B256, KECCAK_EMPTY, U256},
+    primitives::{Address, HashMap, StorageKey, StorageValue, B256, U256},
     state::{Account, AccountInfo, Bytecode, EvmStorage, EvmStorageSlot},
     Database, DatabaseCommit,
 };
@@ -48,10 +48,6 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
     commit_status: bool,
     /// Withdrawals accumulated by the current execution and consumed at the end of it
     withdrawals: Vec<Withdrawal>,
-    /// HACK: [PRECOMPILE_ZERO_ADDRESS_AND_SIMULATION]
-    /// This is used in order to avoid the problem of EIP-3607 for address
-    /// zero which contains the forwarder code.
-    caller: Address,
     /// Storage access to address zero aka the system address
     system: StorageAccount,
     /// Account info snapshot when read to avoid re-write them if they haven't change and only
@@ -70,7 +66,6 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
         host: &'a mut Host,
         block: &'a BlockConstants,
         world_state_handler: &'a mut WorldStateHandler,
-        caller: Address,
     ) -> Result<Self, Error> {
         let system = StorageAccount::get_or_create_account(
             host,
@@ -83,7 +78,6 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
             world_state_handler,
             commit_status: true,
             withdrawals: vec![],
-            caller,
             system,
             original_account_infos: HashMap::with_capacity(2),
         })
@@ -292,19 +286,6 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
 
         self.original_account_infos
             .insert(address, account_info.copy_without_code());
-
-        if self.caller == Address::ZERO && address == Address::ZERO {
-            // HACK: [PRECOMPILE_ZERO_ADDRESS_AND_SIMULATION]
-            // This can only happen in a simulation case only.
-            // The zero address contains code for legacy reasons related to precompiles.
-            // We must return empty code here otherwise the simulation will fail because
-            // of EIP-3607.
-            return Ok(Some(AccountInfo {
-                code_hash: KECCAK_EMPTY,
-                code: None,
-                ..account_info
-            }));
-        }
 
         Ok(Some(account_info))
     }

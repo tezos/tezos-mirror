@@ -499,6 +499,7 @@ impl Evaluation {
             None,
             evm_configuration,
             tracer_input,
+            true,
         ) {
             Ok(Some(outcome)) if !self.with_da_fees => {
                 let result: SimulationResult<CallResult, String> =
