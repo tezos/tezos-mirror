@@ -139,12 +139,37 @@ let send_raw_transaction_to_delayed_inbox ?(wait_for_next_level = true)
   in
   Lwt.return expected_hash
 
-let send_deposit_to_delayed_inbox ~amount ~l1_contracts ~depositor ~receiver
-    ~sc_rollup_node ~sc_rollup_address client =
+type deposit_info = {receiver : string; chain_id : int option}
+
+let encode_option encode_some =
+  let open Evm_node_lib_dev_encoding.Rlp in
+  function
+  | None -> List []
+  | Some v ->
+      let value = encode_some v in
+      List [Value value]
+
+let encode_deposit_info deposit_info =
+  let open Evm_node_lib_dev_encoding.Rlp in
+  let receiver = Hex.to_bytes (`Hex (remove_0x deposit_info.receiver)) in
+  let bytes =
+    encode
+      (List [Value receiver; encode_option encode_int deposit_info.chain_id])
+  in
+  let (`Hex str) = Hex.of_bytes bytes in
+  add_0x ("01" ^ str)
+
+let send_deposit_to_delayed_inbox ?(rlp = false) ~amount ~l1_contracts
+    ~depositor ~deposit_info ~sc_rollup_node ~sc_rollup_address client =
+  (* Implements optional types decoding as in the RLP library from the
+   kernel's library. *)
+  let infos =
+    if rlp then encode_deposit_info deposit_info else deposit_info.receiver
+  in
   let* () =
     Client.transfer
       ~entrypoint:"deposit"
-      ~arg:(sf "Pair %S %s" sc_rollup_address receiver)
+      ~arg:(sf "Pair %S %s" sc_rollup_address infos)
       ~amount
       ~giver:depositor.Account.public_key_hash
       ~receiver:l1_contracts.bridge
@@ -1398,12 +1423,13 @@ let test_send_deposit_to_delayed_inbox =
           "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
       }
   in
+  let deposit_info = {receiver = receiver.address; chain_id = None} in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount
       ~l1_contracts
       ~depositor
-      ~receiver:receiver.address
+      ~deposit_info
       ~sc_rollup_node
       ~sc_rollup_address
       client
@@ -1675,12 +1701,13 @@ let test_delayed_deposit_is_included =
   let* receiver_balance_prev =
     Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
+  let deposit_info = {receiver = receiver.address; chain_id = None} in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount
       ~l1_contracts
       ~depositor
-      ~receiver:receiver.address
+      ~deposit_info
       ~sc_rollup_node
       ~sc_rollup_address
       client
@@ -1933,12 +1960,15 @@ let test_delayed_transaction_peeked =
      are going to play with this property to force an upgrade with a
      blueprint that contains a deposit.
   *)
+  let deposit_info =
+    {receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB"; chain_id = None}
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount:Tez.one
       ~l1_contracts
       ~depositor:Constant.bootstrap5
-      ~receiver:"0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB"
+      ~deposit_info
       ~sc_rollup_node
       ~sc_rollup_address
       client
@@ -2389,12 +2419,13 @@ let test_delayed_deposit_from_init_rollup_node =
      event. *)
   let amount = Tez.of_int 16 in
   let depositor = Constant.bootstrap5 in
+  let deposit_info = {receiver; chain_id = None} in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount
       ~l1_contracts
       ~depositor
-      ~receiver
+      ~deposit_info
       ~sc_rollup_node
       ~sc_rollup_address
       client
@@ -2559,12 +2590,15 @@ let test_init_from_rollup_node_with_delayed_inbox =
   let* () = Evm_node.terminate sequencer in
   let* () = Evm_node.terminate observer in
   (* Sends a deposit to the delayed inbox. *)
+  let deposit_info =
+    {receiver = "0xB7A97043983f24991398E5a82f63F4C58a417185"; chain_id = None}
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount:Tez.one
       ~l1_contracts
       ~depositor:Constant.bootstrap5
-      ~receiver:"0xB7A97043983f24991398E5a82f63F4C58a417185"
+      ~deposit_info
       ~sc_rollup_node
       ~sc_rollup_address
       client
@@ -3457,12 +3491,15 @@ let test_empty_block_on_upgrade =
       _protocol
     ->
   (* Send a deposit so the sequencer will in theory add it to its next block. *)
+  let deposit_info =
+    {receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB"; chain_id = None}
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount:(Tez.of_int 1)
       ~l1_contracts
       ~depositor:Constant.bootstrap5
-      ~receiver:"0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB"
+      ~deposit_info
       ~sc_rollup_node
       ~sc_rollup_address
       client
@@ -3677,13 +3714,15 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
       ~endpoint:(Evm_node.endpoint sequencer)
       ()
   in
-
+  let deposit_info =
+    {receiver = Eth_account.bootstrap_accounts.(1).address; chain_id = None}
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount:Tez.(of_int 16)
       ~l1_contracts
       ~depositor:Constant.bootstrap5
-      ~receiver:Eth_account.bootstrap_accounts.(1).address
+      ~deposit_info
       ~sc_rollup_node
       ~sc_rollup_address
       client
@@ -6852,12 +6891,15 @@ let test_sequencer_dont_read_level_twice =
       _protocol
     ->
   (* We deposit some Tez to the rollup *)
+  let deposit_info =
+    {receiver = Eth_account.bootstrap_accounts.(1).address; chain_id = None}
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount:Tez.(of_int 16)
       ~l1_contracts
       ~depositor:Constant.bootstrap5
-      ~receiver:Eth_account.bootstrap_accounts.(1).address
+      ~deposit_info
       ~sc_rollup_node
       ~sc_rollup_address
       client
@@ -6939,12 +6981,13 @@ let test_outbox_size_limit_resilience ~slow =
   let* receiver_balance_prev =
     Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
+  let deposit_info = {receiver = receiver.address; chain_id = None} in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount
       ~l1_contracts
       ~depositor
-      ~receiver:receiver.address
+      ~deposit_info
       ~sc_rollup_node
       ~sc_rollup_address
       client
@@ -8928,12 +8971,13 @@ let test_trace_transaction_calltracer_deposit =
   let* receiver_balance_prev =
     Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
+  let deposit_info = {receiver = receiver.address; chain_id = None} in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount
       ~l1_contracts
       ~depositor
-      ~receiver:receiver.address
+      ~deposit_info
       ~sc_rollup_node
       ~sc_rollup_address
       client
@@ -9546,6 +9590,7 @@ let test_deposit_and_fast_withdraw =
     ~error_msg:"Expected %R as initial balance instead of %L" ;
 
   (* Execute the deposit of 100 tez to the rollup. The depositor is the admin account, and the receiver is the Ethereum address. *)
+  let deposit_info = {receiver = receiver.address; chain_id = None} in
   let* () =
     send_deposit_to_delayed_inbox
       ~l1_contracts
@@ -9553,7 +9598,7 @@ let test_deposit_and_fast_withdraw =
       ~sc_rollup_address
       ~sc_rollup_node
       ~depositor:admin
-      ~receiver:receiver.address
+      ~deposit_info
       client
   in
 
@@ -12836,12 +12881,15 @@ let test_deposit_event =
       protocol
   in
   (* Send a deposit to the delayed inbox *)
+  let deposit_info =
+    {receiver = Eth_account.bootstrap_accounts.(0).address; chain_id = None}
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount:Tez.one
       ~l1_contracts
       ~depositor:Constant.bootstrap5
-      ~receiver:Eth_account.bootstrap_accounts.(0).address
+      ~deposit_info
       ~sc_rollup_node
       ~sc_rollup_address
       client
