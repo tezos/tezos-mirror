@@ -98,6 +98,18 @@ module Commands = struct
          `octez-baker` instead, which automatically handles protocol switches."
       ()
 
+  let deprecated_proto_specific_accuser =
+    declare_0
+      ~section
+      ~name:"deprecated_proto_specific_accuser"
+      ~level:Warning
+      ~msg:
+        "DEPRECATED: The `octez-accuser-<protocol>` binaries are deprecated, \
+         and will be removed in the next major version of Octez. Please use \
+         `octez-accuser` instead, which automatically handles protocol \
+         switches."
+      ()
+
   let deprecated_adaptive_issuance_vote =
     declare_0
       ~section

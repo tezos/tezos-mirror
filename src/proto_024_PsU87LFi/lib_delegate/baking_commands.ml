@@ -820,6 +820,8 @@ let accuser_commands () =
       (prefixes ["run"] @@ stop)
       (fun (pidfile, preserved_levels, keep_alive) cctxt ->
         Command_run.may_lock_pidfile pidfile @@ fun () ->
+        let open Lwt_syntax in
+        let* () = Events.(emit deprecated_proto_specific_accuser ()) in
         Client_daemon.Accuser.run
           cctxt
           ~chain:cctxt#chain
