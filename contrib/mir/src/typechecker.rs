@@ -6455,6 +6455,44 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn test_script_typechecking_with_big_map_input_view() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage (big_map string nat);",
+                "code { CDR; NIL operation; PAIR };",
+                r#"view "big_map_input_view" (big_map string nat) unit { CDR };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut gas, true),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewInput,
+                Type::BigMap(Rc::new((Type::String, Type::Nat)))
+            ))
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_big_map_output_view() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage unit;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "big_map_output_view" unit (big_map string nat) { DROP ; EMPTY_BIG_MAP string nat; };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut gas, true),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewOutput,
+                Type::BigMap(Rc::new((Type::String, Type::Nat)))
+            ))
+        );
+    }
+
+    #[test]
     fn test_contract_is_passable() {
         let mut gas = Gas::default();
         assert_eq!(
