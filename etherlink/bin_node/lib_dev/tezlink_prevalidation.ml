@@ -281,7 +281,47 @@ let validate_size ~raw ~error_clue =
     @@ Oversized_operation
          (error_clue, length, Constants.max_operation_data_length)
 
-let validate_tezlink_operation ~read raw =
+let get_signature signature =
+  let open Lwt_result_syntax in
+  match signature with
+  | None -> tzfail_p @@ Imported_protocol.Operation_repr.Missing_signature
+  | Some signature -> return (Ok signature)
+
+(** Checks only existence of signature if `check_signature` is true. Used to fail early if there is no signature but one is required. *)
+let signature_exists ~check_signature signature =
+  let open Lwt_result_syntax in
+  if not check_signature then return (Ok ())
+  else
+    let** _signature = get_signature signature in
+    return (Ok ())
+
+(** We can't reuse [Alpha_context.check_signature] because it's asking for the
+   context to check attestation and preattestation Bls signatures. So we
+   implement a simplified version of the underlying
+   [Operation_repr.check_signature] which is unavailable to us because of type.
+*)
+let validate_signature ~check_signature shell contents pk signature =
+  let open Lwt_result_syntax in
+  if not check_signature then return (Ok ())
+  else
+    let** signature = get_signature signature in
+    let unsigned_operation =
+      Data_encoding.Binary.to_bytes_exn
+        Operation.unsigned_encoding
+        (shell, contents)
+    in
+    if
+      (* That watermark is used for all operations except endorsement, which we
+       don't support. *)
+      Signature.check
+        ~watermark:Generic_operation
+        pk
+        signature
+        unsigned_operation
+    then return (Ok ())
+    else tzfail_p @@ Imported_protocol.Operation_repr.Invalid_signature
+
+let validate_tezlink_operation ?(check_signature = true) ~read raw =
   let open Tezlink_imports.Alpha_context in
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
@@ -296,13 +336,14 @@ let validate_tezlink_operation ~read raw =
     | Error e -> tzfail @@ Parsing_failure (error_clue, e)
     | Ok op -> return op
   in
-  let {protocol_data = Operation_data {contents; signature}; _} = op in
+  let {protocol_data = Operation_data {contents; signature}; shell} = op in
   let first, rest =
     match contents with
     | Single only_operation -> (Contents only_operation, [])
     | Cons (first_operation, rest) ->
         (Contents first_operation, Operation.to_list (Contents_list rest))
   in
+  let** () = signature_exists ~check_signature signature in
   let** pk, source, first_counter =
     validate_manager_info ~read ~error_clue first
   in
@@ -325,12 +366,17 @@ let validate_tezlink_operation ~read raw =
         }
       (first :: rest)
   in
-  (* TODO check signature *)
+  let** () =
+    validate_signature
+      ~check_signature
+      shell
+      (Contents_list contents)
+      pk
+      signature
+  in
   let*? first_counter = Tezos_types.Operation.counter_to_z ctxt.first_counter in
   let operation =
     Tezos_types.Operation.
       {length = ctxt.length; source = ctxt.source; raw; op; first_counter}
   in
-  ignore pk ;
-  ignore signature ;
   return (Ok operation)

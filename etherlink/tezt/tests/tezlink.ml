@@ -1972,6 +1972,33 @@ let test_tezlink_prevalidation =
       client_tezlink
   in
 
+  (* case wrong signer *)
+  let* op_wrong_signer =
+    Operation.Manager.(
+      operation
+        ~signer:Constant.bootstrap2
+        [make ~fee:1000 ~counter:2 ~source:Constant.bootstrap1 (transfer ())]
+        client)
+  in
+  let wrong_signer_rex = rex "The operation signature is invalid" in
+  let* _ =
+    Operation.inject
+      ~error:wrong_signer_rex
+      ~dont_wait:true
+      op_wrong_signer
+      client_tezlink
+  in
+
+  let no_signer_rex = rex "The operation requires a signature" in
+  let* _ =
+    Operation.inject
+      ~error:no_signer_rex
+      ~dont_wait:true
+      ~signature:Tezos_crypto.Signature.zero
+      op_wrong_signer
+      client_tezlink
+  in
+
   unit
 
 let () =
