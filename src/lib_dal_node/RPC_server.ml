@@ -418,40 +418,6 @@ module Profile_handlers = struct
         ~current_baker_level
     else Lwt.return_unit
 
-  let is_slot_attestable_with_traps shards_store traps_fraction pkh
-      assigned_shard_indexes slot_id =
-    let open Lwt_result_syntax in
-    List.for_all_es
-      (fun shard_index ->
-        let* {index = _; share} =
-          Store.Shards.read shards_store slot_id shard_index
-        in
-        (* Note: here [pkh] should identify the baker using its delegate key
-           (not the consensus key) *)
-        let trap_res = Trap.share_is_trap pkh share ~traps_fraction in
-        match trap_res with
-        | Ok true ->
-            let*! () =
-              Event.emit_cannot_attest_slot_because_of_trap
-                ~pkh
-                ~published_level:slot_id.slot_level
-                ~slot_index:slot_id.slot_index
-                ~shard_index
-            in
-            return_false
-        | Ok false -> return_true
-        | Error _ ->
-            (* assume the worst, that it is a trap *)
-            let*! () =
-              Event.emit_trap_check_failure
-                ~published_level:slot_id.Types.Slot_id.slot_level
-                ~slot_index:slot_id.slot_index
-                ~shard_index
-                ~delegate:pkh
-            in
-            return false)
-      assigned_shard_indexes
-
   let get_attestable_slots ctxt pkh attested_level () () =
     let get_attestable_slots ~shard_indices store last_known_parameters
         ~attested_level =
@@ -507,7 +473,7 @@ module Profile_handlers = struct
                   return all_stored
                 else if not all_stored then return false
                 else
-                  is_slot_attestable_with_traps
+                  Attestable_slots.is_slot_attestable_with_traps
                     shards_store
                     last_known_parameters.traps_fraction
                     pkh
@@ -527,47 +493,20 @@ module Profile_handlers = struct
           return (Types.Attestable_slots {slots = flags; published_level})
     in
 
-    (* Decide whether to short-circuit attestation computation at attested level [L]
-       because of a protocol migration that decreased [attestation_lag].
-
-       - M = migration level (first level of the new protocol);
-       - new_lag = attestation_lag at attested level L (new protocol);
-       - published_level = L - new_lag 
-       
-       If published_level is still in the old protocol and the old lag > new lag,
-       then for L in [M .. M + new_lag - 1] the corresponding published data belongs
-       to the old protocol and should be ignored for attestation purposes. *)
-    let should_drop_due_to_migration last_known_parameters =
-      let open Lwt_result_syntax in
-      let migration_level = Node_context.get_last_migration_level ctxt in
-      let new_lag = Int32.of_int last_known_parameters.Types.attestation_lag in
-      let published_level = Int32.(sub attested_level new_lag) in
-      let* published_level_parameters =
-        Node_context.get_proto_parameters ctxt ~level:(`Level published_level)
-        |> Lwt.return
-        |> lwt_map_error (fun e -> `Other e)
-      in
-      let old_lag =
-        Int32.of_int published_level_parameters.Types.attestation_lag
-      in
-      return
-        (old_lag > new_lag
-        && migration_level <= attested_level
-        && attested_level < Int32.add migration_level new_lag)
-    in
-
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/8064 *)
     let get_attestable_slots ~shard_indices store last_known_parameters
         ~attested_level =
       let open Lwt_result_syntax in
       let* should_drop_due_to_migration =
-        should_drop_due_to_migration last_known_parameters
+        Attestable_slots.attested_just_after_migration ctxt ~attested_level
+        |> Lwt.return
+        |> lwt_map_error (fun e -> `Other e)
       in
       if should_drop_due_to_migration then
         let*! () = Event.emit_skip_attesting_shards ~level:attested_level in
 
         let slots =
-          Stdlib.List.init last_known_parameters.number_of_slots (fun _ ->
+          Stdlib.List.init last_known_parameters.Types.number_of_slots (fun _ ->
               false)
         in
         return (Types.Attestable_slots {slots; published_level = 0l})
@@ -605,6 +544,12 @@ module Profile_handlers = struct
           store
           last_known_parameters
           ~attested_level)
+
+  let monitor_attestable_slots ctxt pkh () () =
+    let Resto_directory.Answer.{next; shutdown} =
+      Attestable_slots.subscribe ctxt ~pkh
+    in
+    Tezos_rpc.Answer.return_stream {next; shutdown}
 end
 
 let version ctxt () () =
@@ -810,6 +755,10 @@ let register :
        Tezos_rpc.Directory.opt_register2
        Services.get_attestable_slots
        (Profile_handlers.get_attestable_slots ctxt)
+  |> add_service
+       Tezos_rpc.Directory.gen_register1
+       Services.monitor_attestable_slots
+       (Profile_handlers.monitor_attestable_slots ctxt)
   |> add_service
        Tezos_rpc.Directory.register1
        Services.get_traps

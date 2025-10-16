@@ -227,6 +227,15 @@ val get_disable_shard_validation : t -> bool
     [Proto_plugins.get_plugin_and_parameters_for_level] for more clarifications. *)
 val get_last_migration_level : t -> int32
 
+(** [get_attestable_slots_watcher_table ctxt] return the table of streams containing
+    attestable slots per pkh. *)
+val get_attestable_slots_watcher_table :
+  t -> Types.Attestable_slots_watcher_table.t
+
+(** [get_attestation_lag ctxt ~level] returns the attestation lag found at [~level]
+    using protocol parameters obtained using [ctxt]. *)
+val get_attestation_lag : t -> level:int32 -> int32 tzresult
+
 (** Module for P2P-related accessors.  *)
 module P2P : sig
   (** [connect t ?timeout point] initiates a connection to the point

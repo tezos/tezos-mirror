@@ -214,6 +214,19 @@ val get_attestable_slots :
   ; query : unit >
   service
 
+(** Stream attestable slot_ids for the given public key hash [pkh].
+    A slot is attestable at level [L] if it was published at [L - attestation_lag]
+    and *all* shards assigned at level [L] to [pkh] are available in the DAL
+    node's store. *)
+val monitor_attestable_slots :
+  < meth : [`GET]
+  ; input : unit
+  ; output : Types.slot_id
+  ; prefix : unit
+  ; params : unit * Signature.public_key_hash
+  ; query : unit >
+  service
+
 (** For a given published level, return all the traps known by the node. *)
 val get_traps :
   < meth : [`GET]

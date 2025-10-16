@@ -47,6 +47,8 @@ type t = {
   disable_shard_validation : bool;
   ignore_pkhs : Signature.Public_key_hash.Set.t;
   mutable last_migration_level : int32;
+  mutable attestable_slots_watcher_table :
+    Types.Attestable_slots_watcher_table.t;
 }
 
 let init config ~network_name profile_ctxt cryptobox
@@ -74,6 +76,8 @@ let init config ~network_name profile_ctxt cryptobox
     disable_shard_validation;
     ignore_pkhs;
     last_migration_level = 0l;
+    attestable_slots_watcher_table =
+      Types.Attestable_slots_watcher_table.create ~initial_size:5;
   }
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
@@ -265,6 +269,14 @@ let warn_if_attesters_not_delegates ctxt controller_profiles =
 let get_disable_shard_validation ctxt = ctxt.disable_shard_validation
 
 let get_last_migration_level ctxt = ctxt.last_migration_level
+
+let get_attestable_slots_watcher_table ctxt =
+  ctxt.attestable_slots_watcher_table
+
+let get_attestation_lag ctxt ~level =
+  let open Result_syntax in
+  let+ params = get_proto_parameters ctxt ~level:(`Level level) in
+  Int32.of_int params.attestation_lag
 
 module P2P = struct
   let connect {transport_layer; _} ?timeout point =

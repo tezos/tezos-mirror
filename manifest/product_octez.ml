@@ -5310,6 +5310,7 @@ let octez_dal_node_services =
         octez_base |> open_ ~m:"TzPervasives" |> open_;
         octez_rpc;
         octez_crypto_dal;
+        lwt_watcher;
       ]
     ~linkall:true
 
