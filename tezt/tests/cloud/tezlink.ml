@@ -90,16 +90,22 @@ let port_of_option agent = function
   | Some port -> port
 
 let make_proxy agent ~path ~dns_domain public_port activate_ssl =
-  let public_port = port_of_option agent public_port in
   match dns_domain with
   | None ->
       (* No DNS so no proxy, so we must use the public port. *)
+      let public_port = port_of_option agent public_port in
       No_proxy {port = public_port; path}
+  | Some dns_domain when Option.is_some public_port ->
+      Test.fail
+        "Setting a public port is only allowed for non-proxy localhost mode, \
+         but was specified for %s."
+        dns_domain
   | Some dns_domain ->
       (* We let the system choose a fresh internal node port.
          Note that it will be publicy exposed, it's just that we don't need to
          share this one. *)
       let internal_port = Agent.next_available_port agent in
+      let public_port = if activate_ssl then 443 else 80 in
       Proxy
         {
           internal_info = {port = internal_port; path};
