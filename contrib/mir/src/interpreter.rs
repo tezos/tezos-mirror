@@ -107,7 +107,11 @@ impl<'a> ContractScript<'a> {
         let mut result = stack.pop().expect("empty execution stack");
         let mut finished_with_maps = vec![];
         result.view_big_maps_mut(&mut finished_with_maps);
-        dump_big_map_updates(ctx, &started_with_map_ids, &mut finished_with_maps)?;
+        dump_big_map_updates(
+            *ctx.lazy_storage(),
+            &started_with_map_ids,
+            &mut finished_with_maps,
+        )?;
         match result {
             V::Pair(p) => match *p {
                 (V::List(vec), storage) => Ok((
@@ -1304,7 +1308,7 @@ fn interpret_one<'a>(
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_mem(&key, len)?)?;
-                let result = map.mem(&key, ctx)?;
+                let result = map.mem(&key, *ctx.lazy_storage())?;
                 stack.push(V::Bool(result));
             }
         },
@@ -1323,7 +1327,7 @@ fn interpret_one<'a>(
                 let len = map.len_for_gas();
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas().consume(interpret_cost::map_get(&key, len)?)?;
-                let result = map.get(arena, &key, ctx)?;
+                let result = map.get(arena, &key, *ctx.lazy_storage())?;
                 stack.push(V::new_option(result));
             }
         },
@@ -1388,7 +1392,7 @@ fn interpret_one<'a>(
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas()
                     .consume(interpret_cost::map_get_and_update(&key, len)?)?;
-                let opt_old_val = map.get(arena, &key, ctx)?;
+                let opt_old_val = map.get(arena, &key, *ctx.lazy_storage())?;
                 map.update(key, opt_new_val.map(|x| *x));
                 stack.push(V::new_option(opt_old_val));
             }
