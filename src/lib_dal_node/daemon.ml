@@ -354,7 +354,7 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     Dal_metrics.Slot_id_bounded_map.create
       (proto_parameters.number_of_slots * proto_parameters.attestation_lag)
   in
-  Lwt.dont_wait
+  Lwt.catch
     (fun () ->
       Gossipsub.Transport_layer_hooks.activate
         gs_worker
@@ -363,9 +363,12 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
         ~app_in_callback:(shards_in_handler still_to_receive_indices)
         ~verbose)
     (fun exn ->
-      "[dal_node] error in Daemon.connect_gossipsub_with_p2p: "
-      ^ Printexc.to_string exn
-      |> Stdlib.failwith)
+      let msg =
+        "[dal_node] error in Daemon.connect_gossipsub_with_p2p: "
+        ^ Printexc.to_string exn
+      in
+      Format.eprintf "Error: %s@." msg ;
+      Lwt_exit.exit_and_raise 1)
 
 let resolve names =
   let open Lwt_result_syntax in
@@ -789,14 +792,16 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   in
   (* Activate the p2p instance. *)
   let shards_store = Store.shards store in
-  connect_gossipsub_with_p2p
-    proto_parameters
-    gs_worker
-    transport_layer
-    shards_store
-    ctxt
-    amplificator
-    ~verbose:config.verbose ;
+  let gs =
+    connect_gossipsub_with_p2p
+      proto_parameters
+      gs_worker
+      transport_layer
+      shards_store
+      ctxt
+      amplificator
+      ~verbose:config.verbose
+  in
   let*! () =
     Gossipsub.Transport_layer.activate ~additional_points:points transport_layer
   in
@@ -808,5 +813,8 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   (* Start never-ending monitoring daemons *)
   let*! () = Event.emit_node_is_ready () in
   () [@profiler.overwrite may_start_profiler data_dir] ;
-  let* () = daemonize [on_new_finalized_head ctxt cctxt crawler] in
+  let* _ =
+    Lwt.pick
+      [Lwt.bind gs return; daemonize [on_new_finalized_head ctxt cctxt crawler]]
+  in
   return_unit
