@@ -87,15 +87,15 @@ module Commands = struct
       ~pp1:Uri.pp
       ("endpoint", Tezos_rpc.Encoding.uri_encoding)
 
-  let recommend_octez_baker =
+  let deprecated_proto_specific_baker =
     declare_0
       ~section
-      ~name:"recommend_octez_baker"
+      ~name:"deprecated_proto_specific_baker"
       ~level:Warning
       ~msg:
-        "The `octez-baker` binary is now available. We recommend using it \
-         instead of `octez-baker-<protocol>`, as it automatically handles \
-         protocol switches."
+        "DEPRECATED: The `octez-baker-<protocol>` binaries are deprecated, and \
+         will be removed in the next major version of Octez. Please use \
+         `octez-baker` instead, which automatically handles protocol switches."
       ()
 
   let deprecated_adaptive_issuance_vote =

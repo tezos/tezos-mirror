@@ -657,7 +657,7 @@ let baker_args =
    If you do, you need to have the command in sync with the agnostic baker one. This command
    is meant to removed, the source of truth is the agnostic baker.
 *)
-let run_baker ?(recommend_agnostic_baker = true)
+let run_baker
     ( pidfile,
       node_version_check_bypass,
       node_version_allowed,
@@ -680,10 +680,7 @@ let run_baker ?(recommend_agnostic_baker = true)
   Octez_baking_common.Signing_delay.enforce_signing_delay_gating
     ~allow:allow_signing_delay ;
   Command_run.may_lock_pidfile pidfile @@ fun () ->
-  let*! () =
-    if recommend_agnostic_baker then Events.(emit recommend_octez_baker ())
-    else Lwt.return_unit
-  in
+  let*! () = Events.(emit deprecated_proto_specific_baker ()) in
   let* () =
     Octez_agnostic_baker.Command_run.check_node_version
       cctxt
