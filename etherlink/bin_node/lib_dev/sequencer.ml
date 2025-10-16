@@ -458,6 +458,8 @@ let main ~data_dir ~cctxt ?(genesis_timestamp = Misc.now ())
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
         tx_container = Ex_tx_container tx_container;
         sequencer_sunset_sec = sequencer_config.sunset_sec;
+        preconfirmation_stream_enabled =
+          configuration.experimental_features.preconfirmation_stream_enabled;
       }
   in
   let* () =

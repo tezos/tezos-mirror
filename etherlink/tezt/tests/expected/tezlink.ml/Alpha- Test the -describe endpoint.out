@@ -17,6 +17,8 @@ Available services:
         containing at least the blueprint for) a given level 
     - GET /evm/messages
         Watch for new messages 
+    - GET /evm/preconfirmations
+        Watch for preconfirmed transactions 
     - GET /evm/smart_rollup_address
         Get the address of the smart rollup hosting the chain 
     - GET /evm/time_between_blocks

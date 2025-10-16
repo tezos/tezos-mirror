@@ -130,6 +130,7 @@ type experimental_features = {
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
   periodic_snapshot_path : string option;
+  preconfirmation_stream_enabled : bool;
 }
 
 type gcp_key = {

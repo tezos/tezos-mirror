@@ -10,6 +10,7 @@ type parameters = {
   maximum_number_of_chunks : int;
   tx_container : Services_backend_sig.ex_tx_container;
   sequencer_sunset_sec : int64;
+  preconfirmation_stream_enabled : bool;
 }
 
 (* The size of a delayed transaction is overapproximated to the maximum size
@@ -66,6 +67,7 @@ module Types = struct
     tx_container : Services_backend_sig.ex_tx_container;
     sequencer_sunset_sec : int64;
     mutable sunset : bool;
+    preconfirmation_stream_enabled : bool;
   }
 end
 
@@ -217,7 +219,8 @@ let produce_block_with_transactions (type f)
         ~transactions_and_objects
         ~hash_of_tx_object:Tx_queue_types.Tezlink_operation.hash_of_tx_object
 
-let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
+let validate_tx ~preconfirmation_stream_enabled ~maximum_cumulative_size
+    ~(timestamp : Time.Protocol.t) (current_size, validation_state) raw_tx
     (tx_object : Transaction_object.t) =
   let open Lwt_result_syntax in
   let new_size = current_size + String.length raw_tx in
@@ -229,15 +232,22 @@ let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
         tx_object
     in
     match validation_state_res with
-    | Ok validation_state -> return (`Keep (new_size, validation_state))
+    | Ok validation_state ->
+        let () =
+          if preconfirmation_stream_enabled then
+            if Int.equal current_size 0 then
+              Broadcast.notify_new_block_timestamp timestamp ;
+          Broadcast.notify_preconfirmation tx_object
+        in
+        return (`Keep (new_size, validation_state))
     | Error msg ->
         let hash = Transaction_object.hash tx_object in
         let*! () = Block_producer_events.transaction_rejected hash msg in
         return `Drop
 
 let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
-    (head_info : Evm_context.head) ~maximum_cumulative_size :
-    f transaction_object_list tzresult Lwt.t =
+    (head_info : Evm_context.head) ~maximum_cumulative_size ~timestamp
+    ~preconfirmation_stream_enabled : f transaction_object_list tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* Skip validation if chain_family is Michelson. *)
   match tx_container with
@@ -292,7 +302,11 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
         let* l =
           Tx_container.pop_transactions
             ~maximum_cumulative_size
-            ~validate_tx:(validate_tx ~maximum_cumulative_size)
+            ~validate_tx:
+              (validate_tx
+                 ~maximum_cumulative_size
+                 ~timestamp
+                 ~preconfirmation_stream_enabled)
             ~initial_validation_state
         in
         return (Evm_tx_objects l)
@@ -301,13 +315,16 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
     pool or if [force] is true. *)
 let produce_block_if_needed (type f) ~signer ~force ~timestamp ~delayed_hashes
     ~remaining_cumulative_size
-    ~(tx_container : f Services_backend_sig.tx_container) head_info =
+    ~(tx_container : f Services_backend_sig.tx_container)
+    ~preconfirmation_stream_enabled head_info =
   let open Lwt_result_syntax in
   let* transactions_and_objects =
     pop_valid_tx
       ~tx_container
       head_info
       ~maximum_cumulative_size:remaining_cumulative_size
+      ~timestamp
+      ~preconfirmation_stream_enabled
   in
   let n_txs =
     match transactions_and_objects with
@@ -413,6 +430,7 @@ let produce_block (state : Types.state) ~force ~timestamp
             ~delayed_hashes
             ~remaining_cumulative_size
             ~tx_container
+            ~preconfirmation_stream_enabled:state.preconfirmation_stream_enabled
             head_info
 
 module Handlers = struct
@@ -430,15 +448,24 @@ module Handlers = struct
 
   type launch_error = error trace
 
-  let on_launch _w () (parameters : Types.parameters) =
+  let on_launch _w ()
+      ({
+         signer;
+         maximum_number_of_chunks;
+         tx_container;
+         sequencer_sunset_sec;
+         preconfirmation_stream_enabled;
+       } :
+        Types.parameters) =
     Lwt_result_syntax.return
       Types.
         {
           sunset = false;
-          signer = parameters.signer;
-          maximum_number_of_chunks = parameters.maximum_number_of_chunks;
-          tx_container = parameters.tx_container;
-          sequencer_sunset_sec = parameters.sequencer_sunset_sec;
+          signer;
+          maximum_number_of_chunks;
+          tx_container;
+          sequencer_sunset_sec;
+          preconfirmation_stream_enabled;
         }
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :

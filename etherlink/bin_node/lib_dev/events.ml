@@ -512,6 +512,22 @@ let multichain_node_singlechain_kernel =
        because the multichain feature is not yet enabled in the rollup"
     ()
 
+let event_preconfirmation_timestamp =
+  Internal_event.Simple.declare_1
+    ~section
+    ~name:"preconfirmation_timestamp"
+    ~msg:"received timestamp of the next block {timestamp}"
+    ~level:Notice
+    ("timestamp", Time.Protocol.encoding)
+
+let event_preconfirmation =
+  Internal_event.Simple.declare_1
+    ~section
+    ~name:"preconfirmation"
+    ~msg:"received preconfirmation for the transaction {txn_hash}"
+    ~level:Notice
+    ("txn_hash", Ethereum_types.hash_encoding)
+
 let received_upgrade payload = emit received_upgrade payload
 
 let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
@@ -641,3 +657,7 @@ let replicate_transaction_dropped hash reason =
 
 let replicate_operation_dropped hash reason =
   emit replicate_operation_dropped (hash, reason)
+
+let preconfirmation_timestamp t = emit event_preconfirmation_timestamp t
+
+let preconfirmation t = emit event_preconfirmation t

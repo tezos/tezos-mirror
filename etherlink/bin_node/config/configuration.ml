@@ -174,6 +174,7 @@ type experimental_features = {
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
   periodic_snapshot_path : string option;
+  preconfirmation_stream_enabled : bool;
 }
 
 type gcp_key = {
@@ -333,6 +334,7 @@ let default_experimental_features =
     spawn_rpc = None;
     l2_chains = default_l2_chains;
     periodic_snapshot_path = None;
+    preconfirmation_stream_enabled = false;
   }
 
 let default_rpc_addr = "127.0.0.1"
@@ -1014,6 +1016,7 @@ let experimental_features_encoding =
            spawn_rpc;
            l2_chains : l2_chain list option;
            periodic_snapshot_path;
+           preconfirmation_stream_enabled;
          }
        ->
       ( ( drop_duplicate_on_injection,
@@ -1022,14 +1025,22 @@ let experimental_features_encoding =
           None,
           overwrite_simulation_tick_limit,
           None ),
-        (rpc_server, spawn_rpc, l2_chains, periodic_snapshot_path) ))
+        ( rpc_server,
+          spawn_rpc,
+          l2_chains,
+          periodic_snapshot_path,
+          preconfirmation_stream_enabled ) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
              _node_transaction_validation,
              overwrite_simulation_tick_limit,
              _next_wasm_runtime ),
-           (rpc_server, spawn_rpc, l2_chains, periodic_snapshot_path) )
+           ( rpc_server,
+             spawn_rpc,
+             l2_chains,
+             periodic_snapshot_path,
+             preconfirmation_stream_enabled ) )
        ->
       {
         drop_duplicate_on_injection;
@@ -1040,6 +1051,7 @@ let experimental_features_encoding =
         spawn_rpc;
         l2_chains;
         periodic_snapshot_path;
+        preconfirmation_stream_enabled;
       })
     (merge_objs
        (obj6
@@ -1090,7 +1102,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj4
+       (obj5
           (dft
              "rpc_server"
              ~description:
@@ -1115,7 +1127,14 @@ let experimental_features_encoding =
              "periodic_snapshot_path"
              ~description:"Path to the periodic snapshot file"
              (option string)
-             default_experimental_features.periodic_snapshot_path)))
+             default_experimental_features.periodic_snapshot_path)
+          (dft
+             "preconfirmation_stream_enabled"
+             ~description:
+               "Activate or not the preconfirmation stream. This includes the \
+                sequencer as well as the observer."
+             bool
+             default_experimental_features.preconfirmation_stream_enabled)))
 
 let proxy_encoding =
   let open Data_encoding in

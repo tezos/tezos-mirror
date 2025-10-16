@@ -105,6 +105,16 @@ let on_finalized_levels ~rollup_node_tracking ~l1_level ~start_l2_level
     Evm_context.apply_finalized_levels ~l1_level ~start_l2_level ~end_l2_level
   else return_unit
 
+let on_timestamp ts =
+  let open Lwt_result_syntax in
+  let*! () = Events.preconfirmation_timestamp ts in
+  return ()
+
+let on_preconfirmation txn =
+  let open Lwt_result_syntax in
+  let*! () = Events.preconfirmation (Transaction_object.hash txn) in
+  return ()
+
 let install_finalizer_observer ~rollup_node_tracking
     ~(tx_container : _ Services_backend_sig.tx_container)
     finalizer_public_server finalizer_private_server finalizer_rpc_process
@@ -315,6 +325,11 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
         ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
         ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
         ()
+    and* () =
+      when_ config.experimental_features.preconfirmation_stream_enabled
+      @@ fun () ->
+      Preconfirmation_follower.start
+        {evm_node_endpoint; on_timestamp; on_preconfirmation}
     and* () =
       Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
     and* () =

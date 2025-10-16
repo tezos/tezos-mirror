@@ -67,3 +67,10 @@ val monitor_messages :
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
   Broadcast.message monitor tzresult Lwt.t
+
+(** [monitor_preconfirmations ~evm_node_endpoint] connects to the given [evm_node_endpoint]
+    and starts monitoring the stream of incoming {!Broadcast.preconfirmation_message}.
+    Target node must support preconfirmation streaming, which only includes sequencers. *)
+val monitor_preconfirmations :
+  evm_node_endpoint:Uri.t ->
+  Broadcast.preconfirmation_message monitor tzresult Lwt.t

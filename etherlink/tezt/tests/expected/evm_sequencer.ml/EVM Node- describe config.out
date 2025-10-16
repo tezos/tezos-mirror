@@ -157,7 +157,11 @@
         /* None */,
       "periodic_snapshot_path"?:
         /* Path to the periodic snapshot file */
-        $unistring /* Some */ || null /* None */ },
+        $unistring /* Some */ || null /* None */,
+      "preconfirmation_stream_enabled"?:
+        boolean
+        /* Activate or not the preconfirmation stream. This includes the
+           sequencer as well as the observer. */ },
   "proxy"?:
     { "finalized_view"?:
         boolean

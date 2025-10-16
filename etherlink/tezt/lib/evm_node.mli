@@ -284,6 +284,8 @@ val wait_for_blueprint_catchup : ?timeout:float -> t -> (int * int) Lwt.t
 val wait_for_blueprint_injection_failure :
   ?timeout:float -> ?level:int -> t -> unit Lwt.t
 
+val wait_for_preconfirmation : ?timeout:float -> t -> string Lwt.t
+
 module Config_file : sig
   (** Node configuration files. *)
 
@@ -332,6 +334,7 @@ val patch_config_with_experimental_feature :
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?l2_chains:l2_setup list ->
+  ?preconfirmation_stream_enabled:bool ->
   unit ->
   JSON.t ->
   JSON.t
