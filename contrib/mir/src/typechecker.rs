@@ -6334,7 +6334,7 @@ mod typecheck_tests {
                 "parameter unit;",
                 "storage unit;",
                 "code { CAR; NIL operation; PAIR };",
-                r#"view "a" unit unit { CAR };"#,
+                r#"view "this_view_name_has_31_char_okay" unit unit { CAR };"#,
             ))
             .unwrap()
             .typecheck_script(&mut gas, true),
@@ -6347,7 +6347,7 @@ mod typecheck_tests {
                     (Vec::new(), Type::Unit)
                 )]),
                 views: HashMap::from_iter([(
-                    "a".into(),
+                    "this_view_name_has_31_char_okay".into(),
                     View {
                         input_type: Type::Unit,
                         output_type: Type::Unit,
@@ -6415,6 +6415,40 @@ mod typecheck_tests {
             .unwrap()
             .typecheck_script(&mut gas, true),
             Err(TcError::DuplicatedView("a".into()))
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_long_view_name() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage unit;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "this_is_a_very_long_view_name_32" unit unit { CAR };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut gas, true),
+            Err(TcError::InvalidViewName(
+                "this_is_a_very_long_view_name_32".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_special_character_view_name() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage unit;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "?_cannot_be_view_name" unit unit { CAR };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut gas, true),
+            Err(TcError::InvalidViewName("?_cannot_be_view_name".into()))
         );
     }
 
