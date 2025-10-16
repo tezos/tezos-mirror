@@ -168,6 +168,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         heartbeat_handle : unit cancellation_handle;
         event_loop_handle : unit cancellation_handle;
       }
+    | Crashed
 
   type message_with_header = {
     message : Message.t;
@@ -292,7 +293,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     mutable status : worker_status;
     mutable state : worker_state;
     self : Peer.t;
+    worker_crashed : unit Lwt.t * unit Lwt.u;
   }
+
+  exception Worker_crashed
 
   let maybe_reachable_point = C.maybe_reachable_point
 
@@ -901,7 +905,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           {verbosity = Notice} ["apply_event"; "Check_unknown_messages"]]
 
   (** A helper function that pushes events in the state *)
-  let push e {status = _; state; self = _} = Stream.push e state.events_stream
+  let push e {status = _; state; self = _; _} =
+    Stream.push e state.events_stream
 
   let app_input t input = push (App_input input) t
 
@@ -945,12 +950,19 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       if !shutdown then return ()
       else
         let* () = events_logging event in
-        t.state <-
-          (apply_event
-             ~self:t.self
-             t.state
-             event [@profiler.span_f {verbosity = Notice} ["apply_event"]]) ;
-        loop t
+        try
+          let new_state =
+            (apply_event
+               ~self:t.self
+               t.state
+               event [@profiler.span_f {verbosity = Notice} ["apply_event"]])
+          in
+          t.state <- new_state ;
+          loop t
+        with (_ : exn) ->
+          t.status <- Crashed ;
+          Lwt.wakeup (snd t.worker_crashed) () ;
+          return ()
     in
     let promise = loop t in
     let schedule_cancellation () =
@@ -970,7 +982,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let status = Running {heartbeat_handle; event_loop_handle} in
         t.status <- status ;
         List.iter (fun topic -> app_input t (Join topic)) topics
-    | Running _ ->
+    | Running _ | Crashed ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5166
 
            Better error handling *)
@@ -982,7 +994,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   let shutdown state =
     let open C.Monad in
     match state.status with
-    | Starting -> return ()
+    | Starting | Crashed -> return ()
     | Running {heartbeat_handle; event_loop_handle; _} ->
         (* First, we schedule event_loop cancellation without waiting for the
            promise to resolve (i.e. for an input in the stream to be read). *)
@@ -1015,9 +1027,12 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           unknown_validity_messages = Bounded_message_map.make ~capacity:10_000;
           unreachable_points = Point.Map.empty;
         };
+      worker_crashed = Lwt.wait ();
     }
 
   let stats t = t.state.stats
+
+  let worker_crashed t = fst t.worker_crashed
 
   let p2p_output_stream t = t.state.p2p_output_stream
 
