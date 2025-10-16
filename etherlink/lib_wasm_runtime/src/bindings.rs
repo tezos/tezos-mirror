@@ -15,10 +15,14 @@ use std::{
 #[macro_export]
 macro_rules! otel_trace {
     ($name:expr, $expr:expr) => {{
-        crate::bindings::start_span($name);
-        let __otel_result = { $expr };
-        crate::bindings::end_span();
-        __otel_result
+        if crate::api::trace_host_funs_enabled() {
+            crate::bindings::start_span($name);
+            let __otel_result = { $expr };
+            crate::bindings::end_span();
+            __otel_result
+        } else {
+            $expr
+        }
     }};
 }
 

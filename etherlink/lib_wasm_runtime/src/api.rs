@@ -11,12 +11,23 @@ use crate::{
 };
 use log::trace;
 use ocaml::{Error, List, Pointer, Value};
+use std::sync::OnceLock;
 use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock, RwLockReadGuard},
 };
 use wasmer::{Engine, Features, Module, NativeEngineExt, Store, Target};
 use wasmer_compiler_cranelift::Cranelift;
+
+static TRACE_HOST_FUNS: OnceLock<bool> = OnceLock::new();
+
+fn set_host_tracing(trace_host_funs: bool) {
+    TRACE_HOST_FUNS.set(trace_host_funs);
+}
+
+pub fn trace_host_funs_enabled() -> bool {
+    *(TRACE_HOST_FUNS.get().unwrap_or(&false))
+}
 
 pub struct Kernel(Module);
 
@@ -121,7 +132,7 @@ pub fn wasm_runtime_new_context() -> Pointer<Context> {
 
 #[ocaml::func]
 #[ocaml::sig(
-    "context -> string -> string option -> bool -> string -> Wasm_runtime_callbacks.scope -> Irmin_context.tree -> bytes -> int32 -> string list -> Irmin_context.tree"
+    "context -> string -> string option -> bool -> string -> Wasm_runtime_callbacks.scope -> bool -> Irmin_context.tree -> bytes -> int32 -> string list -> Irmin_context.tree"
 )]
 pub fn wasm_runtime_run(
     mut ctxt: Pointer<Context>,
@@ -130,6 +141,7 @@ pub fn wasm_runtime_run(
     native_execution: bool,
     entrypoint: OCamlString,
     otel_scope: OpenTelemetryScope,
+    trace_host_funs: bool,
     mut tree: EvmTree,
     rollup_address: SmartRollupAddress,
     level: u32,
@@ -137,6 +149,7 @@ pub fn wasm_runtime_run(
 ) -> Result<EvmTree, Error> {
     let ctxt = ctxt.as_mut();
     let mut inputs_buffer = InputsBuffer::new(level, inputs.into_vec());
+    set_host_tracing(trace_host_funs);
     init_spans(&otel_scope, "wasm_runtime_run")?;
     loop {
         let host = Host::new(

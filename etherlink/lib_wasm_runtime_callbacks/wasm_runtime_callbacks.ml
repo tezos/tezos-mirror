@@ -7,23 +7,20 @@
 (*****************************************************************************)
 
 type scope =
-  | Root of {scope : Opentelemetry.Scope.t option; trace_host_funs : bool}
+  | Root of {scope : Opentelemetry.Scope.t option}
   | Started of {
       parent : Opentelemetry.Span_id.t option;
       scope : Opentelemetry.Scope.t;
       name : string;
       start_time : Opentelemetry.Timestamp_ns.t;
-      trace_host_funs : bool;
     }
 
-let root_scope ?(trace_host_funs = false) scope = Root {scope; trace_host_funs}
+let root_scope scope = Root {scope}
 
 let prepare_new_span = function
-  | Root {scope = None; trace_host_funs} ->
-      (Opentelemetry.Trace_id.create (), None, trace_host_funs)
-  | Root {scope = Some scope; trace_host_funs}
-  | Started {scope; trace_host_funs; _} ->
-      (scope.trace_id, Some scope.span_id, trace_host_funs)
+  | Root {scope = None} -> (Opentelemetry.Trace_id.create (), None)
+  | Root {scope = Some scope} | Started {scope; _} ->
+      (scope.trace_id, Some scope.span_id)
 
 (*
   Rationale:
@@ -76,10 +73,10 @@ let pop_latest_dls_scope () =
   | hd :: tl ->
       Domain.DLS.set dls_key tl ;
       hd
-  | [] -> Root {scope = None; trace_host_funs = false}
+  | [] -> Root {scope = None}
 
 let create_scope scope scope_name =
-  let trace_id, parent, trace_host_funs = prepare_new_span scope in
+  let trace_id, parent = prepare_new_span scope in
   let span_id = Opentelemetry.Span_id.create () in
   let scope = Opentelemetry.Scope.make ~trace_id ~span_id () in
   let scope =
@@ -89,7 +86,6 @@ let create_scope scope scope_name =
         scope;
         name = scope_name;
         start_time = Opentelemetry.Timestamp_ns.now_unix_ns ();
-        trace_host_funs;
       }
   in
   add_dls_scope scope
