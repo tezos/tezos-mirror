@@ -36,6 +36,9 @@ type slot_index = int
 (** An index of a DAL page. *)
 type page_index = int
 
+(** A DAL attestation lag *)
+type attestation_lag = int
+
 (** An ID associated to a slot or to its commitment. *)
 module Slot_id : sig
   type t = {slot_level : level; slot_index : slot_index}

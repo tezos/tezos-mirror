@@ -281,9 +281,12 @@ module Skip_list_cells : sig
   val insert :
     ?conn:Dal_store_sqlite3.conn ->
     t ->
-    published_level:int32 ->
-    attestation_lag:int ->
-    (Skip_list_hash.t * Skip_list_cell.t * Types.slot_index) list ->
+    attested_level:int32 ->
+    (Skip_list_hash.t
+    * Skip_list_cell.t
+    * Types.slot_index
+    * Types.attestation_lag)
+    list ->
     unit tzresult Lwt.t
 
   (** [remove ?conn store ~published_level] removes any data related to [published_level]

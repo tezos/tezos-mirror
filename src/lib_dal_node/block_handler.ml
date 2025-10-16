@@ -192,26 +192,19 @@ let store_skip_list_cells ctxt cctxt dal_constants ~attested_level
   in
   let cells_of_level =
     List.map
-      (fun (hash, cell, slot_index, _cell_attestation_lag) ->
+      (fun (hash, cell, slot_index, cell_attestation_lag) ->
         ( Dal_proto_types.Skip_list_hash.of_proto
             Plugin.Skip_list.hash_encoding
             hash,
           Dal_proto_types.Skip_list_cell.of_proto
             Plugin.Skip_list.cell_encoding
             cell,
-          slot_index ))
+          slot_index,
+          cell_attestation_lag ))
       cells_of_level
   in
   let store = Node_context.get_store ctxt in
-  (* DAL/FIXME: use the lag and published_level returned by the cells_of_level
-     in https://gitlab.com/tezos/tezos/-/merge_requests/19512 *)
-  let attestation_lag = dal_constants.Types.attestation_lag in
-  let published_level = Int32.(sub attested_level (of_int attestation_lag)) in
-  Store.Skip_list_cells.insert
-    store
-    ~published_level
-    ~attestation_lag
-    cells_of_level
+  Store.Skip_list_cells.insert store ~attested_level cells_of_level
 
 (* This functions counts, for each slot, the number of shards attested by the bakers. *)
 let attested_shards_per_slot attestations slot_to_committee ~number_of_slots

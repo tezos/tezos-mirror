@@ -68,16 +68,19 @@ module Skip_list_cells : sig
     tzresult
     Lwt.t
 
-  (** [insert ?conn store ~published_level ~attestation_lag values] inserts the
-      given list of [values] associated to the given [published_level] in the
-      [store]. Any existing value is overridden. Uses the [conn] if provided
-      (defaults to [None]). *)
+  (** [insert ?conn store ~attested_level values] inserts the given list of
+      [values] associated to the given [attested_level] in the [store]. Any
+      existing value is overridden. Uses the [conn] if provided (defaults to
+      [None]). *)
   val insert :
     ?conn:conn ->
     t ->
-    published_level:int32 ->
-    attestation_lag:int ->
-    (Skip_list_hash.t * Skip_list_cell.t * Types.slot_index) list ->
+    attested_level:int32 ->
+    (Skip_list_hash.t
+    * Skip_list_cell.t
+    * Types.slot_index
+    * Types.attestation_lag)
+    list ->
     unit tzresult Lwt.t
 
   (** [remove ?conn store ~published_level] removes any data related to
