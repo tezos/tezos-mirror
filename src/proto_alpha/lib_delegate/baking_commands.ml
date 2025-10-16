@@ -794,6 +794,8 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
       (prefixes ["run"; "vdf"] @@ stop)
       (fun (pidfile, keep_alive) cctxt ->
         Command_run.may_lock_pidfile pidfile @@ fun () ->
+        let open Lwt_syntax in
+        let* () = Events.(emit deprecated_proto_specific_baker ()) in
         Client_daemon.VDF.run cctxt ~chain:cctxt#chain ~keep_alive);
   ]
 
