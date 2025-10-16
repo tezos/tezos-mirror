@@ -633,7 +633,15 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   (* Users of Cacio just specify a [string] for the [name];
      we don't want them to provide a [string option].
      But in this module, we want the type-checker to force us to check
-     whether the name is empty (for the [Shared] module). *)
+     whether the name is empty (for the [Shared] module).
+
+     Another solution would be to define two functors:
+     - one where the name is optional;
+     - a second one where the name is mandatory;
+     and to only expose the second one.
+     This would encode, in types, the fact that there is a [Shared] component.
+     But it would be heavier, and types would still not exactly capture
+     the intent, since the empty name would become an invalid value. *)
   module Component = struct
     include Component
 
