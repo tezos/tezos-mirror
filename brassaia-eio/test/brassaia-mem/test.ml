@@ -15,7 +15,7 @@
  *)
 
 let () =
-  Eio_main.run @@ fun _ ->
+  Eio_posix.run @@ fun _ ->
   Brassaia_eio_test_helpers.Brassaia_test.Store.run
     ~__FILE__
     "brassaia-eio-mem"

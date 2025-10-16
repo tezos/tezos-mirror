@@ -1884,7 +1884,7 @@ let octez_base_unix =
         lwt_exit;
         terminal;
         eio;
-        eio_main;
+        eio_posix;
         lwt_eio;
       ]
     ~inline_tests:ppx_expect
@@ -3293,7 +3293,7 @@ let _brassaia_eio_generic_key_tests =
         octez_base_unix;
         brassaia_eio_test_helpers |> open_;
         brassaia_eio_mem;
-        eio_main;
+        eio_posix;
         vector;
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
@@ -3399,7 +3399,7 @@ let _brassaia_eio_mem_tests =
         brassaia_eio_mem;
         brassaia_eio_test_helpers;
         octez_test_helpers |> open_;
-        eio_main;
+        eio_posix;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
 
@@ -3572,7 +3572,7 @@ let _brassaia_eio_pack_tests =
         octez_test_helpers |> open_;
         alcotezt;
         fpath;
-        eio_main;
+        eio_posix;
         tezt_lib |> open_ |> open_ ~m:"Base";
       ]
     ~preprocess:(pps ppx_brassaia_eio_internal)

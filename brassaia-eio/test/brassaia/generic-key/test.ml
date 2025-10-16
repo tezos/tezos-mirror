@@ -15,7 +15,7 @@
  *)
 
 let () =
-  Eio_main.run @@ fun _env ->
+  Eio_posix.run @@ fun _env ->
   Brassaia_eio_test_helpers.Brassaia_test.Store.run
     ~__FILE__
     "brassaia-eio/generic-key"
