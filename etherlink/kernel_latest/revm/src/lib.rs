@@ -288,7 +288,7 @@ pub fn run_transaction<'a, Host: Runtime>(
         block_constants.chain_id.as_u64(),
     )?;
 
-    let db = EtherlinkVMDB::new(host, block_constants, caller)?;
+    let db = EtherlinkVMDB::new(host, block_constants)?;
 
     if let Some(tracer_input) = tracer_input {
         let inspector = get_inspector_from(tracer_input, precompiles.clone(), spec_id);
