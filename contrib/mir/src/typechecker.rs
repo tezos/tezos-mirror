@@ -6638,6 +6638,44 @@ mod typecheck_tests {
     }
 
     #[test]
+    fn test_script_typchecking_view_instruction_ok() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage unit;",
+                r#"code { CAR ; NIL operation ; PAIR ; PUSH address "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" ; UNIT ; VIEW "hello_view" string ; DROP ; };"#
+            ))
+            .unwrap()
+            .split_script().unwrap().typecheck_script(&mut gas, true, true),
+            Ok(ContractScript {
+                parameter: Type::Unit,
+                storage: Type::Unit,
+                code: Seq(vec![
+                    Car,
+                    Nil,
+                    Pair,
+                    Push(TypedValue::Address(addr::Address
+                        { hash: AddressHash::try_from("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq").unwrap(),
+                          entrypoint: Entrypoint::default() }
+                        )),
+                    Unit,
+                    IView { name: "hello_view".into(), return_type: Type::String }, Drop(None)]),
+                annotations: HashMap::from([(
+                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    (Vec::new(), Type::Unit)
+                )]),
+                views: HashMap::new(),
+            })
+        );
+    }
+
+    #[test]
+    fn test_typchecking_view_too_short() {
+        too_short_test(&parse("VIEW \"hello_view\" string").unwrap(), Prim::VIEW, 2);
+    }
+
+    #[test]
     fn test_contract_is_passable() {
         let mut gas = Gas::default();
         assert_eq!(
