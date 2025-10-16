@@ -335,18 +335,24 @@ module History = struct
   (* History is represented via a skip list. The content of the cell
      is the hash of a merkle proof. *)
 
-  type attestation_lag_kind = Legacy
+  type attestation_lag_kind = Legacy | Dynamic of int
 
   (** The legacy attestation lag used by mainnet, ghostnet and shadownet *)
   let legacy_attestation_lag = 8
 
-  let attestation_lag_value = function Legacy -> legacy_attestation_lag
+  let attestation_lag_value = function
+    | Legacy -> legacy_attestation_lag
+    | Dynamic n -> n
 
   let attestation_lag_kind_equal lag1 lag2 =
-    match (lag1, lag2) with Legacy, Legacy -> true
+    match (lag1, lag2) with
+    | Legacy, Legacy -> true
+    | Dynamic n1, Dynamic n2 -> Compare.Int.equal n1 n2
+    | Legacy, Dynamic _ | Dynamic _, Legacy -> false
 
   let pp_attestation_lag_kind fmt = function
     | Legacy -> Format.fprintf fmt "Legacy:%d" legacy_attestation_lag
+    | Dynamic n -> Format.fprintf fmt "Dynamic:%d" n
 
   type cell_id = {header_id : Header.id; attestation_lag : attestation_lag_kind}
 
@@ -457,6 +463,10 @@ module History = struct
           (function
             | Unpublished {header_id; attestation_lag = Legacy} ->
                 Some ((), header_id)
+            | Unpublished {attestation_lag = Dynamic _; _} ->
+                (* We'll use a different encoding for [Dynamic] to keep
+                 encoding and hash retro-compatibility for [Legacy]. *)
+                None
             | Published _ -> None)
           (fun ((), header_id) ->
             Unpublished {header_id; attestation_lag = Legacy})
@@ -475,6 +485,10 @@ module History = struct
              Header.encoding)
           (function
             | Unpublished _ -> None
+            | Published {attestation_lag = Dynamic _; _} ->
+                (* We'll use a different encoding for [Dynamic] to keep
+                 encoding and hash retro-compatibility for [Legacy]. *)
+                None
             | Published
                 {
                   header;
@@ -508,7 +522,82 @@ module History = struct
                 total_shards;
               })
       in
-      union ~tag_size:`Uint8 [legacy_unpublished_case; legacy_published_case]
+      let dynamic_unpublished_case =
+        case
+          ~title:"unpublished_dyn"
+          (Tag 4)
+          (merge_objs
+             (obj2
+                (req "kind" (constant "unpublished"))
+                (req "attestation_lag" uint8))
+             Header.id_encoding)
+          (function
+            | Unpublished {header_id; attestation_lag = Dynamic lag} ->
+                Some (((), lag), header_id)
+            | Unpublished {attestation_lag = Legacy; _} -> None
+            | Published _ -> None)
+          (fun (((), lag), header_id) ->
+            Unpublished {header_id; attestation_lag = Dynamic lag})
+      in
+      let dynamic_published_case =
+        case
+          ~title:"published_dyn"
+          (Tag 5)
+          (merge_objs
+             (obj6
+                (req "kind" (constant "published"))
+                (req "publisher" Contract_repr.encoding)
+                (req "is_proto_attested" bool)
+                (req "attested_shards" uint16)
+                (req "total_shards" uint16)
+                (req "attestation_lag" uint8))
+             Header.encoding)
+          (function
+            | Unpublished _ -> None
+            | Published {attestation_lag = Legacy; _} -> None
+            | Published
+                {
+                  header;
+                  attestation_lag = Dynamic lag;
+                  publisher;
+                  is_proto_attested;
+                  attested_shards;
+                  total_shards;
+                } ->
+                Some
+                  ( ( (),
+                      publisher,
+                      is_proto_attested,
+                      attested_shards,
+                      total_shards,
+                      lag ),
+                    header ))
+          (fun ( ( (),
+                   publisher,
+                   is_proto_attested,
+                   attested_shards,
+                   total_shards,
+                   lag ),
+                 header )
+             ->
+            Published
+              {
+                header;
+                attestation_lag = Dynamic lag;
+                publisher;
+                is_proto_attested;
+                attested_shards;
+                total_shards;
+              })
+      in
+      union
+        ~tag_size:`Uint8
+        [
+          legacy_unpublished_case;
+          legacy_published_case;
+          dynamic_unpublished_case;
+          dynamic_published_case;
+        ]
 
     let equal t1 t2 =
       match (t1, t2) with
@@ -823,7 +912,7 @@ module History = struct
        will simplify the shape of proofs and help bounding the history cache
        required for their generation. *)
     let update_skip_list (t : t) cache ~published_level ~number_of_slots
-        slot_headers_with_statuses =
+        ~attestation_lag slot_headers_with_statuses =
       let open Result_syntax in
       let* () =
         List.iter_e
@@ -838,14 +927,19 @@ module History = struct
         fill_slot_headers
           ~number_of_slots
           ~published_level
-          ~attestation_lag:Legacy
+          ~attestation_lag
           slot_headers_with_statuses
       in
       List.fold_left_e (add_cell ~number_of_slots) (t, cache) slot_headers
 
     let update_skip_list_no_cache =
       let empty_cache = History_cache.empty ~capacity:0L in
-      fun t ~published_level ~number_of_slots slot_headers_with_statuses ->
+      fun t
+          ~published_level
+          ~number_of_slots
+          ~attestation_lag
+          slot_headers_with_statuses
+        ->
         let open Result_syntax in
         let+ cell, (_ : History_cache.t) =
           update_skip_list
@@ -853,6 +947,7 @@ module History = struct
             empty_cache
             ~published_level
             ~number_of_slots
+            ~attestation_lag
             slot_headers_with_statuses
         in
         cell

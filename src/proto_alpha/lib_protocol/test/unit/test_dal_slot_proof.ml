@@ -65,11 +65,13 @@ struct
     let index = mk_slot_index id in
     let* _data, _poly, slot = mk_slot ~level ~index () in
     let@ result =
-      Hist.update_skip_list_no_cache
-        skip_list
-        ~published_level:level
-        [(slot, Contract_repr.zero, mk_attested)]
-        ~number_of_slots:Parameters.dal_parameters.number_of_slots
+      Hist.(
+        update_skip_list_no_cache
+          skip_list
+          ~published_level:level
+          [(slot, Contract_repr.zero, mk_attested)]
+          ~number_of_slots:Parameters.dal_parameters.number_of_slots
+          ~attestation_lag:Legacy)
     in
     check_result result
 
@@ -187,12 +189,14 @@ struct
     let open Lwt_result_wrap_syntax in
     let* _slot_data, polynomial, slot = mk_slot ~level ?index () in
     let*?@ skip_list, cache =
-      Hist.update_skip_list
-        ~number_of_slots:Parameters.dal_parameters.number_of_slots
-        genesis_history
-        genesis_history_cache
-        ~published_level:level
-        [(slot, Contract_repr.zero, mk_attested)]
+      Hist.(
+        update_skip_list
+          ~number_of_slots:Parameters.dal_parameters.number_of_slots
+          genesis_history
+          genesis_history_cache
+          ~published_level:level
+          [(slot, Contract_repr.zero, mk_attested)]
+          ~attestation_lag:Legacy)
     in
     let* page_info, page_id = mk_page_info slot polynomial in
     produce_and_verify_proof

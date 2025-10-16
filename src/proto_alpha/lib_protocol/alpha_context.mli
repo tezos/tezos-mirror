@@ -3098,7 +3098,7 @@ module Dal : sig
   module Slots_history : sig
     type t
 
-    type attestation_lag_kind = Legacy
+    type attestation_lag_kind = Legacy | Dynamic of int
 
     val attestation_lag_value : attestation_lag_kind -> int
 
@@ -3151,6 +3151,7 @@ module Dal : sig
       t ->
       published_level:Raw_level.t ->
       number_of_slots:int ->
+      attestation_lag:attestation_lag_kind ->
       (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
       t tzresult
 
@@ -3159,6 +3160,7 @@ module Dal : sig
       History_cache.t ->
       published_level:Raw_level.t ->
       number_of_slots:int ->
+      attestation_lag:attestation_lag_kind ->
       (Slot.Header.t * Contract.t * Attestation.attestation_status) list ->
       (t * History_cache.t) tzresult
 
