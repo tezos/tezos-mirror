@@ -30,7 +30,7 @@ use revm::{
     Context, ExecuteCommitEvm, InspectCommitEvm, MainBuilder,
 };
 use tezos_ethereum::block::BlockConstants;
-use tezos_evm_logging::{trace, tracing::instrument};
+use tezos_evm_logging::{otel_trace, trace, tracing::instrument};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
@@ -332,7 +332,11 @@ pub fn run_transaction<'a, Host: Runtime>(
             is_simulation,
         );
 
-        let execution_result = trace!("evm.transact_commit", evm.transact_commit(&tx))?;
+        let execution_result = otel_trace!(
+            evm.db_mut().host,
+            "evm.transact_commit",
+            trace!("evm.transact_commit", evm.transact_commit(&tx))
+        )?;
 
         let withdrawals = evm.db_mut().take_withdrawals();
 

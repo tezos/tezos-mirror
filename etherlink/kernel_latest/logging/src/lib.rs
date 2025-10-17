@@ -67,20 +67,24 @@ macro_rules! log {
     };
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(all(feature = "tracing", feature = "alloc"))]
 #[macro_export]
 macro_rules! otel_trace {
     ($host:expr, $name:expr, $expr:expr) => {{
-        {
-            let msg = format!("[{}] [start] {}", tezos_evm_logging::Level::OTel, $name);
-            $crate::debug_str!($host, &msg);
-        }
+        let msg = format!("[{}] [start] {}", tezos_evm_logging::Level::OTel, $name);
+        $crate::debug_str!($host, &msg);
         let __otel_result = { $expr };
-        {
-            let msg = format!("[{}] [end] {}", tezos_evm_logging::Level::OTel, $name);
-            $crate::debug_str!($host, &msg);
-        }
+        let msg = format!("[{}] [end] {}", tezos_evm_logging::Level::OTel, $name);
+        $crate::debug_str!($host, &msg);
         __otel_result
+    }};
+}
+
+#[cfg(not(feature = "tracing"))]
+#[macro_export]
+macro_rules! otel_trace {
+    ($host:expr, $name:expr, $expr:expr) => {{
+        $expr
     }};
 }
 
