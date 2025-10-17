@@ -1,35 +1,22 @@
 # Changelog
 
-## Unreleased
+## Version 0.45 (2025-10-17)
 
-### Breaking changes
+This release is a bugfix release following the activation of the Ebisu kernel
+(Etherlink 5.0). The fixes are for regressions introduced in the RPCs
+`eth_call`, `eth_estimateGas` (_i.e._ simulations), and
+`debug_traceBlockByNumber` with `callTracer`. (This fix is applied only on the
+native kernel execution which is enabled by default for the RPC server.)
 
-### Configuration changes
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
 
 ### RPCs changes (Ebisu)
 
-- Disabled [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) checks during `eth_call`
-  simulations in Ebisu. (!19645)
+- Disabled [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) checks during
+  `eth_call` and `eth_estimateGas` simulations in Ebisu. (!19645)
 - Fixed `callTracer` in Ebisu not tracing all transactions in a block if a user
   sent multiples transactions in that same block. (!19650)
-
-
-### Monitoring changes
-
-### Command-line interface changes
-
-### Execution changes
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.44 (2025-10-14)
 
