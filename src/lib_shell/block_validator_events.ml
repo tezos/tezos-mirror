@@ -113,7 +113,7 @@ let preapplication_failure =
     ~msg:
       "pre-application of block at level {level} failed ({worker_status}): \
        {errors}"
-    ~level:Notice
+    ~level:Warning
     ~pp1:(fun fmt -> Format.fprintf fmt "%li")
     ~pp2:Worker_types.pp_status
     ~pp3:pp_print_top_error_of_trace
@@ -125,7 +125,7 @@ let application_failure_after_validation =
   declare_3
     ~section
     ~name:"application_failure_after_validation"
-    ~level:Notice
+    ~level:Warning
     ~msg:
       "application of block {block} failed but validation succeeded, \
        {worker_status}: {errors}"
