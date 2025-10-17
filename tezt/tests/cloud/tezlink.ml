@@ -616,21 +616,21 @@ let nginx_reverse_proxy_config ~(ssl : Ssl.t option) ~proxy =
           Some config)
 
 let make_proxy agent ~path ~dns_domain public_port activate_ssl =
+  let public_port = port_of_option agent public_port in
   match dns_domain with
   | None ->
       (* No DNS so no proxy, so we must use the public port. *)
-      No_proxy {port = port_of_option agent public_port; path}
+      No_proxy {port = public_port; path}
   | Some dns_domain ->
       (* We let the system choose a fresh internal node port.
          Note that it will be publicy exposed, it's just that we don't need to
          share this one. *)
       let internal_port = Agent.next_available_port agent in
-      let external_port = port_of_option agent public_port in
       Proxy
         {
           internal_info = {port = internal_port; path};
           dns_domain;
-          external_port;
+          external_port = public_port;
           activate_ssl;
         }
 
