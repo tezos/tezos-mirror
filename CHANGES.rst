@@ -122,9 +122,16 @@ DAL node
   node's store. If traps are detected within the slot, then it should not be attested,
   so the id is not sent via the stream. (MR :gl:`!19459`)
 
-- The DAL node now starts propagating shards one level after the inclusion of the 
+- The DAL node now starts propagating shards one level after the inclusion of the
   corresponding published slot header operation (i.e., when the operation is finalized),
   instead of two levels after, when the block is finalized. (MR :gl:`!19366`)
+
+- **Breaking change** Slots status are not stored in dedicated files on disk
+  anymore, but found in a cache and the skip list. A consequence of this is that
+  the ``/levels/<slot_level>/slots/<slot_index>/status`` will only work with nodes that store the
+  skip list, and therefore not with observer nodes. Also, the RPC will now answer
+  a 500 error if querying a level at which the DAL was not supported instead
+  of a 404 error. (MR :gl:`!19471`)
 
 - **Breaking change** Enforced stricter validation for the JSON configuration
   file. Previously, the parser would silently ignore any content that appeared

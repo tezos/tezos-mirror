@@ -376,19 +376,6 @@ open struct
 
   let cached_slot_shard = cached_or_stored_slot_shard ~kind:"cached"
 
-  let stored_slot_status =
-    declare_3
-      ~section
-      ~prefix_name_with_section:true
-      ~name:"stored_slot_status"
-      ~msg:
-        "stored slot status for level {published_level} and index \
-         {slot_index}: {status}"
-      ~level:Debug
-      ("published_level", Data_encoding.int32)
-      ("slot_index", Data_encoding.int31)
-      ("status", Types.header_status_encoding)
-
   let removed_slot_shards =
     declare_2
       ~section
@@ -408,15 +395,6 @@ open struct
       ~level:Debug
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
-
-  let removed_status =
-    declare_1
-      ~section
-      ~prefix_name_with_section:true
-      ~name:"removed_status"
-      ~msg:"removed statuses for level {level}"
-      ~level:Debug
-      ("level", Data_encoding.int32)
 
   let slot_header_status_storage_error =
     declare_3
@@ -481,16 +459,6 @@ open struct
          failed: {error}"
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
-      ("error", Error_monad.trace_encoding)
-
-  let removing_status_failed =
-    declare_2
-      ~section
-      ~prefix_name_with_section:true
-      ~name:"removing_status_failed"
-      ~level:Warning
-      ~msg:"removing status file for level {level} failed: {error}"
-      ("level", Data_encoding.int32)
       ("error", Error_monad.trace_encoding)
 
   let removing_skip_list_cells_failed =
@@ -1416,16 +1384,11 @@ let emit_stored_slot_shard ~published_level ~slot_index ~shard_index =
 let emit_cached_slot_shard ~published_level ~slot_index ~shard_index =
   emit cached_slot_shard (published_level, slot_index, shard_index)
 
-let emit_stored_slot_status ~published_level ~slot_index ~status =
-  emit stored_slot_status (published_level, slot_index, status)
-
 let emit_removed_slot_shards ~published_level ~slot_index =
   emit removed_slot_shards (published_level, slot_index)
 
 let emit_removed_slot ~published_level ~slot_index =
   emit removed_slot (published_level, slot_index)
-
-let emit_removed_status ~level = emit removed_status level
 
 let emit_slot_header_status_storage_error ~published_level ~slot_index ~error =
   emit slot_header_status_storage_error (published_level, slot_index, error)
@@ -1443,9 +1406,6 @@ let emit_removing_shards_failed ~published_level ~slot_index ~error =
 
 let emit_removing_slot_failed ~published_level ~slot_index ~error =
   emit removing_slot_failed (published_level, slot_index, error)
-
-let emit_removing_status_failed ~level ~error =
-  emit removing_status_failed (level, error)
 
 let emit_removing_skip_list_cells_failed ~level ~error =
   emit removing_skip_list_cells_failed (level, error)

@@ -58,6 +58,16 @@ let cache_size =
    slots multiplied by the attestation lag, which sounds reasonable. *)
 let slot_id_cache_size = 32 * 8
 
+(* This cache is used for transient info. Permanent info is stored on disk.
+   i.e. you need [number_of_slots * (attestation_lag + 1) * 2].
+   That's because the slot status of a slot published at [L] is first added
+   to the cache at level [L + 1], and then updated at level
+   [L + attestation_lag + tb_finality]. Also, when a block is finalized,
+   the slots will be updated with a attested/unattested status, and you don't
+   want it to erase later levels from statuses cache. Using twice the cache
+   size solves this problem. *)
+let statuses_cache_size = 32 * (8 + 1) * 2
+
 let shards_verification_sampling_frequency = 100
 
 let amplification_timeout = 120.

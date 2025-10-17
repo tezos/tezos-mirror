@@ -773,19 +773,67 @@ let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
 let store_slot_headers ~number_of_slots ~block_level slot_headers node_store =
   Store.(add_slot_headers ~number_of_slots ~block_level slot_headers node_store)
 
+module Statuses = struct
+  let get_status_from_skip_list ctxt (slot_id : Types.slot_id) =
+    let open Lwt_result_syntax in
+    let* slot_cell =
+      Store.Skip_list_cells.find_by_slot_id_opt
+        (Node_context.get_store ctxt)
+        slot_id
+    in
+    match slot_cell with
+    | None -> return_none
+    | Some cell -> (
+        let*? proto_parameters =
+          Node_context.get_proto_parameters
+            ctxt
+            ~level:(`Level slot_id.slot_level)
+        in
+        let attested_level =
+          Int32.(
+            add slot_id.slot_level (of_int proto_parameters.attestation_lag))
+        in
+        let*? (module Plugin : Dal_plugin.T) =
+          Node_context.get_plugin_for_level ctxt ~level:attested_level
+        in
+        let cell =
+          Dal_proto_types.Skip_list_cell.to_proto
+            Plugin.Skip_list.cell_encoding
+            cell
+        in
+        match Plugin.Skip_list.proto_attestation_status cell with
+        | None ->
+            (* Old protocols that do not expose the information *)
+            return_none
+        | Some `Unpublished -> return_none
+        | Some `Attested -> return_some `Attested
+        | Some `Unattested -> return_some `Unattested)
+
+  let find_status ctxt (slot_id : Types.slot_id) =
+    let open Lwt_result_syntax in
+    let store = Node_context.get_store ctxt in
+    let statuses_cache = Store.statuses_cache store in
+    match Store.Statuses_cache.get_slot_status statuses_cache slot_id with
+    | Some status -> return status
+    | None -> (
+        let*! status = get_status_from_skip_list ctxt slot_id in
+        match status with
+        | Ok (Some res) -> return res
+        | Ok None -> fail `Not_found
+        | Error e -> fail (`Other e))
+end
+
 let update_selected_slot_headers_statuses ~block_level ~attestation_lag
     ~number_of_slots attested_slots node_store =
-  let slot_header_statuses_store = Store.slot_header_statuses node_store in
-  Store.Statuses.update_selected_slot_headers_statuses
+  let statuses_cache = Store.statuses_cache node_store in
+  Store.Statuses_cache.update_selected_slot_headers_statuses
     ~block_level
     ~attestation_lag
     ~number_of_slots
     attested_slots
-    slot_header_statuses_store
+    statuses_cache
 
-let get_slot_status ~slot_id node_store =
-  let slot_header_statuses_store = Store.slot_header_statuses node_store in
-  Store.Statuses.get_slot_status ~slot_id slot_header_statuses_store
+let get_slot_status ~slot_id ctxt = Statuses.find_status ctxt slot_id
 
 let get_slot_shard (store : Store.t) (slot_id : Types.slot_id) shard_index =
   Store.Shards.read (Store.shards store) slot_id shard_index

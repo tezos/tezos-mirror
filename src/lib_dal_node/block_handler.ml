@@ -90,17 +90,6 @@ let remove_old_level_stored_data proto_parameters ctxt current_level =
            else return_unit
          in
          let number_of_slots = proto_parameters.Types.number_of_slots in
-         let* () =
-           let* res =
-             Store.Statuses.remove_level_status
-               ~level:oldest_level
-               (Store.slot_header_statuses store)
-           in
-           match res with
-           | Ok () -> Event.emit_removed_status ~level:oldest_level
-           | Error error ->
-               Event.emit_removing_status_failed ~level:oldest_level ~error
-         in
          List.iter_s
            (fun slot_index ->
              let slot_id : Types.slot_id =
@@ -382,7 +371,7 @@ let process_commitments ctxt cctxt store proto_parameters block_level
        ~block_level
        cctxt [@profiler.record_s {verbosity = Notice} "slot_headers"])
   in
-  let* () =
+  let*! () =
     (Slot_manager.store_slot_headers
        ~number_of_slots:proto_parameters.Types.number_of_slots
        ~block_level
@@ -443,14 +432,14 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
     (Plugin.dal_attestation
        block_info [@profiler.record_f {verbosity = Notice} "dal_attestation"])
   in
-  let* () =
+  let () =
     (Slot_manager.update_selected_slot_headers_statuses
        ~block_level
        ~attestation_lag:proto_parameters.Types.attestation_lag
        ~number_of_slots:proto_parameters.number_of_slots
        (Plugin.is_attested dal_attestation)
        store
-     [@profiler.record_s
+     [@profiler.record_f
        {verbosity = Notice} "update_selected_slot_headers_statuses"])
   in
   let*! () =

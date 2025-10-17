@@ -137,7 +137,10 @@ val get_slot_commitment :
   ; query : unit >
   service
 
-(** Return the status for the given slot. *)
+(** Return the status of the given slot. It first looks for the status in its
+    cache, which is available only during the attestation window. If not found
+    in the cache, it fetches the status in the corresponding cell in the
+    skip-list store; this therefore works only on operator nodes. *)
 val get_slot_status :
   < meth : [`GET]
   ; input : unit

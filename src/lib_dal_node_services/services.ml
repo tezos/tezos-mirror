@@ -289,7 +289,8 @@ let get_slot_status :
     ; query : unit >
     service =
   Tezos_rpc.Service.get_service
-    ~description:"Return the status for the given slot."
+    ~description:
+      "Return the status for the given slot. For operator nodes only."
     ~query:Tezos_rpc.Query.empty
     ~output:header_status_encoding
     Tezos_rpc.Path.(

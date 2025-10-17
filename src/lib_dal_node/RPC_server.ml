@@ -253,9 +253,8 @@ module Slots_handlers = struct
 
   let get_slot_status ctxt slot_level slot_index () () =
     call_handler1 (fun () ->
-        let store = Node_context.get_store ctxt in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        Slot_manager.get_slot_status ~slot_id store)
+        Slot_manager.get_slot_status ~slot_id ctxt)
 
   let get_slot_shard ctxt slot_level slot_index shard_index () () =
     call_handler1 (fun () ->
@@ -313,10 +312,9 @@ module Profile_handlers = struct
   let get_assigned_shard_indices ctxt pkh level () () =
     Node_context.fetch_assigned_shard_indices ctxt ~level ~pkh
 
-  let warn_missing_shards store attester published_level
+  let warn_missing_shards ctxt attester published_level
       expected_number_of_shards number_of_stored_shards_per_slot =
     let open Lwt_syntax in
-    let statuses_store = Store.slot_header_statuses store in
     let* problems =
       List.filter_map_s
         (fun (Types.Slot_id.{slot_index; _}, num_stored) ->
@@ -324,8 +322,8 @@ module Profile_handlers = struct
             Lwt.return_some (`Ok (slot_index, num_stored))
           else
             let* res =
-              Store.Statuses.get_slot_status
-                statuses_store
+              Slot_manager.get_slot_status
+                ctxt
                 ~slot_id:{slot_level = published_level; slot_index}
             in
             match res with
@@ -484,7 +482,7 @@ module Profile_handlers = struct
           Lwt.dont_wait
             (fun () ->
               warn_missing_shards
-                store
+                ctxt
                 pkh
                 published_level
                 number_of_assigned_shards
