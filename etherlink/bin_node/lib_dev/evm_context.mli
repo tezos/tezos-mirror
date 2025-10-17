@@ -43,7 +43,7 @@ type error += Cannot_apply_blueprint of {local_state_level : Z.t}
     snapshot if the [data_dir] was not initialized before. *)
 val start :
   configuration:Configuration.t ->
-  ?kernel_path:Wasm_debugger.kernel ->
+  ?kernel_path:Pvm_types.kernel ->
   data_dir:string ->
   ?smart_rollup_address:string ->
   store_perm:Sqlite.perm ->
@@ -146,7 +146,7 @@ val shutdown : unit -> unit tzresult Lwt.t
     kernel with the provided [kernel]. *)
 val patch_kernel :
   ?block_number:Ethereum_types.quantity ->
-  Wasm_debugger.kernel ->
+  Pvm_types.kernel ->
   unit tzresult Lwt.t
 
 (** [provision_balance address value] modifies the state of the current head of

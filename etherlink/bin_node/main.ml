@@ -122,7 +122,7 @@ module Params = struct
         let* () =
           when_ (not file_exists) @@ fun () -> failwith "%s is not a file" s
         in
-        return (Evm_node_lib_dev.Wasm_debugger.On_disk s))
+        return (Evm_node_lib_dev.Pvm_types.On_disk s))
 
   let native_execution_policy =
     Tezos_clic.parameter (fun _ policy ->
@@ -1145,7 +1145,7 @@ let sequencer_disable_native_execution configuration =
   | Never -> return configuration
 
 let kernel_from_args network kernel =
-  let open Evm_node_lib_dev.Wasm_debugger in
+  let open Evm_node_lib_dev.Pvm_types in
   Option.either
     kernel
     (Option.bind network (function

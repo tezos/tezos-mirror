@@ -21,7 +21,7 @@ type head = {
 
 type parameters = {
   configuration : Configuration.t;
-  kernel_path : Wasm_debugger.kernel option;
+  kernel_path : Pvm_types.kernel option;
   data_dir : string;
   smart_rollup_address : string option;
   store_perm : Sqlite.perm;
@@ -63,7 +63,7 @@ type t = {
 let is_sequencer t = Option.is_some t.signer
 
 let pvm_config ctxt =
-  Wasm_debugger.config
+  Pvm.Kernel.config
     ~preimage_directory:ctxt.configuration.kernel_execution.preimages
     ?preimage_endpoint:ctxt.configuration.kernel_execution.preimages_endpoint
     ~kernel_debug:true
@@ -1620,7 +1620,7 @@ module State = struct
       Read_write
       (Evm_state.irmin_store_path ~data_dir)
 
-  let on_disk_kernel = function Wasm_debugger.On_disk _ -> true | _ -> false
+  let on_disk_kernel = function Pvm_types.On_disk _ -> true | _ -> false
 
   let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
       ?smart_rollup_address ~store_perm ?signer ?snapshot_url
@@ -1709,7 +1709,7 @@ module State = struct
             (* By executing the kernel with a minimal inbox, we preemptively
                setup Etherlink (in case an installer is used). *)
             let config =
-              Wasm_debugger.config
+              Pvm.Kernel.config
                 ~preimage_directory:configuration.kernel_execution.preimages
                 ?preimage_endpoint:
                   configuration.kernel_execution.preimages_endpoint
@@ -2592,14 +2592,10 @@ let last_known_l1_level () = worker_wait_for_request Last_known_L1_level
 
 let patch_kernel ?block_number kernel =
   let open Lwt_result_syntax in
-  let* kernel, is_binary = Wasm_debugger.read_kernel kernel in
+  let* kernel, is_binary = Pvm.Kernel.read_kernel kernel in
   let* version = worker_wait_for_request Wasm_pvm_version in
   let* () =
-    Wasm_debugger.check_kernel
-      ~binary:is_binary
-      ~name:"boot.wasm"
-      version
-      kernel
+    Pvm.Kernel.check_kernel ~binary:is_binary ~name:"boot.wasm" version kernel
   in
   let* () =
     worker_wait_for_request

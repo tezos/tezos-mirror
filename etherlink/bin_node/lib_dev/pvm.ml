@@ -214,3 +214,84 @@ module Wasm_internal = struct
   let of_irmin : Irmin_context.tree -> Context.tree =
    fun tree -> Context.make_tree ~tree ~impl:(module Irmin_context)
 end
+
+module Kernel = struct
+  let config = Wasm_debugger.config
+
+  let read_kernel = Wasm_debugger.read_kernel
+
+  let check_kernel = Wasm_debugger.check_kernel
+
+  let set_durable_value ?edit_readonly tree key value =
+    let open Lwt_syntax in
+    let tree = Wasm_internal.to_irmin_exn tree in
+    let* tree = Wasm_debugger.set_durable_value ?edit_readonly tree key value in
+    return (Wasm_internal.of_irmin tree)
+
+  let start ~tree version kernel =
+    let open Lwt_result_syntax in
+    let tree = Wasm_internal.to_irmin_exn tree in
+    let* tree = Wasm_debugger.start ~tree version kernel in
+    return (Wasm_internal.of_irmin tree)
+
+  let find_key_in_durable tree key =
+    Wasm_debugger.find_key_in_durable (Wasm_internal.to_irmin_exn tree) key
+
+  let wrap_as_durable_storage tree =
+    Wasm_debugger.wrap_as_durable_storage (Wasm_internal.to_irmin_exn tree)
+
+  let eval ?hooks ?migrate_to ~write_debug ~wasm_entrypoint level inboxes config
+      step tree =
+    let open Lwt_result_syntax in
+    let tree = Wasm_internal.to_irmin_exn tree in
+    let* tree, ticks, inboxes, level =
+      Wasm_debugger.eval
+        ?hooks
+        ?migrate_to
+        ~write_debug
+        ~wasm_entrypoint
+        level
+        inboxes
+        config
+        step
+        tree
+    in
+    let tree = Wasm_internal.of_irmin tree in
+    return (tree, ticks, inboxes, level)
+
+  let profile ?migrate_to ?hooks ~collapse ~with_time ~no_reboot level inboxes
+      config function_symbols tree =
+    let open Lwt_result_syntax in
+    let tree = Wasm_internal.to_irmin_exn tree in
+    let* tree, inboxes, level =
+      Wasm_debugger.profile
+        ?migrate_to
+        ?hooks
+        ~collapse
+        ~with_time
+        ~no_reboot
+        level
+        inboxes
+        config
+        function_symbols
+        tree
+    in
+    let tree = Wasm_internal.of_irmin tree in
+    return (tree, inboxes, level)
+
+  let encode value tree =
+    let open Lwt_syntax in
+    let tree = Wasm_internal.to_irmin_exn tree in
+    let* tree = Wasm_debugger.encode value tree in
+    return (Wasm_internal.of_irmin tree)
+
+  let decode tree =
+    let tree = Wasm_internal.to_irmin_exn tree in
+    Wasm_debugger.decode tree
+
+  let get_wasm_version tree =
+    Wasm_debugger.get_wasm_version (Wasm_internal.to_irmin_exn tree)
+
+  let get_function_symbols tree =
+    Wasm_debugger.get_function_symbols (Wasm_internal.to_irmin_exn tree)
+end
