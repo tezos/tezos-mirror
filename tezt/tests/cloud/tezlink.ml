@@ -615,6 +615,25 @@ let nginx_reverse_proxy_config ~(ssl : Ssl.t option) ~proxy =
           in
           Some config)
 
+let make_proxy agent ~path ~dns_domain public_port activate_ssl =
+  match dns_domain with
+  | None ->
+      (* No DNS so no proxy, so we must use the public port. *)
+      No_proxy {port = port_of_option agent public_port; path}
+  | Some dns_domain ->
+      (* We let the system choose a fresh internal node port.
+         Note that it will be publicy exposed, it's just that we don't need to
+         share this one. *)
+      let internal_port = Agent.next_available_port agent in
+      let external_port = port_of_option agent public_port in
+      Proxy
+        {
+          internal_info = {port = internal_port; path};
+          dns_domain;
+          external_port;
+          activate_ssl;
+        }
+
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
   let name = "tezlink-sequencer" in
@@ -698,33 +717,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       let* tzkt_proxy =
         if Cli.tzkt then
           let tzkt_proxy =
-            let path = None in
-            match dns_domain with
-            | None ->
-                (* No DNS so no proxy, so we must use the public API port. *)
-                No_proxy
-                  {
-                    port =
-                      port_of_option tezlink_sequencer_agent Cli.tzkt_api_port;
-                    path;
-                  }
-            | Some dns_domain ->
-                (* We let the system choose a fresh internal API node port.
-                   Note that it will be publicy exposed, it's just that we don't
-                   need to share this one. *)
-                let internal_port =
-                  Agent.next_available_port tezlink_sequencer_agent
-                in
-                let external_port =
-                  port_of_option tezlink_sequencer_agent Cli.tzkt_api_port
-                in
-                Proxy
-                  {
-                    internal_info = {port = internal_port; path};
-                    dns_domain;
-                    external_port;
-                    activate_ssl;
-                  }
+            make_proxy
+              tezlink_sequencer_agent
+              ~path:None
+              ~dns_domain
+              Cli.tzkt_api_port
+              activate_ssl
           in
           let external_tzkt_api_endpoint =
             proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
