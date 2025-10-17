@@ -572,8 +572,8 @@ let proxy_internal_endpoint proxy_info =
   let {path; port} = proxy_internal_info proxy_info in
   Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme ~port ())
 
-let proxy_external_endpoint ~runner ~dns_domain = function
-  | No_proxy {port; path} -> build_endpoint ?path ~runner ~dns_domain port
+let proxy_external_endpoint ~runner = function
+  | No_proxy {port; path} -> build_endpoint ?path ~runner ~dns_domain:None port
   | Proxy {dns_domain; external_port; activate_ssl; internal_info = _} ->
       let scheme = if activate_ssl then "https" else "http" in
       Client.Foreign_endpoint
@@ -687,7 +687,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         proxy_internal_endpoint sequencer_proxy_info
       in
       let tezlink_proxy_endpoint =
-        proxy_external_endpoint ~runner ~dns_domain sequencer_proxy_info
+        proxy_external_endpoint ~runner sequencer_proxy_info
       in
       let* () =
         add_service
@@ -713,7 +713,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               activate_ssl
           in
           let external_tzkt_api_endpoint =
-            proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
+            proxy_external_endpoint ~runner tzkt_proxy
           in
           let* () =
             add_service
@@ -766,7 +766,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~time_between_blocks:Cli.time_between_blocks
             and* () =
               let external_tzkt_api_endpoint =
-                proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
+                proxy_external_endpoint ~runner tzkt_proxy
               in
               init_umami
                 tezlink_sequencer_agent
@@ -802,7 +802,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                     ~url:(sf "%s/info" (Client.string_of_endpoint faucet_api))
                 in
                 let external_tzkt_api_endpoint =
-                  proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
+                  proxy_external_endpoint ~runner tzkt_proxy
                 in
                 let* faucet_frontend =
                   init_faucet_frontend
