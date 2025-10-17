@@ -71,6 +71,7 @@
   test_sc_rollup_wasm
   test_local_contexts
   test_dal_slot_proof
+  test_dal_past_parameters_storage
   test_adaptive_issuance
   test_percentage
   test_full_staking_balance_repr
