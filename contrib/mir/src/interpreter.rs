@@ -6725,7 +6725,11 @@ mod interpreter_tests {
                 .unwrap();
         let mut ctx = Ctx::default();
         ctx.set_operation_counter(100);
-        let cs = cs_mich.typecheck_script(ctx.gas(), true).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(ctx.gas(), true)
+            .unwrap();
         let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(super::CreateContract {
@@ -6777,7 +6781,11 @@ mod interpreter_tests {
             PAIR }}"#;
 
         let cs_mich = parse(code).unwrap();
-        let cs = cs_mich.typecheck_script(&mut Gas::default(), true).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true)
+            .unwrap();
 
         let expected_entrypoints = HashMap::from([
             (
@@ -6884,7 +6892,11 @@ mod interpreter_tests {
             PAIR }}"#;
 
         let cs_mich = parse(code).unwrap();
-        let cs = cs_mich.typecheck_script(&mut Gas::default(), true).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true)
+            .unwrap();
 
         let parsed_entrypoints = cs.annotations;
         let expected_entrypoints = HashMap::from([
@@ -7029,7 +7041,11 @@ mod interpreter_tests {
             PAIR }}"#;
 
         let cs_mich = parse(code).unwrap();
-        let cs = cs_mich.typecheck_script(&mut Gas::default(), true).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true)
+            .unwrap();
 
         let parsed_entrypoints = cs.annotations;
         let expected_entrypoints = HashMap::from([
@@ -7174,7 +7190,11 @@ mod interpreter_tests {
             PAIR }}"#;
 
         let cs_mich = parse(code).unwrap();
-        let cs = cs_mich.typecheck_script(&mut Gas::default(), true).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true)
+            .unwrap();
 
         let parsed_entrypoints = cs.annotations;
         let expected_entrypoints = HashMap::from([

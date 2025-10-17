@@ -29,6 +29,8 @@ pub enum Error {
     ImplicitToOriginated,
     #[error("Tried casting an Originated account into an Implicit account")]
     OriginatedToImplicit,
+    #[error("Typechecking error: {0}")]
+    TcError(String),
 }
 
 impl From<PathError> for Error {

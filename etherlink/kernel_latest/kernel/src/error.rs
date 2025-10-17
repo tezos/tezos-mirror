@@ -129,6 +129,8 @@ pub enum Error {
     RevmPrecompileInitError,
     #[error("Overflow occurred during an arithmetic operation")]
     Overflow(String),
+    #[error("Typechecking error: {0}")]
+    TcError(String),
 }
 
 impl From<revm_etherlink::Error> for Error {
@@ -226,6 +228,7 @@ impl From<IndexableStorageError> for Error {
             IndexableStorageError::NomReadError(msg) => Error::NomReadError(msg),
             IndexableStorageError::ImplicitToOriginated => Error::ImplicitToOriginated,
             IndexableStorageError::OriginatedToImplicit => Error::OriginatedToImplicit,
+            IndexableStorageError::TcError(msg) => Error::TcError(msg),
         }
     }
 }
@@ -246,6 +249,7 @@ impl From<GenStorageError> for Error {
             GenStorageError::NomReadError(msg) => Error::NomReadError(msg),
             GenStorageError::ImplicitToOriginated => Error::ImplicitToOriginated,
             GenStorageError::OriginatedToImplicit => Error::OriginatedToImplicit,
+            GenStorageError::TcError(msg) => Error::TcError(msg),
         }
     }
 }

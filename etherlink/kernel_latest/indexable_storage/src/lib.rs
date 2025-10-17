@@ -47,6 +47,8 @@ pub enum IndexableStorageError {
     ImplicitToOriginated,
     #[error("Tried casting an Originated account into an Implicit account")]
     OriginatedToImplicit,
+    #[error("Typechecking error: {0}")]
+    TcError(String),
 }
 
 impl From<GenStorageError> for IndexableStorageError {
@@ -73,6 +75,7 @@ impl From<GenStorageError> for IndexableStorageError {
             GenStorageError::OriginatedToImplicit => {
                 IndexableStorageError::OriginatedToImplicit
             }
+            GenStorageError::TcError(msg) => IndexableStorageError::TcError(msg),
         }
     }
 }

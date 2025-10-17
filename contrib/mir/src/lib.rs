@@ -99,7 +99,7 @@
 //! let mut ctx = Ctx::default();
 //! // You can change various things about the context here, see [Ctx]
 //! // documentation.
-//! let contract_typechecked = contract_micheline.typecheck_script(ctx.gas(), true).unwrap();
+//! let contract_typechecked = contract_micheline.split_script().unwrap().typecheck_script(ctx.gas(), true).unwrap();
 //! // We construct parameter and storage manually, but you'd probably
 //! // parse or deserialize them from some sort of input/storage, so we use
 //! // parser and decoder respectively.
@@ -364,6 +364,8 @@ mod tests {
         use crate::lexer::Prim;
         use Micheline as M;
         let interp_res = parse_contract_script(VOTE_SRC)
+            .unwrap()
+            .split_script()
             .unwrap()
             .typecheck_script(ctx.gas(), true)
             .unwrap()
@@ -1060,7 +1062,11 @@ mod tests {
         let cs_mich =
             parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
                 .unwrap();
-        let cs = cs_mich.typecheck_script(&mut Gas::default(), true).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true)
+            .unwrap();
         let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(CreateContract {
@@ -1255,6 +1261,8 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
+            .split_script()
+            .unwrap()
             .typecheck_script(&mut Gas::default(), true)
             .unwrap()
             .interpret(
@@ -1328,6 +1336,8 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
+            .split_script()
+            .unwrap()
             .typecheck_script(ctx.gas(), true)
             .unwrap()
             .interpret(
@@ -1383,6 +1393,8 @@ mod multisig_tests {
         let invalid_signature = "edsigtt6SusfFFqwKqJNDuZMbhP6Q8f6zu3c3q7W6vPbjYKpv84H3hfXhRyRvAXHzNYSwBNNqjmf5taXKd2ZW3Rbix78bhWjxg5";
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
+            .unwrap()
+            .split_script()
             .unwrap()
             .typecheck_script(ctx.gas(), true)
             .unwrap()
