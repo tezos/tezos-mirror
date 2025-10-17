@@ -36,7 +36,9 @@ type time_between_blocks =
 type native_execution_policy = Always | Rpcs_only | Never
 
 type kernel_execution_config = {
-  preimages : string;  (** Path to the preimages directory. *)
+  preimages : string option;
+      (** Path to the preimages directory. if none, it uses a default
+          path under the data_dir *)
   preimages_endpoint : Uri.t option;
       (** Endpoint where pre-images can be fetched individually when missing. *)
   native_execution_policy : native_execution_policy;
@@ -214,6 +216,7 @@ type telemetry_config = {
 }
 
 type t = {
+  data_dir : string;
   public_rpc : rpc;
   private_rpc : rpc option;
   websockets : websockets_config option;
@@ -257,23 +260,22 @@ val performance_profile_encoding : performance_profile Data_encoding.t
 
     If [encoding] is passed, some default values are set according to the
     selected network, for a more straightforward UX. *)
-val encoding : ?network:supported_network -> string -> t Data_encoding.t
+val encoding : ?network:supported_network -> unit -> t Data_encoding.t
 
 (** Encoding for {!type-rpc_server}. *)
 val rpc_server_encoding : rpc_server Data_encoding.t
 
-(** [save ~force ~data_dir configuration config_file] writes the
-    [config_file] file. If [force] is [true], existing configurations are
+(** [save ~force configuration config_file] writes the [config_file]
+    file. If [force] is [true], existing configurations are
     overwritten. *)
-val save : force:bool -> data_dir:string -> t -> string -> unit tzresult Lwt.t
+val save : force:bool -> t -> string -> unit tzresult Lwt.t
 
-val load_file :
-  ?network:supported_network -> data_dir:string -> string -> t tzresult Lwt.t
+val load_file : ?network:supported_network -> string -> t tzresult Lwt.t
 
-(** [load ~data_dir config_file] loads the configuration stored in
-    [config_file] with preimage directory relative to [data_dir]. *)
-val load :
-  ?network:supported_network -> data_dir:string -> string -> t tzresult Lwt.t
+(** [load config_file] loads the configuration stored in
+    [config_file] with preimage directory relative to [data_dir] or
+    [config.data_dir]. *)
+val load : ?network:supported_network -> string -> t tzresult Lwt.t
 
 (** [sequencer_keys config] returns the keys the sequencer should use, or
     fails. *)
@@ -304,9 +306,18 @@ val gc_param_from_retention_period : days:int -> garbage_collector_parameters
 
 val default_history_mode : history_mode
 
+val default_data_dir : string
+
+val get_data_dir : data_dir:string option -> string
+
+val config_filename :
+  data_dir:string option -> ?config_file:string -> unit -> string
+
+val preimages_path : t -> string
+
 module Cli : sig
   val create :
-    data_dir:string ->
+    data_dir:string option ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?rpc_batch_limit:limit ->
@@ -347,6 +358,7 @@ module Cli : sig
     t
 
   val patch_configuration_from_args :
+    data_dir:string option ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?rpc_batch_limit:limit ->
@@ -386,7 +398,7 @@ module Cli : sig
     t
 
   val create_or_read_config :
-    data_dir:string ->
+    data_dir:string option ->
     ?rpc_addr:string ->
     ?rpc_port:int ->
     ?rpc_batch_limit:limit ->
@@ -435,7 +447,7 @@ val pp_time_between_blocks : Format.formatter -> time_between_blocks -> unit
     standard output. *)
 val describe : unit -> unit
 
-val pp_print_json : data_dir:string -> Format.formatter -> t -> unit
+val pp_print_json : Format.formatter -> t -> unit
 
 val observer_evm_node_endpoint : supported_network -> string
 

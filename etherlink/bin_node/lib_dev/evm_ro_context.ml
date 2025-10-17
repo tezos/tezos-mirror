@@ -90,12 +90,12 @@ let network_sanity_check ~network ctxt =
 
   return_unit
 
-let load ~pool ?network ?smart_rollup_address ~data_dir
-    (configuration : Configuration.t) =
+let load ~pool ?network ?smart_rollup_address (configuration : Configuration.t)
+    =
   let open Lwt_result_syntax in
   let* store =
     Evm_store.init
-      ~data_dir
+      ~data_dir:configuration.data_dir
       ~perm:(Read_only {pool_size = configuration.db.pool_size})
       ?max_conn_reuse_count:configuration.db.max_conn_reuse_count
       ()
@@ -106,7 +106,7 @@ let load ~pool ?network ?smart_rollup_address ~data_dir
         (module Irmin_context)
         ~cache_size:100_000
         Read_only
-        (Evm_state.irmin_store_path ~data_dir))
+        (Evm_state.irmin_store_path ~data_dir:configuration.data_dir))
   in
   let* smart_rollup_address =
     match smart_rollup_address with
@@ -123,8 +123,8 @@ let load ~pool ?network ?smart_rollup_address ~data_dir
     {
       store;
       index;
-      data_dir;
-      preimages = configuration.kernel_execution.preimages;
+      data_dir = configuration.data_dir;
+      preimages = Configuration.preimages_path configuration;
       preimages_endpoint = configuration.kernel_execution.preimages_endpoint;
       native_execution_policy =
         configuration.kernel_execution.native_execution_policy;

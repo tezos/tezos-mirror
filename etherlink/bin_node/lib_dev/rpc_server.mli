@@ -46,14 +46,13 @@ val start_private_server :
     The optional argument [evm_services_methods] can be used to install
     the EVM services.
 
-    If [data_dir] is provided and the host provides the necessary binaries,
-    performance metrics are enabled. *)
+    If the host provides the necessary binaries, performance metrics
+    are enabled. *)
 val start_public_server :
   mode:Configuration.mode ->
   rpc_server_family:'f Rpc_types.rpc_server_family ->
   l2_chain_id:L2_types.chain_id option ->
   ?evm_services:evm_services_methods ->
-  ?data_dir:string ->
   Configuration.t ->
   'f Services_backend_sig.tx_container ->
   (module Services_backend_sig.S) * 'a ->

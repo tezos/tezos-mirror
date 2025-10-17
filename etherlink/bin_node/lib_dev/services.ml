@@ -116,7 +116,7 @@ let configuration_handler config =
   (* Hide some parts of the configuration. *)
   let hidden = "hidden" in
   let kernel_execution =
-    Configuration.{config.kernel_execution with preimages = hidden}
+    Configuration.{config.kernel_execution with preimages = Some hidden}
   in
   let sequencer = {config.sequencer with sequencer = []} in
   let observer =
@@ -135,6 +135,7 @@ let configuration_handler config =
   let config =
     {
       config with
+      data_dir = hidden;
       rollup_node_endpoint = Uri.of_string hidden;
       kernel_execution;
       sequencer;
@@ -146,7 +147,7 @@ let configuration_handler config =
 
   Data_encoding.Json.construct
     ~include_default_fields:`Always
-    (Configuration.encoding hidden)
+    (Configuration.encoding ())
     config
 
 let health_check_handler mode db_liveness_check query =

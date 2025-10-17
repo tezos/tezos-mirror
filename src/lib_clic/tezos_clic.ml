@@ -213,7 +213,11 @@ let rec print_options_detailed : type ctx a.
         match env with
         | None -> doc
         | Some env ->
-            Format.sprintf "%s\nIf set, defaults to the value of %s." doc env
+            Format.sprintf
+              "%s\n\
+               If set, defaults to the value of the environment variable `$%s`."
+              doc
+              env
       in
       Format.fprintf
         ppf

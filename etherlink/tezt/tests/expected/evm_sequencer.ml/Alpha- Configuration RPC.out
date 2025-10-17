@@ -1,4 +1,5 @@
 {
+  "data_dir": "hidden",
   "log_filter": {
     "max_nb_blocks": 100,
     "max_nb_logs": 1000,
@@ -87,6 +88,7 @@
   "performance_profile": "default"
 }
 {
+  "data_dir": "hidden",
   "log_filter": {
     "max_nb_blocks": 100,
     "max_nb_logs": 1000,
@@ -175,6 +177,7 @@
   "performance_profile": "default"
 }
 {
+  "data_dir": "hidden",
   "log_filter": {
     "max_nb_blocks": 100,
     "max_nb_logs": 1000,

@@ -22,7 +22,6 @@ type head = {
 type parameters = {
   configuration : Configuration.t;
   kernel_path : Pvm_types.kernel option;
-  data_dir : string;
   smart_rollup_address : string option;
   store_perm : Sqlite.perm;
   signer : Signer.map option;
@@ -49,7 +48,6 @@ type session_state = {
 
 type t = {
   configuration : Configuration.t;
-  data_dir : string;
   index : Pvm.Context.rw_index;
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   store : Evm_store.t;
@@ -64,7 +62,7 @@ let is_sequencer t = Option.is_some t.signer
 
 let pvm_config ctxt =
   Pvm.Kernel.config
-    ~preimage_directory:ctxt.configuration.kernel_execution.preimages
+    ~preimage_directory:(Configuration.preimages_path ctxt.configuration)
     ?preimage_endpoint:ctxt.configuration.kernel_execution.preimages_endpoint
     ~kernel_debug:true
     ~destination:ctxt.smart_rollup_address
@@ -349,7 +347,7 @@ module State = struct
         (Ptime.diff stop_timestamp start_timestamp)
     in
 
-    let data_dir = ctxt.data_dir in
+    let data_dir = ctxt.configuration.data_dir in
     match ctxt.configuration.experimental_features.periodic_snapshot_path with
     | Some path ->
         let*! () =
@@ -472,8 +470,7 @@ module State = struct
         evm_state
         `Skip_stage_one
 
-  let background_preemptive_download
-      (kernel_execution : Configuration.kernel_execution_config) upgrade_event =
+  let background_preemptive_download config upgrade_event =
     let open Lwt_syntax in
     let open Evm_events.Upgrade in
     let rec downloader root_hash preimages_endpoint preimages =
@@ -492,13 +489,16 @@ module State = struct
           let* () = Lwt_unix.sleep 60.0 in
           downloader root_hash preimages_endpoint preimages)
     in
-    match kernel_execution.preimages_endpoint with
+    match config.Configuration.kernel_execution.preimages_endpoint with
     | None -> ()
     | Some preimages_endpoint ->
         let (Hash (Hex root_hash)) = upgrade_event.hash in
         let root_hash = `Hex root_hash in
         Lwt.async (fun () ->
-            downloader root_hash preimages_endpoint kernel_execution.preimages)
+            downloader
+              root_hash
+              preimages_endpoint
+              (Configuration.preimages_path config))
 
   let reset_to_level ctxt conn l2_level checkpoint =
     let open Lwt_result_syntax in
@@ -1236,9 +1236,7 @@ module State = struct
               kernel_upgrade = upgrade;
               injected_before = ctxt.session.next_blueprint_number;
             } ;
-        background_preemptive_download
-          ctxt.configuration.kernel_execution
-          upgrade ;
+        background_preemptive_download ctxt.configuration upgrade ;
         let payload = Evm_events.Upgrade.to_bytes upgrade |> String.of_bytes in
         let*! evm_state =
           Evm_state.modify
@@ -1584,9 +1582,10 @@ module State = struct
     in
     return ({smart_rollup_address; history_mode} : Evm_store.metadata)
 
-  let irmin_load ?snapshot_url ~data_dir configuration =
+  let irmin_load ?snapshot_url configuration =
     let open Lwt_result_syntax in
     let open Configuration in
+    let data_dir = configuration.data_dir in
     let*! store_already_exists =
       Lwt_utils_unix.dir_exists (Evm_state.irmin_store_path ~data_dir)
     in
@@ -1622,8 +1621,8 @@ module State = struct
 
   let on_disk_kernel = function Pvm_types.On_disk _ -> true | _ -> false
 
-  let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
-      ?smart_rollup_address ~store_perm ?signer ?snapshot_url
+  let init ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
+      ~store_perm ?signer ?snapshot_url
       ~(tx_container : _ Services_backend_sig.tx_container) () =
     let open Lwt_result_syntax in
     let pool =
@@ -1632,17 +1631,17 @@ module State = struct
       Lwt_domain.setup_pool 1
     in
     let*! () =
-      Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
+      Lwt_utils_unix.create_dir
+        (Evm_state.kernel_logs_directory ~data_dir:configuration.data_dir)
     in
-    let*! () =
-      Lwt_utils_unix.create_dir configuration.kernel_execution.preimages
-    in
-    let* index = irmin_load ?snapshot_url ~data_dir configuration in
+    let preimages_dir = Configuration.preimages_path configuration in
+    let*! () = Lwt_utils_unix.create_dir preimages_dir in
+    let* index = irmin_load ?snapshot_url configuration in
     let* store, context, next_blueprint_number, current_block_hash, init_status
         =
       load
         ~l2_chains:configuration.experimental_features.l2_chains
-        ~data_dir
+        ~data_dir:configuration.data_dir
         ~store_perm
         index
     in
@@ -1710,7 +1709,7 @@ module State = struct
                setup Etherlink (in case an installer is used). *)
             let config =
               Pvm.Kernel.config
-                ~preimage_directory:configuration.kernel_execution.preimages
+                ~preimage_directory:(Configuration.preimages_path configuration)
                 ?preimage_endpoint:
                   configuration.kernel_execution.preimages_endpoint
                 ~kernel_debug:true
@@ -1740,7 +1739,7 @@ module State = struct
             let* evm_state =
               Evm_state.execute
                 ~pool
-                ~data_dir
+                ~data_dir:configuration.data_dir
                 ~config
                 ~native_execution:false
                 evm_state
@@ -1771,7 +1770,6 @@ module State = struct
       {
         configuration;
         index;
-        data_dir;
         smart_rollup_address;
         session =
           {
@@ -1796,7 +1794,10 @@ module State = struct
     let* () =
       unless legacy_block_storage (fun () ->
           let* ro_store =
-            Evm_store.init ~data_dir ~perm:(Read_only {pool_size = 1}) ()
+            Evm_store.init
+              ~data_dir:configuration.data_dir
+              ~perm:(Read_only {pool_size = 1})
+              ()
           in
           let* evm_node_endpoint =
             if is_sequencer ctxt then return_none
@@ -2069,7 +2070,6 @@ module Handlers = struct
       {
         configuration : Configuration.t;
         kernel_path;
-        data_dir : string;
         smart_rollup_address : string option;
         store_perm;
         signer;
@@ -2081,7 +2081,6 @@ module Handlers = struct
       State.init
         ~configuration
         ?kernel_path
-        ~data_dir
         ?smart_rollup_address
         ~store_perm
         ?signer
@@ -2089,7 +2088,8 @@ module Handlers = struct
         ~tx_container
         ()
     in
-    Lwt.wakeup execution_config_waker @@ (ctxt.data_dir, pvm_config ctxt) ;
+    Lwt.wakeup execution_config_waker
+    @@ (ctxt.configuration.data_dir, pvm_config ctxt) ;
     Lwt.wakeup init_status_waker status ;
     State.Transaction.initialize_head_info ctxt ;
     return ctxt
@@ -2279,11 +2279,11 @@ let worker_wait_for_request req =
   let*! res = Worker.Queue.push_request_and_wait w req in
   return_ res
 
-let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
+let start ~(configuration : Configuration.t) ?kernel_path ?smart_rollup_address
     ~store_perm ?signer ?snapshot_url
     ~(tx_container : _ Services_backend_sig.tx_container) () =
   let open Lwt_result_syntax in
-  let* () = lock_data_dir ~data_dir in
+  let* () = lock_data_dir ~data_dir:configuration.data_dir in
   let* worker =
     Worker.launch
       table
@@ -2291,7 +2291,6 @@ let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
       {
         configuration;
         kernel_path;
-        data_dir;
         smart_rollup_address;
         store_perm;
         signer;
@@ -2465,12 +2464,14 @@ let apply_evm_events ?finalized_level events =
 let apply_evm_events' ?finalized_level events =
   worker_wait_for_request (Apply_evm_events {finalized_level; events})
 
-let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
-    ~rollup_node_data_dir ~tx_container () =
+let init_from_rollup_node ~(configuration : Configuration.t)
+    ~omit_delayed_tx_events ~rollup_node_data_dir ~tx_container () =
   let open Lwt_result_syntax in
-  let* () = lock_data_dir ~data_dir in
+  let* () = lock_data_dir ~data_dir:configuration.data_dir in
   let* irmin_context, evm_state, finalized_level =
-    init_context_from_rollup_node ~data_dir ~rollup_node_data_dir
+    init_context_from_rollup_node
+      ~data_dir:configuration.data_dir
+      ~rollup_node_data_dir
   in
   let* evm_events =
     get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state
@@ -2482,7 +2483,7 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
   let* () =
     init_store_from_rollup_node
       ~chain_family
-      ~data_dir
+      ~data_dir:configuration.data_dir
       ~evm_state
       ~irmin_context
   in
@@ -2492,7 +2493,6 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
   let* _loaded =
     start
       ~configuration
-      ~data_dir
       ~smart_rollup_address
       ~store_perm:Read_write
       ~tx_container

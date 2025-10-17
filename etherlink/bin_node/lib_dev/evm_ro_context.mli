@@ -19,7 +19,7 @@ type t = {
   trace_host_funs : bool;
 }
 
-(** [load ~data_dir configuration] creates a new read-only handler on the
+(** [load configuration] creates a new read-only handler on the
     node’s context. You can have as many read-only handlers as you want split
     over as many processes.
 
@@ -32,7 +32,6 @@ val load :
   pool:Lwt_domain.pool ->
   ?network:Configuration.supported_network ->
   ?smart_rollup_address:Address.t ->
-  data_dir:string ->
   Configuration.t ->
   t tzresult Lwt.t
 

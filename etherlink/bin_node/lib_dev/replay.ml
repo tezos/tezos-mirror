@@ -46,8 +46,8 @@ let alter_evm_state ~disable_da_fees ~kernel ~kernel_verbosity evm_state =
   | None -> return evm_state
   | Some kernel_verbosity -> patch_verbosity ~kernel_verbosity evm_state
 
-let main ~disable_da_fees ?kernel ?kernel_verbosity ~data_dir ~number ?profile
-    ?upto config =
+let main ~disable_da_fees ?kernel ?kernel_verbosity ~number ?profile ?upto
+    config =
   let open Lwt_result_syntax in
   let pool = Lwt_domain.setup_pool 1 in
   let* up_to_level =
@@ -59,7 +59,7 @@ let main ~disable_da_fees ?kernel ?kernel_verbosity ~data_dir ~number ?profile
             "'upto' must be a level succeeding the initial replayed level"
         else return v
   in
-  let* ro_ctxt = Evm_ro_context.load ~pool ~data_dir config in
+  let* ro_ctxt = Evm_ro_context.load ~pool config in
   let* legacy_block_storage =
     Evm_store.(use ro_ctxt.store Block_storage_mode.legacy)
   in

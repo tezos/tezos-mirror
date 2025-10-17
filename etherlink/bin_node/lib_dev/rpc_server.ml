@@ -147,15 +147,14 @@ let monitor_performances ~data_dir =
 
 let start_public_server (type f) ~(mode : Configuration.mode)
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id
-    ?evm_services ?data_dir (config : Configuration.t)
+    ?evm_services (config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container) ctxt =
   let open Lwt_result_syntax in
   let can_start_performance_metrics =
     Octez_performance_metrics.Unix.supports_performance_metrics ()
   in
-  if can_start_performance_metrics && Option.is_some data_dir then
-    monitor_performances
-      ~data_dir:WithExceptions.Option.(get ~loc:__LOC__ data_dir) ;
+  if can_start_performance_metrics then
+    monitor_performances ~data_dir:config.data_dir ;
   let register_evm_services =
     match evm_services with
     | None -> Fun.id

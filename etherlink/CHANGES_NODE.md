@@ -6,6 +6,9 @@
 
 ### Configuration changes
 
+- Add a `data_dir` field to the config. The field can be overridden by
+  the command line or the environment variable `EVM_NODE_DATA_DIR`. (!19619)
+
 ### RPCs changes
 
 ### Monitoring changes
