@@ -7,7 +7,7 @@
 
 open Ethereum_types
 
-type t = Evm_node_state.PVMState.value
+type t = Pvm.State.t
 
 let kernel_logs_directory ~data_dir = Filename.concat data_dir "kernel_logs"
 
@@ -81,13 +81,13 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
             inbox
             config
             Inbox
-            (Evm_node_state.Wasm_internal.to_irmin_exn evm_state)
+            (Pvm.Wasm_internal.to_irmin_exn evm_state)
         in
-        return (Evm_node_state.Wasm_internal.of_irmin evm_state)
+        return (Pvm.Wasm_internal.of_irmin evm_state)
     | Some Configuration.Flamegraph ->
         let* function_symbols =
           Wasm_debugger.get_function_symbols
-            (Evm_node_state.Wasm_internal.to_irmin_exn evm_state)
+            (Pvm.Wasm_internal.to_irmin_exn evm_state)
         in
         let inbox = to_pvm_inbox inbox in
         let* evm_state, _, _ =
@@ -100,11 +100,11 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
             inbox
             {config with flamecharts_directory = data_dir}
             function_symbols
-            (Evm_node_state.Wasm_internal.to_irmin_exn evm_state)
+            (Pvm.Wasm_internal.to_irmin_exn evm_state)
         in
-        return (Evm_node_state.Wasm_internal.of_irmin evm_state)
+        return (Pvm.Wasm_internal.of_irmin evm_state)
     | None ->
-        let evm_state = Evm_node_state.Wasm_internal.to_irmin_exn evm_state in
+        let evm_state = Pvm.Wasm_internal.to_irmin_exn evm_state in
         (* The [inbox] parameter is inherited from the WASM debugger, where the
            inbox is a list of list of messages (because it supports running the
            fast exec for several Tezos level in a raw).
@@ -147,7 +147,7 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
                     Stdlib.failwith "The WASM PVM raised an exception"
               else Lwt.reraise exn)
         in
-        return @@ Evm_node_state.Wasm_internal.of_irmin evm_state
+        return @@ Pvm.Wasm_internal.of_irmin evm_state
   in
   (* The messages are accumulated during the execution and stored
      atomatically at the end to preserve their order. *)
@@ -169,11 +169,11 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
 
 let modify ?edit_readonly ~key ~value evm_state =
   let open Lwt_syntax in
-  let evm_state = Evm_node_state.Wasm_internal.to_irmin_exn evm_state in
+  let evm_state = Pvm.Wasm_internal.to_irmin_exn evm_state in
   let* value =
     Wasm_debugger.set_durable_value ?edit_readonly evm_state key value
   in
-  return (Evm_node_state.Wasm_internal.of_irmin value)
+  return (Pvm.Wasm_internal.of_irmin value)
 
 let flag_local_exec evm_state =
   modify evm_state ~key:Durable_storage_path.evm_node_flag ~value:""
@@ -194,14 +194,14 @@ let init_reboot_counter evm_state =
 
 let init ~kernel =
   let open Lwt_result_syntax in
-  let evm_state = Evm_node_state.PVMState.empty (module Irmin_context) () in
+  let evm_state = Pvm.State.empty (module Irmin_context) () in
   let* evm_state =
     Wasm_debugger.start
-      ~tree:(Evm_node_state.Wasm_internal.to_irmin_exn evm_state)
+      ~tree:(Pvm.Wasm_internal.to_irmin_exn evm_state)
       Tezos_scoru_wasm.Wasm_pvm_state.V3
       kernel
   in
-  let evm_state = Evm_node_state.Wasm_internal.of_irmin evm_state in
+  let evm_state = Pvm.Wasm_internal.of_irmin evm_state in
   (* The WASM Runtime completely ignores the reboot counter, but some versions
      of the Etherlink kernel will need it to exist. *)
   let*! evm_state = init_reboot_counter evm_state in
@@ -211,14 +211,14 @@ let init ~kernel =
 let inspect evm_state key =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-  let evm_state = Evm_node_state.Wasm_internal.to_irmin_exn evm_state in
+  let evm_state = Pvm.Wasm_internal.to_irmin_exn evm_state in
   let* value = Wasm_debugger.find_key_in_durable evm_state key in
   Option.map_s Tezos_lazy_containers.Chunked_byte_vector.to_bytes value
 
 let subkeys evm_state key =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-  let evm_state = Evm_node_state.Wasm_internal.to_irmin_exn evm_state in
+  let evm_state = Pvm.Wasm_internal.to_irmin_exn evm_state in
   let* durable = Wasm_debugger.wrap_as_durable_storage evm_state in
   let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
   Tezos_scoru_wasm.Durable.list durable key
@@ -226,7 +226,7 @@ let subkeys evm_state key =
 let exists evm_state key =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn key in
-  let evm_state = Evm_node_state.Wasm_internal.to_irmin_exn evm_state in
+  let evm_state = Pvm.Wasm_internal.to_irmin_exn evm_state in
   let* durable = Wasm_debugger.wrap_as_durable_storage evm_state in
   let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
   Tezos_scoru_wasm.Durable.exists durable key
@@ -406,18 +406,17 @@ let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
 let delete ~kind evm_state path =
   let open Lwt_syntax in
   let key = Tezos_scoru_wasm.Durable.key_of_string_exn path in
-  let evm_state = Evm_node_state.Wasm_internal.to_irmin_exn evm_state in
+  let evm_state = Pvm.Wasm_internal.to_irmin_exn evm_state in
   let* pvm_state = Wasm_debugger.decode evm_state in
   let* durable = Tezos_scoru_wasm.Durable.delete ~kind pvm_state.durable key in
   let* res = Wasm_debugger.encode {pvm_state with durable} evm_state in
-  return (Evm_node_state.Wasm_internal.of_irmin res)
+  return (Pvm.Wasm_internal.of_irmin res)
 
 let clear_delayed_inbox evm_state =
   delete ~kind:Directory evm_state Durable_storage_path.delayed_inbox
 
 let wasm_pvm_version state =
-  Wasm_debugger.get_wasm_version
-    (Evm_node_state.Wasm_internal.to_irmin_exn state)
+  Wasm_debugger.get_wasm_version (Pvm.Wasm_internal.to_irmin_exn state)
 
 let storage_version state = Durable_storage.storage_version (read state)
 
@@ -426,9 +425,7 @@ let irmin_store_path ~data_dir = Filename.Infix.(data_dir // "store")
 let preload_kernel ~pool evm_state =
   let open Lwt_syntax in
   let* loaded =
-    Wasm_runtime.preload_kernel
-      ~pool
-      (Evm_node_state.Wasm_internal.to_irmin_exn evm_state)
+    Wasm_runtime.preload_kernel ~pool (Pvm.Wasm_internal.to_irmin_exn evm_state)
   in
   if loaded then
     let* version = kernel_version evm_state in

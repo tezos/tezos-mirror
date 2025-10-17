@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Evm_node_state.PVMState.value
+type t = Pvm.State.t
 
 (** Directory where the kernel logs are stored. The function {!execute} below
     expect the directory to exist.*)
