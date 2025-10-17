@@ -18,7 +18,7 @@ use inspectors::{
 use precompiles::provider::EtherlinkPrecompiles;
 use revm::{
     context::{
-        result::{EVMError, ExecResultAndState, ExecutionResult},
+        result::{EVMError, ExecutionResult},
         transaction::{AccessList, SignedAuthorization},
         tx::TxEnvBuilder,
         BlockEnv, CfgEnv, ContextTr, DBErrorMarker, Evm, TxEnv,
@@ -27,7 +27,7 @@ use revm::{
     handler::{instructions::EthInstructions, EthFrame},
     interpreter::interpreter::EthInterpreter,
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, U256},
-    Context, ExecuteCommitEvm, InspectEvm, MainBuilder,
+    Context, ExecuteCommitEvm, InspectCommitEvm, MainBuilder,
 };
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{trace, tracing::instrument};
@@ -303,7 +303,7 @@ pub fn run_transaction<'a, Host: Runtime>(
             inspector,
         );
 
-        let ExecResultAndState { result, .. } = evm.inspect_tx(&tx)?;
+        let result = evm.inspect_tx_commit(&tx)?;
 
         if evm.inspector.is_struct_logger() {
             StructLogger::store_outcome(
