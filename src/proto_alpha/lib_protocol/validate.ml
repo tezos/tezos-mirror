@@ -1957,14 +1957,17 @@ module Anonymous = struct
     | Single
         (Preattestations_aggregate {consensus_content = {level; _}; committee})
       ->
-        let level = Level.from_raw vi.ctxt level in
+        let attested_level = Level.from_raw vi.ctxt level in
         let* _ctxt, public_keys =
           (* [ctxt] is part of the accumulator so that attesting
              rights data for [level] are loaded at most once. *)
           List.fold_left_es
             (fun (ctxt, public_keys) slot ->
               let* ctxt, consensus_key =
-                Stake_distribution.attestation_slot_owner ctxt level slot
+                Stake_distribution.attestation_slot_owner
+                  ctxt
+                  ~attested_level
+                  slot
               in
               match consensus_key.consensus_pk with
               | Bls pk -> return (ctxt, pk :: public_keys)
@@ -1993,12 +1996,14 @@ module Anonymous = struct
           Operation.(
             serialize_unsigned_operation bls_mode_unsigned_encoding attestation)
         in
-        let level = Level.from_raw vi.ctxt level in
         let* _ctxt, pks, weighted_pks =
           List.fold_left_es
             (fun (ctxt, pks, weighted_pks) (slot, dal) ->
               let* ctxt, consensus_key =
-                Stake_distribution.attestation_slot_owner ctxt level slot
+                Stake_distribution.attestation_slot_owner
+                  ctxt
+                  ~attested_level:(Level.from_raw vi.ctxt level)
+                  slot
               in
               match consensus_key.consensus_pk with
               | Bls consensus_pk -> (
@@ -2167,7 +2172,10 @@ module Anonymous = struct
       check_denunciation_age vi (`Consensus_denounciation kind) level.level
     in
     let* ctxt, consensus_key =
-      Stake_distribution.attestation_slot_owner vi.ctxt level slot
+      Stake_distribution.attestation_slot_owner
+        vi.ctxt
+        ~attested_level:level
+        slot
     in
     let delegate = consensus_key.delegate in
     let* already_slashed =
@@ -2446,7 +2454,10 @@ module Anonymous = struct
         let*? () = check_denunciation_age vi `Dal_denounciation level in
         let level = Level.from_raw vi.ctxt level in
         let* ctxt, consensus_key =
-          Stake_distribution.attestation_slot_owner vi.ctxt level consensus_slot
+          Stake_distribution.attestation_slot_owner
+            vi.ctxt
+            ~attested_level:level
+            consensus_slot
         in
         let delegate = consensus_key.delegate in
         let*! already_denounced =
@@ -4046,10 +4057,10 @@ let check_attesting_power vi bs =
            cache of the stake info for a given level, which should
            already be cached at this time anyways. *)
         let* _ctxt, required =
-          Attesting_power.consensus_threshold vi.ctxt attested_level
+          Attesting_power.consensus_threshold vi.ctxt ~attested_level
         in
         let provided =
-          Attesting_power.get vi.ctxt attested_level bs.attesting_power
+          Attesting_power.get vi.ctxt ~attested_level bs.attesting_power
         in
         fail_unless
           Compare.Int64.(provided >= required)
@@ -4096,14 +4107,16 @@ let check_preattestation_round_and_power vi vs round =
           (Locked_round_after_block_round
              {locked_round = preattestation_round; round})
       in
+      (* The preattestations' level is the same as the block's level. *)
+      let attested_level = vi.current_level in
       (* We can safely drop the context: it is only updated for the cache of
          the stake info for a given level, which should already be cached
          at this time anyways. *)
       let* _ctxt, consensus_threshold =
-        Attesting_power.consensus_threshold vi.ctxt vi.current_level
+        Attesting_power.consensus_threshold vi.ctxt ~attested_level
       in
       let total_attesting_power =
-        Attesting_power.get vi.ctxt vi.current_level total_attesting_power
+        Attesting_power.get vi.ctxt ~attested_level total_attesting_power
       in
       let*? () =
         error_when

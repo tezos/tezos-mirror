@@ -2307,8 +2307,10 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
          preattestations), but we don't need to, because there is no block
          to finalize anyway in this mode. *)
       let* ctxt, consensus_key =
-        let level = Level.from_raw ctxt content.level in
-        Stake_distribution.attestation_slot_owner ctxt level content.slot
+        Stake_distribution.attestation_slot_owner
+          ctxt
+          ~attested_level:(Level.from_raw ctxt content.level)
+          content.slot
       in
       return
         ( ctxt,
@@ -2362,8 +2364,10 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
          attestations), but we don't need to, because there is no block
          to finalize anyway in this mode. *)
       let* ctxt, consensus_key =
-        let level = Level.from_raw ctxt consensus.level in
-        Stake_distribution.attestation_slot_owner ctxt level consensus.slot
+        Stake_distribution.attestation_slot_owner
+          ctxt
+          ~attested_level:(Level.from_raw ctxt consensus.level)
+          consensus.slot
       in
       return
         ( ctxt,
@@ -2547,9 +2551,11 @@ let punish_double_consensus_operation ctxt ~operation_hash ~payload_producer
         | Attestations_aggregate {consensus_content = {level; round; _}; _} ) ->
         Misbehaviour.{level; round; kind = Double_attesting}
   in
-  let level = Level.from_raw ctxt misbehaviour.level in
   let* ctxt, {delegate; _} =
-    Stake_distribution.attestation_slot_owner ctxt level slot
+    Stake_distribution.attestation_slot_owner
+      ctxt
+      ~attested_level:(Level.from_raw ctxt misbehaviour.level)
+      slot
   in
   let* ctxt, contents_result =
     punish_double_signing
@@ -2661,7 +2667,10 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       in
       let level = Level.from_raw ctxt level in
       let* ctxt, consensus_pk =
-        Stake_distribution.attestation_slot_owner ctxt level consensus_slot
+        Stake_distribution.attestation_slot_owner
+          ctxt
+          ~attested_level:level
+          consensus_slot
       in
       let delegate = consensus_pk.delegate in
       let*! ctxt, _already_denounced =
@@ -3198,7 +3207,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
           assert false
       | Some attested_level ->
           let* ctxt, rewards_bonus =
-            Baking.bonus_baking_reward ctxt attested_level ~attesting_power
+            Baking.bonus_baking_reward ctxt ~attested_level ~attesting_power
           in
           return (ctxt, Some rewards_bonus)
     else return (ctxt, None)

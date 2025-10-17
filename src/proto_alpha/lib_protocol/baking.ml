@@ -56,14 +56,16 @@ let () =
     (fun (attesting_power, consensus_threshold) ->
       Insufficient_attesting_power {attesting_power; consensus_threshold})
 
-let bonus_baking_reward ctxt level ~attesting_power =
+let bonus_baking_reward ctxt ~attested_level ~attesting_power =
   let open Lwt_result_syntax in
-  let attesting_power = Attesting_power.get ctxt level attesting_power in
+  let attesting_power =
+    Attesting_power.get ctxt ~attested_level attesting_power
+  in
   let* ctxt, consensus_threshold =
-    Attesting_power.consensus_threshold ctxt level
+    Attesting_power.consensus_threshold ctxt ~attested_level
   in
   let* ctxt, consensus_committee =
-    Attesting_power.consensus_committee ctxt level
+    Attesting_power.consensus_committee ctxt ~attested_level
   in
   let*? baking_reward_bonus_per_block =
     Delegate.Rewards.baking_reward_bonus_per_block ctxt
@@ -82,7 +84,9 @@ let bonus_baking_reward ctxt level ~attesting_power =
      the order of operations (because the division will always result in 0 otherwise). *)
   let* reward =
     if Compare.Int64.(max_extra_attesting_power <= 0L) then return (Ok Tez.zero)
-    else if Attesting_power.check_all_bakers_attest_at_level ctxt level then
+    else if
+      Attesting_power.check_all_bakers_attest_at_level ctxt ~attested_level
+    then
       return
       @@ Tez.mul_ratio
            ~rounding:`Up
@@ -109,13 +113,13 @@ type ordered_slots = {
 
 (* Slots returned by this function are assumed by consumers to be in increasing
    order, hence the use of [Slot.Range.rev_fold_es]. *)
-let attesting_rights (ctxt : t) level =
+let attesting_rights (ctxt : t) ~attested_level =
   let consensus_committee_size = Constants.consensus_committee_size ctxt in
   let all_bakers_attest_enabled =
-    Attesting_power.check_all_bakers_attest_at_level ctxt level
+    Attesting_power.check_all_bakers_attest_at_level ctxt ~attested_level
   in
   let open Lwt_result_syntax in
-  let* ctxt, _, delegates = Stake_distribution.stake_info ctxt level in
+  let* ctxt, _, delegates = Stake_distribution.stake_info ctxt attested_level in
   let* attesting_power_map, _ =
     List.fold_left_es
       (fun (acc_map, i) ((consensus_pk : Consensus_key.pk), power) ->
@@ -136,7 +140,7 @@ let attesting_rights (ctxt : t) level =
       (fun (ctxt, map) slot ->
         let*? round = Round.of_slot slot in
         let* ctxt, _, consensus_pk =
-          Stake_distribution.baking_rights_owner ctxt level ~round
+          Stake_distribution.baking_rights_owner ctxt attested_level ~round
         in
         let map =
           Signature.Public_key_hash.Map.update
@@ -216,7 +220,7 @@ let incr_slot att_rights =
   let one = Attesting_power.make ~slots:1 ~stake:0L in
   Attesting_power.add one att_rights
 
-let attesting_rights_by_first_slot ctxt level :
+let attesting_rights_by_first_slot ctxt ~attested_level :
     (t * Consensus_key.power Slot.Map.t) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let*? slots =
@@ -228,7 +232,7 @@ let attesting_rights_by_first_slot ctxt level :
       (fun (ctxt, (delegates_map, slots_map)) slot ->
         let*? round = Round.of_slot slot in
         let+ ctxt, _, consensus_key =
-          Stake_distribution.baking_rights_owner ctxt level ~round
+          Stake_distribution.baking_rights_owner ctxt attested_level ~round
         in
         let initial_slot, delegates_map =
           match
@@ -278,9 +282,11 @@ let attesting_rights_by_first_slot ctxt level :
       slots
   in
   let all_bakers_attest_enabled =
-    Attesting_power.check_all_bakers_attest_at_level ctxt level
+    Attesting_power.check_all_bakers_attest_at_level ctxt ~attested_level
   in
-  let* ctxt, _, stake_info_list = Stake_distribution.stake_info ctxt level in
+  let* ctxt, _, stake_info_list =
+    Stake_distribution.stake_info ctxt attested_level
+  in
   let* slots_map, _ =
     List.fold_left_es
       (fun (acc, i) ((consensus_key, weight) : Consensus_key.pk * Int64.t) ->
