@@ -6,7 +6,13 @@
 
 ### Configuration changes
 
-### RPCs changes
+### RPCs changes (Ebisu)
+
+- Disabled [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) checks during `eth_call`
+  simulations in Ebisu. (!19645)
+- Fixed `callTracer` in Ebisu not tracing all transactions in a block if a user
+  sent multiples transactions in that same block. (!19650)
+
 
 ### Monitoring changes
 

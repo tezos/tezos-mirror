@@ -27,7 +27,7 @@ use revm::{
     },
     primitives::B256,
     state::EvmState,
-    ExecuteEvm, InspectEvm, Inspector,
+    ExecuteCommitEvm, ExecuteEvm, InspectEvm, Inspector,
 };
 use struct_logger::{StructLogger, StructLoggerInput};
 use tezos_evm_runtime::runtime::Runtime;
@@ -79,6 +79,12 @@ impl<'a, Host: Runtime> ExecuteEvm for EtherlinkEvmInspector<'a, Host> {
         Self::Error,
     > {
         self.inner.replay()
+    }
+}
+
+impl<'a, Host: Runtime> ExecuteCommitEvm for EtherlinkEvmInspector<'a, Host> {
+    fn commit(&mut self, state: Self::State) {
+        self.inner.commit(state);
     }
 }
 
