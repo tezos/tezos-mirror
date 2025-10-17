@@ -658,9 +658,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | Some agent -> agent
       in
       let runner = Agent.runner tezlink_sequencer_agent in
-      let public_rpc_port =
-        port_of_option tezlink_sequencer_agent Cli.public_rpc_port
-      in
       let dns_domain =
         match Tezt_cloud.Tezt_cloud_cli.dns_domains with
         | [] -> None
@@ -677,21 +674,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       in
       let activate_ssl = Cli.activate_ssl in
       let sequencer_proxy_info =
-        let path = Some "/tezlink" in
-        match dns_domain with
-        | None -> No_proxy {port = public_rpc_port; path}
-        | Some dns_domain ->
-            let internal_port =
-              Agent.next_available_port tezlink_sequencer_agent
-            in
-            let external_port = public_rpc_port in
-            Proxy
-              {
-                internal_info = {port = internal_port; path};
-                external_port;
-                dns_domain;
-                activate_ssl;
-              }
+        make_proxy
+          tezlink_sequencer_agent
+          ~path:(Some "/tezlink")
+          ~dns_domain
+          Cli.public_rpc_port
+          activate_ssl
       in
       (* The proxy endpoint is the https endpoint we want to provide
          to the external world, it has no /tezlink path. *)
