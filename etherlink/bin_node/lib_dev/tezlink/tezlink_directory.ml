@@ -402,14 +402,19 @@ let build_block_static_directory ~l2_chain_id
              _chain_id,
              _operation_inclusion_latency )
          ->
-         let*? _chain = check_chain chain in
-         let*? _block = check_block block in
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
          let hash = Alpha_context.Operation.hash_packed operation in
-         let op = operation.protocol_data in
-         let*? mock_result =
-           Tezlink_mock.Operation_metadata.operation_metadata hash op
+         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+         let* result =
+           Backend.simulate_operation
+             ~chain_id
+             ~skip_signature:true
+             operation
+             hash
+             block
          in
-         return (op, mock_result))
+         return (operation.protocol_data, result))
   |> register
        ~service:Tezos_services.preapply_operations
        ~impl:(fun {block; chain} param ops ->
