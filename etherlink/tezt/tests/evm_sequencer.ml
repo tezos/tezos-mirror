@@ -14215,6 +14215,57 @@ let test_validate_encoding_compatibility_accounts =
     ~error_msg:"Expected balance of %R wei, got %L wei after %R transactions" ;
   unit
 
+let test_eip3607_disabled_for_simulation =
+  register_all
+    ~__FILE__
+    ~tags:["evm"; "eip3607"; "simulation"; "eth_call"]
+    ~title:"EIP-3607 is disabled in simulation"
+    ~kernels:[Latest]
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let* contract = Solidity_contracts.eip7702 evm_version in
+  let* contract_address, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:contract.abi
+         ~bin:contract.bin)
+      sequencer
+  in
+  let contract_address = Ezjsonm.encode_string contract_address in
+  let* call_result =
+    Evm_node.(
+      call_evm_rpc
+        sequencer
+        {
+          method_ = "eth_call";
+          parameters =
+            `A
+              [
+                `O [("from", contract_address); ("to", contract_address)];
+                `String "latest";
+              ];
+        })
+  in
+  let call_result =
+    Evm_node.extract_error_message call_result |> JSON.as_string
+  in
+  (*
+    If EIP-3607 was not disabled we would get:
+      {
+        "jsonrpc": "2.0",
+        "error": {
+            "code": -32003,
+            "message": "Execution error: REVM error Transaction(RejectCallerWithCode)"
+        },
+        "id": "0"
+      }
+  *)
+  Check.((call_result = "execution reverted") string)
+    ~error_msg:"Expected error msg %R but got %L" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -14392,4 +14443,5 @@ let () =
   test_eip7702 [Alpha] ;
   test_eip7702_auto_sign [Alpha] ;
   test_validate_encoding_compatibility_accounts [Alpha] ;
-  test_eip2537 [Alpha]
+  test_eip2537 [Alpha] ;
+  test_eip3607_disabled_for_simulation [Alpha]
