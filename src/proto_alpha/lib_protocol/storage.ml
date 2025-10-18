@@ -2379,6 +2379,17 @@ module Dal = struct
 
         let encoding = Data_encoding.empty
       end)
+
+  module Prev_attestation_lag =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["dal_prev_attestation_lag"]
+      end)
+      (struct
+        type t = int
+
+        let encoding = Data_encoding.uint8
+      end)
 end
 
 module Zk_rollup = struct

@@ -2487,8 +2487,11 @@ module Anonymous = struct
                  shard_owner = shard_owner.delegate;
                })
         in
-        let attestation_lag =
-          (Constants.parametric vi.ctxt).dal.attestation_lag
+        let* attestation_lag =
+          let* migration_level = First_level_of_protocol.get ctxt in
+          if Raw_level.(level.level < migration_level) then
+            Alpha_context.Dal.Prev_attestation_lag.get ctxt
+          else return (Constants.parametric vi.ctxt).dal.attestation_lag
         in
         let* published_level =
           match Raw_level.(sub (succ level.level) attestation_lag) with
