@@ -7,7 +7,8 @@ use crate::{
     block_in_progress::EthBlockInProgress,
     blueprint::Blueprint,
     blueprint_storage::{
-        DelayedTransactionFetchingResult, EVMBlockHeader, TezBlockHeader,
+        read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
+        EVMBlockHeader, TezBlockHeader,
     },
     delayed_inbox::DelayedInbox,
     error,
@@ -28,7 +29,7 @@ use std::{
     fmt::{Debug, Display},
 };
 use tezos_crypto_rs::hash::ChainId;
-use tezos_data_encoding::nom::NomReader;
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::{context, mir_ctx::BlockCtx};
@@ -409,6 +410,9 @@ impl EvmChainConfig {
     }
 }
 
+const TEZLINK_SIMULATION_RESULT_PATH: RefPath =
+    RefPath::assert_from(b"/tezlink/simulation_result");
+
 impl ChainConfigTrait for MichelsonChainConfig {
     type Transactions = TezTransactions;
     type BlockInProgress = TezBlockInProgress;
@@ -570,7 +574,85 @@ impl ChainConfigTrait for MichelsonChainConfig {
         })
     }
 
-    fn start_simulation_mode(&self, _host: &mut impl Runtime) -> anyhow::Result<()> {
+    fn start_simulation_mode(&self, host: &mut impl Runtime) -> anyhow::Result<()> {
+        fn read_inbox_message(
+            host: &mut impl Runtime,
+        ) -> anyhow::Result<tezos_smart_rollup_host::input::Message> {
+            match host.read_input()? {
+                Some(input) => Ok(input),
+                None => {
+                    Err(crate::error::TezlinkSimulationError::UnexpectedEndOfInbox.into())
+                }
+            }
+        }
+
+        // We expect the inbox to contain exactly two messages; the
+        // first message is a single byte indicating if signature must
+        // be checked (0x01) or not (0x00); the second message is the
+        // operation to simulate.
+        let skip_signature_check = {
+            let input = read_inbox_message(host)?;
+            match input.as_ref() {
+                &[0x00] => true,
+                &[0x01] => false,
+                input => {
+                    return Err(
+                        crate::error::TezlinkSimulationError::UnexpectedSkipSigTag(
+                            input.to_vec(),
+                        )
+                        .into(),
+                    )
+                }
+            }
+        };
+        let operation = {
+            let input = read_inbox_message(host)?;
+            Operation::nom_read_exact(input.as_ref())
+                .map_err(|_| crate::error::Error::InvalidConversion)?
+        };
+        let hash = operation.hash()?;
+        log!(
+            host,
+            Debug,
+            "Tezlink simulation starts for operation hash {:?}, skip signature flag: {:?}",
+            hash,
+            skip_signature_check
+        );
+        let context = context::Context::from(&self.storage_root_path())?;
+
+        let BlueprintHeader { number, timestamp } = read_current_blueprint_header(host)?;
+        let block_ctx = BlockCtx {
+            level: &number.as_u32().into(),
+            now: &timestamp,
+            chain_id: &self.chain_id,
+        };
+        let receipt = tezos_execution::validate_and_apply_operation(
+            host,
+            &context,
+            hash.clone(),
+            operation.clone(),
+            &block_ctx,
+            skip_signature_check,
+        )?;
+        let operations = zip_operations(operation.clone(), receipt);
+        let result = AppliedOperation {
+            hash,
+            branch: operation.branch,
+            op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                OperationBatchWithMetadata {
+                    operations,
+                    signature: operation.signature,
+                },
+            ),
+        };
+
+        log!(
+            host,
+            Debug,
+            "Tezlink simulation finished, result: {:?}",
+            result
+        );
+        host.store_write_all(&TEZLINK_SIMULATION_RESULT_PATH, &result.to_bytes()?)?;
         Ok(())
     }
 
