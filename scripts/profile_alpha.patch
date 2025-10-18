@@ -47,7 +47,7 @@ index 0078267eca..a301359869 100644
 +       let+ ctxt = Bootstrap.cycle_end ctxt last_cycle in
 +       (ctxt, balance_updates, deactivated))
 +      [@profiler.record_s {verbosity = Notice} "delegate end cycle"]
- 
+
  let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
    let open Lwt_result_syntax in
 diff --git a/src/proto_alpha/lib_protocol/baking.ml b/src/proto_alpha/lib_protocol/baking.ml
@@ -69,7 +69,7 @@ index 1388bc3ea7..ae55ed9ae2 100644
    in
 -  return (ctxt, map)
 +  return (ctxt, map)) [@profiler.record_s {verbosity = Notice} "attesting_rights"]
- 
+
  let incr_slot att_rights =
    let one = Attesting_power.make ~slots:1 ~stake:0L in
 diff --git a/src/proto_alpha/lib_protocol/delegate_cycles.ml b/src/proto_alpha/lib_protocol/delegate_cycles.ml
@@ -197,10 +197,10 @@ index 7fea31a9fe..75d43668c3 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index 2eeb17665d..1202879935 100644
+index 288367f0246..2cfdd533ea7 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
-@@ -221,31 +221,55 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+@@ -221,22 +221,38 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
          (* Start of Alpha stitching. Comment used for automatic snapshot *)
      | Alpha ->
          let* ctxt =
@@ -241,27 +241,8 @@ index 2eeb17665d..1202879935 100644
 +             {verbosity = Notice}
 +               "Sc_rollup_refutation_storage.migrate_clean_refutation_games"])
          in
-         return (ctxt, [])
-     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
-   in
-   let* ctxt =
--    List.fold_left_es patch_script ctxt Legacy_script_patches.addresses_to_patch
-+    (List.fold_left_es
-+       patch_script
-+       ctxt
-+       Legacy_script_patches.addresses_to_patch
-+     [@profiler.record_s {verbosity = Notice} "patch_script"])
-   in
-   let*? balance_updates = Receipt_repr.group_balance_updates balance_updates in
-   let*! ctxt =
--    Storage.Pending_migration.Balance_updates.add ctxt balance_updates
-+    (Storage.Pending_migration.Balance_updates.add
-+       ctxt
-+       balance_updates
-+     [@profiler.record_s
-+       {verbosity = Notice} "Storage.Pending_migration.Balance_updates.add"])
-   in
-   return ctxt
+         let* ctxt =
+           match previous_proto_constants with
 diff --git a/src/proto_alpha/lib_protocol/raw_context.ml b/src/proto_alpha/lib_protocol/raw_context.ml
 index c501d7fc16..00e5338465 100644
 --- a/src/proto_alpha/lib_protocol/raw_context.ml
@@ -280,7 +261,7 @@ index c501d7fc16..00e5338465 100644
 +      ~all_bakers_attest_first_level:None [@profiler.record_s {verbosity = Notice} "Prepare"])
    in
    (previous_proto, previous_proto_constants, ctxt)
- 
+
 diff --git a/src/proto_alpha/lib_protocol/script_cache.ml b/src/proto_alpha/lib_protocol/script_cache.ml
 index 35cc6b5178..5c679ad606 100644
 --- a/src/proto_alpha/lib_protocol/script_cache.ml
@@ -308,7 +289,7 @@ index 35cc6b5178..5c679ad606 100644
 +           in
 +           return (ctxt, identifier, Some (unparsed_script, script_ir)))
 +      [@profiler.record_s {verbosity = Notice} "cache_miss"])
- 
+
  let update ctxt identifier updated_script approx_size =
    Cache.update ctxt identifier (Some (updated_script, approx_size))
 diff --git a/src/proto_alpha/lib_protocol/script_interpreter.ml b/src/proto_alpha/lib_protocol/script_interpreter.ml
@@ -344,7 +325,7 @@ index e098905296..54b1e80d85 100644
        },
 -      ctxt )
 +      ctxt )) [@profiler.record_s {verbosity = Notice} "execute"]
- 
+
  let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
      ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
 diff --git a/src/proto_alpha/lib_protocol/script_ir_translator.ml b/src/proto_alpha/lib_protocol/script_ir_translator.ml
@@ -383,7 +364,7 @@ index b91d2d8711..60727fae94 100644
      ( Ex_script
          (Script
 @@ -5926,15 +5930,15 @@ let list_of_big_map_ids ids =
- 
+
  let parse_data ~elab_conf ctxt ~allow_forged_tickets
      ~allow_forged_lazy_storage_id ty t =
 -  parse_data
@@ -404,9 +385,8 @@ index b91d2d8711..60727fae94 100644
 +     ctxt
 +     ty
 +     t [@profiler.record_s {verbosity = Notice} "parse_data"])
- 
+
  let parse_view ~elab_conf ctxt ty view =
    parse_view ~unparse_code_rec ~elab_conf ctxt ty view
--- 
+--
 2.51.0
-
