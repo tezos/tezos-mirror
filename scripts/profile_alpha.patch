@@ -19,7 +19,7 @@ diff --git a/src/proto_alpha/lib_protocol/apply.ml b/src/proto_alpha/lib_protoco
 index 0078267eca..a301359869 100644
 --- a/src/proto_alpha/lib_protocol/apply.ml
 +++ b/src/proto_alpha/lib_protocol/apply.ml
-@@ -2497,7 +2497,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
+@@ -2501,7 +2501,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
      ~source ~operation contents_list =
    let open Lwt_result_syntax in
    let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
@@ -32,7 +32,7 @@ index 0078267eca..a301359869 100644
    let gas_cost_for_sig_check =
      let algo =
        Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key_hash source
-@@ -2774,11 +2778,12 @@ let may_start_new_cycle ctxt =
+@@ -2780,11 +2784,12 @@ let may_start_new_cycle ctxt =
    match Level.dawn_of_a_new_cycle ctxt with
    | None -> return (ctxt, [], [])
    | Some last_cycle ->
@@ -54,16 +54,16 @@ diff --git a/src/proto_alpha/lib_protocol/baking.ml b/src/proto_alpha/lib_protoc
 index 1388bc3ea7..ae55ed9ae2 100644
 --- a/src/proto_alpha/lib_protocol/baking.ml
 +++ b/src/proto_alpha/lib_protocol/baking.ml
-@@ -110,7 +110,7 @@ type ordered_slots = {
+@@ -114,7 +114,7 @@ type ordered_slots = {
  (* Slots returned by this function are assumed by consumers to be in increasing
     order, hence the use of [Slot.Range.rev_fold_es]. *)
- let attesting_rights (ctxt : t) level =
+ let attesting_rights (ctxt : t) ~attested_level =
 -  let consensus_committee_size = Constants.consensus_committee_size ctxt in
 +  (let consensus_committee_size = Constants.consensus_committee_size ctxt in
    let all_bakers_attest_enabled =
-     Attesting_power.check_all_bakers_attest_at_level ctxt level
+     Attesting_power.check_all_bakers_attest_at_level ctxt ~attested_level
    in
-@@ -210,7 +210,7 @@ let attesting_rights (ctxt : t) level =
+@@ -214,7 +214,7 @@ let attesting_rights (ctxt : t) level =
          map
      else map
    in
@@ -76,7 +76,7 @@ diff --git a/src/proto_alpha/lib_protocol/delegate_cycles.ml b/src/proto_alpha/l
 index 2a0bdad18c..d208afc53b 100644
 --- a/src/proto_alpha/lib_protocol/delegate_cycles.ml
 +++ b/src/proto_alpha/lib_protocol/delegate_cycles.ml
-@@ -229,42 +229,92 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
+@@ -225,42 +225,92 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
  let cycle_end ctxt last_cycle =
    let open Lwt_result_syntax in
    (* attributing attesting rewards   *)
