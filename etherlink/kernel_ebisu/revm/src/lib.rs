@@ -200,6 +200,7 @@ type EvmContext<'a, Host> = Evm<
     EthFrame<EthInterpreter>,
 >;
 
+#[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
 fn evm_inspect<'a, Host: Runtime>(
     db: EtherlinkVMDB<'a, Host>,
@@ -209,8 +210,10 @@ fn evm_inspect<'a, Host: Runtime>(
     chain_id: u64,
     spec_id: SpecId,
     inspector: EtherlinkInspector,
+    is_simulation: bool,
 ) -> EvmInspection<'a, Host> {
-    let cfg = CfgEnv::new().with_chain_id(chain_id).with_spec(spec_id);
+    let mut cfg = CfgEnv::new().with_chain_id(chain_id).with_spec(spec_id);
+    cfg.disable_eip3607 = is_simulation;
 
     Context::<
         BlockEnv,
@@ -300,6 +303,7 @@ pub fn run_transaction<'a, Host: Runtime>(
             block_constants.chain_id.as_u64(),
             spec_id,
             inspector,
+            is_simulation,
         );
 
         let result = evm.inspect_tx_commit(&tx)?;
