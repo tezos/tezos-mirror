@@ -356,11 +356,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   let seed_nonce_hash = Option.map fst seed_nonce_opt in
   let user_activated_upgrades = global_state.config.user_activated_upgrades in
   (* Set liquidity_baking_toggle_vote for this block *)
-  let {
-    Baking_configuration.vote_file;
-    liquidity_baking_vote;
-    adaptive_issuance_vote;
-  } =
+  let {Baking_configuration.vote_file; liquidity_baking_vote} =
     global_state.config.per_block_votes
   in
   (* Prioritize reading from the [vote_file] if it exists. *)
@@ -388,13 +384,9 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     | Some per_block_vote_file ->
         let default =
           Octez_agnostic_baker.Per_block_votes.
-            {
-              liquidity_baking_vote = of_protocol liquidity_baking_vote;
-              adaptive_issuance_vote = of_protocol adaptive_issuance_vote;
-            }
+            {liquidity_baking_vote = of_protocol liquidity_baking_vote}
         in
-        let*! Octez_agnostic_baker.Per_block_votes.
-                {liquidity_baking_vote; adaptive_issuance_vote = _} =
+        let*! Octez_agnostic_baker.Per_block_votes.{liquidity_baking_vote} =
           (Per_block_vote_file.read_per_block_votes_no_fail
              ~default
              ~per_block_vote_file
@@ -408,7 +400,6 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   let*! () =
     Events.(emit vote_for_liquidity_baking_toggle) liquidity_baking_vote
   in
-  let*! () = Events.(emit vote_for_adaptive_issuance) adaptive_issuance_vote in
   let chain = `Hash global_state.chain_id in
   let pred_block = `Hash (predecessor.hash, 0) in
   let* pred_resulting_context_hash =
@@ -437,7 +428,6 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
        ~seed_nonce_hash
        ~payload_round
        ~liquidity_baking_toggle_vote:liquidity_baking_vote
-       ~adaptive_issuance_vote
        ~user_activated_upgrades
        ~force_apply
        global_state.config.fees
@@ -938,7 +928,6 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
                 {
                   state.global_state.config.per_block_votes with
                   liquidity_baking_vote = baking_votes.liquidity_baking_vote;
-                  adaptive_issuance_vote = Per_block_vote_pass;
                 };
             };
         };

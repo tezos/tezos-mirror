@@ -54,7 +54,6 @@ type state_recorder_config = Filesystem | Memory
 type per_block_votes_config = {
   vote_file : string option;
   liquidity_baking_vote : Protocol.Alpha_context.Per_block_votes.per_block_vote;
-  adaptive_issuance_vote : Protocol.Alpha_context.Per_block_votes.per_block_vote;
 }
 
 type t = {
@@ -128,9 +127,6 @@ val user_activate_upgrades_config_encoding :
   (int32 * Protocol_hash.t) list Data_encoding.t
 
 val liquidity_baking_toggle_vote_config_encoding :
-  Protocol.Alpha_context.Per_block_votes.per_block_vote Data_encoding.t
-
-val adaptive_issuance_vote_config_encoding :
   Protocol.Alpha_context.Per_block_votes.per_block_vote Data_encoding.t
 
 val per_block_votes_config_encoding : per_block_votes_config Data_encoding.t

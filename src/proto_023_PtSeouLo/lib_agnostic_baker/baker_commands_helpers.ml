@@ -39,13 +39,9 @@ let run_baker (cctxt : Tezos_client_base.Client_context.full) ?dal_node_rpc_ctxt
           Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass
     in
     Option.map
-      (fun {vote_file; liquidity_baking_vote; adaptive_issuance_vote} ->
+      (fun {vote_file; liquidity_baking_vote} ->
         Baking_configuration.
-          {
-            vote_file;
-            liquidity_baking_vote = to_protocol liquidity_baking_vote;
-            adaptive_issuance_vote = to_protocol adaptive_issuance_vote;
-          })
+          {vote_file; liquidity_baking_vote = to_protocol liquidity_baking_vote})
       votes
   in
   let* delegates = Baking_commands.get_delegates cctxt sources in

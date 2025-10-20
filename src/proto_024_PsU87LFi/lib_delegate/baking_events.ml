@@ -98,15 +98,21 @@ module Commands = struct
          protocol switches."
       ()
 
-  let unused_cli_adaptive_issuance_vote =
+  let deprecated_adaptive_issuance_vote =
     declare_0
       ~section
-      ~name:"unused_cli_adaptive_issuance_vote"
+      ~name:"deprecated_adaptive_issuance_vote"
       ~level:Warning
       ~msg:
-        "Adaptive issuance is now enabled, voting is no longer necessary. \
-         Please remove the argument from the CLI."
+        "DEPRECATED ARGUMENT: The 'adaptive-issuance-vote' argument \
+         (placeholder 'vote') is deprecated. It is already ignored by the \
+         baker, and will be removed in the next major version of Octez."
       ()
+
+  let warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote =
+    if Option.is_some adaptive_issuance_vote then
+      emit deprecated_adaptive_issuance_vote ()
+    else Lwt.return_unit
 end
 
 module State_transitions = struct
@@ -1079,14 +1085,6 @@ module Actions = struct
       ( "value",
         Protocol.Alpha_context.Per_block_votes.liquidity_baking_vote_encoding )
 
-  let vote_for_adaptive_issuance =
-    declare_1
-      ~section
-      ~name:"vote_for_adaptive_issuance"
-      ~level:Notice
-      ~msg:"Voting {value} for adaptive issuance vote"
-      ("value", Baking_configuration.adaptive_issuance_vote_config_encoding)
-
   let signature_timeout =
     declare_1
       ~section
@@ -1397,14 +1395,6 @@ module Per_block_votes = struct
       ~msg:"Error reading the block vote file: {errors}"
       ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
-
-  let adaptive_issuance_vote =
-    declare_1
-      ~section
-      ~name:"read_adaptive_issuance_vote"
-      ~level:Notice
-      ~msg:"read adaptive issuance vote = {value}"
-      ("value", Baking_configuration.adaptive_issuance_vote_config_encoding)
 end
 
 module Selection = struct

@@ -170,13 +170,13 @@ let liquidity_baking_toggle_vote_arg =
     ~placeholder:"vote"
     per_block_vote_parameter
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/8055
+   Remove this argument in Octez v25. *)
 let adaptive_issuance_vote_arg =
   Tezos_clic.arg
     ~doc:
-      "Vote to adopt or not the adaptive issuance feature. The possible values \
-       for this option are: \"off\" to request not activating it, \"on\" to \
-       request activating it, and \"pass\" to abstain. If you do not vote, \
-       default value is \"pass\"."
+      "DEPRECATED: This argument is ignored by the baker and will be removed \
+       in the next major version of Octez."
     ~long:"adaptive-issuance-vote"
     ~placeholder:"vote"
     per_block_vote_parameter
@@ -451,6 +451,9 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
            pkhs
            cctxt
          ->
+        let*! () =
+          Events.warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote
+        in
         let* delegates = get_delegates cctxt pkhs in
         let dal_node_rpc_ctxt =
           Option.map create_dal_node_rpc_ctxt dal_node_endpoint
@@ -468,14 +471,6 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ?extra_operations
           ?data_dir
           ~count:block_count
-          ?votes:
-            (Option.map
-               (fun adaptive_issuance_vote ->
-                 {
-                   Baking_configuration.default_votes_config with
-                   adaptive_issuance_vote;
-                 })
-               adaptive_issuance_vote)
           ~state_recorder
           delegates);
     command
@@ -701,9 +696,7 @@ let run_baker ?(recommend_agnostic_baker = true)
     else Lwt.return per_block_vote_file
   in
   let*! () =
-    if Option.is_some adaptive_issuance_vote then
-      Events.(emit unused_cli_adaptive_issuance_vote ())
-    else Lwt.return_unit
+    Events.warn_if_adaptive_issuance_vote_present ~adaptive_issuance_vote
   in
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for
@@ -725,8 +718,7 @@ let run_baker ?(recommend_agnostic_baker = true)
       | Octez_agnostic_baker.Per_block_votes.Per_block_vote_pass ->
           Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass
     in
-    let* Octez_agnostic_baker.Configuration.
-           {vote_file; liquidity_baking_vote; adaptive_issuance_vote} =
+    let* Octez_agnostic_baker.Configuration.{vote_file; liquidity_baking_vote} =
       Octez_agnostic_baker.Per_block_vote_file.load_per_block_votes_config
         ~default_liquidity_baking_vote:
           (Option.map of_protocol liquidity_baking_vote)
@@ -734,11 +726,7 @@ let run_baker ?(recommend_agnostic_baker = true)
     in
     return
       Baking_configuration.
-        {
-          vote_file;
-          liquidity_baking_vote = to_protocol liquidity_baking_vote;
-          adaptive_issuance_vote = to_protocol adaptive_issuance_vote;
-        }
+        {vote_file; liquidity_baking_vote = to_protocol liquidity_baking_vote}
   in
   let dal_node_rpc_ctxt =
     Option.map create_dal_node_rpc_ctxt dal_node_endpoint

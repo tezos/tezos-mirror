@@ -40,7 +40,7 @@ type simulation_kind =
     }
 
 (* [forge_faked_protocol_data ?payload_hash ~payload_round ~seed_nonce_hash
-   ~liquidity_baking_toggle_vote ~adaptive_issuance_vote] forges a fake [block_header_data] with
+   ~liquidity_baking_toggle_vote] forges a fake [block_header_data] with
    [payload_hash] ([zero] by default), [payload_round], [seed_nonce_hash],
    [liquidity_baking_toggle_vote] and with an empty [proof_of_work_nonce] and a
    dummy [signature]. *)
