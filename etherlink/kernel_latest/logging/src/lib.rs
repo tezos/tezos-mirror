@@ -80,6 +80,22 @@ macro_rules! otel_trace {
     }};
 }
 
+#[cfg(feature = "tracing")]
+pub fn otel_trace<H, F, R>(host: &mut H, name: &str, f: F) -> R
+where
+    H: tezos_smart_rollup_host::runtime::Runtime,
+    F: FnOnce(&mut H) -> R,
+{
+    let msg = format!("[{}] [start] {}", crate::Level::OTel, name);
+    crate::debug_str!(host, &msg);
+    let res = f(host);
+
+    let msg = format!("[{}] [end] {}", crate::Level::OTel, name);
+    crate::debug_str!(host, &msg);
+
+    res
+}
+
 #[cfg(not(feature = "tracing"))]
 #[macro_export]
 macro_rules! otel_trace {

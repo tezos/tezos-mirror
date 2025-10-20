@@ -3161,6 +3161,7 @@ dependencies = [
  "num-derive",
  "num-traits",
  "tezos-smart-rollup-debug",
+ "tezos-smart-rollup-host",
  "tracing",
 ]
 
@@ -3214,6 +3215,15 @@ dependencies = [
  "tezos-smart-rollup-storage",
  "tezos-storage-latest",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "tezos-kernel-tracing-latest"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.103",
+ "tezos-evm-logging-latest",
 ]
 
 [[package]]
