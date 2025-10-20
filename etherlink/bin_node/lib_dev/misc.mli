@@ -44,3 +44,7 @@ val interpolate :
 
     The result is always between 5 and 16. *)
 val domain_count_cap : unit -> int
+
+exception Timeout
+
+val with_timeout : int -> (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
