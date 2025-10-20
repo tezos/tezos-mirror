@@ -46,7 +46,8 @@ module Event = struct
     declare_0
       ~section
       ~name:"sequencer_disabled_native_execution"
-      ~msg:"native execution is disabled in sequencer mode"
+      ~msg:
+        "native execution is disabled for block application in sequencer mode"
       ~level:Warning
       ()
 
@@ -1184,16 +1185,19 @@ let get_keys_or_generate_one wallet_ctxt keys =
 let sequencer_disable_native_execution configuration =
   let open Lwt_syntax in
   match configuration.kernel_execution.native_execution_policy with
-  | Always | Rpcs_only ->
+  | Always ->
       let+ () =
         Internal_event.Simple.emit Event.sequencer_disabled_native_execution ()
       in
       {
         configuration with
         kernel_execution =
-          {configuration.kernel_execution with native_execution_policy = Never};
+          {
+            configuration.kernel_execution with
+            native_execution_policy = Rpcs_only;
+          };
       }
-  | Never -> return configuration
+  | Rpcs_only | Never -> return configuration
 
 let kernel_from_args network kernel =
   let open Evm_node_lib_dev.Pvm_types in

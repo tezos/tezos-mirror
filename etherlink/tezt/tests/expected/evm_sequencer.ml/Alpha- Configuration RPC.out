@@ -137,7 +137,7 @@
   },
   "kernel_execution": {
     "preimages": "hidden",
-    "native_execution_policy": "never"
+    "native_execution_policy": "rpcs_only"
   },
   "public_rpc": {
     "port": "hidden-for-regression-only",
