@@ -28,58 +28,17 @@ General
 Node
 ----
 
-- **Breaking change** Enforced stricter validation for the JSON configuration
-  file. Previously, the parser would silently ignore any content that appeared
-  after the first valid JSON object. Now, any extraneous data will cause the
-  function to return an error. (MR :gl:`!18745`)
-
 Client
 ------
-
-- **Breaking change** Enforced stricter validation for the JSON files
-  manipulated by the client. Previously, the parser would silently ignore any
-  content that appeared after the first valid JSON object. Now, any extraneous
-  data will cause the function to return an error. (MR :gl:`!18745`)
 
 Signer
 ------
 
-- **Breaking change** Enforced stricter validation for the JSON files
-  manipulated by the signer. Previously, the parser would silently ignore any
-  content that appeared after the first valid JSON object. Now, any extraneous
-  data will cause the function to return an error. (MR :gl:`!18745`)
-
 Baker
 -----
 
-- **Breaking change** Enforced stricter validation for the JSON files
-  manipulated by the baker. Previously, the parser would silently ignore any
-  content that appeared after the first valid JSON object. Now, any extraneous
-  data will cause the function to return an error. (MR :gl:`!18745`)
-
-Agnostic Baker
---------------
-
-- **Breaking change** Enforced stricter validation for the JSON files
-  manipulated by the agnostic baker. Previously, the parser would silently
-  ignore any content that appeared after the first valid JSON object. Now, any
-  extraneous data will cause the function to return an error. (MR :gl:`!18745`)
-
 Accuser
 -------
-
-- **Breaking change** Enforced stricter validation for the JSON files
-  manipulated by the accuser. Previously, the parser would silently
-  ignore any content that appeared after the first valid JSON object. Now, any
-  extraneous data will cause the function to return an error. (MR :gl:`!18745`)
-
-Agnostic Accuser
-----------------
-
-- **Breaking change** Enforced stricter validation for the JSON files
-  manipulated by the agnostic accuser. Previously, the parser would silently
-  ignore any content that appeared after the first valid JSON object. Now, any
-  extraneous data will cause the function to return an error. (MR :gl:`!18745`)
 
 Proxy Server
 ------------
@@ -95,11 +54,6 @@ Docker Images
 
 Smart Rollup node
 -----------------
-
-- **Breaking change** Enforced stricter validation for the JSON configuration
-  file. Previously, the parser would silently ignore any content that appeared
-  after the first valid JSON object. Now, any extraneous data will cause the
-  function to return an error. (MR :gl:`!18745`)
 
 - Update opentelemetry library to 0.12 which should fix the issue where a log
   protobuf encoding crashes the node when telemetry is activated. (MR
