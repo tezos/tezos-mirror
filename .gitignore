@@ -201,3 +201,5 @@ node_modules/
 
 # Cache directories for GitLab runners
 .cache_external
+.cargo/registry
+.cargo_targets
