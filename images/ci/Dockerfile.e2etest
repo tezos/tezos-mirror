@@ -15,6 +15,9 @@ ENV RUSTFLAGS="-C linker=clang -C link-arg=-fuse-ld=lld"
 RUN apk update \
  && apk add --no-cache curl git file make jq websocat gcc clang lld \
  && apk add --no-cache ca-certificates build-base musl-dev libusb-dev linux-headers procps-ng
+# Install desync from edge repo as its not yet available in alpine 3.20
+# hadolint ignore=DL3018,DL3019
+RUN apk add --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing --no-cache desync
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | ash -s -- -y
 
@@ -92,6 +95,10 @@ SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
 RUN apk update \
  && apk add --no-cache git file make websocat gcc clang lld \
  && apk add --no-cache ca-certificates build-base musl-dev libusb-dev linux-headers procps-ng npm
+# Install desync from edge repo as its not yet available in alpine 3.20
+# hadolint ignore=DL3018,DL3019
+RUN apk add --repository=https://dl-cdn.alpinelinux.org/alpine/edge/testing --no-cache desync
+
 
 # Install dal SRS setup (need curl)
 COPY scripts/install_dal_trusted_setup.sh scripts/version.sh /tmp/

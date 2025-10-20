@@ -829,7 +829,7 @@ let test_persistent_state =
 
 (* Helper to setup snapshot test. This function stops the observer and sequencer
    and exports two snapshots at one block interval. *)
-let snapshots_setup {sequencer; observer; _} =
+let snapshots_setup ~desync {sequencer; observer; _} =
   let*@ prev_block_number = Rpc.block_number sequencer in
   let block_number = Int32.succ prev_block_number in
   let observer_sync =
@@ -842,9 +842,9 @@ let snapshots_setup {sequencer; observer; _} =
   Log.info "   - Terminate the observer." ;
   let* () = Evm_node.terminate observer in
   Log.info "   - Export observer snapshot." ;
-  let*! snapshot_file_before = Evm_node.export_snapshot observer in
+  let*! snapshot_file_before = Evm_node.export_snapshot ~desync observer in
   let*! snapshot_info_before =
-    Evm_node.snapshot_info ~snapshot_file:snapshot_file_before
+    Evm_node.snapshot_info ~desync ~snapshot_file:snapshot_file_before
   in
   Check.(snapshot_info_before =~ rex "First level:\\s*0")
     ~error_msg:"Snapshot info should have %R, got %L" ;
@@ -862,23 +862,28 @@ let snapshots_setup {sequencer; observer; _} =
   Log.info "   - Terminate the sequencer." ;
   let* () = Evm_node.terminate sequencer in
   Log.info "   - Export snapshot for block %ld." block_number ;
-  let*! snapshot_file = Evm_node.export_snapshot sequencer in
-  let*! snapshot_info_after = Evm_node.snapshot_info ~snapshot_file in
+  let*! snapshot_file = Evm_node.export_snapshot ~desync sequencer in
+  let*! snapshot_info_after = Evm_node.snapshot_info ~desync ~snapshot_file in
   Check.(snapshot_info_after =~ rex "First level:\\s*0")
     ~error_msg:"Snapshot info should have %R, got %L" ;
   Check.(snapshot_info_after =~ rex (sf "Current level:\\s*%ld" block_number))
     ~error_msg:"Snapshot info should have %R, got %L" ;
   return (snapshot_file_before, snapshot_file, block_number)
 
-let test_snapshots_lock =
+let add_desync_tag desync tags = if desync then tags @ ["desync"] else tags
+
+let test_snapshots_lock ~desync =
   register_all
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "snapshots"]
-    ~title:"Sequencer snapshots export require lock"
+    ~tags:(["evm"; "sequencer"; "snapshots"] |> add_desync_tag desync)
+    ~title:
+      (sf
+         "Sequencer %ssnapshots export require lock"
+         (if desync then "desync " else ""))
     ~time_between_blocks:Nothing
   @@ fun {sequencer; _} _protocol ->
   Log.info "Export without stopping evm node." ;
-  let*? locked = Evm_node.export_snapshot sequencer in
+  let*? locked = Evm_node.export_snapshot ~desync sequencer in
   let* () =
     Process.check_error
       ~msg:(rex "EVM node is locked by another process")
@@ -886,11 +891,14 @@ let test_snapshots_lock =
   in
   unit
 
-let test_snapshots_import_empty =
+let test_snapshots_import_empty ~desync =
   register_all
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "snapshots"]
-    ~title:"Import sequencer snapshot in empty data dir"
+    ~tags:(["evm"; "sequencer"; "snapshots"] |> add_desync_tag desync)
+    ~title:
+      (sf
+         "Import %ssequencer snapshot in empty data dir"
+         (if desync then "desync " else ""))
     ~time_between_blocks:Nothing
     ~history_mode:(Rolling 1)
   @@
@@ -898,7 +906,7 @@ let test_snapshots_import_empty =
       _protocol
     ->
   let* _snapshot_file_before, snapshot_file, block_number =
-    snapshots_setup setup
+    snapshots_setup ~desync setup
   in
   Log.info "Create new sequencer from snapshot." ;
   (* patch sequencer config if multichain *)
@@ -920,7 +928,7 @@ let test_snapshots_import_empty =
         Evm_node.Config_file.update new_sequencer patch_config
     | false -> unit
   in
-  let*! () = Evm_node.import_snapshot new_sequencer ~snapshot_file in
+  let*! () = Evm_node.import_snapshot ~desync new_sequencer ~snapshot_file in
   Log.info "Start new sequencer." ;
   let* () = Evm_node.run new_sequencer in
   Log.info "The new sequencer should have the current block of the snapshot." ;
@@ -939,21 +947,26 @@ let test_snapshots_import_empty =
        previously at %R" ;
   unit
 
-let test_snapshots_import_populated =
+let test_snapshots_import_populated ~desync =
   register_all
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "snapshots"]
-    ~title:"Import sequencer snapshot in populated data dir"
+    ~tags:(["evm"; "sequencer"; "snapshots"] |> add_desync_tag desync)
+    ~title:
+      (sf
+         "Import %ssequencer snapshot in populated data dir"
+         (if desync then "desync " else ""))
     ~time_between_blocks:Nothing
   @@ fun ({observer; sequencer; _} as setup) _protocol ->
   let* _snapshot_file_before, snapshot_file, block_number =
-    snapshots_setup setup
+    snapshots_setup ~desync setup
   in
   Log.info "Should not be able to import snapshot in populated node." ;
-  let*? populated = Evm_node.import_snapshot observer ~snapshot_file in
+  let*? populated = Evm_node.import_snapshot ~desync observer ~snapshot_file in
   let* () = Process.check_error ~msg:(rex "is already populated") populated in
   Log.info "Should be able to import snapshot in populated node with --force." ;
-  let*! () = Evm_node.import_snapshot observer ~snapshot_file ~force:true in
+  let*! () =
+    Evm_node.import_snapshot ~desync observer ~snapshot_file ~force:true
+  in
   Log.info "Restart sequencer." ;
   let* () = Evm_node.run sequencer in
   Log.info "Restart observer." ;
@@ -964,19 +977,23 @@ let test_snapshots_import_populated =
   in
   unit
 
-let test_snapshots_import_outdated =
+let test_snapshots_import_outdated ~desync =
   register_all
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "snapshots"]
-    ~title:"Import outdated sequencer snapshot"
+    ~tags:(["evm"; "sequencer"; "snapshots"] |> add_desync_tag desync)
+    ~title:
+      (sf
+         "Import outdated %ssequencer snapshot"
+         (if desync then "desync " else ""))
     ~time_between_blocks:Nothing
   @@ fun ({sequencer; _} as setup) _protocol ->
   let* snapshot_file_before, _snapshot_file, _block_number =
-    snapshots_setup setup
+    snapshots_setup ~desync setup
   in
   Log.info "Cannot import outdated snapshot." ;
   let*? outdated =
     Evm_node.import_snapshot
+      ~desync
       sequencer
       ~snapshot_file:snapshot_file_before
       ~force:true
@@ -988,15 +1005,18 @@ let test_snapshots_import_outdated =
 
 (* A test for the fix introduced in
    https://gitlab.com/tezos/tezos/-/merge_requests/14794. *)
-let test_snapshots_reexport =
+let test_snapshots_reexport ~desync =
   register_all
     ~__FILE__
-    ~tags:["evm"; "sequencer"; "snapshots"]
-    ~title:"Import sequencer snapshot and re-export"
+    ~tags:(["evm"; "sequencer"; "snapshots"] |> add_desync_tag desync)
+    ~title:
+      (sf
+         "Import %ssequencer snapshot and re-export"
+         (if desync then "desync " else ""))
     ~time_between_blocks:Nothing
   @@ fun ({sequencer; sc_rollup_node; _} as setup) _protocol ->
   let* _snapshot_file_before, snapshot_file, _block_number =
-    snapshots_setup setup
+    snapshots_setup ~desync setup
   in
   Log.info "Create new sequencer from snapshot." ;
   let new_sequencer =
@@ -1004,17 +1024,17 @@ let test_snapshots_reexport =
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
-  let*! () = Evm_node.import_snapshot new_sequencer ~snapshot_file in
+  let*! () = Evm_node.import_snapshot ~desync new_sequencer ~snapshot_file in
   Log.info "Re-export snapshot from new sequencer." ;
-  let*! _file = Evm_node.export_snapshot sequencer in
+  let*! _file = Evm_node.export_snapshot ~desync sequencer in
   unit
 
-let test_snapshots protocols =
-  test_snapshots_lock protocols ;
-  test_snapshots_import_empty protocols ;
-  test_snapshots_import_populated protocols ;
-  test_snapshots_import_outdated protocols ;
-  test_snapshots_reexport protocols
+let test_snapshots ~desync protocols =
+  test_snapshots_lock protocols ~desync ;
+  test_snapshots_import_empty ~desync protocols ;
+  test_snapshots_import_populated ~desync protocols ;
+  test_snapshots_import_outdated ~desync protocols ;
+  test_snapshots_reexport ~desync protocols
 
 let test_publish_blueprints =
   register_all
@@ -6345,7 +6365,9 @@ let test_sequencer_upgrade =
     "Stopping current sequencer and starting a new one with new sequencer key" ;
   let* () = Evm_node.terminate sequencer
   and* () = Evm_node.wait_termination sequencer in
-  let* snapshot_file = Runnable.run @@ Evm_node.export_snapshot sequencer in
+  let* snapshot_file =
+    Runnable.run @@ Evm_node.export_snapshot ~desync:true sequencer
+  in
 
   let* new_sequencer =
     let mode =
@@ -6364,7 +6386,8 @@ let test_sequencer_upgrade =
     in
     let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
     let* () =
-      Runnable.run @@ Evm_node.import_snapshot new_sequencer ~snapshot_file
+      Runnable.run
+      @@ Evm_node.import_snapshot ~desync:true new_sequencer ~snapshot_file
     in
     let* () = Evm_node.run new_sequencer in
     return new_sequencer
@@ -6567,7 +6590,9 @@ let test_duplicate_sequencer_upgrade =
     "Stopping current sequencer and starting a new one with new sequencer key" ;
   let* () = Evm_node.terminate sequencer
   and* () = Evm_node.wait_termination sequencer in
-  let* snapshot_file = Runnable.run @@ Evm_node.export_snapshot sequencer in
+  let* snapshot_file =
+    Runnable.run @@ Evm_node.export_snapshot ~desync:true sequencer
+  in
 
   let* new_sequencer =
     let mode =
@@ -6586,7 +6611,8 @@ let test_duplicate_sequencer_upgrade =
     in
     let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
     let* () =
-      Runnable.run @@ Evm_node.import_snapshot new_sequencer ~snapshot_file
+      Runnable.run
+      @@ Evm_node.import_snapshot new_sequencer ~desync:true ~snapshot_file
     in
     let* () = Evm_node.run new_sequencer in
     return new_sequencer
@@ -6654,7 +6680,9 @@ let test_sequencer_diverge =
   in
   (* We duplicate the sequencer by creating a snapshot and importing it *)
   let* _ = Evm_node.terminate sequencer in
-  let* snapshot_file = Runnable.run @@ Evm_node.export_snapshot sequencer in
+  let* snapshot_file =
+    Runnable.run @@ Evm_node.export_snapshot ~desync:true sequencer
+  in
   let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let* sequencer_bis =
     let* mode =
@@ -6682,7 +6710,8 @@ let test_sequencer_diverge =
     | false -> unit
   in
   let* () =
-    Runnable.run @@ Evm_node.import_snapshot sequencer_bis ~snapshot_file
+    Runnable.run
+    @@ Evm_node.import_snapshot ~desync:true sequencer_bis ~snapshot_file
   in
   let* () = Evm_node.run sequencer in
   let* () = Evm_node.run sequencer_bis in
@@ -12601,7 +12630,7 @@ let test_observer_init_from_snapshot =
   let*@ _size = Rpc.produce_block sequencer in
   let* () = Evm_node.wait_for_blueprint_applied sequencer 1 in
   let* () = Evm_node.terminate sequencer in
-  let*! snapshot_file = Evm_node.export_snapshot sequencer in
+  let*! snapshot_file = Evm_node.export_snapshot ~desync:false sequencer in
   let* () = Evm_node.run sequencer in
 
   (* Init observer from snapshot but with history mode set to rolling:5 *)
@@ -12794,7 +12823,7 @@ let test_observer_periodic_snapshot =
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let*? import_process =
-    Evm_node.import_snapshot new_sequencer ~snapshot_file
+    Evm_node.import_snapshot new_sequencer ~desync:false ~snapshot_file
   in
   let* () = Process.check @@ import_process in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
@@ -14284,7 +14313,8 @@ let protocols = Protocol.all
 let () =
   test_remove_sequencer protocols ;
   test_persistent_state protocols ;
-  test_snapshots protocols ;
+  test_snapshots ~desync:false protocols ;
+  test_snapshots ~desync:true protocols ;
   test_patch_state [Protocol.Alpha] ;
   test_publish_blueprints protocols ;
   test_publish_blueprints_signatory protocols ;

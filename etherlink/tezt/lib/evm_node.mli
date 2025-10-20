@@ -616,19 +616,26 @@ val patch_kernel : t -> string -> unit Lwt.t
     by writing [value] at [key]. *)
 val patch_state : t -> key:string -> value:string -> unit Lwt.t
 
-(** [export_snapshot evm_node] exports a snapshot of the evm node in a temporary
-    directory. It returns the path for the produced snapshot file. *)
+(** [export_snapshot ~desync evm_node] exports a snapshot of the evm node in a
+    temporary directory. It returns the path for the produced snapshot file. If
+    [desync=true] it uses the desync format. *)
 val export_snapshot :
-  ?compress_on_the_fly:bool -> t -> (Process.t, string) runnable
+  ?compress_on_the_fly:bool -> desync:bool -> t -> (Process.t, string) runnable
 
-(** [import_snapshot ?force evm_node ~snapshot_file] imports the snapshot
-    [snapshot_file] in the evm node.  *)
+(** [import_snapshot ?force ~desync evm_node ~snapshot_file] imports the
+    snapshot [snapshot_file] in the evm node. If [desync=true] it uses the
+    desync format.  *)
 val import_snapshot :
-  ?force:bool -> t -> snapshot_file:string -> (Process.t, unit) runnable
+  ?force:bool ->
+  desync:bool ->
+  t ->
+  snapshot_file:string ->
+  (Process.t, unit) runnable
 
 (** Run [snapshot info] command and return output containing information about
     the snapshot file. *)
-val snapshot_info : snapshot_file:string -> (Process.t, string) runnable
+val snapshot_info :
+  desync:bool -> snapshot_file:string -> (Process.t, string) runnable
 
 val wait_termination : t -> unit Lwt.t
 
