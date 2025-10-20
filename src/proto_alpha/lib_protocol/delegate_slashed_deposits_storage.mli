@@ -64,7 +64,6 @@ val punish_double_signing :
   operation_hash:Operation_hash.t ->
   Misbehaviour_repr.t ->
   Signature.Public_key_hash.t ->
-  Level_repr.t ->
   rewarded:Signature.public_key_hash ->
   Raw_context.t tzresult Lwt.t
 

@@ -43,16 +43,10 @@ let record_denunciation ctxt ~operation_hash
     ~rewarded_delegate:rewarded
     misbehaviour
 
-let punish_double_signing ctxt ~operation_hash misbehaviour delegate
-    (level : Level_repr.t) ~rewarded =
+let punish_double_signing ctxt ~operation_hash misbehaviour delegate ~rewarded =
   let open Lwt_result_syntax in
   let* ctxt, was_already_denounced =
-    Already_denounced_storage.add_denunciation
-      ctxt
-      delegate
-      level
-      misbehaviour.Misbehaviour_repr.round
-      misbehaviour.kind
+    Already_denounced_storage.add_denunciation ctxt delegate misbehaviour
   in
   if was_already_denounced then
     (* This can only happen in the very specific case where a delegate

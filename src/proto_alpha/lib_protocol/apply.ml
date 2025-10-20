@@ -2514,7 +2514,7 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
   in
   return (ctxt, contents_result_list)
 
-let punish_double_signing ctxt ~operation_hash delegate level misbehaviour
+let punish_double_signing ctxt ~operation_hash delegate misbehaviour
     ~payload_producer =
   let open Lwt_result_syntax in
   let rewarded_delegate = payload_producer.Consensus_key.delegate in
@@ -2524,7 +2524,6 @@ let punish_double_signing ctxt ~operation_hash delegate level misbehaviour
       ~operation_hash
       misbehaviour
       delegate
-      level
       ~rewarded:rewarded_delegate
   in
   let contents_result =
@@ -2557,7 +2556,6 @@ let punish_double_consensus_operation ctxt ~operation_hash ~payload_producer
       ctxt
       ~operation_hash
       delegate
-      level
       misbehaviour
       ~payload_producer
   in
@@ -2581,7 +2579,6 @@ let punish_double_baking ctxt ~operation_hash (bh1 : Block_header.t)
       ctxt
       ~operation_hash
       delegate
-      level
       {level = raw_level; round; kind = Double_baking}
       ~payload_producer
   in
