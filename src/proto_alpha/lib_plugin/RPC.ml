@@ -3863,9 +3863,11 @@ module Attestation_rights = struct
         attestation_path
   end
 
-  let attestation_rights_at_level ctxt level =
+  let attestation_rights_at_level ctxt attested_level =
     let open Lwt_result_syntax in
-    let* ctxt, rights = Baking.attesting_rights_by_first_slot ctxt level in
+    let* ctxt, rights =
+      Baking.attesting_rights_by_first_slot ctxt ~attested_level
+    in
     let* current_round = Round.get ctxt in
     let current_level = Level.current ctxt in
     let current_timestamp = Timestamp.current ctxt in
@@ -3876,7 +3878,7 @@ module Attestation_rights = struct
         ~current_level
         ~current_round
         ~current_timestamp
-        ~level
+        ~level:attested_level
         ~round:Round.zero
     in
     let rights =
@@ -3910,7 +3912,12 @@ module Attestation_rights = struct
     in
     (* returns the ctxt with an updated cache of slot holders *)
     return
-      (ctxt, {level = level.level; delegates_rights = rights; estimated_time})
+      ( ctxt,
+        {
+          level = attested_level.level;
+          delegates_rights = rights;
+          estimated_time;
+        } )
 
   let get_attestation_rights ctxt (q : S.attestation_rights_query) =
     let open Lwt_result_syntax in
@@ -4069,9 +4076,9 @@ module Validators = struct
         path
   end
 
-  let attestation_slots_at_level ctxt level =
+  let attestation_slots_at_level ctxt attested_level =
     let open Lwt_result_syntax in
-    let* ctxt, rights = Baking.attesting_rights ctxt level in
+    let* ctxt, rights = Baking.attesting_rights ctxt ~attested_level in
     let aggregate_attestation = Constants.aggregate_attestation ctxt in
     return
       ( ctxt,
@@ -4112,18 +4119,20 @@ module Validators = struct
         in
         let+ _ctxt, rights =
           List.fold_left_es
-            (fun (ctxt, acc) level ->
+            (fun (ctxt, acc) attested_level ->
               let* ctxt, consensus_threshold =
-                Attesting_power.consensus_threshold ctxt level
+                Attesting_power.consensus_threshold ctxt ~attested_level
               in
               let* ctxt, consensus_committee =
-                Attesting_power.consensus_committee ctxt level
+                Attesting_power.consensus_committee ctxt ~attested_level
               in
-              let* ctxt, delegates = attestation_slots_at_level ctxt level in
+              let* ctxt, delegates =
+                attestation_slots_at_level ctxt attested_level
+              in
               return
                 ( ctxt,
                   ( {
-                      level = level.level;
+                      level = attested_level.level;
                       consensus_threshold;
                       consensus_committee;
                       delegates = [];

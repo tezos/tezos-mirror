@@ -130,13 +130,15 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
   let open Lwt_result_syntax in
   let open Alpha_context in
   let* ctxt, attestations_map =
-    Baking.attesting_rights_by_first_slot ctxt predecessor_level
+    Baking.attesting_rights_by_first_slot ctxt ~attested_level:predecessor_level
   in
   let*? can_contain_preattestations = can_contain_preattestations mode in
   let* ctxt, allowed_preattestations =
     if can_contain_preattestations then
       let* ctxt, preattestations_map =
-        Baking.attesting_rights_by_first_slot ctxt (Level.current ctxt)
+        Baking.attesting_rights_by_first_slot
+          ctxt
+          ~attested_level:(Level.current ctxt)
       in
       return (ctxt, Some preattestations_map)
     else return (ctxt, None)
@@ -173,7 +175,7 @@ let init_consensus_rights_for_mempool ctxt ~predecessor_level =
     List.fold_left_es
       (fun (ctxt, minimal_slots) level ->
         let* ctxt, level_minimal_slot =
-          Baking.attesting_rights_by_first_slot ctxt level
+          Baking.attesting_rights_by_first_slot ctxt ~attested_level:level
         in
         return (ctxt, Level.Map.add level level_minimal_slot minimal_slots))
       (ctxt, Level.Map.empty)

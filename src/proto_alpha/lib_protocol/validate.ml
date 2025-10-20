@@ -1957,14 +1957,17 @@ module Anonymous = struct
     | Single
         (Preattestations_aggregate {consensus_content = {level; _}; committee})
       ->
-        let level = Level.from_raw vi.ctxt level in
+        let attested_level = Level.from_raw vi.ctxt level in
         let* _ctxt, public_keys =
           (* [ctxt] is part of the accumulator so that attesting
              rights data for [level] are loaded at most once. *)
           List.fold_left_es
             (fun (ctxt, public_keys) slot ->
               let* ctxt, consensus_key =
-                Stake_distribution.attestation_slot_owner ctxt level slot
+                Stake_distribution.attestation_slot_owner
+                  ctxt
+                  ~attested_level
+                  slot
               in
               match consensus_key.consensus_pk with
               | Bls pk -> return (ctxt, pk :: public_keys)
@@ -1993,12 +1996,14 @@ module Anonymous = struct
           Operation.(
             serialize_unsigned_operation bls_mode_unsigned_encoding attestation)
         in
-        let level = Level.from_raw vi.ctxt level in
         let* _ctxt, pks, weighted_pks =
           List.fold_left_es
             (fun (ctxt, pks, weighted_pks) (slot, dal) ->
               let* ctxt, consensus_key =
-                Stake_distribution.attestation_slot_owner ctxt level slot
+                Stake_distribution.attestation_slot_owner
+                  ctxt
+                  ~attested_level:(Level.from_raw vi.ctxt level)
+                  slot
               in
               match consensus_key.consensus_pk with
               | Bls consensus_pk -> (
@@ -2101,6 +2106,7 @@ module Anonymous = struct
         && Round.(round = round2))
         (Invalid_denunciation kind)
     in
+    let misbehaviour = {Misbehaviour.level; round; kind} in
     let*? () =
       (* Both denounced operations must involve [slot]. That is,
          they must be either a standalone (pre)attestation for [slot],
@@ -2166,11 +2172,14 @@ module Anonymous = struct
       check_denunciation_age vi (`Consensus_denounciation kind) level.level
     in
     let* ctxt, consensus_key =
-      Stake_distribution.attestation_slot_owner vi.ctxt level slot
+      Stake_distribution.attestation_slot_owner
+        vi.ctxt
+        ~attested_level:level
+        slot
     in
     let delegate = consensus_key.delegate in
     let* already_slashed =
-      Delegate.already_denounced ctxt delegate level round kind
+      Delegate.already_denounced ctxt delegate misbehaviour
     in
     let*? () =
       error_unless
@@ -2266,6 +2275,9 @@ module Anonymous = struct
         (Invalid_double_baking_evidence
            {hash1; level1; round1; hash2; level2; round2})
     in
+    let misbehaviour =
+      {Misbehaviour.level = level1; round = round1; kind = Double_baking}
+    in
     let*? () =
       check_denunciation_age
         vi
@@ -2289,7 +2301,7 @@ module Anonymous = struct
     in
     let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
     let* already_slashed =
-      Delegate.already_denounced ctxt delegate level round1 Double_baking
+      Delegate.already_denounced ctxt delegate misbehaviour
     in
     let*? () =
       error_unless
@@ -2442,7 +2454,10 @@ module Anonymous = struct
         let*? () = check_denunciation_age vi `Dal_denounciation level in
         let level = Level.from_raw vi.ctxt level in
         let* ctxt, consensus_key =
-          Stake_distribution.attestation_slot_owner vi.ctxt level consensus_slot
+          Stake_distribution.attestation_slot_owner
+            vi.ctxt
+            ~attested_level:level
+            consensus_slot
         in
         let delegate = consensus_key.delegate in
         let*! already_denounced =
@@ -4031,18 +4046,25 @@ let check_attesting_power vi bs =
     return Compare.Int32.(level_position_in_protocol > 1l)
   in
   if are_attestations_required then
-    (* We can safely drop the context: it is only updated for the cache of
-       the stake info for a given level, which should already be cached
-       at this time anyways. *)
-    let* _ctxt, required =
-      Attesting_power.consensus_threshold vi.ctxt vi.current_level
-    in
-    let provided =
-      Attesting_power.get vi.ctxt vi.current_level bs.attesting_power
-    in
-    fail_unless
-      Compare.Int64.(provided >= required)
-      (Not_enough_attestations {required; provided})
+    (* The attested level is the predecessor of the block's level. *)
+    match Level.pred vi.ctxt vi.current_level with
+    | None ->
+        (* This cannot happen because [required_attestations = true]
+           ensures that [vi.current_level >= 2]. *)
+        assert false
+    | Some attested_level ->
+        (* We can safely drop the context: it is only updated for the
+           cache of the stake info for a given level, which should
+           already be cached at this time anyways. *)
+        let* _ctxt, required =
+          Attesting_power.consensus_threshold vi.ctxt ~attested_level
+        in
+        let provided =
+          Attesting_power.get vi.ctxt ~attested_level bs.attesting_power
+        in
+        fail_unless
+          Compare.Int64.(provided >= required)
+          (Not_enough_attestations {required; provided})
   else return_unit
 
 (** Check that the locked round in the fitness and the locked round
@@ -4085,14 +4107,16 @@ let check_preattestation_round_and_power vi vs round =
           (Locked_round_after_block_round
              {locked_round = preattestation_round; round})
       in
+      (* The preattestations' level is the same as the block's level. *)
+      let attested_level = vi.current_level in
       (* We can safely drop the context: it is only updated for the cache of
          the stake info for a given level, which should already be cached
          at this time anyways. *)
       let* _ctxt, consensus_threshold =
-        Attesting_power.consensus_threshold vi.ctxt vi.current_level
+        Attesting_power.consensus_threshold vi.ctxt ~attested_level
       in
       let total_attesting_power =
-        Attesting_power.get vi.ctxt vi.current_level total_attesting_power
+        Attesting_power.get vi.ctxt ~attested_level total_attesting_power
       in
       let*? () =
         error_when

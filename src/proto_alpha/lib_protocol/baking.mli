@@ -51,7 +51,7 @@ type ordered_slots = private {
    This function is only used by the 'validators' RPC.  *)
 val attesting_rights :
   context ->
-  Level.t ->
+  attested_level:Level.t ->
   (context * ordered_slots Signature.Public_key_hash.Map.t) tzresult Lwt.t
 
 (** Computes attesting rights for a given level.
@@ -60,12 +60,16 @@ val attesting_rights :
      attesting power, and DAL attesting power. *)
 val attesting_rights_by_first_slot :
   context ->
-  Level.t ->
+  attested_level:Level.t ->
   (context * Consensus_key.power Slot.Map.t) tzresult Lwt.t
 
-(** Computes the bonus baking reward depending on the attestation power. *)
+(** Computes the bonus baking reward depending on the attestation power.
+
+    [attested_level] is the level written in the attestations whose
+    total [attesting_power] is provided, not the level of the block
+    being baked. *)
 val bonus_baking_reward :
   context ->
-  Level.t ->
+  attested_level:Level.t ->
   attesting_power:Attesting_power.t ->
   (context * Tez.t) tzresult Lwt.t

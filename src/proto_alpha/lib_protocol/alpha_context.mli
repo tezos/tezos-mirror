@@ -2264,17 +2264,26 @@ module Attesting_power : sig
 
   val add : t -> t -> t
 
-  val get : context -> Level.t -> t -> int64
+  (** Numerical value for the attesting power: either number of slots
+      or baking power, depending on whether all-bakers-attest is
+      already active at the [attested_level]. *)
+  val get : context -> attested_level:Level.t -> t -> int64
 
   val get_slots : t -> int
 
-  val check_all_bakers_attest_at_level : context -> Level.t -> bool
+  val check_all_bakers_attest_at_level :
+    context -> attested_level:Level.t -> bool
 
+  (** See {!Consensus_parameters_storage.is_all_bakers_attest_enabled_for_cycle}. *)
+  val is_all_bakers_attest_enabled_for_cycle : context -> Cycle.t -> bool
+
+  (** See {!Consensus_parameters_storage.consensus_threshold}. *)
   val consensus_threshold :
-    context -> Level.t -> (context * int64) tzresult Lwt.t
+    context -> attested_level:Level.t -> (context * int64) tzresult Lwt.t
 
+  (** See {!Consensus_parameters_storage.consensus_committee}. *)
   val consensus_committee :
-    context -> Level.t -> (context * int64) tzresult Lwt.t
+    context -> attested_level:Level.t -> (context * int64) tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Delegate_consensus_key}. *)
@@ -2361,12 +2370,7 @@ module Delegate : sig
 
   (** See {!Already_denounced_storage.already_denounced}. *)
   val already_denounced :
-    context ->
-    public_key_hash ->
-    Level.t ->
-    Round.t ->
-    Misbehaviour.kind ->
-    bool tzresult Lwt.t
+    context -> public_key_hash -> Misbehaviour.t -> bool tzresult Lwt.t
 
   type reward_and_burn = {reward : Tez.t; amount_to_burn : Tez.t}
 
@@ -2381,7 +2385,6 @@ module Delegate : sig
     operation_hash:Operation_hash.t ->
     Misbehaviour.t ->
     public_key_hash ->
-    Level.t ->
     rewarded:public_key_hash ->
     context tzresult Lwt.t
 
@@ -5306,8 +5309,21 @@ module Stake_distribution : sig
     round:Round.t ->
     (context * Slot.t * Consensus_key.pk) tzresult Lwt.t
 
+  (** Which delegate owns the given slot at the [attested_level].
+
+      If all-bakers-attest is not yet active at the [attested_level],
+      the slot is considered a Tenderbake slot (out of 7000 on
+      mainnet) and its owner is the delegate sampled for this slot.
+
+      If all-bakers-attest is active at the [attested_level], the
+      owner is the delegate whose index in
+      {!Delegate_sampler.stake_info_for_cycle} is the provided
+      slot. *)
   val attestation_slot_owner :
-    context -> Level.t -> Slot.t -> (context * Consensus_key.pk) tzresult Lwt.t
+    context ->
+    attested_level:Level.t ->
+    Slot.t ->
+    (context * Consensus_key.pk) tzresult Lwt.t
 
   val stake_info_for_cycle :
     context ->
