@@ -1756,6 +1756,10 @@ let id_tokens =
 module Hooks = struct
   let before_merging = ref []
 
+  let schedule_extended_test = ref []
+
+  let custom_extended_test = ref []
+
   let master = ref []
 
   let global_release = ref []
