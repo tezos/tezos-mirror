@@ -97,8 +97,7 @@ let echo x = Printf.ksprintf print_endline x
 let command ?stdout name args =
   let cmd = Filename.quote_command ?stdout name args in
   echo "Run: %s" cmd ;
-  let code = Sys.command cmd in
-  if code <> 0 then failwith (name ^ " returned a non-zero exit code")
+  Sys.command cmd
 
 let get_file_from_file_or_pipeline file_or_pipeline =
   if Filename.check_suffix file_or_pipeline ".yml" then file_or_pipeline
@@ -163,7 +162,9 @@ let () =
 
   let before =
     with_temp_file "before" @@ fun filename ->
-    command ~stdout:filename "git" ["show"; origin ^ ":" ^ was] ;
+    (match command ~stdout:filename "git" ["show"; origin ^ ":" ^ was] with
+    | 0 -> ()
+    | code -> echo "git show returned exit code %d" code) ;
     echo "Parse: before" ;
     parse_yaml_file filename
   in
@@ -178,4 +179,9 @@ let () =
   echo "Write: after" ;
   output_yaml_file after_filename (reorder equalities after) ;
   echo "If the next command hangs, make sure you are not using dune 3.19.0." ;
-  command "git" ["diff"; "--no-index"; "--"; before_filename; after_filename]
+  match
+    command "git" ["diff"; "--no-index"; "--"; before_filename; after_filename]
+  with
+  | 0 -> echo "Empty diff."
+  | 1 -> ()
+  | code -> echo "git diff returned exit code %d" code
