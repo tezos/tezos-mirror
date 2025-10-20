@@ -70,6 +70,8 @@ pub enum ValidityError {
     EmptyBatch,
     #[error("Batch contains operations from multiple sources.")]
     MultipleSources,
+    #[error("Cannot set gas limit due to : {0}")]
+    GasLimitSetError(String),
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]

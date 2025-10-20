@@ -865,10 +865,11 @@ fn apply_operation<Host: Runtime>(
     block_ctx: &BlockCtx,
 ) -> OperationResultSum {
     let mut internal_operations_receipts = Vec::new();
+    let mut gas = validated_operation.gas;
     let mut tc_ctx = TcCtx {
         host,
         context,
-        gas: &mut gas::TezlinkOperationGas::default(),
+        gas: &mut gas,
         big_map_diff: &mut BTreeMap::new(),
     };
     let parser = Parser::new();

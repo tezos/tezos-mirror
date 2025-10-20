@@ -20,6 +20,7 @@ use tezos_tezlink::{
 use crate::{
     account_storage::{Manager, TezlinkAccount, TezlinkImplicitAccount},
     context::Context,
+    gas::TezlinkOperationGas,
     BalanceUpdate,
 };
 
@@ -27,9 +28,9 @@ use crate::{
 /// This function verifies that the counter given in argument is the
 /// successor of the stored counter. If not, it returns the appropriate
 /// error.
-fn check_counter_increment(
+fn check_and_increment_counter(
     host: &impl Runtime,
-    account_counter: &Narith,
+    account_counter: &mut Narith,
     operation_counter: &Narith,
 ) -> Result<(), ValidityError> {
     // The provided counter value must be the successor of the manager's counter.
@@ -41,6 +42,7 @@ fn check_counter_increment(
             "Validation: OK - Operation has the expected counter {:?}.",
             expected_counter
         );
+        *account_counter = expected_counter;
         return Ok(());
     }
     let error = CounterError {
@@ -170,13 +172,13 @@ fn validate_source<Host: Runtime>(
 
 fn validate_individual_operation<Host: Runtime>(
     host: &Host,
-    content: &ManagerOperation<OperationContent>,
+    content: ManagerOperation<OperationContent>,
     account_pkh: &PublicKeyHash,
-    account_balance: &Narith,
-    account_counter: &Narith,
-) -> Result<(Narith, Vec<BalanceUpdate>), ValidityError> {
-    check_counter_increment(host, account_counter, &content.counter)?;
-
+    account_balance: &mut Narith,
+    account_counter: &mut Narith,
+    gas: TezlinkOperationGas,
+) -> Result<ValidatedOperation, ValidityError> {
+    check_and_increment_counter(host, account_counter, &content.counter)?;
     // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
     let hard_gas_limit = 1040000_u64;
     check_gas_limit(&hard_gas_limit.into(), &content.gas_limit)?;
@@ -200,7 +202,7 @@ fn validate_individual_operation<Host: Runtime>(
     );
 
     // The manager account must be solvent to pay the announced fees.
-    let new_balance = account_balance
+    *account_balance = account_balance
         .0
         .checked_sub(&content.fee.0)
         .ok_or(ValidityError::CantPayFees(content.fee.clone()))?
@@ -217,11 +219,20 @@ fn validate_individual_operation<Host: Runtime>(
     let (src_delta, block_fees) = compute_fees_balance_updates(account_pkh, &content.fee)
         .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
 
-    Ok((new_balance, vec![src_delta, block_fees]))
+    Ok(ValidatedOperation {
+        balance_updates: vec![src_delta, block_fees],
+        gas,
+        content,
+    })
 }
 
 pub struct ValidatedOperation {
     pub balance_updates: Vec<BalanceUpdate>,
+    /// Gas available to this operation.
+    /// Set from the operation's declared gas_limit, except for the
+    /// first operation in a batch: some of that operation's gas is consumed
+    /// during validation.
+    pub gas: TezlinkOperationGas,
     pub content: ManagerOperation<OperationContent>,
 }
 
@@ -230,7 +241,11 @@ pub struct ValidatedBatch {
     pub validated_operations: Vec<ValidatedOperation>,
 }
 
-pub fn verify_signature(operation: Operation, pk: &PublicKey) -> Result<bool, BinError> {
+pub fn verify_signature(
+    operation: Operation,
+    pk: &PublicKey,
+    _validation_gas: &mut TezlinkOperationGas,
+) -> Result<bool, BinError> {
     let serialized_unsigned_operation =
         serialize_unsigned_operation(&operation.branch, &operation.content)?;
     let signature = &operation.signature.into();
@@ -252,16 +267,19 @@ pub fn execute_validation<Host: Runtime>(
         return Err(ValidityError::EmptyBatch);
     }
 
-    let mut validated_operations = Vec::new();
-    let unvalidated_operation: Vec<ManagerOperation<OperationContent>> = operation
+    let mut unvalidated_operation: Vec<ManagerOperation<OperationContent>> = operation
         .content
         .clone()
         .into_iter()
         .map(Into::into)
         .collect();
 
+    // Initialize the validation gas using the gas limit of the first operation in the batch
+    let mut validation_gas =
+        TezlinkOperationGas::start(&unvalidated_operation[0].gas_limit)
+            .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
     let (pk, source_account) = validate_source(host, context, &unvalidated_operation)?;
-    match verify_signature(operation, &pk) {
+    match verify_signature(operation, &pk, &mut validation_gas) {
         Ok(true) => log!(host, Debug, "Validation: OK - Signature is valid."),
         _ => return Err(ValidityError::InvalidSignature),
     }
@@ -273,20 +291,30 @@ pub fn execute_validation<Host: Runtime>(
         .counter(host)
         .map_err(|_| ValidityError::FailedToFetchCounter)?;
 
+    let mut validated_operations = Vec::new();
+
+    // Charge the gas for the validation on the first operation of the batch
+    let gas_charged_operation = unvalidated_operation.remove(0);
+    validated_operations.push(validate_individual_operation(
+        host,
+        gas_charged_operation,
+        source_account.pkh(),
+        &mut source_balance,
+        &mut source_counter,
+        validation_gas,
+    )?);
     for content in unvalidated_operation {
-        let (source_balance_after_fees, balance_updates) = validate_individual_operation(
+        let operation_gas = TezlinkOperationGas::start(&content.gas_limit)
+            .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
+        let validated_operation = validate_individual_operation(
             host,
-            &content,
-            source_account.pkh(),
-            &source_balance,
-            &source_counter,
-        )?;
-        source_counter = Narith(&source_counter.0 + 1_u64);
-        source_balance = source_balance_after_fees;
-        validated_operations.push(ValidatedOperation {
-            balance_updates,
             content,
-        });
+            source_account.pkh(),
+            &mut source_balance,
+            &mut source_counter,
+            operation_gas,
+        )?;
+        validated_operations.push(validated_operation);
     }
 
     source_account

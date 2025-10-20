@@ -1324,6 +1324,8 @@ let test_tezlink_long_batch =
       ~endpoint
       ~giver:Constant.bootstrap1.alias
       ~json_batch
+        (* The default fee cap is not enough because of overestimated gas costs by simulation mock *)
+      ~fee_cap:Tez.(of_int 10)
       client
   in
   let*@ _ = produce_block sequencer in
