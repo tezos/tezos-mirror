@@ -172,7 +172,7 @@ module WASM = struct
       ~path:"etherlink/kernel_latest/kernel/tests/resources/mainnet_kernel.wasm"
       ()
 
-  let mainnet_commit = "1f47de061681a9bc4a07b2ddfecc6f4932b5ae9d"
+  let mainnet_commit = "7a62d6a155cc17f5d3b9f8d34b2eb0d68c6f95cc"
 
   let tx_kernel = Uses.make ~tag:"tx_kernel" ~path:"tx_kernel.wasm" ()
 
