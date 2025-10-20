@@ -125,7 +125,7 @@ pub struct TezBlockInProgress {
     timestamp: Timestamp,
     previous_hash: H256,
     applied: Vec<AppliedOperation>,
-    operations: VecDeque<Operation>,
+    operations: VecDeque<TezlinkOperation>,
 }
 
 impl BlockInProgressTrait for TezBlockInProgress {
@@ -239,7 +239,7 @@ impl Decodable for TezlinkContent {
 }
 
 #[derive(Debug)]
-pub struct TezTransactions(pub Vec<Operation>);
+pub struct TezTransactions(pub Vec<TezlinkOperation>);
 
 impl TransactionsTrait for TezTransactions {
     fn extend(&mut self, other: Self) {
@@ -259,10 +259,7 @@ impl Encodable for TezTransactions {
         let Self(operations) = self;
         stream.begin_list(operations.len());
         for op in operations {
-            // We don't want the kernel to panic if there's an error
-            // and we can't print a log as we don't have access to
-            // the host. So we just ignore the result.
-            let _ = op.rlp_append(stream);
+            op.rlp_append(stream);
         }
     }
 }
@@ -274,8 +271,8 @@ impl Decodable for TezTransactions {
         }
         let operations = decoder
             .iter()
-            .map(|rlp| Operation::decode(&rlp))
-            .collect::<Result<Vec<Operation>, rlp::DecoderError>>()?;
+            .map(|rlp| TezlinkOperation::decode(&rlp))
+            .collect::<Result<Vec<TezlinkOperation>, rlp::DecoderError>>()?;
         Ok(TezTransactions(operations))
     }
 }
@@ -551,11 +548,17 @@ impl ChainConfigTrait for MichelsonChainConfig {
         let operations = bytes
             .iter()
             .map(|bytes| {
-                Operation::nom_read_exact(bytes).map_err(|decode_error| {
-                    error::Error::NomReadError(format!("{decode_error:?}"))
+                let operation =
+                    Operation::nom_read_exact(bytes).map_err(|decode_error| {
+                        error::Error::NomReadError(format!("{decode_error:?}"))
+                    })?;
+                let tx_hash = operation.hash()?.0 .0;
+                Ok(TezlinkOperation {
+                    tx_hash,
+                    content: TezlinkContent::Tezos(operation),
                 })
             })
-            .collect::<Result<Vec<Operation>, error::Error>>()?;
+            .collect::<Result<Vec<TezlinkOperation>, error::Error>>()?;
         Ok(TezTransactions(operations))
     }
 
@@ -603,51 +606,57 @@ impl ChainConfigTrait for MichelsonChainConfig {
             // Retrieve the next operation in the VecDequeue
             let operation = operations.pop_front().ok_or(error::Error::Reboot)?;
 
-            // Compute the hash of the operation
-            let hash = operation.hash()?;
+            match operation.content {
+                TezlinkContent::Tezos(operation) => {
+                    // Compute the hash of the operation
+                    let hash = operation.hash()?;
 
-            let skip_signature_check = false;
+                    let skip_signature_check = false;
 
-            let branch = operation.branch.clone();
-            let signature = operation.signature.clone();
+                    let branch = operation.branch.clone();
+                    let signature = operation.signature.clone();
 
-            // Try to apply the operation with the tezos_execution crate, return a receipt
-            // on whether it failed or not
-            let processed_operations = match tezos_execution::validate_and_apply_operation(
-                host,
-                &context,
-                hash.clone(),
-                operation,
-                &block_ctx,
-                skip_signature_check,
-            ) {
-                Ok(receipt) => receipt,
-                Err(OperationError::Validation(err)) => {
-                    log!(
-                        host,
-                        Error,
-                        "Found an invalid operation, dropping it: {:?}",
-                        err
-                    );
-                    continue;
+                    // Try to apply the operation with the tezos_execution crate, return a receipt
+                    // on whether it failed or not
+                    let processed_operations =
+                        match tezos_execution::validate_and_apply_operation(
+                            host,
+                            &context,
+                            hash.clone(),
+                            operation,
+                            &block_ctx,
+                            skip_signature_check,
+                        ) {
+                            Ok(receipt) => receipt,
+                            Err(OperationError::Validation(err)) => {
+                                log!(
+                                    host,
+                                    Error,
+                                    "Found an invalid operation, dropping it: {:?}",
+                                    err
+                                );
+                                continue;
+                            }
+                            Err(OperationError::RuntimeError(err)) => {
+                                return Err(err.into());
+                            }
+                        };
+
+                    // Add the applied operation in the block in progress
+                    let applied_operation = AppliedOperation {
+                        hash,
+                        branch,
+                        op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                            OperationBatchWithMetadata {
+                                operations: processed_operations,
+                                signature,
+                            },
+                        ),
+                    };
+                    applied.push(applied_operation);
                 }
-                Err(OperationError::RuntimeError(err)) => {
-                    return Err(err.into());
-                }
-            };
-
-            // Add the applied operation in the block in progress
-            let applied_operation = AppliedOperation {
-                hash,
-                branch,
-                op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
-                    OperationBatchWithMetadata {
-                        operations: processed_operations,
-                        signature,
-                    },
-                ),
-            };
-            applied.push(applied_operation);
+                TezlinkContent::Deposit(_deposit) => (),
+            }
         }
 
         // Create a Tezos block from the block in progress
