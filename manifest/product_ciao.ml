@@ -176,3 +176,12 @@ let _ci_bin_main =
         ci_documentation;
       ]
     ~release_status:Unreleased
+
+let _ciaodiff =
+  private_exe
+    "main"
+    ~opam:""
+    ~path:"ci/ciaodiff"
+    ~bisect_ppx:No
+    ~deps:[clap; yaml]
+    ~release_status:Unreleased
