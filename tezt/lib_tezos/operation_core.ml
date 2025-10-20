@@ -1232,3 +1232,10 @@ let outdated_dal_denunciation =
 
 let injection_error_unknown_branch =
   rex {|Operation ([\w\d]+) is branched on either:|}
+
+let dal_entrapment_wrong_commitment =
+  rex {|DAL shard proof error: Invalid shard \(for commitment = ([\w\d]+)\).|}
+
+let dal_entrapment_of_not_published_commitment =
+  rex
+    {|Invalid accusation for delegate ([\w\d]+), level ([\d]+), and DAL slot index ([\d]+): the DAL slot was not published.|}
