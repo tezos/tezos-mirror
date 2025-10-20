@@ -11,6 +11,10 @@
 
 ### RPCs changes
 
+- `debug_traceTransaction` and `debug_traceBlockByNumber` RPCs now correctly
+  use native execution when the node is configured with the `rpcs_only` policy
+  (which is the case by default). (!19665)
+
 ### Monitoring changes
 
 ### Command-line interface changes

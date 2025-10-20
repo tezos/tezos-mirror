@@ -569,6 +569,17 @@ let replay ctxt ?(log_file = "replay") ?profile
 let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
     =
   let module Executor = struct
+    let ctxt =
+      match ctxt.native_execution_policy with
+      | Rpcs_only ->
+          (* The [ro_backend] is only used to serve RPCs, so [replay]
+             and [execute] are only used for serving RPCs so it is
+             safe to “promote” the native execution policy to [Always].
+             Without this change, the node believes it is executing a
+             block and default to WASM execution. *)
+          {ctxt with native_execution_policy = Configuration.Always}
+      | _ -> ctxt
+
     let pvm_config = pvm_config ctxt
 
     let replay ?log_file ?profile ?alter_evm_state number =
