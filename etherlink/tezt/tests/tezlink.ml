@@ -1148,8 +1148,8 @@ let test_tezlink_reveal_transfer_batch =
      an account with a batch, so we need to capture this information from the log *)
   let collected_fees : int list ref = ref [] in
 
-  (* Regex: look for "fee" and then find the number after the ꜩ symbol *)
-  let fee_regex = Str.regexp_case_fold "fee[^ꜩ]*ꜩ\\([0-9]+\\.?[0-9]*\\)" in
+  (* Regex: find the number after the ꜩ symbol in the line containing "Fee to the baker" *)
+  let fee_regex = Str.regexp "Fee to the baker: ꜩ\\([0-9]+\\.?[0-9]*\\)" in
 
   let on_log line =
     match
