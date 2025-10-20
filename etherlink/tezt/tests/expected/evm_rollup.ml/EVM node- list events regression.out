@@ -1863,7 +1863,7 @@ sandbox_started:
       string
   
 sequencer_disabled_native_execution:
-  description: native execution is disabled in sequencer mode
+  description: native execution is disabled for block application in sequencer mode
   level: warning
   section: evm_node
   json format:
