@@ -10,14 +10,14 @@ use crate::{
         read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
         EVMBlockHeader, TezBlockHeader,
     },
-    bridge::Deposit,
+    bridge::{execute_tezlink_deposit, Deposit},
     delayed_inbox::DelayedInbox,
     error,
     fees::MINIMUM_BASE_FEE_PER_GAS,
     l2block::L2Block,
     simulation::start_simulation_mode,
     tick_model::constants::MAXIMUM_GAS_LIMIT,
-    transaction::Transactions::EthTxs,
+    transaction::{TransactionContent, Transactions::EthTxs},
     CHAIN_ID,
 };
 use anyhow::Context;
@@ -530,15 +530,46 @@ impl ChainConfigTrait for MichelsonChainConfig {
     }
 
     fn fetch_hashes_from_delayed_inbox(
-        _host: &mut impl Runtime,
-        _delayed_hashes: Vec<crate::delayed_inbox::Hash>,
-        _delayed_inbox: &mut DelayedInbox,
+        host: &mut impl Runtime,
+        delayed_hashes: Vec<crate::delayed_inbox::Hash>,
+        delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
     ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transactions>, usize)>
     {
+        // By reusing 'fetch_hashes_from_delayed_inbox', Tezlink don't have to implement
+        // the logic to retrieve delayed_inbox items.
+        //
+        // However, it still needs to do the conversion as the returned items are EthTxs
+        let (delayed, total_size) =
+            crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
+                host,
+                delayed_hashes,
+                delayed_inbox,
+                current_blueprint_size,
+            )?;
         Ok((
-            DelayedTransactionFetchingResult::Ok(TezTransactions(vec![])),
-            current_blueprint_size,
+            match delayed {
+                DelayedTransactionFetchingResult::Ok(EthTxs(txs)) => {
+                    let mut ops = vec![];
+                    for tx in txs.into_iter() {
+                        if let TransactionContent::Deposit(deposit) = tx.content {
+                            let operation = TezlinkOperation {
+                                tx_hash: tx.tx_hash,
+                                content: TezlinkContent::Deposit(deposit),
+                            };
+                            ops.push(operation)
+                        }
+                    }
+                    DelayedTransactionFetchingResult::Ok(TezTransactions(ops))
+                }
+                DelayedTransactionFetchingResult::BlueprintTooLarge => {
+                    DelayedTransactionFetchingResult::BlueprintTooLarge
+                }
+                DelayedTransactionFetchingResult::DelayedHashMissing(hash) => {
+                    DelayedTransactionFetchingResult::DelayedHashMissing(hash)
+                }
+            },
+            total_size,
         ))
     }
 
@@ -601,6 +632,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
             now: &timestamp,
             chain_id: &self.chain_id,
         };
+
+        let mut included_delayed_transactions = vec![];
         // Compute operations that are in the block in progress
         while !operations.is_empty() {
             // Retrieve the next operation in the VecDequeue
@@ -655,8 +688,12 @@ impl ChainConfigTrait for MichelsonChainConfig {
                     };
                     applied.push(applied_operation);
                 }
-                TezlinkContent::Deposit(_deposit) => (),
-            }
+                TezlinkContent::Deposit(deposit) => {
+                    log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
+                    execute_tezlink_deposit(host, &context, &deposit)?;
+                    included_delayed_transactions.push(operation.tx_hash);
+                }
+            };
         }
 
         // Create a Tezos block from the block in progress
@@ -666,7 +703,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         crate::block_storage::store_current(host, &root, &new_block)
             .context("Failed to store the current block")?;
         Ok(BlockComputationResult::Finished {
-            included_delayed_transactions: vec![],
+            included_delayed_transactions,
             block: new_block,
         })
     }

@@ -414,7 +414,7 @@ pub fn execute_etherlink_deposit<Host: Runtime>(
     })
 }
 
-pub fn _execute_tezlink_deposit<Host: Runtime>(
+pub fn execute_tezlink_deposit<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     deposit: &Deposit,
