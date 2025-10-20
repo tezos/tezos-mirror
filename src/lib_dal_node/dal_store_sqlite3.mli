@@ -49,10 +49,13 @@ module Skip_list_cells : sig
     Skip_list_cell.t option tzresult Lwt.t
 
   (** [find_by_slot_id_opt ?conn store ~slot_id] returns the cell associated to
-      ([slot_id]) in the [store], if any. Uses the [conn] if provided (defaults
-      to [None]). *)
+      ([slot_id]) in the [store] alongside the attestation lag, if any. Uses the
+      [conn] if provided (defaults to [None]). *)
   val find_by_slot_id_opt :
-    ?conn:conn -> t -> Types.slot_id -> Skip_list_cell.t option tzresult Lwt.t
+    ?conn:conn ->
+    t ->
+    Types.slot_id ->
+    (Skip_list_cell.t * int) option tzresult Lwt.t
 
   (** [find_by_level ?conn store ~published_level] retrieves the tuples (cell *
       hash * slot_index) for the given published level, if any. The results are

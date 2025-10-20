@@ -371,7 +371,7 @@ let try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
   in
   match cell_bytes_opt with
   | None -> return_none
-  | Some cell_bytes ->
+  | Some (cell_bytes, __attestation_lag) ->
       Dal_proto_types.Skip_list_cell.to_proto
         Plugin.Skip_list.cell_encoding
         cell_bytes

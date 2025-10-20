@@ -175,18 +175,18 @@ module Skip_list_cells = struct
       WHERE hash = $1
       |sql}
 
+    (* Returns the skip list cell together with its attestation_lag *)
     let find_by_slot_id_opt :
-        (level * slot_index, Skip_list_cell.t, [`One | `Zero]) t =
+        (level * slot_index, Skip_list_cell.t * int, [`One | `Zero]) t =
       let open Caqti_type.Std in
-      (t2 published_level dal_slot_index ->? skip_list_cell)
+      (t2 published_level dal_slot_index ->? t2 skip_list_cell attestation_lag)
       @@ {sql|
-      SELECT cell
-      FROM skip_list_cells
-      WHERE hash = (
-        SELECT skip_list_cell_hash
-        FROM skip_list_slots
-        WHERE published_level = $1 AND slot_index = $2
-      )|sql}
+       SELECT c.cell, s.attestation_lag
+       FROM skip_list_cells AS c
+       JOIN skip_list_slots AS s
+         ON s.skip_list_cell_hash = c.hash
+       WHERE s.published_level = $1 AND s.slot_index = $2
+       |sql}
 
     let find_by_level :
         ( level,
