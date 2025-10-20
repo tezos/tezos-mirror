@@ -4809,9 +4809,13 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     ~migrate_to
     ()
 
-let get_delegate node ~level ~tb_index =
+let get_delegate node ~migrate_from ~level ~tb_index =
   let* json =
     Node.RPC.call node @@ RPC.get_chain_block_helper_validators ~level ()
+  in
+  let indices_field_name, json =
+    if Protocol.number migrate_from <= 023 then ("slots", json)
+    else ("rounds", JSON.geti 0 json |> JSON.get "delegates")
   in
   let pkh =
     Option.get
@@ -4820,7 +4824,7 @@ let get_delegate node ~level ~tb_index =
            if
              List.mem
                tb_index
-               JSON.(elem |-> "slots" |> as_list |> List.map as_int)
+               JSON.(elem |-> indices_field_name |> as_list |> List.map as_int)
            then Some JSON.(elem |-> "delegate" |> as_string)
            else None)
          (JSON.as_list json)
@@ -4904,12 +4908,14 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
     let* delegate_old =
       get_delegate
         node
+        ~migrate_from
         ~level:(publi_with_trap_level + old_lag - 1)
         ~tb_index:shard_index
     in
     let* delegate_new =
       get_delegate
         node
+        ~migrate_from
         ~level:(publi_with_trap_level + new_lag - 1)
         ~tb_index:shard_index
     in
@@ -4945,7 +4951,10 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
     let* () = bake_for ~count:(new_lag - 1) client in
     Log.info "Crafting the attestation using the \"new\" attestation lag" ;
     let* attestation_new = craft_attestation delegate_new in
-    let* () = bake_for ~count:(old_lag - new_lag) client in
+    let* () =
+      if old_lag <> new_lag then bake_for ~count:(old_lag - new_lag) client
+      else unit
+    in
     Log.info "Crafting the attestation using the \"old\" attestation lag" ;
     let* attestation_old = craft_attestation delegate_old in
     Log.info "We bake until 2 levels after the migration." ;
@@ -5036,6 +5045,7 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
     ~operator_profiles:[slot_index]
     ~traps_fraction:Q.one
     ~migration_level:10
+    ~migrate_from
     ~migrate_to
     ()
 
@@ -12366,7 +12376,7 @@ let register_migration ~migrate_from ~migrate_to =
     ~migrate_to ;
   tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;
   test_migration_accuser_issue ~migration_level:4 ~migrate_from ~migrate_to ;
-  test_migration_with_attestation_lag_change ~migrate_from ~migrate_to;
+  test_migration_with_attestation_lag_change ~migrate_from ~migrate_to ;
   test_accusation_migration_with_attestation_lag_decrease
     ~migrate_from
     ~migrate_to
