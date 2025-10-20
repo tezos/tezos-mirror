@@ -13,9 +13,7 @@ class TestMicheline: XCTestCase {
     ]
 
     /*
-     parameter unit;
-     storage unit;
-     code {CDR; NIL operation; PAIR};
+     { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
      */
     func testBuildBasicScriptMicheline() {
         let micheline = Micheline.seq(
@@ -50,7 +48,11 @@ class TestMicheline: XCTestCase {
 
         let michelineManager = MichelineManager()
 
-        XCTAssertTrue(michelineManager.equalMicheline(micheline1: micheline, micheline2: micheline))
+        let parsedMicheline = try! michelineManager.parse(
+          micheline:
+            "{ parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }"
+        )
+        XCTAssertTrue(michelineManager.equalMicheline(micheline1: micheline, micheline2: parsedMicheline))
     }
 
     /*
@@ -69,7 +71,10 @@ class TestMicheline: XCTestCase {
 
         let michelineManager = MichelineManager()
 
-        XCTAssertTrue(michelineManager.equalMicheline(micheline1: micheline, micheline2: micheline))
+        let parsedMicheline = try! michelineManager.parse(
+          micheline: "(Pair :foo \"string\" 0 0x00)"
+        )
+        XCTAssertTrue(michelineManager.equalMicheline(micheline1: micheline, micheline2: parsedMicheline))
     }
 
 }

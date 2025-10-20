@@ -12,9 +12,7 @@ from tezos import (
 
 def test_build_basic_script_micheline():
     """
-    parameter unit;
-    storage unit;
-    code {CDR; NIL operation; PAIR};
+    { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
     """
 
     micheline = Micheline.SEQ([
@@ -31,7 +29,10 @@ def test_build_basic_script_micheline():
 
     micheline_manager = MichelineManager()
 
-    assert micheline_manager.equal_micheline(micheline, micheline)
+    parsed_micheline = micheline_manager.parse(
+        "{ parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }"
+    )
+    assert micheline_manager.equal_micheline(micheline, parsed_micheline)
 
 def test_build_simple_data_micheline():
     """
@@ -46,4 +47,5 @@ def test_build_simple_data_micheline():
 
     micheline_manager = MichelineManager()
 
-    assert micheline_manager.equal_micheline(micheline, micheline)
+    parsed_micheline = micheline_manager.parse("""(Pair :foo "string" 0 0x00)""")
+    assert micheline_manager.equal_micheline(micheline, parsed_micheline)
