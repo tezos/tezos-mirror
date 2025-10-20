@@ -59,6 +59,10 @@ val copy_file : src:string -> dst:string -> unit
 val copy_dir :
   ?perm:int -> ?progress:string * Terminal.Color.t -> string -> string -> unit
 
+(** [hardlink_dir src dst] creates hardlinks in [dst] for all files in [src]
+    using the same directory structure. It creates [dst] if required. *)
+val hardlink_dir : ?perm:int -> string -> string -> unit
+
 (** [retry ?max_delay ~delay ~factor ~tries ~is_error ~emit ?msg f x] retries
     applying [f x] [tries] until it succeeds or returns an error when [is_error]
     is false, at most [tries] number of times. After each try it waits for a

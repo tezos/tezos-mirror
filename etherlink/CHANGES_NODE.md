@@ -32,6 +32,11 @@ features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
 
+- New experimental snapshot format using
+  [desync](https://github.com/folbricht/desync) with support for incremental
+  snapshots and deduplication, available through commands `experimental snapshot
+  ...`. (!19395)
+
 ## Version 0.45 (2025-10-17)
 
 This release is a bugfix release following the activation of the Ebisu kernel

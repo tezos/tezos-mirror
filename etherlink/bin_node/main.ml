@@ -221,6 +221,29 @@ module Params = struct
       string
       next
 
+  let snapshot_index_file_or_url next =
+    Tezos_clic.param
+      ~name:"snapshot.caidx"
+      ~desc:"Snapshot archive file, URL or stdin (when given `-`)."
+      string
+      next
+
+  let desync_chunk_param =
+    Tezos_clic.parameter @@ fun () s ->
+    let open Tezos_layer2_store.Desync_snapshots in
+    let open Lwt_result_syntax in
+    match String.split_on_char ':' s with
+    | [min; avg; max] -> (
+        try
+          return
+            {
+              min = int_of_string min;
+              avg = int_of_string avg;
+              max = int_of_string max;
+            }
+        with _ -> failwith "Invalid chunk sizes format")
+    | _ -> failwith "Invalid chunk sizes format"
+
   let history_param =
     Tezos_clic.parameter @@ fun () s ->
     let open Lwt_result_syntax in
@@ -937,6 +960,38 @@ let snapshot_file_arg =
        in the current directory, and the filename is based on the snapshot \
        information."
     Params.string
+
+let desync_store_arg =
+  Tezos_clic.arg
+    ~long:"snapshot-store"
+    ~doc:"Snapshot store directory or URL"
+    ~placeholder:"path|url"
+    Params.string
+
+let desync_path_arg =
+  Tezos_clic.arg
+    ~long:"desync-path"
+    ~doc:"Path to the desync executable. Will look in $PATH by default."
+    ~placeholder:"path"
+    Params.string
+
+let desync_chunk_size_arg =
+  Tezos_clic.default_arg
+    ~long:"chunk-size"
+    ~doc:
+      "Chunk sizes to use for chunking snapshot. Larger size will be faster at \
+       the cost of reduced deduplication."
+    ~placeholder:"min:avg:max"
+    ~default:Tezos_layer2_store.Desync_snapshots.default_chunk_size_arg
+  @@ Params.desync_chunk_param
+
+let desync_index_dir_arg =
+  Tezos_clic.arg
+    ~long:"index-dir"
+    ~doc:
+      "Directory or URL at which the snapshot index should be placed or read."
+    ~placeholder:"path|url"
+  @@ Params.string
 
 module Groups = struct
   let run = Tezos_clic.{name = "run"; title = "Run commands"}
@@ -3045,7 +3100,7 @@ let observer_command =
 let export_snapshot
     (data_dir, config_file, snapshot_file, compress_on_the_fly, uncompressed) =
   let open Lwt_result_syntax in
-  let open Evm_node_lib_dev.Snapshots in
+  let open Evm_node_lib_dev.Snapshots_legacy in
   let config_file = Configuration.config_filename ~data_dir ?config_file () in
   let* configuration =
     Configuration.Cli.create_or_read_config ~data_dir config_file
@@ -3072,7 +3127,7 @@ let export_snapshot_command =
   let open Tezos_clic in
   command
     ~group:Groups.snapshot
-    ~desc:"Export a snapshot of the EVM node."
+    ~desc:"Export a legacy snapshot of the EVM node."
     (args5
        data_dir_arg
        config_path_arg
@@ -3086,7 +3141,7 @@ let import_snapshot_command =
   let open Tezos_clic in
   command
     ~group:Groups.snapshot
-    ~desc:"Import a snapshot of the EVM node."
+    ~desc:"Import a legacy snapshot of the EVM node."
     (args2
        data_dir_arg
        (force_arg
@@ -3098,7 +3153,7 @@ let import_snapshot_command =
     (fun (data_dir, force) snapshot_file () ->
       let open Lwt_result_syntax in
       let* _ =
-        Evm_node_lib_dev.Snapshots.import_from
+        Evm_node_lib_dev.Snapshots_legacy.import_from
           ~force
           ~data_dir:(Configuration.get_data_dir ~data_dir)
           ~snapshot_file
@@ -3106,17 +3161,53 @@ let import_snapshot_command =
       in
       return_unit)
 
+let pp_snapshot_rollup fmt rollup_address =
+  let open Evm_node_lib_dev in
+  match
+    List.find_opt
+      (fun network ->
+        Octez_smart_rollup.Address.(
+          rollup_address = Constants.rollup_address network))
+      Constants.supported_networks
+  with
+  | Some net ->
+      Format.fprintf fmt "Etherlink:       %s@," (Constants.network_name net)
+  | None -> ()
+
+let pp_snapshot_history fmt history_info =
+  match history_info with
+  | None -> ()
+  | Some (history_mode, first_level) ->
+      Format.fprintf
+        fmt
+        "@,History mode:    %s@,First level:     %a"
+        (match history_mode with
+        | Archive -> "Archive"
+        | Rolling gc | Full gc ->
+            let hist_span =
+              Ptime.Span.of_int_s
+                (gc.split_frequency_in_seconds * gc.number_of_chunks)
+            in
+            Format.asprintf
+              "%a (with %a history)"
+              Configuration.pp_history_mode_info
+              history_mode
+              Ptime.Span.pp
+              hist_span)
+        Evm_node_lib_dev_encoding.Ethereum_types.pp_quantity
+        first_level
+
 let snapshot_info_command =
   let open Tezos_clic in
   command
     ~group:Groups.snapshot
-    ~desc:"Display information about an EVM node snapshot file."
+    ~desc:"Display information about an EVM node legacy snapshot file."
     no_options
     (prefixes ["snapshot"; "info"] @@ Params.snapshot_file_or_url @@ stop)
     (fun () snapshot_file () ->
       let open Lwt_result_syntax in
       let open Evm_node_lib_dev in
-      let* header, compressed = Snapshots.info ~snapshot_file in
+      let* header, compressed = Snapshots_legacy.info ~snapshot_file in
       let rollup_address, current_level, legacy_block_storage, history_info =
         match header with
         | V0_legacy {rollup_address; current_level} ->
@@ -3127,44 +3218,6 @@ let snapshot_info_command =
               false,
               Some (history_mode, first_level) )
       in
-      let pp_rollup fmt () =
-        match
-          List.find_opt
-            (fun network ->
-              Octez_smart_rollup.Address.(
-                rollup_address = Constants.rollup_address network))
-            Constants.supported_networks
-        with
-        | Some net ->
-            Format.fprintf
-              fmt
-              "Etherlink:       %s@,"
-              (Constants.network_name net)
-        | None -> ()
-      in
-      let pp_history fmt () =
-        match history_info with
-        | None -> ()
-        | Some (history_mode, first_level) ->
-            Format.fprintf
-              fmt
-              "@,History mode:    %s@,First level:     %a"
-              (match history_mode with
-              | Archive -> "Archive"
-              | Rolling gc | Full gc ->
-                  let hist_span =
-                    Ptime.Span.of_int_s
-                      (gc.split_frequency_in_seconds * gc.number_of_chunks)
-                  in
-                  Format.asprintf
-                    "%a (with %a history)"
-                    Configuration.pp_history_mode_info
-                    history_mode
-                    Ptime.Span.pp
-                    hist_span)
-              Evm_node_lib_dev_encoding.Ethereum_types.pp_quantity
-              first_level
-      in
       Format.printf
         "@[<v 0>Valid EVM node snapshot.@,\
          Format:          %scompressed@,\
@@ -3172,15 +3225,159 @@ let snapshot_info_command =
          Current level:   %a@,\
          Block storage:   %s%a@]@."
         (match compressed with `Compressed -> "" | `Uncompressed -> "un")
-        pp_rollup
-        ()
+        pp_snapshot_rollup
+        rollup_address
         Octez_smart_rollup.Address.pp
         rollup_address
         Evm_node_lib_dev_encoding.Ethereum_types.pp_quantity
         current_level
         (if legacy_block_storage then "Legacy" else "Sqlite3")
-        pp_history
-        () ;
+        pp_snapshot_history
+        history_info ;
+      return_unit)
+
+let default_desync_store_dir ~data_dir =
+  Filename.concat data_dir ".snapshots_store"
+
+let pp_size fmt bytes =
+  let bytes = float_of_int bytes in
+  let units = [|"B"; "KB"; "MB"; "GB"; "TB"|] in
+  let i = int_of_float (log10 bytes /. log10 1024.) in
+  let i = if i >= Array.length units then Array.length units - 1 else i in
+  let unit = units.(i) in
+  let size = bytes /. (1024. ** float_of_int i) in
+  Format.fprintf fmt "%.1f%s" size unit
+
+let desync_snapshot_info_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.snapshot
+    ~desc:"Display information about an EVM node desync snapshot file."
+    (args4 desync_path_arg desync_store_arg desync_index_dir_arg data_dir_arg)
+    (prefixes ["experimental"; "snapshot"; "info"]
+    @@ Params.snapshot_file_or_url @@ stop)
+    (fun (desync_path, source_store, index_dir, data_dir) index_file () ->
+      let open Lwt_result_syntax in
+      let open Evm_node_lib_dev in
+      let source_store =
+        match source_store with
+        | None ->
+            default_desync_store_dir
+              ~data_dir:(Configuration.get_data_dir ~data_dir)
+        | Some s -> s
+      in
+      let* V1 {rollup_address; current_level; history_mode; first_level}, size =
+        Snapshots.info ?desync_path ~source_store ?index_dir ~index_file ()
+      in
+      let history_info = Some (history_mode, first_level) in
+      Format.printf
+        "@[<v 0>Valid EVM node snapshot.@,\
+         Format:          desync indexed archive@,\
+         Size:            %a@,\
+         %aRollup address:  %a@,\
+         Current level:   %a%a@]@."
+        pp_size
+        size
+        pp_snapshot_rollup
+        rollup_address
+        Octez_smart_rollup.Address.pp
+        rollup_address
+        Evm_node_lib_dev_encoding.Ethereum_types.pp_quantity
+        current_level
+        pp_snapshot_history
+        history_info ;
+      return_unit)
+
+let desync_export_snapshot_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.snapshot
+    ~desc:"Export a desync snapshot of the EVM node."
+    (args7
+       data_dir_arg
+       config_path_arg
+       snapshot_file_arg
+       desync_index_dir_arg
+       desync_store_arg
+       desync_path_arg
+       desync_chunk_size_arg)
+    (prefixes ["experimental"; "snapshot"; "export"] @@ stop)
+    (fun ( data_dir,
+           config_file,
+           index_file,
+           target_dir,
+           target_store,
+           desync_path,
+           chunk_size )
+         ()
+       ->
+      let open Lwt_result_syntax in
+      let open Evm_node_lib_dev.Snapshots in
+      let config_file =
+        Configuration.config_filename ~data_dir ?config_file ()
+      in
+      let* configuration =
+        Configuration.Cli.create_or_read_config ~data_dir config_file
+      in
+      let*! () = init_logs ~daily_logs:false configuration in
+      let*! () = set_gc_parameters configuration in
+      let data_dir = configuration.data_dir in
+      let target_store =
+        match target_store with
+        | None -> default_desync_store_dir ~data_dir
+        | Some s -> s
+      in
+      let* snapshot_file =
+        export
+          ?desync_path
+          ~chunk_size
+          ~target_store
+          ?target_dir
+          ?index_file
+          ~data_dir
+          ()
+      in
+      Format.printf "Snapshot exported to %s@." snapshot_file ;
+      return_unit)
+
+let desync_import_snapshot_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.snapshot
+    ~desc:"Import a desync snapshot of the EVM node."
+    (args5
+       data_dir_arg
+       desync_index_dir_arg
+       desync_store_arg
+       desync_path_arg
+       (force_arg
+          ~doc:
+            "Allow importing snapshot in already populated data dir (previous \
+             contents is removed first, even if the snapshot is corrupted), or \
+             importing a legacy snapshot in an empty data dir."))
+    (prefixes ["experimental"; "snapshot"; "import"]
+    @@ Params.snapshot_index_file_or_url @@ stop)
+    (fun (data_dir, index_dir, source_store, desync_path, force)
+         index_file
+         ()
+       ->
+      let open Lwt_result_syntax in
+      let data_dir = Configuration.get_data_dir ~data_dir in
+      let source_store =
+        match source_store with
+        | None -> default_desync_store_dir ~data_dir
+        | Some s -> s
+      in
+      let* _ =
+        Evm_node_lib_dev.Snapshots.import
+          ?desync_path
+          ~force
+          ~source_store
+          ?index_dir
+          ~index_file
+          ~data_dir
+          ()
+      in
       return_unit)
 
 let switch_history_mode_command =
@@ -3450,6 +3647,9 @@ let commands =
     snapshot_info_command;
     export_snapshot_command;
     import_snapshot_command;
+    desync_snapshot_info_command;
+    desync_export_snapshot_command;
+    desync_import_snapshot_command;
     switch_history_mode_command;
     show_kms_key_info_command;
     chunker_command;

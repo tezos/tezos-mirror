@@ -22,6 +22,10 @@ type store_info = {
 val export_store :
   data_dir:string -> output_db_file:string -> store_info tzresult Lwt.t
 
+(** [store_info ~data_dir_file] returns information about the store
+    database in [data_dir] such as the address and the current level. *)
+val store_info : data_dir:string -> store_info tzresult Lwt.t
+
 (** [lock ~data_dir] takes an exclusive lock on [data_dir] for the
     duration of the process. It fails if there is already another evm node
     with a lock. *)

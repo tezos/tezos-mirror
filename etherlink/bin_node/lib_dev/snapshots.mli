@@ -1,75 +1,137 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>              *)
+(* SPDX-FileCopyrightText: 2025 Nomadic Labs, <contact@nomadic-labs.com>     *)
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Compression strategy for snapshot archives. *)
-type compression =
-  | No  (** Produce uncompressed archive. Takes more space. *)
-  | On_the_fly
-      (** Compress archive on the fly. The rollup node will use less disk space
-          to produce the snapshot but will lock the rollup node (if running) for
-          a longer time. *)
-  | After
-      (** Compress archive after snapshot creation. Uses more disk space
-          temporarily than {!On_the_fly} but does not lock the rollup node for
-          very long. *)
+type error +=
+  | Invalid_snapshot_file of string
+  | Invalid_snapshot_provider of string
+  | Data_dir_populated of string
+  | History_mode_mismatch of
+      Configuration.history_mode * Configuration.history_mode
+  | Incorrect_rollup of Address.t * Address.t
+  | Outdated_snapshot of Z.t * Z.t
 
-module Header : sig
-  (** Snapshot metadata. This information is written as a header
-      of the archive snapshot file. *)
-  type t =
-    | V0_legacy of {
-        rollup_address : Address.t;
-        current_level : Ethereum_types.quantity;
-      }  (** Snapshots with legacy block storage *)
-    | V1 of {
-        rollup_address : Address.t;
-        current_level : Ethereum_types.quantity;
-        history_mode : Configuration.history_mode;
-        first_level : Ethereum_types.quantity;
-      }  (** Snapshots with Sqlite3 block storage *)
+type metadata =
+  | V1 of {
+      rollup_address : Address.t;
+      current_level : Ethereum_types.quantity;
+      history_mode : Configuration.history_mode;
+      first_level : Ethereum_types.quantity;
+    }
 
-  (** Fixed size metadata encoding. *)
-  val encoding : t Data_encoding.t
-end
+(** [interpolate_snapshot_file block_number rollup_address history_mode path]
+    replaces placeholders in the given snapshot [path] with the provided values.
+    The supported placeholders are:
+    - [%l] for the block number
+    - [%r] for the rollup address (short form)
+    - [%R] for the rollup address (long form)
+    - [%h] for the history mode
 
-(** [export ?snapshot_file ~compression ~data_dir () ] creates a
-    tar gzipped archive with name [snapshot_file] (or a generated name in the
-    current directory) containing a snapshot of the data of the rollup node
-    with data directory [data_dir]. The path of the snapshot archive is
-    returned.  *)
-val export :
-  ?snapshot_file:string ->
-  compression:compression ->
-  data_dir:string ->
-  unit ->
-  string tzresult Lwt.t
+    @param block_number The block number to use for interpolation.
+    @param rollup_address The rollup address to use for interpolation.
+    @param history_mode The history mode to use for interpolation.
+    @param path The path to the snapshot file, possibly containing placeholders.
+*)
+val interpolate_snapshot_file :
+  Ethereum_types.quantity ->
+  Address.t ->
+  Configuration.history_mode ->
+  string ->
+  string tzresult
 
-(** [import_from ~force ~data_dir ~snapshot_file] imports the snapshot from file
-    [snapshot_file] (but also takes care of downloading the file if
-    [snapshot_file] is an url) at path [snapshot_file] into the data directory
-    [data_dir]. Import will fail if [data_dir] is already populated unless
-    [force] is set to [true]. *)
-val import_from :
-  force:bool ->
-  ?history_mode:Configuration.history_mode ->
-  data_dir:string ->
-  snapshot_file:string ->
-  unit ->
-  Configuration.history_mode option tzresult Lwt.t
+(** [interpolate_snapshot_provider ?rollup_address ?network history_mode
+    provider] replaces placeholders in the given snapshot [provider] with the
+    provided values.
+    The supported placeholders are:
+    - [%n] for the network name
+    - [%r] for the rollup address (short form)
+    - [%R] for the rollup address (long form)
+    - [%h] for the history mode
 
-(** [info ~snapshot_file] returns information that can be used to inspect the
-    snapshot file. *)
-val info :
-  snapshot_file:string ->
-  (Header.t * [`Compressed | `Uncompressed]) tzresult Lwt.t
-
+    @param rollup_address The rollup address to use for interpolation.
+    @param network The network to use for interpolation.
+    @param history_mode The history mode to use for interpolation.
+    @param provider The snapshot provider string, possibly containing
+      placeholders.
+*)
 val interpolate_snapshot_provider :
   ?rollup_address:Address.t ->
   ?network:Configuration.supported_network ->
   Configuration.history_mode ->
   string ->
   string tzresult
+
+(** [export ?desync_path ?chunk_size ?progress ~target_store ?target_dir
+    ?index_file ~data_dir ()] exports the data from an EVM node data directory
+    to a snapshot index file and snapshot data in the [target_store] for
+    deduplication.
+
+    @param desync_path Path to the desync tool executable. If not provided,
+      it will be looked for in the system's PATH.
+    @param chunk_size Specifies the chunking strategy for the desync tool.
+    @param progress Displays a progress bar if true.
+    @param target_store The path to the desync store where snapshot data will
+      be stored.
+    @param target_dir The directory where the snapshot index file will be
+      created.
+    @param index_file The name of the snapshot index file.
+    @param data_dir The path to the EVM node data directory.
+*)
+val export :
+  ?desync_path:string ->
+  ?chunk_size:Desync_snapshots.chunk_size ->
+  ?progress:bool ->
+  target_store:string ->
+  ?target_dir:string ->
+  ?index_file:string ->
+  data_dir:string ->
+  unit ->
+  string tzresult Lwt.t
+
+(** [info ?desync_path ~source_store ?index_dir ~index_file ()]
+    returns the metadata and the size of a snapshot.
+
+    @param desync_path Path to the desync tool executable. If not provided,
+      it will be looked for in the system's PATH.
+    @param source_store The path to the desync store containing the snapshot
+      data.
+    @param index_dir The directory where the snapshot index file is located.
+    @param index_file The name of the snapshot index file.
+*)
+val info :
+  ?desync_path:string ->
+  source_store:string ->
+  ?index_dir:string ->
+  index_file:string ->
+  unit ->
+  (metadata * int) tzresult Lwt.t
+
+(** [import ?desync_path ~force ?history_mode ~source_store ?index_dir
+    ~index_file ~data_dir ()] imports a snapshot into an EVM node data
+    directory.
+
+    @param desync_path Path to the desync tool executable. If not provided,
+      it will be looked for in the system's PATH.
+    @param force If true, existing data in the data directory will be
+      overwritten.
+    @param history_mode The history mode for the imported data.
+    @param source_store The path to the desync store containing the snapshot
+      data.
+    @param index_dir The directory where the snapshot index file is located.
+    @param index_file The name of the snapshot index file.
+    @param data_dir The path to the EVM node data directory.
+*)
+val import :
+  ?desync_path:string ->
+  force:bool ->
+  ?history_mode:Configuration.history_mode ->
+  source_store:string ->
+  ?index_dir:string ->
+  index_file:string ->
+  data_dir:string ->
+  unit ->
+  Configuration.history_mode option tzresult Lwt.t

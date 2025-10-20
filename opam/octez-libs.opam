@@ -59,6 +59,7 @@ depends: [
   "conf-libev"
   "progress" { >= "0.1.0" }
   "camlp-streams" { >= "5.0.1" }
+  "octez-lwt-domain"
   "terminal"
   "uutf"
   "eio"

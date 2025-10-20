@@ -162,15 +162,21 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ()
   in
 
-  let*? snapshot_url =
-    Option.map_e
-      (Snapshots.interpolate_snapshot_provider
-         ~rollup_address:smart_rollup_address
-         ?network
-         (Option.value
-            ~default:Configuration.default_history_mode
-            config.history_mode))
-      init_from_snapshot
+  let*? snapshot_source =
+    let open Result_syntax in
+    match init_from_snapshot with
+    | None -> return_none
+    | Some provider ->
+        let+ url =
+          Snapshots.interpolate_snapshot_provider
+            ~rollup_address:smart_rollup_address
+            ?network
+            (Option.value
+               ~default:Configuration.default_history_mode
+               config.history_mode)
+            provider
+        in
+        Some (Evm_context.Url_legacy url)
   in
 
   let (Ex_chain_family chain_family) =
@@ -192,7 +198,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         (Tezos_crypto.Hashed.Smart_rollup_address.to_string
            smart_rollup_address)
       ~store_perm:Read_write
-      ?snapshot_url
+      ?snapshot_source
       ~tx_container
       ()
   in
