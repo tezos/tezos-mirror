@@ -13,6 +13,8 @@
 - Disable [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) on simulation (`eth_call`). (!19643)
 - Fixes `callTracer` not tracing all transactions in a block if a user
   sent multiples transactions in that same block. (!19649)
+- Disable [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) checks during
+  `debug_traceCall` simulations. (!19668)
 
 ### Internal
 - Changes the precision of wei to mutez in the internal representation of a `Deposit`. (!19609)

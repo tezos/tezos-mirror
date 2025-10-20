@@ -1,8 +1,12 @@
 # Changelog
 
-## Unreleased
+## Version 0.46 (2025-10-21)
 
-### Breaking changes
+This release is a hotfix release that addresses issues in the RPCs
+`debug_traceTransaction` and `debug_traceBlockByNumber`.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
 
 ### Configuration changes
 
@@ -16,16 +20,8 @@
   (which is the case by default). (!19665)
 - Disable [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) checks during
   `debug_traceCall` simulations in Ebisu. (!19669)
-
-### Monitoring changes
-
-### Command-line interface changes
-
-### Execution changes
-
-### Storage changes
-
-### Documentation changes
+- Prevent transactions from getting stuck when they are being sent to an
+  unresponsive node. (!19683)
 
 ### Experimental features changes
 
