@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 module type Backend = sig
-  include Durable_storage.READER
+  include Simulator.SimulationBackend
 
   val block_param_to_block_number :
     Ethereum_types.Block_parameter.extended ->
@@ -14,6 +14,8 @@ end
 
 module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
   Tezlink_backend_sig.S = struct
+  include Simulator.MakeTezlinkSimulator (Backend)
+
   type block_param =
     [ `Head of int32
     | `Level of int32
@@ -237,4 +239,9 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     let `Main = chain in
     let* number = shell_block_param_to_block_number block in
     Block_storage.nth_block_hash (Z.of_int32 number)
+
+  let simulate_operation ~chain_id ~skip_signature op hash block =
+    let open Lwt_result_syntax in
+    let* block = shell_block_param_to_eth_block_param block in
+    simulate_operation ~chain_id ~skip_signature op hash block
 end

@@ -709,7 +709,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
     module Tezlink =
       Tezlink_services_impl.Make
         (struct
-          include Backend.Reader
+          include Backend.SimulatorBackend
 
           let block_param_to_block_number =
             block_param_to_block_number ~chain_family:L2_types.Michelson
