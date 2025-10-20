@@ -107,7 +107,9 @@ if [ $TEZT_EXIT_CODE -eq 3 ]; then
   exit 0
 fi
 
-if [ -f "$SEND_JUNIT" ]; then
+if [ "$SEND_JUNIT" = no ]; then
+  echo "SEND_JUNIT=no, will not send JUnit file to Datadog."
+elif [ -f "$SEND_JUNIT" ]; then
   if [ -n "$DATADOG_API_KEY" ]; then
     echo "Uploading JUnit file $SEND_JUNIT to Datadog..."
     DD_ENV=ci DATADOG_SITE=datadoghq.eu datadog-ci junit upload --service octez "$SEND_JUNIT"
