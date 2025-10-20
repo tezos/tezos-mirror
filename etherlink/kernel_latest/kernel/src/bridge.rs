@@ -18,15 +18,20 @@ use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
+use tezos_data_encoding::types::Narith;
 use tezos_ethereum::rlp_helpers::{decode_field_u256_le, decode_option_explicit};
+use tezos_ethereum::wei::mutez_from_wei;
 use tezos_ethereum::{
     rlp_helpers::{decode_field, next},
     wei::eth_from_mutez,
 };
-use tezos_evm_logging::{log, Level::Info};
+use tezos_evm_logging::{log, Level::Error, Level::Info};
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_execution::account_storage::{TezlinkAccount, TezlinkImplicitAccount};
+use tezos_execution::context::Context;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
+use tezos_tezlink::operation_result::TransferError;
 use tezos_tracing::trace_kernel;
 
 use crate::tick_model::constants::TICKS_FOR_DEPOSIT;
@@ -52,6 +57,8 @@ pub enum BridgeError {
     InvalidDepositReceiver(Vec<u8>),
     #[error("Invalid RLP bytes: {0}")]
     RlpError(DecoderError),
+    #[error("Error when applying the Tezlink deposit: {0}")]
+    TezExecutionError(#[from] TransferError),
 }
 
 alloy_sol_types::sol! {
@@ -93,6 +100,26 @@ impl DepositReceiver {
                     Err(BridgeError::InvalidDepositReceiver(bytes))
                 }
             }
+        }
+    }
+
+    pub fn to_contract(&self) -> Result<Contract, BridgeError> {
+        match self {
+            DepositReceiver::Ethereum(address) => {
+                // A Tezos contract's length is 22 bytes
+                // The first two bytes here represent:
+                //     - 0u8: means that it's an implicit account
+                //     - 0u8: means that it's a tz1
+                // This code is temporary and should be replaced for the same
+                // reason as in https://linear.app/tezos/issue/L2-641
+                let mut contract = vec![0u8, 0u8];
+                contract.extend_from_slice(address.as_bytes());
+                match Contract::nom_read_exact(&contract) {
+                    Ok(contract) => Ok(contract),
+                    Err(_) => Err(BridgeError::InvalidDepositReceiver(contract)),
+                }
+            }
+            DepositReceiver::Tezos(contract) => Ok(contract.clone()),
         }
     }
 }
@@ -343,16 +370,16 @@ impl Decodable for Deposit {
     }
 }
 
-pub struct DepositResult {
-    pub outcome: ExecutionOutcome,
+pub struct DepositResult<Outcome> {
+    pub outcome: Outcome,
     pub estimated_ticks_used: u64,
 }
 
 #[trace_kernel]
-pub fn execute_deposit<Host: Runtime>(
+pub fn execute_etherlink_deposit<Host: Runtime>(
     host: &mut Host,
     deposit: &Deposit,
-) -> Result<DepositResult, BridgeError> {
+) -> Result<DepositResult<ExecutionOutcome>, BridgeError> {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
     let receiver = deposit.receiver.to_h160()?;
@@ -368,7 +395,7 @@ pub fn execute_deposit<Host: Runtime>(
             output: Output::Call(Bytes::from_static(&[1u8])),
         },
         Err(e) => {
-            log!(host, Info, "Deposit failed because of {}", e);
+            log!(host, Info, "Deposit failed because of {e}");
             ExecutionResult::Revert {
                 gas_used: DEPOSIT_EXECUTION_GAS_COST,
                 output: Bytes::from_static(&[0u8]),
@@ -379,6 +406,35 @@ pub fn execute_deposit<Host: Runtime>(
     let outcome = ExecutionOutcome {
         result,
         withdrawals: vec![],
+    };
+
+    Ok(DepositResult {
+        outcome,
+        estimated_ticks_used: TICKS_FOR_DEPOSIT,
+    })
+}
+
+pub fn _execute_tezlink_deposit<Host: Runtime>(
+    host: &mut Host,
+    context: &Context,
+    deposit: &Deposit,
+) -> Result<DepositResult<bool>, BridgeError> {
+    // We should be able to obtain an account for arbitrary H160 address
+    // otherwise it is a fatal error.
+    let contract = deposit.receiver.to_contract()?;
+    let to_account = TezlinkImplicitAccount::from_contract(context, &contract)
+        .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+    let balance = to_account
+        .balance(host)
+        .map_err(|_| TransferError::FailedToFetchDestinationBalance)?;
+    let amount = mutez_from_wei(deposit.amount)
+        .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    let outcome = match to_account.set_balance(host, &Narith(balance.0 + amount)) {
+        Ok(()) => true,
+        Err(e) => {
+            log!(host, Error, "Deposit failed because of {}", e);
+            false
+        }
     };
 
     Ok(DepositResult {
@@ -406,7 +462,7 @@ mod tests {
         DepositInfo, DepositReceiver, DepositResult, DEPOSIT_EVENT_TOPIC,
     };
 
-    use super::{execute_deposit, Deposit};
+    use super::{execute_etherlink_deposit, Deposit};
 
     mod events {
         alloy_sol_types::sol! {
@@ -607,7 +663,8 @@ mod tests {
 
         let deposit = dummy_deposit();
 
-        let DepositResult { outcome, .. } = execute_deposit(&mut host, &deposit).unwrap();
+        let DepositResult { outcome, .. } =
+            execute_etherlink_deposit(&mut host, &deposit).unwrap();
         let logs = outcome.result.logs();
         assert!(outcome.result.is_success());
         assert_eq!(logs.len(), 1);
@@ -629,10 +686,12 @@ mod tests {
         let mut deposit = dummy_deposit();
         deposit.amount = U256::MAX;
 
-        let DepositResult { outcome, .. } = execute_deposit(&mut host, &deposit).unwrap();
+        let DepositResult { outcome, .. } =
+            execute_etherlink_deposit(&mut host, &deposit).unwrap();
         assert!(outcome.result.is_success());
 
-        let DepositResult { outcome, .. } = execute_deposit(&mut host, &deposit).unwrap();
+        let DepositResult { outcome, .. } =
+            execute_etherlink_deposit(&mut host, &deposit).unwrap();
         assert!(!outcome.result.is_success());
         assert!(outcome.result.logs().is_empty());
     }
