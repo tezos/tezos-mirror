@@ -57,8 +57,8 @@ alloy_sol_types::sol! {
 /// Native token deposit
 #[derive(Debug, PartialEq, Clone, RlpEncodable)]
 pub struct Deposit {
-    /// Deposit amount in wei
-    pub amount: U256,
+    /// Deposit amount in mutez
+    pub amount: u64,
     /// Deposit receiver on L2
     pub receiver: H160,
     /// Inbox level containing the original deposit message
@@ -108,9 +108,7 @@ impl Deposit {
         // bytes. Afterward it's transform to `u64` to use `eth_from_mutez`, it's
         // obviously safe as we deposit CTEZ and the amount is limited by
         // the XTZ quantity.
-        let amount_mutez: u64 = U256::from_little_endian(&amount_bytes).as_u64();
-        let amount: U256 = eth_from_mutez(amount_mutez);
-
+        let amount: u64 = U256::from_little_endian(&amount_bytes).as_u64();
         // EVM address of the receiver and chain id both come from the
         // Michelson byte parameter.
         let (receiver, chain_id) = Self::parse_receiver(receiver)?;
@@ -133,9 +131,11 @@ impl Deposit {
     ///
     /// Signature: Deposit(uint256,address,uint256,uint256)
     pub fn event_log(&self) -> Log {
+        let amount: U256 = eth_from_mutez(self.amount);
+
         let event_data = SolBridgeDepositEvent {
             receiver: h160_to_alloy(&self.receiver),
-            amount: u256_to_alloy(&self.amount),
+            amount: u256_to_alloy(&amount),
             inbox_level: u256_to_alloy(&U256::from(self.inbox_level)),
             inbox_msg_id: u256_to_alloy(&U256::from(self.inbox_msg_id)),
         };
@@ -181,7 +181,7 @@ impl Decodable for Deposit {
         match decoder.item_count()? {
             2 => {
                 let mut it = decoder.iter();
-                let amount: U256 = decode_field(&next(&mut it)?, "amount")?;
+                let amount: u64 = decode_field(&next(&mut it)?, "amount")?;
                 let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
                 Ok(Self {
                     amount,
@@ -192,7 +192,7 @@ impl Decodable for Deposit {
             }
             4 => {
                 let mut it = decoder.iter();
-                let amount: U256 = decode_field(&next(&mut it)?, "amount")?;
+                let amount: u64 = decode_field(&next(&mut it)?, "amount")?;
                 let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
                 let inbox_level: u32 = decode_field(&next(&mut it)?, "inbox_level")?;
                 let inbox_msg_id: u32 = decode_field(&next(&mut it)?, "inbox_msg_id")?;
@@ -220,8 +220,8 @@ pub fn execute_deposit<Host: Runtime>(
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
     let mut to_account = StorageAccount::from_address(&h160_to_alloy(&deposit.receiver))?;
-
-    let result = match to_account.add_balance(host, u256_to_alloy(&deposit.amount)) {
+    let amount: U256 = eth_from_mutez(deposit.amount);
+    let result = match to_account.add_balance(host, u256_to_alloy(&amount)) {
         Ok(()) => ExecutionResult::Success {
             reason: SuccessReason::Return,
             gas_used: DEPOSIT_EXECUTION_GAS_COST,
@@ -254,8 +254,13 @@ mod tests {
     use alloy_sol_types::SolEvent;
     use num_bigint::BigInt;
     use primitive_types::{H160, U256};
+    use revm_etherlink::{
+        helpers::legacy::{h160_to_alloy, u256_to_alloy},
+        storage::world_state_handler::StorageAccount,
+    };
     use rlp::Decodable;
     use tezos_crypto_rs::hash::ContractKt1Hash;
+    use tezos_ethereum::wei::eth_from_mutez;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup::{
         michelson::{ticket::FA2_1Ticket, MichelsonNat, MichelsonOption, MichelsonPair},
@@ -280,7 +285,7 @@ mod tests {
 
     fn dummy_deposit() -> Deposit {
         Deposit {
-            amount: U256::from(1u64),
+            amount: 1u64,
             receiver: H160::from([2u8; 20]),
             inbox_level: 3,
             inbox_msg_id: 4,
@@ -317,7 +322,7 @@ mod tests {
         pretty_assertions::assert_eq!(
             deposit,
             Deposit {
-                amount: tezos_ethereum::wei::eth_from_mutez(2),
+                amount: 2,
                 receiver: H160([1u8; 20]),
                 inbox_level: 0,
                 inbox_msg_id: 0,
@@ -340,7 +345,7 @@ mod tests {
         pretty_assertions::assert_eq!(
             deposit,
             Deposit {
-                amount: tezos_ethereum::wei::eth_from_mutez(2),
+                amount: 2,
                 receiver: H160::from([1u8; 20]),
                 inbox_level: 0,
                 inbox_msg_id: 0,
@@ -361,7 +366,7 @@ mod tests {
         assert_eq!(
             res,
             Deposit {
-                amount: U256::one(),
+                amount: 1,
                 receiver: H160::from([1u8; 20]),
                 inbox_level: 0,
                 inbox_msg_id: 0,
@@ -381,7 +386,7 @@ mod tests {
         assert_eq!(logs.len(), 1);
 
         let event = events::Deposit::decode_log_data(&logs[0].data).unwrap();
-        assert_eq!(event.amount, alloy_primitives::U256::from(1));
+        assert_eq!(event.amount, u256_to_alloy(&eth_from_mutez(1)));
         assert_eq!(
             event.receiver,
             alloy_primitives::Address::from_slice(&[2u8; 20])
@@ -395,10 +400,13 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         let mut deposit = dummy_deposit();
-        deposit.amount = U256::MAX;
+        deposit.amount = u64::MAX;
 
-        let DepositResult { outcome, .. } = execute_deposit(&mut host, &deposit).unwrap();
-        assert!(outcome.result.is_success());
+        let mut to_account =
+            StorageAccount::from_address(&h160_to_alloy(&deposit.receiver)).unwrap();
+        to_account
+            .add_balance(&mut host, u256_to_alloy(&U256::MAX))
+            .unwrap();
 
         let DepositResult { outcome, .. } = execute_deposit(&mut host, &deposit).unwrap();
         assert!(!outcome.result.is_success());
@@ -409,7 +417,7 @@ mod tests {
     fn bridge_deposit_event_log_consistent() {
         let deposit = dummy_deposit();
         let log = deposit.event_log();
-        let expected_log = hex::decode("0000000000000000000000000000000000000000000000000000000000000001\
+        let expected_log = hex::decode("000000000000000000000000000000000000000000000000000000e8d4a51000\
                                         0000000000000000000000000202020202020202020202020202020202020202\
                                         0000000000000000000000000000000000000000000000000000000000000003\
                                         0000000000000000000000000000000000000000000000000000000000000004").unwrap();
