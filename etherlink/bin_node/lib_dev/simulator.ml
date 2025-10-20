@@ -272,3 +272,73 @@ module Make (SimulationBackend : SimulationBackend) = struct
         Ok (Ok {Simulation.gas_used = Some gas_used; value})
     | _ -> return res
 end
+
+type error += Operation_serialization_error of Data_encoding.Binary.write_error
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.operation_serialization_error"
+    ~title:"Operation serialization failed"
+    ~description:"An error occured during the serialization of an operation."
+    ~pp:(fun ppf e ->
+      Format.fprintf
+        ppf
+        "Operation serialization failed: %a"
+        Data_encoding.Binary.pp_write_error
+        e)
+    Data_encoding.(obj1 (req "error" Binary.write_error_encoding))
+    (function Operation_serialization_error e -> Some e | _ -> None)
+    (fun e -> Operation_serialization_error e)
+
+module MakeTezlinkSimulator (SimulationBackend : SimulationBackend) = struct
+  open Tezlink_imports
+  open Imported_protocol
+
+  let call_simulation ~input ~skip_signature block =
+    let open Lwt_result_syntax in
+    let* simulation_state = SimulationBackend.get_state ~block () in
+    let skip_signature_tag = if skip_signature then "\000" else "\001" in
+    let insight_requests =
+      [
+        Simulation.Encodings.Durable_storage_key ["tezlink"; "simulation_result"];
+      ]
+    in
+    SimulationBackend.simulate_and_read
+      ~state_override:Ethereum_types.state_override_empty
+      simulation_state
+      ~input:
+        {
+          messages = [Simulation.simulation_tag; skip_signature_tag; input];
+          reveal_pages = None;
+          insight_requests;
+          log_kernel_debug_file = Some "simulate_call";
+        }
+
+  let simulate_operation ~chain_id ~skip_signature
+      (op : Imported_protocol.operation) _hash block =
+    let open Lwt_result_syntax in
+    let*? input =
+      Data_encoding.Binary.to_string Alpha_context.Operation.encoding op
+      |> Result.map_error_e @@ fun e ->
+         Result_syntax.tzfail (Operation_serialization_error e)
+    in
+    let* bytes = call_simulation ~input ~skip_signature block in
+    let*? operations =
+      Tezos_services.Current_block_services.deserialize_operations
+        ~chain_id
+        bytes
+    in
+    let* simulation_receipt =
+      match operations with
+      | [op] -> (
+          match op.receipt with
+          | Receipt receipt -> return receipt
+          | Empty -> failwith "Simulation produced an empty receipt"
+          | Too_large -> failwith "Produced simulation receipt was too large.")
+      | _ ->
+          failwith
+            "Simulation produced a list of operations whose length is not 1"
+    in
+    return simulation_receipt
+end
