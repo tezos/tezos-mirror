@@ -132,7 +132,7 @@ module type T = sig
     val slot_header_of_cell : cell -> slot_header option
 
     val proto_attestation_status :
-      cell -> [`Attested | `Unattested | `Unpublished] option
+      cell -> [`Attested of attestation_lag | `Unattested | `Unpublished] option
   end
 
   module RPC : sig

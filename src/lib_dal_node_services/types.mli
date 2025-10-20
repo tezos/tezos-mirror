@@ -239,7 +239,8 @@ type header_status =
   [ `Waiting_attestation
     (** The slot header was included and applied in a finalized L1 block
           but remains to be attested. *)
-  | `Attested  (** The slot header was included in an L1 block and attested. *)
+  | `Attested of attestation_lag
+    (** The slot header was included in an L1 block and attested. *)
   | `Unattested
     (** The slot header was included in an L1 block but not timely attested. *)
   | `Unpublished  (** The slot header was not included in any L1 block. *) ]
