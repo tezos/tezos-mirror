@@ -115,7 +115,6 @@ val get_slot_content :
     Returns [None] if the cell is not found in the store.
 *)
 val try_get_slot_header_from_indexed_skip_list :
-  (module Dal_plugin.T) ->
   Node_context.t ->
   Types.slot_id ->
   Dal_plugin.slot_header option tzresult Lwt.t
