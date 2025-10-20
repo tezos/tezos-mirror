@@ -1547,6 +1547,8 @@ module Images = struct
     let fedora_42 = make_img "fedora:42"
 
     let rust_toolchain_unstable = make_img "debian-rust:unstable"
+
+    let homebrew = make_img "debian-homebrew:trixie"
   end
 
   (* Internal images are built in the stage {!Stages.images}. *)

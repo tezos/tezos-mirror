@@ -241,3 +241,38 @@ oc.base-images.rust.merge:
     DOCKER_VERSION: 24.0.7
     RELEASE: unstable
     IMAGE_NAME: ${GCP_REGISTRY}/tezos/tezos/debian-rust
+
+oc.base-images.debian-homebrew:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - changes:
+    - images/base-images/Dockerfile.debian-homebrew
+    when: on_success
+  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
+    when: on_success
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian-homebrew
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    DISTRIBUTION: debian-homebrew
+    IMAGE_PATH: debian
+    PLATFORM: linux/amd64
+  parallel:
+    matrix:
+    - RELEASE:
+      - trixie
