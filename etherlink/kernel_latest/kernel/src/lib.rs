@@ -29,9 +29,10 @@ use storage::{
     STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
-use tezos_evm_logging::{log, otel_trace, Level::*, Verbosity};
+use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::internal_runtime::InternalRuntime;
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
+use tezos_kernel_tracing::kernel_trace;
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
@@ -96,6 +97,7 @@ fn switch_to_public_rollup<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
     }
 }
 
+#[kernel_trace]
 pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
     log!(host, Debug, "Entering stage zero.");
     init_storage_versioning(host)?;
@@ -106,6 +108,7 @@ pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Err
 // DO NOT RENAME: function name is used during benchmark
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
+#[kernel_trace]
 #[cfg_attr(feature = "benchmark", inline(never))]
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,
@@ -226,7 +229,7 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let chain_id = retrieve_chain_id(host).context("Failed to retrieve chain id")?;
 
     // We always start by doing the migration if needed.
-    match otel_trace!(host, "stage_zero", stage_zero(host)) {
+    match stage_zero(host) {
         Ok(MigrationStatus::None) => {
             // No migration in progress. However as we want to have the kernel
             // version written in the storage, we check for its existence
@@ -291,15 +294,11 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     // by another kernel run. This ensures that if the migration does not
     // consume all reboots. At least one reboot will be used to consume the
     // inbox.
-    if let StageOneStatus::Reboot = otel_trace!(
+    if let StageOneStatus::Reboot = stage_one(
         host,
-        "stage_one",
-        stage_one(
-            host,
-            smart_rollup_address,
-            &chain_configuration,
-            &mut configuration,
-        )
+        smart_rollup_address,
+        &chain_configuration,
+        &mut configuration,
     )
     .context("Failed during stage 1")?
     {
@@ -314,30 +313,26 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     #[cfg(not(feature = "benchmark-bypass-stage2"))]
     {
         log!(host, Debug, "Entering stage two.");
-        otel_trace!(
-            host,
-            "stage_two",
-            if let block::ComputationResult::RebootNeeded = match chain_configuration {
-                chains::ChainConfig::Evm(chain_configuration) => block::produce(
-                    host,
-                    &*chain_configuration,
-                    &mut configuration,
-                    sequencer_pool_address,
-                    trace_input,
-                ),
-                chains::ChainConfig::Michelson(chain_configuration) => block::produce(
-                    host,
-                    &chain_configuration,
-                    &mut configuration,
-                    sequencer_pool_address,
-                    trace_input,
-                ),
-            }
-            .context("Failed during stage 2")?
-            {
-                host.mark_for_reboot()?;
-            }
-        )
+        if let block::ComputationResult::RebootNeeded = match chain_configuration {
+            chains::ChainConfig::Evm(chain_configuration) => block::produce(
+                host,
+                &*chain_configuration,
+                &mut configuration,
+                sequencer_pool_address,
+                trace_input,
+            ),
+            chains::ChainConfig::Michelson(chain_configuration) => block::produce(
+                host,
+                &chain_configuration,
+                &mut configuration,
+                sequencer_pool_address,
+                trace_input,
+            ),
+        }
+        .context("Failed during stage 2")?
+        {
+            host.mark_for_reboot()?;
+        }
     }
 
     #[cfg(feature = "benchmark-bypass-stage2")]

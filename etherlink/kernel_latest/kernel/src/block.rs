@@ -37,6 +37,7 @@ use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{log, otel_trace, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_evm_runtime::safe_storage::SafeStorage;
+use tezos_kernel_tracing::kernel_trace;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{OwnedPath, Path};
@@ -440,6 +441,7 @@ fn promote_block<Host: Runtime>(
     Ok(())
 }
 
+#[kernel_trace("stage_two")]
 pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     chain_config: &ChainConfig,

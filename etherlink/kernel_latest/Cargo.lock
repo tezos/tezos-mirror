@@ -1236,6 +1236,7 @@ dependencies = [
  "tezos-evm-runtime-latest",
  "tezos-execution-latest",
  "tezos-indexable-storage-latest",
+ "tezos-kernel-tracing-latest",
  "tezos-smart-rollup",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
