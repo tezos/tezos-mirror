@@ -60,6 +60,16 @@ class Octez < Formula
     bin.install name
   end
 
+  def install_opt_template(name)
+    source = Pathname.new(name)
+    unless source.exist?
+      opoo "Skipping #{name}: source file not found in the build directory"
+      return
+    end
+
+    install_template(name)
+  end
+
   def install
     make_deps
     install_template "octez-node"
@@ -67,10 +77,12 @@ class Octez < Formula
     install_template "octez-signer"
     install_template "octez-baker"
     install_template "octez-accuser"
+
     install_template "octez-accuser-%%PROTO_CURRENT%%"
     install_template "octez-baker-%%PROTO_CURRENT%%"
-    install_template "octez-accuser-%%PROTO_NEXT%%"
-    install_template "octez-baker-%%PROTO_NEXT%%"
+
+    install_opt_template "octez-accuser-%%PROTO_NEXT%%"
+    install_opt_template "octez-baker-%%PROTO_NEXT%%"
   end
 
 end
