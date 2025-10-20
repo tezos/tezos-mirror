@@ -38,3 +38,10 @@ let consensus_threshold ctxt level =
   else
     return
       (ctxt, Int64.of_int @@ Constants_storage.consensus_threshold_size ctxt)
+
+let is_all_bakers_attest_enabled_for_cycle ctxt cycle =
+  let cycle_eras = Raw_context.cycle_eras ctxt in
+  let first_level_of_cycle =
+    Level_repr.first_level_in_cycle_from_eras ~cycle_eras cycle
+  in
+  check_all_bakers_attest_at_level ctxt first_level_of_cycle

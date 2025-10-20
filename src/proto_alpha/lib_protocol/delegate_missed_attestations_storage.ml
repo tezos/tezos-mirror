@@ -237,14 +237,10 @@ let check_and_reset_delegate_participation ctxt delegate =
   | Some missed_attestations ->
       let*! ctxt = Storage.Contract.Missed_attestations.remove ctxt contract in
       let current_cycle = (Raw_context.current_level ctxt).cycle in
-      let cycle_eras = Raw_context.cycle_eras ctxt in
-      let first_level_of_cycle =
-        Level_repr.first_level_in_cycle_from_eras ~cycle_eras current_cycle
-      in
       let all_bakers_attest_enabled =
-        Consensus_parameters_storage.check_all_bakers_attest_at_level
+        Consensus_parameters_storage.is_all_bakers_attest_enabled_for_cycle
           ctxt
-          first_level_of_cycle
+          current_cycle
       in
       if all_bakers_attest_enabled then
         let Ratio_repr.{numerator; denominator} =
@@ -339,9 +335,9 @@ module For_RPC = struct
           Delegate_rewards.attesting_reward_per_block ctxt
         in
         let all_bakers_attest_enabled =
-          Consensus_parameters_storage.check_all_bakers_attest_at_level
+          Consensus_parameters_storage.is_all_bakers_attest_enabled_for_cycle
             ctxt
-            level
+            level.cycle
         in
         let minimal_cycle_activity =
           expected_cycle_activity * numerator / denominator
