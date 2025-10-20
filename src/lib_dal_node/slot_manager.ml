@@ -765,31 +765,17 @@ module Statuses = struct
     in
     match slot_cell with
     | None -> return_none
-    | Some cell -> (
-        let*? proto_parameters =
-          Node_context.get_proto_parameters
-            ctxt
-            ~level:(`Level slot_id.slot_level)
-        in
-        let attested_level =
-          Int32.(
-            add slot_id.slot_level (of_int proto_parameters.attestation_lag))
-        in
+    | Some (cell, attestation_lag) ->
         let*? (module Plugin : Dal_plugin.T) =
-          Node_context.get_plugin_for_level ctxt ~level:attested_level
+          let level = Int32.(add slot_id.slot_level (of_int attestation_lag)) in
+          Node_context.get_plugin_for_level ctxt ~level
         in
-        let cell =
-          Dal_proto_types.Skip_list_cell.to_proto
-            Plugin.Skip_list.cell_encoding
-            cell
-        in
-        match Plugin.Skip_list.proto_attestation_status cell with
-        | None ->
-            (* Old protocols that do not expose the information *)
-            return_none
-        | Some `Unpublished -> return_none
-        | Some `Attested -> return_some `Attested
-        | Some `Unattested -> return_some `Unattested)
+        Dal_proto_types.Skip_list_cell.to_proto
+          Plugin.Skip_list.cell_encoding
+          cell
+        |> Plugin.Skip_list.proto_attestation_status
+        |> Option.map (fun s -> (s :> Types.header_status))
+        |> return
 
   let find_status ctxt (slot_id : Types.slot_id) =
     let open Lwt_result_syntax in
