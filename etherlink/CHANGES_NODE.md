@@ -14,6 +14,8 @@
 - `debug_traceTransaction` and `debug_traceBlockByNumber` RPCs now correctly
   use native execution when the node is configured with the `rpcs_only` policy
   (which is the case by default). (!19665)
+- Disable [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) checks during
+  `debug_traceCall` simulations in Ebisu. (!19669)
 
 ### Monitoring changes
 
