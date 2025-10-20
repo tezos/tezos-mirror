@@ -6237,9 +6237,7 @@ let test_rpc_state_value_and_subkeys =
     ~tags:["evm"; "rpc"; "state_value"; "state_subkeys"]
     ~title:"RPC methods stateValue and stateSubkeys"
   @@ fun ~protocol:_ ~evm_setup ->
-  let {evm_node; sc_rollup_node; client; produce_block; kernel; _} =
-    evm_setup
-  in
+  let {evm_node; sc_rollup_node; client; produce_block; _} = evm_setup in
   let* _ = produce_block () in
   let* () =
     repeat 3 (fun () ->
@@ -6253,10 +6251,7 @@ let test_rpc_state_value_and_subkeys =
       ~error_msg:"Kernel version is %L, but should be %R") ;
   let*@! world_state_subkeys = Rpc.state_subkeys evm_node "/evm/world_state" in
   let expected_subkeys =
-    (* Hack-ish way to know if revm is enabled or not: *)
-    if Kernel.of_tag kernel = Latest then
-      ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"]
-    else ["indexes"; "blocks"; "fees"; "eth_accounts"]
+    ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"]
   in
   Check.(
     (List.sort String.compare world_state_subkeys
