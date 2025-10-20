@@ -30,6 +30,7 @@ type t = {
       (** Optional list of whitelisted addresses *)
   monitor_all_deposits : bool;  (** Whether to store all deposits in the DB.  *)
   block_timeout : float;  (** Timeout for receiving a new block. *)
+  rpc_timeout : Websocket_client.timeout option;
 }
 
 let ctxt = Efunc_core.Eth.Crypto.context ()
@@ -77,6 +78,7 @@ let default =
     whitelist = default_whitelist;
     monitor_all_deposits = false;
     block_timeout = 10. (* seconds *);
+    rpc_timeout = Some {timeout = 10.; on_timeout = `Retry 10};
   }
 
 let rpc_encoding =
@@ -103,6 +105,47 @@ let whitelist_item_encoding =
           ~description:"Optional list of ticket hashes"
           (list Ethereum_types.hash_encoding)))
 
+let rpc_timeout_encoding =
+  let open Data_encoding in
+  let on_timeout_encoding =
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"fail"
+          ~description:"Stop the watchtower on an RPC timeout"
+          (constant "fail")
+          (function `Fail -> Some () | _ -> None)
+          (fun () -> `Fail);
+        case
+          (Tag 1)
+          ~title:"retry"
+          ~description:"Retry (with limit) on an RPC timeout"
+          (obj1 (req "retry" int31))
+          (function `Retry n -> Some n | _ -> None)
+          (fun n -> `Retry n);
+        case
+          (Tag 2)
+          ~title:"retry_forever"
+          ~description:"Retry forever on an RPC timeout"
+          (constant "retry_forever")
+          (function `Retry_forever -> Some () | _ -> None)
+          (fun () -> `Retry_forever);
+      ]
+  in
+  conv
+    (fun {Websocket_client.timeout; on_timeout} -> (timeout, on_timeout))
+    (fun (timeout, on_timeout) -> {timeout; on_timeout})
+    (obj2
+       (req
+          "timeout"
+          ~description:"Timeout in seconds for JSON RPC requests to EVM node"
+          float)
+       (req
+          "on_timeout"
+          ~description:"Action to take on a timeout in a JSON RPC request"
+          on_timeout_encoding))
+
 let encoding =
   let open Data_encoding in
   conv
@@ -115,6 +158,7 @@ let encoding =
            whitelist;
            monitor_all_deposits;
            block_timeout;
+           rpc_timeout;
          }
        ->
       ( evm_node_endpoint,
@@ -124,7 +168,8 @@ let encoding =
         secret_key,
         whitelist,
         monitor_all_deposits,
-        block_timeout ))
+        block_timeout,
+        rpc_timeout ))
     (fun ( evm_node_endpoint,
            gas_limit,
            max_fee_per_gas,
@@ -132,7 +177,8 @@ let encoding =
            secret_key,
            whitelist,
            monitor_all_deposits,
-           block_timeout )
+           block_timeout,
+           rpc_timeout )
        ->
       {
         evm_node_endpoint;
@@ -143,8 +189,9 @@ let encoding =
         whitelist;
         monitor_all_deposits;
         block_timeout;
+        rpc_timeout;
       })
-    (obj8
+    (obj9
        (dft
           "evm_node_endpoint"
           ~description:"URL of the EVM node"
@@ -186,7 +233,12 @@ let encoding =
           "block_timeout"
           ~description:"Timeout for receiving a new block in seconds."
           float
-          default.block_timeout))
+          default.block_timeout)
+       (dft
+          "rpc_timeout"
+          ~description:"Make RPCs to the EVM node with a given timeout"
+          (option rpc_timeout_encoding)
+          default.rpc_timeout))
 
 (** [load_file ~data_dir] attempts to load the configuration file from the
     specified data directory. Returns [None] if the file doesn't exist or [Some

@@ -26,6 +26,11 @@ type 'a subscription = {
       (** A function to unsubscribe from events notifications. *)
 }
 
+type timeout = {
+  timeout : float;
+  on_timeout : [`Retry of int | `Retry_forever | `Fail];
+}
+
 (** Wrapper type for calling a JSONRPC method with an input *)
 type (_, _) call =
   | Call :
@@ -46,18 +51,21 @@ val connect : ?monitoring:monitoring -> Media_type.t -> Uri.t -> t Lwt.t
 val disconnect : t -> unit Lwt.t
 
 (** Send a raw JSON RPC request on the websocket. *)
-val send_jsonrpc_request : t -> JSONRPC.request -> JSONRPC.value Lwt.t
+val send_jsonrpc_request :
+  t -> ?timeout:timeout -> JSONRPC.request -> JSONRPC.value Lwt.t
 
 (** [send_jsonrpc client (Call ((module Method), input))] makes a JSONRPC
     request with the provided [Method] and [input] to the websocket [client]. It
     returns the corresponding response. *)
-val send_jsonrpc : t -> ('input, 'output) call -> 'output tzresult Lwt.t
+val send_jsonrpc :
+  t -> ?timeout:timeout -> ('input, 'output) call -> 'output tzresult Lwt.t
 
 (** [subscribe client kind] creates a subscription of [kind] with the
       websocket [client]. It returns a stream with the notifications and a
       function to unsubscribe. *)
 val subscribe :
   t ->
+  ?timeout:timeout ->
   Subscribe.input ->
   Transaction_object.t Ethereum_types.Subscription.output tzresult subscription
   tzresult
@@ -66,22 +74,28 @@ val subscribe :
 (** [subscribe_newHeads client] is like [subscribe] but specialized for
       newHeads events. *)
 val subscribe_newHeads :
+  ?timeout:timeout ->
   t ->
   Transaction_object.t Ethereum_types.block tzresult subscription tzresult Lwt.t
 
 (** [subscribe_newHeadNumbers client] is like [subscribe_newHeads] but only
     parses numbers in blocks. *)
 val subscribe_newHeadNumbers :
-  t -> Ethereum_types.quantity tzresult subscription tzresult Lwt.t
+  ?timeout:timeout ->
+  t ->
+  Ethereum_types.quantity tzresult subscription tzresult Lwt.t
 
 (** [subscribe_newPendingTransactions client] is like [subscribe] but
       specialized for newPendingTransactions events. *)
 val subscribe_newPendingTransactions :
-  t -> Ethereum_types.hash tzresult subscription tzresult Lwt.t
+  ?timeout:timeout ->
+  t ->
+  Ethereum_types.hash tzresult subscription tzresult Lwt.t
 
 (** [subscribe_syncing client] is like [subscribe] but specialized for syncing
       events. *)
 val subscribe_syncing :
+  ?timeout:timeout ->
   t ->
   Ethereum_types.Subscription.sync_output tzresult subscription tzresult Lwt.t
 
@@ -90,12 +104,14 @@ val subscribe_syncing :
 val subscribe_logs :
   ?address:Ethereum_types.Filter.filter_address ->
   ?topics:Ethereum_types.Filter.topic option list ->
+  ?timeout:timeout ->
   t ->
   Ethereum_types.transaction_log tzresult subscription tzresult Lwt.t
 
 (** Subscribe to L1/L2 levels associations. *)
 val subscribe_l1_l2_levels :
   ?start_l1_level:int32 ->
+  ?timeout:timeout ->
   t ->
   Ethereum_types.Subscription.l1_l2_levels_output tzresult subscription tzresult
   Lwt.t
