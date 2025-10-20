@@ -1892,21 +1892,23 @@ let check_get_commitment dal_node ~slot_level check_result slots_info =
     (fun (slot_index, commitment') ->
       let* response =
         Dal_RPC.(
-          call_raw dal_node
-          @@ get_level_index_commitment ~slot_index ~slot_level)
+          call_raw dal_node @@ get_level_slot_commitment ~slot_index ~slot_level)
       in
       return @@ check_result commitment' response)
     slots_info
 
 let get_commitment_succeeds expected_commitment response =
-  let commitment =
-    JSON.(parse ~origin:__LOC__ response.RPC_core.body |> as_string)
-  in
-  Check.(commitment = expected_commitment)
-    Check.string
-    ~error_msg:
-      "The value of a stored commitment should match the one computed locally \
-       (current = %L, expected = %R)"
+  match response.RPC_core.code with
+  | 200 ->
+      let commitment =
+        JSON.(parse ~origin:__LOC__ response.RPC_core.body |> as_string)
+      in
+      Check.(commitment = expected_commitment)
+        Check.string
+        ~error_msg:
+          "The value of a stored commitment should match the one computed \
+           locally (current = %L, expected = %R)"
+  | code -> Test.fail ~__LOC__ "Unexpected HTTP response code %d" code
 
 let get_commitment_not_found _commit r =
   RPC_core.check_string_response ~code:404 r
@@ -1919,7 +1921,7 @@ let check_stored_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
         let* response =
           Dal_RPC.(
             call_raw dal_node
-            @@ get_level_index_commitment ~slot_level:pub_level ~slot_index)
+            @@ get_level_slot_commitment ~slot_level:pub_level ~slot_index)
         in
         match response.code with
         | 200 -> return (accu + 1)
@@ -1936,25 +1938,10 @@ let check_stored_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
 
 let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
     =
-  let test (slot_index, commitment) =
-    let* commitment_is_stored =
-      let rpc = Dal_RPC.get_level_index_commitment ~slot_level ~slot_index in
-      let* response = Dal_RPC.call_raw dal_node rpc in
-      match response.code with
-      | 200 ->
-          let published_commitment =
-            rpc.decode @@ JSON.parse ~origin:"RPC response" response.body
-          in
-          return (commitment = published_commitment)
-      | _ -> return false
-    in
-    match (commitment_is_stored, expected_status) with
-    | false, None -> unit
-    | true, None ->
-        Test.fail
-          ~__LOC__
-          "It was expected that the given commitment is not stored, but it is."
-    | true, Some expected_status ->
+  let test (slot_index, _commitment) =
+    match expected_status with
+    | None -> unit
+    | Some expected_status ->
         let* status =
           Dal_RPC.(
             call dal_node @@ get_level_slot_status ~slot_level ~slot_index)
@@ -1966,10 +1953,6 @@ let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
             "The value of the fetched status should match the expected one \
              (current = %L, expected = %R)" ;
         unit
-    | false, Some _ ->
-        Test.fail
-          ~__LOC__
-          "It was expected that the given commitment is stored, but it is not."
   in
   Lwt_list.iter_s test slots_info
 
@@ -2051,38 +2034,10 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   let ok = [slot0; slot1; slot2_b] in
   let ko = slot3 :: slot4 :: List.map (fun (i, c) -> (i + 100, c)) ok in
   let* () =
-    (* There are 3 published slots: slot0, slot1, and slot2_b *)
-    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
+    (* There are 3 published slots: slot0, slot1, and slot2_b. But the attestation
+       period is not over, so they are not yet present in the skip-list. *)
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
-  let* slot_headers =
-    Lwt_list.filter_map_s
-      (fun slot_index ->
-        let commitment_rpc =
-          Dal_RPC.get_level_index_commitment ~slot_level:pub_level ~slot_index
-        in
-        let* response = Dal_RPC.call_raw dal_node commitment_rpc in
-        match response.code with
-        | 200 ->
-            let commitment =
-              commitment_rpc.decode
-              @@ JSON.parse ~origin:"RPC response" response.body
-            in
-            let* status =
-              Dal_RPC.(
-                call dal_node
-                @@ get_level_slot_status ~slot_level:pub_level ~slot_index)
-            in
-            if status = "waiting_attestation" then some (slot_index, commitment)
-            else none
-        | 404 -> none
-        | code -> Test.fail ~__LOC__ "Unexpected HTTP response code %d" code)
-      (List.init number_of_slots Fun.id)
-  in
-  Check.(slot_headers = ok)
-    Check.(list (tuple2 int string))
-    ~error_msg:
-      "Published header is different from stored header (current = %L, \
-       expected = %R)" ;
   let check_slot_status ?expected_status l =
     check_slot_status ?expected_status dal_node ~slot_level:pub_level l
   in
@@ -2091,7 +2046,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   in
 
   (* Slots waiting for attestation. *)
-  let* () = check_get_commitment get_commitment_succeeds ok in
+  let* () = check_get_commitment get_commitment_not_found ok in
   let* () =
     check_slot_status ~__LOC__ ~expected_status:"waiting_attestation" ok
   in
@@ -2122,8 +2077,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   let* () = bake_for ~count:2 client in
   let* () = wait_block_processing3 in
   let* () =
-    (* The unattested slot has been removed. *)
-    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:2
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
 
   Log.info "Check that the store is as expected" ;
@@ -2150,7 +2104,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
       ~number_of_headers:0
   in
   let* () =
-    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:2
+    check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:3
   in
   check_stored_level_headers
     ~__LOC__
@@ -5575,9 +5529,16 @@ module History_rpcs = struct
       ~first_dal_level ~last_confirmed_published_level protocol dal_parameters
       client node dal_node =
     let module Map_int = Map.Make (Int) in
-    Log.info "slot_index = %d" slot_index ;
+    Log.info "slot_index = %d first_dal_level = %d" slot_index first_dal_level ;
     let client = Client.with_dal_node client ~dal_node in
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let lag = dal_parameters.attestation_lag in
+    let number_of_slots = dal_parameters.number_of_slots in
+    Log.info
+      "attestation_lag = %d, number_of_slots = %d, slot_size = %d"
+      lag
+      number_of_slots
+      slot_size ;
     let* starting_level = Client.level client in
 
     let rec publish ~max_level level commitments =
@@ -5598,10 +5559,6 @@ module History_rpcs = struct
           @@ Helpers.make_slot ~slot_size ("slot " ^ string_of_int level)
         in
         let* () = wait_mempool_injection in
-        Log.info
-          "Publish commitment %s at published_level %d@."
-          commitment
-          published_level ;
         let* () = bake_for client in
         let* _level = Node.wait_for_level node (level + 1) in
         publish
@@ -5609,29 +5566,43 @@ module History_rpcs = struct
           (level + 1)
           (Map_int.add published_level commitment commitments)
     in
-    Log.info "Publishing some commitments in the previous protocol@." ;
+    Log.info
+      "Publishing commitments in the previous protocol, from published level \
+       %d to %d"
+      (starting_level + 1)
+      (migration_level + 1) ;
     let* commitments =
       publish ~max_level:migration_level starting_level Map_int.empty
     in
 
-    let* dal_parameters = Dal.Parameters.from_client client in
-    let lag = dal_parameters.attestation_lag in
-
-    let number_of_slots = dal_parameters.number_of_slots in
-    Log.info "attestation_lag = %d, number_of_slots = %d" lag number_of_slots ;
+    Log.info "Migrated to the next protocol." ;
 
     let last_attested_level = last_confirmed_published_level + lag in
-    (* The maximum level that needs to be reached (we use +2 to make last
-       attested level final). *)
-    let max_level = last_attested_level + 2 in
 
     let wait_for_dal_node =
       wait_for_layer1_final_block dal_node last_attested_level
     in
 
-    let* first_level_new_proto = Client.level client in
-    Log.info "Publishing some commitments in the new protocol@." ;
-    let* commitments = publish ~max_level first_level_new_proto commitments in
+    let* second_level_new_proto = Client.level client in
+    assert (second_level_new_proto = migration_level + 1) ;
+    Log.info
+      "Publish commitments in the new protocol, from published level %d to %d"
+      (second_level_new_proto + 1)
+      (last_confirmed_published_level + 1) ;
+    let* commitments =
+      publish
+        ~max_level:last_confirmed_published_level
+        second_level_new_proto
+        commitments
+    in
+    let* () =
+      (* The maximum level that needs to be reached (we use +2 to make last
+       attested level final). *)
+      let max_level = last_attested_level + 2 in
+      let* current_level = Node.get_level node in
+      let count = max_level + 1 - current_level in
+      bake_for ~count client
+    in
 
     let module SeenIndexes = Set.Make (struct
       type t = int
@@ -5751,11 +5722,68 @@ module History_rpcs = struct
         check_history (level + 1)
     in
     let* () = wait_for_dal_node in
+    Log.info "Check skip-list using commitments_history RPCs" ;
     let* () = check_history first_dal_level in
+
     Check.(
       (!at_least_one_attested_status = true)
         bool
         ~error_msg:"No cell with the 'attested' status has been visited") ;
+
+    let rec call_cells_of_level level =
+      if level > last_confirmed_published_level then unit
+      else
+        let* cells =
+          Node.RPC.call node
+          @@ RPC.get_chain_block_context_dal_cells_of_level
+               ~block:(string_of_int level)
+               ()
+        in
+        let cells = JSON.as_list cells in
+        let num_cells = List.length cells in
+        let expected_num_cells = if level < lag then 0 else 32 in
+        Check.(
+          (num_cells = expected_num_cells)
+            int
+            ~error_msg:"Unexpected number of cells: got %L, expected %R") ;
+        let* () =
+          Lwt_list.iter_s
+            (fun hash_cell_tuple ->
+              let cell = JSON.geti 1 hash_cell_tuple in
+              check_cell cell ~check_level:(Some level))
+            cells
+        in
+        call_cells_of_level (level + 1)
+    in
+    Log.info
+      "Call cells_of_level on each relevant level, and check the number of \
+       cells returned" ;
+    let* () = call_cells_of_level 1 in
+
+    let rec call_get_commitment level =
+      if level > last_confirmed_published_level then unit
+      else
+        let* commitment =
+          Dal_RPC.(
+            call dal_node
+            @@ get_level_slot_commitment ~slot_level:level ~slot_index)
+        in
+        let expected_commitment =
+          match Map_int.find_opt level commitments with
+          | Some c -> c
+          | None -> Test.fail "Commitment not found at level %d" level
+        in
+        Check.(
+          (commitment = expected_commitment)
+            string
+            ~error_msg:
+              (let msg = sf "Unexpected commitment at level %d: " level in
+               msg ^ ": got %L, expected %R")) ;
+        call_get_commitment (level + 1)
+    in
+    Log.info "Check fetching commitments from the skip-list store" ;
+    let* () = call_get_commitment 2 in
+
     unit
 
   let test_commitments_history_rpcs protocols =
@@ -12103,7 +12131,7 @@ let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:4 ~migrate_from ~migrate_to ;
   History_rpcs.test_commitments_history_rpcs_with_migration
-    ~migration_level:10
+    ~migration_level:11
     ~migrate_from
     ~migrate_to ;
   tests_start_dal_node_around_migration ~migrate_from ~migrate_to ;

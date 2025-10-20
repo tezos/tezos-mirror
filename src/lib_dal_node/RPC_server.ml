@@ -236,20 +236,30 @@ module Slots_handlers = struct
 
   let get_slot_commitment ctxt slot_level slot_index () () =
     call_handler1 (fun () ->
-        let open Lwt_result_syntax in
         let slot_id : Types.slot_id = {slot_level; slot_index} in
-        let* content =
-          Slot_manager.get_slot_content
-            ~reconstruct_if_missing:true
+        let open Lwt_result_syntax in
+        let published_level = slot_id.Types.Slot_id.slot_level in
+        let*? proto_parameters =
+          Node_context.get_proto_parameters ctxt ~level:(`Level published_level)
+          |> Errors.other_result
+        in
+        let attested_level =
+          Int32.(add published_level (of_int proto_parameters.attestation_lag))
+        in
+        let*? plugin =
+          Node_context.get_plugin_for_level ctxt ~level:attested_level
+          |> Errors.other_result
+        in
+        let* slot_header_opt =
+          Slot_manager.try_get_slot_header_from_indexed_skip_list
+            plugin
             ctxt
             slot_id
+          |> Errors.other_lwt_result
         in
-        let cryptobox = Node_context.get_cryptobox ctxt in
-        let*? polynomial =
-          Slot_manager.polynomial_from_slot cryptobox content
-        in
-        let*? commitment = Slot_manager.commit cryptobox polynomial in
-        return commitment)
+        match slot_header_opt with
+        | None -> fail `Not_found
+        | Some slot_header -> return slot_header.Dal_plugin.commitment)
 
   let get_slot_status ctxt slot_level slot_index () () =
     call_handler1 (fun () ->

@@ -102,6 +102,24 @@ val get_slot_content :
   Types.slot_id ->
   (slot, [> Errors.other | Errors.not_found]) result Lwt.t
 
+(** [try_get_slot_header_from_indexed_skip_list plugin node_ctxt ~attested_level
+    slot_id] retrieves the slot header associated with [slot_id], based on the
+    local skip list cell stored in the SQLite store.
+
+   Steps:
+   - Fetch the skip list cell for the given [attested_level] and slot index from
+     the SQLite store.
+   - Decode the cell using the DAL [plugin].
+   - Return the extracted slot header.
+
+    Returns [None] if the cell is not found in the store.
+*)
+val try_get_slot_header_from_indexed_skip_list :
+  (module Dal_plugin.T) ->
+  Node_context.t ->
+  Types.slot_id ->
+  Dal_plugin.slot_header option tzresult Lwt.t
+
 (** [add_commitment_shards ~shards_proofs_precomputation node_store
     cryptobox commitment slot polynomial] registers the shards of the
     slot whose commitment is given.

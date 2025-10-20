@@ -236,7 +236,7 @@ module RPC : sig
   (** Call RPC "GET
         /levels/<published_level>/slot_indices/<slot_index>/commitment" to get
         the commitment associated to the given level and index. *)
-  val get_level_index_commitment :
+  val get_level_slot_commitment :
     slot_level:int -> slot_index:int -> commitment RPC_core.t
 
   (**  Call RPC "PATCH /profiles" to update the list of profiles tracked by

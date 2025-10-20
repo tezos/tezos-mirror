@@ -126,8 +126,11 @@ val get_slot_page_proof :
   ; query : unit >
   service
 
-(** Return the accepted commitment associated to the given slot index and
-    published at the given level, if any. *)
+(** Return the commitment associated to the given slot index and published at
+    the given level, if any. The commitment is fetched from the skip-list
+    storage. Note that the commitment is not present in the storage immediately
+    after publication, but only when its attestation status is known and
+    final. *)
 val get_slot_commitment :
   < meth : [`GET]
   ; input : unit

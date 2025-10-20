@@ -1360,6 +1360,12 @@ val get_chain_block_context_issuance_expected_issuance :
 val get_chain_block_context_dal_commitments_history :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** Call RPC
+   /chains/[chain]/blocks/[block]/context/dal/skip_list_cells_of_level.
+   [chain] defaults to ["main"]. [block] defaults to ["head"]. *)
+val get_chain_block_context_dal_cells_of_level :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** Call RPC /chains/[chain]/blocks/[block]/context/raw/json.
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
