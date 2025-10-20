@@ -515,6 +515,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
             // Compute the hash of the operation
             let hash = operation.hash()?;
 
+            let skip_signature_check = false;
+
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
             let receipt = match tezos_execution::validate_and_apply_operation(
@@ -523,6 +525,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 hash.clone(),
                 operation.clone(),
                 &block_ctx,
+                skip_signature_check,
             ) {
                 Ok(receipt) => receipt,
                 Err(OperationError::Validation(err)) => {
