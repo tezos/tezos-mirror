@@ -1948,7 +1948,7 @@ let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
         in
         Check.(status = expected_status)
           ~__LOC__
-          Check.string
+          Dal.Check.slot_id_status_typ
           ~error_msg:
             "The value of the fetched status should match the expected one \
              (current = %L, expected = %R)" ;
@@ -2048,7 +2048,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   (* Slots waiting for attestation. *)
   let* () = check_get_commitment get_commitment_not_found ok in
   let* () =
-    check_slot_status ~__LOC__ ~expected_status:"waiting_attestation" ok
+    check_slot_status ~__LOC__ ~expected_status:Dal_RPC.Waiting_attestation ok
   in
   (* slot_2_a is not selected. *)
   let* () = check_slot_status ~__LOC__ [slot2_a] in
@@ -2084,7 +2084,9 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   (* Slots confirmed. *)
   let* () = check_get_commitment get_commitment_succeeds attested in
   (* Slots that were waiting for attestation and now attested. *)
-  let* () = check_slot_status ~__LOC__ ~expected_status:"attested" attested in
+  let* () =
+    check_slot_status ~__LOC__ ~expected_status:Dal_RPC.Attested attested
+  in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
   (* Slots that were waiting for attestation and now unattested. *)
@@ -3042,12 +3044,13 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
          and above (and including) [first_not_attested_published_level], it
          should be [unattested]. *)
       let expected_status =
-        if level < first_not_attested_published_level then "attested"
-        else "unattested"
+        let open Dal_RPC in
+        if level < first_not_attested_published_level then Attested
+        else Unattested
       in
       Check.(
         (expected_status = status)
-          string
+          Dal.Check.slot_id_status_typ
           ~error_msg:"Expected status %L (got %R)") ;
       check_attestations (level + 1)
   in
@@ -3156,11 +3159,12 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
                ~slot_index:(slot_idx level))
       in
       let expected_status =
-        if level <= intermediary_level then "attested" else "unattested"
+        let open Dal_RPC in
+        if level <= intermediary_level then Attested else Unattested
       in
       Check.(
         (expected_status = status)
-          string
+          Dal.Check.slot_id_status_typ
           ~error_msg:"Expected status %L (got %R)") ;
       check_attestations (level + 1)
   in
@@ -5756,8 +5760,8 @@ let test_attestation_through_p2p ~batching_time_interval _protocol
       call attester
       @@ get_level_slot_status ~slot_level:publication_level ~slot_index:index)
   in
-  Check.(status = "attested")
-    Check.string
+  Check.(status = Dal_RPC.Attested)
+    Dal.Check.slot_id_status_typ
     ~error_msg:"Expected status %R (got %L)" ;
   Log.info "Slot sucessfully attested" ;
   unit
@@ -7319,9 +7323,9 @@ module Garbage_collection = struct
           call slot_producer
           @@ get_level_slot_status ~slot_level:published_level ~slot_index)
       in
-      Check.(status = "attested")
+      Check.(status = Dal_RPC.Attested)
         ~__LOC__
-        Check.string
+        Dal.Check.slot_id_status_typ
         ~error_msg:
           "The value of the fetched status should match the expected one \
            (current = %L, expected = %R)" ;
@@ -7586,9 +7590,9 @@ module Garbage_collection = struct
           call slot_producer
           @@ get_level_slot_status ~slot_level:published_level ~slot_index)
       in
-      Check.(status = "attested")
+      Check.(status = Dal_RPC.Attested)
         ~__LOC__
-        Check.string
+        Dal.Check.slot_id_status_typ
         ~error_msg:
           "The value of the fetched status should match the expected one \
            (current = %L, expected = %R)" ;
@@ -8190,15 +8194,15 @@ let test_rpc_get_connections _protocol dal_parameters _cryptobox node client
   (* Calling RPC on each node *)
   Log.info "Producer get_connections" ;
   let* producer_connections =
-    Dal_RPC.call producer (Dal_common.RPC.get_gossipsub_connections ())
+    Dal_RPC.call producer (Dal_RPC.get_gossipsub_connections ())
   in
   Log.info "Observer get_connections" ;
   let* observer_connections =
-    Dal_RPC.call observer (Dal_common.RPC.get_gossipsub_connections ())
+    Dal_RPC.call observer (Dal_RPC.get_gossipsub_connections ())
   in
   Log.info "Bootstrap get_connections" ;
   let* bootstrap_connections =
-    Dal_RPC.call dal_bootstrap (Dal_common.RPC.get_gossipsub_connections ())
+    Dal_RPC.call dal_bootstrap (Dal_RPC.get_gossipsub_connections ())
   in
 
   let sort list =
@@ -10146,11 +10150,11 @@ let test_producer_attester (protocol : Protocol.t)
       (* The level the commitment is included in a block is the first one crafted after publication. *)
       @@ get_level_slot_status ~slot_level:(lvl_publish + 1) ~slot_index:index)
   in
-  Log.info "Status is %a" Format.pp_print_string status ;
+  Log.info "Status is %a" Dal_RPC.pp_slot_id_status status ;
   log_step "Final check." ;
   Check.(
-    (status = "attested")
-      string
+    (status = Dal_RPC.Attested)
+      Dal.Check.slot_id_status_typ
       ~error_msg:"Published slot was supposed to be attested.") ;
   unit
 
@@ -10296,11 +10300,11 @@ let test_attester_did_not_attest (protocol : Protocol.t)
          after publication. *)
       @@ get_level_slot_status ~slot_level:(lvl_publish + 1) ~slot_index:index)
   in
-  Log.info "Status is %a" Format.pp_print_string status ;
+  Log.info "Status is %a" Dal_RPC.pp_slot_id_status status ;
   log_step "Final checks." ;
   Check.(
-    (status = "attested")
-      string
+    (status = Dal_RPC.Attested)
+      Dal.Check.slot_id_status_typ
       ~error_msg:"Published slot was supposed to be attested.") ;
   (* If the [not_attested_by_bootstrap2_promise] is not fulfilled yet, it means that
      the [attester_did_not_attest_slot] warning has never been emitted. *)

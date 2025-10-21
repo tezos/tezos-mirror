@@ -199,6 +199,13 @@ module RPC : sig
   (* Profiles tracked by the DAL node. *)
   type profile = Bootstrap | Controller of controller_profiles
 
+  (* The status of a slot id (published level + slot index) on L1. *)
+  type slot_id_status =
+    | Waiting_attestation
+    | Attested
+    | Unattested
+    | Unpublished
+
   (** Information contained in a slot header fetched from the DAL node. *)
   type slot_header = {
     slot_level : int;
@@ -252,7 +259,9 @@ module RPC : sig
   (** Call RPC "GET /levels/<slot_level>/slots/<slot_index>/status" to
       get the status known about the given slot. *)
   val get_level_slot_status :
-    slot_level:int -> slot_index:int -> string RPC_core.t
+    slot_level:int -> slot_index:int -> slot_id_status RPC_core.t
+
+  val pp_slot_id_status : Format.formatter -> slot_id_status -> unit
 
   (** Call RPC "GET
         /profiles/<public_key_hash>/attested_levels/<level>/assigned_shard_indices"
@@ -382,6 +391,8 @@ module Check : sig
   val profiles_typ : RPC.profile Check.typ
 
   val topics_peers_typ : (RPC.topic * string list) list Check.typ
+
+  val slot_id_status_typ : RPC.slot_id_status Check.typ
 
   val slot_header_typ : RPC.slot_header Check.typ
 
