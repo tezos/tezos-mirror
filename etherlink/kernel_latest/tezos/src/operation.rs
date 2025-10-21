@@ -139,6 +139,24 @@ pub enum ManagerOperationContent {
     Origination(ManagerOperation<OriginationContent>),
 }
 
+impl ManagerOperationContent {
+    pub fn gas_limit(&self) -> &Narith {
+        match self {
+            ManagerOperationContent::Reveal(op) => &op.gas_limit,
+            ManagerOperationContent::Transfer(op) => &op.gas_limit,
+            ManagerOperationContent::Origination(op) => &op.gas_limit,
+        }
+    }
+
+    pub fn source(&self) -> &PublicKeyHash {
+        match self {
+            ManagerOperationContent::Reveal(op) => &op.source,
+            ManagerOperationContent::Transfer(op) => &op.source,
+            ManagerOperationContent::Origination(op) => &op.source,
+        }
+    }
+}
+
 impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
     fn from(op: ManagerOperation<OperationContent>) -> Self {
         let ManagerOperation {
@@ -238,7 +256,7 @@ impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
 
 pub fn serialize_unsigned_operation(
     branch: &BlockHash,
-    content: &Vec<ManagerOperationContent>,
+    content: &[ManagerOperationContent],
 ) -> Result<Vec<u8>, BinError> {
     // Watermark comes from `src/lib_crypto/signature_v2.ml`
     // The watermark for a ManagerOperation is always `Generic_operation`
@@ -267,7 +285,7 @@ pub enum SignatureErrors {
 pub fn sign_operation(
     sk: &SecretKeyEd25519,
     branch: &BlockHash,
-    content: &Vec<ManagerOperationContent>,
+    content: &[ManagerOperationContent],
 ) -> Result<UnknownSignature, SignatureErrors> {
     let serialized_unsigned_operation = serialize_unsigned_operation(branch, content)?;
 
