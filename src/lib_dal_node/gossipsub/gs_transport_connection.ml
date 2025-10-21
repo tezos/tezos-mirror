@@ -114,95 +114,6 @@ let disconnections_handler gs_worker peer_id =
   | None -> (* Something is off, we should log something probably. *) ()
   | Some (peer, _) -> Worker.(Disconnection {peer} |> p2p_input gs_worker)
 
-let try_connect ?expected_peer_id gs_worker p2p_layer ~trusted point =
-  let open Lwt_syntax in
-  (* We don't wait for the promise to resolve here, because if the
-     advertised peer is not reachable or is not responding, we might block
-     until connection timeout is reached (we observed a timeout of 10
-     seconds in some case). Blocking here means that processing of other
-     messages from p2p_output_stream (including shards propagation) will
-     be delayed. *)
-  Lwt.dont_wait
-    (fun () ->
-      (* We don't check [expected_peer_id] anymore because people frequently
-         wipe / regenerate their peer identities while keeping the same IP
-         addresses. The [expected_peer_id] check, if enabled, will make
-         Octez-p2p reject any other connection with a different identity. *)
-      ignore expected_peer_id ;
-      let* (result : _ P2p.connection tzresult) =
-        P2p.connect ~trusted p2p_layer point
-      in
-      Result.iter_error
-        (fun _ -> Worker.set_unreachable_point gs_worker point)
-        result ;
-      return_unit)
-    (fun exn ->
-      Format.eprintf
-        "Warning: got an exception while trying to connect to %a: %s@."
-        Point.pp
-        point
-        (Printexc.to_string exn))
-  |> return
-
-(** This handler pops and processes the items put by the worker in the p2p
-    output stream. The out messages are sent to the corresponding peers and the
-    directives to the P2P layer to connect or disconnect peers are handled. *)
-let gs_worker_p2p_output_handler gs_worker p2p_layer =
-  let open Lwt_syntax in
-  (* only log sending of GS control messages  *)
-  let log_sending_message = function
-    | Message_with_header _ -> false
-    | _ -> true
-  in
-  let rec loop output_stream =
-    let* p2p_output = Worker.Stream.pop output_stream in
-    let* () =
-      match p2p_output with
-      | Worker.Out_message {to_peer; p2p_message} -> (
-          let conn = P2p.find_connection_by_peer_id p2p_layer to_peer.peer_id in
-          match conn with
-          | None ->
-              (* This could happen when the peer is disconnected or the
-                 connection is accepted but not running (authenticated) yet. *)
-              Events.(emit no_connection_for_peer to_peer.peer_id)
-          | Some conn -> (
-              let* (res : unit tzresult) =
-                let* () =
-                  if log_sending_message p2p_message then
-                    Events.(
-                      emit send_p2p_message (to_peer.peer_id, p2p_message))
-                  else return_unit
-                in
-                P2p.send p2p_layer conn p2p_message
-              in
-              match res with
-              | Ok () -> return_unit
-              | Error err ->
-                  Events.(emit send_p2p_message_failed (to_peer.peer_id, err))))
-      | Disconnect {peer} ->
-          P2p.find_connection_by_peer_id p2p_layer peer.peer_id
-          |> Option.iter_s
-               (P2p.disconnect ~reason:"disconnected by Gossipsub" p2p_layer)
-      | Connect {peer; origin} ->
-          let trusted = origin = Trusted in
-          let Types.Peer.{maybe_reachable_point; peer_id} = peer in
-          try_connect
-            ~trusted
-            ~expected_peer_id:peer_id
-            gs_worker
-            p2p_layer
-            maybe_reachable_point
-      | Connect_point {point} ->
-          try_connect gs_worker p2p_layer point ~trusted:false
-      | Forget _ -> return_unit
-      | Kick {peer} ->
-          P2p.pool p2p_layer
-          |> Option.iter_s (fun pool -> P2p_pool.Peers.ban pool peer.peer_id)
-    in
-    loop output_stream
-  in
-  Worker.p2p_output_stream gs_worker |> loop
-
 (** This handler forwards p2p messages received via Octez p2p to the Gossipsub
     worker. *)
 let transport_layer_inputs_handler gs_worker p2p_layer ~app_in_callback =
@@ -241,19 +152,28 @@ let app_messages_handler gs_worker ~app_out_callback ~verbose =
   in
   Worker.app_output_stream gs_worker |> loop
 
-let activate gs_worker p2p_layer ~app_out_callback ~app_in_callback ~verbose =
+let activate gs_worker p2p_layer ~app_out_callback ~app_in_callback ~verbose
+    ~canceler =
   (* Register a handler to notify new P2P connections to GS. *)
+  let open Lwt_result_syntax in
   let () =
     new_connections_handler gs_worker p2p_layer
     |> P2p.on_new_connection p2p_layer
   in
   (* Register a handler to notify P2P disconnections to GS. *)
   let () = disconnections_handler gs_worker |> P2p.on_disconnection p2p_layer in
+  let* p2p_worker = Gs_callback_worker.create gs_worker p2p_layer in
+  let () =
+    Lwt_canceler.on_cancel canceler (fun () ->
+        Gs_callback_worker.shutdown p2p_worker)
+  in
   (* We are not expecting any of the promises below to fulfill, unless they are rejected. *)
-  Lwt.pick
-    [
-      Worker.main_loop_promise gs_worker;
-      gs_worker_p2p_output_handler gs_worker p2p_layer;
-      transport_layer_inputs_handler gs_worker p2p_layer ~app_in_callback;
-      app_messages_handler gs_worker ~app_out_callback ~verbose;
-    ]
+  let*! _ =
+    Lwt.pick
+      [
+        Worker.main_loop_promise gs_worker;
+        transport_layer_inputs_handler gs_worker p2p_layer ~app_in_callback;
+        app_messages_handler gs_worker ~app_out_callback ~verbose;
+      ]
+  in
+  return_unit

@@ -325,6 +325,21 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     Dal_metrics.Slot_id_bounded_map.create
       (proto_parameters.number_of_slots * proto_parameters.attestation_lag)
   in
+  let canceler = Lwt_canceler.create () in
+  let _ : Lwt_exit.clean_up_callback_id =
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
+        let open Lwt_syntax in
+        let* c = Lwt_canceler.cancel canceler in
+        match c with
+        | Ok () | Error [] -> Lwt.return_unit
+        | Error excs ->
+            let texcs =
+              List.map (fun exc -> TzTrace.make (Error_monad.Exn exc)) excs
+            in
+            let errs = TzTrace.conp_list [] texcs in
+            Format.eprintf "Error: %a@." Error_monad.pp_print_trace errs ;
+            return_unit)
+  in
   Lwt.catch
     (fun () ->
       Gossipsub.Transport_layer_hooks.activate
@@ -332,6 +347,7 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
         transport_layer
         ~app_out_callback:(shards_out_handler node_store)
         ~app_in_callback:(shards_in_handler still_to_receive_indices)
+        ~canceler
         ~verbose)
     (fun exn ->
       let msg =
@@ -857,9 +873,6 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   () [@profiler.overwrite may_start_profiler data_dir] ;
   let* _ =
     Lwt.pick
-      [
-        Lwt.bind gs return;
-        daemonize [on_new_finalized_head ctxt cctxt crawler amplificator];
-      ]
+      [gs; daemonize [on_new_finalized_head ctxt cctxt crawler amplificator]]
   in
   return_unit
