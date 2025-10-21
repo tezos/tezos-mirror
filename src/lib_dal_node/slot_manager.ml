@@ -361,8 +361,7 @@ let try_get_commitment_of_slot_id_from_memory ctxt slot_id =
    - Return the extracted slot header, if available.
 
     Returns [None] if the cell is not found in the store. *)
-let try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
-    ctxt slot_id =
+let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let* cell_bytes_opt =
     Store.Skip_list_cells.find_by_slot_id_opt
@@ -371,7 +370,11 @@ let try_get_slot_header_from_indexed_skip_list (module Plugin : Dal_plugin.T)
   in
   match cell_bytes_opt with
   | None -> return_none
-  | Some cell_bytes ->
+  | Some (cell_bytes, attestation_lag) ->
+      let*? (module Plugin : Dal_plugin.T) =
+        let level = Int32.(add slot_id.slot_level (of_int attestation_lag)) in
+        Node_context.get_plugin_for_level ctxt ~level
+      in
       Dal_proto_types.Skip_list_cell.to_proto
         Plugin.Skip_list.cell_encoding
         cell_bytes
@@ -429,11 +432,11 @@ let _try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
     Returns [Some commitment] if found and matches the [slot_id], [None]
     otherwise. Performs assertions to ensure the returned slot header matches
     the requested [slot_id]. *)
-let try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt slot_id =
+let try_get_commitment_of_slot_id_from_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let*! published_slot_header_opt =
     let*! from_sqlite =
-      try_get_slot_header_from_indexed_skip_list dal_plugin ctxt slot_id
+      try_get_slot_header_from_indexed_skip_list ctxt slot_id
     in
     match from_sqlite with
     | Ok (Some _header as res) -> return res
@@ -471,28 +474,7 @@ let get_commitment_from_slot_id ctxt slot_id =
   match try_get_commitment_of_slot_id_from_memory ctxt slot_id with
   | Some res -> return res
   | None -> (
-      let published_level = slot_id.Types.Slot_id.slot_level in
-      let*? parameters =
-        Node_context.get_proto_parameters ctxt ~level:(`Level published_level)
-      in
-      let attested_level =
-        Int32.add
-          published_level
-          (Int32.of_int parameters.Types.attestation_lag)
-      in
-      (* Note: the precise [attested_level] is not important; however, it is
-         important that we use the right plugin to decode cells in
-         [try_get_slot_header_from_indexed_skip_list]. Even if the
-         [attestation_lag] value decreases in protocol P2 wrt P1, we are sure to
-         get the right plugin, because [attested_level] is computed with the
-         (bigger) value from P1, so we are sure [attested_level] is in P2 when
-         needed. *)
-      let*? dal_plugin =
-        Node_context.get_plugin_for_level ctxt ~level:attested_level
-      in
-      let*! res =
-        try_get_commitment_of_slot_id_from_skip_list dal_plugin ctxt slot_id
-      in
+      let*! res = try_get_commitment_of_slot_id_from_skip_list ctxt slot_id in
       match res with
       | Ok (Some res) -> return res
       | Ok None ->
@@ -783,31 +765,17 @@ module Statuses = struct
     in
     match slot_cell with
     | None -> return_none
-    | Some cell -> (
-        let*? proto_parameters =
-          Node_context.get_proto_parameters
-            ctxt
-            ~level:(`Level slot_id.slot_level)
-        in
-        let attested_level =
-          Int32.(
-            add slot_id.slot_level (of_int proto_parameters.attestation_lag))
-        in
+    | Some (cell, attestation_lag) ->
         let*? (module Plugin : Dal_plugin.T) =
-          Node_context.get_plugin_for_level ctxt ~level:attested_level
+          let level = Int32.(add slot_id.slot_level (of_int attestation_lag)) in
+          Node_context.get_plugin_for_level ctxt ~level
         in
-        let cell =
-          Dal_proto_types.Skip_list_cell.to_proto
-            Plugin.Skip_list.cell_encoding
-            cell
-        in
-        match Plugin.Skip_list.proto_attestation_status cell with
-        | None ->
-            (* Old protocols that do not expose the information *)
-            return_none
-        | Some `Unpublished -> return_none
-        | Some `Attested -> return_some `Attested
-        | Some `Unattested -> return_some `Unattested)
+        Dal_proto_types.Skip_list_cell.to_proto
+          Plugin.Skip_list.cell_encoding
+          cell
+        |> Plugin.Skip_list.proto_attestation_status
+        |> Option.map (fun s -> (s :> Types.header_status))
+        |> return
 
   let find_status ctxt (slot_id : Types.slot_id) =
     let open Lwt_result_syntax in

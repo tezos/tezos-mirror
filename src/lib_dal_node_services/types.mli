@@ -242,7 +242,7 @@ type header_status =
   | `Attested  (** The slot header was included in an L1 block and attested. *)
   | `Unattested
     (** The slot header was included in an L1 block but not timely attested. *)
-  ]
+  | `Unpublished  (** The slot header was not included in any L1 block. *) ]
 
 (** A DAL node can be in one of two profiles (aka modes): bootstrap or
     controller. A controller node can have one or more (sub)profiles that

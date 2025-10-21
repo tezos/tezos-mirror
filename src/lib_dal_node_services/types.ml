@@ -347,7 +347,8 @@ type slot_set = {slots : bool list; published_level : int32}
 
 type attestable_slots = Attestable_slots of slot_set | Not_in_committee
 
-type header_status = [`Waiting_attestation | `Attested | `Unattested]
+type header_status =
+  [`Waiting_attestation | `Attested | `Unattested | `Unpublished]
 
 type shard_index = int
 
@@ -448,12 +449,19 @@ let header_status_encoding : header_status Data_encoding.t =
         (constant "unattested")
         (function `Unattested -> Some () | _ -> None)
         (function () -> `Unattested);
+      case
+        ~title:"unpublished"
+        (Tag 3)
+        (constant "unpublished")
+        (function `Unpublished -> Some () | _ -> None)
+        (function () -> `Unpublished);
     ]
 
 let pp_header_status fmt = function
   | `Waiting_attestation -> Format.fprintf fmt "waiting_attestation"
   | `Attested -> Format.fprintf fmt "attested"
   | `Unattested -> Format.fprintf fmt "unattested"
+  | `Unpublished -> Format.fprintf fmt "unpublished"
 
 let slot_header_encoding =
   let open Data_encoding in

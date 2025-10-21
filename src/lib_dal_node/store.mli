@@ -247,13 +247,14 @@ module Skip_list_cells : sig
     Skip_list_hash.t ->
     Skip_list_cell.t option tzresult Lwt.t
 
-  (** [find_by_slot_id_opt ?conn store slot_id] returns the cell associated to
-      ([slot_id.slot_level], [slot_id.slot_index]) in the [store], if any. *)
+  (** [find_by_slot_id_opt ?conn store slot_id] returns the cell and the
+      attestation lag associated to ([slot_id.slot_level], [slot_id.slot_index])
+      in the [store], if any. *)
   val find_by_slot_id_opt :
     ?conn:Sqlite.conn ->
     t ->
     Types.slot_id ->
-    Dal_proto_types.Skip_list_cell.t option tzresult Lwt.t
+    (Dal_proto_types.Skip_list_cell.t * int) option tzresult Lwt.t
 
   (** See {!Dal_store_sqlite3.Skip_list_cells.find_by_level}. *)
   val find_by_level :
