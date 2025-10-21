@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:  Protocol (Zk_rollup)
-    Invocation: dune exec src/proto_024_PsU87LFi/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_024_PsD5wVTJ/lib_protocol/test/unit/main.exe \
                   -- --file test_zk_rollup_storage.ml
     Subject:    On ZK Rollup storage
 *)

@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (token)
-    Invocation: dune exec src/proto_024_PsU87LFi/lib_protocol/test/integration/main.exe \
+    Invocation: dune exec src/proto_024_PsD5wVTJ/lib_protocol/test/integration/main.exe \
                  -- --file test_token.ml
     Subject:    Token movements in the protocol.
 *)

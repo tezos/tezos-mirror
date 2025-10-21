@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Address registry
-    Invocation:   dune exec src/proto_024_PsU87LFi/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_024_PsD5wVTJ/lib_protocol/test/unit/main.exe \
                   -- --file test_address_registry.ml
     Subject:      Test the account registry storage
 *)
