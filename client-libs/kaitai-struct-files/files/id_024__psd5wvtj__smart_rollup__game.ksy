@@ -1,7 +1,7 @@
 meta:
-  id: alpha__smart_rollup__game
+  id: id_024__psd5wvtj__smart_rollup__game
   endian: be
-doc: ! 'Encoding id: alpha.smart_rollup.game'
+doc: ! 'Encoding id: 024-PsD5wVTJ.smart_rollup.game'
 types:
   agreed_start_chunk:
     seq:
@@ -13,18 +13,6 @@ types:
       if: (state_tag == bool::true)
     - id: tick
       type: n
-  alpha__contract_id:
-    seq:
-    - id: alpha__contract_id_tag
-      type: u1
-      enum: alpha__contract_id_tag
-    - id: implicit
-      type: public_key_hash
-      if: (alpha__contract_id_tag == alpha__contract_id_tag::implicit)
-      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
-    - id: originated
-      type: originated
-      if: (alpha__contract_id_tag == alpha__contract_id_tag::originated)
   back_pointers:
     seq:
     - id: back_pointers_entries
@@ -78,12 +66,6 @@ types:
     - id: published
       type: published
       if: (content_tag == content_tag::published)
-    - id: unpublished_dyn
-      type: unpublished_dyn
-      if: (content_tag == content_tag::unpublished_dyn)
-    - id: published_dyn
-      type: published_dyn
-      if: (content_tag == content_tag::published_dyn)
   dal_snapshot:
     seq:
     - id: dal_snapshot_tag
@@ -142,6 +124,18 @@ types:
     - id: final_move
       type: final_move
       if: (game_state_tag == game_state_tag::final_move)
+  id_024__psd5wvtj__contract_id:
+    seq:
+    - id: id_024__psd5wvtj__contract_id_tag
+      type: u1
+      enum: id_024__psd5wvtj__contract_id_tag
+    - id: implicit
+      type: public_key_hash
+      if: (id_024__psd5wvtj__contract_id_tag == id_024__psd5wvtj__contract_id_tag::implicit)
+      doc: A Ed25519, Secp256k1, P256, or BLS public key hash
+    - id: originated
+      type: originated
+      if: (id_024__psd5wvtj__contract_id_tag == id_024__psd5wvtj__contract_id_tag::originated)
   inbox_snapshot:
     seq:
     - id: index
@@ -189,7 +183,7 @@ types:
   published:
     seq:
     - id: publisher
-      type: alpha__contract_id
+      type: id_024__psd5wvtj__contract_id
       doc: ! >-
         A contract handle: A contract notation as given to an RPC or inside scripts.
         Can be a base58 implicit contract hash or a base58 originated contract hash.
@@ -206,28 +200,6 @@ types:
     - id: v0
       type: v0
       if: (published_tag == published_tag::v0)
-  published_dyn:
-    seq:
-    - id: publisher
-      type: alpha__contract_id
-      doc: ! >-
-        A contract handle: A contract notation as given to an RPC or inside scripts.
-        Can be a base58 implicit contract hash or a base58 originated contract hash.
-    - id: is_proto_attested
-      type: u1
-      enum: bool
-    - id: attested_shards
-      type: u2be
-    - id: total_shards
-      type: u2be
-    - id: attestation_lag
-      type: u1
-    - id: published_dyn_tag
-      type: u1
-      enum: published_dyn_tag
-    - id: v0
-      type: v0
-      if: (published_dyn_tag == published_dyn_tag::v0)
   refuted_stop_chunk:
     seq:
     - id: state_tag
@@ -252,14 +224,6 @@ types:
       type: s4be
     - id: index
       type: u1
-  unpublished_dyn:
-    seq:
-    - id: attestation_lag
-      type: u1
-    - id: level
-      type: s4be
-    - id: index
-      type: u1
   v0:
     seq:
     - id: level
@@ -269,30 +233,26 @@ types:
     - id: commitment
       size: 48
 enums:
-  alpha__contract_id_tag:
-    0: implicit
-    1: originated
   bool:
     0: false
     255: true
   content_tag:
     2: unpublished
     3: published
-    4: unpublished_dyn
-    5: published_dyn
   dal_snapshot_tag:
     0: dal_skip_list_legacy
     1: dal_skip_list
   game_state_tag:
     0: dissecting
     1: final_move
+  id_024__psd5wvtj__contract_id_tag:
+    0: implicit
+    1: originated
   public_key_hash_tag:
     0: ed25519
     1: secp256k1
     2: p256
     3: bls
-  published_dyn_tag:
-    0: v0
   published_tag:
     0: v0
   turn_tag:
