@@ -899,6 +899,7 @@ struct
               let open Lwt_syntax in
               let* send_result =
                 protect @@ fun () ->
+                Misc.with_timeout 5 @@ fun () ->
                 send_transactions_batch
                   ~keep_alive:state.keep_alive
                   ~evm_node_endpoint

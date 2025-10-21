@@ -53,8 +53,6 @@ let metadata_server_uri =
     ~path:"/computeMetadata/v1/instance/service-accounts/default/token"
     ()
 
-exception Timeout
-
 let run_without_error cmd args =
   let open Lwt_syntax in
   let+ status =
@@ -64,19 +62,10 @@ let run_without_error cmd args =
   in
   match status with Unix.WEXITED 0 -> true | _ -> false
 
-let with_timeout t k =
-  let open Lwt_result_syntax in
-  Lwt.pick
-    [
-      k ();
-      (let*! () = Lwt_unix.sleep (float_of_int t) in
-       fail_with_exn Timeout);
-    ]
-
 let rec retry ~timeout ~backoff ~on_error remaining_count k =
   let open Lwt_syntax in
   if remaining_count > 0 then
-    let* try_result = protect (fun () -> with_timeout timeout k) in
+    let* try_result = protect (fun () -> Misc.with_timeout timeout k) in
     match try_result with
     | Error err ->
         let* () = on_error err in
