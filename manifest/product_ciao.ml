@@ -42,7 +42,7 @@ let ci_lib_cacio =
     ~opam:""
     ~path:"ci/lib_cacio"
     ~bisect_ppx:No
-    ~deps:[ci_lib_gitlab_ci_main; ci_lib_tezos_ci]
+    ~deps:[ci_lib_gitlab_ci_main; ci_lib_tezos_ci; tezt_core_lib]
     ~release_status:Unreleased
 
 let ci_sdk_bindings =
