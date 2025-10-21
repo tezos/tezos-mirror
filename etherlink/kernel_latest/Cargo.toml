@@ -14,6 +14,7 @@ members = [
   "kernel",
   "evm_evaluation",
   "indexable_storage",
+  "tracing",
   "logging",
   "storage",
   "revm",
@@ -69,6 +70,7 @@ tezos_ethereum = { package = "tezos_ethereum_latest", path = "./ethereum" }
 tezos_tezlink = { package = "tezos_tezlink_latest", path = "./tezos" }
 tezos-execution = { package = "tezos-execution-latest", path = "./tezos_execution" }
 tezos-evm-logging = { package = "tezos-evm-logging-latest", path = "./logging" }
+tezos-tracing = { package = "tezos-tracing-latest", path = "./tracing" }
 tezos-evm-runtime = { package = "tezos-evm-runtime-latest", path = "./runtime" }
 tezos-indexable-storage = { package = "tezos-indexable-storage-latest", path = "./indexable_storage" }
 tezos-storage = { package = "tezos-storage-latest", path = "./storage" }
@@ -120,6 +122,8 @@ format_no_std = "1.2.0"
 # kernel execution profiling
 nop-macros = { version = "0.2.0" }
 tracing = { version = "0.1.41", features = ["attributes"] }
+syn = { version = "2", features = ["full"] }
+quote = "1"
 
 [profile.release]
 # Will apply heavy LTO which attempts to perform optimizations across all crates

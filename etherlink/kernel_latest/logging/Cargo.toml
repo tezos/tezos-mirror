@@ -12,6 +12,7 @@ license = "MIT"
 num-traits.workspace = true
 num-derive.workspace = true
 tezos-smart-rollup-debug.workspace = true
+tezos-smart-rollup-host.workspace = true
 nop-macros.workspace = true
 tracing = { workspace = true, optional = true }
 

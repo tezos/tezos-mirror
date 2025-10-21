@@ -1247,6 +1247,7 @@ dependencies = [
  "tezos-smart-rollup-panic-hook",
  "tezos-smart-rollup-storage",
  "tezos-storage-latest",
+ "tezos-tracing-latest",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum_latest",
@@ -3161,6 +3162,7 @@ dependencies = [
  "num-derive",
  "num-traits",
  "tezos-smart-rollup-debug",
+ "tezos-smart-rollup-host",
  "tracing",
 ]
 
@@ -3381,6 +3383,15 @@ dependencies = [
  "tezos_data_encoding",
  "tezos_ethereum_latest",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "tezos-tracing-latest"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.103",
+ "tezos-evm-logging-latest",
 ]
 
 [[package]]
