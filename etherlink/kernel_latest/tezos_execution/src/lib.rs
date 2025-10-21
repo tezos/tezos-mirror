@@ -25,11 +25,11 @@ use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_tezlink::enc_wrappers::OperationHash;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
-use tezos_tezlink::operation::{Operation, OriginationContent, Script};
+use tezos_tezlink::operation::{zip_operations, Operation, OriginationContent, Script};
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, ApplyOperationError, ContentResult,
-    InternalContentWithMetadata, InternalOperationSum, Originated, OriginationSuccess,
-    TransferTarget,
+    InternalContentWithMetadata, InternalOperationSum, OperationWithMetadata, Originated,
+    OriginationSuccess, TransferTarget,
 };
 use tezos_tezlink::{
     operation::{OperationContent, Parameter, RevealContent, TransferContent},
@@ -750,7 +750,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     operation: Operation,
     block_ctx: &BlockCtx,
     skip_signature_check: bool,
-) -> Result<Vec<OperationResultSum>, OperationError> {
+) -> Result<Vec<OperationWithMetadata>, OperationError> {
     let mut safe_host = SafeStorage {
         host,
         world_state: context.path(),
@@ -763,7 +763,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     let validation_info = match validate::execute_validation(
         &mut safe_host,
         context,
-        operation,
+        operation.clone(),
         skip_signature_check,
     ) {
         Ok(validation_info) => validation_info,
@@ -811,7 +811,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         safe_host.revert()?;
     }
 
-    Ok(receipts)
+    Ok(zip_operations(operation, receipts))
 }
 
 fn apply_batch<Host: Runtime>(
@@ -1002,17 +1002,17 @@ mod tests {
         block::TezBlock,
         enc_wrappers::OperationHash,
         operation::{
-            sign_operation, ManagerOperation, ManagerOperationContent, Operation,
-            OperationContent, OriginationContent, Parameter, RevealContent, Script,
-            TransferContent,
+            sign_operation, zip_operations, ManagerOperation, ManagerOperationContent,
+            Operation, OperationContent, OriginationContent, Parameter, RevealContent,
+            Script, TransferContent,
         },
         operation_result::{
             ApplyOperationError, ApplyOperationErrors, BacktrackedResult, Balance,
             BalanceTooLow, BalanceUpdate, ContentResult, CounterError,
             InternalContentWithMetadata, InternalOperationSum, OperationKind,
-            OperationResult, OperationResultSum, Originated, OriginationError,
-            OriginationSuccess, RevealError, RevealSuccess, TransferError,
-            TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
+            OperationResult, OperationResultSum, OperationWithMetadata, Originated,
+            OriginationError, OriginationSuccess, RevealError, RevealSuccess,
+            TransferError, TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
         },
     };
 
@@ -1491,7 +1491,7 @@ mod tests {
             &mut host,
             &context::Context::init_context(),
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -1500,24 +1500,27 @@ mod tests {
         );
 
         // Reveal operation should fail
-        let expected_receipt = vec![OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![
-                BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(source.pkh)),
-                    changes: -15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-                BalanceUpdate {
-                    balance: Balance::BlockFees,
-                    changes: 15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-            ],
-            result: ContentResult::Failed(
-                vec![RevealError::PreviouslyRevealedKey(pk).into()].into(),
-            ),
-            internal_operation_results: vec![],
-        })];
+        let expected_receipt = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Reveal(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(source.pkh)),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Failed(
+                    vec![RevealError::PreviouslyRevealedKey(pk).into()].into(),
+                ),
+                internal_operation_results: vec![],
+            }),
+        }];
 
         assert_eq!(
             account.counter(&host).unwrap(),
@@ -1553,7 +1556,7 @@ mod tests {
             &mut host,
             &context::Context::init_context(),
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -1561,24 +1564,27 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = vec![OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![
-                BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(source.pkh)),
-                    changes: -15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-                BalanceUpdate {
-                    balance: Balance::BlockFees,
-                    changes: 15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-            ],
-            result: ContentResult::Failed(
-                vec![RevealError::InconsistentHash(inconsistent_pkh).into()].into(),
-            ),
-            internal_operation_results: vec![],
-        })];
+        let expected_receipt = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Reveal(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(source.pkh)),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Failed(
+                    vec![RevealError::InconsistentHash(inconsistent_pkh).into()].into(),
+                ),
+                internal_operation_results: vec![],
+            }),
+        }];
 
         assert_eq!(receipt, expected_receipt);
         assert_eq!(
@@ -1652,7 +1658,7 @@ mod tests {
             &mut host,
             &context::Context::init_context(),
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -1660,24 +1666,27 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = vec![OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![
-                BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(source.pkh)),
-                    changes: -15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-                BalanceUpdate {
-                    balance: Balance::BlockFees,
-                    changes: 15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-            ],
-            result: ContentResult::Applied(RevealSuccess {
-                consumed_milligas: 168913_u64.into(),
+        let expected_receipt = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Reveal(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(source.pkh)),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Applied(RevealSuccess {
+                    consumed_milligas: 168913_u64.into(),
+                }),
+                internal_operation_results: vec![],
             }),
-            internal_operation_results: vec![],
-        })];
+        }];
 
         assert_eq!(receipt, expected_receipt);
 
@@ -1724,7 +1733,7 @@ mod tests {
             &mut host,
             &context::Context::init_context(),
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -1732,30 +1741,33 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![
-                BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(source.pkh.clone())),
-                    changes: -15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-                BalanceUpdate {
-                    balance: Balance::BlockFees,
-                    changes: 15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-            ],
-            result: ContentResult::Failed(
-                vec![TransferError::BalanceTooLow(BalanceTooLow {
-                    contract: Contract::Implicit(source.pkh),
-                    balance: 35_u64.into(),
-                    amount: 100_u64.into(),
-                })
-                .into()]
-                .into(),
-            ),
-            internal_operation_results: vec![],
-        })];
+        let expected_receipt = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(source.pkh.clone())),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Failed(
+                    vec![TransferError::BalanceTooLow(BalanceTooLow {
+                        contract: Contract::Implicit(source.pkh),
+                        balance: 35_u64.into(),
+                        amount: 100_u64.into(),
+                    })
+                    .into()]
+                    .into(),
+                ),
+                internal_operation_results: vec![],
+            }),
+        }];
 
         assert_eq!(receipt, expected_receipt);
 
@@ -1800,7 +1812,7 @@ mod tests {
             &mut host,
             &context::Context::init_context(),
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -1808,43 +1820,48 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![
-                BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                    changes: -15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-                BalanceUpdate {
-                    balance: Balance::BlockFees,
-                    changes: 15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-            ],
-            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
-                storage: None,
-                lazy_storage_diff: None,
+        let expected_receipt = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Transfer(OperationResult {
                 balance_updates: vec![
                     BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh)),
-                        changes: -30,
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                     BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(dst.pkh)),
-                        changes: 30,
+                        balance: Balance::BlockFees,
+                        changes: 15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                 ],
-                ticket_receipt: vec![],
-                originated_contracts: vec![],
-                consumed_milligas: 2168615_u64.into(),
-                storage_size: 0_u64.into(),
-                paid_storage_size_diff: 0_u64.into(),
-                allocated_destination_contract: false,
-            })),
-            internal_operation_results: vec![],
-        })];
+                result: ContentResult::Applied(TransferTarget::ToContrat(
+                    TransferSuccess {
+                        storage: None,
+                        lazy_storage_diff: None,
+                        balance_updates: vec![
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(src.pkh)),
+                                changes: -30,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(dst.pkh)),
+                                changes: 30,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                        ],
+                        ticket_receipt: vec![],
+                        originated_contracts: vec![],
+                        consumed_milligas: 2168615_u64.into(),
+                        storage_size: 0_u64.into(),
+                        paid_storage_size_diff: 0_u64.into(),
+                        allocated_destination_contract: false,
+                    },
+                )),
+                internal_operation_results: vec![],
+            }),
+        }];
         assert_eq!(receipt, expected_receipt);
 
         // Verify that source and destination balances changed
@@ -1887,7 +1904,7 @@ mod tests {
             &mut host,
             &context::Context::init_context(),
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -1895,43 +1912,48 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![
-                BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                    changes: -15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-                BalanceUpdate {
-                    balance: Balance::BlockFees,
-                    changes: 15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-            ],
-            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
-                storage: None,
-                lazy_storage_diff: None,
+        let expected_receipt = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Transfer(OperationResult {
                 balance_updates: vec![
                     BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh)),
-                        changes: -30,
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                     BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(dest.pkh)),
-                        changes: 30,
+                        balance: Balance::BlockFees,
+                        changes: 15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                 ],
-                ticket_receipt: vec![],
-                originated_contracts: vec![],
-                consumed_milligas: 2168615_u64.into(),
-                storage_size: 0_u64.into(),
-                paid_storage_size_diff: 0_u64.into(),
-                allocated_destination_contract: false,
-            })),
-            internal_operation_results: vec![],
-        })];
+                result: ContentResult::Applied(TransferTarget::ToContrat(
+                    TransferSuccess {
+                        storage: None,
+                        lazy_storage_diff: None,
+                        balance_updates: vec![
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(src.pkh)),
+                                changes: -30,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(dest.pkh)),
+                                changes: 30,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                        ],
+                        ticket_receipt: vec![],
+                        originated_contracts: vec![],
+                        consumed_milligas: 2168615_u64.into(),
+                        storage_size: 0_u64.into(),
+                        paid_storage_size_diff: 0_u64.into(),
+                        allocated_destination_contract: false,
+                    },
+                )),
+                internal_operation_results: vec![],
+            }),
+        }];
 
         // Verify that balance was only debited for fees
         assert_eq!(source.balance(&host).unwrap(), 35_u64.into());
@@ -1999,7 +2021,7 @@ mod tests {
             &mut host,
             &context,
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -2007,76 +2029,80 @@ mod tests {
         .remove(0);
         assert_eq!(
             res,
-            OperationResultSum::Transfer(OperationResult {
-                balance_updates: vec![
-                    BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                        changes: 0 - fees as i64,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::BlockFees,
-                        changes: fees as i64,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                ],
-                result: ContentResult::Applied(TransferTarget::ToContrat(
-                    TransferSuccess {
-                        storage: Some(storage.encode()),
-                        lazy_storage_diff: None,
-                        balance_updates: vec![],
-                        ticket_receipt: vec![],
-                        originated_contracts: vec![],
-                        consumed_milligas: 176061_u64.into(),
-                        storage_size: 0_u64.into(),
-                        paid_storage_size_diff: 0_u64.into(),
-                        allocated_destination_contract: false,
-                    }
-                )),
-                internal_operation_results: vec![InternalOperationSum::Transfer(
-                    InternalContentWithMetadata {
-                        content: TransferContent {
-                            amount: requested_amount.into(),
-                            destination: Contract::Implicit(src.pkh.clone()),
-                            parameters: Some(Parameter {
-                                entrypoint: Entrypoint::default(),
-                                value: Micheline::from(()).encode(),
-                            }),
+            OperationWithMetadata {
+                content: operation.content[0].clone(),
+                receipt: OperationResultSum::Transfer(OperationResult {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone()
+                            )),
+                            changes: 0 - fees as i64,
+                            update_origin: UpdateOrigin::BlockApplication,
                         },
-
-                        sender: Contract::Originated(desthash.clone()),
-                        nonce: 1,
-                        result: ContentResult::Applied(TransferTarget::ToContrat(
-                            TransferSuccess {
-                                storage: None,
-                                lazy_storage_diff: None,
-                                balance_updates: vec![
-                                    BalanceUpdate {
-                                        balance: Balance::Account(Contract::Originated(
-                                            desthash.clone()
-                                        )),
-                                        changes: 0 - (requested_amount as i64),
-                                        update_origin: UpdateOrigin::BlockApplication,
-                                    },
-                                    BalanceUpdate {
-                                        balance: Balance::Account(Contract::Implicit(
-                                            src.pkh.clone()
-                                        )),
-                                        changes: requested_amount as i64,
-                                        update_origin: UpdateOrigin::BlockApplication,
-                                    },
-                                ],
-                                ticket_receipt: vec![],
-                                originated_contracts: vec![],
-                                consumed_milligas: 2_100_000_u64.into(),
-                                storage_size: 0_u64.into(),
-                                paid_storage_size_diff: 0_u64.into(),
-                                allocated_destination_contract: false,
-                            }
-                        )),
-                    }
-                )],
-            })
+                        BalanceUpdate {
+                            balance: Balance::BlockFees,
+                            changes: fees as i64,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                        TransferSuccess {
+                            storage: Some(storage.encode()),
+                            lazy_storage_diff: None,
+                            balance_updates: vec![],
+                            ticket_receipt: vec![],
+                            originated_contracts: vec![],
+                            consumed_milligas: 176061_u64.into(),
+                            storage_size: 0_u64.into(),
+                            paid_storage_size_diff: 0_u64.into(),
+                            allocated_destination_contract: false,
+                        }
+                    )),
+                    internal_operation_results: vec![InternalOperationSum::Transfer(
+                        InternalContentWithMetadata {
+                            content: TransferContent {
+                                amount: requested_amount.into(),
+                                destination: Contract::Implicit(src.pkh.clone()),
+                                parameters: Some(Parameter {
+                                    entrypoint: Entrypoint::default(),
+                                    value: Micheline::from(()).encode(),
+                                }),
+                            },
+                            sender: Contract::Originated(desthash.clone()),
+                            nonce: 1,
+                            result: ContentResult::Applied(TransferTarget::ToContrat(
+                                TransferSuccess {
+                                    storage: None,
+                                    lazy_storage_diff: None,
+                                    balance_updates: vec![
+                                        BalanceUpdate {
+                                            balance: Balance::Account(
+                                                Contract::Originated(desthash.clone())
+                                            ),
+                                            changes: 0 - (requested_amount as i64),
+                                            update_origin: UpdateOrigin::BlockApplication,
+                                        },
+                                        BalanceUpdate {
+                                            balance: Balance::Account(
+                                                Contract::Implicit(src.pkh.clone())
+                                            ),
+                                            changes: requested_amount as i64,
+                                            update_origin: UpdateOrigin::BlockApplication,
+                                        },
+                                    ],
+                                    ticket_receipt: vec![],
+                                    originated_contracts: vec![],
+                                    consumed_milligas: 2_100_000_u64.into(),
+                                    storage_size: 0_u64.into(),
+                                    paid_storage_size_diff: 0_u64.into(),
+                                    allocated_destination_contract: false,
+                                }
+                            )),
+                        }
+                    )],
+                })
+            }
         );
         assert_eq!(
             faucet.balance(&host).unwrap(),
@@ -2129,7 +2155,7 @@ mod tests {
             &mut host,
             &context::Context::init_context(),
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -2139,45 +2165,50 @@ mod tests {
 
         let storage = Some(storage_value.clone());
 
-        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![
-                BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                    changes: -15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-                BalanceUpdate {
-                    balance: Balance::BlockFees,
-                    changes: 15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-            ],
-            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
-                storage,
-                lazy_storage_diff: None,
+        let expected_receipt = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Transfer(OperationResult {
                 balance_updates: vec![
                     BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh)),
-                        changes: -30,
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                     BalanceUpdate {
-                        balance: Balance::Account(
-                            Contract::from_b58check(CONTRACT_1).unwrap(),
-                        ),
-                        changes: 30,
+                        balance: Balance::BlockFees,
+                        changes: 15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                 ],
-                ticket_receipt: vec![],
-                originated_contracts: vec![],
-                consumed_milligas: 171923_u64.into(),
-                storage_size: 0_u64.into(),
-                paid_storage_size_diff: 0_u64.into(),
-                allocated_destination_contract: false,
-            })),
-            internal_operation_results: vec![],
-        })];
+                result: ContentResult::Applied(TransferTarget::ToContrat(
+                    TransferSuccess {
+                        storage,
+                        lazy_storage_diff: None,
+                        balance_updates: vec![
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(src.pkh)),
+                                changes: -30,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(
+                                    Contract::from_b58check(CONTRACT_1).unwrap(),
+                                ),
+                                changes: 30,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                        ],
+                        ticket_receipt: vec![],
+                        originated_contracts: vec![],
+                        consumed_milligas: 171923_u64.into(),
+                        storage_size: 0_u64.into(),
+                        paid_storage_size_diff: 0_u64.into(),
+                        allocated_destination_contract: false,
+                    },
+                )),
+                internal_operation_results: vec![],
+            }),
+        }];
 
         // Verify that source and destination balances changed
         // 30 for transfer + 15 for fees, 5 should be left
@@ -2239,7 +2270,7 @@ mod tests {
             &mut host,
             &context::Context::init_context(),
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -2247,7 +2278,9 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
+        let expected_receipt = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
                     balance: Balance::Account(Contract::Implicit(src.pkh)),
@@ -2267,7 +2300,7 @@ mod tests {
             )
         )].into()),
             internal_operation_results: vec![],
-        })];
+            })}];
 
         // Verify that source and destination balances changed
         // Transfer should be free as it got reverted + 15 for fees, 5 should be left
@@ -2318,7 +2351,7 @@ mod tests {
             &mut host,
             &context::Context::init_context(),
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -2326,27 +2359,30 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![
-                BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src.pkh)),
-                    changes: -15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-                BalanceUpdate {
-                    balance: Balance::BlockFees,
-                    changes: 15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-            ],
-            result: ContentResult::Failed(
-                vec![ApplyOperationError::Transfer(
-                    TransferError::NonSmartContractExecutionCall,
-                )]
-                .into(),
-            ),
-            internal_operation_results: vec![],
-        })];
+        let expected_receipt = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh)),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Failed(
+                    vec![ApplyOperationError::Transfer(
+                        TransferError::NonSmartContractExecutionCall,
+                    )]
+                    .into(),
+                ),
+                internal_operation_results: vec![],
+            }),
+        }];
 
         assert_eq!(receipt, expected_receipt);
     }
@@ -2381,7 +2417,7 @@ mod tests {
             &mut host,
             &context::Context::init_context(),
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -2389,27 +2425,30 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![
-                BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src.pkh)),
-                    changes: -15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-                BalanceUpdate {
-                    balance: Balance::BlockFees,
-                    changes: 15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-            ],
-            result: ContentResult::Failed(
-                vec![ApplyOperationError::Transfer(
-                    TransferError::NonSmartContractExecutionCall,
-                )]
-                .into(),
-            ),
-            internal_operation_results: vec![],
-        })];
+        let expected_receipt = vec![OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh)),
+                        changes: -15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 15,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Failed(
+                    vec![ApplyOperationError::Transfer(
+                        TransferError::NonSmartContractExecutionCall,
+                    )]
+                    .into(),
+                ),
+                internal_operation_results: vec![],
+            }),
+        }];
 
         assert_eq!(receipt, expected_receipt);
     }
@@ -2461,114 +2500,127 @@ mod tests {
             &mut host,
             &ctx,
             OperationHash(H256::zero()),
-            batch,
+            batch.clone(),
             &block_ctx!(),
             false,
         )
         .unwrap();
 
-        let expected_receipts = vec![
-            OperationResultSum::Reveal(OperationResult {
-                balance_updates: vec![
-                    BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                        changes: -5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::BlockFees,
-                        changes: 5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                ],
-                result: ContentResult::Applied(RevealSuccess {
-                    consumed_milligas: 172391_u64.into(),
+        let expected_receipts = zip_operations(
+            batch,
+            vec![
+                OperationResultSum::Reveal(OperationResult {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::BlockFees,
+                            changes: 5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    result: ContentResult::Applied(RevealSuccess {
+                        consumed_milligas: 172391_u64.into(),
+                    }),
+                    internal_operation_results: vec![],
                 }),
-                internal_operation_results: vec![],
-            }),
-            OperationResultSum::Transfer(OperationResult {
-                balance_updates: vec![
-                    BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                        changes: -5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::BlockFees,
-                        changes: 5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                ],
-                result: ContentResult::Applied(TransferTarget::ToContrat(
-                    TransferSuccess {
-                        storage: None,
-                        lazy_storage_diff: None,
-                        balance_updates: vec![
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Implicit(
-                                    src.pkh.clone(),
-                                )),
-                                changes: -10,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Implicit(
-                                    dest.pkh.clone(),
-                                )),
-                                changes: 10,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                        ],
-                        ticket_receipt: vec![],
-                        originated_contracts: vec![],
-                        consumed_milligas: 2100000_u64.into(),
-                        storage_size: 0_u64.into(),
-                        paid_storage_size_diff: 0_u64.into(),
-                        allocated_destination_contract: false,
-                    },
-                )),
-                internal_operation_results: vec![],
-            }),
-            OperationResultSum::Transfer(OperationResult {
-                balance_updates: vec![
-                    BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                        changes: -5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::BlockFees,
-                        changes: 5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                ],
-                result: ContentResult::Applied(TransferTarget::ToContrat(
-                    TransferSuccess {
-                        storage: None,
-                        lazy_storage_diff: None,
-                        balance_updates: vec![
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Implicit(src.pkh)),
-                                changes: -20,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Implicit(dest.pkh)),
-                                changes: 20,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                        ],
-                        ticket_receipt: vec![],
-                        originated_contracts: vec![],
-                        consumed_milligas: 2100000_u64.into(),
-                        storage_size: 0_u64.into(),
-                        paid_storage_size_diff: 0_u64.into(),
-                        allocated_destination_contract: false,
-                    },
-                )),
-                internal_operation_results: vec![],
-            }),
-        ];
+                OperationResultSum::Transfer(OperationResult {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::BlockFees,
+                            changes: 5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                        TransferSuccess {
+                            storage: None,
+                            lazy_storage_diff: None,
+                            balance_updates: vec![
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Implicit(
+                                        src.pkh.clone(),
+                                    )),
+                                    changes: -10,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Implicit(
+                                        dest.pkh.clone(),
+                                    )),
+                                    changes: 10,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                            ],
+                            ticket_receipt: vec![],
+                            originated_contracts: vec![],
+                            consumed_milligas: 2100000_u64.into(),
+                            storage_size: 0_u64.into(),
+                            paid_storage_size_diff: 0_u64.into(),
+                            allocated_destination_contract: false,
+                        },
+                    )),
+                    internal_operation_results: vec![],
+                }),
+                OperationResultSum::Transfer(OperationResult {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::BlockFees,
+                            changes: 5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                        TransferSuccess {
+                            storage: None,
+                            lazy_storage_diff: None,
+                            balance_updates: vec![
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Implicit(
+                                        src.pkh,
+                                    )),
+                                    changes: -20,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Implicit(
+                                        dest.pkh,
+                                    )),
+                                    changes: 20,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                            ],
+                            ticket_receipt: vec![],
+                            originated_contracts: vec![],
+                            consumed_milligas: 2100000_u64.into(),
+                            storage_size: 0_u64.into(),
+                            paid_storage_size_diff: 0_u64.into(),
+                            allocated_destination_contract: false,
+                        },
+                    )),
+                    internal_operation_results: vec![],
+                }),
+            ],
+        );
 
         assert_eq!(receipts, expected_receipts);
 
@@ -2734,7 +2786,7 @@ mod tests {
 
         assert!(
             matches!(
-                &receipts[0],
+                &receipts[0].receipt,
                 OperationResultSum::Reveal(OperationResult {
                     result: ContentResult::BackTracked(_),
                     ..
@@ -2745,7 +2797,7 @@ mod tests {
 
         assert!(
             matches!(
-                &receipts[1],
+                &receipts[1].receipt,
                 OperationResultSum::Transfer(OperationResult {
                     result: ContentResult::BackTracked(_),
                     ..
@@ -2756,7 +2808,7 @@ mod tests {
 
         assert!(
             matches!(
-                &receipts[2],
+                &receipts[2].receipt,
                 OperationResultSum::Transfer(OperationResult {
                     result: ContentResult::Failed(_),
                     ..
@@ -2838,7 +2890,7 @@ mod tests {
             &mut host,
             &context,
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -2850,64 +2902,73 @@ mod tests {
             OriginationNonce::initial(OperationHash(H256::zero()));
         let expected_kt1 = origination_nonce.generate_kt1();
 
-        let expected_receipt = OperationResultSum::Origination(OperationResult {
-            balance_updates: vec![
-                BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                    changes: -15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-                BalanceUpdate {
-                    balance: Balance::BlockFees,
-                    changes: 15,
-                    update_origin: UpdateOrigin::BlockApplication,
-                },
-            ],
-            result: ContentResult::Applied(OriginationSuccess {
+        let expected_receipt = OperationWithMetadata {
+            content: operation.content[0].clone(),
+            receipt: OperationResultSum::Origination(OperationResult {
                 balance_updates: vec![
                     BalanceUpdate {
                         balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                        changes: -30,
+                        changes: -15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                     BalanceUpdate {
-                        balance: Balance::Account(Contract::Originated(
-                            expected_kt1.clone(),
-                        )),
-                        changes: 30,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                        changes: -9500,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::StorageFees,
-                        changes: 9500,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                        changes: -64250,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::StorageFees,
-                        changes: 64250,
+                        balance: Balance::BlockFees,
+                        changes: 15,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                 ],
-                originated_contracts: vec![Originated {
-                    contract: expected_kt1.clone(),
-                }],
-                consumed_milligas: 171777u64.into(),
-                storage_size: 38u64.into(),
-                paid_storage_size_diff: 38u64.into(),
-                lazy_storage_diff: None,
+                result: ContentResult::Applied(OriginationSuccess {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -30,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                expected_kt1.clone(),
+                            )),
+                            changes: 30,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -9500,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::StorageFees,
+                            changes: 9500,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::StorageFees,
+                            changes: 64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    originated_contracts: vec![Originated {
+                        contract: expected_kt1.clone(),
+                    }],
+                    consumed_milligas: 171777u64.into(),
+                    storage_size: 38u64.into(),
+                    paid_storage_size_diff: 38u64.into(),
+                    lazy_storage_diff: None,
+                }),
+                internal_operation_results: vec![],
             }),
-            internal_operation_results: vec![],
-        });
+        };
 
         assert_eq!(receipt, vec![expected_receipt]);
 
@@ -3066,32 +3127,32 @@ mod tests {
         );
         assert!(
             matches!(
-                &receipts[0],
+                &receipts[0].receipt,
                 OperationResultSum::Reveal(OperationResult {
                     result: ContentResult::BackTracked(_),
                     ..
                 })
             ),
             "First receipt should be a BackTracked Reveal but is {:?}",
-            receipts[0]
+            receipts[0].receipt
         );
         assert!(
             matches!(
-                &receipts[1],
+                &receipts[1].receipt,
                 OperationResultSum::Transfer(OperationResult {
                     result: ContentResult::BackTracked(_),
                     ..
                 })
             ),
             "Second receipt should be a BackTracked Transfer but is {:?}",
-            receipts[1]
+            receipts[1].receipt
         );
 
         // Check Internal Operations
         if let OperationResultSum::Transfer(OperationResult {
             internal_operation_results,
             ..
-        }) = &receipts[1]
+        }) = &receipts[1].receipt
         {
             assert_eq!(
                 internal_operation_results.len(),
@@ -3423,7 +3484,7 @@ mod tests {
             &mut host,
             &context,
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -3437,7 +3498,7 @@ mod tests {
         );
         assert!(
             matches!(
-                &receipts[0],
+                &receipts[0].receipt,
                 OperationResultSum::Transfer(OperationResult {
                     result: ContentResult::Applied(_),
                     ..
@@ -3446,7 +3507,7 @@ mod tests {
             "First receipt should be an Applied Transfer but is {:?}",
             receipts[0]
         );
-        let internal_receipts = get_internal_receipts(&receipts[0]);
+        let internal_receipts = get_internal_receipts(&receipts[0].receipt);
 
         assert_eq!(
             internal_receipts.len(),
@@ -3623,7 +3684,7 @@ mod tests {
             &mut host,
             &context,
             OperationHash(H256::zero()),
-            operation,
+            operation.clone(),
             &block_ctx!(),
             false,
         )
@@ -3637,16 +3698,16 @@ mod tests {
         );
         assert!(
             matches!(
-                &receipts[0],
+                &receipts[0].receipt,
                 OperationResultSum::Transfer(OperationResult {
                     result: ContentResult::Applied(_),
                     ..
                 })
             ),
             "First receipt should be an Applied Transfer but is {:?}",
-            receipts[0]
+            receipts[0].receipt
         );
-        let internal_receipts = get_internal_receipts(&receipts[0]);
+        let internal_receipts = get_internal_receipts(&receipts[0].receipt);
 
         assert_eq!(
             internal_receipts.len(),
@@ -3849,7 +3910,7 @@ mod tests {
             &mut host,
             &ctx,
             OperationHash(H256::zero()),
-            batch,
+            batch.clone(),
             &block_ctx!(),
             false,
         )
@@ -3858,195 +3919,208 @@ mod tests {
         let mut orignation_nonce = OriginationNonce::initial(OperationHash(H256::zero()));
         let expected_kt1_1 = orignation_nonce.generate_kt1();
         let expected_kt1_2 = orignation_nonce.generate_kt1();
-        let expected_receipts = vec![
-            OperationResultSum::Reveal(OperationResult {
-                balance_updates: vec![
-                    BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                        changes: -5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::BlockFees,
-                        changes: 5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                ],
-                result: ContentResult::BackTracked(backtrack_result(RevealSuccess {
-                    consumed_milligas: 177493_u64.into(),
-                })),
-                internal_operation_results: vec![],
-            }),
-            OperationResultSum::Origination(OperationResult {
-                balance_updates: vec![
-                    BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                        changes: -5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::BlockFees,
-                        changes: 5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                ],
-                result: ContentResult::BackTracked(backtrack_result(
-                    OriginationSuccess {
-                        balance_updates: vec![
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Implicit(
-                                    src.pkh.clone(),
-                                )),
-                                changes: -15,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Originated(
-                                    expected_kt1_1.clone(),
-                                )),
-                                changes: 15,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Implicit(
-                                    src.pkh.clone(),
-                                )),
-                                changes: -7500,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::StorageFees,
-                                changes: 7500,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Implicit(
-                                    src.pkh.clone(),
-                                )),
-                                changes: -64250,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::StorageFees,
-                                changes: 64250,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                        ],
-                        originated_contracts: vec![Originated {
-                            contract: expected_kt1_1.clone(),
-                        }],
-                        consumed_milligas: 102400_u64.into(),
-                        storage_size: 30.into(),
-                        paid_storage_size_diff: 30.into(),
-                        lazy_storage_diff: None,
-                    },
-                )),
-                internal_operation_results: vec![],
-            }),
-            OperationResultSum::Origination(OperationResult {
-                balance_updates: vec![
-                    BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                        changes: -5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::BlockFees,
-                        changes: 5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                ],
-                result: ContentResult::BackTracked(backtrack_result(
-                    OriginationSuccess {
-                        balance_updates: vec![
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Implicit(
-                                    src.pkh.clone(),
-                                )),
-                                changes: -20,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Originated(
-                                    expected_kt1_2.clone(),
-                                )),
-                                changes: 20,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Implicit(
-                                    src.pkh.clone(),
-                                )),
-                                changes: -7500,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::StorageFees,
-                                changes: 7500,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Implicit(
-                                    src.pkh.clone(),
-                                )),
-                                changes: -64250,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::StorageFees,
-                                changes: 64250,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                        ],
-                        originated_contracts: vec![Originated {
-                            contract: expected_kt1_2.clone(),
-                        }],
-                        consumed_milligas: 102400u64.into(),
-                        storage_size: 30.into(),
-                        paid_storage_size_diff: 30.into(),
-                        lazy_storage_diff: None,
-                    },
-                )),
-                internal_operation_results: vec![],
-            }),
-            OperationResultSum::Origination(OperationResult {
-                balance_updates: vec![
-                    BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                        changes: -5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::BlockFees,
-                        changes: 5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                ],
-                result: ContentResult::Failed(
-                    ApplyOperationError::Origination(
-                        OriginationError::FailedToApplyBalanceUpdate,
-                    )
-                    .into(),
-                ),
-                internal_operation_results: vec![],
-            }),
-            OperationResultSum::Transfer(OperationResult {
-                balance_updates: vec![
-                    BalanceUpdate {
-                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
-                        changes: -5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                    BalanceUpdate {
-                        balance: Balance::BlockFees,
-                        changes: 5,
-                        update_origin: UpdateOrigin::BlockApplication,
-                    },
-                ],
-                result: ContentResult::Skipped,
-                internal_operation_results: vec![],
-            }),
-        ];
+        let expected_receipts = zip_operations(
+            batch,
+            vec![
+                OperationResultSum::Reveal(OperationResult {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::BlockFees,
+                            changes: 5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    result: ContentResult::BackTracked(backtrack_result(RevealSuccess {
+                        consumed_milligas: 177493_u64.into(),
+                    })),
+                    internal_operation_results: vec![],
+                }),
+                OperationResultSum::Origination(OperationResult {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::BlockFees,
+                            changes: 5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    result: ContentResult::BackTracked(backtrack_result(
+                        OriginationSuccess {
+                            balance_updates: vec![
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Implicit(
+                                        src.pkh.clone(),
+                                    )),
+                                    changes: -15,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Originated(
+                                        expected_kt1_1.clone(),
+                                    )),
+                                    changes: 15,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Implicit(
+                                        src.pkh.clone(),
+                                    )),
+                                    changes: -7500,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::StorageFees,
+                                    changes: 7500,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Implicit(
+                                        src.pkh.clone(),
+                                    )),
+                                    changes: -64250,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::StorageFees,
+                                    changes: 64250,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                            ],
+                            originated_contracts: vec![Originated {
+                                contract: expected_kt1_1.clone(),
+                            }],
+                            consumed_milligas: 102400_u64.into(),
+                            storage_size: 30.into(),
+                            paid_storage_size_diff: 30.into(),
+                            lazy_storage_diff: None,
+                        },
+                    )),
+                    internal_operation_results: vec![],
+                }),
+                OperationResultSum::Origination(OperationResult {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::BlockFees,
+                            changes: 5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    result: ContentResult::BackTracked(backtrack_result(
+                        OriginationSuccess {
+                            balance_updates: vec![
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Implicit(
+                                        src.pkh.clone(),
+                                    )),
+                                    changes: -20,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Originated(
+                                        expected_kt1_2.clone(),
+                                    )),
+                                    changes: 20,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Implicit(
+                                        src.pkh.clone(),
+                                    )),
+                                    changes: -7500,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::StorageFees,
+                                    changes: 7500,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::Account(Contract::Implicit(
+                                        src.pkh.clone(),
+                                    )),
+                                    changes: -64250,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                                BalanceUpdate {
+                                    balance: Balance::StorageFees,
+                                    changes: 64250,
+                                    update_origin: UpdateOrigin::BlockApplication,
+                                },
+                            ],
+                            originated_contracts: vec![Originated {
+                                contract: expected_kt1_2.clone(),
+                            }],
+                            consumed_milligas: 102400u64.into(),
+                            storage_size: 30.into(),
+                            paid_storage_size_diff: 30.into(),
+                            lazy_storage_diff: None,
+                        },
+                    )),
+                    internal_operation_results: vec![],
+                }),
+                OperationResultSum::Origination(OperationResult {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::BlockFees,
+                            changes: 5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    result: ContentResult::Failed(
+                        ApplyOperationError::Origination(
+                            OriginationError::FailedToApplyBalanceUpdate,
+                        )
+                        .into(),
+                    ),
+                    internal_operation_results: vec![],
+                }),
+                OperationResultSum::Transfer(OperationResult {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::BlockFees,
+                            changes: 5,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    result: ContentResult::Skipped,
+                    internal_operation_results: vec![],
+                }),
+            ],
+        );
         assert_eq!(
             receipts, expected_receipts,
             "Receipts do not match the expected ones"
@@ -4124,7 +4198,7 @@ mod tests {
 
         assert_eq!(receipts.len(), 1, "There should be one receipt");
         assert!(matches!(
-            &receipts[0],
+            &receipts[0].receipt,
             OperationResultSum::Origination(OperationResult {
             result: ContentResult::Failed(ApplyOperationErrors { errors }),
             ..
@@ -4199,7 +4273,7 @@ mod tests {
 
         assert_eq!(receipts1.len(), 1, "There should be one receipt");
         assert!(matches!(
-            &receipts1[0],
+            &receipts1[0].receipt,
             OperationResultSum::Transfer(OperationResult {
                 result: ContentResult::Failed(ApplyOperationErrors { errors }),
                 ..
@@ -4241,7 +4315,7 @@ mod tests {
         assert_eq!(receipts2.len(), 1, "There should be one receipt");
         assert!(
             matches!(
-                &receipts2[0],
+                &receipts2[0].receipt,
                 OperationResultSum::Transfer(OperationResult {
                     result: ContentResult::Applied(TransferTarget::ToContrat(
                         TransferSuccess { .. }
@@ -4250,7 +4324,7 @@ mod tests {
                 })
             ),
             "Expected Successful Transfer operation result, got {:?}",
-            receipts2[0]
+            receipts2[0].receipt
         );
 
         // An empty internal transfer to an implicit account fails.
@@ -4283,7 +4357,7 @@ mod tests {
         assert_eq!(receipts3.len(), 1, "There should be one receipt");
         assert!(
             matches!(
-                &receipts3[0],
+                &receipts3[0].receipt,
                 OperationResultSum::Transfer(OperationResult {
                     result: ContentResult::BackTracked(BacktrackedResult { result: TransferTarget::ToContrat(TransferSuccess { .. }), .. }),
                     internal_operation_results,
@@ -4300,7 +4374,7 @@ mod tests {
                 )
             ),
             "Expected Failed Transfer operation result with EmptyImplicitTransfer, got {:?}",
-            receipts3[0]
+            receipts3[0].receipt
         );
 
         // An empty internal transfer to a smart contract succeeds.
@@ -4333,7 +4407,7 @@ mod tests {
         assert_eq!(receipts4.len(), 1, "There should be one receipt");
         assert!(
             matches!(
-                &receipts4[0],
+                &receipts4[0].receipt,
                 OperationResultSum::Transfer(OperationResult {
                     result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess{ .. })),
                     internal_operation_results,
@@ -4344,7 +4418,7 @@ mod tests {
                 )
             ),
             "Expected Successful Transfer operation result, got {:?}",
-            receipts4[0]
+            receipts4[0].receipt
         );
     }
 }

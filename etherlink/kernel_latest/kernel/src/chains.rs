@@ -38,7 +38,7 @@ use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
-    operation::{zip_operations, Operation},
+    operation::Operation,
     operation_result::{
         OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
     },
@@ -523,7 +523,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
-            let receipt = match tezos_execution::validate_and_apply_operation(
+            let operations = match tezos_execution::validate_and_apply_operation(
                 host,
                 &context,
                 hash.clone(),
@@ -545,8 +545,6 @@ impl ChainConfigTrait for MichelsonChainConfig {
                     return Err(err.into());
                 }
             };
-
-            let operations = zip_operations(operation.clone(), receipt);
 
             // Add the applied operation in the block in progress
             let applied_operation = AppliedOperation {
@@ -626,7 +624,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             now: &timestamp,
             chain_id: &self.chain_id,
         };
-        let receipt = tezos_execution::validate_and_apply_operation(
+        let operations = tezos_execution::validate_and_apply_operation(
             host,
             &context,
             hash.clone(),
@@ -634,7 +632,6 @@ impl ChainConfigTrait for MichelsonChainConfig {
             &block_ctx,
             skip_signature_check,
         )?;
-        let operations = zip_operations(operation.clone(), receipt);
         let result = AppliedOperation {
             hash,
             branch: operation.branch,
