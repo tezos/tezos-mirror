@@ -521,13 +521,16 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
             let skip_signature_check = false;
 
+            let branch = operation.branch.clone();
+            let signature = operation.signature.clone();
+
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
             let operations = match tezos_execution::validate_and_apply_operation(
                 host,
                 &context,
                 hash.clone(),
-                operation.clone(),
+                operation,
                 &block_ctx,
                 skip_signature_check,
             ) {
@@ -549,11 +552,11 @@ impl ChainConfigTrait for MichelsonChainConfig {
             // Add the applied operation in the block in progress
             let applied_operation = AppliedOperation {
                 hash,
-                branch: operation.branch,
+                branch,
                 op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                     OperationBatchWithMetadata {
                         operations,
-                        signature: operation.signature,
+                        signature,
                     },
                 ),
             };
@@ -624,6 +627,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
             now: &timestamp,
             chain_id: &self.chain_id,
         };
+        let branch = operation.branch.clone();
+        let signature = operation.signature.clone();
         let operations = tezos_execution::validate_and_apply_operation(
             host,
             &context,
@@ -634,11 +639,11 @@ impl ChainConfigTrait for MichelsonChainConfig {
         )?;
         let result = AppliedOperation {
             hash,
-            branch: operation.branch,
+            branch,
             op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                 OperationBatchWithMetadata {
                     operations,
-                    signature: operation.signature,
+                    signature,
                 },
             ),
         };
