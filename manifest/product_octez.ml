@@ -9500,6 +9500,15 @@ let _tezt_vesting_contract_test =
         ptime;
       ]
 
+let _tezt_stats =
+  private_exe
+    "main"
+    ~opam:""
+    ~path:"tezt/stats"
+    ~bisect_ppx:No
+    ~deps:[clap; tezt_core_lib]
+    ~release_status:Unreleased
+
 let _docs_doc_gen =
   private_exes
     ["rpc_doc"; "p2p_doc"]
