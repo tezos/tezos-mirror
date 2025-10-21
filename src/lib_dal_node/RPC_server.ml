@@ -337,6 +337,7 @@ module Profile_handlers = struct
                 match res with
                 | `Waiting_attestation ->
                     Lwt.return_some (`Not_ok (slot_index, num_stored))
+                | `Unpublished -> Lwt.return_none
                 | status ->
                     (* Most probably the RPC was called/handled too late. This
                        may mean that that DAL node is lagging. *)
