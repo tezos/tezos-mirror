@@ -31,7 +31,6 @@ val get_delegates :
   Baking_state_types.Key.t list tzresult Lwt.t
 
 val run_baker :
-  ?recommend_agnostic_baker:bool ->
   string option
   * bool
   * string option

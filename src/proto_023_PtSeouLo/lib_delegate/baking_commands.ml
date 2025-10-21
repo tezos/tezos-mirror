@@ -657,7 +657,7 @@ let baker_args =
    If you do, you need to have the command in sync with the agnostic baker one. This command
    is meant to removed, the source of truth is the agnostic baker.
 *)
-let run_baker ?(recommend_agnostic_baker = true)
+let run_baker
     ( pidfile,
       node_version_check_bypass,
       node_version_allowed,
@@ -680,10 +680,7 @@ let run_baker ?(recommend_agnostic_baker = true)
   Octez_baking_common.Signing_delay.enforce_signing_delay_gating
     ~allow:allow_signing_delay ;
   Command_run.may_lock_pidfile pidfile @@ fun () ->
-  let*! () =
-    if recommend_agnostic_baker then Events.(emit recommend_octez_baker ())
-    else Lwt.return_unit
-  in
+  let*! () = Events.(emit deprecated_proto_specific_baker ()) in
   let* () =
     Octez_agnostic_baker.Command_run.check_node_version
       cctxt
@@ -800,6 +797,8 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
       (prefixes ["run"; "vdf"] @@ stop)
       (fun (pidfile, keep_alive) cctxt ->
         Command_run.may_lock_pidfile pidfile @@ fun () ->
+        let open Lwt_syntax in
+        let* () = Events.(emit deprecated_proto_specific_baker ()) in
         Client_daemon.VDF.run cctxt ~chain:cctxt#chain ~keep_alive);
   ]
 
@@ -824,6 +823,8 @@ let accuser_commands () =
       (prefixes ["run"] @@ stop)
       (fun (pidfile, preserved_levels, keep_alive) cctxt ->
         Command_run.may_lock_pidfile pidfile @@ fun () ->
+        let open Lwt_syntax in
+        let* () = Events.(emit deprecated_proto_specific_accuser ()) in
         Client_daemon.Accuser.run
           cctxt
           ~chain:cctxt#chain

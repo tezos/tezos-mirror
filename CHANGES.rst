@@ -43,9 +43,20 @@ Baker
   Adaptive Issuance feature, and has had no effects since the Paris
   protocol has been voted in. (MR :gl:`!19215`)
 
+- **Deprecation** The ``octez-baker-<protocol>`` binaries are
+   deprecated, and will be removed in the next major version of
+   Octez. Please use ``octez-baker`` instead, which automatically
+   handles protocol switches. (MR :gl:`!19641`)
+
 
 Accuser
 -------
+
+- **Deprecation** The ``octez-accuser-<protocol>`` binaries are
+   deprecated, and will be removed in the next major version of
+   Octez. Please use ``octez-accuser`` instead, which automatically
+   handles protocol switches. (MR :gl:`!19641`)
+
 
 Proxy Server
 ------------
