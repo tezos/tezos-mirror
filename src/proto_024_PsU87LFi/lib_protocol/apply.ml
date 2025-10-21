@@ -3155,11 +3155,8 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
       (Gas.Arith.fp @@ Constants.hard_gas_limit_per_block ctxt)
       (Gas.block_level ctxt)
   in
-  let level = Level.current ctxt in
+  let current_level = Level.current ctxt in
   let attesting_power = Consensus.current_attesting_power ctxt in
-  let* required_attestations =
-    are_attestations_required ctxt ~level:level.level
-  in
   let block_payload_hash =
     Block_payload.hash
       ~predecessor_hash
@@ -3191,12 +3188,22 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   in
   let* ctxt, dal_attestation = Dal_apply.finalisation ctxt in
   let* ctxt, reward_bonus =
+    let* required_attestations =
+      are_attestations_required ctxt ~level:current_level.level
+    in
     if required_attestations then
       let* ctxt = record_attesting_participation ctxt dal_attestation in
-      let* ctxt, rewards_bonus =
-        Baking.bonus_baking_reward ctxt level ~attesting_power
-      in
-      return (ctxt, Some rewards_bonus)
+      (* The attested level is the predecessor of the block's level. *)
+      match Level.pred ctxt current_level with
+      | None ->
+          (* This cannot happen because [required_attestations = true]
+             ensures that [current_level >= 2]. *)
+          assert false
+      | Some attested_level ->
+          let* ctxt, rewards_bonus =
+            Baking.bonus_baking_reward ctxt attested_level ~attesting_power
+          in
+          return (ctxt, Some rewards_bonus)
     else return (ctxt, None)
   in
   let*? baking_reward = Delegate.Rewards.baking_reward_fixed_portion ctxt in
@@ -3227,7 +3234,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
       {
         proposer = payload_producer;
         baker = block_producer;
-        level_info = level;
+        level_info = current_level;
         voting_period_info;
         nonce_hash = block_data_contents.seed_nonce_hash;
         consumed_gas;

@@ -4028,18 +4028,25 @@ let check_attesting_power vi bs =
     return Compare.Int32.(level_position_in_protocol > 1l)
   in
   if are_attestations_required then
-    (* We can safely drop the context: it is only updated for the cache of
-       the stake info for a given level, which should already be cached
-       at this time anyways. *)
-    let* _ctxt, required =
-      Attesting_power.consensus_threshold vi.ctxt vi.current_level
-    in
-    let provided =
-      Attesting_power.get vi.ctxt vi.current_level bs.attesting_power
-    in
-    fail_unless
-      Compare.Int64.(provided >= required)
-      (Not_enough_attestations {required; provided})
+    (* The attested level is the predecessor of the block's level. *)
+    match Level.pred vi.ctxt vi.current_level with
+    | None ->
+        (* This cannot happen because [required_attestations = true]
+           ensures that [vi.current_level >= 2]. *)
+        assert false
+    | Some attested_level ->
+        (* We can safely drop the context: it is only updated for the
+           cache of the stake info for a given level, which should
+           already be cached at this time anyways. *)
+        let* _ctxt, required =
+          Attesting_power.consensus_threshold vi.ctxt attested_level
+        in
+        let provided =
+          Attesting_power.get vi.ctxt attested_level bs.attesting_power
+        in
+        fail_unless
+          Compare.Int64.(provided >= required)
+          (Not_enough_attestations {required; provided})
   else return_unit
 
 (** Check that the locked round in the fitness and the locked round
