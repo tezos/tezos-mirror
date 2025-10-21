@@ -791,6 +791,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         &mut origination_nonce,
         validation_info,
         block_ctx,
+        operation,
     );
 
     if applied {
@@ -811,7 +812,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         safe_host.revert()?;
     }
 
-    Ok(zip_operations(operation, receipts))
+    Ok(receipts)
 }
 
 fn apply_batch<Host: Runtime>(
@@ -820,7 +821,8 @@ fn apply_batch<Host: Runtime>(
     origination_nonce: &mut OriginationNonce,
     validation_info: validate::ValidatedBatch,
     block_ctx: &BlockCtx,
-) -> (Vec<OperationResultSum>, bool) {
+    operation: Operation,
+) -> (Vec<OperationWithMetadata>, bool) {
     let validate::ValidatedBatch {
         source_account,
         validated_operations,
@@ -867,9 +869,10 @@ fn apply_batch<Host: Runtime>(
         receipts[..failure_idx]
             .iter_mut()
             .for_each(OperationResultSum::transform_result_backtrack);
+        let receipts = zip_operations(operation, receipts);
         return (receipts, false);
     }
-
+    let receipts = zip_operations(operation, receipts);
     (receipts, true)
 }
 
