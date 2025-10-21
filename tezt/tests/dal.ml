@@ -2098,7 +2098,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   let* () = check_get_commitment get_commitment_succeeds attested in
   (* Slots that were waiting for attestation and now attested. *)
   let* () =
-    check_slot_status ~__LOC__ ~expected_status:Dal_RPC.Attested attested
+    check_slot_status ~__LOC__ ~expected_status:(Dal_RPC.Attested lag) attested
   in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
@@ -3058,7 +3058,8 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
          should be [unattested]. *)
       let expected_status =
         let open Dal_RPC in
-        if level < first_not_attested_published_level then Attested
+        if level < first_not_attested_published_level then
+          Attested parameters.attestation_lag
         else Unattested
       in
       Check.(
@@ -3173,7 +3174,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
       in
       let expected_status =
         let open Dal_RPC in
-        if level <= intermediary_level then Attested else Unattested
+        if level <= intermediary_level then Attested lag else Unattested
       in
       Check.(
         (expected_status = status)
@@ -5760,7 +5761,7 @@ let test_attestation_through_p2p ~batching_time_interval _protocol
       call attester
       @@ get_level_slot_status ~slot_level:publication_level ~slot_index:index)
   in
-  Check.(status = Dal_RPC.Attested)
+  Check.(status = Dal_RPC.Attested attestation_lag)
     Dal.Check.slot_id_status_typ
     ~error_msg:"Expected status %R (got %L)" ;
   Log.info "Slot sucessfully attested" ;
@@ -7323,7 +7324,7 @@ module Garbage_collection = struct
           call slot_producer
           @@ get_level_slot_status ~slot_level:published_level ~slot_index)
       in
-      Check.(status = Dal_RPC.Attested)
+      Check.(status = Dal_RPC.Attested dal_parameters.attestation_lag)
         ~__LOC__
         Dal.Check.slot_id_status_typ
         ~error_msg:
@@ -7590,7 +7591,7 @@ module Garbage_collection = struct
           call slot_producer
           @@ get_level_slot_status ~slot_level:published_level ~slot_index)
       in
-      Check.(status = Dal_RPC.Attested)
+      Check.(status = Dal_RPC.Attested dal_parameters.attestation_lag)
         ~__LOC__
         Dal.Check.slot_id_status_typ
         ~error_msg:
@@ -10163,7 +10164,7 @@ let test_producer_attester (protocol : Protocol.t)
   Log.info "Status is %a" Dal_RPC.pp_slot_id_status status ;
   log_step "Final check." ;
   Check.(
-    (status = Dal_RPC.Attested)
+    (status = Dal_RPC.Attested lag)
       Dal.Check.slot_id_status_typ
       ~error_msg:"Published slot was supposed to be attested.") ;
   unit
@@ -10313,7 +10314,7 @@ let test_attester_did_not_attest (protocol : Protocol.t)
   Log.info "Status is %a" Dal_RPC.pp_slot_id_status status ;
   log_step "Final checks." ;
   Check.(
-    (status = Dal_RPC.Attested)
+    (status = Dal_RPC.Attested lag)
       Dal.Check.slot_id_status_typ
       ~error_msg:"Published slot was supposed to be attested.") ;
   (* If the [not_attested_by_bootstrap2_promise] is not fulfilled yet, it means that
