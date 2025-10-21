@@ -34,13 +34,13 @@ use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::TransactionHash;
-use tezos_evm_logging::{log, otel_trace, Level::*, Verbosity};
+use tezos_evm_logging::{__trace_kernel, log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_evm_runtime::safe_storage::SafeStorage;
-use tezos_kernel_tracing::kernel_trace;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
 use tezos_smart_rollup_host::path::{OwnedPath, Path};
+use tezos_tracing::trace_kernel;
 
 pub const GENESIS_PARENT_HASH: H256 = H256([0xff; 32]);
 
@@ -169,7 +169,7 @@ fn compute<Host: Runtime>(
 
         // If `apply_transaction` returns `None`, the transaction should be
         // ignored, i.e. invalid signature or nonce.
-        match otel_trace!(
+        match __trace_kernel!(
             host,
             "apply_transaction",
             apply_transaction(
@@ -441,7 +441,7 @@ fn promote_block<Host: Runtime>(
     Ok(())
 }
 
-#[kernel_trace("stage_two")]
+#[trace_kernel("stage_two")]
 pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &mut Host,
     chain_config: &ChainConfig,

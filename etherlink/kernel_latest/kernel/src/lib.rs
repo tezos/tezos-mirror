@@ -32,7 +32,6 @@ use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::internal_runtime::InternalRuntime;
 use tezos_evm_runtime::runtime::{KernelHost, Runtime};
-use tezos_kernel_tracing::kernel_trace;
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup::michelson::MichelsonUnit;
 use tezos_smart_rollup::outbox::{
@@ -40,6 +39,7 @@ use tezos_smart_rollup::outbox::{
 };
 use tezos_smart_rollup_encoding::public_key::PublicKey;
 use tezos_smart_rollup_host::runtime::ValueType;
+use tezos_tracing::trace_kernel;
 
 mod apply;
 mod block;
@@ -97,7 +97,7 @@ fn switch_to_public_rollup<Host: Runtime>(host: &mut Host) -> Result<(), Error> 
     }
 }
 
-#[kernel_trace]
+#[trace_kernel]
 pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Error> {
     log!(host, Debug, "Entering stage zero.");
     init_storage_versioning(host)?;
@@ -108,7 +108,7 @@ pub fn stage_zero<Host: Runtime>(host: &mut Host) -> Result<MigrationStatus, Err
 // DO NOT RENAME: function name is used during benchmark
 // Never inlined when the kernel is compiled for benchmarks, to ensure the
 // function is visible in the profiling results.
-#[kernel_trace]
+#[trace_kernel]
 #[cfg_attr(feature = "benchmark", inline(never))]
 pub fn stage_one<Host: Runtime>(
     host: &mut Host,

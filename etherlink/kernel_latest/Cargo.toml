@@ -14,7 +14,7 @@ members = [
   "kernel",
   "evm_evaluation",
   "indexable_storage",
-  "kernel_tracing",
+  "tracing",
   "logging",
   "storage",
   "revm",
@@ -70,7 +70,7 @@ tezos_ethereum = { package = "tezos_ethereum_latest", path = "./ethereum" }
 tezos_tezlink = { package = "tezos_tezlink_latest", path = "./tezos" }
 tezos-execution = { package = "tezos-execution-latest", path = "./tezos_execution" }
 tezos-evm-logging = { package = "tezos-evm-logging-latest", path = "./logging" }
-tezos-kernel-tracing = { package = "tezos-kernel-tracing-latest", path = "./kernel_tracing" }
+tezos-tracing = { package = "tezos-tracing-latest", path = "./tracing" }
 tezos-evm-runtime = { package = "tezos-evm-runtime-latest", path = "./runtime" }
 tezos-indexable-storage = { package = "tezos-indexable-storage-latest", path = "./indexable_storage" }
 tezos-storage = { package = "tezos-storage-latest", path = "./storage" }

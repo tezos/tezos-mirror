@@ -1236,7 +1236,6 @@ dependencies = [
  "tezos-evm-runtime-latest",
  "tezos-execution-latest",
  "tezos-indexable-storage-latest",
- "tezos-kernel-tracing-latest",
  "tezos-smart-rollup",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
@@ -1248,6 +1247,7 @@ dependencies = [
  "tezos-smart-rollup-panic-hook",
  "tezos-smart-rollup-storage",
  "tezos-storage-latest",
+ "tezos-tracing-latest",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "tezos_ethereum_latest",
@@ -3219,15 +3219,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tezos-kernel-tracing-latest"
-version = "0.1.0"
-dependencies = [
- "quote",
- "syn 2.0.103",
- "tezos-evm-logging-latest",
-]
-
-[[package]]
 name = "tezos-smart-rollup"
 version = "0.2.2"
 dependencies = [
@@ -3392,6 +3383,15 @@ dependencies = [
  "tezos_data_encoding",
  "tezos_ethereum_latest",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "tezos-tracing-latest"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.103",
+ "tezos-evm-logging-latest",
 ]
 
 [[package]]

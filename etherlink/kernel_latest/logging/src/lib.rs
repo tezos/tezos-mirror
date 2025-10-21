@@ -69,7 +69,7 @@ macro_rules! log {
 
 #[cfg(all(feature = "tracing", feature = "alloc"))]
 #[macro_export]
-macro_rules! otel_trace {
+macro_rules! __trace_kernel {
     ($host:expr, $name:expr, $expr:expr) => {{
         let msg = format!("[{}] [start] {}", tezos_evm_logging::Level::OTel, $name);
         $crate::debug_str!($host, &msg);
@@ -80,8 +80,9 @@ macro_rules! otel_trace {
     }};
 }
 
+// Must only be used by the procedural macro for kernel tracing.
 #[cfg(feature = "tracing")]
-pub fn otel_trace<H, F, R>(host: &mut H, name: &str, f: F) -> R
+pub fn internal_trace_kernel<H, F, R>(host: &mut H, name: &str, f: F) -> R
 where
     H: tezos_smart_rollup_host::runtime::Runtime,
     F: FnOnce(&mut H) -> R,
@@ -98,7 +99,7 @@ where
 
 #[cfg(not(feature = "tracing"))]
 #[macro_export]
-macro_rules! otel_trace {
+macro_rules! __trace_kernel {
     ($host:expr, $name:expr, $expr:expr) => {{
         $expr
     }};
