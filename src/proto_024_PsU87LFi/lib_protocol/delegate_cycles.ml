@@ -132,14 +132,10 @@ let maybe_distribute_dal_attesting_rewards ctxt delegate ~gets_consensus_rewards
 (* This includes DAL rewards. *)
 let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
   let open Lwt_result_syntax in
-  let cycle_eras = Raw_context.cycle_eras ctxt in
-  let first_level =
-    Level_repr.first_level_in_cycle_from_eras ~cycle_eras last_cycle
-  in
   let all_bakers_attest_enabled =
-    Consensus_parameters_storage.check_all_bakers_attest_at_level
+    Consensus_parameters_storage.is_all_bakers_attest_enabled_for_cycle
       ctxt
-      first_level
+      last_cycle
   in
   let*? attesting_reward_per_block =
     Delegate_rewards.attesting_reward_per_block ctxt

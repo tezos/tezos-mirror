@@ -14,3 +14,15 @@ val consensus_threshold :
 
 val consensus_committee :
   Raw_context.t -> Level_repr.t -> (Raw_context.t * int64) tzresult Lwt.t
+
+(** Returns true IFF the first level of the given cycle is greater
+    than or equal to the activation level of all-bakers-attest.
+
+    This is used by some mechanisms that must do something consistent
+    accross the whole cycle, such as cycle rewards or missed
+    attestations tracking.
+
+    Remark: the activation level will always be set to the first level
+    of a cycle anyway. *)
+val is_all_bakers_attest_enabled_for_cycle :
+  Raw_context.t -> Cycle_repr.t -> bool
