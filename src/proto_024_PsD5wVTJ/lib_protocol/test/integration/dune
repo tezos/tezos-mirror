@@ -9,12 +9,12 @@
   bls12-381.archive
   tezt
   octez-libs.base
-  octez-protocol-024-PsU87LFi-libs.client
-  tezos-protocol-024-PsU87LFi.protocol
-  tezos-protocol-024-PsU87LFi.parameters
-  octez-protocol-024-PsU87LFi-libs.test-helpers
+  octez-protocol-024-PsD5wVTJ-libs.client
+  tezos-protocol-024-PsD5wVTJ.protocol
+  tezos-protocol-024-PsD5wVTJ.parameters
+  octez-protocol-024-PsD5wVTJ-libs.test-helpers
   octez-libs.base-test-helpers
-  octez-protocol-024-PsU87LFi-libs.plugin)
+  octez-protocol-024-PsD5wVTJ-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -22,8 +22,8 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_client_024_PsU87LFi
-  -open Tezos_protocol_024_PsU87LFi
-  -open Tezos_protocol_024_PsU87LFi_parameters
+  -open Tezos_protocol_024_PsD5wVTJ
+  -open Tezos_protocol_024_PsD5wVTJ_parameters
   -open Tezos_024_PsU87LFi_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_protocol_plugin_024_PsU87LFi)
@@ -55,7 +55,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-024-PsU87LFi-tests)
+ (package tezos-protocol-024-PsD5wVTJ-tests)
  (deps (glob_files wasm_kernel/*.wasm))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))

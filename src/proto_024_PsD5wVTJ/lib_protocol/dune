@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_environment_024_PsU87LFi)
- (public_name tezos-protocol-024-PsU87LFi.protocol.environment)
+ (public_name tezos-protocol-024-PsD5wVTJ.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment)
@@ -18,11 +18,11 @@
    "module Name = struct let name = \"024-PsU87LFi\" end\ninclude Tezos_protocol_environment.V15.Make(Name)()\n")))
 
 (library
- (name tezos_raw_protocol_024_PsU87LFi)
- (public_name tezos-protocol-024-PsU87LFi.protocol.raw)
+ (name tezos_raw_protocol_024_PsD5wVTJ)
+ (public_name tezos-protocol-024-PsD5wVTJ.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-024-PsU87LFi.protocol.environment)
+  tezos-protocol-024-PsD5wVTJ.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -291,20 +291,20 @@
   Main))
 
 (library
- (name tezos_protocol_024_PsU87LFi)
- (public_name tezos-protocol-024-PsU87LFi.protocol)
+ (name tezos_protocol_024_PsD5wVTJ)
+ (public_name tezos-protocol-024-PsD5wVTJ.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs
-  tezos-protocol-024-PsU87LFi.protocol.raw)
+  tezos-protocol-024-PsD5wVTJ.protocol.raw)
  (flags
   (:standard)
   -nopervasives)
- (modules Protocol Tezos_protocol_024_PsU87LFi))
+ (modules Protocol Tezos_protocol_024_PsD5wVTJ))
 
 (install
- (package tezos-protocol-024-PsU87LFi)
+ (package tezos-protocol-024-PsD5wVTJ)
  (section lib)
  (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
@@ -313,10 +313,10 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsU87LFiQKMFspfnufwsWQ4NSWwR3fH8M2xneJEyAj61M6NNLew\"\nlet name = Tezos_protocol_environment_024_PsU87LFi.Name.name\ninclude Tezos_raw_protocol_024_PsU87LFi\ninclude Tezos_raw_protocol_024_PsU87LFi.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsU87LFiQKMFspfnufwsWQ4NSWwR3fH8M2xneJEyAj61M6NNLew\"\nlet name = Tezos_protocol_environment_024_PsU87LFi.Name.name\ninclude Tezos_raw_protocol_024_PsD5wVTJ\ninclude Tezos_raw_protocol_024_PsU87LFi.Main\n")))
 
 (rule
- (targets tezos_protocol_024_PsU87LFi.ml)
+ (targets tezos_protocol_024_PsD5wVTJ.ml)
  (action
   (write-file
    %{targets}
@@ -591,17 +591,17 @@
  (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
 
 (library
- (name tezos_protocol_024_PsU87LFi_lifted)
- (public_name tezos-protocol-024-PsU87LFi.protocol.lifted)
+ (name tezos_protocol_024_PsD5wVTJ_lifted)
+ (public_name tezos-protocol-024-PsD5wVTJ.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs
-  tezos-protocol-024-PsU87LFi.protocol)
+  tezos-protocol-024-PsD5wVTJ.protocol)
  (flags
   (:standard)
   -nopervasives
-  -open Tezos_protocol_024_PsU87LFi)
+  -open Tezos_protocol_024_PsD5wVTJ)
  (modules Lifted_protocol))
 
 (rule
@@ -612,7 +612,7 @@
    "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
 
 (library
- (name tezos_protocol_024_PsU87LFi_functor)
+ (name tezos_protocol_024_PsD5wVTJ_functor)
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs)
@@ -894,11 +894,11 @@
     (run %{bin:octez-protocol-compiler.octez-protocol-packer} %{src_dir})))))
 
 (library
- (name tezos_embedded_protocol_024_PsU87LFi)
- (public_name tezos-protocol-024-PsU87LFi.embedded-protocol)
+ (name tezos_embedded_protocol_024_PsD5wVTJ)
+ (public_name tezos-protocol-024-PsD5wVTJ.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-024-PsU87LFi.protocol
+  tezos-protocol-024-PsD5wVTJ.protocol
   octez-shell-libs.protocol-updater
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
