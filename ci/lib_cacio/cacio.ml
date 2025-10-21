@@ -744,7 +744,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   let job_tezt_fetch_records =
     parameterize @@ fun from_pipeline ->
     job
-      ("fetch_tezt_records_from_" ^ from_pipeline)
+      ("teztrec_" ^ from_pipeline)
       ~__POS__
       ~description:
         "Fetch Tezt records so that jobs that run Tezt tests can use them for \
