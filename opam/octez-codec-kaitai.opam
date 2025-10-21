@@ -38,7 +38,7 @@ depopts: [
   "octez-protocol-021-PsQuebec-libs"
   "octez-protocol-022-PsRiotum-libs"
   "octez-protocol-023-PtSeouLo-libs"
-  "octez-protocol-024-PsU87LFi-libs"
+  "octez-protocol-024-PsD5wVTJ-libs"
   "octez-protocol-alpha-libs"
 ]
 build: [

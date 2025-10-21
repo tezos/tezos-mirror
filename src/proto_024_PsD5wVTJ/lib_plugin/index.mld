@@ -1,0 +1,17 @@
+{0 Octez-protocol-024-PsD5wVTJ-libs: octez protocol 024-PsD5wVTJ libraries}
+
+This is a package containing some libraries related to the Tezos 024-PsD5wVTJ protocol.
+
+It contains the following libraries:
+
+- {{!module-Tezos_024_PsD5wVTJ_test_helpers}Tezos_024_PsD5wVTJ_test_helpers}: Protocol testing framework
+- {{!module-Tezos_agnostic_baker_024_PsD5wVTJ}Tezos_agnostic_baker_024_PsD5wVTJ}: Protocol specific library for the Agnostic Baker
+- {{!module-Tezos_baking_024_PsD5wVTJ}Tezos_baking_024_PsD5wVTJ}: Base library for `tezos-baker/accuser`
+- {{!module-Tezos_baking_024_PsD5wVTJ_commands}Tezos_baking_024_PsD5wVTJ_commands}: Protocol-specific commands for baking
+- {{!module-Tezos_client_024_PsD5wVTJ}Tezos_client_024_PsD5wVTJ}: Protocol specific library for `octez-client`
+- {{!module-Tezos_dal_024_PsD5wVTJ}Tezos_dal_024_PsD5wVTJ}: Protocol specific library for the Data availability Layer
+- {{!module-Tezos_layer2_utils_024_PsD5wVTJ}Tezos_layer2_utils_024_PsD5wVTJ}: Protocol specific library for Layer 2 utils
+- {{!module-Tezos_protocol_plugin_024_PsD5wVTJ}Tezos_protocol_plugin_024_PsD5wVTJ}: Protocol plugin
+- {{!module-Tezos_protocol_plugin_024_PsD5wVTJ_registerer}Tezos_protocol_plugin_024_PsD5wVTJ_registerer}: Protocol plugin registerer
+- {{!module-Tezos_smart_rollup_024_PsD5wVTJ}Tezos_smart_rollup_024_PsD5wVTJ}: Protocol specific library of helpers for `tezos-smart-rollup`
+- {{!module-Tezos_smart_rollup_layer2_024_PsD5wVTJ}Tezos_smart_rollup_layer2_024_PsD5wVTJ}: Protocol specific library for `tezos-smart-rollup`
