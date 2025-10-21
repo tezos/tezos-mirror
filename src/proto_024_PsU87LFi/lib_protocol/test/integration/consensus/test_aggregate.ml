@@ -74,12 +74,25 @@ type 'kind aggregate =
   | Preattestation : Alpha_context.Kind.preattestations_aggregate aggregate
   | Attestation : Alpha_context.Kind.attestations_aggregate aggregate
 
-let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters ~ctxt
-    ~level
-    (result :
-      kind Tezos_protocol_024_PsU87LFi__Protocol.Apply_results.contents_result)
-    =
+let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
+    ((block, (_, op_receipts)) : Block.block_with_metadata) =
   let open Lwt_result_syntax in
+  let (result
+        : kind
+          Tezos_protocol_024_PsU87LFi__Protocol.Apply_results.contents_result) =
+    match kind with
+    | Preattestation -> find_preattestations_aggregate_result op_receipts
+    | Attestation -> find_attestations_aggregate_result op_receipts
+  in
+  let* ctxt = Block.get_alpha_ctxt block in
+  let block_level = Alpha_context.Level.current ctxt in
+  let attested_level =
+    match kind with
+    | Preattestation -> block_level
+    | Attestation ->
+        Alpha_context.Level.pred ctxt block_level
+        |> WithExceptions.Option.get ~loc:__LOC__
+  in
   match (kind, result) with
   | ( Preattestation,
       Preattestations_aggregate_result
@@ -111,7 +124,10 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters ~ctxt
             attesters
         in
         let total_consensus_power =
-          Alpha_context.Attesting_power.get ctxt level total_consensus_power
+          Alpha_context.Attesting_power.get
+            ctxt
+            ~attested_level
+            total_consensus_power
         in
         if Int64.equal voting_power total_consensus_power then return_unit
         else
@@ -136,7 +152,8 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters ~ctxt
       in
       let resulting_committee =
         List.map
-          (fun (a, b) -> (a, Alpha_context.Attesting_power.get ctxt level b))
+          (fun (a, b) ->
+            (a, Alpha_context.Attesting_power.get ctxt ~attested_level b))
           resulting_committee
       in
       if
@@ -172,38 +189,6 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters ~ctxt
           pp
           resulting_committee
 
-(* [check_preattestations_aggregate_result ~committee result] verifies that
-   [result] has the following properties:
-   - [balance_update] is empty;
-   - [voting_power] equals the sum of slots owned by attesters in [committee];
-   - the public key hashes in [result] committee match those of [committee]. *)
-let check_preattestations_aggregate_result ~attesters
-    (result :
-      Alpha_context.Kind.preattestations_aggregate
-      Tezos_protocol_024_PsU87LFi__Protocol.Apply_results.contents_result) =
-  check_aggregate_result Preattestation ~attesters result
-
-(* [check_attestations_aggregate_result ~committee result] verifies that
-   [result] has the following properties:
-   - [balance_update] is empty;
-   - [voting_power] equals the sum of slots owned by attesters in [committee];
-   - the public key hashes in [result] committee match those of [committee]. *)
-let check_attestations_aggregate_result ~attesters
-    (result :
-      Alpha_context.Kind.attestations_aggregate
-      Tezos_protocol_024_PsU87LFi__Protocol.Apply_results.contents_result) =
-  check_aggregate_result Attestation ~attesters result
-
-let check_after_preattestations_aggregate
-    ((_, (_, op_receipts)) : Block.block_with_metadata) =
-  check_preattestations_aggregate_result
-    (find_preattestations_aggregate_result op_receipts)
-
-let check_after_attestations_aggregate
-    ((_, (_, op_receipts)) : Block.block_with_metadata) =
-  check_attestations_aggregate_result
-    (find_attestations_aggregate_result op_receipts)
-
 (** Tests the validation and application of a preattestations_aggregate.
 
     [attesting_slots] defaults to the respective canonical slots of
@@ -237,14 +222,8 @@ let check_preattestations_aggregate_validation_and_application ~loc ~attesters
   in
   match error with
   | None ->
-      let*? ((b, _) as block_with_metadata) = res in
-      let* ctxt = Block.get_alpha_ctxt b in
-      let level = Alpha_context.Level.current ctxt in
-      check_after_preattestations_aggregate
-        ~attesters
-        ~ctxt
-        ~level
-        block_with_metadata
+      let*? block_with_metadata = res in
+      check_aggregate_result Preattestation ~attesters block_with_metadata
   | Some error -> Assert.proto_error ~loc res error
 
 (** Tests the validation and application of an attestations_aggregate.
@@ -270,11 +249,9 @@ let check_attestations_aggregate_validation_and_application ~loc ~attesters
     | None -> List.map Op.attesting_slot_of_attester attesters
   in
   let* operation = Op.attestations_aggregate ~committee attested_block in
-  let* ctxt = Block.get_alpha_ctxt attested_block in
-  let level = Alpha_context.Level.current ctxt in
   let check_after_block_mode =
     match error with
-    | None -> Some (check_after_attestations_aggregate ~ctxt ~level ~attesters)
+    | None -> Some (check_aggregate_result Attestation ~attesters)
     | Some _ -> None
   in
   Op.check_validation_and_application_all_modes_different_outcomes

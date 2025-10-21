@@ -48,7 +48,7 @@ let get ctxt misbehaviour (denounced : Signature.public_key_hash list) =
       let all_bakers_attest_enabled =
         Consensus_parameters_storage.check_all_bakers_attest_at_level
           ctxt
-          misbehaviour_level
+          ~attested_level:misbehaviour_level
       in
       let* ctxt, rights =
         Delegate_sampler.attesting_power
@@ -57,7 +57,9 @@ let get ctxt misbehaviour (denounced : Signature.public_key_hash list) =
           misbehaviour_level
       in
       let* ctxt, committee_size =
-        Consensus_parameters_storage.consensus_committee ctxt misbehaviour_level
+        Consensus_parameters_storage.consensus_committee
+          ctxt
+          ~attested_level:misbehaviour_level
       in
       return (ctxt, for_double_attestation ctxt ~committee_size rights denounced)
 

@@ -822,9 +822,11 @@ let get_context context ~(head : Tezos_base.Block_header.shell_header) =
   in
   return ctxt
 
-let sources_from_level_and_slot ctxt level slot =
+let sources_from_level_and_slot ctxt ~attested_level slot =
   let open Lwt_syntax in
-  let* slot_owner = Stake_distribution.attestation_slot_owner ctxt level slot in
+  let* slot_owner =
+    Stake_distribution.attestation_slot_owner ctxt ~attested_level slot
+  in
   match slot_owner with
   | Ok
       ( _ctxt,
@@ -841,10 +843,10 @@ let sources_from_level_and_slot ctxt level slot =
 let sources_from_aggregate ctxt
     (consensus_content : consensus_aggregate_content) slots =
   let open Lwt_syntax in
-  let level = Level.from_raw ctxt consensus_content.level in
+  let attested_level = Level.from_raw ctxt consensus_content.level in
   Lwt_list.fold_left_s
     (fun acc slot ->
-      let* sources = sources_from_level_and_slot ctxt level slot in
+      let* sources = sources_from_level_and_slot ctxt ~attested_level slot in
       return (sources @ acc))
     []
     slots
@@ -857,8 +859,8 @@ let sources_from_operation ctxt
   | Single (Failing_noop _) -> return_nil
   | Single (Preattestation consensus_content)
   | Single (Attestation {consensus_content; dal_content = _}) ->
-      let level = Level.from_raw ctxt consensus_content.level in
-      sources_from_level_and_slot ctxt level consensus_content.slot
+      let attested_level = Level.from_raw ctxt consensus_content.level in
+      sources_from_level_and_slot ctxt ~attested_level consensus_content.slot
   | Single (Preattestations_aggregate {consensus_content; committee}) ->
       sources_from_aggregate ctxt consensus_content committee
   | Single (Attestations_aggregate {consensus_content; committee}) ->
