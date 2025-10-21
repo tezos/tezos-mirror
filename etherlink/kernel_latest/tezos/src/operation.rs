@@ -5,7 +5,6 @@
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::enc_wrappers::{BlockHash, OperationHash};
-use crate::operation_result::{OperationResultSum, OperationWithMetadata};
 use mir::ast::michelson_address::entrypoint;
 use primitive_types::H256;
 use rlp::Decodable;
@@ -275,21 +274,6 @@ pub fn sign_operation(
     let signature = sk.sign(serialized_unsigned_operation)?;
 
     Ok(signature.into())
-}
-
-pub fn zip_operations(
-    operation: Operation,
-    receipt: Vec<OperationResultSum>,
-) -> Vec<OperationWithMetadata> {
-    operation
-        .content
-        .into_iter()
-        .zip(receipt)
-        .map(|(c, r)| OperationWithMetadata {
-            content: c,
-            receipt: r,
-        })
-        .collect::<Vec<OperationWithMetadata>>()
 }
 
 #[cfg(test)]

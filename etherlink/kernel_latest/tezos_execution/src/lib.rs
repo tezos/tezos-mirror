@@ -1010,9 +1010,9 @@ mod tests {
         block::TezBlock,
         enc_wrappers::OperationHash,
         operation::{
-            sign_operation, zip_operations, ManagerOperation, ManagerOperationContent,
-            Operation, OperationContent, OriginationContent, Parameter, RevealContent,
-            Script, TransferContent,
+            sign_operation, ManagerOperation, ManagerOperationContent, Operation,
+            OperationContent, OriginationContent, Parameter, RevealContent, Script,
+            TransferContent,
         },
         operation_result::{
             ApplyOperationError, ApplyOperationErrors, BacktrackedResult, Balance,
@@ -1364,6 +1364,21 @@ mod tests {
             .expect("Set balance should have succeeded");
 
         account
+    }
+
+    fn zip_operations(
+        operation: Operation,
+        receipt: Vec<OperationResultSum>,
+    ) -> Vec<OperationWithMetadata> {
+        operation
+            .content
+            .into_iter()
+            .zip(receipt)
+            .map(|(c, r)| OperationWithMetadata {
+                content: c,
+                receipt: r,
+            })
+            .collect::<Vec<OperationWithMetadata>>()
     }
 
     // Test an operation on an account that has no entry in `/context/contracts/index`
