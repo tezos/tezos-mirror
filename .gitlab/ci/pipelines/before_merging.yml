@@ -3364,6 +3364,81 @@ etherlink.unit_tests:
     when: always
   retry: 2
 
+etherlink.build_tezt:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - etherlink.mk
+    - etherlink/**/*
+    - etherlink/**/*.rs
+    - images/create_image.sh
+    - images/rust-toolchain/**/*
+    - images/scripts/install_datadog_static.sh
+    - scripts/version.sh
+    - sdk/rust/**/*
+    - src/kernel_sdk/**/*
+    - src/lib_wasm_runtime/**/*.rs
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: rust-targets-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - dune build etherlink/ci/tezt/main.exe
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+  artifacts:
+    name: etherlink_tezt_exe
+    expire_in: 1 day
+    paths:
+    - _build/default/etherlink/ci/tezt/main.exe
+    when: on_success
+
 documentation.rst-check:
   image: ${ci_image_name_protected}/test:amd64--master
   stage: sanity

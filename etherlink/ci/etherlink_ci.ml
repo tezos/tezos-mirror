@@ -203,6 +203,35 @@ let job_test_revm_compatibility =
       "./revm-evaluation-assessor --test-cases ./evm_fixtures/";
     ]
 
+let job_build_tezt =
+  CI.job
+    "build_tezt"
+    ~__POS__
+    ~stage:Build
+    ~description:"Build the Etherlink Tezt executable."
+    ~image:Tezos_ci.Images.CI.build
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~name:"etherlink_tezt_exe"
+         ~when_:On_success
+         ~expire_in:(Duration (Days 1))
+         ["_build/default/etherlink/ci/tezt/main.exe"])
+    ~dune_cache:
+      (Cacio.dune_cache
+         ~key:
+           ("dune-build-cache-"
+           ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id))
+         ())
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    ~cargo_target_caches:true
+    [
+      "./scripts/ci/take_ownership.sh";
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      "dune build etherlink/ci/tezt/main.exe";
+    ]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -216,6 +245,7 @@ let register () =
       (Auto, job_test_firehose Before_merging);
       (Auto, job_test_evm_compatibility Before_merging);
       (Auto, job_test_revm_compatibility Before_merging);
+      (Auto, job_build_tezt);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
@@ -231,5 +261,6 @@ let register () =
       (Auto, job_test_firehose Schedule_extended_test);
       (Auto, job_test_evm_compatibility Before_merging);
       (Auto, job_test_revm_compatibility Before_merging);
+      (Auto, job_build_tezt);
     ] ;
   ()
