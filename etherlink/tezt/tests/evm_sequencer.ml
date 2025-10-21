@@ -1387,9 +1387,7 @@ let test_send_deposit_to_delayed_inbox =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "deposit"]
     ~title:"Send a deposit to the delayed inbox"
   @@
-  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; kernel; _}
-      _protocol
-    ->
+  fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} _protocol ->
   let amount = Tez.of_int 16 in
   let depositor = Constant.bootstrap5 in
   let receiver =
@@ -1418,6 +1416,7 @@ let test_send_deposit_to_delayed_inbox =
       (Sc_rollup_node sc_rollup_node)
       (List.hd delayed_transactions_hashes)
   in
+
   let deposit_bytes = Hex.to_bytes (`Hex (Option.get deposit)) in
 
   match Evm_node_lib_dev_encoding.Rlp.decode deposit_bytes with
@@ -1432,19 +1431,8 @@ let test_send_deposit_to_delayed_inbox =
       Check.((receiver = "1074fd1ec02cbeaa5a90450505cf3b48d834f3eb") string)
         ~error_msg:"Expected receiver %R, but got: %L" ;
       let amount = amnt |> Hex.of_bytes |> Hex.show in
-      (* Changing the internal representation of the deposit from wei to mutez *)
-      (* This doesn't affect Etherlink logs and behavior but as we verify
-         directly in the durable_storage, the exepected amount depends on the kernel. *)
-      let expected_amount =
-        match Kernel.of_tag_use kernel with
-        | Kernel.Latest ->
-            (* 16_000_000 mutez in big endian *)
-            "f42400"
-        | Kernel.Mainnet ->
-            (* 16000000000000000000 big endian *)
-            "de0b6b3a76400000"
-      in
-      Check.((amount = expected_amount) string)
+      (* 16000000000000000000 big endian *)
+      Check.((amount = "de0b6b3a76400000") string)
         ~error_msg:"Expected amount %R, but got: %L" ;
       unit
   | _ -> failwith "invalid delayed inbox item"

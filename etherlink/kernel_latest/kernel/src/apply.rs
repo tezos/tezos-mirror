@@ -74,9 +74,7 @@ impl Transaction {
 
     fn value(&self) -> U256 {
         match &self.content {
-            TransactionContent::Deposit(Deposit { amount, .. }) => {
-                tezos_ethereum::wei::eth_from_mutez(*amount)
-            }
+            TransactionContent::Deposit(Deposit { amount, .. }) => *amount,
             &TransactionContent::FaDeposit(_) => U256::zero(),
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => transaction.value,
