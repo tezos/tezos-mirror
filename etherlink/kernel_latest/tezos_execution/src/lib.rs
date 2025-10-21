@@ -25,7 +25,7 @@ use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_tezlink::enc_wrappers::OperationHash;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
-use tezos_tezlink::operation::{zip_operations, Operation, OriginationContent, Script};
+use tezos_tezlink::operation::{Operation, OriginationContent, Script};
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, ApplyOperationError, ContentResult,
     InternalContentWithMetadata, InternalOperationSum, OperationWithMetadata, Originated,
@@ -763,7 +763,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     let validation_info = match validate::execute_validation(
         &mut safe_host,
         context,
-        operation.clone(),
+        operation,
         skip_signature_check,
     ) {
         Ok(validation_info) => validation_info,
@@ -791,7 +791,6 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         &mut origination_nonce,
         validation_info,
         block_ctx,
-        operation,
     );
 
     if applied {
@@ -821,7 +820,6 @@ fn apply_batch<Host: Runtime>(
     origination_nonce: &mut OriginationNonce,
     validation_info: validate::ValidatedBatch,
     block_ctx: &BlockCtx,
-    operation: Operation,
 ) -> (Vec<OperationWithMetadata>, bool) {
     let validate::ValidatedBatch {
         source_account,
@@ -858,7 +856,7 @@ fn apply_batch<Host: Runtime>(
             )
         };
 
-        if first_failure.is_none() && !receipt.is_applied() {
+        if first_failure.is_none() && !receipt.receipt.is_applied() {
             first_failure = Some(index);
         }
 
@@ -866,13 +864,11 @@ fn apply_batch<Host: Runtime>(
     }
 
     if let Some(failure_idx) = first_failure {
-        receipts[..failure_idx]
-            .iter_mut()
-            .for_each(OperationResultSum::transform_result_backtrack);
-        let receipts = zip_operations(operation, receipts);
+        receipts[..failure_idx].iter_mut().for_each(|receipt| {
+            OperationResultSum::transform_result_backtrack(&mut receipt.receipt)
+        });
         return (receipts, false);
     }
-    let receipts = zip_operations(operation, receipts);
     (receipts, true)
 }
 
@@ -883,7 +879,7 @@ fn apply_operation<Host: Runtime>(
     source_account: &TezlinkImplicitAccount,
     validated_operation: validate::ValidatedOperation,
     block_ctx: &BlockCtx,
-) -> OperationResultSum {
+) -> OperationWithMetadata {
     let mut internal_operations_receipts = Vec::new();
     let mut gas = validated_operation.gas;
     let mut tc_ctx = TcCtx {
@@ -906,7 +902,10 @@ fn apply_operation<Host: Runtime>(
                 reveal_result.map_err(Into::into),
                 internal_operations_receipts,
             );
-            OperationResultSum::Reveal(manager_result)
+            OperationWithMetadata {
+                content: validated_operation.content.into(),
+                receipt: OperationResultSum::Reveal(manager_result),
+            }
         }
         OperationContent::Transfer(TransferContent {
             amount,
@@ -944,7 +943,10 @@ fn apply_operation<Host: Runtime>(
                 transfer_result.map_err(Into::into),
                 internal_operations_receipts,
             );
-            OperationResultSum::Transfer(manager_result)
+            OperationWithMetadata {
+                content: validated_operation.content.into(),
+                receipt: OperationResultSum::Transfer(manager_result),
+            }
         }
         OperationContent::Origination(OriginationContent {
             ref balance,
@@ -980,7 +982,10 @@ fn apply_operation<Host: Runtime>(
                 origination_result.map_err(|e| e.into()),
                 internal_operations_receipts,
             );
-            OperationResultSum::Origination(manager_result)
+            OperationWithMetadata {
+                content: validated_operation.content.into(),
+                receipt: OperationResultSum::Origination(manager_result),
+            }
         }
     }
 }
