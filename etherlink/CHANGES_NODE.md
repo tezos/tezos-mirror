@@ -6,16 +6,7 @@
 
 ### Configuration changes
 
-- Add a `data_dir` field to the config. The field can be overridden by
-  the command line or the environment variable `EVM_NODE_DATA_DIR`. (!19619)
-
 ### RPCs changes
-
-- `debug_traceTransaction` and `debug_traceBlockByNumber` RPCs now correctly
-  use native execution when the node is configured with the `rpcs_only` policy
-  (which is the case by default). (!19665)
-- Disable [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) checks during
-  `debug_traceCall` simulations in Ebisu. (!19669)
 
 ### Monitoring changes
 
@@ -26,6 +17,36 @@
 ### Storage changes
 
 ### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.46 (2025-10-21)
+
+This release is a hotfix release that addresses issues in the RPCs
+`debug_traceTransaction` and `debug_traceBlockByNumber`.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+### Configuration changes
+
+- Add a `data_dir` field to the config. The field can be overridden by
+  the command line or the environment variable `EVM_NODE_DATA_DIR`. (!19619)
+
+### RPCs changes
+
+- `debug_traceTransaction` and `debug_traceBlockByNumber` RPCs now correctly
+  use native execution when the node is configured with the `rpcs_only` policy
+  (which is the case by default). (!19665)
+- Disable [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) checks during
+  `debug_traceCall` simulations in Ebisu. (!19669)
+- Prevent transactions from getting stuck when they are being sent to an
+  unresponsive node. (!19683)
 
 ### Experimental features changes
 
