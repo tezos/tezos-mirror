@@ -844,7 +844,7 @@ fn apply_batch<Host: Runtime>(
                 "Skipping this operation because we already failed on {first_failure:?}."
             );
             produce_skipped_receipt(
-                &validated_operation.content,
+                validated_operation.content,
                 validated_operation.balance_updates,
             )
         } else {

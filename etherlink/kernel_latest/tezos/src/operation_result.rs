@@ -627,7 +627,7 @@ pub fn produce_operation_result<M: OperationKind>(
 }
 
 pub fn produce_skipped_receipt(
-    op: &ManagerOperation<OperationContent>,
+    op: ManagerOperation<OperationContent>,
     balance_updates: Vec<BalanceUpdate>,
 ) -> OperationResultSum {
     match op.operation {
