@@ -194,12 +194,32 @@ module Dal_RPC = struct
 
   type profile = Bootstrap | Controller of controller_profiles
 
+  type slot_id_status =
+    | Waiting_attestation
+    | Attested
+    | Unattested
+    | Unpublished
+
   type slot_header = {
     slot_level : int;
     slot_index : int;
     commitment : string;
     status : string;
   }
+
+  let pp_slot_id_status fmt = function
+    | Waiting_attestation -> Format.fprintf fmt "Waiting_attestation"
+    | Attested -> Format.fprintf fmt "Attested"
+    | Unattested -> Format.fprintf fmt "Unattested"
+    | Unpublished -> Format.fprintf fmt "Unpublished"
+
+  let slot_id_status_of_json json =
+    match String.lowercase_ascii @@ JSON.as_string json with
+    | "waiting_attestation" -> Waiting_attestation
+    | "attested" -> Attested
+    | "unattested" -> Unattested
+    | "unpublished" -> Unattested
+    | s -> failwith @@ Format.sprintf "Unknown slot_id status %s" s
 
   let slot_header_of_json json =
     let open JSON in
@@ -350,7 +370,7 @@ module Dal_RPC = struct
         string_of_int slot_index;
         "status";
       ]
-      JSON.as_string
+      slot_id_status_of_json
 
   let get_assigned_shard_indices ~level ~pkh =
     make
@@ -851,6 +871,9 @@ module Check = struct
 
   let topics_peers_typ : (topic * string list) list Check.typ =
     Check.list (Check.tuple2 topic_typ (Check.list Check.string))
+
+  let slot_id_status_typ =
+    Check.equalable Dal_RPC.pp_slot_id_status Stdlib.( = )
 
   let slot_header_typ : slot_header Check.typ =
     Check.convert slot_header_to_json_u Check.json_u
