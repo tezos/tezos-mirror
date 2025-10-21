@@ -74,7 +74,6 @@ impl TezBlock {
 
 #[cfg(test)]
 mod tests {
-    use crate::operation::zip_operations;
     use primitive_types::H256;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::nom::NomReader;
@@ -82,7 +81,7 @@ mod tests {
 
     use crate::operation_result::{
         OperationBatchWithMetadata, OperationDataAndMetadata, OperationResult,
-        OperationResultSum, RevealSuccess,
+        OperationResultSum, OperationWithMetadata, RevealSuccess,
     };
 
     use super::{AppliedOperation, TezBlock};
@@ -99,19 +98,22 @@ mod tests {
     fn dummy_applied_operation() -> AppliedOperation {
         let hash = H256::random().into();
         let data = crate::operation::make_dummy_reveal_operation();
-        let receipt = vec![OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![],
-            result: crate::operation_result::ContentResult::Applied(RevealSuccess {
-                consumed_milligas: 0u64.into(),
+        let operations = vec![OperationWithMetadata {
+            content: data.content[0].clone(),
+            receipt: OperationResultSum::Reveal(OperationResult {
+                balance_updates: vec![],
+                result: crate::operation_result::ContentResult::Applied(RevealSuccess {
+                    consumed_milligas: 0u64.into(),
+                }),
+                internal_operation_results: vec![],
             }),
-            internal_operation_results: vec![],
-        })];
+        }];
         AppliedOperation {
             hash,
             branch: data.branch.clone(),
             op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                 OperationBatchWithMetadata {
-                    operations: zip_operations(data.clone(), receipt),
+                    operations,
                     signature: data.signature,
                 },
             ),
