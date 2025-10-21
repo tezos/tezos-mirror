@@ -92,7 +92,7 @@ let active_protocols =
     "Ps3BVMUNQhj15D1VXdFnjP91y11jYShkZRJnBx3N7koz2dKRndB";
     "PtSEouLov7Fp6XoqXUBqd7XzggUpUarSMcSUsR5MarqspqiuQBY";
     "Psbm9fXge5noCDc2pcwtjnUs4FuAuxmRh6ts8kyPk3CpJVFFQhN";
-    "PsU87LFiQKMFspfnufwsWQ4NSWwR3fH8M2xneJEyAj61M6NNLew";
+    "PsD5wVTJc9Rg228rXbXbeoeEo8g3fgWH211U7V3qjUed11g5Gqk";
     "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
   ]
 
