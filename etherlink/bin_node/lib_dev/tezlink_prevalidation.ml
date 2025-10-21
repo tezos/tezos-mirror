@@ -213,6 +213,16 @@ let validate_counter ~ctxt counter =
            construction *)
         failwith "unreachable"
 
+let validate_gas_limit gas_limit =
+  let open Lwt_result_syntax in
+  (* TODO check gas limit high enough *)
+  let hard_gas_limit_per_operation =
+    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
+  in
+  match Gas.check_gas_limit ~hard_gas_limit_per_operation ~gas_limit with
+  | Ok () -> return (Ok ())
+  | Error _ -> tzfail_p @@ Imported_protocol.Gas_limit_repr.Gas_limit_too_high
+
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
   let open Lwt_result_syntax in
@@ -221,11 +231,12 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       tzfail_p
       @@ Imported_protocol.Validate_errors.Manager.Incorrect_reveal_position
   | Manager_operation
-      {source; fee; counter; operation; gas_limit = _; storage_limit = _} ->
+      {source; fee; counter; operation; gas_limit; storage_limit = _} ->
       let** () = validate_supported_operation ~ctxt operation in
       let** () = validate_source ~ctxt source in
       let** () = validate_counter ~ctxt counter in
-      (* TODO check gas limit high enough *)
+      let** () = validate_gas_limit gas_limit in
+      (* TODO check storage limit too *)
       let** balance_left = validate_balance ~ctxt ~fee in
       (* the update will be updated during the validation steps *)
       return
