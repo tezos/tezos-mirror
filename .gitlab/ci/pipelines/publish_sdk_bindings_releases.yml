@@ -96,7 +96,7 @@ build_python_sdk_linux:
     - contrib/sdk-bindings/rust/target/wheels/*
 
 build_python_sdk_macos:
-  image: macos-14-xcode-15
+  image: macos-15-xcode-16
   stage: build
   tags:
   - $TAGS

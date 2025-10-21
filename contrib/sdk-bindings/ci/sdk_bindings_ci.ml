@@ -78,7 +78,7 @@ module Release = struct
           ~__POS__
           ~name:"build_python_sdk_macos"
           ~description:"Build Python SDK on macOS"
-          ~image:Images.macosx_14
+          ~image:Images.macosx_15
           ~variables:macos_variables
           ~tag:Dynamic
           ~artifacts
