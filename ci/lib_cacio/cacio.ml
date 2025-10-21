@@ -1039,7 +1039,9 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
            Shared component; regular components should define their own \
            schedule pipelines with register_scheduled_pipeline"
     | None ->
-        let jobs = convert_jobs ~with_condition:false jobs in
+        let jobs =
+          convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
+        in
         Tezos_ci.Hooks.schedule_extended_test :=
           jobs @ !Tezos_ci.Hooks.schedule_extended_test
 

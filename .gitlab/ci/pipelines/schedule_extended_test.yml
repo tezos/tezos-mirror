@@ -2969,7 +2969,7 @@ fetch_tezt_records_from_schedule_extended_test:
   - oc.docker:ci:amd64
   allow_failure: true
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3010,7 +3010,7 @@ tezt-static-binaries:
   - oc.build_amd64-extra-dev
   - fetch_tezt_records_from_schedule_extended_test
   timeout: 40 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3077,7 +3077,7 @@ tezt-flaky:
   - fetch_tezt_records_from_schedule_extended_test
   allow_failure: true
   timeout: 40 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3147,7 +3147,7 @@ tezt-extra:
   - oc.build_kernels
   - fetch_tezt_records_from_schedule_extended_test
   timeout: 40 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3213,7 +3213,7 @@ tezt-slow:
   - oc.build_kernels
   - fetch_tezt_records_from_schedule_extended_test
   timeout: 40 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3279,7 +3279,7 @@ tezt-riscv-slow-sequential:
   - oc.build_kernels
   - fetch_tezt_records_from_schedule_extended_test
   timeout: 40 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3344,7 +3344,7 @@ tezt-time-sensitive:
   - oc.build_kernels
   - fetch_tezt_records_from_schedule_extended_test
   timeout: 40 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -3414,7 +3414,7 @@ tezt:
   - oc.build_kernels
   - fetch_tezt_records_from_schedule_extended_test
   timeout: 40 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
