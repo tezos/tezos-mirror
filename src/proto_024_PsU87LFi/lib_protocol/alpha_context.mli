@@ -2361,12 +2361,7 @@ module Delegate : sig
 
   (** See {!Already_denounced_storage.already_denounced}. *)
   val already_denounced :
-    context ->
-    public_key_hash ->
-    Level.t ->
-    Round.t ->
-    Misbehaviour.kind ->
-    bool tzresult Lwt.t
+    context -> public_key_hash -> Misbehaviour.t -> bool tzresult Lwt.t
 
   type reward_and_burn = {reward : Tez.t; amount_to_burn : Tez.t}
 
@@ -2381,7 +2376,6 @@ module Delegate : sig
     operation_hash:Operation_hash.t ->
     Misbehaviour.t ->
     public_key_hash ->
-    Level.t ->
     rewarded:public_key_hash ->
     context tzresult Lwt.t
 

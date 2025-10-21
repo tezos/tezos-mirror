@@ -28,9 +28,7 @@
 val already_denounced :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
-  Level_repr.t ->
-  Round_repr.t ->
-  Misbehaviour_repr.kind ->
+  Misbehaviour_repr.t ->
   bool tzresult Lwt.t
 
 (** Records a denunciation in {!Storage.Already_denounced}.
@@ -50,9 +48,7 @@ val already_denounced :
 val add_denunciation :
   Raw_context.t ->
   Signature.public_key_hash ->
-  Level_repr.t ->
-  Round_repr.t ->
-  Misbehaviour_repr.kind ->
+  Misbehaviour_repr.t ->
   (Raw_context.t * bool) tzresult Lwt.t
 
 (** Clear {!Storage.Already_denounced} for old cycles that we no

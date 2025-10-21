@@ -2101,6 +2101,7 @@ module Anonymous = struct
         && Round.(round = round2))
         (Invalid_denunciation kind)
     in
+    let misbehaviour = {Misbehaviour.level; round; kind} in
     let*? () =
       (* Both denounced operations must involve [slot]. That is,
          they must be either a standalone (pre)attestation for [slot],
@@ -2170,7 +2171,7 @@ module Anonymous = struct
     in
     let delegate = consensus_key.delegate in
     let* already_slashed =
-      Delegate.already_denounced ctxt delegate level round kind
+      Delegate.already_denounced ctxt delegate misbehaviour
     in
     let*? () =
       error_unless
@@ -2266,6 +2267,9 @@ module Anonymous = struct
         (Invalid_double_baking_evidence
            {hash1; level1; round1; hash2; level2; round2})
     in
+    let misbehaviour =
+      {Misbehaviour.level = level1; round = round1; kind = Double_baking}
+    in
     let*? () =
       check_denunciation_age
         vi
@@ -2289,7 +2293,7 @@ module Anonymous = struct
     in
     let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
     let* already_slashed =
-      Delegate.already_denounced ctxt delegate level round1 Double_baking
+      Delegate.already_denounced ctxt delegate misbehaviour
     in
     let*? () =
       error_unless
