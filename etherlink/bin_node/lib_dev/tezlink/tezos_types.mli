@@ -57,11 +57,12 @@ module Operation : sig
     raw : bytes;
   }
 
+  val counter_to_z :
+    Tezlink_imports.Alpha_context.Manager_counter.t -> Z.t tzresult
+
   val hash_operation : t -> Ethereum_types.hash
 
   val encoding : t Data_encoding.t
-
-  val decode : bytes -> t tzresult
 end
 
 module Tez : sig
