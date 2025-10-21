@@ -56,6 +56,8 @@ let schedule_extended_tests =
 
 let debian_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "debian.daily"
 
+let rpm_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "rpm.daily"
+
 let schedule_extended_rpc_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_RPC_TESTS"
 

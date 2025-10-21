@@ -66,6 +66,12 @@ val schedule_extended_tests : If.t
     [TZ_SCHEDULE_KIND] set to [debian.daily]. *)
 val debian_daily : If.t
 
+(** A rule that is true for daily RPM test pipelines.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [rpm.daily]. *)
+val rpm_daily : If.t
+
 (** A rule that is true for scheduled extended RPC test pipelines.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
