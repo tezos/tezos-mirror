@@ -2,25 +2,25 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name octez_injector_PsU87LFi)
- (package tezos-injector-024-PsU87LFi)
+ (name octez_injector_PsD5wVTJ)
+ (package tezos-injector-024-PsD5wVTJ)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-024-PsU87LFi.protocol
+  tezos-protocol-024-PsD5wVTJ.protocol
   octez-injector
-  octez-protocol-024-PsU87LFi-libs.client
+  octez-protocol-024-PsD5wVTJ-libs.client
   octez-shell-libs.client-base
-  octez-protocol-024-PsU87LFi-libs.plugin)
+  octez-protocol-024-PsD5wVTJ-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_024_PsU87LFi
+  -open Tezos_protocol_024_PsD5wVTJ
   -open Octez_injector
-  -open Tezos_client_024_PsU87LFi
+  -open Tezos_client_024_PsD5wVTJ
   -open Tezos_client_base
-  -open Tezos_protocol_plugin_024_PsU87LFi))
+  -open Tezos_protocol_plugin_024_PsD5wVTJ))
 
 (rule
  (targets client_keys.ml)

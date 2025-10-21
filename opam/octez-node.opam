@@ -73,8 +73,8 @@ depopts: [
   "octez-protocol-021-PsQuebec-libs"
   "tezos-protocol-022-PsRiotum"
   "octez-protocol-022-PsRiotum-libs"
-  "tezos-protocol-024-PsU87LFi"
-  "octez-protocol-024-PsU87LFi-libs"
+  "tezos-protocol-024-PsD5wVTJ"
+  "octez-protocol-024-PsD5wVTJ-libs"
   "tezos-protocol-alpha"
   "octez-protocol-alpha-libs"
 ]
@@ -122,8 +122,8 @@ conflicts: [
   "octez-protocol-021-PsQuebec-libs" { != version }
   "tezos-protocol-022-PsRiotum" { != version }
   "octez-protocol-022-PsRiotum-libs" { != version }
-  "tezos-protocol-024-PsU87LFi" { != version }
-  "octez-protocol-024-PsU87LFi-libs" { != version }
+  "tezos-protocol-024-PsD5wVTJ" { != version }
+  "octez-protocol-024-PsD5wVTJ-libs" { != version }
   "tezos-protocol-alpha" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]

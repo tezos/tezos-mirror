@@ -11,15 +11,10 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "tezos-micheline-rewriting" { = version }
-  "tezos-benchmark" { = version }
-  "tezos-benchmark-type-inference-024-PsU87LFi" { = version }
-  "tezos-protocol-024-PsU87LFi" { = version }
-  "hashcons"
-  "octez-protocol-024-PsU87LFi-libs" { = version }
-  "prbnmcn-stats" { = "0.0.6" }
-  "octez-rust-deps" { with-test & = version }
-  "bls12-381" { with-test & = version }
+  "tezos-protocol-024-PsD5wVTJ" { = version }
+  "octez-injector" { = version }
+  "octez-protocol-024-PsD5wVTJ-libs" { = version }
+  "octez-shell-libs" { = version }
 ]
 build: [
   ["rm" "-rf" "vendors" "contrib"]
@@ -27,4 +22,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezos/Protocol: library for writing benchmarks (protocol-specific part)"
+synopsis: "Tezos/Protocol: protocol-specific library for the injector binary"

@@ -22,9 +22,9 @@
    (octez-protocol-022-PsRiotum-libs.dal -> void_for_linking-octez-protocol-022-PsRiotum-libs-dal.empty)
    (-> void_for_linking-octez-protocol-022-PsRiotum-libs-dal.empty))
   octez-protocol-023-PtSeouLo-libs.dal
-  (select void_for_linking-octez-protocol-024-PsU87LFi-libs-dal from
-   (octez-protocol-024-PsU87LFi-libs.dal -> void_for_linking-octez-protocol-024-PsU87LFi-libs-dal.empty)
-   (-> void_for_linking-octez-protocol-024-PsU87LFi-libs-dal.empty))
+  (select void_for_linking-octez-protocol-024-PsD5wVTJ-libs-dal from
+   (octez-protocol-024-PsD5wVTJ-libs.dal -> void_for_linking-octez-protocol-024-PsD5wVTJ-libs-dal.empty)
+   (-> void_for_linking-octez-protocol-024-PsD5wVTJ-libs-dal.empty))
   (select void_for_linking-octez-protocol-alpha-libs-dal from
    (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))
@@ -45,5 +45,5 @@
   (progn
    (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty "")
    (write-file void_for_linking-octez-protocol-022-PsRiotum-libs-dal.empty "")
-   (write-file void_for_linking-octez-protocol-024-PsU87LFi-libs-dal.empty "")
+   (write-file void_for_linking-octez-protocol-024-PsD5wVTJ-libs-dal.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-dal.empty ""))))

@@ -2,34 +2,34 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_024_PsU87LFi_mockup_simulator)
- (public_name octez-protocol-024-PsU87LFi-libs.bakings.mockup-simulator)
+ (name tezos_024_PsD5wVTJ_mockup_simulator)
+ (public_name octez-protocol-024-PsD5wVTJ-libs.bakings.mockup-simulator)
  (libraries
   octez-libs.base
-  tezos-protocol-024-PsU87LFi.protocol
-  octez-protocol-024-PsU87LFi-libs.client
+  tezos-protocol-024-PsD5wVTJ.protocol
+  octez-protocol-024-PsD5wVTJ-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-024-PsU87LFi-libs.baking
+  octez-protocol-024-PsD5wVTJ-libs.baking
   octez-libs.stdlib-unix
   octez-shell-libs.client-base-unix
-  tezos-protocol-024-PsU87LFi.parameters
+  tezos-protocol-024-PsD5wVTJ.parameters
   octez-shell-libs.mockup
   octez-shell-libs.mockup-proxy
   octez-shell-libs.mockup-commands
-  octez-protocol-024-PsU87LFi-libs.baking.tenderbrute
+  octez-protocol-024-PsD5wVTJ-libs.baking.tenderbrute
   tezt.core)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_024_PsU87LFi
-  -open Tezos_protocol_024_PsU87LFi.Protocol
-  -open Tezos_client_024_PsU87LFi
+  -open Tezos_protocol_024_PsD5wVTJ
+  -open Tezos_protocol_024_PsD5wVTJ.Protocol
+  -open Tezos_client_024_PsD5wVTJ
   -open Tezos_client_commands
-  -open Tezos_baking_024_PsU87LFi
+  -open Tezos_baking_024_PsD5wVTJ
   -open Tezos_stdlib_unix
   -open Tezos_client_base_unix
-  -open Tezos_protocol_024_PsU87LFi_parameters
-  -open Tenderbrute_024_PsU87LFi
+  -open Tezos_protocol_024_PsD5wVTJ_parameters
+  -open Tenderbrute_024_PsD5wVTJ
   -open Tezt_core))
 
 (rule

@@ -2,21 +2,21 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_baking_024_PsU87LFi)
- (public_name octez-protocol-024-PsU87LFi-libs.baking)
+ (name tezos_baking_024_PsD5wVTJ)
+ (public_name octez-protocol-024-PsD5wVTJ-libs.baking)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-libs.clic
   octez-version.value
-  tezos-protocol-024-PsU87LFi.protocol
-  tezos-protocol-024-PsU87LFi.protocol.lifted
-  octez-protocol-024-PsU87LFi-libs.plugin
+  tezos-protocol-024-PsD5wVTJ.protocol
+  tezos-protocol-024-PsD5wVTJ.protocol.lifted
+  octez-protocol-024-PsD5wVTJ-libs.plugin
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-node-config
   octez-shell-libs.client-base
-  octez-protocol-024-PsU87LFi-libs.client
+  octez-protocol-024-PsD5wVTJ-libs.client
   octez-shell-libs.client-commands
   octez-libs.stdlib
   octez-libs.stdlib-unix
@@ -40,12 +40,12 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_024_PsU87LFi
-  -open Tezos_protocol_024_PsU87LFi_lifted
-  -open Tezos_protocol_plugin_024_PsU87LFi
+  -open Tezos_protocol_024_PsD5wVTJ
+  -open Tezos_protocol_024_PsD5wVTJ_lifted
+  -open Tezos_protocol_plugin_024_PsD5wVTJ
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_024_PsU87LFi
+  -open Tezos_client_024_PsD5wVTJ
   -open Tezos_client_commands
   -open Tezos_stdlib
   -open Tezos_stdlib_unix
@@ -69,60 +69,60 @@
  (action (write-file %{targets} "include Tezos_client_base.Client_keys_v2")))
 
 (library
- (name tezos_baking_024_PsU87LFi_commands)
- (public_name octez-protocol-024-PsU87LFi-libs.baking-commands)
+ (name tezos_baking_024_PsD5wVTJ_commands)
+ (public_name octez-protocol-024-PsD5wVTJ-libs.baking-commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-024-PsU87LFi.protocol
-  tezos-protocol-024-PsU87LFi.parameters
+  tezos-protocol-024-PsD5wVTJ.protocol
+  tezos-protocol-024-PsD5wVTJ.parameters
   octez-libs.stdlib-unix
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-024-PsU87LFi-libs.client
+  octez-protocol-024-PsD5wVTJ-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-024-PsU87LFi-libs.baking
+  octez-protocol-024-PsD5wVTJ-libs.baking
   octez-libs.rpc
   uri)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_024_PsU87LFi
-  -open Tezos_protocol_024_PsU87LFi_parameters
+  -open Tezos_protocol_024_PsD5wVTJ
+  -open Tezos_protocol_024_PsD5wVTJ_parameters
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_024_PsU87LFi
+  -open Tezos_client_024_PsD5wVTJ
   -open Tezos_client_commands
-  -open Tezos_baking_024_PsU87LFi)
+  -open Tezos_baking_024_PsD5wVTJ)
  (modules Baking_commands))
 
 (library
- (name tezos_baking_024_PsU87LFi_commands_registration)
- (public_name octez-protocol-024-PsU87LFi-libs.baking-commands.registration)
+ (name tezos_baking_024_PsD5wVTJ_commands_registration)
+ (public_name octez-protocol-024-PsD5wVTJ-libs.baking-commands.registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-024-PsU87LFi.protocol
+  tezos-protocol-024-PsD5wVTJ.protocol
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-024-PsU87LFi-libs.client
+  octez-protocol-024-PsD5wVTJ-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-024-PsU87LFi-libs.baking
-  octez-protocol-024-PsU87LFi-libs.baking-commands
+  octez-protocol-024-PsD5wVTJ-libs.baking
+  octez-protocol-024-PsD5wVTJ-libs.baking-commands
   octez-libs.rpc)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_024_PsU87LFi
+  -open Tezos_protocol_024_PsD5wVTJ
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_024_PsU87LFi
+  -open Tezos_client_024_PsD5wVTJ
   -open Tezos_client_commands
-  -open Tezos_baking_024_PsU87LFi
-  -open Tezos_baking_024_PsU87LFi_commands)
+  -open Tezos_baking_024_PsD5wVTJ
+  -open Tezos_baking_024_PsD5wVTJ_commands)
  (modules Baking_commands_registration))

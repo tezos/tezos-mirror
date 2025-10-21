@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_024_PsU87LFi_lib_protocol_test_pbt_tezt_lib)
+ (name src_proto_024_PsD5wVTJ_lib_protocol_test_pbt_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -17,8 +17,8 @@
   octez-alcotezt
   qcheck-alcotest
   tezos-benchmark
-  tezos-benchmark-024-PsU87LFi
-  tezos-benchmark-type-inference-024-PsU87LFi
+  tezos-benchmark-024-PsD5wVTJ
+  tezos-benchmark-type-inference-024-PsD5wVTJ
   octez-protocol-024-PsD5wVTJ-libs.smart-rollup
   octez-libs.crypto-dal
   octez-libs.base-test-helpers
@@ -30,14 +30,14 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_micheline
-  -open Tezos_client_024_PsU87LFi
+  -open Tezos_client_024_PsD5wVTJ
   -open Tezos_protocol_024_PsD5wVTJ
   -open Tezos_test_helpers
-  -open Tezos_024_PsU87LFi_test_helpers
+  -open Tezos_024_PsD5wVTJ_test_helpers
   -open Octez_alcotezt
-  -open Tezos_benchmark_024_PsU87LFi
-  -open Tezos_benchmark_type_inference_024_PsU87LFi
-  -open Tezos_smart_rollup_024_PsU87LFi
+  -open Tezos_benchmark_024_PsD5wVTJ
+  -open Tezos_benchmark_type_inference_024_PsD5wVTJ
+  -open Tezos_smart_rollup_024_PsD5wVTJ
   -open Tezos_crypto_dal
   -open Tezos_base_test_helpers
   -open Tezos_protocol_024_PsD5wVTJ_parameters)
@@ -66,7 +66,7 @@
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   octez-rust-deps
-  src_proto_024_PsU87LFi_lib_protocol_test_pbt_tezt_lib
+  src_proto_024_PsD5wVTJ_lib_protocol_test_pbt_tezt_lib
   tezt)
  (link_flags
   (:standard)

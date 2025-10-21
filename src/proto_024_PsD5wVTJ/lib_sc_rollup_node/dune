@@ -2,21 +2,21 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name octez_smart_rollup_node_PsU87LFi)
- (package octez-smart-rollup-node-PsU87LFi)
+ (name octez_smart_rollup_node_PsD5wVTJ)
+ (package octez-smart-rollup-node-PsD5wVTJ)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-libs.stdlib-unix
   octez-shell-libs.client-base
   octez-shell-libs.client-base-unix
-  octez-protocol-024-PsU87LFi-libs.client
-  octez-protocol-024-PsU87LFi-libs.dal
+  octez-protocol-024-PsD5wVTJ-libs.client
+  octez-protocol-024-PsD5wVTJ-libs.dal
   octez-libs.tezos-context.encoding
   octez-libs.tezos-context.helpers
-  tezos-protocol-024-PsU87LFi.protocol
-  octez-protocol-024-PsU87LFi-libs.plugin
-  tezos-protocol-024-PsU87LFi.parameters
+  tezos-protocol-024-PsD5wVTJ.protocol
+  octez-protocol-024-PsD5wVTJ-libs.plugin
+  tezos-protocol-024-PsD5wVTJ.parameters
   octez-libs.rpc
   octez-libs.rpc-http
   octez-libs.rpc-http-server
@@ -25,9 +25,9 @@
   tezos-dal-node-lib
   octez-shell-libs.shell-services
   octez-l2-libs.smart-rollup
-  octez-protocol-024-PsU87LFi-libs.smart-rollup
-  octez-protocol-024-PsU87LFi-libs.smart-rollup-layer2
-  octez-protocol-024-PsU87LFi-libs.layer2-utils
+  octez-protocol-024-PsD5wVTJ-libs.smart-rollup
+  octez-protocol-024-PsD5wVTJ-libs.smart-rollup-layer2
+  octez-protocol-024-PsD5wVTJ-libs.layer2-utils
   octez-l2-libs.layer2_store
   octez-l2-libs.riscv_context
   octez-l2-libs.irmin_context
@@ -54,18 +54,18 @@
   -open Tezos_stdlib_unix
   -open Tezos_client_base
   -open Tezos_client_base_unix
-  -open Tezos_client_024_PsU87LFi
-  -open Tezos_dal_024_PsU87LFi
-  -open Tezos_protocol_024_PsU87LFi
-  -open Tezos_protocol_plugin_024_PsU87LFi
-  -open Tezos_protocol_024_PsU87LFi_parameters
+  -open Tezos_client_024_PsD5wVTJ
+  -open Tezos_dal_024_PsD5wVTJ
+  -open Tezos_protocol_024_PsD5wVTJ
+  -open Tezos_protocol_plugin_024_PsD5wVTJ
+  -open Tezos_protocol_024_PsD5wVTJ_parameters
   -open Tezos_workers
   -open Tezos_dal_node_lib
   -open Tezos_shell_services
   -open Octez_smart_rollup
-  -open Tezos_smart_rollup_024_PsU87LFi
-  -open Tezos_smart_rollup_layer2_024_PsU87LFi
-  -open Tezos_layer2_utils_024_PsU87LFi
+  -open Tezos_smart_rollup_024_PsD5wVTJ
+  -open Tezos_smart_rollup_layer2_024_PsD5wVTJ
+  -open Tezos_layer2_utils_024_PsD5wVTJ
   -open Tezos_layer2_store
   -open Tezos_layer2_riscv_context
   -open Tezos_layer2_irmin_context

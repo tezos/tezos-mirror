@@ -13,8 +13,8 @@ depends: [
   "octez-rust-deps" { = version }
   "bls12-381" { = version }
   "octez-libs" { = version }
-  "tezos-protocol-024-PsU87LFi" { = version }
-  "octez-protocol-024-PsU87LFi-libs" { = version }
+  "tezos-protocol-024-PsD5wVTJ" { = version }
+  "octez-protocol-024-PsD5wVTJ-libs" { = version }
   "octez-shell-libs" { = version }
 ]
 build: [

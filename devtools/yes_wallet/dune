@@ -11,7 +11,7 @@
   octez-node-config
   octez-shell-libs.store
   tezos-protocol-023-PtSeouLo.protocol
-  tezos-protocol-024-PsU87LFi.protocol
+  tezos-protocol-024-PsD5wVTJ.protocol
   tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
  (flags

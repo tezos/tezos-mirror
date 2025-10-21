@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_dal_024_PsU87LFi)
- (public_name octez-protocol-024-PsU87LFi-libs.dal)
+ (name tezos_dal_024_PsD5wVTJ)
+ (public_name octez-protocol-024-PsD5wVTJ-libs.dal)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
@@ -11,11 +11,11 @@
   octez-libs.stdlib-unix
   octez-shell-libs.shell-services
   tezos-dal-node-lib
-  octez-protocol-024-PsU87LFi-libs.client
-  octez-protocol-024-PsU87LFi-libs.plugin
-  tezos-protocol-024-PsU87LFi.embedded-protocol
-  octez-protocol-024-PsU87LFi-libs.layer2-utils
-  tezos-protocol-024-PsU87LFi.protocol)
+  octez-protocol-024-PsD5wVTJ-libs.client
+  octez-protocol-024-PsD5wVTJ-libs.plugin
+  tezos-protocol-024-PsD5wVTJ.embedded-protocol
+  octez-protocol-024-PsD5wVTJ-libs.layer2-utils
+  tezos-protocol-024-PsD5wVTJ.protocol)
  (inline_tests
   (flags -verbose)
   (modes native)
@@ -30,11 +30,11 @@
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_dal_node_lib
-  -open Tezos_client_024_PsU87LFi
-  -open Tezos_protocol_plugin_024_PsU87LFi
-  -open Tezos_embedded_protocol_024_PsU87LFi
-  -open Tezos_layer2_utils_024_PsU87LFi
-  -open Tezos_protocol_024_PsU87LFi))
+  -open Tezos_client_024_PsD5wVTJ
+  -open Tezos_protocol_plugin_024_PsD5wVTJ
+  -open Tezos_embedded_protocol_024_PsD5wVTJ
+  -open Tezos_layer2_utils_024_PsD5wVTJ
+  -open Tezos_protocol_024_PsD5wVTJ))
 
 (rule
  (targets signature.ml)

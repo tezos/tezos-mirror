@@ -3,7 +3,7 @@
 
 (library
  (name
-  src_proto_024_PsU87LFi_lib_protocol_test_integration_operations_tezt_lib)
+  src_proto_024_PsD5wVTJ_lib_protocol_test_integration_operations_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -23,10 +23,10 @@
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_024_PsD5wVTJ
-  -open Tezos_client_024_PsU87LFi
-  -open Tezos_024_PsU87LFi_test_helpers
+  -open Tezos_client_024_PsD5wVTJ
+  -open Tezos_024_PsD5wVTJ_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_protocol_plugin_024_PsU87LFi)
+  -open Tezos_protocol_plugin_024_PsD5wVTJ)
  (modules
   test_activation
   test_combined_operations
@@ -46,7 +46,7 @@
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   octez-rust-deps
-  src_proto_024_PsU87LFi_lib_protocol_test_integration_operations_tezt_lib
+  src_proto_024_PsD5wVTJ_lib_protocol_test_integration_operations_tezt_lib
   tezt)
  (link_flags
   (:standard)

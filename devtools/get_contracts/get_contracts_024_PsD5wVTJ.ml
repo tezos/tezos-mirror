@@ -22,8 +22,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Tezos_protocol_024_PsU87LFi
-open Tezos_client_024_PsU87LFi
+open Tezos_protocol_024_PsD5wVTJ
+open Tezos_client_024_PsD5wVTJ
 open Protocol
 
 module Proto = struct

@@ -8,24 +8,24 @@
   bls12-381.archive
   octez-libs.micheline
   tezos-micheline-rewriting
-  tezos-benchmark-type-inference-024-PsU87LFi
-  tezos-protocol-024-PsU87LFi.protocol
+  tezos-benchmark-type-inference-024-PsD5wVTJ
+  tezos-protocol-024-PsD5wVTJ.protocol
   octez-libs.error-monad
-  octez-protocol-024-PsU87LFi-libs.client)
+  octez-protocol-024-PsD5wVTJ-libs.client)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp))
  (flags
   (:standard)
   -open Tezos_micheline
-  -open Tezos_benchmark_type_inference_024_PsU87LFi))
+  -open Tezos_benchmark_type_inference_024_PsD5wVTJ))
 
 (rule
  (alias runtest)
- (package tezos-benchmark-type-inference-024-PsU87LFi)
+ (package tezos-benchmark-type-inference-024-PsD5wVTJ)
  (action (run %{dep:./test_uf.exe})))
 
 (rule
  (alias runtest)
- (package tezos-benchmark-type-inference-024-PsU87LFi)
+ (package tezos-benchmark-type-inference-024-PsD5wVTJ)
  (action (run %{dep:./test_inference.exe})))

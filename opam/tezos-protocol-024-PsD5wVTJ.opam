@@ -22,4 +22,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezos protocol 024-PsU87LFi package"
+synopsis: "Tezos protocol 024-PsD5wVTJ package"

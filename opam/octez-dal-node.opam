@@ -20,14 +20,14 @@ depends: [
 depopts: [
   "octez-protocol-021-PsQuebec-libs"
   "octez-protocol-022-PsRiotum-libs"
-  "octez-protocol-024-PsU87LFi-libs"
+  "octez-protocol-024-PsD5wVTJ-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
   "checkseum" { = "0.5.0" }
   "octez-protocol-021-PsQuebec-libs" { != version }
   "octez-protocol-022-PsRiotum-libs" { != version }
-  "octez-protocol-024-PsU87LFi-libs" { != version }
+  "octez-protocol-024-PsD5wVTJ-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

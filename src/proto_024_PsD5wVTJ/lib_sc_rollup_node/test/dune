@@ -2,16 +2,16 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_024_PsU87LFi_lib_sc_rollup_node_test_tezt_lib)
+ (name src_proto_024_PsD5wVTJ_lib_sc_rollup_node_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
   bls12-381.archive
   octez-libs.base
-  tezos-protocol-024-PsU87LFi.protocol
+  tezos-protocol-024-PsD5wVTJ.protocol
   octez-libs.test-helpers
-  octez-protocol-024-PsU87LFi-libs.smart-rollup-layer2
-  octez_smart_rollup_node_PsU87LFi
+  octez-protocol-024-PsD5wVTJ-libs.smart-rollup-layer2
+  octez_smart_rollup_node_PsD5wVTJ
   octez-alcotezt)
  (library_flags (:standard -linkall))
  (flags
@@ -19,10 +19,10 @@
   -open Tezt_core
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_024_PsU87LFi
+  -open Tezos_protocol_024_PsD5wVTJ
   -open Tezos_test_helpers
-  -open Tezos_smart_rollup_layer2_024_PsU87LFi
-  -open Octez_smart_rollup_node_PsU87LFi
+  -open Tezos_smart_rollup_layer2_024_PsD5wVTJ
+  -open Octez_smart_rollup_node_PsD5wVTJ
   -open Octez_alcotezt)
  (modules serialized_proofs test_octez_conversions))
 
@@ -31,7 +31,7 @@
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   octez-rust-deps
-  src_proto_024_PsU87LFi_lib_sc_rollup_node_test_tezt_lib
+  src_proto_024_PsD5wVTJ_lib_sc_rollup_node_test_tezt_lib
   tezt)
  (link_flags
   (:standard)
