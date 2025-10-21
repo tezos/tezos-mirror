@@ -39,7 +39,7 @@ let jobs pipeline_type : tezos_job list =
       ~name:"oc.install-homebrew"
       ~arch:Amd64
       ~cpu:Very_high
-      ~allow_failure:Yes
+      ~allow_failure:No
       ~image
       ~stage
       ~dependencies:(Dependent [Job job_create_homebrew_formula])

@@ -47,7 +47,7 @@ oc.install-homebrew:
   needs:
   - oc.build-homebrew
   dependencies: []
-  allow_failure: true
+  allow_failure: false
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
