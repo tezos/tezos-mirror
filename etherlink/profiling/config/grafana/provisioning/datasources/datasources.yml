@@ -9,14 +9,16 @@ datasources:
     jsonData:
       derivedFields:
         - datasourceUid: Tempo
-          matcherRegex: '"traceid":"(\w+)"'
+          type: label
+          label: trace_id
           name: TraceID
-          url: '$${__value.raw}'
+          url: '$${__value}'
           urlDisplayLabel: 'View Trace'
         - datasourceUid: Tempo
-          matcherRegex: '"spanid":"(\w+)"'
+          type: label
+          label: span_id
           name: SpanID
-          url: '{ span:id = "$${__value.raw}" }'
+          url: '{ span:id = "$${__value}" }'
           urlDisplayLabel: 'View Span'
 
   - name: Tempo
@@ -27,7 +29,7 @@ datasources:
     jsonData:
       tracesToLogsV2:
         datasourceUid: 'Loki'
-        tags: [{ key: 'service.instance.id', value: 'instance' }]
+        tags: [{ key: 'service.instance.id', value: 'service_instance_id' }]
         spanStartTimeShift: '-1m'
         spanEndTimeShift: '1m'
         filterByTraceID: true
