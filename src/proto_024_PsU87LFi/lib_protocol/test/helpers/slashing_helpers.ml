@@ -5,18 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let slashing_percentage ~block_before_slash
-    {Protocol.Misbehaviour_repr.level; round = _; kind} ~all_culprits =
+let slashing_percentage ~block_before_slash misbehaviour ~all_culprits =
   let open Lwt_result_wrap_syntax in
   let* ctxt = Block.get_alpha_ctxt block_before_slash in
   let raw_ctxt = Protocol.Alpha_context.Internal_for_tests.to_raw ctxt in
-  let level =
-    Protocol.Level_repr.level_from_raw
-      ~cycle_eras:(Protocol.Raw_context.cycle_eras raw_ctxt)
-      level
-  in
   let*@ _, slashing_pct =
-    Protocol.Slash_percentage.get raw_ctxt ~kind ~level all_culprits
+    Protocol.Slash_percentage.get raw_ctxt misbehaviour all_culprits
   in
   return slashing_pct
 

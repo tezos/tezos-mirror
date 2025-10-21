@@ -39,20 +39,25 @@ let for_double_attestation ctxt ~committee_size rights denounced =
     let den_z = Z.(pow (of_int64 threshold_max) 2) in
     Percentage.mul_q_bounded ~round:`Up max_slashing Q.(num_z /// den_z)
 
-let get ctxt ~(kind : Misbehaviour_repr.kind) ~(level : Level_repr.t)
-    (denounced : Signature.public_key_hash list) =
+let get ctxt misbehaviour (denounced : Signature.public_key_hash list) =
   let open Lwt_result_syntax in
-  match kind with
+  match misbehaviour.Misbehaviour_repr.kind with
   | Double_baking -> return (ctxt, for_double_baking ctxt)
   | Double_attesting | Double_preattesting ->
+      let misbehaviour_level = Level_storage.from_raw ctxt misbehaviour.level in
       let all_bakers_attest_enabled =
-        Consensus_parameters_storage.check_all_bakers_attest_at_level ctxt level
+        Consensus_parameters_storage.check_all_bakers_attest_at_level
+          ctxt
+          misbehaviour_level
       in
       let* ctxt, rights =
-        Delegate_sampler.attesting_power ~all_bakers_attest_enabled ctxt level
+        Delegate_sampler.attesting_power
+          ~all_bakers_attest_enabled
+          ctxt
+          misbehaviour_level
       in
       let* ctxt, committee_size =
-        Consensus_parameters_storage.consensus_committee ctxt level
+        Consensus_parameters_storage.consensus_committee ctxt misbehaviour_level
       in
       return (ctxt, for_double_attestation ctxt ~committee_size rights denounced)
 

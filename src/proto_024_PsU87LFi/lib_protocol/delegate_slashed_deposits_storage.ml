@@ -198,23 +198,16 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
     Constants_storage.adaptive_issuance_global_limit_of_staking_over_baking ctxt
   in
   MisMap.fold_es
-    (fun ({Misbehaviour_repr.level = raw_level; round = _; kind; _} as miskey)
-         denunciations_map
-         acc
-       ->
+    (fun miskey denunciations_map acc ->
       let ctxt, balance_updates = acc in
-      let misbehaviour_level =
-        Level_repr.level_from_raw
-          ~cycle_eras:(Raw_context.cycle_eras ctxt)
-          raw_level
-      in
+      let misbehaviour_level = Level_storage.from_raw ctxt miskey.level in
       let misbehaviour_cycle = misbehaviour_level.cycle in
       let denunciations =
         Signature.Public_key_hash.Map.bindings denunciations_map
       in
       let denounced = List.map fst denunciations in
       let* ctxt, slashing_percentage =
-        Slash_percentage.get ctxt ~kind ~level:misbehaviour_level denounced
+        Slash_percentage.get ctxt miskey denounced
       in
       let+ ctxt, balance_updates =
         List.fold_left_es
@@ -508,8 +501,7 @@ module For_RPC = struct
         let*! pending_misbehaviour_map = get_pending_misbehaviour_map ctxt in
         List.fold_left_es
           (fun estimated_punishing_amount denunciation ->
-            let ({Misbehaviour_repr.level = raw_level; kind; _} as
-                 misbehaviour_key) =
+            let misbehaviour_key =
               denunciation.Denunciations_repr.misbehaviour
             in
             match MisMap.find misbehaviour_key pending_misbehaviour_map with
@@ -519,20 +511,17 @@ module For_RPC = struct
                    [denunciation] belongs to [Storage.Pending_denunciations]. *)
                 return estimated_punishing_amount
             | Some denunciations ->
-                let level =
-                  Level_repr.level_from_raw
-                    ~cycle_eras:(Raw_context.cycle_eras ctxt)
-                    raw_level
-                in
                 let denounced_pkhs =
                   List.map
                     fst
                     (Signature.Public_key_hash.Map.bindings denunciations)
                 in
                 let* ctxt, slashing_percentage =
-                  Slash_percentage.get ctxt ~kind ~level denounced_pkhs
+                  Slash_percentage.get ctxt misbehaviour_key denounced_pkhs
                 in
-                let misbehaviour_cycle = level.cycle in
+                let misbehaviour_cycle =
+                  (Level_storage.from_raw ctxt misbehaviour_key.level).cycle
+                in
                 let* frozen_deposits =
                   (* We ignore the context because this function is only used for RPCs *)
                   let* _ctxt, initial_amount =
