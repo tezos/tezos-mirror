@@ -1728,16 +1728,6 @@ opam:all_7:
       - octez-distributed-internal
       - octez-alcotezt
 
-trigger:rpm_repository_full:
-  stage: test
-  variables:
-    PIPELINE_TYPE: schedule_extended_test-rpm_repository_full
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  needs: []
-  trigger:
-    include: .gitlab/ci/pipelines/rpm_repository_full.yml
-    strategy: depend
-
 trigger:homebrew:
   stage: test
   variables:

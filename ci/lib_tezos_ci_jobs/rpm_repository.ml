@@ -388,14 +388,6 @@ let child_pipeline_partial =
     ~auto:false
     Partial
 
-let child_pipeline_full =
-  register
-    ~description:
-      "A child pipeline of 'schedule_extended_test' testing the build of all \
-       .rpm packages."
-    ~auto:false
-    Full
-
 let child_pipeline_partial_auto =
   register
     ~description:
