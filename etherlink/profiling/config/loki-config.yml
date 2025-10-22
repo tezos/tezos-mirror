@@ -47,7 +47,7 @@ limits_config:
     log_attributes:
       - action: index_label
         attributes:
-          - event
+          - name
           - section
 
 table_manager:
