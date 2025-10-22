@@ -672,32 +672,33 @@ let rec process_daemon ({node_ctxt; _} as state) =
         return_unit
     | e -> error_to_degraded_mode e)
 
+let initialize_metrics ({node_ctxt; configuration; _} as state)
+    (current_protocol : Node_context.current_protocol) history_mode =
+  let open Lwt_result_syntax in
+  (* Do not wrap active_metrics *)
+  Metrics.active_metrics configuration ;
+  let* () =
+    Metrics.wrap_lwt @@ fun () ->
+    Metrics.Info.init_rollup_node_info
+      configuration
+      ~genesis_level:node_ctxt.genesis_info.level
+      ~genesis_hash:node_ctxt.genesis_info.commitment_hash
+      ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind)
+      ~history_mode ;
+    Metrics.Info.set_proto_info current_protocol.hash current_protocol.constants ;
+    let* first_available_level = Node_context.first_available_level node_ctxt in
+    Metrics.GC.set_oldest_available_level first_available_level ;
+    return_unit
+  in
+  let*! () = maybe_performance_metrics state in
+  return_unit
+
 let run ({node_ctxt; configuration; plugin; _} as state) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
   let current_protocol = Reference.get node_ctxt.current_protocol in
   let* history_mode = Node_context.get_history_mode node_ctxt in
-  (* Do not wrap active_metrics *)
-  Metrics.active_metrics configuration ;
-  Metrics.wrap (fun () ->
-      Metrics.Info.init_rollup_node_info
-        configuration
-        ~genesis_level:node_ctxt.genesis_info.level
-        ~genesis_hash:node_ctxt.genesis_info.commitment_hash
-        ~pvm_kind:(Octez_smart_rollup.Kind.to_string node_ctxt.kind)
-        ~history_mode ;
-      Metrics.Info.set_proto_info
-        current_protocol.hash
-        current_protocol.constants) ;
-  let* () =
-    Metrics.wrap_lwt (fun () ->
-        let* first_available_level =
-          Node_context.first_available_level node_ctxt
-        in
-        Metrics.GC.set_oldest_available_level first_available_level ;
-        return_unit)
-  in
-  let*! () = maybe_performance_metrics state in
+  let* () = initialize_metrics state current_protocol history_mode in
   let signers = make_signers_for_injector node_ctxt.config.operators in
   let* () =
     unless (signers = []) @@ fun () ->
