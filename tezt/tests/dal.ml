@@ -5008,7 +5008,7 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
       in
       let* _op_hash =
         Operation.Anonymous.inject
-          ~error:Operation_core.dal_entrapment_of_not_published_commitment
+          ~error:Operation.dal_entrapment_of_not_published_commitment
           accusation
           client
       in
@@ -10430,7 +10430,7 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
     Operation.Anonymous.inject
       accusation_dup
       client
-      ~error:Operation_core.already_dal_denounced
+      ~error:Operation.already_dal_denounced
   in
   let* proto_params =
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
@@ -10446,7 +10446,7 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
     Operation.Anonymous.inject
       accusation_dup
       client
-      ~error:Operation_core.already_dal_denounced
+      ~error:Operation.already_dal_denounced
   in
   let* () = bake_for ~count:blocks_per_cycle client in
   let* current_level = Node.get_level node in
@@ -10458,7 +10458,7 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
     Operation.Anonymous.inject
       accusation_dup
       client
-      ~error:Operation_core.outdated_dal_denunciation
+      ~error:Operation.outdated_dal_denunciation
   in
   unit
 
@@ -11108,7 +11108,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
   let inject_attestations () =
     let count_dal_attesting_bakers = ref 0 in
     (* 1. Baker always attests TB and all DAL slots *)
-    let* (_ : Operation_core.t * [`OpHash of peer_id]) =
+    let* (_ : Operation.t * [`OpHash of peer_id]) =
       (* The baker delegate will miss 1/10 of its DAL attestations and will send
          [No_dal_attestation] in this case. *)
       let baker_attestation =
@@ -11125,7 +11125,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
         client
     in
     (* 2. attesting_dal_slot_10 always attests TB and DAL slot 10 *)
-    let* (_ : Operation_core.t * [`OpHash of peer_id]) =
+    let* (_ : Operation.t * [`OpHash of peer_id]) =
       (* The attesting_dal_slot_10 delegate misses 1/11th of its DAL
          attestations and will send Slots [], but it should be fine for its
          rewards. *)
@@ -11144,7 +11144,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
     in
     (* 3. not_attesting_at_all is not attesting neither TB nor DAL slots *)
     (* 4. not_attesting_dal either sends no DAL content or sends bitset 0 *)
-    let* (_ : Operation_core.t * [`OpHash of peer_id]) =
+    let* (_ : Operation.t * [`OpHash of peer_id]) =
       let dal_attestation =
         if !level mod 2 = 0 then No_dal_attestation else Slots []
       in
@@ -11157,7 +11157,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
     in
     (* 5. not_sufficiently_attesting_dal_slot_10: is attesting DAL slot 10, but only 25%
        of the time. *)
-    let* (_ : Operation_core.t * [`OpHash of peer_id]) =
+    let* (_ : Operation.t * [`OpHash of peer_id]) =
       let slots_to_attest =
         if !level mod 4 = 0 then (
           incr count_dal_attesting_bakers ;
