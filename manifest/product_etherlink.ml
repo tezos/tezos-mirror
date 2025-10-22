@@ -23,23 +23,6 @@ include Product (struct
   let source = ["etherlink"; "src"] @ Product_websocket.product_source
 end)
 
-let tezt_etherlink =
-  private_lib
-    "tezt_etherlink"
-    ~path:"etherlink/tezt/lib"
-    ~opam:"tezt-etherlink"
-    ~bisect_ppx:No
-    ~deps:
-      [
-        tezt_wrapper |> open_ |> open_ ~m:"Base";
-        tezt_performance_regression |> open_;
-        octez_crypto;
-        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_cloud |> open_;
-        octez_test_helpers |> open_;
-      ]
-    ~release_status:Unreleased
-
 (* Container of the registered sublibraries of [octez-evm-node] *)
 let registered_octez_evm_node_libs = Sub_lib.make_container ()
 
@@ -247,6 +230,24 @@ let evm_node_lib_dev_encoding =
         re;
         uuidm;
       ]
+
+let tezt_etherlink =
+  private_lib
+    "tezt_etherlink"
+    ~path:"etherlink/tezt/lib"
+    ~opam:"tezt-etherlink"
+    ~bisect_ppx:No
+    ~deps:
+      [
+        evm_node_lib_dev_encoding;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_performance_regression |> open_;
+        octez_crypto;
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_cloud |> open_;
+        octez_test_helpers |> open_;
+      ]
+    ~release_status:Unreleased
 
 let evm_node_lib_dev_tezlink =
   let tezlink_target_proto =

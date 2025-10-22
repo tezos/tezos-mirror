@@ -10,6 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "octez-evm-node-libs" { = version }
   "octez-libs"
   "tezt-tezos"
   "tezt-cloud"
@@ -21,7 +22,6 @@ depends: [
   "qcheck-alcotest" { with-test & >= "0.20" }
   "octez-alcotezt" {with-test}
   "octez-l2-libs" {with-test}
-  "octez-evm-node-libs" { with-test & = version }
   "tezos-protocol-alpha" {with-test}
 ]
 build: [
