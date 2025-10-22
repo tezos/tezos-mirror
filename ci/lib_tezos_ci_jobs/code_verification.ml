@@ -1282,19 +1282,20 @@ let jobs pipeline_type =
         job
           ~__POS__
           ~name:"oc.install_opam_noble"
-          ~image:Images.opam_ubuntu_noble
-          ~dependencies:dependencies_needs_start
+          ~cpu:Very_high
+          ~image:
+            (Image.mk_external
+               ~image_path:
+                 (Images.Base_images.path_prefix ^ "/build-ubuntu-noble:master"))
           ~rules:(make_rules ~manual:Yes ())
           ~allow_failure:Yes
           ~stage:Stages.test
-            (* The default behavior of opam is to use `nproc` to determine its level of
-               parallelism. This returns the number of CPU of the "host" CI runner
-               instead of the number of cores a single CI job can reasonably use. *)
-          ~variables:[("OPAMJOBS", "4")]
             (* As this job is long, we override the default timeout to
                2 hours. *)
           ~timeout:(Hours 2)
+          ~before_script:["apt update"; "apt install -y sudo"]
           ["./docs/introduction/install-opam.sh"]
+        |> enable_networked_cargo
       in
       let job_compile_sources_build ~__POS__ ~name ~matrix ?retry () =
         job
