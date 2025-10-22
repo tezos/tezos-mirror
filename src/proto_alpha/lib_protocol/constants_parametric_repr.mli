@@ -270,6 +270,8 @@ type t = {
   allow_tz4_delegate_enable : bool;
   (* Portion of tz4 bakers required to activate all bakers attest *)
   all_bakers_attest_activation_threshold : Ratio_repr.t;
+  (* Native contracts feature flag *)
+  native_contracts_enable : bool;
 }
 
 val encoding : t Data_encoding.encoding

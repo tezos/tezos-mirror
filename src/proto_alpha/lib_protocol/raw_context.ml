@@ -1273,6 +1273,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  aggregate_attestation = _;
                  allow_tz4_delegate_enable = _;
                  all_bakers_attest_activation_threshold;
+                 native_contracts_enable;
                }
                 : Previous.t) =
             c
@@ -1325,6 +1326,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             aggregate_attestation = true;
             allow_tz4_delegate_enable = true;
             all_bakers_attest_activation_threshold;
+            native_contracts_enable;
           }
         in
         let*! ctxt = add_constants ctxt constants in
@@ -1620,6 +1622,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             aggregate_attestation = true;
             allow_tz4_delegate_enable = true;
             all_bakers_attest_activation_threshold;
+            (* Feature flag should be set to true once the feature has been enabled. *)
+            native_contracts_enable = false;
           }
         in
         let*! ctxt = add_constants ctxt constants in

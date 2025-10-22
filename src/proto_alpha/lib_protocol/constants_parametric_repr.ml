@@ -321,6 +321,7 @@ type t = {
   aggregate_attestation : bool;
   allow_tz4_delegate_enable : bool;
   all_bakers_attest_activation_threshold : Ratio_repr.t;
+  native_contracts_enable : bool;
 }
 
 let sc_rollup_encoding =
@@ -625,8 +626,8 @@ let encoding =
                       ( c.direct_ticket_spending_enable,
                         c.aggregate_attestation,
                         c.allow_tz4_delegate_enable,
-                        c.all_bakers_attest_activation_threshold ) ) ) ) ) ) )
-        ) ))
+                        c.all_bakers_attest_activation_threshold,
+                        c.native_contracts_enable ) ) ) ) ) ) ) ) ))
     (fun ( ( ( consensus_rights_delay,
                blocks_preservation_cycles,
                delegate_parameters_activation_delay,
@@ -671,8 +672,8 @@ let encoding =
                          ( direct_ticket_spending_enable,
                            aggregate_attestation,
                            allow_tz4_delegate_enable,
-                           all_bakers_attest_activation_threshold ) ) ) ) ) ) )
-           ) )
+                           all_bakers_attest_activation_threshold,
+                           native_contracts_enable ) ) ) ) ) ) ) ) )
        ->
       {
         consensus_rights_delay;
@@ -721,6 +722,7 @@ let encoding =
         aggregate_attestation;
         allow_tz4_delegate_enable;
         all_bakers_attest_activation_threshold;
+        native_contracts_enable;
       })
     (merge_objs
        (merge_objs
@@ -784,13 +786,14 @@ let encoding =
                          (merge_objs sc_rollup_encoding zk_rollup_encoding)
                          (merge_objs
                             adaptive_issuance_encoding
-                            (obj4
+                            (obj5
                                (req "direct_ticket_spending_enable" bool)
                                (req "aggregate_attestation" bool)
                                (req "allow_tz4_delegate_enable" bool)
                                (req
                                   "all_bakers_attest_activation_threshold"
-                                  Ratio_repr.encoding))))))))))
+                                  Ratio_repr.encoding)
+                               (req "native_contracts_enable" bool))))))))))
 
 let update_sc_rollup_parameter ratio_i32 c =
   (* Constants remain small enough to fit in [int32] after update (as a

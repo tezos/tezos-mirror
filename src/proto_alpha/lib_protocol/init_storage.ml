@@ -246,7 +246,11 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         in
         let* ctxt = Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt in
         let* ctxt = Address_registry_storage.init ctxt in
-        let* ctxt = initialize_accumulator_native_contract ctxt in
+        let* ctxt =
+          if parametric.native_contracts_enable then
+            initialize_accumulator_native_contract ctxt
+          else return ctxt
+        in
         return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
         (* Start of Alpha stitching. Comment used for automatic snapshot *)
     | Alpha ->
