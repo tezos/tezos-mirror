@@ -3072,6 +3072,13 @@ module Dal = struct
         ~output:(Data_encoding.list shards_assignment_encoding)
         RPC_path.(path / "shards")
 
+    let past_parameters =
+      RPC_service.get_service
+        ~description:"Get the DAL parameters to use for a given level"
+        ~output:Constants.Parametric.dal_encoding
+        ~query:RPC_query.empty
+        RPC_path.(path / "past_parameters" /: Raw_level.rpc_arg)
+
     let published_slot_headers =
       let output = Data_encoding.(list Dal.Slot.Header.encoding) in
       RPC_service.get_service
@@ -3140,6 +3147,13 @@ module Dal = struct
       []
     |> return
 
+  let register_past_parameters () =
+    Registration.register1 ~chunked:false S.past_parameters
+    @@ fun ctxt level () () -> Dal.Past_parameters.parameters ctxt level
+
+  let past_parameters ctxt block level =
+    RPC_context.make_call1 S.past_parameters ctxt block level () ()
+
   let dal_published_slot_headers ctxt block ?level () =
     RPC_context.make_call0 S.published_slot_headers ctxt block level ()
 
@@ -3168,6 +3182,7 @@ module Dal = struct
   let register () =
     register_dal_commitments_history () ;
     register_shards () ;
+    register_past_parameters () ;
     register_published_slot_headers () ;
     register_skip_list_cells_of_level ()
 end

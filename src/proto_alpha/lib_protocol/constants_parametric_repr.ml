@@ -57,6 +57,12 @@ type dal = {
   traps_fraction : Q.t;
 }
 
+type past_dal_parameters = {
+  dal_parameters : dal;
+  next_protocol_activation : Raw_level_repr.t;
+      (** This is the migration level up to which the parameters were used. *)
+}
+
 let minimal_participation_ratio_encoding =
   between_zero_and_one_q_encoding
     "dal.minimal_participation_ratio must be a value between zero and one"
@@ -128,6 +134,17 @@ let dal_encoding =
           (req "rewards_ratio" rewards_ratio_encoding)
           (req "traps_fraction" traps_fraction_encoding))
        Dal.parameters_encoding)
+
+let past_dal_parameters_encoding =
+  let open Data_encoding in
+  conv
+    (fun {dal_parameters; next_protocol_activation} ->
+      (dal_parameters, next_protocol_activation))
+    (fun (dal_parameters, next_protocol_activation) ->
+      {dal_parameters; next_protocol_activation})
+    (obj2
+       (req "dal_parameters" dal_encoding)
+       (req "next_protocol_activation" Raw_level_repr.encoding))
 
 (* The encoded representation of this type is stored in the context as
    bytes. Changing the encoding, or the value of these constants from

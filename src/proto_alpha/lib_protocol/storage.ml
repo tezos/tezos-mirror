@@ -2380,15 +2380,17 @@ module Dal = struct
         let encoding = Data_encoding.empty
       end)
 
-  module Prev_attestation_lag =
+  module Past_parameters =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
-        let name = ["dal_prev_attestation_lag"]
+        let name = ["past_parameters"]
       end)
       (struct
-        type t = int
+        type t = Constants_parametric_repr.past_dal_parameters list
 
-        let encoding = Data_encoding.uint8
+        let encoding =
+          Data_encoding.list
+            Constants_parametric_repr.past_dal_parameters_encoding
       end)
 end
 

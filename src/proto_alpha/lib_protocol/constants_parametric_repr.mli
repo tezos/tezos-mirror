@@ -84,7 +84,14 @@ type dal = {
   traps_fraction : Q.t; (* probability that a given shard is a trap *)
 }
 
+type past_dal_parameters = {
+  dal_parameters : dal;
+  next_protocol_activation : Raw_level_repr.t;
+}
+
 val dal_encoding : dal Data_encoding.t
+
+val past_dal_parameters_encoding : past_dal_parameters Data_encoding.t
 
 type sc_rollup_reveal_hashing_schemes = {blake2B : Raw_level_repr.t}
 

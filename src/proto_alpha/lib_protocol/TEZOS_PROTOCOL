@@ -213,6 +213,7 @@
         "Sc_rollup_storage",
         "Sc_rollup_stake_storage",
         "Dal_slot_storage",
+        "Dal_storage",
         "Sc_rollup_refutation_storage",
         "Zk_rollup_errors",
 
