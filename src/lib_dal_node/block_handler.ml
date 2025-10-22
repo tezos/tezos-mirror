@@ -103,24 +103,47 @@ let remove_old_level_stored_data proto_parameters ctxt current_level =
 
 (* [attestation_lag] levels after the publication of a commitment,
    if it has not been attested it will never be so we can safely
-   remove it from the store. This function removes from the store
-   all the slots (and their shards) published at the given level and
-   which are not listed in the [attested] list. *)
-let remove_unattested_slots_and_shards proto_parameters ctxt ~published_level
-    attested =
+   remove it from the store. *)
+let remove_unattested_slots_and_shards ~prev_proto_parameters proto_parameters
+    ctxt ~attested_level attested =
   let open Lwt_syntax in
   let number_of_slots = proto_parameters.Types.number_of_slots in
   let slot_size = proto_parameters.cryptobox_parameters.slot_size in
   let store = Node_context.get_store ctxt in
-  List.iter_s
-    (fun slot_index ->
-      if attested slot_index then return_unit
-      else
-        let slot_id : Types.slot_id =
-          {slot_level = published_level; slot_index}
-        in
-        remove_slots_and_shards ~slot_size store slot_id)
-    (0 -- (number_of_slots - 1))
+  let previous_lag = prev_proto_parameters.Types.attestation_lag in
+  let current_lag = proto_parameters.attestation_lag in
+  (* This function removes from the store all the slots (and their shards)
+     published [lag] levels before the [attested_level] and which are not
+     listed in the [attested]. *)
+  let remove_slots_and_shards lag attested =
+    let published_level = Int32.(sub attested_level (of_int lag)) in
+    List.iter_s
+      (fun slot_index ->
+        if attested slot_index then return_unit
+        else
+          let slot_id : Types.slot_id =
+            {slot_level = published_level; slot_index}
+          in
+          remove_slots_and_shards ~slot_size store slot_id)
+      (0 -- (number_of_slots - 1))
+  in
+  let* () =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
+       Remove after dynamic lag is active.
+       This code removes all slots and shards associated to the "orphan" levels
+       which are guaranteed to never be attested when a protocol migration
+       reduces the attestation lag. *)
+    if previous_lag > current_lag then
+      let rec loop lag =
+        if lag = current_lag then return_unit
+        else
+          let* () = remove_slots_and_shards lag (fun _ -> false) in
+          loop (lag - 1)
+      in
+      loop previous_lag
+    else return_unit
+  in
+  remove_slots_and_shards current_lag attested
 
 (* Here [block_level] is the same as in [new_finalized_payload_level]. When the
    DAL node is up-to-date and the current L1 head is at level L, we call this
@@ -444,10 +467,10 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
   in
   let*! () =
     (remove_unattested_slots_and_shards
+       ~prev_proto_parameters
        proto_parameters
        ctxt
-       ~published_level:
-         Int32.(sub block_level (of_int proto_parameters.attestation_lag))
+       ~attested_level:block_level
        (Plugin.is_attested dal_attestation)
      [@profiler.record_s
        {verbosity = Notice} "remove_unattested_slots_and_shards"])
