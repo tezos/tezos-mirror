@@ -190,7 +190,7 @@ let changeset_homebrew =
         "scripts/packaging/homebrew_release.sh";
         "scripts/ci/install-gsutil.sh";
         "scripts/packaging/homebrew_install.sh";
-        "scripts/packaging/Formula/*";
+        "scripts/packaging/octez/homebrew/Formula/*";
         "scripts/version.sh";
         "manifest/**/*.ml*";
       ])

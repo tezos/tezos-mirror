@@ -1401,9 +1401,9 @@ trigger:homebrew_auto:
     - .gitlab/ci/pipelines/homebrew_auto.yml
     - manifest/**/*.ml*
     - scripts/ci/install-gsutil.sh
-    - scripts/packaging/Formula/*
     - scripts/packaging/homebrew_install.sh
     - scripts/packaging/homebrew_release.sh
+    - scripts/packaging/octez/homebrew/Formula/*
     - scripts/packaging/test_homebrew_install.sh
     - scripts/version.sh
     when: on_success
