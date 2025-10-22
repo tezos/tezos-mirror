@@ -750,7 +750,7 @@ let test_misc_protocol _test_mode_tag protocol ?endpoint client =
     if Protocol.(number protocol >= 024) then
       let* _ =
         Client.RPC.call ?endpoint ~hooks client
-        @@ RPC.get_tz4_staker_number_ratio ()
+        @@ RPC.get_tz4_baker_number_ratio ()
       in
       unit
     else unit
