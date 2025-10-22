@@ -95,53 +95,50 @@ let tx_queue_pop_and_inject (type f)
     ~(tx_container : f Services_backend_sig.tx_container) ~smart_rollup_address
     =
   let open Lwt_result_syntax in
-  let*? (module Tx_container) =
-    let open Result_syntax in
-    match tx_container with
-    | Evm_tx_container m -> return m
-    | Michelson_tx_container _ ->
-        error_with "Unsupported: Tezlink + Tx_queue + Proxy mode"
-  in
-  let maximum_cumulative_size =
-    Sequencer_blueprint.maximum_usable_space_in_blueprint
-      Sequencer_blueprint.maximum_chunks_per_l1_level
-  in
-  let initial_validation_state = 0 in
-  let validate_tx current_size raw_tx _tx_object =
-    let new_size = current_size + String.length raw_tx in
-    if new_size >= maximum_cumulative_size then return `Stop
-    else return (`Keep new_size)
-  in
-  let* popped_txs =
-    Tx_container.pop_transactions
-      ~maximum_cumulative_size
-      ~initial_validation_state
-      ~validate_tx
-  in
-  let*! hashes =
-    Rollup_node_rpc.Etherlink.inject_transactions
-    (* The timestamp is ignored in observer and proxy mode, it's just for
+  match tx_container with
+  | Evm_tx_container m -> (
+      let (module Tx_container) = m in
+      let maximum_cumulative_size =
+        Sequencer_blueprint.maximum_usable_space_in_blueprint
+          Sequencer_blueprint.maximum_chunks_per_l1_level
+      in
+      let initial_validation_state = 0 in
+      let validate_tx current_size raw_tx _tx_object =
+        let new_size = current_size + String.length raw_tx in
+        if new_size >= maximum_cumulative_size then return `Stop
+        else return (`Keep new_size)
+      in
+      let* popped_txs =
+        Tx_container.pop_transactions
+          ~maximum_cumulative_size
+          ~initial_validation_state
+          ~validate_tx
+      in
+      let*! hashes =
+        Rollup_node_rpc.Etherlink.inject_transactions
+        (* The timestamp is ignored in observer and proxy mode, it's just for
        compatibility with sequencer mode. *)
-      ~timestamp:(Misc.now ())
-      ~smart_rollup_address
-      ~transactions:popped_txs
-  in
-  match hashes with
-  | Error trace ->
-      let*! () = Tx_pool_events.transaction_injection_failed trace in
-      return_unit
-  | Ok hashes ->
-      let* () =
-        Tx_container.confirm_transactions
-          ~clear_pending_queue_after:true
-          ~confirmed_txs:(List.to_seq hashes)
+          ~timestamp:(Misc.now ())
+          ~smart_rollup_address
+          ~transactions:popped_txs
       in
-      let*! () =
-        List.iter_s
-          (fun hash -> Tx_pool_events.transaction_injected ~hash)
-          hashes
-      in
-      return_unit
+      match hashes with
+      | Error trace ->
+          let*! () = Tx_pool_events.transaction_injection_failed trace in
+          return_unit
+      | Ok hashes ->
+          let* () =
+            Tx_container.confirm_transactions
+              ~clear_pending_queue_after:true
+              ~confirmed_txs:(List.to_seq hashes)
+          in
+          let*! () =
+            List.iter_s
+              (fun hash -> Tx_pool_events.transaction_injected ~hash)
+              hashes
+          in
+          return_unit)
+  | Michelson_tx_container _ -> return_unit
 
 let main
     ({
