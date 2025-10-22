@@ -10679,8 +10679,6 @@ let test_e2e_trap_faulty_dal_node protocol dal_parameters _cryptobox node client
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
-  (* This constraint makes the test simpler; it could be lifted. *)
-  assert (blocks_per_cycle = dal_parameters.Dal.Parameters.attestation_lag) ;
   let target_attested_level = (2 * blocks_per_cycle) + 1 in
   let faulty_delegate = Constant.bootstrap1.Account.public_key_hash in
   let proxy =
