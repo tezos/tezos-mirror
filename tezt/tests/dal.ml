@@ -9460,7 +9460,7 @@ let extract_dal_balance_updates balance_updates =
    supposed to be used only by the test scenario below, as it assumes
    [expected_attested_shards] is either 0 or [expected_attestable_shards],
    [denounced] is [false], and there are only two kinds of transfers, both to
-   the delegate itself, as there are no co-stakers in the scenario below.. *)
+   the delegate itself, as there are no co-stakers in the scenario below. *)
 let check_participation_and_rewards participation ~expected_assigned_shards
     ~expected_attestable_slots ~attesting_reward_per_shard dal_balance_updates
     delegate ~sufficient_participation =
@@ -9480,12 +9480,12 @@ let check_participation_and_rewards participation ~expected_assigned_shards
     (participation.delegate_attested_dal_slots = expected_attested_slots)
       ~__LOC__
       int
-      ~error_msg:"Expected that the delegate has attested %L slots, got %R") ;
+      ~error_msg:"Expected that the delegate has attested %R slots, got %L") ;
   Check.(
     (participation.delegate_attestable_dal_slots = expected_attestable_slots)
       ~__LOC__
       int
-      ~error_msg:"Expected that there are %L attestable slots, got %R") ;
+      ~error_msg:"Expected that there are %R attestable slots, got %L") ;
   Check.(
     (participation.sufficient_dal_participation = sufficient_participation)
       ~__LOC__
@@ -9607,10 +9607,14 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let attestation_lag = dal_parameters.Dal.Parameters.attestation_lag in
   (* This constraint makes the test simpler; it could be lifted. *)
-  assert (blocks_per_cycle = dal_parameters.Dal.Parameters.attestation_lag) ;
+  assert (attestation_lag <= blocks_per_cycle) ;
+
   let expected_assigned_shards =
-    let number_of_shards = dal_parameters.cryptobox.number_of_shards in
+    let number_of_shards =
+      dal_parameters.Dal.Parameters.cryptobox.number_of_shards
+    in
     let num_delegates = Array.length Account.Bootstrap.keys in
     number_of_shards * blocks_per_cycle / num_delegates
   in
@@ -9652,6 +9656,7 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
   let* level =
     Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ()
   in
+  Log.info "Current level (and last published level) is %d" level.level ;
   assert (level.cycle_position = blocks_per_cycle - 1) ;
 
   let* check =
@@ -9661,6 +9666,7 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
       ~expected_assigned_shards
       ~expected_attestable_slots
   in
+  Log.info "Check that [delegate_without_dal] sufficiently participated" ;
   let* () = check delegate_without_dal ~sufficient_participation:true in
 
   Log.info "Bake for one more cycle" ;
@@ -9678,14 +9684,18 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
   let* check =
     (* [-1] because the participation is obtained one level before the cycle end;
        and another [-1] because the slot for the first level in the cycle was not
-       published *)
-    let expected_attestable_slots = blocks_per_cycle - 2 in
+       published. *)
+    let expected_attestable_slots =
+      min attestation_lag (blocks_per_cycle - 2)
+    in
     check_participation_and_rewards
       node
       ~expected_assigned_shards
       ~expected_attestable_slots
   in
+  Log.info "Check that [delegate_without_dal] did not sufficiently participate" ;
   let* () = check delegate_without_dal ~sufficient_participation:false in
+  Log.info "Check that [delegate_with_dal] sufficiently participated" ;
   let* () = check delegate_with_dal ~sufficient_participation:true in
   unit
 
