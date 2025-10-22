@@ -137,15 +137,11 @@ let register () =
       (Auto, job_build `release Arm64);
       (Manual, job_release_page `test `build_dependencies);
     ] ;
-  (* Remove this [if false then] to allow dedicated releases of Teztale.
-     At the time Teztale was migrated to Cacio, it didn't have them.
-     (But it did have dedicated test releases.) *)
-  if false then
-    CI.register_dedicated_release_pipeline
-      [
-        (Auto, job_gitlab_release);
-        (Manual, job_release_page `real `build_dependencies);
-      ] ;
+  CI.register_dedicated_release_pipeline
+    [
+      (Auto, job_gitlab_release);
+      (Manual, job_release_page `real `build_dependencies);
+    ] ;
   CI.register_dedicated_test_release_pipeline
     [
       (Auto, job_gitlab_release);
