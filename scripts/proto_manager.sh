@@ -2146,7 +2146,7 @@ function hash() {
     -e "s/octez-accuser-${tezos_protocol_source}/octez-accuser-${new_tezos_protocol}/g" \
     -i tezt/lib_tezos/constant.ml
   ocamlformat -i tezt/lib_tezos/constant.ml
-  commit_if_changes "tezt: replace baker in constant.ml"
+  commit_if_changes "tezt: replace accuser in constant.ml"
 
   #fix other tests:
   sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" \
