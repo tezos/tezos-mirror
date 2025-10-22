@@ -4819,25 +4819,14 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     ~migrate_to
     ()
 
-let get_delegate node ~migrate_from ~level ~tb_index =
-  let* json =
-    Node.RPC.call node @@ RPC.get_chain_block_helper_validators ~level ()
-  in
-  let indices_field_name, json =
-    if Protocol.number migrate_from <= 023 then ("slots", json)
-    else ("rounds", JSON.geti 0 json |> JSON.get "delegates")
-  in
+let get_delegate client ~protocol ~level ~tb_index =
+  let* pkh_to_rounds = Operation.Consensus.get_rounds ~level ~protocol client in
   let pkh =
     Option.get
     @@ List.find_map
-         (fun elem ->
-           if
-             List.mem
-               tb_index
-               JSON.(elem |-> indices_field_name |> as_list |> List.map as_int)
-           then Some JSON.(elem |-> "delegate" |> as_string)
-           else None)
-         (JSON.as_list json)
+         (fun (pkh, rounds) ->
+           if List.mem tb_index rounds then Some pkh else None)
+         pkh_to_rounds
   in
   return
   @@ List.find
@@ -4845,24 +4834,14 @@ let get_delegate node ~migrate_from ~level ~tb_index =
        Constant.all_secret_keys
 
 (* A commitment is published in the "previous protocol" and attested in the
-   same protocol. Then, in the "new protocol" a trap denunciation is sent.
+   same protocol.
 
-   This denunciation is valid only if the denounced trap refers to the
-   publication sent "previous attestation lag" before.
+   More precisely, two attestations are crafted, one after "new attestation lag"
+   levels, and one after "previous attestation lag" levels.
 
-   Still in the "previous protocol", a baker DAL attests the publication slot
-   of all levels between the publication level and the migration level
-   (despite the trap fraction being 1).
-
-   Since the migration level is expected to be after publication level +
-   previous attestation lag, the attestation is expected to be in the
-   "previous protocol".
-
-   Then denunciations are sent in the "new protocol", both for the attestation
-   "new attestation lag" and "previous attestation lag" after the publication.
-
-   We expect the one using the "new attestation lag" to be invalid and the
-   other one to be included.
+   Then, two corresponding denunciations are sent in the "new protocol".  We
+   expect the one using the "new attestation lag" attestation to be invalid and
+   the other one to be included.
 *)
 let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
     ~migrate_to =
@@ -4909,30 +4888,32 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
     let* level = Client.level client in
     let publi_with_trap_level = level + 1 in
     Log.info
-      "Computing the delegate which sends the attestation related to the shard \
-       we want to denounce." ;
+      "Computing the delegates which send the two attestations related to the \
+       shard we want to denounce." ;
     (* Given that there are 2 potential attestation lags, we compute the one
        associated to both. *)
     (* This computation relies on the fact the shard index is the same as the
        index in the Tenderbake committee. *)
     let* delegate_old =
       get_delegate
-        node
-        ~migrate_from
+        client
+        ~protocol:migrate_from
         ~level:(publi_with_trap_level + old_lag - 1)
         ~tb_index:shard_index
     in
     let* delegate_new =
       get_delegate
-        node
-        ~migrate_from
+        client
+        ~protocol:migrate_from
         ~level:(publi_with_trap_level + new_lag - 1)
         ~tb_index:shard_index
     in
     (* We want to have enough levels to attest in "previous" what has been
        published at [publi_with_trap_level]. *)
     assert (publi_with_trap_level + old_lag <= migration_level) ;
-    Log.info "Publishing the to-be-denounced slot." ;
+    Log.info
+      "Publishing the to-be-denounced slot at level %d."
+      publi_with_trap_level ;
     let* _op_hash =
       Helpers.publish_commitment
         ~source:Constant.bootstrap1
@@ -4942,9 +4923,6 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
         client
     in
     let* () = bake_for client in
-    Log.info
-      "The to-be-denounced delegates attest at every level, until the \
-       attestation of the denounced shard (included)." ;
     let availability = Slots [slot_index] in
     let craft_attestation delegate =
       let* attestation, _op_hash =
@@ -4958,11 +4936,14 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
       let* signature = Operation.sign attestation client in
       return (attestation, signature)
     in
+    Log.info "Bake %d blocks" (new_lag - 1) ;
     let* () = bake_for ~count:(new_lag - 1) client in
     Log.info "Crafting the attestation using the \"new\" attestation lag" ;
     let* attestation_new = craft_attestation delegate_new in
     let* () =
-      if old_lag <> new_lag then bake_for ~count:(old_lag - new_lag) client
+      if old_lag <> new_lag then (
+        Log.info "Bake %d blocks" (old_lag - new_lag) ;
+        bake_for ~count:(old_lag - new_lag) client)
       else unit
     in
     Log.info "Crafting the attestation using the \"old\" attestation lag" ;
@@ -5009,7 +4990,7 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
     else
       let () =
         Log.info
-          "Since attestation lag changed, this accusation refer to the wrong \
+          "Since attestation lag changed, this accusation refers to the wrong \
            commitment, hence injection should fail."
       in
       let* _op_hash =
