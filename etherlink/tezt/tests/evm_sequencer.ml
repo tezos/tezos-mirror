@@ -12712,8 +12712,12 @@ let test_observer_periodic_snapshot =
     let*@ _ = Rpc.produce_block ~timestamp:(get_timestamp gc) sequencer in
     let* () = Evm_node.wait_for_blueprint_applied observer 1 in
     Log.info "Produce blocks while snapshot is exporting." ;
+    (* There were cases in the CI where the default [timeout_in_blocks] was reached.
+       So we double both timeouts. *)
     bake_until
       ~__LOC__
+      ~timeout_in_blocks:40
+      ~timeout:60.
       ~bake:(fun () ->
         let*@ _ = produce_block sequencer in
         unit)
