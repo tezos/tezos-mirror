@@ -50,6 +50,8 @@ module Context_no_proofs = struct
 
   let proof_after = function (_ : proof) -> .
 
+  let cast_read_only = function (_ : proof) -> .
+
   let proof_encoding = void
 end
 

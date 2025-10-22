@@ -133,6 +133,13 @@ module Protocol_implementation :
   let install_boot_sector state boot_sector =
     Riscv.install_boot_sector state boot_sector
 
+  let get_proof_state_level _proof =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8148
+
+       Returns the level included in the proof, that is the level where the
+       disputed tick was processed. *)
+    Lwt_result_syntax.return_none
+
   let verify_proof ~is_reveal_enabled:_ input proof =
     let open Lwt_result_syntax in
     let* input_request =

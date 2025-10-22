@@ -197,6 +197,9 @@ end) : sig
       [rpoof].  *)
   val proof_after : proof -> Hash.t
 
+  (** [cast_read_only] replaces [proof.after] with [proof.before]. *)
+  val cast_read_only : proof -> proof
+
   (** [produce_proof ctxt tree f] produces and returns a proof for the execution
       of [f] on the state [tree]. *)
   val produce_proof :

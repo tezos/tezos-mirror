@@ -76,6 +76,9 @@ module Arith_Context = struct
   let proof_after proof =
     kinded_hash_to_state_hash proof.Context_binary.Proof.after
 
+  let cast_read_only proof =
+    Context_binary.Proof.{proof with after = proof.before}
+
   let produce_proof context tree step =
     let open Lwt_syntax in
     (* FIXME: With on-disk context, we cannot commit the empty

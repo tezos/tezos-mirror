@@ -272,6 +272,8 @@ struct
     let (`Value hash | `Node hash) = proof.IStoreProof.Proof.after in
     Hash.of_context_hash hash
 
+  let cast_read_only proof = IStoreProof.Proof.{proof with after = proof.before}
+
   let produce_proof index tree step =
     let open Lwt_syntax in
     (* Committing the context is required by Irmin to produce valid proofs. *)

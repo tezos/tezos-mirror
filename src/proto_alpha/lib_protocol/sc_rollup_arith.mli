@@ -159,7 +159,7 @@ module Protocol_implementation :
      and type state = Context.tree
      and type proof = Context.Proof.tree Context.Proof.t
 
-module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
+module Make (Context : Sc_rollup_PVM_sig.Generic_irmin_pvm_context_sig) :
   S
     with type context = Context.Tree.t
      and type state = Context.tree
