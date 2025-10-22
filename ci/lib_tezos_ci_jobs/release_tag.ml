@@ -340,10 +340,10 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
      else
        match (test, release_tag_pipeline_type) with
        | false, (Release_tag | Beta_release_tag | Non_release_tag) ->
-           !Tezos_ci.Hooks.global_release
+           Cacio.get_global_release_jobs ()
        | true, (Release_tag | Beta_release_tag | Non_release_tag) ->
-           !Tezos_ci.Hooks.global_test_release
-       | true, Schedule_test -> !Tezos_ci.Hooks.global_scheduled_test_release
+           Cacio.get_global_test_release_jobs ()
+       | true, Schedule_test -> Cacio.get_global_scheduled_test_release_jobs ()
        | false, Schedule_test ->
            failwith
              "test = false is inconsistent with release_tag_pipeline_type = \

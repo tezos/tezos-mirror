@@ -1747,28 +1747,6 @@ let id_tokens =
     );
   ]
 
-module Hooks = struct
-  let before_merging = ref []
-
-  let schedule_extended_test = ref []
-
-  let custom_extended_test = ref []
-
-  let master = ref []
-
-  let global_release = ref []
-
-  let global_test_release = ref []
-
-  let global_scheduled_test_release = ref []
-
-  let global_publish_release_page = ref []
-
-  let global_test_publish_release_page = ref []
-
-  let release_tags = ref []
-end
-
 let job_datadog_pipeline_trace : tezos_job =
   job
     ~__POS__

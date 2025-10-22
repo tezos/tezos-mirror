@@ -90,42 +90,6 @@ publish:release-page:
     - index.html
   retry: 0
 
-teztale.release_page:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: publish
-  tags:
-  - gcp_not_interruptible
-  rules:
-  - when: manual
-    allow_failure: true
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - eval $(opam env)
-  - sudo apk add aws-cli pandoc
-  - ./teztale/scripts/releases/publish_release_page.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    S3_BUCKET: site-prod.octez.tezos.com/releases
-    URL: octez.tezos.com
-    DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
-  artifacts:
-    expire_in: 1 day
-    paths:
-    - ./index.md
-    - index.html
-  retry: 0
-
 grafazos.release_page:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
@@ -148,6 +112,42 @@ grafazos.release_page:
   - eval $(opam env)
   - sudo apk add aws-cli pandoc
   - ./grafazos/scripts/releases/publish_release_page.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    S3_BUCKET: site-prod.octez.tezos.com/releases
+    URL: octez.tezos.com
+    DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - ./index.md
+    - index.html
+  retry: 0
+
+teztale.release_page:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  rules:
+  - when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - sudo apk add aws-cli pandoc
+  - ./teztale/scripts/releases/publish_release_page.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
