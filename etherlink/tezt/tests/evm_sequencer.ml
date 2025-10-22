@@ -1476,26 +1476,6 @@ let test_rpc_produceBlock =
     ~error_msg:"Expected new block number to be %L, but got: %R" ;
   unit
 
-let wait_for_event ?(timeout = 30.) ?(levels = 10) event_watcher ~sequencer
-    ~sc_rollup_node ~client ~error_msg =
-  let event_value = ref None in
-  let _ =
-    let* return_value = event_watcher in
-    event_value := Some return_value ;
-    unit
-  in
-  let rec rollup_node_loop n =
-    if n = 0 then Test.fail error_msg
-    else
-      let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
-      let*@ _ = produce_block sequencer in
-      if Option.is_some !event_value then unit else rollup_node_loop (n - 1)
-  in
-  let* () = Lwt.pick [rollup_node_loop levels; Lwt_unix.sleep timeout] in
-  match !event_value with
-  | Some value -> return value
-  | None -> Test.fail ~loc:__LOC__ "Waiting for event failed"
-
 let wait_for_delayed_inbox_add_tx_and_injected ~sequencer ~sc_rollup_node
     ~client =
   let event_watcher =
