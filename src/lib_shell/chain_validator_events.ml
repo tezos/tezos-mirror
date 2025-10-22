@@ -34,7 +34,7 @@ let updated_to_checkpoint =
     ~name:"updated_to_checkpoint"
     ~msg:"updated to checkpoint {block_hash} (running in mode {history_mode})"
     ~level:Notice
-    ~pp1:Block_hash.pp
+    ~pp1:Block_hash.pp_short
     ~pp2:History_mode.Legacy.pp
     ("block_hash", Block_hash.encoding)
     ("history_mode", History_mode.Legacy.encoding)
