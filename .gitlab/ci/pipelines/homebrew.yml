@@ -47,7 +47,7 @@ oc.install-homebrew:
   needs:
   - oc.build-homebrew
   dependencies: []
-  allow_failure: true
+  allow_failure: false
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -90,7 +90,7 @@ oc.build-homebrew:
     CARGO_NET_OFFLINE: "false"
 
 oc.install-homebrew-macosx:
-  image: macos-14-xcode-15
+  image: macos-15-xcode-16
   stage: build
   tags:
   - $TAGS
@@ -111,4 +111,4 @@ oc.install-homebrew-macosx:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
-    TAGS: saas-macos-medium-m1
+    TAGS: saas-macos-large-m2pro

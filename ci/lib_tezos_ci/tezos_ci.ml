@@ -1365,8 +1365,8 @@ module Images_external = struct
 
   (* Image provided by GitLab. More details in the doc:
      - https://docs.gitlab.com/ee/ci/runners/hosted_runners/macos.html#supported-macos-images
-     - https://gitlab-org.gitlab.io/ci-cd/shared-runners/images/macos-image-inventory/macos-14-xcode-15/ *)
-  let macosx_14 = Image.mk_external ~image_path:"macos-14-xcode-15"
+     - https://gitlab-org.gitlab.io/ci-cd/shared-runners/images/macos-image-inventory/macos-15-xcode-16/ *)
+  let macosx_15 = Image.mk_external ~image_path:"macos-15-xcode-16"
 
   (* Image used in [schedule_security_scans] pipeline. Trivy scans
      Docker images and codebase for CVEs and SBOMs. *)

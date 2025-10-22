@@ -630,7 +630,7 @@ module Images : sig
 
   val semgrep_agent : Image.t
 
-  val macosx_14 : Image.t
+  val macosx_15 : Image.t
 
   val client_libs_dependencies : Image.t
 

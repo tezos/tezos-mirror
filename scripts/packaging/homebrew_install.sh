@@ -190,7 +190,7 @@ fi
 export HOMEBREW_{BREW,CORE}_GIT_REMOTE
 
 # TODO: bump version when new macOS is released or announced
-MACOS_NEWEST_UNSUPPORTED="15.0"
+MACOS_NEWEST_UNSUPPORTED="26.0"
 # TODO: bump version when new macOS is released
 MACOS_OLDEST_SUPPORTED="12.0"
 

@@ -39,7 +39,7 @@ let jobs pipeline_type : tezos_job list =
       ~name:"oc.install-homebrew"
       ~arch:Amd64
       ~cpu:Very_high
-      ~allow_failure:Yes
+      ~allow_failure:No
       ~image
       ~stage
       ~dependencies:(Dependent [Job job_create_homebrew_formula])
@@ -65,11 +65,11 @@ let jobs pipeline_type : tezos_job list =
     job
       ~__POS__
       ~name:"oc.install-homebrew-macosx"
-      ~image:Images.macosx_14
-      ~variables:[("TAGS", "saas-macos-medium-m1")]
+      ~image:Images.macosx_15
+      ~variables:[("TAGS", "saas-macos-large-m2pro")]
       ~dependencies:(Dependent [Job job_create_homebrew_formula])
       ~stage
-      ~description:"Run the homebrew installation on gitlab MacOSX runners"
+      ~description:"Run the homebrew installation on MacOSX 15"
       ~allow_failure:Yes
       ~tag:Dynamic
       [
