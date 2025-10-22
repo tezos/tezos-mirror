@@ -205,9 +205,6 @@ module type Tx_container = sig
     raw_tx:Ethereum_types.hex ->
     (Ethereum_types.hash, string) result tzresult Lwt.t
 
-  (* REVIEW NOTE: Temporary return type change, to avoid a gargantuan MR
-      Impact is none, Tezlink and Etherlink now share the same type in tx obj and legacy *)
-
   (** [find hash] returns the transaction_object found in tx
       container. *)
   val find : Ethereum_types.hash -> transaction_object option tzresult Lwt.t

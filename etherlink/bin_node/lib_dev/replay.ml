@@ -60,11 +60,7 @@ let main ~disable_da_fees ?kernel ?kernel_verbosity ~number ?profile ?upto
         else return v
   in
   let* ro_ctxt = Evm_ro_context.load ~pool config in
-  let* legacy_block_storage =
-    Evm_store.(use ro_ctxt.store Block_storage_mode.legacy)
-  in
-  if not legacy_block_storage then
-    Block_storage_setup.enable ~keep_alive:config.keep_alive ro_ctxt.store ;
+  Block_storage_setup.enable ~keep_alive:config.keep_alive ro_ctxt.store ;
   let alter_evm_state =
     alter_evm_state ~disable_da_fees ~kernel ~kernel_verbosity
   in

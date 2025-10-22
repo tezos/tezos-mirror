@@ -55,7 +55,6 @@ type t = {
   store : Evm_store.t;
   session : session_state;
   signer : Signer.map option;
-  legacy_block_storage : bool;
   tx_container : Services_backend_sig.ex_tx_container;
   execution_pool : Lwt_domain.pool;
 }
@@ -565,20 +564,7 @@ module State = struct
        level). *)
     let latest_finalized_level = Z.max latest_finalized_level number in
     let* block_hash_opt =
-      if not ctxt.legacy_block_storage then
-        Evm_store.Blocks.find_hash_of_number conn (Qty number)
-      else
-        let (Ex_chain_family chain_family) =
-          Configuration.retrieve_chain_family
-            ~l2_chains:ctxt.configuration.experimental_features.l2_chains
-        in
-        let root = Durable_storage_path.root_of_chain_family chain_family in
-        let*! bytes =
-          Evm_state.inspect
-            evm_state
-            (Durable_storage_path.Indexes.block_by_number ~root (Nth number))
-        in
-        return (Option.map Ethereum_types.decode_block_hash bytes)
+      Evm_store.Blocks.find_hash_of_number conn (Qty number)
     in
     match block_hash_opt with
     | Some found_block_hash ->
@@ -989,45 +975,32 @@ module State = struct
         in
 
         let* evm_state, receipts, execution_gas =
-          if not ctxt.legacy_block_storage then
-            let* execution_gas, receipts =
-              match block with
-              | Eth block ->
-                  let* da_fee_per_byte =
-                    Etherlink_durable_storage.da_fee_per_byte
-                      (read_from_state evm_state)
-                  in
-                  let* (Qty base_fee_per_gas) =
-                    Etherlink_durable_storage.base_fee_per_gas
-                      (read_from_state evm_state)
-                  in
-                  store_block_unsafe
-                    ~da_fee_per_byte
-                    ~base_fee_per_gas
-                    conn
-                    evm_state
-                    block
-              | Tez block ->
-                  let+ receipts = store_tez_block_unsafe conn block in
-                  (* TODO: support extracting the execution gas *)
-                  (Z.zero, receipts)
-            in
-            let*! evm_state =
-              Evm_state.clear_block_storage chain_family block evm_state
-            in
-            return (evm_state, receipts, execution_gas)
-          else
-            let*! receipts =
-              match block with
-              | Eth block ->
-                  Etherlink_durable_storage.block_receipts_of_block
+          let* execution_gas, receipts =
+            match block with
+            | Eth block ->
+                let* da_fee_per_byte =
+                  Etherlink_durable_storage.da_fee_per_byte
                     (read_from_state evm_state)
-                    block
-              | Tez _ ->
-                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
-                  Lwt.return []
-            in
-            return (evm_state, receipts, Z.zero)
+                in
+                let* (Qty base_fee_per_gas) =
+                  Etherlink_durable_storage.base_fee_per_gas
+                    (read_from_state evm_state)
+                in
+                store_block_unsafe
+                  ~da_fee_per_byte
+                  ~base_fee_per_gas
+                  conn
+                  evm_state
+                  block
+            | Tez block ->
+                let+ receipts = store_tez_block_unsafe conn block in
+                (* TODO: support extracting the execution gas *)
+                (Z.zero, receipts)
+          in
+          let*! evm_state =
+            Evm_state.clear_block_storage chain_family block evm_state
+          in
+          return (evm_state, receipts, execution_gas)
         in
         List.iter (Lwt_watcher.notify receipt_watcher) receipts ;
 
@@ -1770,8 +1743,6 @@ module State = struct
       | Archive -> return_none
     in
 
-    let* legacy_block_storage = Evm_store.Block_storage_mode.legacy conn in
-
     let ctxt =
       {
         configuration;
@@ -1791,33 +1762,31 @@ module State = struct
           };
         store;
         signer;
-        legacy_block_storage;
         tx_container = Ex_tx_container tx_container;
         execution_pool = pool;
       }
     in
 
     let* () =
-      unless legacy_block_storage (fun () ->
-          let* ro_store =
-            Evm_store.init
-              ~data_dir:configuration.data_dir
-              ~perm:(Read_only {pool_size = 1})
-              ()
-          in
-          let* evm_node_endpoint =
-            if is_sequencer ctxt then return_none
-            else
-              match configuration.observer with
-              | Some observer -> return_some observer.evm_node_endpoint
-              | None -> return_none
-          in
+      let* ro_store =
+        Evm_store.init
+          ~data_dir:configuration.data_dir
+          ~perm:(Read_only {pool_size = 1})
+          ()
+      in
+      let* evm_node_endpoint =
+        if is_sequencer ctxt then return_none
+        else
+          match configuration.observer with
+          | Some observer -> return_some observer.evm_node_endpoint
+          | None -> return_none
+      in
 
-          Block_storage_setup.enable
-            ~keep_alive:configuration.keep_alive
-            ?evm_node_endpoint
-            ro_store ;
-          return_unit)
+      Block_storage_setup.enable
+        ~keep_alive:configuration.keep_alive
+        ?evm_node_endpoint
+        ro_store ;
+      return_unit
     in
 
     let*! () =
@@ -2004,24 +1973,7 @@ module State = struct
           *)
           let (Qty pred_number) = Ethereum_types.Qty.pred blueprint_number in
           let* local_parent_block_hash =
-            if not ctxt.legacy_block_storage then
-              Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
-            else
-              let (Ex_chain_family chain_family) =
-                Configuration.retrieve_chain_family
-                  ~l2_chains:ctxt.configuration.experimental_features.l2_chains
-              in
-              let root =
-                Durable_storage_path.root_of_chain_family chain_family
-              in
-              let*! bytes =
-                Evm_state.inspect
-                  ctxt.session.evm_state
-                  (Durable_storage_path.Indexes.block_by_number
-                     ~root
-                     (Nth pred_number))
-              in
-              return (Option.map Ethereum_types.decode_block_hash bytes)
+            Evm_store.Blocks.find_hash_of_number conn (Qty pred_number)
           in
           match local_parent_block_hash with
           | None ->
@@ -2406,22 +2358,35 @@ let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
   in
 
   (* Assert we can read the current block hash *)
-  let* () =
+  let* block_hash =
     let*! current_block_hash_opt =
       Evm_state.inspect
         evm_state
         (Durable_storage_path.Block.current_hash ~root)
     in
     match current_block_hash_opt with
-    | Some _bytes -> return_unit
+    | Some bytes -> return (Ethereum_types.decode_block_hash bytes)
     | None -> failwith "The block hash was not found"
+  in
+  let* block =
+    let*! block =
+      Etherlink_durable_storage.block_by_hash
+        (Evm_state.read evm_state)
+        ~full_transaction_object:true
+        block_hash
+    in
+    match block with
+    | Ok block -> return block
+    | Error _ -> failwith "Failed to retrieve the current block by its hash"
   in
   (* Init the store *)
   let* store = Evm_store.init ~data_dir ~perm:Read_write () in
-  Evm_store.(
-    use store @@ fun conn ->
-    let* () = Block_storage_mode.force_legacy conn in
-    Context_hashes.store conn (Qty current_blueprint_number) checkpoint)
+  let* () =
+    Evm_store.(
+      use store @@ fun conn ->
+      Context_hashes.store conn (Qty current_blueprint_number) checkpoint)
+  in
+  Evm_store.(use store @@ fun conn -> Blocks.store conn block)
 
 let reset = State.reset
 

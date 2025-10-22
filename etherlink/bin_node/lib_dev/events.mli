@@ -77,9 +77,6 @@ val is_ready :
   backend:Configuration.rpc_server ->
   unit Lwt.t
 
-(** [legacy_mode ()] advertises the EVM node is using the legacy block storage. *)
-val legacy_mode : unit -> unit Lwt.t
-
 (** [spawn_rpc_is_ready ()] advertises that the RPC spawned with experimental
     feature [spawn_rpc] has made its public endpoint available. *)
 val spawn_rpc_is_ready : unit -> unit Lwt.t

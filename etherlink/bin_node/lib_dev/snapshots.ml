@@ -233,7 +233,6 @@ let export ?desync_path ?chunk_size ?progress ~target_store ?target_dir
   let* {
          rollup_address;
          current_number = current_level;
-         legacy_block_storage = _;
          history_mode;
          first_number = first_level;
        } =
