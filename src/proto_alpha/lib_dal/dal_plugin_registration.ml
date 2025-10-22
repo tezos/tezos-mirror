@@ -48,7 +48,7 @@ module Plugin = struct
         published_level : int32;
         attestation_lag : int;
       }
-    | Get_committee_RPC_failed
+    | Unexpected_RPC_outcome of string
 
   let () =
     Protocol_client_context.register_error_kind
@@ -83,16 +83,17 @@ module Plugin = struct
   let () =
     Protocol_client_context.register_error_kind
       `Permanent
-      ~id:"Get_committee_RPC_failed"
-      ~title:"Get attestation rights RPC failed"
-      ~description:"RPC querying attestation rights to the L1 node failed"
-      ~pp:(fun ppf () ->
+      ~id:"Unexpected_RPC_outcome"
+      ~title:"Unexpected outcome from L1 RPC"
+      ~description:"An RPC to the L1 node gave an unexpected answer"
+      ~pp:(fun ppf rpc_string ->
         Format.fprintf
           ppf
-          "RPC querying attestation rights to the L1 node failed")
-      Data_encoding.unit
-      (function Get_committee_RPC_failed -> Some () | _ -> None)
-      (fun () -> Get_committee_RPC_failed)
+          "The RPC %s to the L1 node gave an unexpected answer"
+          rpc_string)
+      Data_encoding.(obj1 (req "rpc" string))
+      (function Unexpected_RPC_outcome s -> Some s | _ -> None)
+      (fun s -> Unexpected_RPC_outcome s)
 
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
@@ -304,7 +305,11 @@ module Plugin = struct
       in
       match res with
       | [{delegates_rights; _}] -> return delegates_rights
-      | _ -> tzfail Get_committee_RPC_failed
+      | _ ->
+          tzfail
+            (Unexpected_RPC_outcome
+               (Resto.Path.to_string
+                  Plugin.RPC.Attestation_rights.S.attestation_path))
     in
     let pkh_to_tb_slot_map =
       List.fold_left
@@ -324,9 +329,11 @@ module Plugin = struct
           with
           | Some slot -> return (Slot.to_int slot)
           | None ->
-              (* We assume that the set indexes associated to a delegate is
-                 never empty. *)
-              tzfail Get_committee_RPC_failed
+              (* A delegate with assigned DAL shards also has attestation rights. *)
+              tzfail
+                (Unexpected_RPC_outcome
+                   (Resto.Path.to_string
+                      Tezos_rpc.Path.(Plugin.RPC.Dal.path / "shards")))
         in
         return
         @@ Tezos_crypto.Signature.Public_key_hash.Map.add
