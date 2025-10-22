@@ -670,6 +670,7 @@ oc.build:static-x86_64-linux-binaries:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -747,6 +748,7 @@ oc.build:static-arm64-linux-binaries:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -833,6 +835,7 @@ oc.build_x86_64-released:
     - grafazos/doc/**/*
     - irmin/**/*
     - irmin/**/*.ml*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -928,6 +931,7 @@ oc.build_amd64-extra-dev:
     - grafazos/doc/**/*
     - irmin/**/*
     - irmin/**/*.ml*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -1039,6 +1043,7 @@ oc.build_amd64-extra-exp:
     - grafazos/doc/**/*
     - irmin/**/*
     - irmin/**/*.ml*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -1153,6 +1158,7 @@ oc.build_kernels:
     - irmin/**/*
     - irmin/**/*.ml*
     - kernels.mk
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -1283,6 +1289,7 @@ build-layer1-profiling:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -1591,6 +1598,7 @@ oc.integration:compiler-rejections:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -1657,6 +1665,7 @@ oc.script:test-gen-genesis:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -1769,6 +1778,7 @@ oc.script:test_octez_release_versions:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -2277,6 +2287,7 @@ oc.unit:non-proto-x86_64:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -2368,6 +2379,7 @@ oc.unit:other-x86_64:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -2459,6 +2471,7 @@ oc.unit:proto-x86_64:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -2550,6 +2563,7 @@ oc.unit:non-proto-arm64:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -2630,6 +2644,7 @@ oc.unit:webassembly-x86_64:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -2681,6 +2696,7 @@ oc.unit:protocol_compiles:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -2933,6 +2949,7 @@ oc.unified_coverage:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -3197,6 +3214,7 @@ select_tezts:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -4187,6 +4205,7 @@ teztrec_schedule_extended_test:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -4247,6 +4266,7 @@ tezt-static-binaries:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -4340,6 +4360,7 @@ tezt-flaky:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -4441,6 +4462,7 @@ tezt-extra:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -4537,6 +4559,7 @@ tezt-slow:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -4633,6 +4656,7 @@ tezt-riscv-slow-sequential:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -4728,6 +4752,7 @@ tezt-time-sensitive:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
@@ -4827,6 +4852,7 @@ tezt:
     - dune-workspace
     - etherlink/**/*
     - irmin/**/*
+    - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
     - prometheus/**/*
