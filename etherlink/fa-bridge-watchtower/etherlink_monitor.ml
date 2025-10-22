@@ -1010,6 +1010,8 @@ let start db ~config ~notify_ws_change ~first_block =
           tx_per_addr_limit = 10000L;
         }
       ~keep_alive:true
+      ?timeout:
+        (Option.map (fun t -> t.Websocket_client.timeout) config.rpc_timeout)
       ()
   in
   Lwt.dont_wait tx_queue_beacon ignore ;
