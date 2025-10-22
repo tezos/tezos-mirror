@@ -284,7 +284,7 @@ let select_distribution_for_cycle ctxt cycle =
       stakes
       total_stake
   in
-  let* stakes_pk, tz4_number_stakers =
+  let* stakes_pk, tz4_number_bakers =
     List.fold_left_es
       (fun (list_acc, tz4_count_acc) (pkh, stake) ->
         let* pk =
@@ -316,8 +316,8 @@ let select_distribution_for_cycle ctxt cycle =
     .may_update_all_bakers_attest_first_level
       ctxt
       cycle
-      ~total_number_stakers:(List.length stakes)
-      ~tz4_number_stakers
+      ~total_number_bakers:(List.length stakes)
+      ~tz4_number_bakers
   in
   return ctxt
 
