@@ -2081,7 +2081,7 @@ module Cli = struct
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?history_mode
-      ?dal_slots ?sunset_sec configuration =
+      ?dal_slots ?sunset_sec ?rpc_timeout configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -2100,6 +2100,9 @@ module Cli = struct
     in
     let keep_alive =
       Option.value keep_alive ~default:configuration.keep_alive
+    in
+    let rpc_timeout =
+      Option.value rpc_timeout ~default:configuration.rpc_timeout
     in
     let finalized_view =
       Option.value finalized_view ~default:configuration.finalized_view
@@ -2270,7 +2273,7 @@ module Cli = struct
       gcp_kms = configuration.gcp_kms;
       keep_alive = configuration.keep_alive || keep_alive;
       rollup_node_endpoint;
-      rpc_timeout = configuration.rpc_timeout;
+      rpc_timeout;
       verbose;
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
@@ -2291,8 +2294,8 @@ module Cli = struct
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode ?sunset_sec ()
-      =
+      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode ?sunset_sec
+      ?rpc_timeout () =
     default ~data_dir ?network ?evm_node_endpoint ()
     |> patch_configuration_from_args
          ~data_dir
@@ -2331,6 +2334,7 @@ module Cli = struct
          ?dal_slots
          ?history_mode
          ?sunset_sec
+         ?rpc_timeout
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?cors_origins ?cors_headers ?enable_websocket ?tx_queue_max_lifespan
@@ -2342,7 +2346,7 @@ module Cli = struct
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?dal_slots
-      ?network ?history_mode ?sunset_sec config_file =
+      ?network ?history_mode ?sunset_sec ?rpc_timeout config_file =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -2402,6 +2406,7 @@ module Cli = struct
           ?history_mode
           ?dal_slots
           ?sunset_sec
+          ?rpc_timeout
           configuration
       in
       return configuration
@@ -2445,6 +2450,7 @@ module Cli = struct
           ?network
           ?history_mode
           ?sunset_sec
+          ?rpc_timeout
           ()
       in
       return config

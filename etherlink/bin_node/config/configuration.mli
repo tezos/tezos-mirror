@@ -355,6 +355,7 @@ module Cli : sig
     ?network:supported_network ->
     ?history_mode:history_mode ->
     ?sunset_sec:int64 ->
+    ?rpc_timeout:float ->
     unit ->
     t
 
@@ -395,6 +396,7 @@ module Cli : sig
     ?history_mode:history_mode ->
     ?dal_slots:int list ->
     ?sunset_sec:int64 ->
+    ?rpc_timeout:float ->
     t ->
     t
 
@@ -436,6 +438,7 @@ module Cli : sig
     ?network:supported_network ->
     ?history_mode:history_mode ->
     ?sunset_sec:int64 ->
+    ?rpc_timeout:float ->
     string ->
     t tzresult Lwt.t
 end

@@ -101,6 +101,9 @@ module Params = struct
 
   let int = Tezos_clic.parameter (fun _ s -> Lwt.return_ok (int_of_string s))
 
+  let float =
+    Tezos_clic.parameter (fun _ s -> Lwt.return_ok (float_of_string s))
+
   let int64 =
     Tezos_clic.parameter (fun _ s -> Lwt.return_ok (Int64.of_string s))
 
@@ -684,6 +687,13 @@ let keep_alive_arg =
     ~long:"keep-alive"
     ()
 
+let rpc_timeout_arg =
+  Tezos_clic.arg
+    ~long:"rpc-timeout"
+    ~placeholder:"sec"
+    ~doc:"Timeout in seconds for RPCs made by the EVM node."
+    Params.float
+
 let blueprint_mode_arg =
   Tezos_clic.switch
     ~long:"as-blueprint"
@@ -906,7 +916,7 @@ let profiling_arg =
        | s -> failwith "Invalid value %S for --profiling" s)
 
 let common_config_args =
-  Tezos_clic.args23
+  Tezos_clic.args24
     data_dir_arg
     config_path_arg
     rpc_addr_arg
@@ -919,6 +929,7 @@ let common_config_args =
     log_filter_max_nb_logs_arg
     log_filter_chunk_size_arg
     keep_alive_arg
+    rpc_timeout_arg
     rollup_node_endpoint_arg
     tx_pool_addr_limit_arg
     tx_queue_max_lifespan_arg
@@ -1096,8 +1107,8 @@ let set_gc_parameters (config : Configuration.t) =
           let minor_heap_size, space_overhead = performance_gc_params in
           Gc.set {params with minor_heap_size; space_overhead})
 
-let start_proxy ~data_dir ?config_file ~keep_alive ?rpc_addr ?rpc_port
-    ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
+let start_proxy ~data_dir ?config_file ~keep_alive ?rpc_timeout ?rpc_addr
+    ?rpc_port ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
     ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
     ?rollup_node_endpoint ?evm_node_endpoint ?tx_queue_max_lifespan
     ?tx_queue_max_size ?tx_queue_tx_per_addr_limit ?restricted_rpcs ~verbose
@@ -1107,6 +1118,7 @@ let start_proxy ~data_dir ?config_file ~keep_alive ?rpc_addr ?rpc_port
     Cli.create_or_read_config
       ~data_dir
       ~keep_alive
+      ?rpc_timeout
       ?rpc_addr
       ?rpc_port
       ?rpc_batch_limit
@@ -1232,8 +1244,8 @@ let add_tezlink_to_node_configuration tezlink_chain_id configuration =
 let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_keys ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
     ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
-    ~keep_alive ?rollup_node_endpoint ~verbose ?profiling ?preimages
-    ?preimages_endpoint ?native_execution_policy ?time_between_blocks
+    ~keep_alive ?rpc_timeout ?rollup_node_endpoint ~verbose ?profiling
+    ?preimages ?preimages_endpoint ?native_execution_policy ?time_between_blocks
     ?max_number_of_chunks ?private_rpc_port ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
@@ -1253,6 +1265,7 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_keys ?rpc_addr ?rpc_port
       ?tx_queue_max_size
       ?tx_queue_tx_per_addr_limit
       ~keep_alive
+      ?rpc_timeout
       ?sequencer_keys
       ?rollup_node_endpoint
       ~verbose
@@ -1333,6 +1346,7 @@ let rpc_command =
              log_filter_max_nb_logs,
              log_filter_chunk_size,
              keep_alive,
+             rpc_timeout,
              rollup_node_endpoint,
              _tx_pool_addr_limit,
              tx_queue_max_lifespan,
@@ -1407,6 +1421,7 @@ let rpc_command =
         Cli.patch_configuration_from_args
           ~data_dir
           ~keep_alive
+          ?rpc_timeout
           ?cors_origins
           ?cors_headers
           ?rpc_batch_limit
@@ -1438,19 +1453,20 @@ let rpc_command =
         ~config
         ())
 
-let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
-    ?private_rpc_port ?cors_origins ?cors_headers ?enable_websocket ~verbose
-    ?profiling ?preimages ?preimages_endpoint ?native_execution_policy
-    ?rollup_node_endpoint ~dont_track_rollup_node ?evm_node_endpoint
-    ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
-    ?log_filter_chunk_size ?log_filter_max_nb_logs ?log_filter_max_nb_blocks
-    ?restricted_rpcs ?kernel ~no_sync ~init_from_snapshot ?history_mode
-    ~finalized_view ?network config_file =
+let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
+    ?rpc_batch_limit ?private_rpc_port ?cors_origins ?cors_headers
+    ?enable_websocket ~verbose ?profiling ?preimages ?preimages_endpoint
+    ?native_execution_policy ?rollup_node_endpoint ~dont_track_rollup_node
+    ?evm_node_endpoint ?tx_queue_max_lifespan ?tx_queue_max_size
+    ?tx_queue_tx_per_addr_limit ?log_filter_chunk_size ?log_filter_max_nb_logs
+    ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel ~no_sync
+    ~init_from_snapshot ?history_mode ~finalized_view ?network config_file =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
       ~data_dir
       ~keep_alive
+      ?rpc_timeout
       ?rpc_addr
       ?rpc_port
       ?private_rpc_port
@@ -2089,6 +2105,7 @@ let init_config_command =
              log_filter_max_nb_logs,
              log_filter_chunk_size,
              keep_alive,
+             rpc_timeout,
              rollup_node_endpoint,
              _tx_pool_addr_limit,
              tx_queue_max_lifespan,
@@ -2149,6 +2166,7 @@ let init_config_command =
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
           ~keep_alive
+          ?rpc_timeout
           ?rollup_node_endpoint
           ?dont_track_rollup_node:
             (* If `dont_track_rollup_node` is false, it means the argument was
@@ -2547,6 +2565,7 @@ let proxy_command =
              log_filter_max_nb_logs,
              log_filter_chunk_size,
              keep_alive,
+             rpc_timeout,
              rollup_node_endpoint,
              _tx_pool_addr_limit,
              tx_queue_max_lifespan,
@@ -2569,6 +2588,7 @@ let proxy_command =
         ~data_dir
         ?config_file
         ~keep_alive
+        ?rpc_timeout
         ?rpc_addr
         ?rpc_port
         ?rpc_batch_limit
@@ -2671,6 +2691,7 @@ let sequencer_command =
              log_filter_max_nb_logs,
              log_filter_chunk_size,
              keep_alive,
+             rpc_timeout,
              rollup_node_endpoint,
              _tx_pool_addr_limit,
              tx_queue_max_lifespan,
@@ -2728,6 +2749,7 @@ let sequencer_command =
         ?tx_queue_max_size
         ?tx_queue_tx_per_addr_limit
         ~keep_alive
+        ?rpc_timeout
         ?rollup_node_endpoint
         ~verbose
         ?profiling
@@ -2775,6 +2797,7 @@ let sandbox_command =
              log_filter_max_nb_logs,
              log_filter_chunk_size,
              keep_alive,
+             rpc_timeout,
              rollup_node_endpoint,
              _tx_pool_addr_limit,
              tx_queue_max_lifespan,
@@ -2855,6 +2878,7 @@ let sandbox_command =
         ?tx_queue_max_size
         ?tx_queue_tx_per_addr_limit
         ~keep_alive
+        ?rpc_timeout
         ~rollup_node_endpoint
         ~verbose
         ?profiling
@@ -2904,6 +2928,7 @@ let tezlink_sandbox_command =
              log_filter_max_nb_logs,
              log_filter_chunk_size,
              keep_alive,
+             rpc_timeout,
              rollup_node_endpoint,
              _tx_pool_addr_limit,
              tx_queue_max_lifespan,
@@ -2977,6 +3002,7 @@ let tezlink_sandbox_command =
         ?tx_queue_max_size
         ?tx_queue_tx_per_addr_limit
         ~keep_alive
+        ?rpc_timeout
         ~rollup_node_endpoint
         ~verbose
         ?profiling
@@ -3036,6 +3062,7 @@ let observer_command =
              log_filter_max_nb_logs,
              log_filter_chunk_size,
              keep_alive,
+             rpc_timeout,
              rollup_node_endpoint,
              _tx_pool_addr_limit,
              tx_queue_max_lifespan,
@@ -3071,6 +3098,7 @@ let observer_command =
       start_observer
         ~data_dir
         ~keep_alive
+        ?rpc_timeout
         ?rpc_addr
         ?rpc_port
         ?rpc_batch_limit
