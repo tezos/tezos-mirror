@@ -133,7 +133,10 @@ let may_notify ctxt ~(slot_id : Types.slot_id) =
           let all_stored = number_stored_shards = number_of_assigned_shards in
           if not last_known_parameters.incentives_enable then (
             if all_stored then
-              T.notify attestable_slots_watcher_table pkh ~slot_id ;
+              T.notify_attestable_slot
+                attestable_slots_watcher_table
+                pkh
+                ~slot_id ;
             return_unit)
           else if not all_stored then return_unit
           else
@@ -147,8 +150,32 @@ let may_notify ctxt ~(slot_id : Types.slot_id) =
               |> Errors.to_option_tzresult
             in
             (match is_slot_attestable_with_traps with
-            | Some true -> T.notify attestable_slots_watcher_table pkh ~slot_id
+            | Some true ->
+                T.notify_attestable_slot
+                  attestable_slots_watcher_table
+                  pkh
+                  ~slot_id
             | _ -> ()) ;
             return_unit
       in
       Seq.iter_ep notify_if_attestable subscribers
+
+let may_notify_not_in_committee ctxt committee ~attestation_level =
+  let module T = Types.Attestable_slots_watcher_table in
+  let attestable_slots_watcher_table =
+    Node_context.get_attestable_slots_watcher_table ctxt
+  in
+  let subscribers = T.elements attestable_slots_watcher_table in
+  Seq.iter
+    (fun pkh ->
+      let assigned_shard_indices =
+        match Signature.Public_key_hash.Map.find pkh committee with
+        | None -> []
+        | Some (indexes, _) -> indexes
+      in
+      if List.is_empty assigned_shard_indices then
+        T.notify_no_shards_assigned
+          attestable_slots_watcher_table
+          pkh
+          ~attestation_level)
+    subscribers
