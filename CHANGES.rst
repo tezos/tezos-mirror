@@ -76,7 +76,8 @@ Smart Rollup node
 - Update opentelemetry library to 0.12 which should fix the issue where a log
   protobuf encoding crashes the node when telemetry is activated. (MR
   :gl:`!19516`)
-
+- Ensure metrics are initialized before starting metrics server. (MR
+  :gl:`!19707`)
 
 Smart Rollup WASM Debugger
 --------------------------
