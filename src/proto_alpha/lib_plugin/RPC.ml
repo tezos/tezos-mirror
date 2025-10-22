@@ -4277,12 +4277,12 @@ module S = struct
     let open RPC_query in
     query Fun.id |+ opt_field "cycle" Cycle.rpc_arg Fun.id |> seal
 
-  let tz4_staker_number_ratio =
+  let tz4_baker_number_ratio =
     RPC_service.get_service
       ~description:"Returns the ratio of active bakers using a tz4."
       ~query:cycle_query
       ~output:Data_encoding.(string Plain)
-      RPC_path.(path / "tz4_staker_number_ratio")
+      RPC_path.(path / "tz4_baker_number_ratio")
 end
 
 type Environment.Error_monad.error += Negative_level_offset
@@ -4356,13 +4356,13 @@ let register () =
       return (total_stake, stake_info_list)) ;
   Registration.register0
     ~chunked:false
-    S.tz4_staker_number_ratio
+    S.tz4_baker_number_ratio
     (fun ctxt q () ->
       let cycle = Option.value ~default:(Level.current ctxt).cycle q in
       let* _, _total_stake, stake_info_list =
         Stake_distribution.stake_info_for_cycle ctxt cycle
       in
-      let tz4_stakers =
+      let tz4_bakers =
         List.fold_left
           (fun acc (x, _) ->
             match x.Consensus_key.consensus_pk with
@@ -4371,7 +4371,7 @@ let register () =
           0
           stake_info_list
       in
-      let num = Z.(mul (of_int tz4_stakers) (of_int 100)) in
+      let num = Z.(mul (of_int tz4_bakers) (of_int 100)) in
       let den = Z.of_int (List.length stake_info_list) in
       let whole_part, rest = Z.(div_rem num den) in
       let decimals = Z.(div (mul rest (of_int 100)) den) in
