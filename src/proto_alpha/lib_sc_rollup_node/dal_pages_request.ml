@@ -34,7 +34,12 @@ module Slot_id = Tezos_dal_node_services.Types.Slot_id
     - Add entries [None] for the slot's pages in the store, if the slot
       is not confirmed. *)
 
-type Environment.Error_monad.error += Dal_invalid_page_for_slot of Dal.Page.t
+type Environment.Error_monad.error +=
+  | Dal_invalid_page_for_slot of Dal.Page.t
+  | Dal_attestation_status_not_final of {
+      published_level : int32;
+      slot_index : int;
+    }
 
 let () =
   let open Environment.Error_monad in
@@ -48,6 +53,35 @@ let () =
     Data_encoding.(obj1 (req "page_id" Dal.Page.encoding))
     (function Dal_invalid_page_for_slot page_id -> Some page_id | _ -> None)
     (fun page_id -> Dal_invalid_page_for_slot page_id)
+
+let () =
+  let open Environment.Error_monad in
+  register_error_kind
+    `Temporary
+    ~id:"dal_pages_request.attestation_status_not_final"
+    ~title:"DAL attestation status is not final"
+    ~description:
+      "The DAL attestation status for the requested slot is not final yet. We \
+       cannot decide whether it is legitimate for the rollup node to import \
+       it."
+    ~pp:(fun ppf (published_level, slot_index) ->
+      Format.fprintf
+        ppf
+        "DAL attestation status not final for slot %d published at level %ld. \
+         We cannot decide yet if it is legitimate for the rollup node to \
+         import it."
+        slot_index
+        published_level)
+    Data_encoding.(
+      obj2
+        (req "published_level" Data_encoding.int32)
+        (req "slot_index" Data_encoding.uint8))
+    (function
+      | Dal_attestation_status_not_final {published_level; slot_index} ->
+          Some (published_level, slot_index)
+      | _ -> None)
+    (fun (published_level, slot_index) ->
+      Dal_attestation_status_not_final {published_level; slot_index})
 
 module Event = struct
   include Internal_event.Simple
@@ -193,6 +227,18 @@ let page_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
        slot_id
        ~dal_attested_slots_validity_lag
 
+let attestation_status_not_final published_level slot_index =
+  let open Environment.Error_monad.Lwt_result_syntax in
+  let*! res =
+    tzfail
+    @@ Dal_attestation_status_not_final
+         {
+           published_level = Raw_level.to_int32 published_level;
+           slot_index = Sc_rollup_proto_types.Dal.Slot_index.to_octez slot_index;
+         }
+  in
+  Environment.wrap_tzresult res |> Lwt.return
+
 let slot_pages
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
     ~dal_activation_level ~inbox_level node_ctxt slot_id
@@ -228,7 +274,8 @@ let slot_pages
           download_confirmed_slot_pages dal_cctxt ~published_level ~index
         in
         return (Some pages)
-  | `Unattested | `Waiting_attestation | `Unpublished -> return_none
+  | `Unattested | `Unpublished -> return_none
+  | `Waiting_attestation -> attestation_status_not_final published_level index
 
 let page_content
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
@@ -263,4 +310,5 @@ let page_content
              page_id
       then return_none
       else get_page dal_cctxt ~inbox_level page_id
-  | `Unattested | `Waiting_attestation | `Unpublished -> return_none
+  | `Unattested | `Unpublished -> return_none
+  | `Waiting_attestation -> attestation_status_not_final published_level index
