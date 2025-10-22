@@ -64,6 +64,8 @@ module Request = struct
 
   let eth_blockNumber = {method_ = "eth_blockNumber"; parameters = `A []}
 
+  let generic_blockNumber = {method_ = "tez_blockNumber"; parameters = `A []}
+
   let eth_getBlockByNumber ~block ~full_tx_objects =
     {
       method_ = "eth_getBlockByNumber";
@@ -416,6 +418,22 @@ let block_number ?websocket evm_node =
 
 let block_number_opt ?websocket evm_node =
   let* json = Evm_node.jsonrpc ?websocket evm_node Request.eth_blockNumber in
+  return
+    (decode_or_error
+       (fun json -> JSON.(json |-> "result" |> as_opt |> Option.map as_int32))
+       json)
+
+let generic_block_number ?websocket evm_node =
+  let* json =
+    Evm_node.jsonrpc ?websocket evm_node Request.generic_blockNumber
+  in
+  return
+    (decode_or_error (fun json -> JSON.(json |-> "result" |> as_int32)) json)
+
+let generic_block_number_opt ?websocket evm_node =
+  let* json =
+    Evm_node.jsonrpc ?websocket evm_node Request.generic_blockNumber
+  in
   return
     (decode_or_error
        (fun json -> JSON.(json |-> "result" |> as_opt |> Option.map as_int32))

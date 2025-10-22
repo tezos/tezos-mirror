@@ -308,8 +308,8 @@ let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ~sc_rollup_node ~proxy
   in
   let result_f () =
     let open Rpc.Syntax in
-    let* proxy_level_opt = Rpc.block_number_opt proxy in
-    let*@ sequencer_level = Rpc.block_number sequencer in
+    let* proxy_level_opt = Rpc.generic_block_number_opt proxy in
+    let*@ sequencer_level = Rpc.generic_block_number sequencer in
     match proxy_level_opt with
     | Error _ | Ok None -> Lwt.return_none
     | Ok (Some proxy_level) ->
