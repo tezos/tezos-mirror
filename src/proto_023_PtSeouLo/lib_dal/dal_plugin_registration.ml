@@ -42,25 +42,6 @@ module Plugin = struct
 
   let tb_slot_to_int tb_slot = Slot.to_int tb_slot
 
-  type error += Aggregation_result_size_error
-
-  let () =
-    Protocol_client_context.register_error_kind
-      `Permanent
-      ~id:"Aggregation_result_size_error"
-      ~title:"Bad aggregagtion result size"
-      ~description:
-        "Aggregation result should have as many elements as the original \
-         aggregated attestation"
-      ~pp:(fun ppf () ->
-        Format.fprintf
-          ppf
-          "Aggregation result should have as many elements as the original \
-           aggregated attestation")
-      Data_encoding.unit
-      (function Aggregation_result_size_error -> Some () | _ -> None)
-      (fun () -> Aggregation_result_size_error)
-
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Plugin.Constants_services.parametric cpctxt (chain, block)
