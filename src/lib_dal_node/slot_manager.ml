@@ -715,7 +715,10 @@ let publish_proved_shards ctxt (slot_id : Types.slot_id) ~level_committee
     gs_worker
   [@profiler.wrap_f
     {driver_ids = [Opentelemetry]}
-      (Opentelemetry_helpers.trace_slot ~name:"publish_shards" slot_id)]
+      (Opentelemetry_helpers.trace_slot
+         ~name:"publish_shards"
+         ~slot_commitment:commitment
+         ~slot_id)]
 
 (** This function publishes the shards of a commitment that is waiting
     for attestation on L1 if this node has those shards and their proofs

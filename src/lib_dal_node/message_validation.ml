@@ -59,11 +59,13 @@ let gossipsub_app_message_payload_validation ~disable_shard_validation cryptobox
           (Opentelemetry_helpers.trace_slot
              ~attrs:[("shard_index", `Int shard_index)]
              ~name:"verify_shard"
-             Types.Slot_id.
-               {
-                 slot_level = message_id.level;
-                 slot_index = message_id.slot_index;
-               })])
+             ~slot_commitment:commitment
+             ~slot_id:
+               Types.Slot_id.
+                 {
+                   slot_level = message_id.level;
+                   slot_index = message_id.slot_index;
+                 })])
     in
     match res with
     | Ok () -> `Valid
@@ -428,7 +430,8 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
                 {driver_ids = [Opentelemetry]}
                   (Opentelemetry_helpers.trace_slot
                      ~name:"verify_shards"
-                     Types.Slot_id.{slot_level = level; slot_index})]
+                     ~slot_commitment:commitment
+                     ~slot_id:{Types.Slot_id.slot_level = level; slot_index})]
           in
           match res with
           | Ok () ->
