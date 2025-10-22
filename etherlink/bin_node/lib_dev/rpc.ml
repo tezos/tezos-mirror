@@ -303,7 +303,11 @@ let main ~evm_node_endpoint ?evm_node_private_endpoint
     | None ->
         let start, tx_container = Tx_queue.tx_container ~chain_family in
         let* () =
-          start ~config:config.tx_queue ~keep_alive:config.keep_alive ()
+          start
+            ~config:config.tx_queue
+            ~keep_alive:config.keep_alive
+            ~timeout:config.rpc_timeout
+            ()
         in
         return tx_container
   in

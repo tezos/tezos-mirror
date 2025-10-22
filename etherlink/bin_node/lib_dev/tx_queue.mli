@@ -33,6 +33,7 @@ val tx_container :
   chain_family:'f L2_types.chain_family ->
   (config:Configuration.tx_queue ->
   keep_alive:bool ->
+  ?timeout:float ->
   unit ->
   unit tzresult Lwt.t)
   * 'f Services_backend_sig.tx_container

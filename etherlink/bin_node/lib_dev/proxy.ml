@@ -212,7 +212,11 @@ let main
     | true, None ->
         let start, tx_container = Tx_queue.tx_container ~chain_family in
         let* () =
-          start ~config:config.tx_queue ~keep_alive:config.keep_alive ()
+          start
+            ~config:config.tx_queue
+            ~keep_alive:config.keep_alive
+            ~timeout:config.rpc_timeout
+            ()
         in
         return
         @@ ( Some

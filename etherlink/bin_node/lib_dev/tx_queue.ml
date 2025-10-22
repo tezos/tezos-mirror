@@ -6,7 +6,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type parameters = {config : Configuration.tx_queue; keep_alive : bool}
+type parameters = {
+  config : Configuration.tx_queue;
+  keep_alive : bool;
+  timeout : float option;
+}
 
 type queue_variant = [`Accepted | `Refused]
 
@@ -257,6 +261,7 @@ struct
     config : Configuration.tx_queue;
     keep_alive : bool;
     mutable locked : bool;
+    timeout : float option;
   }
 
   module Types = struct
@@ -600,8 +605,8 @@ struct
       let* rev_selected = select [] seq in
       return @@ List.rev rev_selected
 
-    let send_transactions_batch ~evm_node_endpoint ~keep_alive ~state self
-        transactions =
+    let send_transactions_batch ~evm_node_endpoint ~timeout ~keep_alive ~state
+        self transactions =
       let open Lwt_result_syntax in
       let module M = Map.Make (String) in
       let module Srt = Rpc_encodings.Send_raw_transaction in
@@ -617,6 +622,7 @@ struct
               Rollup_services.call_service
                 ~keep_alive
                 ~base
+                ?timeout
                 (Batch.dispatch_batch_service ~path:Resto.Path.root)
                 ()
                 ()
@@ -627,6 +633,17 @@ struct
             in
             check_missed_transactions ~self ~hashes ~responses
         | Websocket ws_client ->
+            let timeout =
+              Option.map
+                (fun timeout ->
+                  Websocket_client.
+                    {
+                      timeout;
+                      on_timeout =
+                        (if keep_alive then `Retry_forever else `Fail);
+                    })
+                timeout
+            in
             let batch, hashes = build_batch transactions in
             let*! () =
               Tx_queue_events.injecting_transactions (List.length batch)
@@ -635,7 +652,7 @@ struct
               List.map_ep
                 (fun req ->
                   let*! response =
-                    Websocket_client.send_jsonrpc_request ws_client req
+                    Websocket_client.send_jsonrpc_request ?timeout ws_client req
                   in
                   return Rpc_encodings.JSONRPC.{value = response; id = req.id})
                 batch
@@ -657,6 +674,7 @@ struct
            keep_alive = _;
            locked = _;
            waiting_injection = _;
+           timeout = _;
          } as state :
           state) =
       (* full matching so when a new element is added to the state it's not
@@ -941,9 +959,9 @@ struct
               let open Lwt_syntax in
               let* send_result =
                 protect @@ fun () ->
-                Misc.with_timeout 5 @@ fun () ->
                 send_transactions_batch
                   ~keep_alive:state.keep_alive
+                  ~timeout:state.timeout
                   ~evm_node_endpoint
                   ~state
                   self
@@ -1092,7 +1110,7 @@ struct
 
     type launch_error = tztrace
 
-    let on_launch _self () ({config; keep_alive} : parameters) =
+    let on_launch _self () ({config; keep_alive; timeout} : parameters) =
       let open Lwt_result_syntax in
       return
         {
@@ -1112,6 +1130,7 @@ struct
           config;
           keep_alive;
           locked = false;
+          timeout;
         }
 
     let on_error (type a b) _self _status_request (_r : (a, b) Request.t)
@@ -1270,10 +1289,11 @@ struct
          {validate_tx; validation_state = initial_validation_state})
     |> handle_request_error
 
-  let start ~config ~keep_alive () =
+  let start ~config ~keep_alive ?timeout () =
     let open Lwt_result_syntax in
+    let timeout = Option.map (min 5.) timeout in
     let* worker =
-      Worker.launch table () {config; keep_alive} (module Handlers)
+      Worker.launch table () {config; keep_alive; timeout} (module Handlers)
     in
     Lwt.wakeup worker_waker worker ;
     let*! () = Tx_queue_events.is_ready () in

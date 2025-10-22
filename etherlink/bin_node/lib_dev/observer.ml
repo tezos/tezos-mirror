@@ -188,7 +188,13 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
 
   let* tx_container =
     let start, tx_container = Tx_queue.tx_container ~chain_family in
-    let* () = start ~config:config.tx_queue ~keep_alive:config.keep_alive () in
+    let* () =
+      start
+        ~config:config.tx_queue
+        ~keep_alive:config.keep_alive
+        ~timeout:config.rpc_timeout
+        ()
+    in
     return tx_container
   in
 
