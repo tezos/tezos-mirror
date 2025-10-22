@@ -5,8 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let may_update_all_bakers_attest_first_level ctxt cycle ~total_number_stakers
-    ~tz4_number_stakers =
+let may_update_all_bakers_attest_first_level ctxt cycle ~total_number_bakers
+    ~tz4_number_bakers =
   let open Lwt_syntax in
   let* b = Storage.All_bakers_attest_activation.mem ctxt in
   if b then return ctxt
@@ -14,10 +14,10 @@ let may_update_all_bakers_attest_first_level ctxt cycle ~total_number_stakers
     let Ratio_repr.{numerator; denominator} =
       Constants_storage.all_bakers_attest_activation_threshold ctxt
     in
-    (* Activate iff tz4_stakers >= total_stakers * numerator / denominator
-                  <=> tz4_stakers * denominator >= total_stakers * numerator *)
-    let total = total_number_stakers * numerator in
-    let tz4_weight = tz4_number_stakers * denominator in
+    (* Activate iff tz4_bakers >= total_bakers * numerator / denominator
+                  <=> tz4_bakers * denominator >= total_bakers * numerator *)
+    let total = total_number_bakers * numerator in
+    let tz4_weight = tz4_number_bakers * denominator in
     if Compare.Int.(tz4_weight < total) then return ctxt
     else
       let cycle_eras = Raw_context.cycle_eras ctxt in

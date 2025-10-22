@@ -146,5 +146,5 @@
 ./octez-client --mode light rpc get /chains/main/blocks/head/helpers/total_baking_power
 "7333333333330"
 
-./octez-client --mode light rpc get /chains/main/blocks/head/helpers/tz4_staker_number_ratio
+./octez-client --mode light rpc get /chains/main/blocks/head/helpers/tz4_baker_number_ratio
 "0.00%"

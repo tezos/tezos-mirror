@@ -75,10 +75,10 @@ RPC Changes
   at the current cycle. (MR :gl:`!18019`)
 
 - Added a new RPC ``GET
-  /chains/<chain_id>/blocks/<block_id>/helpers/tz4_staker_number_ratio?cycle=<cycle>``.
+  /chains/<chain_id>/blocks/<block_id>/helpers/tz4_baker_number_ratio?cycle=<cycle>``.
   It returns the portion of active delegates that sign with a BLS key.
   The ``cycle`` argument, if omitted, defaults to the current
-  cycle. (MR :gl:`!19093`)
+  cycle. (MRs :gl:`!19093`, :gl:`!19710`)
 
 - Added a new RPC ``GET
   /chains/<chain_id>/blocks/<block_id>/context/destination/<destination>/index``.
