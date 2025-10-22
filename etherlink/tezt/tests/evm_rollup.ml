@@ -4609,9 +4609,7 @@ let test_keep_alive =
       let* () = Sc_rollup_node.terminate sc_rollup_node in
       (* Restart the evm node without keep alive, expected to fail. *)
       let process = Evm_node.spawn_run evm_node in
-      let* () =
-        Process.check_error ~msg:(rex "the communication was lost") process
-      in
+      let* () = Process.check_error ~msg:(rex "Unable to connect") process in
       (* Restart with keep alive. The EVM node is waiting for the connection. *)
       let* () =
         Evm_node.run ~wait:false ~extra_arguments:["--keep-alive"] evm_node

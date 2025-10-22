@@ -19,22 +19,22 @@
 open Tezos_rpc
 open Path
 
-type error += Lost_connection | Timeout of float * Uri.t
+type error += Connection_error of Uri.t | Timeout of float * Uri.t
 
 let () =
-  let description =
-    "The EVM node is no longer able to communicate with the rollup node, the \
-     communication was lost"
-  in
   register_error_kind
     `Temporary
     ~id:"evm_node_dev_lost_connection"
-    ~title:"Lost connection with rollup node"
-    ~description
-    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-    Data_encoding.unit
-    (function Lost_connection -> Some () | _ -> None)
-    (fun () -> Lost_connection) ;
+    ~title:"Lost connection with node"
+    ~description:"The EVM node cannot communicate with the node."
+    ~pp:(fun ppf url ->
+      Format.fprintf
+        ppf
+        "The EVM node cannot communicate with the node when calling %s"
+        url)
+    Data_encoding.(obj1 (req "url" string))
+    (function Connection_error url -> Some (Uri.to_string url) | _ -> None)
+    (fun url -> Connection_error (Uri.of_string url)) ;
   register_error_kind
     `Temporary
     ~id:"evm_node_timeout"
@@ -312,7 +312,9 @@ let call_service ~base ?(media_types = Media_type.all_media_types) ?timeout rpc
   in
   match res with
   | Ok res -> return res
-  | Error trace when is_connection_error trace -> fail (Lost_connection :: trace)
+  | Error trace when is_connection_error trace ->
+      fail
+      @@ TzTrace.cons (Connection_error (uri_of_service base rpc b c)) trace
   | Error trace -> fail trace
 
 let call_service ~keep_alive ~base ?media_types ?timeout rpc b c input =
