@@ -1,25 +1,25 @@
-From 480ed0cc216a7057e29565588c3490787e5cff82 Mon Sep 17 00:00:00 2001
+From b9179f897a3f03ce43cf67eb7aefd8f554c233f5 Mon Sep 17 00:00:00 2001
 From: Pierrick Couderc <pierrick.couderc@nomadic-labs.com>
-Date: Wed, 15 Oct 2025 14:18:06 +0200
-Subject: [PATCH 1/1] Profiler: patch Alpha
+Date: Wed, 22 Oct 2025 15:05:41 +0200
+Subject: [PATCH 1/1] Proto_alpha: profiler patch
 
 ---
  src/proto_alpha/lib_protocol/apply.ml         | 17 ++--
  src/proto_alpha/lib_protocol/baking.ml        |  4 +-
  .../lib_protocol/delegate_cycles.ml           | 78 +++++++++++++++----
  src/proto_alpha/lib_protocol/dune             |  2 +
- src/proto_alpha/lib_protocol/init_storage.ml  | 36 +++++++--
+ src/proto_alpha/lib_protocol/init_storage.ml  | 24 +++++-
  src/proto_alpha/lib_protocol/raw_context.ml   |  4 +-
  src/proto_alpha/lib_protocol/script_cache.ml  | 19 ++---
- .../lib_protocol/script_interpreter.ml        | 11 +--
- .../lib_protocol/script_ir_translator.ml      | 40 +++++-----
- 9 files changed, 149 insertions(+), 62 deletions(-)
+ .../lib_protocol/script_interpreter.ml        | 15 ++++
+ .../lib_protocol/script_ir_translator.ml      | 26 ++++---
+ 9 files changed, 142 insertions(+), 47 deletions(-)
 
 diff --git a/src/proto_alpha/lib_protocol/apply.ml b/src/proto_alpha/lib_protocol/apply.ml
-index 0078267eca..a301359869 100644
+index cdbeea9ee4..b4df332c44 100644
 --- a/src/proto_alpha/lib_protocol/apply.ml
 +++ b/src/proto_alpha/lib_protocol/apply.ml
-@@ -2501,7 +2501,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
+@@ -2508,7 +2508,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
      ~source ~operation contents_list =
    let open Lwt_result_syntax in
    let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
@@ -32,7 +32,7 @@ index 0078267eca..a301359869 100644
    let gas_cost_for_sig_check =
      let algo =
        Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key_hash source
-@@ -2780,11 +2784,12 @@ let may_start_new_cycle ctxt =
+@@ -2787,11 +2791,12 @@ let may_start_new_cycle ctxt =
    match Level.dawn_of_a_new_cycle ctxt with
    | None -> return (ctxt, [], [])
    | Some last_cycle ->
@@ -47,11 +47,11 @@ index 0078267eca..a301359869 100644
 +       let+ ctxt = Bootstrap.cycle_end ctxt last_cycle in
 +       (ctxt, balance_updates, deactivated))
 +      [@profiler.record_s {verbosity = Notice} "delegate end cycle"]
-
+ 
  let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
    let open Lwt_result_syntax in
 diff --git a/src/proto_alpha/lib_protocol/baking.ml b/src/proto_alpha/lib_protocol/baking.ml
-index 1388bc3ea7..ae55ed9ae2 100644
+index 7cf362b259..a45d1eda4a 100644
 --- a/src/proto_alpha/lib_protocol/baking.ml
 +++ b/src/proto_alpha/lib_protocol/baking.ml
 @@ -114,7 +114,7 @@ type ordered_slots = {
@@ -63,17 +63,17 @@ index 1388bc3ea7..ae55ed9ae2 100644
    let all_bakers_attest_enabled =
      Attesting_power.check_all_bakers_attest_at_level ctxt ~attested_level
    in
-@@ -214,7 +214,7 @@ let attesting_rights (ctxt : t) level =
+@@ -214,7 +214,7 @@ let attesting_rights (ctxt : t) ~attested_level =
          map
      else map
    in
 -  return (ctxt, map)
 +  return (ctxt, map)) [@profiler.record_s {verbosity = Notice} "attesting_rights"]
-
+ 
  let incr_slot att_rights =
    let one = Attesting_power.make ~slots:1 ~stake:0L in
 diff --git a/src/proto_alpha/lib_protocol/delegate_cycles.ml b/src/proto_alpha/lib_protocol/delegate_cycles.ml
-index 2a0bdad18c..d208afc53b 100644
+index a666a47b9b..6c87495e8a 100644
 --- a/src/proto_alpha/lib_protocol/delegate_cycles.ml
 +++ b/src/proto_alpha/lib_protocol/delegate_cycles.ml
 @@ -225,42 +225,92 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
@@ -184,7 +184,7 @@ index 2a0bdad18c..d208afc53b 100644
    let balance_updates = slashing_balance_updates @ attesting_balance_updates in
    return (ctxt, balance_updates, deactivated_delegates)
 diff --git a/src/proto_alpha/lib_protocol/dune b/src/proto_alpha/lib_protocol/dune
-index 7fea31a9fe..75d43668c3 100644
+index f1a9e3bf62..bce1980044 100644
 --- a/src/proto_alpha/lib_protocol/dune
 +++ b/src/proto_alpha/lib_protocol/dune
 @@ -23,6 +23,8 @@
@@ -197,10 +197,10 @@ index 7fea31a9fe..75d43668c3 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index 288367f0246..2cfdd533ea7 100644
+index 02788e854b..0598dc7a0e 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
-@@ -221,22 +221,38 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+@@ -236,22 +236,38 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
          (* Start of Alpha stitching. Comment used for automatic snapshot *)
      | Alpha ->
          let* ctxt =
@@ -261,7 +261,7 @@ index c501d7fc16..00e5338465 100644
 +      ~all_bakers_attest_first_level:None [@profiler.record_s {verbosity = Notice} "Prepare"])
    in
    (previous_proto, previous_proto_constants, ctxt)
-
+ 
 diff --git a/src/proto_alpha/lib_protocol/script_cache.ml b/src/proto_alpha/lib_protocol/script_cache.ml
 index 35cc6b5178..5c679ad606 100644
 --- a/src/proto_alpha/lib_protocol/script_cache.ml
@@ -289,59 +289,66 @@ index 35cc6b5178..5c679ad606 100644
 +           in
 +           return (ctxt, identifier, Some (unparsed_script, script_ir)))
 +      [@profiler.record_s {verbosity = Notice} "cache_miss"])
-
+ 
  let update ctxt identifier updated_script approx_size =
    Cache.update ctxt identifier (Some (updated_script, approx_size))
 diff --git a/src/proto_alpha/lib_protocol/script_interpreter.ml b/src/proto_alpha/lib_protocol/script_interpreter.ml
-index e098905296..54b1e80d85 100644
+index 182af698fa..23620cd13c 100644
 --- a/src/proto_alpha/lib_protocol/script_interpreter.ml
 +++ b/src/proto_alpha/lib_protocol/script_interpreter.ml
-@@ -1820,7 +1820,7 @@ type execution_result = {
- let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
-     unparsed_script cached_script arg =
-   let open Lwt_result_syntax in
--  let elab_conf =
-+  (let elab_conf =
-     Script_ir_translator_config.make
-       ~legacy:true
-       ~keep_extra_types_for_interpreter_logging:(Option.is_some logger)
-@@ -1873,9 +1873,10 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
-     Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
-   in
-   let* (ops, new_storage), ctxt =
--    trace
--      (Runtime_contract_error step_constants.self)
--      (interp logger (ctxt, step_constants) code (arg, old_storage))
-+    (trace
-+       (Runtime_contract_error step_constants.self)
-+       (interp logger (ctxt, step_constants) code (arg, old_storage))
-+     [@profiler.record_s {verbosity = Notice} "interprete"])
+@@ -1878,10 +1878,12 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
+         trace
+           (Runtime_contract_error step_constants.self)
+           (interp logger (ctxt, step_constants) code (arg, old_storage))
++        [@profiler.record_s {verbosity = Notice} "interprete"]
+     | Native {kind} ->
+         trace
+           (Runtime_contract_error step_constants.self)
+           (Script_native.execute (ctxt, step_constants) kind arg old_storage)
++        [@profiler.record_s {verbosity = Notice} "interprete_native"]
    in
    let* storage, lazy_storage_diff, ctxt =
      Script_ir_translator.extract_lazy_storage_diff
-@@ -1943,7 +1944,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
-         ticket_receipt;
-         address_registry_diff;
+@@ -1959,6 +1961,19 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
        },
--      ctxt )
-+      ctxt )) [@profiler.record_s {verbosity = Notice} "execute"]
-
+       ctxt )
+ 
++let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
++    unparsed_script cached_script arg =
++  execute_any_arg
++    logger
++    ctxt
++    mode
++    step_constants
++    ~entrypoint
++    ~internal
++    unparsed_script
++    cached_script
++    arg [@profiler.record_s {verbosity = Notice} "execute"]
++
  let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
      ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
+   execute_any_arg
 diff --git a/src/proto_alpha/lib_protocol/script_ir_translator.ml b/src/proto_alpha/lib_protocol/script_ir_translator.ml
-index b91d2d8711..60727fae94 100644
+index 05e30ca6ee..b618445e78 100644
 --- a/src/proto_alpha/lib_protocol/script_ir_translator.ml
 +++ b/src/proto_alpha/lib_protocol/script_ir_translator.ml
-@@ -5217,17 +5217,21 @@ let parse_script :
-     let* ( Ex_code
-              (Code {code; arg_type; storage_type; views; entrypoints; code_size}),
-            ctxt ) =
--      parse_code ~unparse_code_rec ~elab_conf ctxt ~code
-+      (parse_code
-+         ~unparse_code_rec
-+         ~elab_conf
-+         ctxt
-+         ~code [@profiler.record_s {verbosity = Notice} "parse_code"])
+@@ -5269,21 +5269,27 @@ let parse_script :
+            storage ) =
+       match script with
+       | Script {code; storage} ->
+-          let* ex_code = parse_code ~unparse_code_rec ~elab_conf ctxt ~code in
++          let* ex_code =
++            (parse_code
++               ~unparse_code_rec
++               ~elab_conf
++               ctxt
++               ~code [@profiler.record_s {verbosity = Notice} "parse_code"])
++          in
+           return (ex_code, storage)
+       | Native {kind; storage} ->
+           let* ex_code = get_typed_native_code ctxt ~kind in
+           return (ex_code, storage)
      in
      let+ storage, ctxt =
 -      parse_storage
@@ -363,30 +370,15 @@ index b91d2d8711..60727fae94 100644
      in
      ( Ex_script
          (Script
-@@ -5926,15 +5930,15 @@ let list_of_big_map_ids ids =
-
- let parse_data ~elab_conf ctxt ~allow_forged_tickets
-     ~allow_forged_lazy_storage_id ty t =
--  parse_data
--    ~unparse_code_rec
--    ~elab_conf
--    ~allow_forged_tickets
--    ~allow_forged_lazy_storage_id
--    ~stack_depth:0
--    ctxt
--    ty
+@@ -5990,7 +5996,7 @@ let parse_data ~elab_conf ctxt ~allow_forged_tickets
+     ~stack_depth:0
+     ctxt
+     ty
 -    t
-+  (parse_data
-+     ~unparse_code_rec
-+     ~elab_conf
-+     ~allow_forged_tickets
-+     ~allow_forged_lazy_storage_id
-+     ~stack_depth:0
-+     ctxt
-+     ty
-+     t [@profiler.record_s {verbosity = Notice} "parse_data"])
-
++    t [@profiler.record_s {verbosity = Notice} "parse_data"]
+ 
  let parse_view ~elab_conf ctxt ty view =
    parse_view ~unparse_code_rec ~elab_conf ctxt ty view
---
-2.51.0
+-- 
+2.51.1.dirty
+
