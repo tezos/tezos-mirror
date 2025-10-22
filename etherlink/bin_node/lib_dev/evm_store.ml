@@ -1053,6 +1053,16 @@ let init ?max_conn_reuse_count ~data_dir ~perm () =
           return_unit)
         migrations
     in
+    let* legacy_block_storage_mode =
+      with_connection conn @@ fun conn ->
+      Db.find conn Q.Block_storage_mode.legacy ()
+    in
+    let* () =
+      when_ legacy_block_storage_mode @@ fun () ->
+      failwith
+        "The EVM node is in legacy block storage mode which is no longer \
+         supported."
+    in
     return_unit
   in
   Sqlite.init ?max_conn_reuse_count ~path ~perm migration

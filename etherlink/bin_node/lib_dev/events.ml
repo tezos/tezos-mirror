@@ -133,16 +133,6 @@ let event_is_ready =
     ~pp4:(fun fmt b ->
       (if b then Format.fprintf else Format.ifprintf) fmt "(websockets enabled)")
 
-let legacy_mode =
-  Internal_event.Simple.declare_0
-    ~section
-    ~name:"legacy_mode"
-    ~level:Warning
-    ~msg:
-      "node is using the (deprecated) legacy block storage, import a recent \
-       snapshot to start using the new block storage"
-    ()
-
 let importing_legacy_snapshot =
   Internal_event.Simple.declare_0
     ~section
@@ -562,8 +552,6 @@ let catching_up_evm_event ~from ~to_ = emit catching_up_evm_event (from, to_)
 
 let is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
   emit event_is_ready (rpc_addr, rpc_port, backend, websockets)
-
-let legacy_mode () = emit legacy_mode ()
 
 let spawn_rpc_is_ready () = emit spawn_rpc_is_ready ()
 

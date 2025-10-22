@@ -11,7 +11,6 @@ val store_path : data_dir:string -> string
 type store_info = {
   rollup_address : Address.t;
   current_number : Ethereum_types.quantity;
-  legacy_block_storage : bool;
   history_mode : Configuration.history_mode;
   first_number : Ethereum_types.quantity;
 }

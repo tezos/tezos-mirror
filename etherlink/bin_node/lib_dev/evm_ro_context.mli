@@ -14,7 +14,6 @@ type t = {
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   index : Pvm.Context.ro_index;
   finalized_view : bool;
-  block_storage_sqlite3 : bool;
   execution_pool : Lwt_domain.pool;
   trace_host_funs : bool;
 }

@@ -14,7 +14,6 @@ type t = {
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   index : Pvm.Context.ro_index;
   finalized_view : bool;
-  block_storage_sqlite3 : bool;
   execution_pool : Lwt_domain.pool;
   trace_host_funs : bool;
 }
@@ -115,10 +114,6 @@ let load ~pool ?network ?smart_rollup_address (configuration : Configuration.t)
         return metadata.smart_rollup_address
     | Some smart_rollup_address -> return smart_rollup_address
   in
-  let* legacy_mode = Evm_store.(use store Block_storage_mode.legacy) in
-  let* () =
-    when_ legacy_mode @@ fun () -> Lwt_result.ok (Events.legacy_mode ())
-  in
   let ctxt =
     {
       store;
@@ -129,7 +124,6 @@ let load ~pool ?network ?smart_rollup_address (configuration : Configuration.t)
       native_execution_policy =
         configuration.kernel_execution.native_execution_policy;
       smart_rollup_address;
-      block_storage_sqlite3 = not legacy_mode;
       finalized_view = configuration.finalized_view;
       execution_pool = pool;
       trace_host_funs = configuration.opentelemetry.trace_host_functions;
@@ -171,21 +165,6 @@ let get_irmin_hash_from_number ctxt number =
         Ethereum_types.pp_quantity
         number
 
-let get_irmin_hash_from_block_hash ~chain_family ctxt hash =
-  let open Lwt_result_syntax in
-  (* we use the latest state to read the contents of the block *)
-  let* latest_hash = find_latest_hash ctxt in
-  let* evm_tree = get_evm_state ctxt latest_hash in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
-  let*! res =
-    Evm_state.inspect evm_tree Durable_storage_path.Block.(by_hash ~root hash)
-  in
-  match res with
-  | Some block_bytes ->
-      let block = L2_types.block_from_bytes ~chain_family block_bytes in
-      get_irmin_hash_from_number ctxt (L2_types.block_number block)
-  | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash
-
 let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
   let open Lwt_result_syntax in
   match block with
@@ -210,16 +189,12 @@ let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
             "No state available for block %a"
             Ethereum_types.pp_quantity
             number)
-  | Block_hash {hash; require_canonical = _} ->
-      if ctxt.block_storage_sqlite3 then
-        Evm_store.use ctxt.store @@ fun conn ->
-        let* context_hash_opt =
-          Evm_store.context_hash_of_block_hash conn hash
-        in
-        match context_hash_opt with
-        | Some context_hash -> return context_hash
-        | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash
-      else get_irmin_hash_from_block_hash ~chain_family:L2_types.EVM ctxt hash
+  | Block_hash {hash; require_canonical = _} -> (
+      Evm_store.use ctxt.store @@ fun conn ->
+      let* context_hash_opt = Evm_store.context_hash_of_block_hash conn hash in
+      match context_hash_opt with
+      | Some context_hash -> return context_hash
+      | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash)
 
 module MakeBackend (Ctxt : sig
   val ctxt : t
@@ -507,13 +482,11 @@ let replay ctxt ?(log_file = "replay") ?profile
     Evm_store.Blueprints.get_with_events conn (Qty number)
   in
   let* expected_block =
-    if ctxt.block_storage_sqlite3 then
-      Evm_store.use ctxt.store @@ fun conn ->
-      Evm_store.Blocks.get_with_level
-        ~full_transaction_object:false
-        conn
-        (Qty number)
-    else failwith "Todo: support legacy mode"
+    Evm_store.use ctxt.store @@ fun conn ->
+    Evm_store.Blocks.get_with_level
+      ~full_transaction_object:false
+      conn
+      (Qty number)
   in
   let log_file = Printf.sprintf "%s_%s" log_file (Z.to_string number) in
   let*! () = Evm_state.preload_kernel ~pool:ctxt.execution_pool evm_state in
@@ -621,194 +594,121 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
 
     let execution_pool = ctxt.execution_pool
   end) in
-  if ctxt.block_storage_sqlite3 then
-    (module struct
-      include Backend
+  (module struct
+    include Backend
 
-      (* This function is generic that's why we don't define it in Tezlink block storage
+    (* This function is generic that's why we don't define it in Tezlink block storage
          (even if for now this is the only place where it's used) *)
-      let nth_block_hash level =
-        Evm_store.use ctxt.store @@ fun conn ->
-        Evm_store.Blocks.find_hash_of_number conn (Qty level)
+    let nth_block_hash level =
+      Evm_store.use ctxt.store @@ fun conn ->
+      Evm_store.Blocks.find_hash_of_number conn (Qty level)
 
-      (* Overwrite Etherlink_block_storage module *)
-      module Etherlink_block_storage = struct
-        (* Current block number is kept in durable storage. *)
-        let current_block_number = Etherlink_block_storage.current_block_number
+    (* Overwrite Etherlink_block_storage module *)
+    module Etherlink_block_storage = struct
+      (* Current block number is kept in durable storage. *)
+      let current_block_number = Etherlink_block_storage.current_block_number
 
-        let nth_block ~full_transaction_object level =
-          let open Lwt_result_syntax in
-          Evm_store.use ctxt.store @@ fun conn ->
-          let* block_opt =
-            Evm_store.Blocks.find_with_level
-              ~full_transaction_object
-              conn
-              (Qty level)
-          in
-          match block_opt with
-          | None -> failwith "Block %a not found" Z.pp_print level
-          | Some block -> return block
-
-        let block_by_hash ~full_transaction_object hash =
-          let open Lwt_result_syntax in
-          Evm_store.use ctxt.store @@ fun conn ->
-          let* block_opt =
-            Evm_store.Blocks.find_with_hash ~full_transaction_object conn hash
-          in
-          match block_opt with
-          | None ->
-              failwith "Block %a not found" Ethereum_types.pp_block_hash hash
-          | Some block -> return block
-
-        let block_receipts level =
-          let open Lwt_result_syntax in
-          Evm_store.use ctxt.store @@ fun conn ->
-          let* found = Evm_store.Blocks.find_hash_of_number conn (Qty level) in
-          match found with
-          | None -> failwith "Block %a not found" Z.pp_print level
-          | Some _hash ->
-              Evm_store.Transactions.receipts_of_block_number conn (Qty level)
-
-        let block_range_receipts level len =
-          let open Lwt_result_syntax in
-          Evm_store.use ctxt.store @@ fun conn ->
-          let start = Ethereum_types.Qty level in
-          let finish = Ethereum_types.Qty Z.(pred (level + of_int len)) in
-          let* found1 = Evm_store.Blocks.find_hash_of_number conn start in
-          let* found2 = Evm_store.Blocks.find_hash_of_number conn finish in
-          match (found1, found2) with
-          | None, _ | _, None ->
-              failwith
-                "Block range [%a, %a] unavailable"
-                Ethereum_types.pp_quantity
-                start
-                Ethereum_types.pp_quantity
-                finish
-          | _ -> Evm_store.Transactions.receipts_of_block_range conn start len
-
-        let transaction_receipt hash =
-          Evm_store.use ctxt.store @@ fun conn ->
-          Evm_store.Transactions.find_receipt conn hash
-
-        let transaction_object hash =
-          Evm_store.use ctxt.store @@ fun conn ->
-          Evm_store.Transactions.find_object conn hash
-      end
-
-      (* Overwrite Etherlink Tracer using the new Etherlink_block_storage *)
-      module Tracer_etherlink =
-        Tracer_sig.Make (Executor) (Etherlink_block_storage) (Tracer)
-
-      let block_param_to_block_number ~chain_family
-          (block_param : Ethereum_types.Block_parameter.extended) =
+      let nth_block ~full_transaction_object level =
         let open Lwt_result_syntax in
-        match block_param with
-        | Block_hash {hash; _} -> (
-            Evm_store.use ctxt.store @@ fun conn ->
-            let* res = Evm_store.Blocks.find_number_of_hash conn hash in
-            match res with
-            | Some number -> return number
-            | None ->
-                failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
-        | param -> block_param_to_block_number ~chain_family param
+        Evm_store.use ctxt.store @@ fun conn ->
+        let* block_opt =
+          Evm_store.Blocks.find_with_level
+            ~full_transaction_object
+            conn
+            (Qty level)
+        in
+        match block_opt with
+        | None -> failwith "Block %a not found" Z.pp_print level
+        | Some block -> return block
 
-      module Tezlink_block_storage : Tezlink_block_storage_sig.S = struct
-        let nth_block level =
-          let open Lwt_result_syntax in
+      let block_by_hash ~full_transaction_object hash =
+        let open Lwt_result_syntax in
+        Evm_store.use ctxt.store @@ fun conn ->
+        let* block_opt =
+          Evm_store.Blocks.find_with_hash ~full_transaction_object conn hash
+        in
+        match block_opt with
+        | None ->
+            failwith "Block %a not found" Ethereum_types.pp_block_hash hash
+        | Some block -> return block
+
+      let block_receipts level =
+        let open Lwt_result_syntax in
+        Evm_store.use ctxt.store @@ fun conn ->
+        let* found = Evm_store.Blocks.find_hash_of_number conn (Qty level) in
+        match found with
+        | None -> failwith "Block %a not found" Z.pp_print level
+        | Some _hash ->
+            Evm_store.Transactions.receipts_of_block_number conn (Qty level)
+
+      let block_range_receipts level len =
+        let open Lwt_result_syntax in
+        Evm_store.use ctxt.store @@ fun conn ->
+        let start = Ethereum_types.Qty level in
+        let finish = Ethereum_types.Qty Z.(pred (level + of_int len)) in
+        let* found1 = Evm_store.Blocks.find_hash_of_number conn start in
+        let* found2 = Evm_store.Blocks.find_hash_of_number conn finish in
+        match (found1, found2) with
+        | None, _ | _, None ->
+            failwith
+              "Block range [%a, %a] unavailable"
+              Ethereum_types.pp_quantity
+              start
+              Ethereum_types.pp_quantity
+              finish
+        | _ -> Evm_store.Transactions.receipts_of_block_range conn start len
+
+      let transaction_receipt hash =
+        Evm_store.use ctxt.store @@ fun conn ->
+        Evm_store.Transactions.find_receipt conn hash
+
+      let transaction_object hash =
+        Evm_store.use ctxt.store @@ fun conn ->
+        Evm_store.Transactions.find_object conn hash
+    end
+
+    (* Overwrite Etherlink Tracer using the new Etherlink_block_storage *)
+    module Tracer_etherlink =
+      Tracer_sig.Make (Executor) (Etherlink_block_storage) (Tracer)
+
+    let block_param_to_block_number ~chain_family
+        (block_param : Ethereum_types.Block_parameter.extended) =
+      let open Lwt_result_syntax in
+      match block_param with
+      | Block_hash {hash; _} -> (
           Evm_store.use ctxt.store @@ fun conn ->
-          let* block_opt =
-            Evm_store.Blocks.tez_find_with_level conn (Qty level)
-          in
-          match block_opt with
-          | None -> failwith "Block %a not found" Z.pp_print level
-          | Some block -> return block
+          let* res = Evm_store.Blocks.find_number_of_hash conn hash in
+          match res with
+          | Some number -> return number
+          | None ->
+              failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
+      | param -> block_param_to_block_number ~chain_family param
 
-        let nth_block_hash = nth_block_hash
-      end
+    module Tezlink_block_storage : Tezlink_block_storage_sig.S = struct
+      let nth_block level =
+        let open Lwt_result_syntax in
+        Evm_store.use ctxt.store @@ fun conn ->
+        let* block_opt =
+          Evm_store.Blocks.tez_find_with_level conn (Qty level)
+        in
+        match block_opt with
+        | None -> failwith "Block %a not found" Z.pp_print level
+        | Some block -> return block
 
-      (* Overwrites Tezlink using the store instead of the durable_storage *)
-      module Tezlink =
-        Tezlink_services_impl.Make
-          (struct
-            include Backend.Reader
+      let nth_block_hash = nth_block_hash
+    end
 
-            let block_param_to_block_number =
-              block_param_to_block_number ~chain_family:L2_types.Michelson
-          end)
-          (Tezlink_block_storage)
-    end)
-  else
-    (module struct
-      include Backend
+    (* Overwrites Tezlink using the store instead of the durable_storage *)
+    module Tezlink =
+      Tezlink_services_impl.Make
+        (struct
+          include Backend.Reader
 
-      (* Overwrite Etherlink_block_storage module *)
-      module Etherlink_block_storage = struct
-        (* Current block number is kept in durable storage. *)
-        let current_block_number = Etherlink_block_storage.current_block_number
-
-        let with_blueprint ~default level k =
-          let open Lwt_result_syntax in
-          let* blueprint =
-            Evm_store.(use ctxt.store @@ fun conn -> Blueprints.find conn level)
-          in
-          match blueprint with
-          | None -> return default
-          | Some blueprint -> k blueprint
-
-        let nth_block ~full_transaction_object level =
-          let open Lwt_result_syntax in
-          let* block =
-            Etherlink_block_storage.nth_block ~full_transaction_object level
-          in
-          if full_transaction_object then
-            with_blueprint ~default:block block.number @@ fun blueprint ->
-            Lwt.return
-              (Transaction_object.rereconstruct_block blueprint.payload block)
-          else
-            (* [full_transaction_object] being false, we just return hashes, no
-               need to try to reconstruct the transaction objects. *)
-            return block
-
-        let block_by_hash ~full_transaction_object hash =
-          let open Lwt_result_syntax in
-          let* block =
-            Etherlink_block_storage.block_by_hash ~full_transaction_object hash
-          in
-          if full_transaction_object then
-            with_blueprint ~default:block block.number @@ fun blueprint ->
-            Lwt.return
-              (Transaction_object.rereconstruct_block blueprint.payload block)
-          else
-            (* [full_transaction_object] being false, we just return hashes, no
-               need to try to reconstruct the transaction objects. *)
-            return block
-
-        let block_receipts = Etherlink_block_storage.block_receipts
-
-        let block_range_receipts = Etherlink_block_storage.block_range_receipts
-
-        let transaction_receipt = Etherlink_block_storage.transaction_receipt
-
-        let transaction_object hash =
-          let open Lwt_result_syntax in
-          let* obj = Etherlink_block_storage.transaction_object hash in
-          match obj with
-          | Some obj -> (
-              match Transaction_object.block_number obj with
-              | Some level ->
-                  with_blueprint ~default:(Some obj) level @@ fun blueprint ->
-                  let*? obj =
-                    Transaction_object.rereconstruct blueprint.payload obj
-                  in
-                  return_some obj
-              | None -> return_some obj)
-          | None -> return_none
-      end
-
-      (* Overwrite Etherlink Tracer using the new Etherlink_block_storage *)
-      module Tracer_etherlink =
-        Tracer_sig.Make (Executor) (Etherlink_block_storage) (Tracer)
-    end)
+          let block_param_to_block_number =
+            block_param_to_block_number ~chain_family:L2_types.Michelson
+        end)
+        (Tezlink_block_storage)
+  end)
 
 let next_blueprint_number ctxt =
   let open Lwt_result_syntax in

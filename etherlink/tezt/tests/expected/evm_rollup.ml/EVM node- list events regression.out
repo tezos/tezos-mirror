@@ -1316,14 +1316,6 @@ kernel_log_notice:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
-legacy_mode:
-  description: node is using the (deprecated) legacy block storage, import a recent snapshot to start using the new block storage
-  level: warning
-  section: evm_node.dev
-  json format:
-    { /* legacy_mode version 0 */
-      "legacy_mode.v0": any }
-  
 migrations_from_the_future:
   description: store has {applied} migrations applied but the EVM node is only aware of {known}
   level: error

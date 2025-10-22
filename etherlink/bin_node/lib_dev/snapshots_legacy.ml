@@ -102,16 +102,13 @@ let export ?snapshot_file ~compression ~data_dir () =
   let* {
          rollup_address;
          current_number = current_level;
-         legacy_block_storage;
          history_mode;
          first_number = first_level;
        } =
     Data_dir.export_store ~data_dir ~output_db_file
   in
   let header =
-    if legacy_block_storage then
-      Header.(V0_legacy {rollup_address; current_level})
-    else Header.(V1 {rollup_address; current_level; history_mode; first_level})
+    Header.(V1 {rollup_address; current_level; history_mode; first_level})
   in
   let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
   let writer =
@@ -170,35 +167,19 @@ let export ?snapshot_file ~compression ~data_dir () =
   let*! () = Events.finished_exporting_snapshot dest_file in
   return dest_file
 
-let check_header ~populated ~force ~data_dir (header : Header.t) :
-    unit tzresult Lwt.t =
+let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
+    =
   let open Lwt_result_syntax in
-  let ( header_rollup_address,
-        Qty header_current_level,
-        header_history,
-        header_legacy ) =
+  let*? header_rollup_address, Qty header_current_level, header_history =
     match header with
-    | V0_legacy {rollup_address; current_level} ->
-        (rollup_address, current_level, None, true)
+    | V0_legacy _ -> error_with "Support for legacy snapshot was dropped"
     | V1 {rollup_address; current_level; history_mode; first_level} ->
-        (rollup_address, current_level, Some (history_mode, first_level), false)
-  in
-  let* () =
-    if (not populated) && header_legacy && not force then
-      failwith
-        "Snapshot uses legacy block storage, please import a snapshot \
-         generated from a more recent node (or use --force to still import the \
-         legacy snapshot)."
-    else if header_legacy then
-      let*! () = Events.importing_legacy_snapshot () in
-      return_unit
-    else return_unit
+        Ok (rollup_address, current_level, Some (history_mode, first_level))
   in
   when_ populated @@ fun () ->
   let* store = Evm_store.init ~data_dir ~perm:(Read_only {pool_size = 1}) () in
   Evm_store.use store @@ fun conn ->
   let* metadata = Evm_store.Metadata.find conn in
-  let* legacy = Evm_store.Block_storage_mode.legacy conn in
   let* () =
     match metadata with
     | None -> return_unit
@@ -206,17 +187,6 @@ let check_header ~populated ~force ~data_dir (header : Header.t) :
         fail_unless
           Address.(header_rollup_address = r)
           (Snapshots.Incorrect_rollup (header_rollup_address, r))
-  in
-  let* () =
-    match (header_legacy, legacy) with
-    | true, _ ->
-        (* Legacy block storage will be replaced with new block storage *)
-        return_unit
-    | false, false -> return_unit
-    | false, true ->
-        failwith
-          "Snapshot uses legacy block storage but already populated with new \
-           Sqlite3 block storage"
   in
   let* () =
     match (header_history, metadata) with
@@ -296,7 +266,7 @@ let import_from ~force ?history_mode ~data_dir ~snapshot_file () =
     let*! () = Lwt_utils_unix.remove_dir (Data_dir.store_path ~data_dir) in
     return_unit
   in
-  let* () = check_header ~force ~populated ~data_dir header in
+  let* () = check_header ~populated ~data_dir header in
   let*! is_tty = Lwt_unix.isatty Lwt_unix.stderr in
   (* We always emit the importing event for local files. For remote files, we
      only show the event if the output is not a TTY because if it is, the

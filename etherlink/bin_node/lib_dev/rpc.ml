@@ -280,12 +280,7 @@ let main ~evm_node_endpoint ?evm_node_private_endpoint
   in
   let* ctxt = Evm_ro_context.load ~pool config in
   let* () = Evm_ro_context.preload_known_kernels ctxt in
-
-  let* legacy_block_storage =
-    Evm_store.(use ctxt.store Block_storage_mode.legacy)
-  in
-  if not legacy_block_storage then
-    Block_storage_setup.enable ~keep_alive:config.keep_alive ctxt.store ;
+  Block_storage_setup.enable ~keep_alive:config.keep_alive ctxt.store ;
 
   let (module Rpc_backend) =
     Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint

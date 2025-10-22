@@ -8,7 +8,6 @@
 type store_info = {
   rollup_address : Address.t;
   current_number : Ethereum_types.quantity;
-  legacy_block_storage : bool;
   history_mode : Configuration.history_mode;
   first_number : Ethereum_types.quantity;
 }
@@ -49,7 +48,6 @@ let lock ~data_dir =
 let store_info conn =
   let open Lwt_result_syntax in
   let* metadata = Evm_store.Metadata.get conn in
-  let* legacy_block_storage = Evm_store.Block_storage_mode.legacy conn in
   let* current = Evm_store.Context_hashes.find_latest conn in
   let* first = Evm_store.Context_hashes.find_earliest conn in
   let*? current_number, first_number =
@@ -61,7 +59,6 @@ let store_info conn =
     {
       rollup_address = metadata.smart_rollup_address;
       current_number;
-      legacy_block_storage;
       history_mode = metadata.history_mode;
       first_number;
     }
