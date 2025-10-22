@@ -2960,7 +2960,7 @@ oc.compile_sources_doc:
       - build-debian-bookworm:master
       - build-ubuntu-noble:master
 
-fetch_tezt_records_from_schedule_extended_test:
+teztrec_schedule_extended_test:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -3004,13 +3004,13 @@ tezt-static-binaries:
   - oc.build:static-x86_64-linux-binaries
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   dependencies:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -3069,14 +3069,14 @@ tezt-flaky:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   allow_failure: true
   timeout: 40 minutes
   interruptible: false
@@ -3140,14 +3140,14 @@ tezt-extra:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -3206,14 +3206,14 @@ tezt-slow:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -3272,14 +3272,14 @@ tezt-riscv-slow-sequential:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -3337,14 +3337,14 @@ tezt-time-sensitive:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -3407,14 +3407,14 @@ tezt:
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
-  - fetch_tezt_records_from_schedule_extended_test
+  - teztrec_schedule_extended_test
   timeout: 40 minutes
   interruptible: false
   before_script:
