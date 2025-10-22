@@ -45,15 +45,35 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
       ${gitlab_release_rc_version:+--rc "${gitlab_release_rc_version}"} \
       --announcement "${announcement}"
 
-    # Mark as latest only if not an RC
+    # Set as latest only if not an RC
     if [ -z "${gitlab_release_rc_version}" ]; then
-      echo "Marking version as latest..."
+      echo "Setting version as latest..."
       dune exec ./ci/bin_release_page/version_manager.exe -- \
         --path "${S3_BUCKET}${BUCKET_PATH}" \
         set-latest \
         --major "${gitlab_release_major_version}" \
         --minor "${gitlab_release_minor_version}"
     fi
+
+    # Active versions logic
+    if [ -z "${gitlab_release_rc_version}" ] && [ "${gitlab_release_minor_version}" = "0" ]; then
+
+      echo "Major release (${gitlab_release_major_version}.0), set all previous versions as not active..."
+
+      prev_major=$((gitlab_release_major_version - 1))
+      if [ "$prev_major" -ge 0 ]; then
+        dune exec ./ci/bin_release_page/version_manager.exe -- \
+          --path "${S3_BUCKET}${BUCKET_PATH}" \
+          set-inactive \
+          --major "${prev_major}" || true
+      fi
+    fi
+
+    echo "Set versions ${gitlab_release_major_version} as active..."
+    dune exec ./ci/bin_release_page/version_manager.exe -- \
+      --path "${S3_BUCKET}${BUCKET_PATH}" \
+      set-active \
+      --major "${gitlab_release_major_version}"
 
     # Upload binaries to S3 bucket
     echo "Uploading binaries..."
@@ -89,13 +109,24 @@ else
   echo "No tag found. No asset will be added to the release page."
 fi
 
-echo "Building release page"
+echo "Building older releases page (inactive versions only)"
+dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
+  --title 'Octez older releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
+  "${BUCKET_PATH:-}" --filter-active inactive changelog binaries packages
+
+# Rename the second page to older_releases.html
+mv index.html older_releases.html
+
+# Generate the main page again (active versions) to create index.html
+echo "Generating main release page for index.html"
 dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
   --title 'Octez releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
-  "${BUCKET_PATH:-}" changelog binaries packages
+  "${BUCKET_PATH:-}" --filter-active active changelog binaries packages
 
 echo "Syncing html files to remote s3 bucket"
-if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH}/" --cache-control "max-age=30, must-revalidate" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"; then
+if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH}/" --cache-control "max-age=30, must-revalidate" --region "${REGION}" &&
+  aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}" &&
+  aws s3 cp "./older_releases.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"; then
   echo "Deployment successful!"
 else
   echo "Deployment failed. Please check the configuration and try again."

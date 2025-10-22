@@ -5,14 +5,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Base
 open Base.Version
 
-let create_version_from_args ?major ?minor ?announcement ?rc () =
+type rc = Rc of int | Stable
+
+let parse_rc_opt = function
+  | "stable" -> Some Stable
+  | rc -> (
+      match int_of_string_opt rc with Some rc -> Some (Rc rc) | None -> None)
+
+let show_rc = function Stable -> "stable" | Rc rc -> sf "%i" rc
+
+let create_version_from_args ?major ?minor ?(active = false) ?announcement ?rc
+    () =
   match (major, minor) with
   | None, _ -> failwith "Missing argument for [--major]"
   | _, None -> failwith "Missing argument for [--minor]"
   | Some major, Some minor ->
-      make ?announcement ?rc ~major ~minor ~latest:false ()
+      let rc =
+        match rc with None | Some Stable -> None | Some (Rc rc) -> Some rc
+      in
+      make ?announcement ~major ~minor ?rc ~latest:false ~active ()
+
+let predicate_from_args ?major ?minor ?rc () =
+ fun version ->
+  let check x = function None -> true | Some y -> x = y in
+  check version.major major && check version.minor minor
+  &&
+  match rc with
+  | None -> true
+  | Some Stable -> Option.is_none version.rc
+  | Some (Rc rc) -> (
+      match version.rc with None -> false | Some version_rc -> version_rc = rc)
 
 let () =
   Clap.description
@@ -42,12 +67,18 @@ let () =
       ~description:"Minor version number"
       ()
   in
+  let rc_typ =
+    Clap.typ ~name:"rc" ~dummy:Stable ~parse:parse_rc_opt ~show:show_rc
+  in
   let rc =
-    Clap.optional_int
+    Clap.optional
+      rc_typ
       ~long:"rc"
       ~short:'r'
       ~placeholder:"RC"
-      ~description:"RC number"
+      ~description:
+        "RC value.\n\
+         Its value is \"stable\" if the version is not a Release Candidate."
       ()
   in
   let announcement =
@@ -68,7 +99,17 @@ let () =
     Clap.case ~description:"Set a version as latest" "set-latest" @@ fun () ->
     `set_latest
   in
-  let command = Clap.subcommand [list_versions; add; set_latest] in
+  let set_active =
+    Clap.case ~description:"Set version(s) as active" "set-active" @@ fun () ->
+    `set_active
+  in
+  let set_inactive =
+    Clap.case ~description:"Set version(s) as inactive " "set-inactive"
+    @@ fun () -> `set_inactive
+  in
+  let command =
+    Clap.subcommand [list_versions; add; set_latest; set_active; set_inactive]
+  in
   Clap.close () ;
   match command with
   | `list ->
@@ -95,3 +136,38 @@ let () =
       match find_latest updated with
       | Some latest -> Format.printf "Set %s as latest@." (to_string latest)
       | None -> Format.printf "Warning: No version marked as latest@.")
+  | `set_active ->
+      let predicate = predicate_from_args ?major ?minor ?rc () in
+      let updated =
+        update_in_storage ~path:s3_path (Base.Version.set_active predicate)
+      in
+      let active_versions = find_active updated in
+      if List.is_empty active_versions then
+        Format.printf "No versions marked as active.@."
+      else (
+        Format.printf "Marked the following version(s) as active:@." ;
+        List.iter
+          (fun v -> Format.printf "  - %s@." (to_string v))
+          active_versions)
+  | `set_inactive ->
+      let predicate = predicate_from_args ?major ?minor ?rc () in
+      let updated =
+        update_in_storage ~path:s3_path (Base.Version.set_inactive predicate)
+      in
+      let still_active = find_active updated in
+      let now_inactive =
+        List.filter
+          (fun v -> not (List.exists (fun a -> a = v) still_active))
+          updated
+        |> List.filter predicate
+      in
+      if List.is_empty now_inactive then
+        Format.printf "No version was set as inactive.@."
+      else (
+        Format.printf "The following version(s) are now inactive:@." ;
+        List.iter (fun v -> Format.printf "  - %s@." (to_string v)) now_inactive) ;
+      if List.is_empty still_active then
+        Format.printf "No version is active anymore.@."
+      else (
+        Format.printf "The following version(s) remain active:@." ;
+        List.iter (fun v -> Format.printf "  - %s@." (to_string v)) still_active)
