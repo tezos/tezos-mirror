@@ -1,6 +1,6 @@
 use primitive_types::{H256, U256};
 use rlp::DecoderError;
-use tezos_data_encoding::enc::BinWriter;
+use tezos_data_encoding::enc::{BinError, BinWriter};
 use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::{block::EthBlock, rlp_helpers::VersionedEncoding};
 use tezos_smart_rollup::types::Timestamp;
@@ -64,7 +64,7 @@ impl L2Block {
         }
     }
 
-    pub fn to_bytes(&self) -> anyhow::Result<Vec<u8>> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, BinError> {
         match self {
             Self::Etherlink(block) => Ok(block.to_bytes()),
             Self::Tezlink(block) => Ok(block.to_bytes()?),

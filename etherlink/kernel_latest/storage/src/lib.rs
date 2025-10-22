@@ -104,7 +104,7 @@ pub fn write_h256_be(
     host: &mut impl Runtime,
     path: &impl Path,
     hash: H256,
-) -> anyhow::Result<()> {
+) -> Result<(), Error> {
     Ok(host.store_write(path, hash.as_bytes(), 0)?)
 }
 

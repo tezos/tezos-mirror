@@ -431,12 +431,11 @@ where
 mod tests {
     use std::str::FromStr;
 
+    use crate::block_storage::internal_for_tests::read_transaction_receipt_status;
     use crate::fees;
     use crate::parsing::RollupType;
     use crate::run;
-    use crate::storage::{
-        read_transaction_receipt_status, store_chain_id, ENABLE_FA_BRIDGE,
-    };
+    use crate::storage::{store_chain_id, ENABLE_FA_BRIDGE};
     use alloy_primitives::keccak256;
     use alloy_sol_types::sol;
     use pretty_assertions::assert_eq;

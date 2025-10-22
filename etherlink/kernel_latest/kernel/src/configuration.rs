@@ -69,7 +69,6 @@ pub struct Configuration {
     pub mode: ConfigurationMode,
     pub maximum_allowed_ticks: u64,
     pub enable_fa_bridge: bool,
-    pub garbage_collect_blocks: bool,
 }
 
 impl Default for Configuration {
@@ -79,7 +78,6 @@ impl Default for Configuration {
             mode: ConfigurationMode::Proxy,
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
-            garbage_collect_blocks: false,
         }
     }
 }
@@ -88,8 +86,8 @@ impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Tezos Contracts: {}, Mode: {}, Enable FA Bridge: {}, Garbage collect blocks: {}",
-            &self.tezos_contracts, &self.mode, &self.enable_fa_bridge, &self.garbage_collect_blocks
+            "Tezos Contracts: {}, Mode: {}, Enable FA Bridge: {}",
+            &self.tezos_contracts, &self.mode, &self.enable_fa_bridge
         )
     }
 }
@@ -270,7 +268,6 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
                     },
                     maximum_allowed_ticks,
                     enable_fa_bridge,
-                    garbage_collect_blocks: !evm_node_flag,
                 },
                 Err(err) => {
                     log!(host, Fatal, "The kernel failed to created the delayed inbox, reverting configuration to proxy ({:?})", err);
@@ -283,7 +280,6 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
             mode: ConfigurationMode::Proxy,
             maximum_allowed_ticks,
             enable_fa_bridge,
-            garbage_collect_blocks: false,
         },
     }
 }
