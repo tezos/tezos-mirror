@@ -688,6 +688,11 @@ let initialize_metrics ({node_ctxt; configuration; _} as state)
     Metrics.Info.set_proto_info current_protocol.hash current_protocol.constants ;
     let* first_available_level = Node_context.first_available_level node_ctxt in
     Metrics.GC.set_oldest_available_level first_available_level ;
+    let* head = Node_context.last_processed_head_opt node_ctxt in
+    Option.iter
+      (fun Sc_rollup_block.{header = {level; _}; _} ->
+        Metrics.Inbox.set_head_level level)
+      head ;
     return_unit
   in
   let*! () = maybe_performance_metrics state in
