@@ -537,7 +537,8 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?dal_rewards_weight ?traps_fraction ?event_sections_levels ?node_arguments
     ?activation_timestamp ?dal_bootstrap_peers ?(parameters = [])
     ?(prover = true) ?smart_rollup_timeout_period_in_blocks ?l1_history_mode
-    ?blocks_per_cycle ?blocks_per_commitment f ~protocol =
+    ?blocks_per_cycle ?blocks_per_commitment
+    ?all_bakers_attest_activation_threshold f ~protocol =
   let parameter_overrides =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
@@ -581,14 +582,25 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
        immediately in tests *)
     @ make_int_parameter ["blocks_per_cycle"] blocks_per_cycle
     @ make_int_parameter ["blocks_per_commitment"] blocks_per_commitment
-    @ (if
-         (* TODO ABAAB: reactivate test with threshold active *)
-         Protocol.(number protocol >= 024)
-       then
-         [
-           ( ["all_bakers_attest_activation_threshold"],
-             `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
-         ]
+    @ (if Protocol.(number protocol >= 024) then
+         match all_bakers_attest_activation_threshold with
+         | None ->
+             (* TODO ABAAB: in current version of the tests, the
+                "all bakers attest" feature is not active unless a threshold is
+                passed explicitly as a parameter override. *)
+             [
+               ( ["all_bakers_attest_activation_threshold"],
+                 `O [("numerator", `Float 2.); ("denominator", `Float 1.)] );
+             ]
+         | Some Q.{num; den} ->
+             [
+               ( ["all_bakers_attest_activation_threshold"],
+                 `O
+                   [
+                     ("numerator", `Float (Z.to_float num));
+                     ("denominator", `Float (Z.to_float den));
+                   ] );
+             ]
        else [])
     @ parameters
   in
@@ -736,9 +748,9 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?traps_fraction ?commitment_period ?challenge_window ?(dal_enable = true)
     ?incentives_enable ?dal_rewards_weight ?activation_timestamp
     ?bootstrap_profile ?event_sections_levels ?operator_profiles ?history_mode
-    ?prover ?l1_history_mode ?wait_ready ?env ?disable_shard_validation
-    ?disable_amplification ?ignore_pkhs ?batching_time_interval variant scenario
-    =
+    ?prover ?l1_history_mode ?all_bakers_attest_activation_threshold ?wait_ready
+    ?env ?disable_shard_validation ?disable_amplification ?ignore_pkhs
+    ?batching_time_interval variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
   test
@@ -776,6 +788,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ~l1_history_mode
         ~protocol
         ~dal_enable
+        ?all_bakers_attest_activation_threshold
       @@ fun parameters cryptobox node client ->
       with_dal_node
         ?bootstrap_profile
