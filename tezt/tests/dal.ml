@@ -11851,7 +11851,115 @@ let test_dal_one_level_reorg protocol dal_parameters _cryptobox node1 client1
   Log.info "node1 synchronised with node2" ;
   Log.info "Waiting for attester to receive its assigned shards" ;
   let* () = wait_for_shards_promises in
+  unit
 
+(* [test_denunciation_when_all_bakers_attest] checks that a delegate who
+   wrongly attests is denounced by the DAL node, and that this denunciation is
+   included in a block by the protocol.
+
+   The test consists of:
+   - enabling the "all bakers attest" feature,
+   - publishing commitments,
+   - forcing a baker to attest to those commitments, despite the traps_fraction
+     being set to 1 (so all shards are traps),
+   - letting the publisher DAL node identify that those attestations are wrong
+     and denounce them,
+   - and checking that the denunciations are indeed included in a block by the
+     protocol.
+
+   The rationale for this test is that before the "all bakers attest" feature,
+   the slot index contained in an attestation was the same as the smallest shard
+   index assigned to a baker.
+
+   This property was used in the `get_committees` function of the protocol
+   plugin. Hence, before https://gitlab.com/tezos/tezos/-/merge_requests/19698,
+   the DAL accuser would associate attestations with the wrong bakers when
+   "all bakers attest" was enabled. This test exposes that issue.
+
+   It should be noted that it may still happen that the slot index in an
+   attestation coincides with the smallest shard index. To prevent such a
+   collision from making the test pass by chance, three publications are
+   attested and denounced at three consecutive slots, making the probability
+   of a false positive (a test passing by luck) very low.
+*)
+let test_denunciation_when_all_bakers_attest protocol dal_parameters _cryptobox
+    l1_node client dal_node =
+  let slot_index = 0 in
+  let* () = Dal_RPC.(call dal_node (patch_profiles [Operator slot_index])) in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let attestation_lag = dal_parameters.attestation_lag in
+  let nb_slots = dal_parameters.number_of_slots in
+  (* To trigger the "all bakers attest" feature, one has to create enough tz4
+     and stake with them. *)
+  let* tz4_accounts =
+    create_tz4_accounts_stake_and_wait
+      ~funders:[Constant.bootstrap1; Constant.bootstrap2]
+      ~node:l1_node
+      ~client
+      10
+  in
+  let all_delegates =
+    Array.to_list Account.Bootstrap.keys
+    @ List.map (fun {delegate_key; _} -> delegate_key) tz4_accounts
+  in
+  let delegate_wrongly_attestating = List.hd all_delegates in
+  let rest_delegates_pkhs =
+    List.map (fun key -> key.Account.public_key_hash) (List.tl all_delegates)
+  in
+  Log.info "Enough waiting, let's publish 3 commitments" ;
+  let* () =
+    repeat 3 (fun () ->
+        let message = Helpers.make_slot ~slot_size "Hello world!" in
+        let* _pid =
+          Helpers.publish_and_store_slot
+            client
+            dal_node
+            delegate_wrongly_attestating
+            ~index:slot_index
+            message
+        in
+        bake_for client)
+  in
+  let* () = bake_for ~count:(attestation_lag - 3) client in
+  Log.info "Our byzantine baker to DAL attest" ;
+  let* () =
+    repeat 3 (fun () ->
+        let* _attestation, _op_hash =
+          inject_dal_attestation_exn
+            ~protocol
+            ~signer:delegate_wrongly_attestating
+            ~nb_slots
+            (Slots [slot_index])
+            client
+        in
+        let* () = bake_for ~delegates:(`For rest_delegates_pkhs) client in
+        let* _ops =
+          Node.RPC.call l1_node @@ RPC.get_chain_block_operations ()
+        in
+        unit)
+  in
+  (* As soon as the attestations are final, the DAL node should see that they
+     are denounceable and publish the denunciation. *)
+  Log.info "Denunciations should start to arrive." ;
+  let* () =
+    repeat 3 (fun () ->
+        let* () = bake_for client in
+        let* _mempool =
+          Client.RPC.call client @@ RPC.get_chain_mempool_pending_operations ()
+        in
+        let* ops =
+          Node.RPC.call l1_node
+          @@ RPC.get_chain_block_operations_validation_pass
+               ~block:"head"
+               ~validation_pass:2
+               ()
+        in
+        Check.(List.length (JSON.as_list ops) = 1)
+          ~__LOC__
+          Check.(int)
+          ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
+        unit)
+  in
   unit
 
 let register ~protocols =
@@ -12227,6 +12335,14 @@ let register ~protocols =
     ~attestation_threshold:0
     "fetching slots from backup sources"
     dal_slots_retrievability
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["traps"]
+    ~operator_profiles:[0]
+    ~traps_fraction:Q.one
+    ~all_bakers_attest_activation_threshold:Q.(Z.one /// Z.of_int 2)
+    "Trap is denounced when all bakers attest"
+    test_denunciation_when_all_bakers_attest
     protocols ;
 
   (* Tests with all nodes *)
