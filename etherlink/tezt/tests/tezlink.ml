@@ -1703,7 +1703,7 @@ let test_tezlink_prevalidation =
   register_tezlink_test
     ~title:"Test Tezlink prevalidation"
     ~tags:["kernel"; "prevalidation"]
-    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
   @@ fun {sequencer; client; _} _protocol ->
   let endpoint =
     Client.(
@@ -1809,7 +1809,12 @@ let test_tezlink_prevalidation =
   in
 
   (* case already revealed *)
-  let previously_revealed_rex = rex (sf "") in
+  let previously_revealed_rex =
+    rex
+      (sf
+         "Previously revealed manager key for contract %s."
+         Constant.bootstrap1.public_key_hash)
+  in
   let* op_previously_revealed =
     Operation.Manager.(
       operation
@@ -1826,6 +1831,196 @@ let test_tezlink_prevalidation =
       ~error:previously_revealed_rex
       ~dont_wait:true
       op_previously_revealed
+      client_tezlink
+  in
+
+  (* case unsupported manager *)
+  let* op_not_supported =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~source:Constant.bootstrap1
+            (update_consensus_key ~public_key:unknown.public_key ());
+        ]
+        client)
+  in
+  let unsupported_rex =
+    rex "evm_node.dev.tezlink.unsupported_manager_operation"
+  in
+  let* _ =
+    Operation.inject
+      ~error:unsupported_rex
+      ~dont_wait:true
+      op_not_supported
+      client_tezlink
+  in
+
+  (* case batch with two sources *)
+  let counter = 2 in
+  let* op_two_sources =
+    Operation.Manager.(
+      operation
+        [
+          make ~fee:1000 ~counter ~source:Constant.bootstrap1 (transfer ());
+          make
+            ~fee:1000
+            ~counter:(counter + 1)
+            ~source:Constant.bootstrap2
+            (transfer ());
+        ]
+        client)
+  in
+  let two_sources_rex =
+    rex
+      "Inconsistent sources in operation batch. All operations in a batch must \
+       have the same source."
+  in
+  let* _ =
+    Operation.inject
+      ~error:two_sources_rex
+      ~dont_wait:true
+      op_two_sources
+      client_tezlink
+  in
+
+  (* case balance too low *)
+  let counter = 2 in
+  let* balance =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  let balance = Tez.to_mutez balance in
+  let fee = 10000 in
+  (* the second transfer should put us over the balance *)
+  let fee2 = balance - fee + 1 in
+  let* op_balance_too_low =
+    Operation.Manager.(
+      operation
+        [
+          make ~fee ~counter ~source:Constant.bootstrap1 (transfer ~amount:1 ());
+          make
+            ~fee:fee2
+            ~counter:(counter + 1)
+            ~source:Constant.bootstrap1
+            (transfer ~amount:1 ());
+        ]
+        client)
+  in
+  let balance_too_low_rex =
+    rex
+      (sf "Balance of contract %s too low" Constant.bootstrap1.public_key_hash)
+  in
+  let* _ =
+    Operation.inject
+      ~error:balance_too_low_rex
+      ~dont_wait:true
+      op_balance_too_low
+      client_tezlink
+  in
+
+  (* case counter in the past *)
+  let* op_wrong_counter =
+    Operation.Manager.(
+      operation
+        [make ~fee:1000 ~counter:0 ~source:Constant.bootstrap1 (transfer ())]
+        client)
+  in
+  let wrong_counter_rex =
+    rex
+      (sf
+         "Counter %d already used for contract %s"
+         0
+         Constant.bootstrap1.public_key_hash)
+  in
+  let* _ =
+    Operation.inject
+      ~error:wrong_counter_rex
+      ~dont_wait:true
+      op_wrong_counter
+      client_tezlink
+  in
+
+  (* case batch with non consecutive counters *)
+  let counter = 2 in
+  let* op_non_consecutive_counter =
+    Operation.Manager.(
+      operation
+        [
+          make ~fee:1000 ~counter ~source:Constant.bootstrap1 (transfer ());
+          make
+            ~fee:1000
+            ~counter:(counter + 4)
+            ~source:Constant.bootstrap1
+            (transfer ());
+        ]
+        client)
+  in
+  let non_consecutive_counter_rex =
+    rex
+      (sf
+         "Non-consecutive counters for source %s: jumped from %d to %d"
+         Constant.bootstrap1.public_key_hash
+         2
+         6)
+  in
+  let* _ =
+    Operation.inject
+      ~error:non_consecutive_counter_rex
+      ~dont_wait:true
+      op_non_consecutive_counter
+      client_tezlink
+  in
+
+  (* case wrong signer *)
+  let* op_wrong_signer =
+    Operation.Manager.(
+      operation
+        ~signer:Constant.bootstrap2
+        [make ~fee:1000 ~counter:2 ~source:Constant.bootstrap1 (transfer ())]
+        client)
+  in
+  let wrong_signer_rex = rex "The operation signature is invalid" in
+  let* _ =
+    Operation.inject
+      ~error:wrong_signer_rex
+      ~dont_wait:true
+      op_wrong_signer
+      client_tezlink
+  in
+
+  let no_signer_rex = rex "The operation requires a signature" in
+  let* _ =
+    Operation.inject
+      ~error:no_signer_rex
+      ~dont_wait:true
+      ~signature:Tezos_crypto.Signature.zero
+      op_wrong_signer
+      client_tezlink
+  in
+
+  (* case wrong gas limit *)
+  let gas_limit_too_high_rex =
+    rex "A transaction tried to exceed the hard limit on gas"
+  in
+  let* op_wrong_gas_limit =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~gas_limit:Int32.(max_int |> Int32.to_int)
+            ~counter:2
+            ~source:Constant.bootstrap1
+            (transfer ());
+        ]
+        client)
+  in
+  let* _ =
+    Operation.inject
+      ~error:gas_limit_too_high_rex
+      ~dont_wait:true
+      op_wrong_gas_limit
       client_tezlink
   in
 

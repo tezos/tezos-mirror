@@ -24,6 +24,8 @@ let tzfail_p e = Lwt_result_syntax.tzfail @@ Imported_env.Ecoproto_error e
 type error +=
   | Parsing_failure of clue * Data_encoding.Binary.read_error
   | Not_a_manager_operation of clue
+  | Unsupported_manager_operation of clue
+  | Oversized_operation of clue * int * int
 
 let () =
   register_error_kind
@@ -61,7 +63,46 @@ let () =
         raw)
     Data_encoding.(obj1 (req "operation" clue_encoding))
     (function Not_a_manager_operation raw -> Some raw | _ -> None)
-    (fun raw -> Not_a_manager_operation raw)
+    (fun raw -> Not_a_manager_operation raw) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.unsupported_manager_operation"
+    ~title:"Failed to prevalidate an operation: unsupported manager operation."
+    ~description:
+      "Prevalidation of the operation failed because it contains at least one \
+       unsupported operation. The only supported operations are reveal, \
+       transaction and origination."
+    ~pp:(fun ppf op ->
+      Format.fprintf
+        ppf
+        "Failed to prevalidate an operation: it contains at least one \
+         unsupported operation %a"
+        pp_clue
+        op)
+    Data_encoding.(obj1 (req "operation" clue_encoding))
+    (function Unsupported_manager_operation op -> Some op | _ -> None)
+    (fun op -> Unsupported_manager_operation op) ;
+  register_error_kind
+    `Temporary
+    ~id:"evm_node.dev.tezlink.too_big"
+    ~title:"Failed to prevalidate an operation: too big."
+    ~description:
+      "Prevalidation of the operation failed because the operation is too big."
+    ~pp:(fun ppf (op, size, max) ->
+      Format.fprintf
+        ppf
+        "Failed to prevalidate an operation: oversized operation %a (size: %d, \
+         max: %d)"
+        pp_clue
+        op
+        size
+        max)
+    Data_encoding.(
+      obj3 (req "operation" clue_encoding) (req "size" int31) (req "max" int31))
+    (function
+      | Oversized_operation (clue, size, max) -> Some (clue, size, max)
+      | _ -> None)
+    (fun (clue, size, max) -> Oversized_operation (clue, size, max))
 
 let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
   let open Lwt_result_syntax in
@@ -114,6 +155,9 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
 type batch_validation_context = {
   source : public_key_hash;
   balance_left : Tez.t;
+  previous_counter : Manager_counter.t option;
+      (* Used for [Inconsistent_counter] error, so only relevant starting from
+         the second operation. *)
   next_counter : Manager_counter.t;
       (* invariant: next_counter = first_counter + length *)
   error_clue : clue;
@@ -121,24 +165,90 @@ type batch_validation_context = {
   length : int;
 }
 
+let validate_supported_operation (type kind) ~ctxt
+    (operation : kind manager_operation) =
+  let open Lwt_result_syntax in
+  match operation with
+  | Reveal _ | Transaction _ | Origination _ -> return (Ok ())
+  | _ -> tzfail @@ Unsupported_manager_operation ctxt.error_clue
+
+let validate_source ~ctxt second_source =
+  let open Lwt_result_syntax in
+  if Signature.Public_key_hash.equal ctxt.source second_source then
+    return (Ok ())
+  else
+    tzfail_p
+    @@ Imported_protocol.Validate_errors.Manager.(
+         Inconsistent_sources
+           {expected_source = ctxt.source; source = second_source})
+
+let validate_balance ~ctxt ~fee =
+  let open Lwt_result_syntax in
+  match Tez.sub_opt ctxt.balance_left fee with
+  | Some balance_left -> return (Ok balance_left)
+  | None ->
+      let tezrep_of t =
+        let open Imported_protocol in
+        t |> Tez.to_mutez |> Tez_repr.of_mutez
+        |> Option.value ~default:Tez_repr.zero
+        (* The conversion should not fail so the zero value won't be used *)
+      in
+      tzfail_p
+      @@ Imported_protocol.Contract_storage.(
+           Balance_too_low
+             (Implicit ctxt.source, tezrep_of ctxt.balance_left, tezrep_of fee))
+
+let validate_counter ~ctxt counter =
+  let open Lwt_result_syntax in
+  if Manager_counter.equal ctxt.next_counter counter then return (Ok ())
+  else
+    match ctxt.previous_counter with
+    | Some previous_counter ->
+        tzfail_p
+        @@ Imported_protocol.Validate_errors.Manager.(
+             Inconsistent_counters
+               {source = ctxt.source; previous_counter; counter})
+    | None ->
+        (* the first counter in the batch is equal to ctxt.counter by
+           construction *)
+        failwith "unreachable"
+
+let validate_gas_limit gas_limit =
+  let open Lwt_result_syntax in
+  (* TODO check gas limit high enough *)
+  let hard_gas_limit_per_operation =
+    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
+  in
+  match Gas.check_gas_limit ~hard_gas_limit_per_operation ~gas_limit with
+  | Ok () -> return (Ok ())
+  | Error _ -> tzfail_p @@ Imported_protocol.Gas_limit_repr.Gas_limit_too_high
+
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
   let open Lwt_result_syntax in
-  ignore operation ;
-  (* TODO check supported by tezlink *)
-  (* TODO check source *)
-  (* TODO check counter is ok *)
-  (* TODO check gas limit high enough *)
-  (* TODO check only one reveal, at the start *)
-  (* TODO check manager solvent for fees *)
-  (* the update will be updated during the validation steps *)
-  return
-    (Ok
-       {
-         ctxt with
-         next_counter = Manager_counter.succ ctxt.next_counter;
-         length = ctxt.length + 1;
-       })
+  match operation with
+  | Manager_operation {operation = Reveal _; _} when not (ctxt.length = 0) ->
+      tzfail_p
+      @@ Imported_protocol.Validate_errors.Manager.Incorrect_reveal_position
+  | Manager_operation
+      {source; fee; counter; operation; gas_limit; storage_limit = _} ->
+      let** () = validate_supported_operation ~ctxt operation in
+      let** () = validate_source ~ctxt source in
+      let** () = validate_counter ~ctxt counter in
+      let** () = validate_gas_limit gas_limit in
+      (* TODO check storage limit too *)
+      let** balance_left = validate_balance ~ctxt ~fee in
+      (* the update will be updated during the validation steps *)
+      return
+        (Ok
+           {
+             ctxt with
+             previous_counter = Some ctxt.next_counter;
+             next_counter = Manager_counter.succ ctxt.next_counter;
+             length = ctxt.length + 1;
+             balance_left;
+           })
+  | _ -> tzfail @@ Not_a_manager_operation ctxt.error_clue
 
 let rec validate_batch ~(ctxt : batch_validation_context)
     (rest : packed_contents list) =
@@ -149,12 +259,85 @@ let rec validate_batch ~(ctxt : batch_validation_context)
       let** ctxt = validate_operation_in_batch ~ctxt c in
       (validate_batch [@ocaml.tailcall]) ~ctxt rest
 
-let validate_tezlink_operation ~read raw =
+let validate_first_counter ~read ~source ~first_counter =
+  let open Lwt_result_syntax in
+  let* counter =
+    Tezlink_durable_storage.counter read
+    @@ Tezos_types.Contract.of_implicit source
+  in
+  let*? first_counter = Tezos_types.Operation.counter_to_z first_counter in
+  if Z.gt first_counter counter then
+    (* we allow the first counter to be in the future *) return (Ok ())
+  else
+    let expected =
+      Imported_protocol.Manager_counter_repr.Internal_for_tests.of_int
+      @@ Z.to_int counter
+    in
+    let found =
+      Imported_protocol.Manager_counter_repr.Internal_for_tests.of_int
+      @@ Z.to_int first_counter
+    in
+
+    tzfail_p
+    @@ Imported_protocol.Contract_storage.(
+         Counter_in_the_past {contract = Implicit source; expected; found})
+
+let validate_size ~raw ~error_clue =
+  let open Lwt_result_syntax in
+  let open Tezlink_imports.Alpha_context in
+  let length = Bytes.length raw in
+  if length <= Constants.max_operation_data_length then return (Ok ())
+  else
+    tzfail
+    @@ Oversized_operation
+         (error_clue, length, Constants.max_operation_data_length)
+
+let get_signature signature =
+  let open Lwt_result_syntax in
+  match signature with
+  | None -> tzfail_p @@ Imported_protocol.Operation_repr.Missing_signature
+  | Some signature -> return (Ok signature)
+
+(** Checks only existence of signature if `check_signature` is true. Used to fail early if there is no signature but one is required. *)
+let signature_exists ~check_signature signature =
+  let open Lwt_result_syntax in
+  if not check_signature then return (Ok ())
+  else
+    let** _signature = get_signature signature in
+    return (Ok ())
+
+(** We can't reuse [Alpha_context.check_signature] because it's asking for the
+   context to check attestation and preattestation Bls signatures. So we
+   implement a simplified version of the underlying
+   [Operation_repr.check_signature] which is unavailable to us because of type.
+*)
+let validate_signature ~check_signature shell contents pk signature =
+  let open Lwt_result_syntax in
+  if not check_signature then return (Ok ())
+  else
+    let** signature = get_signature signature in
+    let unsigned_operation =
+      Data_encoding.Binary.to_bytes_exn
+        Operation.unsigned_encoding
+        (shell, contents)
+    in
+    if
+      (* That watermark is used for all operations except endorsement, which we
+       don't support. *)
+      Signature.check
+        ~watermark:Generic_operation
+        pk
+        signature
+        unsigned_operation
+    then return (Ok ())
+    else tzfail_p @@ Imported_protocol.Operation_repr.Invalid_signature
+
+let validate_tezlink_operation ?(check_signature = true) ~read raw =
   let open Tezlink_imports.Alpha_context in
   let open Lwt_result_syntax in
-  (* TODO check size *)
   let raw = Bytes.of_string raw in
   let error_clue = Operation_hash.hash_bytes [raw] in
+  let** () = validate_size ~raw ~error_clue in
   let* op =
     match
       Data_encoding.Binary.of_bytes
@@ -164,13 +347,14 @@ let validate_tezlink_operation ~read raw =
     | Error e -> tzfail @@ Parsing_failure (error_clue, e)
     | Ok op -> return op
   in
-  let {protocol_data = Operation_data {contents; signature}; _} = op in
+  let {protocol_data = Operation_data {contents; signature}; shell} = op in
   let first, rest =
     match contents with
     | Single only_operation -> (Contents only_operation, [])
     | Cons (first_operation, rest) ->
         (Contents first_operation, Operation.to_list (Contents_list rest))
   in
+  let** () = signature_exists ~check_signature signature in
   let** pk, source, first_counter =
     validate_manager_info ~read ~error_clue first
   in
@@ -178,12 +362,14 @@ let validate_tezlink_operation ~read raw =
     Tezlink_durable_storage.balance read
     @@ Tezos_types.Contract.of_implicit source
   in
+  let** () = validate_first_counter ~read ~source ~first_counter in
   let** ctxt =
     validate_batch
       ~ctxt:
         {
           source;
           balance_left;
+          previous_counter = None;
           next_counter = first_counter;
           error_clue;
           first_counter;
@@ -191,12 +377,17 @@ let validate_tezlink_operation ~read raw =
         }
       (first :: rest)
   in
-  (* TODO check signature *)
+  let** () =
+    validate_signature
+      ~check_signature
+      shell
+      (Contents_list contents)
+      pk
+      signature
+  in
   let*? first_counter = Tezos_types.Operation.counter_to_z ctxt.first_counter in
   let operation =
     Tezos_types.Operation.
       {length = ctxt.length; source = ctxt.source; raw; op; first_counter}
   in
-  ignore pk ;
-  ignore signature ;
   return (Ok operation)
