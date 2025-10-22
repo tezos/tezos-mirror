@@ -228,6 +228,7 @@ type t = {
   gcp_kms : gcp_kms;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
+  rpc_timeout : float;
   verbose : Internal_event.level;
   experimental_features : experimental_features;
   fee_history : fee_history;

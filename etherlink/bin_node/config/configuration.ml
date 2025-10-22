@@ -262,6 +262,7 @@ type t = {
   gcp_kms : gcp_kms;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
+  rpc_timeout : float;
   verbose : Internal_event.level;
   experimental_features : experimental_features;
   fee_history : fee_history;
@@ -347,6 +348,8 @@ let default_keep_alive = false
 let default_finalized_view = false
 
 let default_rollup_node_endpoint = Uri.of_string "http://localhost:8932"
+
+let default_rpc_timeout_s = 30. (* seconds *)
 
 let default_rollup_node_tracking = true
 
@@ -574,12 +577,9 @@ let observer_evm_node_endpoint = function
   | Testnet -> "https://relay.ghostnet.etherlink.com"
   | Shadownet -> "https://relay.shadownet.etherlink.com"
 
-let observer_config_dft ~evm_node_endpoint ?rollup_node_tracking () =
-  {
-    evm_node_endpoint;
-    rollup_node_tracking =
-      Option.value ~default:default_rollup_node_tracking rollup_node_tracking;
-  }
+let observer_config_dft ~evm_node_endpoint
+    ?(rollup_node_tracking = default_rollup_node_tracking) () =
+  {evm_node_endpoint; rollup_node_tracking}
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
@@ -1602,6 +1602,7 @@ let encoding ?network () : t Data_encoding.t =
            gcp_kms;
            keep_alive;
            rollup_node_endpoint;
+           rpc_timeout;
            verbose;
            experimental_features;
            fee_history;
@@ -1614,12 +1615,10 @@ let encoding ?network () : t Data_encoding.t =
            performance_profile;
          }
        ->
-      ( (data_dir, log_filter, sequencer, observer),
-        ( ( None,
-            None,
-            None,
-            keep_alive,
+      ( (data_dir, log_filter, sequencer, observer, None, None, None),
+        ( ( keep_alive,
             rollup_node_endpoint,
+            rpc_timeout,
             verbose,
             experimental_features,
             proxy,
@@ -1635,12 +1634,16 @@ let encoding ?network () : t Data_encoding.t =
             opentelemetry,
             tx_queue,
             performance_profile ) ) ))
-    (fun ( (data_dir, log_filter, sequencer, observer),
-           ( ( _tx_pool_timeout_limit,
-               _tx_pool_addr_limit,
-               _tx_pool_tx_per_addr_limit,
-               keep_alive,
+    (fun ( ( data_dir,
+             log_filter,
+             sequencer,
+             observer,
+             _tx_pool_timeout_limit,
+             _tx_pool_addr_limit,
+             _tx_pool_tx_per_addr_limit ),
+           ( ( keep_alive,
                rollup_node_endpoint,
+               rpc_timeout,
                verbose,
                experimental_features,
                proxy,
@@ -1669,6 +1672,7 @@ let encoding ?network () : t Data_encoding.t =
         gcp_kms;
         keep_alive;
         rollup_node_endpoint;
+        rpc_timeout;
         verbose;
         experimental_features;
         fee_history;
@@ -1681,7 +1685,7 @@ let encoding ?network () : t Data_encoding.t =
         performance_profile;
       })
     (merge_objs
-       (obj4
+       (obj7
           (dft
              "data_dir"
              ~description:"The path to the EVM node data directory."
@@ -1692,29 +1696,28 @@ let encoding ?network () : t Data_encoding.t =
              log_filter_config_encoding
              (default_filter_config ()))
           (dft "sequencer" sequencer_encoding (sequencer_config_dft ()))
-          (observer_field "observer" (observer_encoding ?network ())))
+          (observer_field "observer" (observer_encoding ?network ()))
+          (opt
+             "tx_pool_timeout_limit"
+             ~description:
+               "Transaction timeout limit inside the transaction pool. \
+                DEPRECATED: You should use \"tx_pool.max_lifespan\" instead."
+             int64)
+          (opt
+             "tx_pool_addr_limit"
+             ~description:
+               "Maximum allowed addresses inside the transaction pool. \
+                DEPRECATED: You should use \"tx_pool.max_size\" instead."
+             int64)
+          (opt
+             "tx_pool_tx_per_addr_limit"
+             ~description:
+               "Maximum allowed transactions per user address inside the \
+                transaction pool. DEPRECATED: You should use \
+                \"tx_pool.tx_per_addr_limit\" instead."
+             int64))
        (merge_objs
-          (obj10
-             (opt
-                "tx_pool_timeout_limit"
-                ~description:
-                  "Transaction timeout limit inside the transaction pool. \
-                   DEPRECATED: You should use \"tx_pool.max_lifespan\" \
-                   instead."
-                int64)
-             (opt
-                "tx_pool_addr_limit"
-                ~description:
-                  "Maximum allowed addresses inside the transaction pool. \
-                   DEPRECATED: You should use \"tx_pool.max_size\" instead."
-                int64)
-             (opt
-                "tx_pool_tx_per_addr_limit"
-                ~description:
-                  "Maximum allowed transactions per user address inside the \
-                   transaction pool. DEPRECATED: You should use \
-                   \"tx_pool.tx_per_addr_limit\" instead."
-                int64)
+          (obj8
              (dft
                 "keep_alive"
                 ~description:
@@ -1732,6 +1735,12 @@ let encoding ?network () : t Data_encoding.t =
                    Layer 1 blocks."
                 Tezos_rpc.Encoding.uri_encoding
                 default_rollup_node_endpoint)
+             (dft
+                "rpc_timeout"
+                ~description:
+                  "Timeout in seconds for RPC calls made by the EVM node."
+                float
+                default_rpc_timeout_s)
              (dft "verbose" Internal_event.Level.encoding Internal_event.Notice)
              (dft
                 "experimental_features"
@@ -2023,6 +2032,7 @@ module Cli = struct
       gcp_kms = default_gcp_kms;
       keep_alive = false;
       rollup_node_endpoint = default_rollup_node_endpoint;
+      rpc_timeout = default_rpc_timeout_s;
       verbose = Internal_event.Notice;
       experimental_features = default_experimental_features;
       fee_history = default_fee_history;
@@ -2260,6 +2270,7 @@ module Cli = struct
       gcp_kms = configuration.gcp_kms;
       keep_alive = configuration.keep_alive || keep_alive;
       rollup_node_endpoint;
+      rpc_timeout = configuration.rpc_timeout;
       verbose;
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
