@@ -109,6 +109,9 @@
        track of the state of the smart rollup powering the Layer 2 chain. In
        sequencer mode, the blueprint created by the node are forwarded to the
        rollup node to be injected in Layer 1 blocks. */,
+  "rpc_timeout"?:
+    number
+    /* Timeout in seconds for RPC calls made by the EVM node. */,
   "verbose"?: "info" | "debug" | "error" | "fatal" | "warning" | "notice",
   "experimental_features"?:
     { "drop_duplicate_on_injection"?:
