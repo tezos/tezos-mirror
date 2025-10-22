@@ -183,13 +183,22 @@ let validated_block =
     ("hash", Block_hash.encoding)
 
 let validating_block =
-  declare_1
+  declare_5
     ~section
     ~name:"validating_block"
-    ~level:Debug
-    ~msg:"validating block {hash}"
+    ~level:Info
+    ~msg:
+      "{hash} with level {level}, parent {parent}, fitness {fitness}, \
+       timestamp {timestamp}"
     ~pp1:Block_hash.pp
     ("hash", Block_hash.encoding)
+    ("level", Data_encoding.int32)
+    ~pp3:Block_hash.pp_short
+    ("parent", Block_hash.encoding)
+    ~pp4:Fitness.pp
+    ("fitness", Fitness.encoding)
+    ~pp5:Time.Protocol.pp_hum
+    ("timestamp", Time.Protocol.encoding)
 
 let could_not_find_context =
   declare_1

@@ -205,7 +205,7 @@ let block_info =
     ~section
     ~name:"block_info"
     ~msg:"treated block has timestamp {timestamp} with fitness {fitness}"
-    ~level:Info
+    ~level:Debug
     ~pp1:Time.Protocol.pp_hum
     ~pp2:Fitness.pp
     ("timestamp", Time.Protocol.encoding)
