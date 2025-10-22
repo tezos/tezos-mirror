@@ -17,7 +17,6 @@
   `debug_traceCall` simulations. (!19668)
 
 ### Internal
-- Changes the precision of wei to mutez in the internal representation of a `Deposit`. (!19609)
 
 ## Etherlink 5 (Ebisu)
 
