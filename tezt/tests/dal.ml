@@ -5815,28 +5815,36 @@ module History_rpcs = struct
       "Publishing commitments in the previous protocol, from published level \
        %d to %d"
       (starting_level + 1)
-      (migration_level + 1) ;
+      migration_level ;
     let* commitments =
-      publish ~max_level:migration_level starting_level Map_int.empty
+      publish ~max_level:(migration_level - 1) starting_level Map_int.empty
     in
 
     Log.info "Migrated to the next protocol." ;
 
-    let last_attested_level = last_confirmed_published_level + lag in
+    let* new_proto_params =
+      Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+    in
+    let new_lag =
+      JSON.(
+        new_proto_params |-> "dal_parametric" |-> "attestation_lag" |> as_int)
+    in
+    if new_lag <> lag then Log.info "new attestation_lag = %d" new_lag ;
 
+    let last_attested_level = last_confirmed_published_level + lag in
     let wait_for_dal_node =
       wait_for_layer1_final_block dal_node last_attested_level
     in
 
     let* second_level_new_proto = Client.level client in
-    assert (second_level_new_proto = migration_level + 1) ;
+    assert (second_level_new_proto = migration_level) ;
     Log.info
       "Publish commitments in the new protocol, from published level %d to %d"
       (second_level_new_proto + 1)
-      (last_confirmed_published_level + 1) ;
+      last_confirmed_published_level ;
     let* commitments =
       publish
-        ~max_level:last_confirmed_published_level
+        ~max_level:(last_confirmed_published_level - 1)
         second_level_new_proto
         commitments
     in
@@ -5938,8 +5946,12 @@ module History_rpcs = struct
         let published cell_level =
           (* - Cond 1: we publish at [slot_index]
              - Cond 2: the (published) [cell_level] is greater than
-             [starting_level] *)
-          cell_slot_index = slot_index && cell_level > starting_level
+             [starting_level]
+             - Cond 3: the (published) [cell_level] is smaller or equal to
+             [last_confirmed_published_level] *)
+          cell_slot_index = slot_index
+          && cell_level > starting_level
+          && cell_level <= last_confirmed_published_level
         in
         let expected_kind =
           if not (published cell_level) then "unpublished"
@@ -6013,7 +6025,12 @@ module History_rpcs = struct
         in
         let cells = JSON.as_list cells in
         let num_cells = List.length cells in
-        let expected_num_cells = if level < lag then 0 else 32 in
+        let expected_num_cells =
+          if level < lag then 0
+          else if level = migration_level + 1 then
+            (lag - new_lag + 1) * number_of_slots
+          else number_of_slots
+        in
         Check.(
           (num_cells = expected_num_cells)
             int
