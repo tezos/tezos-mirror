@@ -26,8 +26,30 @@ type error +=
   | Not_a_manager_operation of clue
   | Unsupported_manager_operation of clue
   | Oversized_operation of clue * int * int
+  | Bls_is_not_allowed of clue * public_key_hash
 
 let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.bls_is_not_allowed"
+    ~title:"Failed to prevalidate an operation: tz4 are forbidden"
+    ~description:
+      "Prevalidation of the operation failed because tz4 addresses are not \
+       supported."
+    ~pp:(fun ppf (clue, key) ->
+      Format.fprintf
+        ppf
+        "Failed to prevaliate operation %a: tz4 keys are forbidden %a"
+        pp_clue
+        clue
+        Signature.Public_key_hash.pp
+        key)
+    Data_encoding.(
+      obj2
+        (req "operation" clue_encoding)
+        (req "key" Signature.Public_key_hash.encoding))
+    (function Bls_is_not_allowed (clue, err) -> Some (clue, err) | _ -> None)
+    (fun (clue, err) -> Bls_is_not_allowed (clue, err)) ;
   register_error_kind
     `Permanent
     ~id:"evm_node.dev.tezlink.parsing_failure"
@@ -165,11 +187,38 @@ type batch_validation_context = {
   length : int;
 }
 
+let is_tz4 pkh =
+  match
+    Imported_protocol.Michelson_v1_gas.Cost_of.Interpreter
+    .algo_of_public_key_hash
+      pkh
+  with
+  | Bls -> true
+  | _ -> false
+
+let validate_reveal ctxt (Reveal {public_key; _}) =
+  let open Lwt_result_syntax in
+  match public_key with
+  | Bls _ ->
+      tzfail
+      @@ Bls_is_not_allowed
+           (ctxt.error_clue, Signature.Public_key.hash public_key)
+  | _ -> return (Ok ())
+
+let validate_transaction ctxt (Transaction {destination; _}) =
+  let open Lwt_result_syntax in
+  match destination with
+  | Implicit destination when is_tz4 destination ->
+      tzfail @@ Bls_is_not_allowed (ctxt.error_clue, destination)
+  | _ -> return (Ok ())
+
 let validate_supported_operation (type kind) ~ctxt
     (operation : kind manager_operation) =
   let open Lwt_result_syntax in
   match operation with
-  | Reveal _ | Transaction _ | Origination _ -> return (Ok ())
+  | Reveal _ -> validate_reveal ctxt operation
+  | Transaction _ -> validate_transaction ctxt operation
+  | Origination _ -> return (Ok ())
   | _ -> tzfail @@ Unsupported_manager_operation ctxt.error_clue
 
 let validate_source ~ctxt second_source =
