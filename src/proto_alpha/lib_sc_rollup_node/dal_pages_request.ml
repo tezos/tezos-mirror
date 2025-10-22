@@ -103,18 +103,26 @@ let download_confirmed_slot_pages =
         res
 
 (* Adaptive DAL is not supported anymore *)
-let get_slot_header_attestation_info {Node_context.dal_cctxt; _}
-    ~published_level ~index =
-  (* TODO: add a cache for this Query, but not for the Not_indexed case. *)
-  let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
-  let slot_id =
-    Slot_id.
-      {
-        slot_level = Raw_level.to_int32 published_level;
-        slot_index = Dal.Slot_index.to_int index;
-      }
-  in
-  Dal_node_client.get_slot_status dal_cctxt slot_id
+let get_slot_header_attestation_info =
+  let open Lwt_result_syntax in
+  let cache = Slot_id_cache.create 160 in
+  fun dal_cctxt ~published_level ~index ->
+    let slot_id =
+      Slot_id.
+        {
+          slot_level = Raw_level.to_int32 published_level;
+          slot_index = Dal.Slot_index.to_int index;
+        }
+    in
+    match Slot_id_cache.find_opt cache slot_id with
+    | Some pages -> return pages
+    | None ->
+        let+ res = Dal_node_client.get_slot_status dal_cctxt slot_id in
+        (match res with
+        | `Attested _ | `Unattested | `Unpublished ->
+            Slot_id_cache.replace cache slot_id res
+        | `Waiting_attestation -> ()) ;
+        res
 
 let get_page node_ctxt ~inbox_level page_id =
   let open Environment.Error_monad.Lwt_result_syntax in
@@ -198,7 +206,7 @@ let slot_pages
   let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ node_ctxt.dal_cctxt in
   let Dal.Slot.Header.{published_level; index} = slot_id in
   let* status =
-    get_slot_header_attestation_info node_ctxt ~published_level ~index
+    get_slot_header_attestation_info dal_cctxt ~published_level ~index
   in
   match status with
   | `Attested attestation_lag ->
@@ -236,7 +244,7 @@ let page_content
   let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ node_ctxt.dal_cctxt in
   let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
   let* status =
-    get_slot_header_attestation_info node_ctxt ~published_level ~index
+    get_slot_header_attestation_info dal_cctxt ~published_level ~index
   in
   match status with
   | `Attested attestation_lag ->
