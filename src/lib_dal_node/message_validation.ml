@@ -356,7 +356,7 @@ let may_finalize_batch_stats last_stat_level head_level =
          the block time but it is good enough to observe the overall
          behaviour. *)
       if last_level != head_level then
-        match Batches_stats.find_opt batches_stats_tbl head_level with
+        match Batches_stats.find_opt batches_stats_tbl last_level with
         | None -> ()
         | Some {total_shards; total_duration; batches_count} ->
             let () =
