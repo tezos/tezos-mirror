@@ -324,16 +324,16 @@ let update_batches_stats number_of_slots cryptobox batch_size head_level batch_l
           } ;
         1
     | Some v ->
-        let batch_id = v.batches_count in
+        let next_batch_id = v.batches_count + 1 in
         Batches_stats.replace
           batches_stats_tbl
           head_level
           {
             total_shards = v.total_shards + batch_size;
             total_duration = v.total_duration +. duration;
-            batches_count = v.batches_count + 1;
+            batches_count = next_batch_id;
           } ;
-        batch_id
+        next_batch_id
   in
   Event.emit_dont_wait__batch_validation_stats
     ~batch_id
