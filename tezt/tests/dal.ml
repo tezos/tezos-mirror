@@ -5767,7 +5767,7 @@ let test_attestation_through_p2p ~batching_time_interval _protocol
   Log.info "Slot sucessfully attested" ;
   unit
 
-module History_rpcs = struct
+module Skip_list_rpcs = struct
   (* In the following function, no migration is performed (expect from genesis
      to alpha) when [migration_level] is equal to or smaller than 1. *)
   let main_scenario ?(migration_level = 1) ~slot_index ~first_cell_level
@@ -6052,7 +6052,7 @@ module History_rpcs = struct
 
     unit
 
-  let test_commitments_history_rpcs protocols =
+  let test_skip_list_rpcs protocols =
     let scenario protocol dal_parameters _ client node dal_node =
       main_scenario
         ~slot_index:3
@@ -6066,7 +6066,7 @@ module History_rpcs = struct
         dal_node
     in
     let tags = ["rpc"; "skip_list"] in
-    let description = "commitments history RPCs" in
+    let description = "skip-list RPCs" in
     scenario_with_layer1_and_dal_nodes
       ~tags
       ~operator_profiles:[3; 15]
@@ -6074,7 +6074,7 @@ module History_rpcs = struct
       scenario
       protocols
 
-  let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to
+  let test_skip_list_rpcs_with_migration ~migrate_from ~migrate_to
       ~migration_level =
     let slot_index = 3 in
     let scenario ~migrate_to ~migration_level dal_parameters =
@@ -6099,7 +6099,7 @@ module History_rpcs = struct
         dal_parameters
     in
 
-    let description = "test commitments history with migration" in
+    let description = "test skip-list RPCs with migration" in
     let tags = ["rpc"; "skip_list"] in
     test_l1_migration_scenario
       ~migrate_from
@@ -12194,7 +12194,7 @@ let register ~protocols =
     ~prover:false
     test_operator_profile
     protocols ;
-  History_rpcs.test_commitments_history_rpcs protocols ;
+  Skip_list_rpcs.test_skip_list_rpcs protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["amplification"]
     ~bootstrap_profile:true
@@ -12504,7 +12504,7 @@ let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
 
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:11 ~migrate_from ~migrate_to ;
-  History_rpcs.test_commitments_history_rpcs_with_migration
+  Skip_list_rpcs.test_skip_list_rpcs_with_migration
     ~migration_level:11
     ~migrate_from
     ~migrate_to ;
