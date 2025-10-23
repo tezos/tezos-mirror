@@ -246,6 +246,9 @@ module Opam = struct
            :: jobs)
          package_by_group_index
          []
+
+  let jobs_opam_packages_daily =
+    jobs_opam_packages ~dependencies:(Dependent []) Schedule_extended_test
 end
 
 (** Configuration of manual jobs for [make_rules] *)
