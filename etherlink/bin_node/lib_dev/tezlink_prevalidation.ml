@@ -463,10 +463,38 @@ let init_blueprint_validation read () =
     addr_balance = String.Map.empty;
   }
 
-let validate_for_blueprint state operation =
+let add_ source = String.Map.add (Signature.Public_key_hash.to_b58check source)
+
+let get_ read cache source =
   let open Lwt_result_syntax in
-  (* TODO check nonce *)
+  match
+    String.Map.find (Signature.Public_key_hash.to_b58check source) cache
+  with
+  | Some v -> return v
+  | None -> read (Tezlink_imports.Alpha_context.Contract.Implicit source)
+
+let validate_for_blueprint state (operation : Tezos_types.Operation.t) =
+  let open Lwt_result_syntax in
+  let* counter =
+    get_ state.michelson_config.get_counter state.addr_nonce operation.source
+  in
+  let** new_counter =
+    if not Z.(equal (succ counter) operation.first_counter) then
+      return
+      @@ Error
+           (Format.asprintf
+              "Operation counter %a does not follow the current counter %a"
+              Z.pp_print
+              operation.first_counter
+              Z.pp_print
+              counter)
+    else return @@ Ok Z.(add counter (Z.of_int operation.length))
+  in
   (* TODO check balance *)
-  (* TODO update balance and nonce *)
-  ignore operation ;
-  return (Ok state)
+  (* TODO update balance *)
+  return
+    (Ok
+       {
+         state with
+         addr_nonce = add_ operation.source new_counter state.addr_nonce;
+       })
