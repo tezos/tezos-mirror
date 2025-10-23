@@ -108,6 +108,7 @@ using ``apt`` directly from our APT repository.
 
 We support the following distribution/releases:
 
+- ``debian/trixie``
 - ``debian/bookworm``
 - ``ubuntu/noble``
 - ``ubuntu/jammy``
@@ -119,7 +120,7 @@ In order to set the Tezos package repository to your machine, do:
 ::
 
   export distribution=debian
-  export release=bookworm
+  export release=trixie
 
 We also maintain a separate repository for release candidates. To set
 the last release candidate simply prepend ``RC/`` to the distribution name
