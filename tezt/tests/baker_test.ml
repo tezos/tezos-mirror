@@ -1273,6 +1273,105 @@ let aggregated_operations_retrival_from_block_content =
   in
   unit
 
+let unable_to_reach_node_mempool =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Baker shuts down when unable to reach the node mempool"
+    ~tags:[team; "operation_worker"; "shutdown"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+    ~supports:Protocol.(From_protocol 023)
+  @@ fun protocol ->
+  log_step 1 "Initialize a node with the mempool disabled" ;
+  let* node, client =
+    Client.init_with_protocol
+      ~nodes_args:[Connections 0; Synchronisation_threshold 0; Disable_mempool]
+      `Client
+      ~timestamp:Now
+      ~protocol
+      ()
+  in
+  log_step 2 "Run a baker" ;
+  let* baker = Agnostic_baker.init node client in
+  log_step 3 "Wait for baker termination" ;
+  let* outcome =
+    Lwt.choose
+      [
+        (let* () = Agnostic_baker.wait_for_termination baker in
+         return `Terminated);
+        (* Saves some CI time by failing after 2 minutes if the baker fails to
+           shut down as expected.*)
+        (let* () = Lwt_unix.sleep 120. in
+         return `Timeout);
+      ]
+  in
+  match outcome with
+  | `Terminated -> unit
+  | `Timeout ->
+      Test.fail
+        "The baker failed to shut down after being unable to reach the node \
+         mempool for 2 minutes"
+
+let stream_is_refreshed_on_timeout =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Operation stream is refreshed on timeout"
+    ~tags:[team; "operation_worker"; "timeout"]
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+    ~supports:Protocol.(From_protocol 023)
+  @@ fun protocol ->
+  log_step 1 "Initialize a node with mainnet constants" ;
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.Right (protocol, Some Constants_mainnet))
+      []
+  in
+  let* node, client =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~parameter_file
+      ~timestamp:Now
+      ()
+  in
+  log_step 2 "Run a baker" ;
+  let* baker =
+    Agnostic_baker.init
+      ~delegates:Constant.[activator.public_key_hash]
+      node
+      client
+  in
+  log_step 3 "Bake 2 levels" ;
+  let* () =
+    Client.bake_for_and_wait ~keys:[] ~minimal_timestamp:true ~count:2 client
+  in
+  (* Since the node will neither switch heads nor forward new operations, the
+     operation worker is expected to refresh the monitor_operations stream after
+     the equivalent of two rounds of inactivity. *)
+  log_step 4 "Wait for stream_timeout event" ;
+  let wait_for_stream_timeout () =
+    Agnostic_baker.wait_for
+      baker
+      "monitor_operations_stream_timeout.v0"
+      (fun _ -> Some ())
+  in
+  let* waiter =
+    Lwt.choose
+      [
+        (let* () = wait_for_stream_timeout () in
+         return `Stream_timeout);
+        (* Saves some CI time by failing after 2 minutes if the baker fails to
+           refresh the stream as expected.*)
+        (let* () = Lwt_unix.sleep 120. in
+         return `Timeout);
+      ]
+  in
+  match waiter with
+  | `Stream_timeout -> unit
+  | `Timeout ->
+      Test.fail
+        "The baker did not refresh the streamed RPC after prolonged inactivity \
+         from the mempool"
+
 let register ~protocols =
   check_node_version_check_bypass_test protocols ;
   check_node_version_allowed_test protocols ;
@@ -1290,4 +1389,6 @@ let register ~protocols =
   prequorum_check_levels protocols ;
   attestations_aggregation_on_reproposal_local_context protocols ;
   attestations_aggregation_on_reproposal_remote_node protocols ;
-  aggregated_operations_retrival_from_block_content protocols
+  aggregated_operations_retrival_from_block_content protocols ;
+  unable_to_reach_node_mempool protocols ;
+  stream_is_refreshed_on_timeout protocols

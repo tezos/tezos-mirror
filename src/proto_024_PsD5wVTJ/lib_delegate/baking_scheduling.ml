@@ -616,8 +616,8 @@ let create_round_durations constants =
     (Round.Durations.create ~first_round_duration ~delay_increment_per_round)
 
 let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
-    config operation_worker ~(current_proposal : Baking_state.proposal)
-    ?constants delegates =
+    config operation_worker round_durations
+    ~(current_proposal : Baking_state.proposal) ?constants delegates =
   let open Lwt_result_syntax in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
      consider saved attestable value *)
@@ -628,7 +628,6 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
     | Some c -> return c
     | None -> Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
   in
-  let*? round_durations = create_round_durations constants in
   let* validation_mode =
     Baking_state.(
       match config.Baking_configuration.validation with
@@ -732,7 +731,6 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
   in
   let* round_state =
     if synchronize then
-      let*? round_durations = create_round_durations constants in
       let*? current_round =
         Baking_actions.compute_round current_proposal round_durations
       in
@@ -1015,7 +1013,8 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
     | Some current_head -> return current_head
     | None -> failwith "head stream unexpectedly ended"
   in
-  let*! operation_worker = Operation_worker.run cctxt in
+  let*? round_durations = create_round_durations constants in
+  let*! operation_worker = Operation_worker.run ~round_durations cctxt in
   Option.iter
     (fun canceler ->
       Lwt_canceler.on_cancel canceler (fun () ->
@@ -1029,6 +1028,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
       ~chain
       config
       operation_worker
+      round_durations
       ~current_proposal
       ~constants
       delegates

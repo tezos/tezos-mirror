@@ -38,6 +38,9 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
  *)
 val wait_for_ready : t -> unit Lwt.t
 
+(* Wait for agnostic baker termination. *)
+val wait_for_termination : t -> unit Lwt.t
+
 (** Raw events. *)
 type event = {name : string; value : JSON.t; timestamp : float}
 
