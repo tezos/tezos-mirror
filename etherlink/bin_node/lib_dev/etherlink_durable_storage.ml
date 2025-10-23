@@ -10,6 +10,11 @@ open Ethereum_types
 
 let root = Durable_storage_path.etherlink_root
 
+let post_v41_unsupported_function ~__FUNCTION__ =
+  Invalid_argument (__FUNCTION__ ^ " is not supported for storage version >= 41")
+
+let legacy_storage_compatible ~storage_version = storage_version < 41
+
 module AccountInfo = struct
   type t = {
     balance : Ethereum_types.quantity;
@@ -117,144 +122,295 @@ let code read address =
 let current_block_number read =
   Durable_storage.block_number ~root read Durable_storage_path.Block.Current
 
+let current_block_hash read =
+  let open Lwt_result_syntax in
+  let+ hash =
+    inspect_durable_and_decode
+      read
+      (Durable_storage_path.Block.current_hash ~root)
+      decode_block_hash
+  in
+  hash
+
 let un_qty (Qty z) = z
 
 let mock_block_hash = Block_hash (Hex (String.make 64 'a'))
 
+let current_transactions_receipts block_hash storage_version read =
+  if not (legacy_storage_compatible ~storage_version) then
+    Durable_storage.inspect_durable_and_decode_default
+      read
+      (Durable_storage_path.Block.current_receipts
+         ~root:Durable_storage_path.etherlink_root)
+      ~default:[]
+      (function bytes ->
+        (match Rlp.decode bytes with
+        | Ok (Rlp.List receipts_rlp) ->
+            List.map
+              (fun rlp -> Transaction_receipt.of_rlp_item block_hash rlp)
+              receipts_rlp
+        | _ -> raise (Invalid_argument "Transaction receipts should be a list")))
+  else raise (post_v41_unsupported_function ~__FUNCTION__)
+
 let transaction_receipt read ?block_hash tx_hash =
   let open Lwt_result_syntax in
-  (* We use a mock block hash to decode the rest of the receipt,
-     so that we can get the number to query for the actual block
-     hash (only if the block hash isn't already available). *)
-  let block = Option.value block_hash ~default:mock_block_hash in
-  let* opt_receipt =
-    inspect_durable_and_decode_opt
+  let* storage_version = storage_version read in
+  if not (legacy_storage_compatible ~storage_version) then
+    let* block_hash = current_block_hash read in
+    let* receipts =
+      current_transactions_receipts block_hash storage_version read
+    in
+    return
+      (List.find_opt
+         (fun (receipt : Transaction_receipt.t) ->
+           receipt.transactionHash = tx_hash)
+         receipts)
+  else
+    (* We use a mock block hash to decode the rest of the receipt,
+      so that we can get the number to query for the actual block
+      hash (only if the block hash isn't already available). *)
+    let block = Option.value block_hash ~default:mock_block_hash in
+    let* opt_receipt =
+      inspect_durable_and_decode_opt
+        read
+        (Durable_storage_path.Transaction_receipt.receipt tx_hash)
+        (Transaction_receipt.of_rlp_bytes block)
+    in
+    match block_hash with
+    | Some _ ->
+        (* Correct receipt *)
+        return opt_receipt
+    | None -> (
+        (* Need to replace with correct block hash *)
+        match opt_receipt with
+        | Some temp_receipt ->
+            let+ blockHash =
+              inspect_durable_and_decode
+                read
+                (Durable_storage_path.Indexes.block_by_number
+                   ~root
+                   (Nth (un_qty temp_receipt.blockNumber)))
+                decode_block_hash
+            in
+            let logs =
+              List.map
+                (fun (log : transaction_log) ->
+                  {log with blockHash = Some blockHash})
+                temp_receipt.logs
+            in
+            Some {temp_receipt with blockHash; logs}
+        | None -> return_none)
+
+let current_transactions_objects ?block_hash storage_version read =
+  let open Lwt_result_syntax in
+  if not (legacy_storage_compatible ~storage_version) then
+    let* block_hash =
+      match block_hash with
+      | Some bh -> return bh
+      | None ->
+          let+ bh = current_block_hash read in
+          bh
+    in
+    Durable_storage.inspect_durable_and_decode_default
       read
-      (Durable_storage_path.Transaction_receipt.receipt tx_hash)
-      (Transaction_receipt.of_rlp_bytes block)
-  in
-  match block_hash with
-  | Some _ ->
-      (* Correct receipt *)
-      return opt_receipt
-  | None -> (
-      (* Need to replace with correct block hash *)
-      match opt_receipt with
-      | Some temp_receipt ->
-          let+ blockHash =
-            inspect_durable_and_decode
-              read
-              (Durable_storage_path.Indexes.block_by_number
-                 ~root
-                 (Nth (un_qty temp_receipt.blockNumber)))
-              decode_block_hash
-          in
-          let logs =
+      (Durable_storage_path.Block.current_transactions_objects
+         ~root:Durable_storage_path.etherlink_root)
+      ~default:[]
+      (function bytes ->
+        (match Rlp.decode bytes with
+        | Ok (Rlp.List objects_rlp) ->
             List.map
-              (fun (log : transaction_log) ->
-                {log with blockHash = Some blockHash})
-              temp_receipt.logs
-          in
-          Some {temp_receipt with blockHash; logs}
-      | None -> return_none)
+              (fun rlp ->
+                Ethereum_types.legacy_transaction_object_from_rlp_item
+                  (Some block_hash)
+                  rlp)
+              objects_rlp
+        | _ -> raise (Invalid_argument "Transaction objects should be a list")))
+  else raise (post_v41_unsupported_function ~__FUNCTION__)
 
 let transaction_object read tx_hash =
   let open Lwt_result_syntax in
-  (* We use a mock block hash to decode the rest of the receipt,
+  let* storage_version = storage_version read in
+  if not (legacy_storage_compatible ~storage_version) then
+    let* transaction_objects =
+      current_transactions_objects storage_version read
+    in
+    return
+      (List.find_opt
+         (fun (obj : Ethereum_types.legacy_transaction_object) ->
+           obj.hash = tx_hash)
+         transaction_objects)
+  else
+    (* We use a mock block hash to decode the rest of the receipt,
      so that we can get the number to query for the actual block
      hash. *)
-  let mock_block_hash = Block_hash (Hex (String.make 64 'a')) in
-  let* opt_object =
+    let mock_block_hash = Block_hash (Hex (String.make 64 'a')) in
+    let* opt_object =
+      inspect_durable_and_decode_opt
+        read
+        (Durable_storage_path.Transaction_object.object_ tx_hash)
+        (Ethereum_types.legacy_transaction_object_from_rlp
+           (Some mock_block_hash))
+    in
+    match opt_object with
+    | Some temp_object ->
+        let*? (blockNumber : quantity) =
+          match temp_object.blockNumber with
+          | None -> error_with "Unexpected null blockNumber in valid object"
+          | Some n -> Ok n
+        in
+        let+ blockHash =
+          inspect_durable_and_decode
+            read
+            (Durable_storage_path.Indexes.block_by_number
+               ~root
+               (Nth (un_qty blockNumber)))
+            decode_block_hash
+        in
+        Some {temp_object with blockHash = Some blockHash}
+    | None -> return_none
+
+let transaction_object_with_block_hash ?known_storage_version read block_hash
+    tx_hash =
+  let open Lwt_result_syntax in
+  let* storage_version =
+    match known_storage_version with
+    | Some v -> return v
+    | None -> storage_version read
+  in
+  if not (legacy_storage_compatible ~storage_version) then
+    raise (post_v41_unsupported_function ~__FUNCTION__)
+  else
     inspect_durable_and_decode_opt
       read
       (Durable_storage_path.Transaction_object.object_ tx_hash)
-      (Ethereum_types.legacy_transaction_object_from_rlp (Some mock_block_hash))
-  in
-  match opt_object with
-  | Some temp_object ->
-      let*? (blockNumber : quantity) =
-        match temp_object.blockNumber with
-        | None -> error_with "Unexpected null blockNumber in valid object"
-        | Some n -> Ok n
-      in
-      let+ blockHash =
-        inspect_durable_and_decode
-          read
-          (Durable_storage_path.Indexes.block_by_number
-             ~root
-             (Nth (un_qty blockNumber)))
-          decode_block_hash
-      in
-      Some {temp_object with blockHash = Some blockHash}
-  | None -> return_none
+      (Ethereum_types.legacy_transaction_object_from_rlp block_hash)
 
-let transaction_object_with_block_hash read block_hash tx_hash =
-  inspect_durable_and_decode_opt
-    read
-    (Durable_storage_path.Transaction_object.object_ tx_hash)
-    (Ethereum_types.legacy_transaction_object_from_rlp block_hash)
-
-let full_transactions read block_hash transactions =
+let full_transactions ?known_storage_version read block_hash transactions =
   let open Lwt_result_syntax in
   match transactions with
   | TxHash hashes ->
       let+ objects =
         List.filter_map_es
-          (transaction_object_with_block_hash read block_hash)
+          (transaction_object_with_block_hash
+             ?known_storage_version
+             read
+             block_hash)
           hashes
       in
       TxFull objects
   | TxFull l -> return (TxFull l)
 
-let populate_tx_objects read ~full_transaction_object
+let populate_tx_objects ?known_storage_version read ~full_transaction_object
     (block : legacy_transaction_object block) =
   let open Lwt_result_syntax in
   if full_transaction_object then
     let* transactions =
-      full_transactions read (Some block.hash) block.transactions
+      full_transactions
+        ?known_storage_version
+        read
+        (Some block.hash)
+        block.transactions
     in
     return {block with transactions}
   else return block
 
+let block_by_hash ?known_storage_version read ~full_transaction_object
+    block_hash =
+  let open Lwt_result_syntax in
+  let* storage_version =
+    match known_storage_version with
+    | Some v -> return v
+    | None -> storage_version read
+  in
+  if not (legacy_storage_compatible ~storage_version) then
+    raise (post_v41_unsupported_function ~__FUNCTION__)
+  else
+    let* block_opt =
+      inspect_durable_and_decode_opt
+        read
+        (Durable_storage_path.Block.by_hash ~root block_hash)
+        Ethereum_types.block_from_rlp
+    in
+    match block_opt with
+    | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
+    | Some block -> populate_tx_objects read ~full_transaction_object block
+
+let current_block ?known_storage_version read ~full_transaction_object =
+  let open Lwt_result_syntax in
+  let* storage_version =
+    match known_storage_version with
+    | Some v -> return v
+    | None -> storage_version read
+  in
+  if not (legacy_storage_compatible ~storage_version) then
+    let* block_opt =
+      inspect_durable_and_decode_opt
+        read
+        (Durable_storage_path.Block.current_block ~root)
+        Ethereum_types.block_from_rlp
+    in
+    let block =
+      match block_opt with
+      | Some block -> block
+      | None ->
+          raise
+          @@ Invalid_block_structure "Couldn't decode bytes of current block"
+    in
+    if full_transaction_object then
+      let* transaction_objects =
+        current_transactions_objects ~block_hash:block.hash storage_version read
+      in
+      return {block with transactions = TxFull transaction_objects}
+    else return block
+  else
+    let* block_hash = current_block_hash read in
+    block_by_hash read ~full_transaction_object block_hash
+
 let blocks_by_number read ~full_transaction_object ~number =
   let open Lwt_result_syntax in
-  let* (Ethereum_types.Qty level) = block_number ~root read number in
-  let* block_hash_opt =
-    inspect_durable_and_decode_opt
-      read
-      (Durable_storage_path.Indexes.block_by_number ~root (Nth level))
-      decode_block_hash
-  in
-  match block_hash_opt with
-  | None -> failwith "Block %a not found" Z.pp_print level
-  | Some block_hash -> (
-      let* block_opt =
-        inspect_durable_and_decode_opt
+  let* storage_version = storage_version read in
+  if not (legacy_storage_compatible ~storage_version) then
+    match number with
+    | Durable_storage_path.Block.Current ->
+        current_block
+          ~known_storage_version:storage_version
+          ~full_transaction_object
           read
-          (Durable_storage_path.Block.by_hash ~root block_hash)
-          Ethereum_types.block_from_rlp
-      in
-      match block_opt with
-      | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
-      | Some block -> populate_tx_objects read ~full_transaction_object block)
+    | Durable_storage_path.Block.(Nth n) ->
+        let* (Qty current_number) = current_block_number read in
+        if current_number = n then
+          current_block
+            ~known_storage_version:storage_version
+            ~full_transaction_object
+            read
+        else raise (post_v41_unsupported_function ~__FUNCTION__)
+  else
+    let* (Ethereum_types.Qty level) = block_number ~root read number in
+    let* block_hash_opt =
+      inspect_durable_and_decode_opt
+        read
+        (Durable_storage_path.Indexes.block_by_number ~root (Nth level))
+        decode_block_hash
+    in
+    match block_hash_opt with
+    | None -> failwith "Block %a not found" Z.pp_print level
+    | Some block_hash -> (
+        let* block_opt =
+          inspect_durable_and_decode_opt
+            read
+            (Durable_storage_path.Block.by_hash ~root block_hash)
+            Ethereum_types.block_from_rlp
+        in
+        match block_opt with
+        | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
+        | Some block -> populate_tx_objects read ~full_transaction_object block)
 
 let nth_block read ~full_transaction_object n =
   blocks_by_number
     read
     ~full_transaction_object
     ~number:Durable_storage_path.Block.(Nth n)
-
-let block_by_hash read ~full_transaction_object block_hash =
-  let open Lwt_result_syntax in
-  let* block_opt =
-    inspect_durable_and_decode_opt
-      read
-      (Durable_storage_path.Block.by_hash ~root block_hash)
-      Ethereum_types.block_from_rlp
-  in
-  match block_opt with
-  | None -> raise @@ Invalid_block_structure "Couldn't decode bytes"
-  | Some block -> populate_tx_objects read ~full_transaction_object block
 
 let block_receipts_of_block read block =
   let get_receipt_from_hash tx_hash =
@@ -281,12 +437,7 @@ let block_receipts read n =
 
 let base_fee_per_gas read =
   let open Lwt_result_syntax in
-  let* block =
-    blocks_by_number
-      read
-      ~full_transaction_object:false
-      ~number:Durable_storage_path.Block.Current
-  in
+  let* block = current_block read ~full_transaction_object:false in
   match block.baseFeePerGas with
   | Some base_fee_per_gas -> return base_fee_per_gas
   | None ->
@@ -403,6 +554,16 @@ module Make (Reader : READER) = struct
     coinbase read
 end
 
+(**
+  This module is only used by the proxy mode, which is deprecated and
+  scheduled to be removed. Therefore, this module will also be removed in the
+  near future.
+  For now, after storage version 40, it still support serving data that are available
+  in the last block only. It does not support querying historical blocks anymore.
+  It would be removed after the proxy mode removal.
+  See https://linear.app/tezos/issue/L2-301/drop-the-proxy-mode
+  for more details.
+*)
 module Make_block_storage (Reader : READER) = struct
   let read = Reader.read
 

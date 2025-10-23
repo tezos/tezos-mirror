@@ -101,18 +101,29 @@ module Block : sig
   (** Path to the given block. *)
   val by_hash : root:path -> block_hash -> path
 
+  (** Path to the current block data. *)
+  val current_block : root:path -> path
+
   (** Path to the current block number. *)
   val current_number : root:path -> path
 
   (** Path to the current block hash. *)
   val current_hash : root:path -> path
+
+  (** Path to the current block receipts. *)
+  val current_receipts : root:path -> path
+
+  (** Path to the current block transactions objects. *)
+  val current_transactions_objects : root:path -> path
 end
 
+(** Can't be used if storage version >= 41 *)
 module Indexes : sig
   (** Make the path to the indexed block hash. *)
   val block_by_number : root:path -> Block.number -> path
 end
 
+(** Can't be used if storage version >= 41 *)
 module Transaction_receipt : sig
   val receipts : path
 
@@ -120,6 +131,7 @@ module Transaction_receipt : sig
   val receipt : hash -> path
 end
 
+(** Can't be used if storage version >= 41 *)
 module Transaction_object : sig
   val objects : path
 

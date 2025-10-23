@@ -26,25 +26,24 @@ type t = {
   contractAddress : address option;
 }
 
-let of_rlp_bytes block_hash bytes =
-  match Rlp.decode bytes with
-  | Ok
-      (Rlp.List
-         [
-           Value hash;
-           Value index;
-           Value block_number;
-           Value from;
-           Value to_;
-           Value cumulative_gas_used;
-           Value effective_gas_price;
-           Value gas_used;
-           Value contract_address;
-           List logs;
-           Value bloom;
-           Value type_;
-           Value status;
-         ]) ->
+let of_rlp_item block_hash item =
+  match item with
+  | Rlp.List
+      [
+        Value hash;
+        Value index;
+        Value block_number;
+        Value from;
+        Value to_;
+        Value cumulative_gas_used;
+        Value effective_gas_price;
+        Value gas_used;
+        Value contract_address;
+        List logs;
+        Value bloom;
+        Value type_;
+        Value status;
+      ] ->
       let hash = decode_hash hash in
       let index = decode_number_be index in
       let block_number = decode_number_le block_number in
@@ -97,6 +96,15 @@ let of_rlp_bytes block_hash bytes =
       raise
         (Invalid_argument
            "Expected a RlpList of 13 elements in transaction receipt")
+
+let of_rlp_bytes block_hash bytes =
+  let rlp_item = Rlp.decode bytes in
+  match rlp_item with
+  | Ok rlp_item -> of_rlp_item block_hash rlp_item
+  | _ ->
+      raise
+      @@ Invalid_argument
+           "Expected a RlpList of 13 elements in transaction receipt"
 
 let encoding =
   let open Data_encoding in

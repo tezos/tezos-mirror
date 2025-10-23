@@ -4,6 +4,8 @@
 
 ### Breaking changes
 
+- Proxy mode can't serve data of blocks older than the last one. (!19744)
+
 ### Configuration changes
 
 ### RPCs changes

@@ -221,12 +221,12 @@ let read state key =
   let*! res = inspect state key in
   return res
 
+let storage_version state = Durable_storage.storage_version (read state)
+
 let kernel_version evm_state =
   let open Lwt_syntax in
   let+ version = inspect evm_state Durable_storage_path.kernel_version in
   match version with Some v -> Bytes.unsafe_to_string v | None -> "(unknown)"
-
-let storage_version state = Durable_storage.storage_version (read state)
 
 let current_block_height ~root evm_state =
   let open Lwt_syntax in
@@ -373,14 +373,26 @@ let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
       evm_state
       `Skip_stage_one
   in
-  let* block_hash = current_block_hash ~chain_family evm_state in
   let root = Durable_storage_path.root_of_chain_family chain_family in
+  let* storage_version = storage_version evm_state in
   let* block =
-    let*! bytes =
-      inspect evm_state (Durable_storage_path.Block.by_hash ~root block_hash)
-    in
-    return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
+    if
+      not (Etherlink_durable_storage.legacy_storage_compatible ~storage_version)
+    then
+      let*! bytes =
+        inspect evm_state (Durable_storage_path.Block.current_block ~root)
+      in
+      return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
+    else
+      let* current_block_hash = current_block_hash ~chain_family evm_state in
+      let*! bytes =
+        inspect
+          evm_state
+          (Durable_storage_path.Block.by_hash ~root current_block_hash)
+      in
+      return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
   in
+
   let export_gas_used (Qty gas) =
     match (profile, log_file) with
     | Some Configuration.Minimal, Some log_file ->
@@ -456,7 +468,11 @@ let get_delayed_inbox_item evm_state hash =
 
 let clear_block_storage chain_family block evm_state =
   let open Lwt_syntax in
-  (* We have 2 path to clear related to block storage:
+  let* storage_version = Lwt_result.get_exn (storage_version evm_state) in
+  if not (Etherlink_durable_storage.legacy_storage_compatible ~storage_version)
+  then return evm_state
+  else
+    (* We have 2 path to clear related to block storage:
      1. The predecessor block.
      2. The indexes (which is a bit trickier).
 
@@ -464,50 +480,50 @@ let clear_block_storage chain_family block evm_state =
      necessary to produce the next block. Block production starts by reading
      the head to retrieve information such as parent block hash.
   *)
-  let root = Durable_storage_path.root_of_chain_family chain_family in
-  let block_parent = L2_types.block_parent block in
-  let block_number = L2_types.block_number block in
-  let (Qty number) = block_number in
-  (* Handles case (1.). *)
-  let* evm_state =
-    if number > Z.zero then
-      let pred_block_path =
-        Durable_storage_path.Block.by_hash ~root block_parent
-      in
-      delete ~kind:Value evm_state pred_block_path
-    else return evm_state
-  in
-  (* Handles case (2.). *)
-  let* evm_state =
-    (* The opcode BLOCKHASH must return the hash of the last 256 complete blocks,
+    let root = Durable_storage_path.root_of_chain_family chain_family in
+    let block_parent = L2_types.block_parent block in
+    let block_number = L2_types.block_number block in
+    let (Qty number) = block_number in
+    (* Handles case (1.). *)
+    let* evm_state =
+      if number > Z.zero then
+        let pred_block_path =
+          Durable_storage_path.Block.by_hash ~root block_parent
+        in
+        delete ~kind:Value evm_state pred_block_path
+      else return evm_state
+    in
+    (* Handles case (2.). *)
+    let* evm_state =
+      (* The opcode BLOCKHASH must return the hash of the last 256 complete blocks,
        see the yellow paper for the specification.
        The kernel uses the indexable storage to retrieve the last 256 blocks,
        so we garbage collect only what's possible. *)
-    let to_keep = Z.of_int 256 in
-    if number >= to_keep then
-      let index_path =
-        Durable_storage_path.Indexes.block_by_number
-          ~root
-          (Nth (Z.sub number to_keep))
-      in
-      delete ~kind:Value evm_state index_path
-    else return evm_state
-  in
-  (* Receipts are not necessary for the kernel, we can just remove
+      let to_keep = Z.of_int 256 in
+      if number >= to_keep then
+        let index_path =
+          Durable_storage_path.Indexes.block_by_number
+            ~root
+            (Nth (Z.sub number to_keep))
+        in
+        delete ~kind:Value evm_state index_path
+      else return evm_state
+    in
+    (* Receipts are not necessary for the kernel, we can just remove
      the directories. *)
-  let* evm_state =
-    delete
-      ~kind:Directory
-      evm_state
-      Durable_storage_path.Transaction_receipt.receipts
-  in
-  let* evm_state =
-    delete
-      ~kind:Directory
-      evm_state
-      Durable_storage_path.Transaction_object.objects
-  in
-  return evm_state
+    let* evm_state =
+      delete
+        ~kind:Directory
+        evm_state
+        Durable_storage_path.Transaction_receipt.receipts
+    in
+    let* evm_state =
+      delete
+        ~kind:Directory
+        evm_state
+        Durable_storage_path.Transaction_object.objects
+    in
+    return evm_state
 
 let delayed_inbox_hashes evm_state =
   let open Lwt_syntax in

@@ -713,31 +713,45 @@ module State = struct
     (* Store all transactions from the block. *)
     match block.transactions with
     | Ethereum_types.TxHash hashes ->
-        List.fold_left_map_es
-          (fun cumulative_execution_gas hash ->
-            let* receipt =
-              let* receipt_opt =
-                Etherlink_durable_storage.transaction_receipt
-                  (read_from_state evm_state)
-                  ~block_hash:block.hash
-                  hash
-              in
-              match receipt_opt with
-              | Some receipt -> return receipt
-              | None ->
-                  failwith "Receipt missing for %a" Ethereum_types.pp_hash hash
-            in
-            let* object_ =
-              let* object_opt =
-                Etherlink_durable_storage.transaction_object
-                  (read_from_state evm_state)
-                  hash
-              in
-              match object_opt with
-              | Some object_ -> return object_
-              | None ->
-                  failwith "Object missing for %a" Ethereum_types.pp_hash hash
-            in
+        let* storage_version =
+          Durable_storage.storage_version (read_from_state evm_state)
+        in
+        if
+          not
+            (Etherlink_durable_storage.legacy_storage_compatible
+               ~storage_version)
+        then
+          let* receipts =
+            Etherlink_durable_storage.current_transactions_receipts
+              block.hash
+              storage_version
+              (read_from_state evm_state)
+          in
+          let* transaction_objects =
+            Etherlink_durable_storage.current_transactions_objects
+              ~block_hash:block.hash
+              storage_version
+              (read_from_state evm_state)
+          in
+          let mismatch_error =
+            error_of_fmt
+              "Inconsistent durable storage: %d receipts and %d transaction \
+               objects for block %a"
+              (List.length receipts)
+              (List.length transaction_objects)
+              Ethereum_types.pp_block_hash
+              block.hash
+          in
+          let* receipts_and_objects =
+            List.fold_left2_es
+              ~when_different_lengths:(TzTrace.make mismatch_error)
+              (fun acc receipt object_ -> return ((object_, receipt) :: acc))
+              []
+              receipts
+              transaction_objects
+          in
+          let store_info_and_acc_gas cumulative_execution_gas (object_, receipt)
+              =
             let info = Transaction_info.of_receipt_and_object receipt object_ in
             let* () = Evm_store.Transactions.store conn info in
             return
@@ -748,9 +762,59 @@ module State = struct
                      ~da_fee_per_byte
                      receipt
                      object_),
-                receipt ))
-          Z.zero
-          hashes
+                receipt )
+          in
+          let gas_and_receipts =
+            List.fold_left_map_es
+              store_info_and_acc_gas
+              Z.zero
+              receipts_and_objects
+          in
+          gas_and_receipts
+        else
+          List.fold_left_map_es
+            (fun cumulative_execution_gas hash ->
+              let* receipt =
+                let* receipt_opt =
+                  Etherlink_durable_storage.transaction_receipt
+                    (read_from_state evm_state)
+                    ~block_hash:block.hash
+                    hash
+                in
+                match receipt_opt with
+                | Some receipt -> return receipt
+                | None ->
+                    failwith
+                      "Receipt missing for %a"
+                      Ethereum_types.pp_hash
+                      hash
+              in
+              let* object_ =
+                let* object_opt =
+                  Etherlink_durable_storage.transaction_object
+                    (read_from_state evm_state)
+                    hash
+                in
+                match object_opt with
+                | Some object_ -> return object_
+                | None ->
+                    failwith "Object missing for %a" Ethereum_types.pp_hash hash
+              in
+              let info =
+                Transaction_info.of_receipt_and_object receipt object_
+              in
+              let* () = Evm_store.Transactions.store conn info in
+              return
+                ( Z.add
+                    cumulative_execution_gas
+                    (execution_gas
+                       ~base_fee_per_gas
+                       ~da_fee_per_byte
+                       receipt
+                       object_),
+                  receipt ))
+            Z.zero
+            hashes
     | TxFull _ ->
         (* Block must be read without the transactions objects. Even though
            we could be resilient and store the objects, it doesn't make sense
@@ -996,9 +1060,6 @@ module State = struct
                 let+ receipts = store_tez_block_unsafe conn block in
                 (* TODO: support extracting the execution gas *)
                 (Z.zero, receipts)
-          in
-          let*! evm_state =
-            Evm_state.clear_block_storage chain_family block evm_state
           in
           return (evm_state, receipts, execution_gas)
         in
@@ -2359,27 +2420,11 @@ let init_store_from_rollup_node ~chain_family ~data_dir ~evm_state
     | None -> failwith "The blueprint number was not found"
   in
 
-  (* Assert we can read the current block hash *)
-  let* block_hash =
-    let*! current_block_hash_opt =
-      Evm_state.inspect
-        evm_state
-        (Durable_storage_path.Block.current_hash ~root)
-    in
-    match current_block_hash_opt with
-    | Some bytes -> return (Ethereum_types.decode_block_hash bytes)
-    | None -> failwith "The block hash was not found"
-  in
+  (* Read the current block *)
   let* block =
-    let*! block =
-      Etherlink_durable_storage.block_by_hash
-        (Evm_state.read evm_state)
-        ~full_transaction_object:true
-        block_hash
-    in
-    match block with
-    | Ok block -> return block
-    | Error _ -> failwith "Failed to retrieve the current block by its hash"
+    Etherlink_durable_storage.current_block
+      (Evm_state.read evm_state)
+      ~full_transaction_object:true
   in
   (* Init the store *)
   let* store = Evm_store.init ~data_dir ~perm:Read_write () in
