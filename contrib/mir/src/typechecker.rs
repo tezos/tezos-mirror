@@ -13,6 +13,7 @@ use chrono::prelude::DateTime;
 use entrypoint::DEFAULT_EP_NAME;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};
+use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
@@ -167,6 +168,12 @@ pub enum TcError {
     /// Two views with the same name where declared in a script
     #[error("two views were declared with the same name {0}")]
     DuplicatedView(String),
+    /// View names must be at most 31 characters and match the expression [a-zA-Z0-9_.%@]*
+    #[error("Invalid name for view {0}")]
+    InvalidViewName(String),
+    /// View instructions must be a sequence
+    #[error("{0} instructions are not a sequence")]
+    NonSeqViewInstrs(String),
 }
 
 impl From<TryFromBigIntError<()>> for TcError {
@@ -251,6 +258,15 @@ pub enum StacksNotEqualReason {
 #[error("types not equal: {0:?} != {1:?}")]
 pub struct TypesNotEqual(Type, Type);
 
+/// Check that name is a valid view name
+pub fn check_view_name(name: &str) -> Result<(), TcError> {
+    let re = Regex::new(r"^[a-zA-Z0-9_.%@]*$").expect("view name regex should be valid");
+    if name.len() > 31 || !re.is_match(name) {
+        return Err(TcError::InvalidViewName(name.to_owned()));
+    };
+    Ok(())
+}
+
 impl<'a> Micheline<'a> {
     /// Typechecks `Micheline` as a value, given its type (also as `Micheline`).
     /// Validates the type.
@@ -307,8 +323,6 @@ impl<'a> Micheline<'a> {
     /// Typecheck the contract script. Validates the script's types, then
     /// typechecks the code and checks the result stack is as expected. Returns
     /// typechecked script.
-    /// If the script contains some views, they are not typechecked.
-    /// TODO https://linear.app/tezos/issue/L2-376/type-check-views
     pub fn typecheck_script(
         &self,
         gas: &mut Gas,
@@ -348,10 +362,13 @@ impl<'a> Micheline<'a> {
                     [Micheline::String(name), input_type, output_type, code],
                     anns,
                 ) if anns.is_empty() => {
+                    check_view_name(name)?;
                     // TODO: consume some gas
                     let name: String = name.into();
                     let input_type = input_type.parse_ty(gas)?;
+                    input_type.ensure_prop(gas, TypeProperty::ViewInput)?;
                     let output_type = output_type.parse_ty(gas)?;
+                    output_type.ensure_prop(gas, TypeProperty::ViewOutput)?;
                     let previous_view = views.insert(
                         name.clone(),
                         View {
@@ -381,6 +398,28 @@ impl<'a> Micheline<'a> {
         let storage = storage_ty
             .ok_or(TcError::MissingTopLevelElt(Prim::storage))?
             .parse_ty(gas)?;
+        for view in views.clone() {
+            let (
+                name,
+                View {
+                    input_type,
+                    output_type,
+                    code,
+                },
+            ) = view;
+            match code {
+                Micheline::Seq(instrs) => {
+                    typecheck_lambda(
+                        instrs,
+                        gas,
+                        Type::Pair(Rc::new((input_type.clone(), storage.clone()))),
+                        output_type.clone(),
+                        false,
+                    )?;
+                }
+                _ => return Err(TcError::NonSeqViewInstrs(name)),
+            }
+        }
         parameter.ensure_prop(gas, TypeProperty::Passable)?;
         storage.ensure_prop(
             gas,
@@ -2251,7 +2290,6 @@ pub(crate) fn typecheck_instruction<'a>(
             no_overload!(CREATE_CONTRACT, len 3)
         }
         (App(CREATE_CONTRACT, expect_args!(1), _), _) => unexpected_micheline!(),
-
         (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
             Err(TcError::TodoInstr(*prim))?
         }
@@ -6323,7 +6361,7 @@ mod typecheck_tests {
                 "parameter unit;",
                 "storage unit;",
                 "code { CAR; NIL operation; PAIR };",
-                r#"view "a" unit unit { CAR };"#,
+                r#"view "this_view_name_has_31_char_okay" unit unit { CAR };"#,
             ))
             .unwrap()
             .typecheck_script(&mut gas, true),
@@ -6336,7 +6374,7 @@ mod typecheck_tests {
                     (Vec::new(), Type::Unit)
                 )]),
                 views: HashMap::from_iter([(
-                    "a".into(),
+                    "this_view_name_has_31_char_okay".into(),
                     View {
                         input_type: Type::Unit,
                         output_type: Type::Unit,
@@ -6404,6 +6442,114 @@ mod typecheck_tests {
             .unwrap()
             .typecheck_script(&mut gas, true),
             Err(TcError::DuplicatedView("a".into()))
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_long_view_name() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage unit;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "this_is_a_very_long_view_name_32" unit unit { CAR };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut gas, true),
+            Err(TcError::InvalidViewName(
+                "this_is_a_very_long_view_name_32".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_special_character_view_name() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage unit;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "?_cannot_be_view_name" unit unit { CAR };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut gas, true),
+            Err(TcError::InvalidViewName("?_cannot_be_view_name".into()))
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_big_map_input_view() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage (big_map string nat);",
+                "code { CDR; NIL operation; PAIR };",
+                r#"view "big_map_input_view" (big_map string nat) unit { CDR };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut gas, true),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewInput,
+                Type::BigMap(Rc::new((Type::String, Type::Nat)))
+            ))
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_big_map_output_view() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage unit;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "big_map_output_view" unit (big_map string nat) { DROP ; EMPTY_BIG_MAP string nat; };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut gas, true),
+            Err(TcError::InvalidTypeProperty(
+                TypeProperty::ViewOutput,
+                Type::BigMap(Rc::new((Type::String, Type::Nat)))
+            ))
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_different_storage_type_view() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage string;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "multiply_view" nat nat { UNPAIR ; MUL; };"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut gas, true),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::MUL,
+                stack: stk![Type::String, Type::Nat],
+                reason: None,
+            })
+        );
+    }
+
+    #[test]
+    fn test_script_typechecking_with_non_seq_view() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage string;",
+                "code { CAR; NIL operation; PAIR };",
+                r#"view "non_seq_view" nat nat UNPAIR;"#,
+            ))
+            .unwrap()
+            .typecheck_script(&mut gas, true),
+            Err(TcError::NonSeqViewInstrs("non_seq_view".into()))
         );
     }
 
