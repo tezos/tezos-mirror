@@ -818,14 +818,6 @@ let jobs pipeline_type =
         ~dependencies:dependencies_needs_start
         Homebrew.child_pipeline_full_auto
     in
-    let job_homebrew_trigger_full =
-      trigger_job
-        ~__POS__
-        ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
-        ~stage:Stages.test
-        ~dependencies:(Dependent [])
-        Homebrew.child_pipeline_full
-    in
 
     let job_base_images_trigger =
       trigger_job
@@ -1498,8 +1490,7 @@ let jobs pipeline_type =
             job_rpm_repository_trigger_auto;
             job_homebrew_trigger_auto;
           ]
-      | Schedule_extended_test ->
-          [job_homebrew_trigger_full; job_base_images_trigger]
+      | Schedule_extended_test -> [job_base_images_trigger]
     in
     jobs_debian @ jobs_misc @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_kernels
     @ jobs_unit @ jobs_install_octez
