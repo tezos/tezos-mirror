@@ -24,6 +24,10 @@ let commitment_to_trace_id slot_commitment =
   |> Commitment_hash.hash_bytes |> Commitment_hash.to_bytes
   |> Opentelemetry.Trace_id.of_bytes
 
+let slot_to_trace_id slot =
+  [slot] |> Commitment_hash.hash_bytes |> Commitment_hash.to_bytes
+  |> Opentelemetry.Trace_id.of_bytes
+
 let attr_of_index slot_index = ("slot_index", `Int slot_index)
 
 let attrs_of_slot Types.Slot_id.{slot_level; slot_index} =
@@ -40,6 +44,22 @@ let trace_slot ?(attrs = []) ~name ?slot_id ~slot_commitment f =
   let commitment_attr = attr_of_commitment slot_commitment in
   let attrs = slot_id_attrs @ commitment_attr @ attrs in
   Opentelemetry_profiler.trace ~attrs ~trace_id name f
+
+let trace_slot_no_commitment ?(attrs = []) ~name ~slot f =
+  let trace_id = slot_to_trace_id (Bytes.unsafe_of_string slot) in
+  let parent_scope = Opentelemetry.Scope.get_ambient_scope () in
+  let links =
+    match parent_scope with
+    | Some scope -> [Opentelemetry.Scope.to_span_link scope]
+    | None -> []
+  in
+  Opentelemetry_profiler.trace
+    ?scope:parent_scope
+    ~links
+    ~attrs
+    ~trace_id
+    name
+    f
 
 let error_span ~error_pp error ~attrs ~start_time ~end_time ~name =
   fst
