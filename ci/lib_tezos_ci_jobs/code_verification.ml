@@ -1473,7 +1473,7 @@ let jobs pipeline_type =
       ]
     in
 
-    let jobs_debian =
+    let jobs_packaging =
       match pipeline_type with
       | Before_merging | Merge_train ->
           [
@@ -1483,8 +1483,8 @@ let jobs pipeline_type =
           ]
       | Schedule_extended_test -> []
     in
-    jobs_debian @ jobs_misc @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_kernels
-    @ jobs_unit @ jobs_install_octez
+    jobs_packaging @ jobs_misc @ jobs_sdk_rust @ jobs_sdk_bindings
+    @ jobs_kernels @ jobs_unit @ jobs_install_octez
   in
 
   (* Coverage jobs *)
