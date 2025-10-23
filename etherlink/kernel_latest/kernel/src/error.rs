@@ -115,6 +115,8 @@ pub enum Error {
     OriginatedToImplicit,
     #[error("Error while initializing REVM precompile bytecodes")]
     RevmPrecompileInitError,
+    #[error("Overflow occurred during an arithmetic operation")]
+    Overflow(String),
 }
 
 impl From<revm_etherlink::Error> for Error {

@@ -8,6 +8,7 @@ use crate::chains::{ChainConfigTrait, ChainHeaderTrait, TransactionsTrait};
 use crate::configuration::{Configuration, ConfigurationMode};
 use crate::error::{Error, StorageError};
 use crate::l2block::L2Block;
+use crate::migration::allow_path_not_found;
 use crate::sequencer_blueprint::{
     BlueprintWithDelayedHashes, UnsignedSequencerBlueprint,
 };
@@ -37,6 +38,13 @@ use tezos_tezlink::block::TezBlock;
 pub const EVM_BLUEPRINTS: RefPath = RefPath::assert_from(b"/evm/blueprints");
 
 const EVM_BLUEPRINT_NB_CHUNKS: RefPath = RefPath::assert_from(b"/nb_chunks");
+
+// This generation number is used to decide if the blueprint containing this sub-key
+// is outdated or not. Instead of deleting all blueprints when we want to
+// invalidate them, we just increment the current generation number stored
+// so that when reading a blueprint we can check if its generation matches
+// the current one.
+const EVM_BLUEPRINT_GENERATION: RefPath = RefPath::assert_from(b"/generation");
 
 const EVM_CURRENT_BLOCK_HEADER: RefPath =
     RefPath::assert_from(b"/evm/current_block_header");
@@ -192,6 +200,82 @@ fn blueprint_nb_chunks_path(
     concat(blueprint_path, &EVM_BLUEPRINT_NB_CHUNKS).map_err(StorageError::from)
 }
 
+fn blueprint_current_generation_path() -> Result<OwnedPath, StorageError> {
+    concat(&EVM_BLUEPRINTS, &EVM_BLUEPRINT_GENERATION).map_err(StorageError::from)
+}
+
+fn blueprint_generation_path(
+    blueprint_path: &OwnedPath,
+) -> Result<OwnedPath, StorageError> {
+    concat(blueprint_path, &EVM_BLUEPRINT_GENERATION).map_err(StorageError::from)
+}
+
+fn read_current_generation_or_default<Host: Runtime>(
+    host: &Host,
+    default: U256,
+) -> Result<U256, Error> {
+    let path = blueprint_current_generation_path()?;
+    let mut buffer = [0u8; 32];
+    match store_read_slice(host, &path, &mut buffer, 32) {
+        Ok(()) => Ok(U256::from_little_endian(&buffer)),
+        Err(tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound))
+        | Err(tezos_storage::error::Error::Runtime(RuntimeError::HostErr(
+            tezos_smart_rollup_host::Error::StoreNotAValue,
+        ))) => Ok(default),
+        Err(err) => Err(err.into()),
+    }
+}
+
+fn store_current_generation<Host: Runtime>(
+    host: &mut Host,
+    generation: U256,
+) -> Result<(), Error> {
+    let path = blueprint_current_generation_path()?;
+    let mut buffer = [0u8; 32];
+    generation.to_little_endian(&mut buffer);
+    host.store_write(&path, &buffer, 0).map_err(Error::from)
+}
+
+fn increment_current_generation<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
+    let current_generation = read_current_generation_or_default(host, U256::zero())?;
+    let new_generation =
+        current_generation
+            .checked_add(U256::one())
+            .ok_or(Error::Overflow(String::from(
+                "blueprint current generation",
+            )))?;
+    store_current_generation(host, new_generation)?;
+    Ok(())
+}
+
+fn read_blueprint_generation_or_default<Host: Runtime>(
+    host: &Host,
+    blueprint_path: &OwnedPath,
+    default: U256,
+) -> Result<U256, Error> {
+    let path = blueprint_generation_path(blueprint_path)?;
+    let mut buffer = [0u8; 32];
+    match store_read_slice(host, &path, &mut buffer, 32) {
+        Ok(()) => Ok(U256::from_little_endian(&buffer)),
+        Err(tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound))
+        | Err(tezos_storage::error::Error::Runtime(RuntimeError::HostErr(
+            tezos_smart_rollup_host::Error::StoreNotAValue,
+        ))) => Ok(default),
+        Err(err) => Err(err.into()),
+    }
+}
+
+fn store_blueprint_generation<Host: Runtime>(
+    host: &mut Host,
+    blueprint_path: &OwnedPath,
+    generation: U256,
+) -> Result<(), Error> {
+    let path = blueprint_generation_path(blueprint_path)?;
+    let mut buffer = [0u8; 32];
+    generation.to_little_endian(&mut buffer);
+    host.store_write(&path, &buffer, 0).map_err(Error::from)
+}
+
 fn read_blueprint_nb_chunks<Host: Runtime>(
     host: &Host,
     blueprint_path: &OwnedPath,
@@ -218,6 +302,8 @@ pub fn store_sequencer_blueprint<Host: Runtime>(
 ) -> Result<(), Error> {
     let blueprint_path = blueprint_path(blueprint.number)?;
     store_blueprint_nb_chunks(host, &blueprint_path, blueprint.nb_chunks)?;
+    let current_generation = read_current_generation_or_default(host, U256::zero())?;
+    store_blueprint_generation(host, &blueprint_path, current_generation)?;
     let blueprint_chunk_path =
         blueprint_chunk_path(&blueprint_path, blueprint.chunk_index)?;
     // The `Transactions` type parameter of `StoreBlueprint` is not
@@ -234,6 +320,8 @@ pub fn store_inbox_blueprint_by_number<Host: Runtime, Txs: Encodable>(
 ) -> Result<(), Error> {
     let blueprint_path = blueprint_path(number)?;
     store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
+    let current_generation = read_current_generation_or_default(host, U256::zero())?;
+    store_blueprint_generation(host, &blueprint_path, current_generation)?;
     let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
     store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
@@ -266,6 +354,8 @@ pub fn store_forced_blueprint<Host: Runtime, Txs: Encodable>(
 ) -> Result<(), Error> {
     let blueprint_path = blueprint_path(number)?;
     store_blueprint_nb_chunks(host, &blueprint_path, 1)?;
+    let current_generation = read_current_generation_or_default(host, U256::zero())?;
+    store_blueprint_generation(host, &blueprint_path, current_generation)?;
     let chunk_path = blueprint_chunk_path(&blueprint_path, 0)?;
     let store_blueprint = StoreBlueprint::InboxBlueprint(blueprint);
     store_rlp(&store_blueprint, host, &chunk_path).map_err(Error::from)
@@ -406,6 +496,11 @@ pub enum BlueprintValidity<Txs> {
     DecoderError(DecoderError),
     DelayedHashMissing(delayed_inbox::Hash),
     BlueprintTooLarge,
+    // The blueprint becomes stale when we expect it
+    // to not be used anymore. For now it's when :
+    // - Flush when taking transactions from delayed inbox
+    // - Change sequencer key
+    StaleBlueprint,
 }
 
 pub enum DelayedTransactionFetchingResult<Txs> {
@@ -587,7 +682,7 @@ fn invalidate_blueprint<Host: Runtime, Txs: Debug>(
     host: &mut Host,
     blueprint_path: &OwnedPath,
     error: &BlueprintValidity<Txs>,
-) -> Result<(), RuntimeError> {
+) -> Result<(), Error> {
     log!(
         host,
         Info,
@@ -596,7 +691,7 @@ fn invalidate_blueprint<Host: Runtime, Txs: Debug>(
         error
     );
     // Remove invalid blueprint from storage
-    host.store_delete(blueprint_path)
+    delete_blueprint(host, blueprint_path)
 }
 
 fn read_all_chunks_and_validate<Host: Runtime, ChainConfig: ChainConfigTrait>(
@@ -619,7 +714,14 @@ fn read_all_chunks_and_validate<Host: Runtime, ChainConfig: ChainConfigTrait>(
     };
     for i in 0..nb_chunks {
         let path = blueprint_chunk_path(blueprint_path, i)?;
-        let stored_chunk = read_rlp(host, &path)?;
+        let stored_chunk = match read_rlp(host, &path) {
+            Ok(chunk) => chunk,
+            Err(tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound)) => {
+                delete_blueprint(host, blueprint_path)?;
+                return Ok((None, 0));
+            }
+            Err(err) => return Err(err.into()),
+        };
         // The tick model is based on the size of the chunk, we overapproximate it.
         size += MAX_INPUT_MESSAGE_SIZE;
         match stored_chunk {
@@ -676,39 +778,37 @@ pub fn read_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     previous_chain_header: &ChainConfig::ChainHeader,
 ) -> anyhow::Result<(Option<Blueprint<ChainConfig::Transactions>>, usize)> {
     let blueprint_path = blueprint_path(number)?;
-    let exists = host.store_has(&blueprint_path)?.is_some();
+    let exists = blueprint_exists(host, &blueprint_path)?;
     if exists {
         let nb_chunks = read_blueprint_nb_chunks(host, &blueprint_path)?;
+        let current_generation = read_current_generation_or_default(host, U256::zero())?;
+        let blueprint_generation =
+            read_blueprint_generation_or_default(host, &blueprint_path, U256::zero())?;
+        // If the generation is not the current one, the blueprint is stale
+        if blueprint_generation < current_generation {
+            invalidate_blueprint(
+                host,
+                &blueprint_path,
+                &BlueprintValidity::<ChainConfig::Transactions>::StaleBlueprint,
+            )?;
+            return Ok((None, 0));
+        }
         log!(
             host,
             Benchmarking,
             "Number of chunks in blueprint: {}",
             nb_chunks
         );
-        let n_subkeys = host.store_count_subkeys(&blueprint_path)?;
-        let available_chunks = n_subkeys as u16 - 1;
-        if available_chunks == nb_chunks {
-            // All chunks are available
-            let (blueprint, size) = read_all_chunks_and_validate::<_, ChainConfig>(
-                host,
-                &blueprint_path,
-                nb_chunks,
-                config,
-                previous_chain_header,
-                previous_timestamp,
-            )?;
-            Ok((blueprint, size))
-        } else {
-            if available_chunks > nb_chunks {
-                // We are in an inconsistent state (a previous blueprint was submitted with more
-                // chunks).
-                // As-is, the rollup is blocked. Easiest way to recover is to delete the whole
-                // blueprint and let the sequencer re-submit it later.
-                host.store_delete(&blueprint_path).map_err(Error::from)?;
-            }
-
-            Ok((None, 0))
-        }
+        // All chunks are available
+        let (blueprint, size) = read_all_chunks_and_validate::<_, ChainConfig>(
+            host,
+            &blueprint_path,
+            nb_chunks,
+            config,
+            previous_chain_header,
+            previous_timestamp,
+        )?;
+        Ok((blueprint, size))
     } else {
         log!(host, Benchmarking, "Number of chunks in blueprint: {}", 0);
         log!(
@@ -753,15 +853,39 @@ pub fn read_next_blueprint<Host: Runtime>(
 
 pub fn drop_blueprint<Host: Runtime>(host: &mut Host, number: U256) -> Result<(), Error> {
     let path = blueprint_path(number)?;
-    host.store_delete(&path).map_err(Error::from)
+    delete_blueprint(host, &path)
+}
+
+pub fn delete_blueprint<Host: Runtime>(
+    host: &mut Host,
+    blueprint_path: &OwnedPath,
+) -> Result<(), Error> {
+    let exists = blueprint_exists(host, blueprint_path)?;
+    if !exists {
+        return Ok(());
+    }
+    let nb_chunks = read_blueprint_nb_chunks(host, blueprint_path)?;
+    for i in 0..nb_chunks {
+        let chunk_path = blueprint_chunk_path(blueprint_path, i)?;
+        allow_path_not_found(host.store_delete(&chunk_path))?;
+    }
+    allow_path_not_found(host.store_delete(&blueprint_generation_path(blueprint_path)?))?;
+    allow_path_not_found(host.store_delete(&blueprint_nb_chunks_path(blueprint_path)?))?;
+    Ok(())
+}
+
+pub fn blueprint_exists<Host: Runtime>(
+    host: &Host,
+    blueprint_path: &OwnedPath,
+) -> Result<bool, Error> {
+    host.store_has(&blueprint_nb_chunks_path(blueprint_path)?)
+        .map_err(Error::from)
+        .map(|exists| exists.is_some())
 }
 
 pub fn clear_all_blueprints<Host: Runtime>(host: &mut Host) -> Result<(), Error> {
-    if host.store_has(&EVM_BLUEPRINTS)?.is_some() {
-        Ok(host.store_delete(&EVM_BLUEPRINTS)?)
-    } else {
-        Ok(())
-    }
+    increment_current_generation(host)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -780,7 +904,6 @@ mod tests {
     use tezos_ethereum::transaction::TRANSACTION_HASH_SIZE;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::public_key::PublicKey;
-    use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used to put traits interface in the scope
 
     fn test_invalid_sequencer_blueprint_is_removed(enable_dal: bool) {
         let mut host = MockKernelHost::default();
@@ -872,7 +995,7 @@ mod tests {
 
         // Blueprint 0 should be stored
         let blueprint_path = blueprint_path(U256::zero()).unwrap();
-        let exists = host.store_has(&blueprint_path).unwrap().is_some();
+        let exists = blueprint_exists(&host, &blueprint_path).unwrap();
         assert!(exists);
 
         // Reading the next blueprint should be None, as the delayed hash
@@ -887,7 +1010,7 @@ mod tests {
         assert!(number.is_zero());
 
         // The blueprint 0 should have been removed
-        let exists = host.store_has(&blueprint_path).unwrap().is_some();
+        let exists = blueprint_exists(&host, &blueprint_path).unwrap();
         assert!(!exists);
 
         // Test with invalid parent hash
@@ -933,7 +1056,7 @@ mod tests {
         store_sequencer_blueprint(&mut host, seq_blueprint)
             .expect("Should be able to store sequencer blueprint");
         // Blueprint 0 should be stored
-        let exists = host.store_has(&blueprint_path).unwrap().is_some();
+        let exists = blueprint_exists(&host, &blueprint_path).unwrap();
         assert!(exists);
 
         // Reading the next blueprint should be None, as the parent hash
@@ -943,7 +1066,7 @@ mod tests {
         assert!(blueprint.0.is_none());
 
         // The blueprint 0 should have been removed
-        let exists = host.store_has(&blueprint_path).unwrap().is_some();
+        let exists = blueprint_exists(&host, &blueprint_path).unwrap();
         assert!(!exists)
     }
 

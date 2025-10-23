@@ -151,6 +151,8 @@ module Code = struct
 end
 
 module Blueprint = struct
+  let current_generation = EVM.make "/blueprints/generation"
+
   let blueprint blueprint_number =
     EVM.make "/blueprints/" ^ Z.to_string blueprint_number
 
@@ -158,6 +160,8 @@ module Blueprint = struct
     blueprint blueprint_number ^ "/" ^ string_of_int chunk_index
 
   let nb_chunks ~blueprint_number = blueprint blueprint_number ^ "/nb_chunks"
+
+  let generation ~blueprint_number = blueprint blueprint_number ^ "/generation"
 end
 
 module Block = struct

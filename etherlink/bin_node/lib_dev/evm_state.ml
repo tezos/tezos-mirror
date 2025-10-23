@@ -226,6 +226,8 @@ let kernel_version evm_state =
   let+ version = inspect evm_state Durable_storage_path.kernel_version in
   match version with Some v -> Bytes.unsafe_to_string v | None -> "(unknown)"
 
+let storage_version state = Durable_storage.storage_version (read state)
+
 let current_block_height ~root evm_state =
   let open Lwt_syntax in
   let* current_block_number =
@@ -321,7 +323,23 @@ let store_blueprint_chunks ~blueprint_number evm_state
       ~value:(Z.to_bits (Z.of_int nb_chunks))
       evm_state
   in
-  return evm_state
+  let* version = storage_version evm_state in
+  if version >= 39 then
+    let* current_generation =
+      Durable_storage.inspect_durable_and_decode_default
+        ~default:Qty.zero
+        (read evm_state)
+        Durable_storage_path.Blueprint.current_generation
+        Ethereum_types.decode_number_le
+    in
+    let*! evm_state =
+      modify
+        ~key:(Durable_storage_path.Blueprint.generation ~blueprint_number)
+        ~value:(encode_u256_le current_generation |> Bytes.to_string)
+        evm_state
+    in
+    return evm_state
+  else return evm_state
 
 type apply_result =
   | Apply_success of {
@@ -399,8 +417,6 @@ let clear_delayed_inbox evm_state =
   delete ~kind:Directory evm_state Durable_storage_path.delayed_inbox
 
 let wasm_pvm_version state = Pvm.Kernel.get_wasm_version state
-
-let storage_version state = Durable_storage.storage_version (read state)
 
 let irmin_store_path ~data_dir = Filename.Infix.(data_dir // "store")
 

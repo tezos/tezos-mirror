@@ -552,11 +552,16 @@ fn migrate_to<Host: Runtime>(
         StorageVersion::V38 => {
             // Dummy migration for the new gas price
             Ok(MigrationStatus::Done)
-        } // ///////////////////////////////////////////////////////////////////////////////// //
-          // PREVIOUS MIGRATIONS SHOULD NOT BE CHANGED AS THEY HAVE BEEN DEPLOYED ON ETHERLINK //
-          //                                      MAINNET                                      //
-          //          REMEMBER TO MOVE THIS COMMENT ONCE NEW VERSIONS LAND ON MAINNET          //
-          // ///////////////////////////////////////////////////////////////////////////////// //
+        }
+        // ///////////////////////////////////////////////////////////////////////////////// //
+        // PREVIOUS MIGRATIONS SHOULD NOT BE CHANGED AS THEY HAVE BEEN DEPLOYED ON ETHERLINK //
+        //                                      MAINNET                                      //
+        //          REMEMBER TO MOVE THIS COMMENT ONCE NEW VERSIONS LAND ON MAINNET          //
+        // ///////////////////////////////////////////////////////////////////////////////// //
+        StorageVersion::V39 => {
+            // Dummy migration for the blueprint generation
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 

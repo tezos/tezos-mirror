@@ -84,9 +84,13 @@ module Code : sig
 end
 
 module Blueprint : sig
+  val current_generation : path
+
   val chunk : blueprint_number:Z.t -> chunk_index:int -> path
 
   val nb_chunks : blueprint_number:Z.t -> path
+
+  val generation : blueprint_number:Z.t -> path
 end
 
 (** Paths related to blocks. *)
