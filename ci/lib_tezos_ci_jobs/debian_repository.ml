@@ -234,9 +234,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~stage:Stages.build
       ~variables:
         (variables
-           [
-             ("DISTRIBUTION", "debian"); ("RELEASE", "bookworm"); ("TAGS", "gcp");
-           ])
+           [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")])
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~tag:Dynamic
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
@@ -282,8 +280,8 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
            ])
       ~variables:(archs_variables pipeline_type)
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-      ~image:Images.Base_images.debian_bookworm
-      ["./scripts/ci/create_debian_repo.sh debian bookworm"]
+      ~image:Images.Base_images.debian_trixie
+      ["./scripts/ci/create_debian_repo.sh debian bookworm trixie"]
   in
   let job_apt_repo_ubuntu =
     make_job_apt_repo

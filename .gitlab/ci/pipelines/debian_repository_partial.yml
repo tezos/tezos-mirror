@@ -179,14 +179,14 @@ oc.build-data_packages:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
-    RELEASE: bookworm
+    RELEASE: trixie
     TAGS: gcp
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
 
 apt_repo_debian:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:trixie
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -205,7 +205,7 @@ apt_repo_debian:
   - apt install -y apt-utils debsigs jq
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/create_debian_repo.sh debian bookworm
+  - ./scripts/ci/create_debian_repo.sh debian bookworm trixie
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
