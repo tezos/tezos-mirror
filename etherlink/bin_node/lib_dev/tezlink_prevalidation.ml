@@ -440,3 +440,33 @@ let validate_tezlink_operation ?(check_signature = true) ~read raw =
       {length = ctxt.length; source = ctxt.source; raw; op; first_counter}
   in
   return (Ok operation)
+
+type config = {
+  get_balance : Tezos_types.Contract.t -> Z.t tzresult Lwt.t;
+  get_counter : Tezos_types.Contract.t -> Z.t tzresult Lwt.t;
+}
+
+(* TODO: merge with Prevalidator.validation_state *)
+type blueprint_validation_state = {
+  michelson_config : config;
+  addr_balance : Z.t String.Map.t;
+  addr_nonce : Z.t String.Map.t;
+}
+
+let init_blueprint_validation read () =
+  let get_counter = Tezlink_durable_storage.counter read in
+  let get_balance = Tezlink_durable_storage.balance_z read in
+  let michelson_config = {get_balance; get_counter} in
+  {
+    michelson_config;
+    addr_nonce = String.Map.empty;
+    addr_balance = String.Map.empty;
+  }
+
+let validate_for_blueprint state operation =
+  let open Lwt_result_syntax in
+  (* TODO check nonce *)
+  (* TODO check balance *)
+  (* TODO update balance and nonce *)
+  ignore operation ;
+  return (Ok state)

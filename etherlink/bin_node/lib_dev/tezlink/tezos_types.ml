@@ -112,6 +112,8 @@ module Tez = struct
     | None ->
         raise (Invalid_argument (Printf.sprintf "Invalid tez value: %s" str))
     | Some s -> s
+
+  let to_mutez_z t = t |> to_mutez |> Z.of_int64
 end
 
 module Manager = Tezlink_imports.Imported_protocol.Manager_repr

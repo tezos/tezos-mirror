@@ -44,6 +44,11 @@ let balance read c =
     (Path.balance c)
     (Data_encoding.Binary.of_bytes_exn Tez.encoding)
 
+let balance_z read c =
+  let open Lwt_result_syntax in
+  let* b = balance read c in
+  return @@ Tezos_types.Tez.to_mutez_z b
+
 let manager read c =
   Durable_storage.inspect_durable_and_decode_opt
     read

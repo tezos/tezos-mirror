@@ -69,6 +69,8 @@ module Tez : sig
   include module type of Tezlink_imports.Alpha_context.Tez
 
   val of_string_exn : string -> t
+
+  val to_mutez_z : t -> Z.t
 end
 
 module Manager = Tezlink_imports.Imported_protocol.Manager_repr

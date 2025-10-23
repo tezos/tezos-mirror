@@ -279,6 +279,20 @@ let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
         let*! () = Block_producer_events.transaction_rejected hash msg in
         return `Drop
 
+let validate_op ~maximum_cumulative_size (current_size, state) raw_op
+    (operation : Tezos_types.Operation.t) =
+  let open Lwt_result_syntax in
+  let new_size = current_size + String.length raw_op in
+  if new_size > maximum_cumulative_size then return `Stop
+  else
+    let* res = Tezlink_prevalidation.validate_for_blueprint state operation in
+    match res with
+    | Ok state -> return (`Keep (new_size, state))
+    | Error msg ->
+        let hash = Operation_hash.hash_bytes [operation.raw] in
+        let*! () = Block_producer_events.operation_rejected hash msg in
+        return `Drop
+
 let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
     (head_info : Evm_context.head) ~maximum_cumulative_size :
     f transaction_object_list tzresult Lwt.t =
@@ -286,14 +300,20 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
   (* Skip validation if chain_family is Michelson. *)
   match tx_container with
   | Michelson_tx_container (module Tx_container) ->
-      let initial_validation_state = () in
-      let* l =
-        Tx_container.pop_transactions
-          ~maximum_cumulative_size
-          ~validate_tx:(fun () _ _ -> return (`Keep ()))
-          ~initial_validation_state
-      in
-      return (Michelson_tx_objects l)
+      if maximum_cumulative_size <= minimum_ethereum_transaction_size then
+        return (Michelson_tx_objects [])
+      else
+        let read = Evm_state.read head_info.evm_state in
+        let initial_validation_state =
+          (0, Tezlink_prevalidation.init_blueprint_validation read ())
+        in
+        let* l =
+          Tx_container.pop_transactions
+            ~maximum_cumulative_size
+            ~validate_tx:(validate_op ~maximum_cumulative_size)
+            ~initial_validation_state
+        in
+        return (Michelson_tx_objects l)
   | Evm_tx_container (module Tx_container) ->
       (* Low key optimization to avoid even checking the txpool if there is not
          enough space for the smallest transaction. *)
