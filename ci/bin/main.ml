@@ -369,6 +369,14 @@ let () =
     ~jobs:(Homebrew.(jobs Full) |> List.map (with_interruptible false))
     ~description:
       "Daily pipeline containing all Homebrew jobs (build and extended tests)." ;
+  register
+    "base_images.daily"
+    base_images_daily
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace :: Base_images.jobs
+      |> List.map (with_interruptible false))
+    ~description:
+      "Daily pipeline containing all Base Images jobs (build and merge)." ;
   let custom_extended_test_jobs = Custom_extended_test_pipeline.jobs () in
   register
     "schedule_extended_rpc_test"
