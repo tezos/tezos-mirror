@@ -13,6 +13,7 @@ type blueprints_range =
 type parameters = {
   blueprints_range : blueprints_range;
   rollup_node_endpoint : Uri.t;
+  rollup_node_endpoint_timeout : float;
   latest_level_seen : Z.t;
   config : Configuration.blueprints_publisher_config;
   keep_alive : bool;
@@ -24,6 +25,7 @@ type parameters = {
 type state = {
   blueprints_range : blueprints_range;
   rollup_node_endpoint : Uri.t;
+  rollup_node_endpoint_timeout : float;
   drop_duplicate : bool;
   max_blueprints_lag : Z.t;
   max_blueprints_ahead : Z.t;
@@ -68,6 +70,9 @@ module Worker = struct
       (Types)
 
   let rollup_node_endpoint worker = (state worker).rollup_node_endpoint
+
+  let rollup_node_endpoint_timeout worker =
+    (state worker).rollup_node_endpoint_timeout
 
   let latest_level_seen worker = (state worker).latest_level_seen
 
@@ -126,6 +131,7 @@ module Worker = struct
       ?order:(if state.order_enabled then Some level else None)
       ~keep_alive:false
       ~rollup_node_endpoint:state.rollup_node_endpoint
+      ~timeout:state.rollup_node_endpoint_timeout
       payload
 
   let publish_on_dal state level chunks =
@@ -136,7 +142,9 @@ module Worker = struct
     Metrics.record_blueprint_chunks_sent_on_dal chunks ;
     Rollup_services.publish_on_dal
       ~rollup_node_endpoint:state.rollup_node_endpoint
+      ~timeout:state.rollup_node_endpoint_timeout
       ~messages:payloads
+      ()
 
   let publish_on_dal_precondition state use_dal_if_enabled level =
     state.enable_dal && use_dal_if_enabled && Z.(zero < level)
@@ -229,6 +237,7 @@ module Worker = struct
       call_service
         ~keep_alive:(keep_alive self)
         ~base:(rollup_node_endpoint self)
+        ~timeout:(rollup_node_endpoint_timeout self)
         durable_state_value
         ((), Block_id.Level rollup_block_lvl)
         {
@@ -260,6 +269,7 @@ module Handlers = struct
       ({
          blueprints_range;
          rollup_node_endpoint;
+         rollup_node_endpoint_timeout;
          config =
            {
              max_blueprints_lag;
@@ -282,7 +292,9 @@ module Handlers = struct
       | Some dal_slots ->
           Rollup_services.set_dal_slot_indices
             ~rollup_node_endpoint
+            ~timeout:rollup_node_endpoint_timeout
             ~slot_indices:dal_slots
+            ()
     in
     return
       {
@@ -294,6 +306,7 @@ module Handlers = struct
         latest_level_seen;
         cooldown = 0;
         rollup_node_endpoint;
+        rollup_node_endpoint_timeout;
         drop_duplicate;
         max_blueprints_lag = Z.of_int max_blueprints_lag;
         max_blueprints_ahead = Z.of_int max_blueprints_ahead;
@@ -362,8 +375,9 @@ let table = Worker.create_table Queue
 
 let worker_promise, worker_waker = Lwt.task ()
 
-let start ~blueprints_range ~rollup_node_endpoint ~config ~latest_level_seen
-    ~keep_alive ~drop_duplicate ~order_enabled ~tx_container () =
+let start ~blueprints_range ~rollup_node_endpoint ~rollup_node_endpoint_timeout
+    ~config ~latest_level_seen ~keep_alive ~drop_duplicate ~order_enabled
+    ~tx_container () =
   let open Lwt_result_syntax in
   let* worker =
     Worker.launch
@@ -372,6 +386,7 @@ let start ~blueprints_range ~rollup_node_endpoint ~config ~latest_level_seen
       {
         blueprints_range;
         rollup_node_endpoint;
+        rollup_node_endpoint_timeout;
         config;
         latest_level_seen;
         keep_alive;

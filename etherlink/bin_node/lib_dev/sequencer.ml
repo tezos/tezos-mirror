@@ -193,7 +193,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       configuration.opentelemetry.config
   in
   let is_sandbox = Option.is_some sandbox_config in
-  let {rollup_node_endpoint; keep_alive; _} = configuration in
+  let {rollup_node_endpoint; rpc_timeout; keep_alive; _} = configuration in
   let sequencer_config = configuration.sequencer in
   let* rollup_node_smart_rollup_address =
     if Option.is_some sandbox_config then return_none
@@ -201,6 +201,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       let* sr1 =
         Rollup_services.smart_rollup_address
           ~keep_alive:configuration.keep_alive
+          ~timeout:configuration.rpc_timeout
           rollup_node_endpoint
       in
       return_some sr1
@@ -370,6 +371,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
           ~signer
           ~smart_rollup_address:smart_rollup_address_b58
           ~rollup_node_endpoint
+          ~rollup_node_endpoint_timeout:rpc_timeout
           ())
       sequencer_config.blueprints_publisher_config.dal_slots
   in
@@ -397,6 +399,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
     Blueprints_publisher.start
       ~blueprints_range:(Evm_ro_context.blueprints_range ro_ctxt)
       ~rollup_node_endpoint
+      ~rollup_node_endpoint_timeout:rpc_timeout
       ~config:sequencer_config.blueprints_publisher_config
       ~latest_level_seen:(Z.pred next_blueprint_number)
       ~keep_alive
@@ -474,8 +477,9 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       in
       let () =
         Rollup_node_follower.start
-          ~keep_alive:configuration.keep_alive
+          ~keep_alive
           ~rollup_node_endpoint
+          ~rollup_node_endpoint_timeout:rpc_timeout
           ()
       in
       return_unit

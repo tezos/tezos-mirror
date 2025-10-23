@@ -146,6 +146,7 @@ let main
     ({
        keep_alive;
        rollup_node_endpoint;
+       rpc_timeout;
        experimental_features = {drop_duplicate_on_injection; _};
        _;
      } as config :
@@ -154,6 +155,7 @@ let main
   let* smart_rollup_address =
     Rollup_services.smart_rollup_address
       ~keep_alive:config.keep_alive
+      ~timeout:rpc_timeout
       rollup_node_endpoint
   in
   let* () =
@@ -237,6 +239,7 @@ let main
       ~keep_alive:config.keep_alive
       ?on_new_head
       ~rollup_node_endpoint
+      ~rollup_node_endpoint_timeout:rpc_timeout
       ()
   in
 

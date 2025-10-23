@@ -13,6 +13,7 @@ val start :
   signer:Signer.map ->
   smart_rollup_address:string ->
   rollup_node_endpoint:Uri.t ->
+  rollup_node_endpoint_timeout:float ->
   unit ->
   unit tzresult Lwt.t
 

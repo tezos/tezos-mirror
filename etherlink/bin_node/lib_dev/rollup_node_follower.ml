@@ -74,6 +74,8 @@ type rollup_node_connection = {
   timeout : Float.t;
       (** expected time to receive a l2 block from the rollup node. is
           recalculated at each received block. *)
+  rollup_node_endpoint_timeout : float;
+      (** timeout for the initial connection to the node *)
 }
 
 (** [timeout] is updated to reflect reality of how long we should with
@@ -111,19 +113,29 @@ let sleep_before_reconnection ~factor =
    to reconnect.
 
     [count] is the number of time we tried to reconnect in a row. *)
-let rec connect_to_stream ?(count = 0) ~rollup_node_endpoint () =
+let rec connect_to_stream ?(count = 0) ~rollup_node_endpoint ~timeout () =
   let open Lwt_result_syntax in
   let*! () = sleep_before_reconnection ~factor:count in
-  let*! res = Rollup_services.make_streamed_call ~rollup_node_endpoint in
+  let*! res =
+    Rollup_services.make_streamed_call ~timeout rollup_node_endpoint
+  in
   match res with
   | Ok (stream, close) ->
       let*! () = Rollup_node_follower_events.connection_acquired () in
-      return {close; stream; rollup_node_endpoint; timeout = 300.}
+      return
+        {
+          close;
+          stream;
+          rollup_node_endpoint;
+          timeout = 300.;
+          rollup_node_endpoint_timeout = timeout;
+        }
   | Error errs ->
       let*! () = Rollup_node_follower_events.connection_failed errs in
       (connect_to_stream [@tailcall])
         ~count:(count + 1)
         ~rollup_node_endpoint
+        ~timeout
         ()
 
 (** [get_next_block ?on_new_head ~connection] returns the next block found
@@ -157,6 +169,7 @@ let rec get_next_block ?on_new_head ~connection () =
         connect_to_stream
           ~count:1
           ~rollup_node_endpoint:connection.rollup_node_endpoint
+          ~timeout:connection.rollup_node_endpoint_timeout
           ()
       in
       (get_next_block [@tailcall]) ?on_new_head ~connection ()
@@ -195,7 +208,8 @@ let rec loop_on_rollup_node_stream ~keep_alive ?on_new_head
     ~connection
     ()
 
-let start ~keep_alive ?on_new_head ~rollup_node_endpoint () =
+let start ~keep_alive ?on_new_head ~rollup_node_endpoint
+    ~rollup_node_endpoint_timeout () =
   Lwt.async @@ fun () ->
   let open Lwt_syntax in
   let* () = Rollup_node_follower_events.started () in
@@ -204,7 +218,12 @@ let start ~keep_alive ?on_new_head ~rollup_node_endpoint () =
   let* oldest_rollup_node_known_l1_level =
     Rollup_services.oldest_known_l1_level ~keep_alive rollup_node_endpoint
   in
-  let* connection = connect_to_stream ~rollup_node_endpoint () in
+  let* connection =
+    connect_to_stream
+      ~rollup_node_endpoint
+      ~timeout:rollup_node_endpoint_timeout
+      ()
+  in
   loop_on_rollup_node_stream
     ~keep_alive
     ?on_new_head
