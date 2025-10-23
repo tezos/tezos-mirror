@@ -1200,8 +1200,14 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
             let inbox_level = Raw_level_repr.to_int32 inbox_level in
             (* the [published_level]'s pages to request is [inbox_level -
                attestation_lag - 1]. *)
+            (* Before importing a slot, we wait 2 blocks for finality + 1 block
+               for DAL node processing, + 1 block because PVM arith requests DAL
+               slots at start of level internal message. *)
+            let import_extra_delay = 4l in
             let lvl =
-              Int32.sub (Int32.sub inbox_level dal_params.attestation_lag) 1l
+              Int32.sub
+                (Int32.sub inbox_level dal_params.attestation_lag)
+                import_extra_delay
             in
             match Raw_level_repr.of_int32 lvl with
             | Error _ ->
