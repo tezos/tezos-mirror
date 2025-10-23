@@ -41,6 +41,7 @@ include Product (struct
       "brassaia/";
       "brassaia-eio/";
       "rust-toolchain";
+      "lwt_domain/";
     ]
     @ Product_data_encoding.product_source @ Product_prometheus.product_source
     @ Product_resto.product_source
