@@ -426,6 +426,7 @@ type 'accounts init :=
   ?adaptive_issuance:Constants.Parametric.adaptive_issuance ->
   ?allow_tz4_delegate_enable:bool ->
   ?aggregate_attestation:bool ->
+  ?native_contracts_enable:bool ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
 
