@@ -6068,6 +6068,36 @@ module Skip_list_rpcs = struct
     in
     Log.info "Check fetching commitments from the skip-list store" ;
     let* () = call_get_commitment 2 in
+
+    let rec call_get_status level =
+      (* At [max_level] we'd get 404; at [max_level - 1] we get answer because
+         statuses are inserted at L1 head level + 1. *)
+      if level >= max_level then unit
+      else
+        let* status =
+          Dal_RPC.(
+            call dal_node @@ get_level_slot_status ~slot_level:level ~slot_index)
+        in
+        let expected_status =
+          if level <= migration_level - lag then Dal_RPC.Attested lag
+          else if level == migration_level + 1 - lag then Dal_RPC.Unattested
+          else if new_lag <> lag && level <= migration_level then
+            Dal_RPC.Unattested
+          else if level <= last_confirmed_published_level then
+            Dal_RPC.Attested lag
+          else Dal_RPC.Unpublished
+        in
+        Check.(
+          (status = expected_status)
+            Dal_common.Check.slot_id_status_typ
+            ~__LOC__
+            ~error_msg:
+              (let msg = sf "Unexpected status at level %d: " level in
+               msg ^ "got %L, expected %R")) ;
+        call_get_status (level + 1)
+    in
+    Log.info "Check fetching statuses from the skip-list store" ;
+    let* () = call_get_status 2 in
     unit
 
   let test_skip_list_rpcs protocols =
