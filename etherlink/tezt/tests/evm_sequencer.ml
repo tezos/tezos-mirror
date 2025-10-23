@@ -2710,14 +2710,16 @@ let test_observer_receives_preconfirmations =
   let* _ = p in
 
   (*
-    1. Observer receives the transaction
-    2. Transaction is added to the transaction queue
-    3. Transaction is forwarded to the sequencer
-    4. Sequencer validates the transaction
-    5. Sequencer streams the result back to the observer
-    6. Sequencer produces block in order to access the receipt
-    7. Hashes are the same
+    1. Produce one block to initialize internal timestamp
+    2. Observer receives the transaction
+    3. Transaction is added to the transaction queue
+    4. Transaction is forwarded to the sequencer
+    5. Sequencer validates the transaction
+    6. Sequencer streams the result back to the observer
+    7. Sequencer produces block in order to access the receipt
+    8. Hashes are the same
   *)
+  let* _res = produce_block sequencer in
   let add = Evm_node.wait_for_tx_queue_add_transaction sequencer in
   let next_ts = Evm_node.wait_for_preconfirmation_timestamp observer in
   let preconf = Evm_node.wait_for_preconfirmation observer in

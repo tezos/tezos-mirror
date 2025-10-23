@@ -71,6 +71,7 @@ module Types = struct
     mutable validated_txns :
       (string * Tx_queue_types.transaction_object_t) list;
     mutable validation_state : int * Prevalidator.validation_state;
+    mutable next_block_timestamp : Time.System.t option;
   }
 end
 
@@ -461,13 +462,50 @@ let clear_preconfirmation_data ~(state : Types.state) =
   state.validation_state <- validation_state ;
   return_unit
 
-let produce_block (state : Types.state) ~force ~timestamp
+(* [now] is the timestamp of the previously created block.
+   We compute [next] as the maximum between:
+   - [now + 500 ms], ensuring a minimal delay between blocks, and
+   - [now'], the actual end time of the previous block. *)
+let compute_next_block_timestamp ~now =
+  let now' = Ptime_clock.now () in
+
+  let t_500 =
+    Ptime.Span.of_float_s 0.5 |> WithExceptions.Option.get ~loc:__LOC__
+  in
+  let now_plus =
+    Ptime.add_span now t_500 |> WithExceptions.Option.get ~loc:__LOC__
+  in
+  Time.System.(max now_plus now')
+
+(* Required while the preconfirmation system and previous block production co-exist *)
+let choose_block_timestamp preconfirmation_stream_enabled next_block_timestamp
+    external_timestamp =
+  match (preconfirmation_stream_enabled, next_block_timestamp) with
+  | false, _ -> external_timestamp
+  | true, Some next -> Time.System.to_protocol next
+  | true, None -> Misc.now ()
+
+let produce_block (state : Types.state) ~force ~(timestamp : Time.Protocol.t)
     ~with_delayed_transactions =
   let open Lwt_result_syntax in
   match state.tx_container with
   | Ex_tx_container tx_container -> (
       let (module Tx_container) =
         Services_backend_sig.tx_container_module tx_container
+      in
+      (*
+        now and timestamp serve distinct but complementary purposes:
+        - now: taken at the start of the request, used to predict the next timestamp
+          and keep it aligned with real time.
+        - timestamp: derived from the previously computed `next_block_timestamp`,
+          ensuring consistency between preconfirmation and block creation.
+      *)
+      let now = Ptime_clock.now () in
+      let timestamp =
+        choose_block_timestamp
+          state.preconfirmation_stream_enabled
+          state.next_block_timestamp
+          timestamp
       in
       let*! head_info = Evm_context.head_info () in
       let* () =
@@ -501,7 +539,7 @@ let produce_block (state : Types.state) ~force ~timestamp
           | None -> false
         in
         let signer = state.signer in
-        if is_going_to_upgrade_kernel then
+        if is_going_to_upgrade_kernel then (
           let* hashes =
             produce_block_with_transactions
               ~signer
@@ -511,8 +549,9 @@ let produce_block (state : Types.state) ~force ~timestamp
               ~tx_container
               head_info
           in
+          state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
           (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
-          return (`Block_produced (Seq.length hashes))
+          return (`Block_produced (Seq.length hashes)))
         else
           let* result =
             produce_block_if_needed
@@ -524,6 +563,7 @@ let produce_block (state : Types.state) ~force ~timestamp
               ~tx_container
               head_info
           in
+          state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
           match result with
           | `Block_produced _ ->
               let* () =
@@ -533,7 +573,7 @@ let produce_block (state : Types.state) ~force ~timestamp
               return result
           | `No_block -> return result)
 
-let preconfirm_transactions ~(state : Types.state) ~transactions =
+let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
   let open Lwt_result_syntax in
   let maximum_cumulative_size =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
@@ -549,7 +589,8 @@ let preconfirm_transactions ~(state : Types.state) ~transactions =
         | `Drop -> (validation_state, rev_txns)
         | `Keep latest_validation_state ->
             if Int.equal (List.length state.validated_txns) 0 then
-              Broadcast.notify_new_block_timestamp (Time.Protocol.of_seconds 0L) ;
+              Broadcast.notify_new_block_timestamp
+                (Time.System.to_protocol timestamp) ;
             Broadcast.notify_preconfirmation tx_object ;
             (latest_validation_state, entry :: rev_txns)
         | `Stop -> (validation_state, rev_txns))
@@ -576,8 +617,14 @@ module Handlers = struct
     | Request.Produce_block (with_delayed_transactions, timestamp, force) ->
         protect @@ fun () ->
         produce_block state ~force ~timestamp ~with_delayed_transactions
-    | Request.Preconfirm_transactions transactions ->
-        protect @@ fun () -> preconfirm_transactions ~state ~transactions
+    | Request.Preconfirm_transactions transactions -> (
+        protect @@ fun () ->
+        (* If we are before the first created block and block producer
+          is not aware of its future timestamp, preconfirmation are disabled *)
+        match state.next_block_timestamp with
+        | Some timestamp ->
+            preconfirm_transactions ~state ~transactions ~timestamp
+        | None -> Lwt_result_syntax.return_unit)
 
   type launch_error = error trace
 
@@ -603,6 +650,7 @@ module Handlers = struct
           preconfirmation_stream_enabled;
           validation_state;
           validated_txns = [];
+          next_block_timestamp = None;
         }
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
