@@ -2204,6 +2204,7 @@ type tezt_target = {
   tezt_local_test_lib : target;
   preprocess : Target.preprocessor;
   preprocessor_deps : Target.preprocessor_dep list;
+  include_in_main_tezt_exe : bool;
   product : string;
 }
 
@@ -2213,7 +2214,7 @@ let tezt ~opam ~path ?modes ?(lib_deps = []) ?(exe_deps = []) ?(dep_globs = [])
     ?(dep_globs_rec = []) ?(dep_files = []) ?synopsis ?opam_with_test
     ?dune_with_test ?(with_macos_security_framework = false) ?flags
     ?(dune = Dune.[]) ?(preprocess = Target.No_PPS) ?(preprocessor_deps = [])
-    ?source ~product modules =
+    ?(include_in_main_tezt_exe = true) ?source ~product modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -2257,6 +2258,7 @@ let tezt ~opam ~path ?modes ?(lib_deps = []) ?(exe_deps = []) ?(dep_globs = [])
       tezt_local_test_lib;
       preprocess;
       preprocessor_deps;
+      include_in_main_tezt_exe;
       product;
     }
   in
@@ -2282,9 +2284,11 @@ let register_tezt_targets ~make_tezt_exe =
         preprocess = _;
         preprocessor_deps = _;
         lib_deps;
+        include_in_main_tezt_exe;
         _;
       } =
-    tezt_test_libs := tezt_local_test_lib :: !tezt_test_libs ;
+    if include_in_main_tezt_exe then
+      tezt_test_libs := tezt_local_test_lib :: !tezt_test_libs ;
     let declare_exe exe_name modes deps main =
       let (_ : Target.t option) =
         Target.test
@@ -4422,6 +4426,7 @@ let list_tests_to_run_after_changes ~(tezt_exe : target)
         preprocess;
         preprocessor_deps;
         product = _;
+        include_in_main_tezt_exe = _;
       }
     ->
     if
