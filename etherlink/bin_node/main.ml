@@ -71,16 +71,6 @@ module Event = struct
       ~level:Warning
       ()
 
-  let no_default_snapshot_provider_shadownet =
-    declare_0
-      ~section
-      ~name:"no_default_snapshot_provider_for_shadownet"
-      ~msg:
-        "the default snapshots provider for Etherlink Shadownet may not be \
-         available yet"
-      ~level:Warning
-      ()
-
   let performance_profile =
     declare_1
       ~section
@@ -1503,15 +1493,6 @@ let start_observer ~data_dir ~keep_alive ?rpc_timeout ?rpc_addr ?rpc_port
   let* () = websocket_checks config in
   let*! () = set_gc_parameters config in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
-  let*! () =
-    match (network, init_from_snapshot) with
-    | Some Shadownet, Some provider when provider = default_snapshot_provider ->
-        Internal_event.Simple.emit
-          Event.no_default_snapshot_provider_shadownet
-          ()
-    | _ -> Lwt.return_unit
-  in
-
   Evm_node_lib_dev.Observer.main
     ?network
     ~no_sync
