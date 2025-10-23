@@ -66,31 +66,66 @@ let remove_slots_and_shards ~slot_size (store : Store.t)
    {!Node_context.level_to_gc ~current_level}. It also removes skip list cells
    attested at that level. *)
 let remove_old_level_stored_data proto_parameters ctxt current_level =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let store = Node_context.get_store ctxt in
-  Node_context.level_to_gc ctxt proto_parameters ~current_level
-  |> Option.iter_s (fun oldest_level ->
-         let* () =
-           (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
-              We may want to remove this check. *)
-           if Node_context.supports_refutations ctxt then
-             let published_level =
-               Int32.(
-                 sub
-                   oldest_level
-                   (of_int proto_parameters.Types.attestation_lag))
-             in
-             let* res = Store.Skip_list_cells.remove store ~published_level in
-             match res with
-             | Ok () -> Event.emit_removed_skip_list_cells ~level:oldest_level
-             | Error error ->
-                 Event.emit_removing_skip_list_cells_failed
-                   ~level:oldest_level
-                   ~error
-           else return_unit
-         in
-         let number_of_slots = proto_parameters.Types.number_of_slots in
-         List.iter_s
+  match Node_context.level_to_gc ctxt proto_parameters ~current_level with
+  | None -> return_unit
+  | Some oldest_level ->
+      (* The protocol parameters to consider when cleaning are the ones at the
+         time of the level we are cleaning. *)
+      let*? proto_parameters =
+        Node_context.get_proto_parameters ctxt ~level:(`Level oldest_level)
+      in
+      let current_lag = proto_parameters.attestation_lag in
+      (* This function removes from the skip-list all the cells for slots
+         published [lag] levels before the [oldest_level]. *)
+      let clean_skip_list_cells lag =
+        let published_level = Int32.(sub oldest_level (of_int lag)) in
+        let*! res = Store.Skip_list_cells.remove store ~published_level in
+        let*! () =
+          match res with
+          | Ok () -> Event.emit_removed_skip_list_cells ~level:oldest_level
+          | Error error ->
+              Event.emit_removing_skip_list_cells_failed
+                ~level:oldest_level
+                ~error
+        in
+        return_unit
+      in
+      let* () =
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7258
+           We may want to remove this check. *)
+        if Node_context.supports_refutations ctxt then
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
+             Remove after dynamic lag is active.
+             This code cleans the skip-list for the "orphan" levels which are
+             guaranteed to never be attested when a protocol migration reduces
+             the attestation lag. *)
+          let* () =
+            if oldest_level > 1l then
+              let*? prev_proto_parameters =
+                Node_context.get_proto_parameters
+                  ctxt
+                  ~level:(`Level (Int32.pred oldest_level))
+              in
+              let previous_lag = prev_proto_parameters.Types.attestation_lag in
+              if previous_lag > current_lag then
+                let rec loop lag =
+                  if lag = current_lag then return_unit
+                  else
+                    let* () = clean_skip_list_cells lag in
+                    loop (lag - 1)
+                in
+                loop previous_lag
+              else return_unit
+            else return_unit
+          in
+          clean_skip_list_cells current_lag
+        else return_unit
+      in
+      let number_of_slots = proto_parameters.Types.number_of_slots in
+      Lwt_result.ok
+      @@ List.iter_s
            (fun slot_index ->
              let slot_id : Types.slot_id =
                {slot_level = oldest_level; slot_index}
@@ -99,7 +134,7 @@ let remove_old_level_stored_data proto_parameters ctxt current_level =
                ~slot_size:proto_parameters.cryptobox_parameters.slot_size
                store
                slot_id)
-           (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id))
+           (WithExceptions.List.init ~loc:__LOC__ number_of_slots Fun.id)
 
 (* [attestation_lag] levels after the publication of a commitment,
    if it has not been attested it will never be so we can safely
@@ -676,7 +711,7 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
        cryptobox
        ~head_level:level
        proto_parameters) ;
-  let*! () = remove_old_level_stored_data proto_parameters ctxt level in
+  let* () = remove_old_level_stored_data proto_parameters ctxt level in
   let* () =
     if level = 1l then
       (* We do not process the block at level 1, as it will not
