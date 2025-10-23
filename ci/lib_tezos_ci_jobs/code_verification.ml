@@ -118,33 +118,12 @@ module Opam = struct
           Some {name; group; batch_index}
       | _ -> fail ()
 
-  (** Opam job rules.
-
-      These rules define when the opam job runs, and implements the
-      delay used to run opam jobs in batches. *)
-  let opam_rules pipeline_type ~only_final_pipeline ~batch_index () =
-    let when_ = Delayed (Minutes batch_index) in
-    match pipeline_type with
-    | Schedule_extended_test -> [job_rule ~when_ ()]
-    | Before_merging | Merge_train ->
-        [
-          job_rule ~if_:(Rules.has_mr_label "ci--opam") ~when_ ();
-          job_rule
-            ?if_:
-              (if only_final_pipeline then Some Rules.is_final_pipeline
-               else None)
-            ~changes:(Changeset.encode changeset_opam_jobs)
-            ~when_
-            ();
-        ]
-
   (** Constructs the opam package job for a given group and batch.
 
       Separate packages with the same group and batch are tested in
       separate jobs, which is implemented through parallel-matrix
       jobs. *)
-  let job_opam_packages ?dependencies pipeline_type group batch_index packages :
-      tezos_job =
+  let job_opam_packages ?dependencies group batch_index packages : tezos_job =
     job
       ?dependencies
       ~__POS__
@@ -161,12 +140,7 @@ module Opam = struct
            underlying tests have been fixed. *)
       ~retry:{max = 2; when_ = []}
       ~timeout:(Minutes 90)
-      ~rules:
-        (opam_rules
-           pipeline_type
-           ~only_final_pipeline:(group = All)
-           ~batch_index
-           ())
+      ~rules:[job_rule ~when_:(Delayed (Minutes batch_index)) ()]
       ~variables:
         (* See [variables] in [main.ml] for details on [RUNTEZTALIAS] *)
         [("RUNTEZTALIAS", "true")]
@@ -199,7 +173,7 @@ module Opam = struct
       ~path:"$CI_PROJECT_DIR/_build/_sccache"
     |> enable_cargo_cache
 
-  let jobs_opam_packages ?dependencies pipeline_type : tezos_job list =
+  let jobs_opam_packages ?dependencies () : tezos_job list =
     let package_by_group_index = Hashtbl.create 5 in
     List.iter
       (fun pkg ->
@@ -225,12 +199,7 @@ module Opam = struct
         ?dependencies
         ~before_script:(before_script ~eval_opam:true [])
         ~artifacts:(artifacts ["_opam-repo-for-release/"])
-        ~rules:
-          (opam_rules
-             pipeline_type
-             ~only_final_pipeline:false
-             ~batch_index:1
-             ())
+        ~rules:[job_rule ~when_:(Delayed (Minutes 1)) ()]
         [
           "git init _opam-repo-for-release";
           "./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release";
@@ -242,13 +211,9 @@ module Opam = struct
     :: Hashtbl.fold
          (fun (group, index) packages jobs ->
            let dependencies = Dependent [Artifacts job_prepare] in
-           job_opam_packages ~dependencies pipeline_type group index packages
-           :: jobs)
+           job_opam_packages ~dependencies group index packages :: jobs)
          package_by_group_index
          []
-
-  let jobs_opam_packages_daily =
-    jobs_opam_packages ~dependencies:(Dependent []) Schedule_extended_test
 end
 
 (** Configuration of manual jobs for [make_rules] *)
