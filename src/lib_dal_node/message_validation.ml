@@ -429,6 +429,7 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
               [@profiler.wrap_f
                 {driver_ids = [Opentelemetry]}
                   (Opentelemetry_helpers.trace_slot
+                     ~attrs:[("number_of_shards", `Int (List.length shards))]
                      ~name:"verify_shards"
                      ~slot_commitment:commitment
                      ~slot_id:{Types.Slot_id.slot_level = level; slot_index})]
