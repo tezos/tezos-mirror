@@ -733,15 +733,6 @@ let jobs pipeline_type =
     @ bin_packages_jobs
   in
 
-  (* Packaging jobs *)
-  let packaging =
-    match pipeline_type with
-    | Merge_train | Before_merging -> []
-    | Schedule_extended_test ->
-        Opam.jobs_opam_packages
-          ~dependencies:dependencies_needs_start
-          pipeline_type
-  in
   (* Dependencies for jobs that should run immediately after jobs
      [job_build_x86_64] in [Before_merging] if they are present
      (otherwise, they run immediately after [job_start]). In
@@ -1622,4 +1613,4 @@ let jobs pipeline_type =
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in
-  start_stage @ sanity @ build @ packaging @ test @ coverage @ manual
+  start_stage @ sanity @ build @ test @ coverage @ manual
