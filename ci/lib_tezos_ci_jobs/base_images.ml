@@ -74,9 +74,15 @@ let jobs =
     let platform, tags =
       match compilation with
       | Amd64_only -> ("linux/amd64", [])
-      | Arm64_only -> ("", [("TAGS", ["gcp_arm64"])])
+      | Arm64_only -> ("", [("TAGS", [Runner.Tag.show Gcp_arm64])])
       | Emulated -> ("linux/amd64,linux/arm64", []) (* default *)
-      | Native -> ("", [("TAGS", ["gcp_very_high_cpu"; "gcp_arm64"])])
+      | Native ->
+          ( "",
+            [
+              ( "TAGS",
+                [Runner.Tag.show Gcp_very_high_cpu; Runner.Tag.show Gcp_arm64]
+              );
+            ] )
     in
     let emulated = tags = [] in
     let variables =
