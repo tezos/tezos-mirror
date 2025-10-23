@@ -76,8 +76,8 @@ let child_pipeline_full =
   Pipeline.register_child
     "homebrew"
     ~description:
-      "A child pipeline of 'schedule_extended_test' testing the build of  \
-       homebrew packages."
+      "A child pipeline of 'before_merging' building and testing the homebrew \
+       packaging. Manually triggered."
     ~default:Common.retry_default_config
     ~jobs:(jobs Full)
 
@@ -85,7 +85,8 @@ let child_pipeline_full_auto =
   Pipeline.register_child
     "homebrew_auto"
     ~description:
-      "A child pipeline of 'schedule_extended_test' testing the homebrew \
-       packaging. This pipelines starts automatically"
+      "A child pipeline of 'before_merging' (and thus 'merge_train') building \
+       and testing the homebrew packaging. Starts automatically on certain \
+       conditions."
     ~default:Common.retry_default_config
     ~jobs:(jobs Full)
