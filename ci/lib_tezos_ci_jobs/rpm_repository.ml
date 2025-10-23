@@ -21,9 +21,10 @@ let generic_packages_image =
     ~image_path:"$DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 
 let tag_amd64 ~ramfs =
-  if ramfs then "gcp_very_high_cpu_ramfs" else "gcp_very_high_cpu"
+  if ramfs then Runner.Tag.show Gcp_very_high_cpu_ramfs
+  else Runner.Tag.show Gcp_very_high_cpu
 
-let tag_arm64 = "gcp_arm64"
+let tag_arm64 = Runner.Tag.show Gcp_arm64
 
 (** These are the set of Rocky Linux release-architecture combinations for
     which we build rpm packages in the job
