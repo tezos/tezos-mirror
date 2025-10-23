@@ -646,3 +646,6 @@ seq:
   enum: bool
 - id: all_bakers_attest_activation_threshold
   type: all_bakers_attest_activation_threshold
+- id: native_contracts_enable
+  type: u1
+  enum: bool
