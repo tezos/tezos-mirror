@@ -195,47 +195,92 @@ module Slots_handlers = struct
                  | None | Some _ -> return_unit
                in
                let* proto_parameters =
-                 Node_context.get_proto_parameters ctxt ~level:`Last_proto
+                 (Node_context.get_proto_parameters ctxt ~level:`Last_proto
                  |> Lwt.return
-                 |> lwt_map_error (fun e -> `Other e)
+                 |> lwt_map_error (fun e -> `Other e))
+                 [@profiler.wrap_f
+                   {driver_ids = [Opentelemetry]}
+                     (Opentelemetry_helpers.trace_slot_no_commitment
+                        ~slot
+                        ~name:"get_proto_parameters")]
                in
                let slot_size =
                  proto_parameters.cryptobox_parameters.slot_size
                in
                let slot_length = String.length slot in
                let*? slot_bytes =
-                 if slot_length > slot_size then
-                   Error
-                     (Errors.other
-                        [
-                          Post_slot_too_large
-                            {expected = slot_size; got = slot_length};
-                        ])
-                 else if slot_length = slot_size then Ok (Bytes.of_string slot)
-                 else
-                   let padding =
-                     String.make (slot_size - slot_length) query#padding
-                   in
-                   Ok (Bytes.of_string (slot ^ padding))
+                 (if slot_length > slot_size then
+                    Error
+                      (Errors.other
+                         [
+                           Post_slot_too_large
+                             {expected = slot_size; got = slot_length};
+                         ])
+                  else if slot_length = slot_size then Ok (Bytes.of_string slot)
+                  else
+                    let padding =
+                      String.make (slot_size - slot_length) query#padding
+                    in
+                    Ok (Bytes.of_string (slot ^ padding)))
+                 [@profiler.wrap_f
+                   {driver_ids = [Opentelemetry]}
+                     (Opentelemetry_helpers.trace_slot_no_commitment
+                        ~attrs:[]
+                        ~slot
+                        ~name:"padding_slot")]
                in
                let*? polynomial =
-                 Slot_manager.polynomial_from_slot cryptobox slot_bytes
+                 (Slot_manager.polynomial_from_slot
+                    cryptobox
+                    slot_bytes
+                  [@profiler.wrap_f
+                    {driver_ids = [Opentelemetry]}
+                      (Opentelemetry_helpers.trace_slot_no_commitment
+                         ~slot
+                         ~name:"computing_polynomial")])
                in
-               let*? commitment = Slot_manager.commit cryptobox polynomial in
+               let*? commitment =
+                 (Slot_manager.commit
+                    cryptobox
+                    polynomial
+                  [@profiler.wrap_f
+                    {driver_ids = [Opentelemetry]}
+                      (Opentelemetry_helpers.trace_slot_no_commitment
+                         ~slot
+                         ~name:"computing_commitment")])
+               in
                let*? commitment_proof =
-                 commitment_proof_from_polynomial cryptobox polynomial
+                 (commitment_proof_from_polynomial
+                    cryptobox
+                    polynomial
+                  [@profiler.wrap_f
+                    {driver_ids = [Opentelemetry]}
+                      (Opentelemetry_helpers.trace_slot_no_commitment
+                         ~slot
+                         ~name:"computing_commitment_proof")])
                in
                let shards_proofs_precomputation =
-                 Node_context.get_shards_proofs_precomputation ctxt
+                 (Node_context.get_shards_proofs_precomputation
+                    ctxt
+                  [@profiler.wrap_f
+                    {driver_ids = [Opentelemetry]}
+                      (Opentelemetry_helpers.trace_slot_no_commitment
+                         ~slot
+                         ~name:"shard_proof_precomputation")])
                in
                let* () =
-                 Slot_manager.add_commitment_shards
-                   ~shards_proofs_precomputation
-                   store
-                   cryptobox
-                   commitment
-                   slot_bytes
-                   polynomial
+                 (Slot_manager.add_commitment_shards
+                    ~shards_proofs_precomputation
+                    store
+                    cryptobox
+                    commitment
+                    slot_bytes
+                    polynomial
+                  [@profiler.wrap_f
+                    {driver_ids = [Opentelemetry]}
+                      (Opentelemetry_helpers.trace_slot_no_commitment
+                         ~slot
+                         ~name:"add_commitment_s_shards")])
                in
                Injected_slots_cache.replace
                  slots_cache
