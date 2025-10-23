@@ -371,6 +371,7 @@ oc.docker-build-debian-dependencies:
     matrix:
     - RELEASE:
       - bookworm
+      - trixie
       TAGS:
       - gcp_very_high_cpu
       - gcp_arm64
@@ -417,6 +418,7 @@ oc.build-debian:
     matrix:
     - RELEASE:
       - bookworm
+      - trixie
       TAGS:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64

@@ -39,16 +39,22 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
 let debian_package_release_matrix ?(ramfs = false) = function
-  | Partial -> [[("RELEASE", ["bookworm"]); ("TAGS", [tag_amd64 ~ramfs])]]
+  | Partial ->
+      [[("RELEASE", ["bookworm"; "trixie"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full ->
       [
         [
-          ("RELEASE", ["unstable"; "bookworm"]);
+          ("RELEASE", ["unstable"; "bookworm"; "trixie"]);
           ("TAGS", [tag_amd64 ~ramfs; tag_arm64]);
         ];
       ]
   | Release ->
-      [[("RELEASE", ["bookworm"]); ("TAGS", [tag_amd64 ~ramfs; tag_arm64])]]
+      [
+        [
+          ("RELEASE", ["bookworm"; "trixie"]);
+          ("TAGS", [tag_amd64 ~ramfs; tag_arm64]);
+        ];
+      ]
 
 (** These are the set of Ubuntu release-architecture combinations for
     which we build deb packages in the job

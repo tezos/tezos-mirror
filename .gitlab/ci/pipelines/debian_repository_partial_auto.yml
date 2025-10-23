@@ -72,6 +72,7 @@ oc.docker-systemd_tests_debian:
     matrix:
     - RELEASE:
       - bookworm
+      - trixie
       TAGS:
       - gcp_very_high_cpu
 
@@ -105,6 +106,7 @@ oc.docker-build-debian-dependencies:
     matrix:
     - RELEASE:
       - bookworm
+      - trixie
       TAGS:
       - gcp_very_high_cpu
 
@@ -149,6 +151,7 @@ oc.build-debian:
     matrix:
     - RELEASE:
       - bookworm
+      - trixie
       TAGS:
       - gcp_very_high_cpu_ramfs
 
