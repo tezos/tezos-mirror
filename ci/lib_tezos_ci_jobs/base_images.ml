@@ -175,6 +175,20 @@ let jobs =
     in
     (images, merge)
   in
+  let job_debian_homebrew_base_images =
+    let changes =
+      Changeset.make ["images/base-images/Dockerfile.debian-homebrew"]
+    in
+    make_job_base_images
+      ~__POS__
+      ~name:"oc.base-images.debian-homebrew"
+      ~image_name:"debian-homebrew"
+      ~base_name:"debian"
+      ~matrix:[("RELEASE", ["trixie"])]
+      ~compilation:Amd64_only
+      ~changes
+      "images/base-images/Dockerfile.debian-homebrew"
+  in
   [
     job_debian_based_images;
     job_ubuntu_based_images;
@@ -182,6 +196,7 @@ let jobs =
     job_rockylinux_based_images;
     job_rust_based_images;
     job_rust_based_images_merge;
+    job_debian_homebrew_base_images;
   ]
 
 let child_pipeline =
