@@ -154,6 +154,7 @@ val create_initial_state :
   chain:Chain_services.chain ->
   Baking_configuration.t ->
   Operation_worker.t ->
+  Round.round_durations ->
   current_proposal:proposal ->
   ?constants:Constants.t ->
   Baking_state_types.Key.t list ->

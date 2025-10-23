@@ -57,8 +57,14 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
   let* constants =
     Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
   in
+  let*? round_durations =
+    Round.Durations.create
+      ~first_round_duration:constants.parametric.minimal_block_delay
+      ~delay_increment_per_round:constants.parametric.delay_increment_per_round
+    |> Environment.wrap_tzresult
+  in
   let*! operation_worker =
-    Operation_worker.run ?monitor_node_operations cctxt
+    Operation_worker.run ?monitor_node_operations ~round_durations cctxt
   in
   Baking_scheduling.create_initial_state
     cctxt
@@ -67,6 +73,7 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
     ~chain
     config
     operation_worker
+    round_durations
     ~current_proposal
     ~constants
     delegates
