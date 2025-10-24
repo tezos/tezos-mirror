@@ -957,8 +957,13 @@ let dispatch_request (type f) ~websocket
             in
             build_with_input ~f module_ parameters
         | Get_estimate_gas.Method ->
-            let f (call, block) =
-              let* result = Backend_rpc.Etherlink.estimate_gas call block in
+            let f (call, block_param, state_override) =
+              let* result =
+                Backend_rpc.Etherlink.estimate_gas
+                  call
+                  block_param
+                  state_override
+              in
               match result with
               | Ok (Ok {value = _; gas_used = Some gas}) -> rpc_ok gas
               | Ok (Ok {value = _; gas_used = None}) ->

@@ -183,12 +183,6 @@ let encoding_with_optional_extended_block_param encoding =
     Ethereum_types.Block_parameter.extended_encoding
     Ethereum_types.Block_parameter.(Block_parameter Latest)
 
-let encoding_with_optional_block_param encoding =
-  Evm_node_lib_dev_encoding.Helpers.encoding_with_optional_last_param
-    encoding
-    Ethereum_types.Block_parameter.encoding
-    Ethereum_types.Block_parameter.Latest
-
 module Kernel_version = struct
   type input = unit
 
@@ -709,11 +703,11 @@ end
 module Get_estimate_gas = struct
   open Ethereum_types
 
-  type input = call * Block_parameter.t
+  type input = Eth_call.input
 
   type output = quantity
 
-  let input_encoding = encoding_with_optional_block_param call_encoding
+  let input_encoding = Eth_call.input_encoding
 
   let output_encoding = quantity_encoding
 
