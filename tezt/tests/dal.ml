@@ -5811,16 +5811,17 @@ module Skip_list_rpcs = struct
           (level + 1)
           (Map_int.add published_level commitment commitments)
     in
-    Log.info
-      "Publishing commitments in the previous protocol, from published level \
-       %d to %d"
-      (starting_level + 1)
-      migration_level ;
+    if migration_level > 1 then
+      Log.info
+        "Publishing commitments in the previous protocol, from published level \
+         %d to %d"
+        (starting_level + 1)
+        migration_level ;
     let* commitments =
       publish ~max_level:(migration_level - 1) starting_level Map_int.empty
     in
 
-    Log.info "Migrated to the next protocol." ;
+    if migration_level > 1 then Log.info "Migrated to the next protocol." ;
 
     let* new_proto_params =
       Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
@@ -5832,6 +5833,14 @@ module Skip_list_rpcs = struct
     if new_lag <> lag then Log.info "new attestation_lag = %d" new_lag ;
 
     let last_attested_level = last_confirmed_published_level + lag in
+    (* The maximum level that needs to be reached (we use +2 to make last
+       attested level final). *)
+    let max_level = last_attested_level + 2 in
+    Log.info
+      "last published_level = %d, last attested_level = %d, last level = %d"
+      last_confirmed_published_level
+      last_attested_level
+      max_level ;
     let wait_for_dal_node =
       wait_for_layer1_final_block dal_node last_attested_level
     in
@@ -5848,12 +5857,14 @@ module Skip_list_rpcs = struct
         second_level_new_proto
         commitments
     in
-    let* () =
-      (* The maximum level that needs to be reached (we use +2 to make last
+
+    (* The maximum level that needs to be reached (we use +2 to make last
        attested level final). *)
-      let max_level = last_attested_level + 2 in
+    let max_level = last_attested_level + 2 in
+    let* () =
       let* current_level = Node.get_level node in
-      let count = max_level + 1 - current_level in
+      let count = max_level - current_level in
+      Log.info "Current level is %d. Bake %d more blocks." current_level count ;
       bake_for ~count client
     in
 
@@ -6052,7 +6063,7 @@ module Skip_list_rpcs = struct
             ~__LOC__
             ~error_msg:
               (let msg = sf "Unexpected commitment at level %d: " level in
-               msg ^ ": got %L, expected %R")) ;
+               msg ^ "got %L, expected %R")) ;
         call_get_commitment (level + 1)
     in
     Log.info "Check fetching commitments from the skip-list store" ;
