@@ -31,6 +31,7 @@ COPY --chown=tezos:tezos .gitconfig /home/tezos/
 # Rust installer script
 COPY --chown=tezos:tezos install-rust.sh /tmp/
 COPY --chown=tezos:tezos scripts/install_opam_static.sh /tmp/
+COPY --chown=tezos:tezos scripts/install_sccache_static.sh /tmp/
 
 # setup kisscache
 COPY --chown=tezos:tezos scripts/kiss-fetch.sh scripts/kiss-logs.sh /tmp/
@@ -72,7 +73,6 @@ RUN apk update \
     zlib-static \
     libusb-dev \
     hidapi-dev \
-    sccache \
     shfmt \
     upx \
     protobuf \
@@ -88,7 +88,10 @@ ARG OPAM_VERSION
 ENV OPAM_VERSION=$OPAM_VERSION
 # Install opam
 RUN ./install_opam_static.sh \
-    && rm -rf /tmp/install_opam_static.sh
+    && rm -f /tmp/install_opam_static.sh
+
+RUN ./install_sccache_static.sh \
+    && rm -f /tmp/install_sccache_static.sh
 
 USER tezos
 WORKDIR /home/tezos
