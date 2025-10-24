@@ -5871,6 +5871,7 @@ module Skip_list_rpcs = struct
       Check.(
         (skip_list_kind = expected_skip_list_kind)
           string
+          ~__LOC__
           ~error_msg:"Unexpected skip list kind: got %L, expected %R") ;
       let skip_list = JSON.(cell |-> "skip_list") in
       let cell_index = JSON.(skip_list |-> "index" |> as_int) in
@@ -5891,6 +5892,7 @@ module Skip_list_rpcs = struct
             Check.(
               (cell_level = expected_published_level)
                 int
+                ~__LOC__
                 ~error_msg:
                   "Unexpected cell's published level: got %L, expected %R")
         | None -> ()) ;
@@ -5908,6 +5910,7 @@ module Skip_list_rpcs = struct
               Check.(
                 (cell_slot_index = expected_slot_index)
                   int
+                  ~__LOC__
                   ~error_msg:"Unexpected slot index: got %L, expected %R")
         in
         (if cell_index > 0 then
@@ -5917,6 +5920,7 @@ module Skip_list_rpcs = struct
            Check.(
              (cell_index = expected_cell_index)
                int
+               ~__LOC__
                ~error_msg:"Unexpected cell index: got %L, expected %R")) ;
         let cell_kind = JSON.(content |-> "kind" |> as_string) in
         let published cell_level =
@@ -5938,12 +5942,14 @@ module Skip_list_rpcs = struct
         Check.(
           (cell_kind = expected_kind)
             string
+            ~__LOC__
             ~error_msg:"Unexpected cell kind: got %L, expected %R") ;
         (if cell_kind = "published" || cell_kind = "attested" then
            let commitment = JSON.(content |-> "commitment" |> as_string) in
            Check.(
              (commitment = Map_int.find cell_level commitments)
                string
+               ~__LOC__
                ~error_msg:"Unexpected commitment: got %L, expected %R")) ;
         let back_pointers =
           JSON.(skip_list |-> "back_pointers" |> as_list)
@@ -5988,6 +5994,7 @@ module Skip_list_rpcs = struct
     Check.(
       (!at_least_one_attested_status = true)
         bool
+        ~__LOC__
         ~error_msg:"No cell with the 'attested' status has been visited") ;
 
     let rec call_cells_of_level level =
@@ -6010,6 +6017,7 @@ module Skip_list_rpcs = struct
         Check.(
           (num_cells = expected_num_cells)
             int
+            ~__LOC__
             ~error_msg:"Unexpected number of cells: got %L, expected %R") ;
         let* () =
           Lwt_list.iter_s
@@ -6041,6 +6049,7 @@ module Skip_list_rpcs = struct
         Check.(
           (commitment = expected_commitment)
             string
+            ~__LOC__
             ~error_msg:
               (let msg = sf "Unexpected commitment at level %d: " level in
                msg ^ ": got %L, expected %R")) ;
@@ -6048,7 +6057,6 @@ module Skip_list_rpcs = struct
     in
     Log.info "Check fetching commitments from the skip-list store" ;
     let* () = call_get_commitment 2 in
-
     unit
 
   let test_skip_list_rpcs protocols =
