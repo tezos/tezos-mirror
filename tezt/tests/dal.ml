@@ -5770,11 +5770,11 @@ let test_attestation_through_p2p ~batching_time_interval _protocol
 module Skip_list_rpcs = struct
   (* In the following function, no migration is performed (expect from genesis
      to alpha) when [migration_level] is equal to or smaller than 1. *)
-  let main_scenario ?(migration_level = 1) ~slot_index ~first_cell_level
-      ~first_dal_level ~last_confirmed_published_level protocol dal_parameters
-      client node dal_node =
+  let main_scenario ?(migration_level = 1) ~slot_index
+      ~last_confirmed_published_level protocol dal_parameters client node
+      dal_node =
     let module Map_int = Map.Make (Int) in
-    Log.info "slot_index = %d first_dal_level = %d" slot_index first_dal_level ;
+    Log.info "slot_index = %d" slot_index ;
     let client = Client.with_dal_node client ~dal_node in
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
     let lag = dal_parameters.attestation_lag in
@@ -5882,9 +5882,9 @@ module Skip_list_rpcs = struct
 
         (match check_level with
         | Some level ->
-            assert (level >= first_dal_level) ;
+            assert (level >= 1) ;
             let expected_published_level =
-              if level = first_dal_level then (* the "level" of genesis *) 0
+              if level = 1 then (* the "level" of genesis *) 0
               else if level > migration_level then level - new_lag
               else level - lag
             in
@@ -5900,7 +5900,7 @@ module Skip_list_rpcs = struct
           | None -> ()
           | Some level ->
               let expected_slot_index =
-                if level = first_dal_level then
+                if level = 1 then
                   (* the "slot index" of genesis *)
                   0
                 else number_of_slots - 1
@@ -5912,8 +5912,7 @@ module Skip_list_rpcs = struct
         in
         (if cell_index > 0 then
            let expected_cell_index =
-             ((cell_level - 1 - first_cell_level) * number_of_slots)
-             + cell_slot_index
+             ((cell_level - 1) * number_of_slots) + cell_slot_index
            in
            Check.(
              (cell_index = expected_cell_index)
@@ -5984,7 +5983,7 @@ module Skip_list_rpcs = struct
     in
     let* () = wait_for_dal_node in
     Log.info "Check skip-list using commitments_history RPCs" ;
-    let* () = check_history first_dal_level in
+    let* () = check_history 1 in
 
     Check.(
       (!at_least_one_attested_status = true)
@@ -6056,8 +6055,6 @@ module Skip_list_rpcs = struct
     let scenario protocol dal_parameters _ client node dal_node =
       main_scenario
         ~slot_index:3
-        ~first_cell_level:0
-        ~first_dal_level:1
         ~last_confirmed_published_level:3
         protocol
         dal_parameters
@@ -6091,8 +6088,6 @@ module Skip_list_rpcs = struct
       let last_confirmed_published_level = migration_level + 3 in
       main_scenario
         ~slot_index
-        ~first_cell_level:0
-        ~first_dal_level:1
         ~last_confirmed_published_level
         ~migration_level
         migrate_to
