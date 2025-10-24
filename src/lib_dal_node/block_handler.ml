@@ -217,7 +217,7 @@ let may_update_topics ctxt proto_parameters ~block_level =
    level, then skip-list cells were build using the previous protocol's encoding
    and parameters; while the plugin and parameters at [attested_level] are the
    ones for the new protocol (given that the migration already occurred). *)
-let store_skip_list_cells ctxt cctxt dal_constants ~attested_level
+let fetch_skip_list_cells ctxt cctxt dal_constants ~attested_level
     (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
   let* cells_of_level =
@@ -237,21 +237,37 @@ let store_skip_list_cells ctxt cctxt dal_constants ~attested_level
                ctxt
                ~level:(`Level pred_published_level)))
   in
-  let cells_of_level =
-    List.map
-      (fun (hash, cell, slot_index, cell_attestation_lag) ->
-        ( Dal_proto_types.Skip_list_hash.of_proto
-            Plugin.Skip_list.hash_encoding
-            hash,
-          Dal_proto_types.Skip_list_cell.of_proto
-            Plugin.Skip_list.cell_encoding
-            cell,
-          slot_index,
-          cell_attestation_lag ))
-      cells_of_level
-  in
+  List.map
+    (fun (hash, cell, slot_index, cell_attestation_lag) ->
+      ( Dal_proto_types.Skip_list_hash.of_proto
+          Plugin.Skip_list.hash_encoding
+          hash,
+        Dal_proto_types.Skip_list_cell.of_proto
+          Plugin.Skip_list.cell_encoding
+          cell,
+        slot_index,
+        cell_attestation_lag,
+        Plugin.Skip_list.proto_attestation_status cell
+        |> Option.map (fun s -> (s :> Types.header_status)) ))
+    cells_of_level
+  |> return
+
+let store_skip_list_cells ctxt ~attested_level skip_list_cells =
   let store = Node_context.get_store ctxt in
-  Store.Skip_list_cells.insert store ~attested_level cells_of_level
+  Store.Skip_list_cells.insert store ~attested_level skip_list_cells
+
+let fetch_and_store_skip_list_cells ctxt cctxt proto_params ~attested_level
+    (module Plugin : Dal_plugin.T) =
+  let open Lwt_result_syntax in
+  let* skip_list_cells =
+    fetch_skip_list_cells
+      ctxt
+      cctxt
+      proto_params
+      ~attested_level
+      (module Plugin : Dal_plugin.T)
+  in
+  store_skip_list_cells ctxt ~attested_level skip_list_cells
 
 (* This functions counts, for each slot, the number of shards attested by the bakers. *)
 let attested_shards_per_slot attestations slot_to_committee ~number_of_slots
@@ -465,6 +481,20 @@ let process_commitments ctxt cctxt store proto_parameters block_level
        [@profiler.aggregate_s {verbosity = Notice} "publish_slot_data"]))
     slot_headers
 
+let update_slot_headers_statuses store ~attested_level skip_list_cells =
+  List.iter
+    (fun (_hash, _cell, slot_index, cell_attestation_lag, status_opt) ->
+      let slot_level =
+        Int32.(sub attested_level (of_int cell_attestation_lag))
+      in
+      let slot_id = Types.Slot_id.{slot_level; slot_index} in
+      Option.iter
+        (Slot_manager.update_slot_header_status store slot_id)
+        status_opt)
+    skip_list_cells
+
+(* The [Plugin] is that for the predecessor of the block level, it corresponds
+   to [prev_proto_parameters]. *)
 let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
     ~proto_parameters block_level (module Plugin : Dal_plugin.T) =
   let open Lwt_result_syntax in
@@ -475,14 +505,21 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
        ~operations_metadata:`Never
      [@profiler.record_s {verbosity = Notice} "block_info"])
   in
+  let* skip_list_cells =
+    (fetch_skip_list_cells
+       ctxt
+       cctxt
+       prev_proto_parameters
+       ~attested_level:block_level
+       (module Plugin : Dal_plugin.T)
+     [@profiler.record_s {verbosity = Notice} "fetch_skip_list_cells"])
+  in
   let* () =
     if Node_context.supports_refutations ctxt then
       store_skip_list_cells
         ctxt
-        cctxt
-        prev_proto_parameters
         ~attested_level:block_level
-        (module Plugin : Dal_plugin.T)
+        skip_list_cells
       [@profiler.record_s {verbosity = Notice} "store_skip_list_cells"]
     else return_unit
   in
@@ -491,14 +528,10 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
        block_info [@profiler.record_f {verbosity = Notice} "dal_attestation"])
   in
   let () =
-    (Slot_manager.update_selected_slot_headers_statuses
-       ~block_level
-       ~attestation_lag:proto_parameters.Types.attestation_lag
-       ~number_of_slots:proto_parameters.number_of_slots
-       (Plugin.is_attested dal_attestation)
-       store
-     [@profiler.record_f
-       {verbosity = Notice} "update_selected_slot_headers_statuses"])
+    update_slot_headers_statuses
+      store
+      ~attested_level:block_level
+      skip_list_cells
   in
   let*! () =
     (remove_unattested_slots_and_shards

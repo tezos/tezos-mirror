@@ -671,34 +671,26 @@ module Statuses_cache = struct
 
   let get_slot_status = Slot_map.find_opt
 
-  let update_slot_headers_attestation ~published_level ~number_of_slots
-      ~attestation_lag t attested =
-    List.iter
-      (fun slot_index ->
-        let index = Types.Slot_id.{slot_level = published_level; slot_index} in
-        if attested slot_index then (
-          Dal_metrics.slot_attested ~set:true slot_index ;
-          add_status t (`Attested attestation_lag) index)
-        else
-          let old_data_opt = get_slot_status t index in
-          Dal_metrics.slot_attested ~set:false slot_index ;
-          if Option.is_some old_data_opt then add_status t `Unattested index
-          else
-            (* There is no header that has been included in a block
-               and selected for this index. So, the slot cannot be
-               attested or unattested. *)
-            ())
-      (0 -- (number_of_slots - 1))
-
-  let update_selected_slot_headers_statuses ~block_level ~attestation_lag
-      ~number_of_slots attested t =
-    let published_level = Int32.(sub block_level (of_int attestation_lag)) in
-    update_slot_headers_attestation
-      ~published_level
-      ~number_of_slots
-      ~attestation_lag
-      t
-      attested
+  let update_slot_header_status t slot_id status =
+    assert (status <> `Waiting_attestation) ;
+    (match get_slot_status t slot_id with
+    | None -> add_status t status slot_id
+    | Some `Unpublished -> assert (status = `Unpublished)
+    | Some `Waiting_attestation -> (
+        match status with
+        | `Attested _lag -> add_status t status slot_id
+        | `Unattested -> add_status t status slot_id
+        | `Unpublished | `Waiting_attestation -> assert false)
+    | Some (`Attested _lag) ->
+        (* If a status was already inserted, then its value was either
+           [Unpublished] or [Waiting_attestation]. *)
+        assert false
+    | Some `Unattested -> assert false) ;
+    match status with
+    | `Attested _lag -> Dal_metrics.slot_attested ~set:true slot_id.slot_index
+    | `Unattested | `Unpublished | `Waiting_attestation ->
+        (* TODO: is the right way to update the metric here?? *)
+        Dal_metrics.slot_attested ~set:false slot_id.slot_index
 end
 
 module Commitment_indexed_cache =

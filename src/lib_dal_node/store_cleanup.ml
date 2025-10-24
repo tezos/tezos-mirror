@@ -49,7 +49,7 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
     let*? dal_constants =
       Node_context.get_proto_parameters ctxt ~level:(`Level level)
     in
-    Block_handler.store_skip_list_cells
+    Block_handler.fetch_and_store_skip_list_cells
       ctxt
       cctxt
       dal_constants

@@ -82,7 +82,8 @@ module Skip_list_cells : sig
     (Skip_list_hash.t
     * Skip_list_cell.t
     * Types.slot_index
-    * Types.attestation_lag)
+    * Types.attestation_lag
+    * Types.header_status option)
     list ->
     unit tzresult Lwt.t
 
