@@ -220,7 +220,7 @@ module Dal_RPC = struct
       | "waiting_attestation" -> Waiting_attestation
       | "attested" -> Attested legacy_attestation_lag
       | "unattested" -> Unattested
-      | "unpublished" -> Unattested
+      | "unpublished" -> Unpublished
       | exception _exn -> (
           match
             JSON.
