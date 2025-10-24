@@ -17,6 +17,7 @@ open Sc_rollup_helpers
 open Rpc.Syntax
 open Test_helpers
 open Setup
+open Delayed_inbox
 
 let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses
@@ -2727,6 +2728,77 @@ let test_node_catchup_on_multichain =
       ~error_msg:"Finalized blueprint check failed. Found %L, expected >= %R") ;
   unit
 
+let test_delayed_deposit_is_included =
+  register_tezlink_test
+    ~time_between_blocks:Nothing
+    ~tags:["sequencer"; "delayed_inbox"; "inclusion"; "deposit"]
+    ~title:"Tezlink Delayed deposit is included"
+  @@
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        proxy;
+        _;
+      }
+      _protocol
+    ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+
+  let* balance =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  Check.((balance = Tez.zero) Tez.typ)
+    ~error_msg:"Expected balance at 0 for bootstrap1" ;
+  let amount = Tez.of_int 1000 in
+  let depositor = Constant.bootstrap5 in
+  let receiver =
+    Result.get_ok
+    @@ Tezos_protocol_alpha.Protocol.Contract_repr.of_b58check
+         Constant.bootstrap1.public_key_hash
+  in
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Tezos_protocol_alpha.Protocol.Contract_repr.encoding
+      receiver
+  in
+  let (`Hex receiver) = Hex.of_bytes bytes in
+  let deposit_info =
+    Delayed_inbox.{receiver = TezosAddr receiver; chain_id = None}
+  in
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~rlp:true
+      ~amount
+      ~bridge:l1_contracts.bridge
+      ~depositor
+      ~deposit_info
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let* balance =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  Check.((balance = Tez.of_int 1000) Tez.typ)
+    ~error_msg:"Expected a 1000 tez on bootstrap1" ;
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -2773,4 +2845,5 @@ let () =
   test_tezlink_origination [Alpha] ;
   test_tezlink_forge_operations [Alpha] ;
   test_tezlink_gas_vs_l1 [Alpha] ;
-  test_node_catchup_on_multichain [Alpha]
+  test_node_catchup_on_multichain [Alpha] ;
+  test_delayed_deposit_is_included [Alpha]

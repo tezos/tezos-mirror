@@ -11,7 +11,11 @@ open Rpc.Syntax
 open Test_helpers
 open Evm_node_lib_dev_encoding.Rlp
 
-type deposit_info = {receiver : string; chain_id : int option}
+type receiver = TezosAddr of string | EthereumAddr of string
+
+let raw_addr = function TezosAddr addr | EthereumAddr addr -> addr
+
+type deposit_info = {receiver : receiver; chain_id : int option}
 
 let encode_option encode_some = function
   | None -> List []
@@ -20,10 +24,18 @@ let encode_option encode_some = function
       List [Value value]
 
 let encode_deposit_info deposit_info =
-  let receiver = Hex.to_bytes (`Hex (remove_0x deposit_info.receiver)) in
+  let receiver =
+    match deposit_info.receiver with
+    | TezosAddr addr ->
+        let tag = Bytes.make 1 '\001' in
+        let receiver = Hex.to_bytes (`Hex (remove_0x addr)) in
+        List [Value tag; Value receiver]
+    | EthereumAddr addr ->
+        let receiver = Hex.to_bytes (`Hex (remove_0x addr)) in
+        Value receiver
+  in
   let bytes =
-    encode
-      (List [Value receiver; encode_option encode_int deposit_info.chain_id])
+    encode (List [receiver; encode_option encode_int deposit_info.chain_id])
   in
   let (`Hex str) = Hex.of_bytes bytes in
   add_0x ("01" ^ str)
@@ -105,7 +117,8 @@ let send_deposit_to_delayed_inbox ?(rlp = false) ~amount ~bridge ~depositor
   (* Implements optional types decoding as in the RLP library from the
    kernel's library. *)
   let infos =
-    if rlp then encode_deposit_info deposit_info else deposit_info.receiver
+    if rlp then encode_deposit_info deposit_info
+    else raw_addr deposit_info.receiver
   in
   let* () =
     Client.transfer

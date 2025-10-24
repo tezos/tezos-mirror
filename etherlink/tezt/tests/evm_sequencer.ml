@@ -1330,7 +1330,9 @@ let test_send_deposit_to_delayed_inbox =
           "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
       }
   in
-  let deposit_info = {receiver = receiver.address; chain_id = None} in
+  let deposit_info =
+    {receiver = EthereumAddr receiver.address; chain_id = None}
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount
@@ -1567,7 +1569,9 @@ let test_delayed_deposit_is_included =
   let* receiver_balance_prev =
     Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
-  let deposit_info = {receiver = receiver.address; chain_id = None} in
+  let deposit_info =
+    {receiver = EthereumAddr receiver.address; chain_id = None}
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount
@@ -1827,7 +1831,10 @@ let test_delayed_transaction_peeked =
      blueprint that contains a deposit.
   *)
   let deposit_info =
-    {receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB"; chain_id = None}
+    {
+      receiver = EthereumAddr "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+      chain_id = None;
+    }
   in
   let* () =
     send_deposit_to_delayed_inbox
@@ -2285,7 +2292,7 @@ let test_delayed_deposit_from_init_rollup_node =
      event. *)
   let amount = Tez.of_int 16 in
   let depositor = Constant.bootstrap5 in
-  let deposit_info = {receiver; chain_id = None} in
+  let deposit_info = {receiver = EthereumAddr receiver; chain_id = None} in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount
@@ -2457,7 +2464,10 @@ let test_init_from_rollup_node_with_delayed_inbox =
   let* () = Evm_node.terminate observer in
   (* Sends a deposit to the delayed inbox. *)
   let deposit_info =
-    {receiver = "0xB7A97043983f24991398E5a82f63F4C58a417185"; chain_id = None}
+    {
+      receiver = EthereumAddr "0xB7A97043983f24991398E5a82f63F4C58a417185";
+      chain_id = None;
+    }
   in
   let* () =
     send_deposit_to_delayed_inbox
@@ -3299,7 +3309,10 @@ let test_empty_block_on_upgrade =
     ->
   (* Send a deposit so the sequencer will in theory add it to its next block. *)
   let deposit_info =
-    {receiver = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB"; chain_id = None}
+    {
+      receiver = EthereumAddr "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+      chain_id = None;
+    }
   in
   let* () =
     send_deposit_to_delayed_inbox
@@ -3522,7 +3535,10 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
       ()
   in
   let deposit_info =
-    {receiver = Eth_account.bootstrap_accounts.(1).address; chain_id = None}
+    {
+      receiver = EthereumAddr Eth_account.bootstrap_accounts.(1).address;
+      chain_id = None;
+    }
   in
   let* () =
     send_deposit_to_delayed_inbox
@@ -6702,7 +6718,10 @@ let test_sequencer_dont_read_level_twice =
     ->
   (* We deposit some Tez to the rollup *)
   let deposit_info =
-    {receiver = Eth_account.bootstrap_accounts.(1).address; chain_id = None}
+    {
+      receiver = EthereumAddr Eth_account.bootstrap_accounts.(1).address;
+      chain_id = None;
+    }
   in
   let* () =
     send_deposit_to_delayed_inbox
@@ -6791,7 +6810,9 @@ let test_outbox_size_limit_resilience ~slow =
   let* receiver_balance_prev =
     Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
-  let deposit_info = {receiver = receiver.address; chain_id = None} in
+  let deposit_info =
+    {receiver = EthereumAddr receiver.address; chain_id = None}
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount
@@ -8783,7 +8804,9 @@ let test_trace_transaction_calltracer_deposit =
   let* receiver_balance_prev =
     Eth_cli.balance ~account:receiver.address ~endpoint ()
   in
-  let deposit_info = {receiver = receiver.address; chain_id = None} in
+  let deposit_info =
+    {receiver = EthereumAddr receiver.address; chain_id = None}
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~amount
@@ -9402,7 +9425,9 @@ let test_deposit_and_fast_withdraw =
     ~error_msg:"Expected %R as initial balance instead of %L" ;
 
   (* Execute the deposit of 100 tez to the rollup. The depositor is the admin account, and the receiver is the Ethereum address. *)
-  let deposit_info = {receiver = receiver.address; chain_id = None} in
+  let deposit_info =
+    {receiver = EthereumAddr receiver.address; chain_id = None}
+  in
   let* () =
     send_deposit_to_delayed_inbox
       ~bridge:l1_contracts.bridge
@@ -12904,7 +12929,10 @@ let test_deposit_event =
   in
   (* Send a deposit to the delayed inbox *)
   let deposit_info =
-    {receiver = Eth_account.bootstrap_accounts.(0).address; chain_id = None}
+    {
+      receiver = EthereumAddr Eth_account.bootstrap_accounts.(0).address;
+      chain_id = None;
+    }
   in
   let* () =
     send_deposit_to_delayed_inbox
