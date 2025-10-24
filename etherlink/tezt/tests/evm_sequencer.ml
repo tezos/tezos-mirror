@@ -4195,7 +4195,7 @@ let test_multiple_flushed_blueprints =
       int)
     ~error_msg:
       (sf
-         "Expected 2 flushed bqlueprints, proxy level before flush is %ld, \
+         "Expected 2 flushed blueprints, proxy level before flush is %ld, \
           after is %%R"
          proxy_head_before_flush) ;
 
