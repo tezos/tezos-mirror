@@ -4676,11 +4676,6 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
   let slot_index = 0 in
   let scenario ~migration_level (dal_parameters : Dal.Parameters.t) client node
       dal_node =
-    let* level = Client.level client in
-    (* We will publish random data for a whole cycle, which includes a migration
-       in the middle. *)
-    let first_level = level + 1 in
-    let last_publication_level = 22 in
     (* [dal_parameters] should contain the parameters of the "previous"
        protocol. *)
     log_step "Getting the parameters of the next protocol" ;
@@ -4691,9 +4686,15 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     in
     let old_lag = dal_parameters.attestation_lag in
     let new_lag = new_dal_parameters.attestation_lag in
-    (* We want to have enough levels to attest in "previous" and to
-       attest in "next" commitments published in "next".
-    *)
+
+    let* level = Client.level client in
+    (* We will publish random data for a whole cycle, which includes a migration
+       in the middle. *)
+    let first_level = level + 1 in
+    let last_publication_level = migration_level + new_lag + 2 in
+
+    (* We want to have enough levels to attest in the "previous" protocol and to
+       attest commitments published in the "next" protocol. *)
     log_step
       "Checking that the migration level is at good distance of both ends" ;
     assert (first_level + old_lag < migration_level) ;
@@ -4730,12 +4731,16 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     let* _level = Node.wait_for_level node last_publication_level in
     log_step "Turning the baker off" ;
     let* () = Agnostic_baker.terminate baker in
-    let check_if_metadata_contain_expected_dal lvl metadata =
-      if lvl <= migration_level then (
+    let check_if_metadata_contain_expected_dal attested_level =
+      let* metadata =
+        Node.RPC.call node
+        @@ RPC.get_chain_block_metadata ~block:(string_of_int attested_level) ()
+      in
+      if attested_level <= migration_level then (
         log_step
           "Checking that level %d which is before migration is considered as \
            attested"
-          lvl ;
+          attested_level ;
         Check.is_true
           ((function
              | None -> false
@@ -4743,19 +4748,23 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
              metadata.RPC.dal_attestation)
           ~__LOC__
           ~error_msg:"Slot before migration is expected to be attested")
-      else if lvl = migration_level + 1 then
+      else if attested_level = migration_level + 1 then (
+        log_step
+          "Checking that migration level %d is not considered as DAL attested \
+           (as it is not attested at all)"
+          attested_level ;
         Check.is_false
           ((function
              | None -> false | Some vec -> Array.fold_left ( || ) false vec)
              metadata.dal_attestation)
           ~__LOC__
-          ~error_msg:"The migration level block is not supposed to be attested"
-      else if lvl <= migration_level + new_lag then (
+          ~error_msg:"The migration level block is not supposed to be attested")
+      else if attested_level <= migration_level + new_lag then (
         log_step
           "Checking that level %d which is after migration but refers to a \
            publication before is attested only if the attestation_level did \
            not change between the 2 protocols."
-          lvl ;
+          attested_level ;
         if new_lag = old_lag then
           Check.is_true
             ((function
@@ -4779,23 +4788,20 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
         log_step
           "Checking that level %d which is after migration and refers to a \
            publication after migration is considered as attested"
-          lvl ;
+          attested_level ;
         Check.is_true
           ((function
              | None -> false
              | Some vec -> Array.length vec > slot_index && vec.(slot_index))
              metadata.dal_attestation)
           ~__LOC__
-          ~error_msg:"Slot published after migration is expected to be attested")
+          ~error_msg:"Slot published after migration is expected to be attested") ;
+      unit
     in
-    let rec loop level =
-      if level <= last_publication_level then
-        let* metadata =
-          Node.RPC.call node
-          @@ RPC.get_chain_block_metadata ~block:(string_of_int level) ()
-        in
-        let () = check_if_metadata_contain_expected_dal level metadata in
-        loop (level + 1)
+    let rec loop attested_level =
+      if attested_level <= last_publication_level then
+        let* () = check_if_metadata_contain_expected_dal attested_level in
+        loop (attested_level + 1)
       else unit
     in
     let* () = loop (first_level + old_lag + 1) in
@@ -4813,25 +4819,14 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     ~migrate_to
     ()
 
-let get_delegate node ~migrate_from ~level ~tb_index =
-  let* json =
-    Node.RPC.call node @@ RPC.get_chain_block_helper_validators ~level ()
-  in
-  let indices_field_name, json =
-    if Protocol.number migrate_from <= 023 then ("slots", json)
-    else ("rounds", JSON.geti 0 json |> JSON.get "delegates")
-  in
+let get_delegate client ~protocol ~level ~tb_index =
+  let* pkh_to_rounds = Operation.Consensus.get_rounds ~level ~protocol client in
   let pkh =
     Option.get
     @@ List.find_map
-         (fun elem ->
-           if
-             List.mem
-               tb_index
-               JSON.(elem |-> indices_field_name |> as_list |> List.map as_int)
-           then Some JSON.(elem |-> "delegate" |> as_string)
-           else None)
-         (JSON.as_list json)
+         (fun (pkh, rounds) ->
+           if List.mem tb_index rounds then Some pkh else None)
+         pkh_to_rounds
   in
   return
   @@ List.find
@@ -4839,24 +4834,14 @@ let get_delegate node ~migrate_from ~level ~tb_index =
        Constant.all_secret_keys
 
 (* A commitment is published in the "previous protocol" and attested in the
-   same protocol. Then, in the "new protocol" a trap denunciation is sent.
+   same protocol.
 
-   This denunciation is valid only if the denounced trap refers to the
-   publication sent "previous attestation lag" before.
+   More precisely, two attestations are crafted, one after "new attestation lag"
+   levels, and one after "previous attestation lag" levels.
 
-   Still in the "previous protocol", a baker DAL attests the publication slot
-   of all levels between the publication level and the migration level
-   (despite the trap fraction being 1).
-
-   Since the migration level is expected to be after publication level +
-   previous attestation lag, the attestation is expected to be in the
-   "previous protocol".
-
-   Then denunciations are sent in the "new protocol", both for the attestation
-   "new attestation lag" and "previous attestation lag" after the publication.
-
-   We expect the one using the "new attestation lag" to be invalid and the
-   other one to be included.
+   Then, two corresponding denunciations are sent in the "new protocol".  We
+   expect the one using the "new attestation lag" attestation to be invalid and
+   the other one to be included.
 *)
 let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
     ~migrate_to =
@@ -4903,30 +4888,32 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
     let* level = Client.level client in
     let publi_with_trap_level = level + 1 in
     Log.info
-      "Computing the delegate which sends the attestation related to the shard \
-       we want to denounce." ;
+      "Computing the delegates which send the two attestations related to the \
+       shard we want to denounce." ;
     (* Given that there are 2 potential attestation lags, we compute the one
        associated to both. *)
     (* This computation relies on the fact the shard index is the same as the
        index in the Tenderbake committee. *)
     let* delegate_old =
       get_delegate
-        node
-        ~migrate_from
+        client
+        ~protocol:migrate_from
         ~level:(publi_with_trap_level + old_lag - 1)
         ~tb_index:shard_index
     in
     let* delegate_new =
       get_delegate
-        node
-        ~migrate_from
+        client
+        ~protocol:migrate_from
         ~level:(publi_with_trap_level + new_lag - 1)
         ~tb_index:shard_index
     in
     (* We want to have enough levels to attest in "previous" what has been
        published at [publi_with_trap_level]. *)
     assert (publi_with_trap_level + old_lag <= migration_level) ;
-    Log.info "Publishing the to-be-denounced slot." ;
+    Log.info
+      "Publishing the to-be-denounced slot at level %d."
+      publi_with_trap_level ;
     let* _op_hash =
       Helpers.publish_commitment
         ~source:Constant.bootstrap1
@@ -4936,9 +4923,6 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
         client
     in
     let* () = bake_for client in
-    Log.info
-      "The to-be-denounced delegates attest at every level, until the \
-       attestation of the denounced shard (included)." ;
     let availability = Slots [slot_index] in
     let craft_attestation delegate =
       let* attestation, _op_hash =
@@ -4952,11 +4936,14 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
       let* signature = Operation.sign attestation client in
       return (attestation, signature)
     in
+    Log.info "Bake %d blocks" (new_lag - 1) ;
     let* () = bake_for ~count:(new_lag - 1) client in
     Log.info "Crafting the attestation using the \"new\" attestation lag" ;
     let* attestation_new = craft_attestation delegate_new in
     let* () =
-      if old_lag <> new_lag then bake_for ~count:(old_lag - new_lag) client
+      if old_lag <> new_lag then (
+        Log.info "Bake %d blocks" (old_lag - new_lag) ;
+        bake_for ~count:(old_lag - new_lag) client)
       else unit
     in
     Log.info "Crafting the attestation using the \"old\" attestation lag" ;
@@ -5003,12 +4990,12 @@ let test_accusation_migration_with_attestation_lag_decrease ~migrate_from
     else
       let () =
         Log.info
-          "Since attestation lag changed, this accusation refer to the wrong \
+          "Since attestation lag changed, this accusation refers to the wrong \
            commitment, hence injection should fail."
       in
       let* _op_hash =
         Operation.Anonymous.inject
-          ~error:Operation_core.dal_entrapment_of_not_published_commitment
+          ~error:Operation.dal_entrapment_of_not_published_commitment
           accusation
           client
       in
@@ -9460,7 +9447,7 @@ let extract_dal_balance_updates balance_updates =
    supposed to be used only by the test scenario below, as it assumes
    [expected_attested_shards] is either 0 or [expected_attestable_shards],
    [denounced] is [false], and there are only two kinds of transfers, both to
-   the delegate itself, as there are no co-stakers in the scenario below.. *)
+   the delegate itself, as there are no co-stakers in the scenario below. *)
 let check_participation_and_rewards participation ~expected_assigned_shards
     ~expected_attestable_slots ~attesting_reward_per_shard dal_balance_updates
     delegate ~sufficient_participation =
@@ -9480,12 +9467,12 @@ let check_participation_and_rewards participation ~expected_assigned_shards
     (participation.delegate_attested_dal_slots = expected_attested_slots)
       ~__LOC__
       int
-      ~error_msg:"Expected that the delegate has attested %L slots, got %R") ;
+      ~error_msg:"Expected that the delegate has attested %R slots, got %L") ;
   Check.(
     (participation.delegate_attestable_dal_slots = expected_attestable_slots)
       ~__LOC__
       int
-      ~error_msg:"Expected that there are %L attestable slots, got %R") ;
+      ~error_msg:"Expected that there are %R attestable slots, got %L") ;
   Check.(
     (participation.sufficient_dal_participation = sufficient_participation)
       ~__LOC__
@@ -9607,10 +9594,14 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let attestation_lag = dal_parameters.Dal.Parameters.attestation_lag in
   (* This constraint makes the test simpler; it could be lifted. *)
-  assert (blocks_per_cycle = dal_parameters.Dal.Parameters.attestation_lag) ;
+  assert (attestation_lag <= blocks_per_cycle) ;
+
   let expected_assigned_shards =
-    let number_of_shards = dal_parameters.cryptobox.number_of_shards in
+    let number_of_shards =
+      dal_parameters.Dal.Parameters.cryptobox.number_of_shards
+    in
     let num_delegates = Array.length Account.Bootstrap.keys in
     number_of_shards * blocks_per_cycle / num_delegates
   in
@@ -9652,6 +9643,7 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
   let* level =
     Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ()
   in
+  Log.info "Current level (and last published level) is %d" level.level ;
   assert (level.cycle_position = blocks_per_cycle - 1) ;
 
   let* check =
@@ -9661,6 +9653,7 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
       ~expected_assigned_shards
       ~expected_attestable_slots
   in
+  Log.info "Check that [delegate_without_dal] sufficiently participated" ;
   let* () = check delegate_without_dal ~sufficient_participation:true in
 
   Log.info "Bake for one more cycle" ;
@@ -9678,14 +9671,18 @@ let test_attesters_receive_dal_rewards _protocol dal_parameters _cryptobox node
   let* check =
     (* [-1] because the participation is obtained one level before the cycle end;
        and another [-1] because the slot for the first level in the cycle was not
-       published *)
-    let expected_attestable_slots = blocks_per_cycle - 2 in
+       published. *)
+    let expected_attestable_slots =
+      min attestation_lag (blocks_per_cycle - 2)
+    in
     check_participation_and_rewards
       node
       ~expected_assigned_shards
       ~expected_attestable_slots
   in
+  Log.info "Check that [delegate_without_dal] did not sufficiently participate" ;
   let* () = check delegate_without_dal ~sufficient_participation:false in
+  Log.info "Check that [delegate_with_dal] sufficiently participated" ;
   let* () = check delegate_with_dal ~sufficient_participation:true in
   unit
 
@@ -10322,9 +10319,9 @@ let test_attester_did_not_attest (protocol : Protocol.t)
     not_attested_by_bootstrap2 ;
   unit
 
-(* [test_duplicate_denunciations] publishes a commitment for slot [0].
-   The test then injects a DAL trapped attestation at level [2] and
-   after baking [attestation_lag] blocks, it attempts to:
+(* [test_duplicate_denunciations] publishes a commitment for slot [0].  After
+   baking [attestation_lag] blocks, the test then injects a DAL trapped
+   attestation. Then it attempts to:
 
    - inject a first denunciation that is expected to succeed,
 
@@ -10339,12 +10336,21 @@ let test_attester_did_not_attest (protocol : Protocol.t)
 let test_duplicate_denunciations protocol dal_parameters cryptobox node client
     _bootstrap_key =
   let slot_index = 0 in
-  Log.info "Bake two blocks" ;
-  let* () = bake_for ~count:2 client in
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let attestation_lag = dal_parameters.Dal.Parameters.attestation_lag in
+  assert (attestation_lag <= blocks_per_cycle) ;
+  let blocks_to_bake = 2 + blocks_per_cycle - attestation_lag in
+  Log.info
+    "Bake %d blocks so that the attestation level is in cycle 1"
+    blocks_to_bake ;
+  let* () = bake_for ~count:blocks_to_bake client in
   let accused = Constant.bootstrap2 in
   let* current_level = Node.get_level node in
   let* shards_with_proofs =
-    let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+    let slot_size = dal_parameters.cryptobox.slot_size in
     let slot = Cryptobox.Internal_for_tests.generate_slot ~slot_size in
     let commitment, proof, shards_with_proofs =
       Helpers.get_commitment_and_shards_with_proofs cryptobox ~slot
@@ -10360,7 +10366,7 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
     in
     return shards_with_proofs
   in
-  let* () = bake_for ~count:dal_parameters.attestation_lag client in
+  let* () = bake_for ~count:attestation_lag client in
   let* current_level = Node.get_level node in
   Log.info "Injecting an attestation at level %d" current_level ;
   let availability = Slots [slot_index] in
@@ -10430,12 +10436,8 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
     Operation.Anonymous.inject
       accusation_dup
       client
-      ~error:Operation_core.already_dal_denounced
+      ~error:Operation.already_dal_denounced
   in
-  let* proto_params =
-    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
-  in
-  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
   let* () = bake_for ~count:blocks_per_cycle client in
   let* current_level = Node.get_level node in
   Log.info
@@ -10446,7 +10448,7 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
     Operation.Anonymous.inject
       accusation_dup
       client
-      ~error:Operation_core.already_dal_denounced
+      ~error:Operation.already_dal_denounced
   in
   let* () = bake_for ~count:blocks_per_cycle client in
   let* current_level = Node.get_level node in
@@ -10458,7 +10460,7 @@ let test_duplicate_denunciations protocol dal_parameters cryptobox node client
     Operation.Anonymous.inject
       accusation_dup
       client
-      ~error:Operation_core.outdated_dal_denunciation
+      ~error:Operation.outdated_dal_denunciation
   in
   unit
 
@@ -10664,8 +10666,6 @@ let test_e2e_trap_faulty_dal_node protocol dal_parameters _cryptobox node client
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
   in
   let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
-  (* This constraint makes the test simpler; it could be lifted. *)
-  assert (blocks_per_cycle = dal_parameters.Dal.Parameters.attestation_lag) ;
   let target_attested_level = (2 * blocks_per_cycle) + 1 in
   let faulty_delegate = Constant.bootstrap1.Account.public_key_hash in
   let proxy =
@@ -11108,7 +11108,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
   let inject_attestations () =
     let count_dal_attesting_bakers = ref 0 in
     (* 1. Baker always attests TB and all DAL slots *)
-    let* (_ : Operation_core.t * [`OpHash of peer_id]) =
+    let* (_ : Operation.t * [`OpHash of peer_id]) =
       (* The baker delegate will miss 1/10 of its DAL attestations and will send
          [No_dal_attestation] in this case. *)
       let baker_attestation =
@@ -11125,7 +11125,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
         client
     in
     (* 2. attesting_dal_slot_10 always attests TB and DAL slot 10 *)
-    let* (_ : Operation_core.t * [`OpHash of peer_id]) =
+    let* (_ : Operation.t * [`OpHash of peer_id]) =
       (* The attesting_dal_slot_10 delegate misses 1/11th of its DAL
          attestations and will send Slots [], but it should be fine for its
          rewards. *)
@@ -11144,7 +11144,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
     in
     (* 3. not_attesting_at_all is not attesting neither TB nor DAL slots *)
     (* 4. not_attesting_dal either sends no DAL content or sends bitset 0 *)
-    let* (_ : Operation_core.t * [`OpHash of peer_id]) =
+    let* (_ : Operation.t * [`OpHash of peer_id]) =
       let dal_attestation =
         if !level mod 2 = 0 then No_dal_attestation else Slots []
       in
@@ -11157,7 +11157,7 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
     in
     (* 5. not_sufficiently_attesting_dal_slot_10: is attesting DAL slot 10, but only 25%
        of the time. *)
-    let* (_ : Operation_core.t * [`OpHash of peer_id]) =
+    let* (_ : Operation.t * [`OpHash of peer_id]) =
       let slots_to_attest =
         if !level mod 4 = 0 then (
           incr count_dal_attesting_bakers ;

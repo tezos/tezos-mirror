@@ -509,7 +509,8 @@ module Consensus = struct
 
   let get_rounds ~level ~protocol client =
     let* rpc_json =
-      Client.RPC.call client @@ RPC.get_chain_block_helper_validators ~level ()
+      Client.RPC.call_via_endpoint client
+      @@ RPC.get_chain_block_helper_validators ~level ()
     in
     let open JSON in
     let list =
@@ -548,7 +549,7 @@ module Consensus = struct
     let delegate = Option.map get_pkh delegate in
     let consensus_key = Option.map get_pkh consensus_key in
     let* rpc_json =
-      Client.RPC.call client
+      Client.RPC.call_via_endpoint client
       @@ RPC.get_chain_block_helper_validators
            ~level
            ?delegate

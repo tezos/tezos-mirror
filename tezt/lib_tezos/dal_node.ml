@@ -585,7 +585,7 @@ module Proxy = struct
       let path = Uri.path uri in
       match find_mocked_action t ~path with
       | Some action -> (
-          Log.info "[%s] mocking data for request: '%s'" t.name uri_str ;
+          Log.debug "[%s] mocking data for request: '%s'" t.name uri_str ;
           let* res =
             action.callback ~path ~fetch_answer:(fun () ->
                 let headers = Cohttp.Request.headers req in
@@ -602,10 +602,10 @@ module Proxy = struct
           match res with
           | None -> Cohttp_lwt_unix.Server.respond_not_found ()
           | Some (`Response body) ->
-              Log.info "[%s] mocking with custom answer '%s'" t.name body ;
+              Log.debug "[%s] mocking with custom answer '%s'" t.name body ;
               Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ())
       | None ->
-          Log.info
+          Log.debug
             "[%s] forwarding the following request to the honest dal node: '%s'"
             t.name
             uri_str ;
@@ -614,7 +614,7 @@ module Proxy = struct
             Cohttp_lwt_unix.Client.call ~headers ~body method_ (dal_uri uri)
           in
           let* body_str = Cohttp_lwt.Body.to_string body in
-          Log.info
+          Log.debug
             "[%s] mocking with honest dal node answer: '%s'"
             t.name
             body_str ;
