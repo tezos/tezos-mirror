@@ -564,10 +564,10 @@ let register_published_commitment node_ctxt commitment ~first_published_at_level
         {first_published_at_level; published_at_level}
     else return_unit
   in
-  Metrics.wrap (fun () ->
-      if published_by_us then Metrics.Info.set_lpc_level_local level
-      else Metrics.Info.set_lpc_level_l1 level) ;
+  Metrics.wrap (fun () -> Metrics.Info.set_lpc_level_l1 commitment.inbox_level) ;
   when_ published_by_us @@ fun () ->
+  Metrics.wrap (fun () ->
+      Metrics.Info.set_lpc_level_local commitment.inbox_level) ;
   let* () =
     Store.State.LPC.set node_ctxt.store (commitment_hash, commitment.inbox_level)
   in

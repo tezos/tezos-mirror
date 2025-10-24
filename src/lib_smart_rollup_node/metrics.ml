@@ -250,13 +250,22 @@ module Info = struct
       Int32.to_float
 
   let set_lpc_level_l1 =
-    set_gauge "Last published commitment on L1" "lpc_level_l1" Int32.to_float
+    let gauge =
+      v_gauge ~help:"Last published commitment on L1" "lpc_level_l1"
+    in
+    fun lpc ->
+      let new_lpc = Int32.to_float lpc in
+      let old_lpc = Gauge.read gauge in
+      Gauge.set gauge (max new_lpc old_lpc)
 
   let set_lpc_level_local =
-    set_gauge
-      "Last published commitment by operator"
-      "lpc_level_local"
-      Int32.to_float
+    let gauge =
+      v_gauge ~help:"Last published commitment by operator" "lpc_level_local"
+    in
+    fun lpc ->
+      let new_lpc = Int32.to_float lpc in
+      let old_lpc = Gauge.read gauge in
+      Gauge.set gauge (max new_lpc old_lpc)
 
   let set_commitment_period =
     set_gauge "Current commitment period" "commitment_period" float_of_int
