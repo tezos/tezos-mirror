@@ -68,13 +68,14 @@ let config_init_command =
           no_degraded_arg
           gc_frequency_arg
           history_mode_arg)
-       (args6
+       (args7
           cors_allowed_origins_arg
           cors_allowed_headers_arg
           bail_on_disagree_switch
           unsafe_disable_wasm_kernel_checks_switch
           profiling_arg
-          etherlink_switch))
+          etherlink_switch
+          l1_monitor_finalized_switch))
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -109,7 +110,8 @@ let config_init_command =
              bail_on_disagree,
              unsafe_disable_wasm_kernel_checks,
              profiling,
-             force_etherlink ) )
+             force_etherlink,
+             l1_monitor_finalized ) )
          mode
          sc_rollup_address
          operators
@@ -154,6 +156,7 @@ let config_init_command =
           ~bail_on_disagree
           ~profiling
           ~force_etherlink
+          ~l1_monitor_finalized
       in
       let config_file = Configuration.config_filename ~data_dir config_file in
       let* () = Configuration.save ~force ~config_file config in
@@ -172,7 +175,7 @@ let legacy_run_command =
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
     (merge_options
-       (args11
+       (args12
           data_dir_arg
           config_file_arg
           mode_arg
@@ -183,7 +186,8 @@ let legacy_run_command =
           acl_override_arg
           metrics_addr_arg
           enable_performance_metrics_arg
-          disable_performance_metrics_arg)
+          disable_performance_metrics_arg
+          l1_monitor_finalized_switch)
        (args21
           loser_mode_arg
           reconnection_delay_arg
@@ -217,7 +221,8 @@ let legacy_run_command =
              acl_override,
              metrics_addr,
              enable_performance_metrics,
-             disable_performance_metrics ),
+             disable_performance_metrics,
+             l1_monitor_finalized ),
            ( loser_mode,
              reconnection_delay,
              dal_node_endpoint,
@@ -282,6 +287,7 @@ let legacy_run_command =
           ~bail_on_disagree
           ~profiling
           ~force_etherlink
+          ~l1_monitor_finalized
       in
       Rollup_node_daemon.run
         ~data_dir
@@ -299,7 +305,7 @@ let run_command =
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
     (merge_options
-       (args13
+       (args14
           data_dir_arg
           config_file_arg
           rpc_addr_arg
@@ -310,6 +316,7 @@ let run_command =
           enable_performance_metrics_arg
           disable_performance_metrics_arg
           loser_mode_arg
+          l1_monitor_finalized_switch
           reconnection_delay_arg
           dal_node_endpoint_arg
           pre_images_endpoint_arg)
@@ -345,6 +352,7 @@ let run_command =
              enable_performance_metrics,
              disable_performance_metrics,
              loser_mode,
+             l1_monitor_finalized,
              reconnection_delay,
              dal_node_endpoint,
              pre_images_endpoint ),
@@ -411,6 +419,7 @@ let run_command =
           ~bail_on_disagree
           ~profiling
           ~force_etherlink
+          ~l1_monitor_finalized
       in
       Rollup_node_daemon.run
         ~data_dir

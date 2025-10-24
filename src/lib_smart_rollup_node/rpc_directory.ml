@@ -171,8 +171,12 @@ let () =
     | Some {header = {timestamp; _}; _} ->
         Time.Protocol.diff Time.System.(to_protocol @@ now ()) timestamp > 60L
   in
+  let l1_lateness_threshold =
+    if node_ctxt.config.l1_monitor_finalized then 3l else 1l
+  in
   let healthy =
-    (not degraded) && l1_connection = `Connected && l1_blocks_late <= 1l
+    (not degraded) && l1_connection = `Connected
+    && l1_blocks_late <= l1_lateness_threshold
     && (not l1_likely_late)
     && List.for_all (fun (_name, st) -> st = `Running) active_workers
   in
@@ -254,13 +258,10 @@ let () =
 (* Sets up a block watching service. It creates a stream to
    observe block events and asynchronously fetches the next
    block when available *)
-let create_block_watcher_service (node_ctxt : _ Node_context.t) =
+let create_block_watcher_service first_block watcher =
   let open Lwt_syntax in
   (* input source block creating a stream to observe the events *)
-  let block_stream, stopper =
-    Lwt_watcher.create_stream node_ctxt.global_block_watcher
-  in
-  let* head = Node_context.last_processed_head_opt node_ctxt in
+  let block_stream, stopper = Lwt_watcher.create_stream watcher in
   let shutdown () = Lwt_watcher.shutdown stopper in
   (* generate the next asynchronous event *)
   let next =
@@ -268,7 +269,7 @@ let create_block_watcher_service (node_ctxt : _ Node_context.t) =
     fun () ->
       if !first_call then (
         first_call := false ;
-        return (Result.to_option head |> Option.join))
+        return (Result.to_option first_block |> Option.join))
       else Lwt_stream.get block_stream
   in
   Tezos_rpc.Answer.return_stream {next; shutdown}
@@ -276,7 +277,18 @@ let create_block_watcher_service (node_ctxt : _ Node_context.t) =
 let () =
   Global_directory.gen_register0
     Rollup_node_services.Global.global_block_watcher
-  @@ fun node_ctxt () () -> create_block_watcher_service node_ctxt
+  @@ fun node_ctxt () () ->
+  let open Lwt_syntax in
+  let* head = Node_context.last_processed_head_opt node_ctxt in
+  create_block_watcher_service head node_ctxt.global_block_watcher
+
+let () =
+  Global_directory.gen_register0
+    Rollup_node_services.Global.finalized_block_watcher
+  @@ fun node_ctxt () () ->
+  let open Lwt_syntax in
+  let* finalized = Node_context.get_finalized_head_opt node_ctxt in
+  create_block_watcher_service finalized node_ctxt.finalized_block_watcher
 
 let () =
   Block_directory.register0 Rollup_node_services.Block.block

@@ -91,6 +91,7 @@ type t = {
   l1_blocks_cache_size : int;
   l2_blocks_cache_size : int;
   prefetch_blocks : int option;
+  l1_monitor_finalized : bool;
   l1_rpc_timeout : float;
   loop_retry_delay : float;
   index_buffer_size : int option;
@@ -246,6 +247,8 @@ let default_l1_blocks_cache_size = 64
 let default_l2_blocks_cache_size = 64
 
 let default_l1_rpc_timeout = 60. (* seconds *)
+
+let default_l1_monitor_finalized = false
 
 let default_loop_retry_delay = 10. (* seconds *)
 
@@ -534,6 +537,7 @@ let encoding default_display : t Data_encoding.t =
            l1_blocks_cache_size;
            l2_blocks_cache_size;
            prefetch_blocks;
+           l1_monitor_finalized;
            l1_rpc_timeout;
            loop_retry_delay;
            index_buffer_size;
@@ -571,7 +575,8 @@ let encoding default_display : t Data_encoding.t =
             injector,
             l1_blocks_cache_size,
             l2_blocks_cache_size,
-            prefetch_blocks ),
+            prefetch_blocks,
+            l1_monitor_finalized ),
           ( ( l1_rpc_timeout,
               loop_retry_delay,
               index_buffer_size,
@@ -607,7 +612,8 @@ let encoding default_display : t Data_encoding.t =
                injector,
                l1_blocks_cache_size,
                l2_blocks_cache_size,
-               prefetch_blocks ),
+               prefetch_blocks,
+               l1_monitor_finalized ),
              ( ( l1_rpc_timeout,
                  loop_retry_delay,
                  index_buffer_size,
@@ -649,6 +655,7 @@ let encoding default_display : t Data_encoding.t =
         l1_blocks_cache_size;
         l2_blocks_cache_size;
         prefetch_blocks;
+        l1_monitor_finalized;
         l1_rpc_timeout;
         loop_retry_delay;
         index_buffer_size;
@@ -741,14 +748,15 @@ let encoding default_display : t Data_encoding.t =
                 execute_outbox_messages_filter_encoding
                 default_execute_outbox_filter)))
        (merge_objs
-          (obj7
+          (obj8
              (opt "DAL node endpoint" Tezos_rpc.Encoding.uri_encoding)
              (opt "pre-images-endpoint" Tezos_rpc.Encoding.uri_encoding)
              (dft "batcher" batcher_encoding default_batcher)
              (dft "injector" injector_encoding default_injector)
              (dft "l1_blocks_cache_size" int31 default_l1_blocks_cache_size)
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
-             (opt "prefetch_blocks" int31))
+             (opt "prefetch_blocks" int31)
+             (dft "l1_monitor_finalized" bool default_l1_monitor_finalized))
           (merge_objs
              (obj7
                 (dft
@@ -897,7 +905,7 @@ module Cli = struct
       ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
       ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
       ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
-      ~force_etherlink =
+      ~force_etherlink ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
@@ -948,6 +956,7 @@ module Cli = struct
         l1_blocks_cache_size = default_l1_blocks_cache_size;
         l2_blocks_cache_size = default_l2_blocks_cache_size;
         prefetch_blocks = None;
+        l1_monitor_finalized;
         l1_rpc_timeout = default_l1_rpc_timeout;
         loop_retry_delay = default_loop_retry_delay;
         index_buffer_size;
@@ -983,7 +992,7 @@ module Cli = struct
       ~irmin_cache_size ~log_kernel_debug ~log_kernel_debug_file ~no_degraded
       ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
       ~apply_unsafe_patches ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree
-      ~profiling ~force_etherlink =
+      ~profiling ~force_etherlink ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let*? () = check_custom_mode mode in
@@ -1090,6 +1099,7 @@ module Cli = struct
           (match profiling with
           | None -> configuration.opentelemetry
           | Some enable -> {configuration.opentelemetry with enable});
+        l1_monitor_finalized;
       }
 
   let create_or_read_config ~config_file ~rpc_addr ~rpc_port ~acl_override
@@ -1100,7 +1110,7 @@ module Cli = struct
       ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
       ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
       ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
-      ~force_etherlink =
+      ~force_etherlink ~l1_monitor_finalized =
     let open Lwt_result_syntax in
     let*! exists_config = Lwt_unix.file_exists config_file in
     if exists_config then
@@ -1140,6 +1150,7 @@ module Cli = struct
           ~bail_on_disagree
           ~profiling
           ~force_etherlink
+          ~l1_monitor_finalized
       in
       return configuration
     else
@@ -1194,6 +1205,7 @@ module Cli = struct
           ~bail_on_disagree
           ~profiling
           ~force_etherlink
+          ~l1_monitor_finalized
       in
       return config
 end

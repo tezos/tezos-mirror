@@ -101,6 +101,17 @@ val shutdown : t -> unit Lwt.t
 val iter_heads :
   ?name:string -> t -> (header -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
 
+(** [iter_finalized_heads ?name ~prefetch t f] is the same as [iter_heads] but
+    only iterates on blocks that are considered finalized. [prefetch] is a
+    function that is called as soon as a block is seen on L1, even if it's
+    unfinalized, to prefetch it for the next processing call. *)
+val iter_finalized_heads :
+  ?name:string ->
+  prefetch:(t -> head -> unit) ->
+  t ->
+  (header -> unit tzresult Lwt.t) ->
+  unit tzresult Lwt.t
+
 (** [wait_first t] waits for the first head to appear in the stream and
     returns it. *)
 val wait_first : t -> header Lwt.t
