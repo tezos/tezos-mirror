@@ -116,6 +116,20 @@ module Event = struct
       ("inbox_level", Data_encoding.int32)
       ("content", Data_encoding.bytes)
       ~pp5:pp_content_elipsis
+
+  let pages_reveal_failed =
+    declare_4
+      ~section
+      ~name:"dal_pages_reveal_failed"
+      ~msg:
+        "Fetching pages at inbox level {inbox_level} of slot index \
+         {slot_index} published at level {published_level} failed with {error}"
+      ~level:Error
+      ("inbox_level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("published_level", Data_encoding.int32)
+      ~pp4:Error_monad.pp_print_trace
+      ("error", Error_monad.trace_encoding)
 end
 
 module Slot_id_cache =
@@ -239,7 +253,7 @@ let attestation_status_not_final published_level slot_index =
   in
   Environment.wrap_tzresult res |> Lwt.return
 
-let slot_pages
+let slot_pages_int
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
     ~dal_activation_level ~inbox_level node_ctxt slot_id
     ~dal_attested_slots_validity_lag =
@@ -277,7 +291,7 @@ let slot_pages
   | `Unattested | `Unpublished -> return_none
   | `Waiting_attestation -> attestation_status_not_final published_level index
 
-let page_content
+let page_content_int
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
     ~dal_activation_level ~inbox_level node_ctxt
     ~attestation_threshold_percent:_ ~restricted_commitments_publishers:_
@@ -312,3 +326,47 @@ let page_content
       else get_page dal_cctxt ~inbox_level page_id
   | `Unattested | `Unpublished -> return_none
   | `Waiting_attestation -> attestation_status_not_final published_level index
+
+let with_errors_logging ~inbox_level slot_id f =
+  let open Lwt_syntax in
+  let* res = f in
+  let+ () =
+    match res with
+    | Ok _ -> return_unit
+    | Error err ->
+        Event.(emit pages_reveal_failed)
+          ( inbox_level,
+            Dal.(Slot_index.to_int slot_id.index),
+            Raw_level.to_int32 slot_id.published_level,
+            err )
+  in
+  res
+
+let page_content
+    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
+    ~dal_activation_level ~inbox_level node_ctxt ~attestation_threshold_percent
+    ~restricted_commitments_publishers page_id ~dal_attested_slots_validity_lag
+    =
+  with_errors_logging ~inbox_level page_id.Dal.Page.slot_id
+  @@ page_content_int
+       dal_constants
+       ~dal_activation_level
+       ~inbox_level
+       node_ctxt
+       ~attestation_threshold_percent
+       ~restricted_commitments_publishers
+       page_id
+       ~dal_attested_slots_validity_lag
+
+let slot_pages
+    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
+    ~dal_activation_level ~inbox_level node_ctxt slot_id
+    ~dal_attested_slots_validity_lag =
+  with_errors_logging ~inbox_level slot_id
+  @@ slot_pages_int
+       dal_constants
+       ~dal_activation_level
+       ~inbox_level
+       node_ctxt
+       slot_id
+       ~dal_attested_slots_validity_lag
