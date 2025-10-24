@@ -62,9 +62,19 @@ fi
 # Enable release-cli verbose mode
 export DEBUG='true'
 
+deprecated_release_name="${gitlab_release_name} - GitLab Releases Deprecated, See octez.tezos.com/releases/"
+
 release-cli create \
-  --name="${gitlab_release_name}" \
+  --name="${deprecated_release_name}" \
   --tag-name="${CI_COMMIT_TAG}" \
+  --description="⚠️ **DEPRECATION NOTICE** ⚠️
+
+This GitLab release page is deprecated. Please use our new dedicated release page for the latest releases and information.
+
+🔗 **New Release Page: https://octez.tezos.com/releases/**
+
+This page will no longer be updated. All future releases and updates will be available on the new release page." \
+  --assets-link="{\"name\":\"NEW RELEASE PAGE (Use This Instead)\",\"url\":\"https://octez.tezos.com/releases/\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Changelog\",\"url\":\"https://octez.tezos.com/docs/CHANGES.html#version-${gitlab_release_no_dot}\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Announcement\",\"url\":\"https://octez.tezos.com/docs/releases/version-${gitlab_release_major_version}.html\",\"link_type\":\"other\"}" \
   --assets-link="{\"name\":\"Docker image\",\"url\":\"${docker_image_url}\",\"link_type\":\"image\"}" \
