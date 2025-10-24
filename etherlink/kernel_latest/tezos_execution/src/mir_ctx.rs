@@ -24,6 +24,7 @@ use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::ChainId;
 use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup::types::{Contract, Timestamp};
 use tezos_storage::{read_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::BlockNumber;
@@ -128,20 +129,24 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a> for TcCtx<'a, Host> {
         &mut self,
         id: &BigMapId,
     ) -> Result<Option<(Type, Type)>, LazyStorageError> {
-        let big_map_path = big_map_path(self.context, id)?;
-        if self.host.store_has(&big_map_path)?.is_none() {
-            return Ok(None);
-        }
-
         let arena = Arena::new();
         let key_type_path = key_type_path(self.context, id)?;
         let value_type_path = value_type_path(self.context, id)?;
 
-        let encoded_key_type = self.host.store_read_all(&key_type_path)?;
+        let encoded_key_type = match self.host.store_read_all(&key_type_path) {
+            Ok(key_type) => Ok(key_type),
+            Err(RuntimeError::PathNotFound) => return Ok(None),
+            Err(err) => Err(err),
+        }?;
+
         let key_type =
             Micheline::decode_raw(&arena, &encoded_key_type)?.parse_ty(self.gas())?;
 
-        let encoded_value_type = self.host.store_read_all(&value_type_path)?;
+        let encoded_value_type = match self.host.store_read_all(&value_type_path) {
+            Ok(key_type) => Ok(key_type),
+            Err(RuntimeError::PathNotFound) => return Ok(None),
+            Err(err) => Err(err),
+        }?;
         let value_type =
             Micheline::decode_raw(&arena, &encoded_value_type)?.parse_ty(self.gas())?;
 
