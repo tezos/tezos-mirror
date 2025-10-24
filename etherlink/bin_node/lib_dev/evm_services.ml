@@ -248,10 +248,10 @@ let register get_next_blueprint_number find_blueprint_legacy find_blueprint
   |> register_broadcast_service find_blueprint get_next_blueprint_number
   |> register_preconfirmation_service ()
 
-let get_smart_rollup_address ~keep_alive ?timeout evm_node_endpoint =
+let get_smart_rollup_address ~keep_alive ~timeout evm_node_endpoint =
   Rollup_services.call_service
     ~keep_alive
-    ?timeout
+    ~timeout
     ~media_types:[Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_smart_rollup_address_service
@@ -259,12 +259,12 @@ let get_smart_rollup_address ~keep_alive ?timeout evm_node_endpoint =
     ()
     ()
 
-let get_time_between_blocks ?fallback ?timeout ~evm_node_endpoint () =
+let get_time_between_blocks ?fallback ~timeout ~evm_node_endpoint () =
   let open Lwt_result_syntax in
   let*! res =
     Rollup_services.call_service
       ~keep_alive:false
-      ?timeout
+      ~timeout
       ~media_types:[Media_type.octet_stream]
       ~base:evm_node_endpoint
       get_time_between_blocks_service
@@ -279,11 +279,11 @@ let get_time_between_blocks ?fallback ?timeout ~evm_node_endpoint () =
       return res
   | Error trace, None -> fail trace
 
-let get_blueprint ~keep_alive ?timeout ~evm_node_endpoint
+let get_blueprint ~keep_alive ~timeout ~evm_node_endpoint
     Ethereum_types.(Qty level) =
   Rollup_services.call_service
     ~keep_alive
-    ?timeout
+    ~timeout
     ~media_types:[Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_blueprint_service
@@ -291,11 +291,11 @@ let get_blueprint ~keep_alive ?timeout ~evm_node_endpoint
     ()
     ()
 
-let get_blueprints ~keep_alive ?timeout ~evm_node_endpoint ~count
+let get_blueprints ~keep_alive ~timeout ~evm_node_endpoint ~count
     Ethereum_types.(Qty level) =
   Rollup_services.call_service
     ~keep_alive
-    ?timeout
+    ~timeout
     ~media_types:[Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_blueprints_service
@@ -303,11 +303,11 @@ let get_blueprints ~keep_alive ?timeout ~evm_node_endpoint ~count
     {from_level = Z.to_int64 level; count}
     ()
 
-let get_blueprint_with_events ~keep_alive ?timeout ~evm_node_endpoint
+let get_blueprint_with_events ~keep_alive ~timeout ~evm_node_endpoint
     Ethereum_types.(Qty level) =
   Rollup_services.call_service
     ~keep_alive
-    ?timeout
+    ~timeout
     ~media_types:[Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_blueprint_with_events_service
@@ -315,11 +315,11 @@ let get_blueprint_with_events ~keep_alive ?timeout ~evm_node_endpoint
     ()
     ()
 
-let get_blueprints_with_events ~keep_alive ?timeout ~evm_node_endpoint ~count
+let get_blueprints_with_events ~keep_alive ~timeout ~evm_node_endpoint ~count
     Ethereum_types.(Qty level) =
   Rollup_services.call_service
     ~keep_alive
-    ?timeout
+    ~timeout
     ~media_types:[Media_type.octet_stream]
     ~base:evm_node_endpoint
     get_blueprints_with_events_service
@@ -327,7 +327,7 @@ let get_blueprints_with_events ~keep_alive ?timeout ~evm_node_endpoint ~count
     {from_level = Z.to_int64 level; count}
     ()
 
-let monitor_blueprints ~evm_node_endpoint ?timeout Ethereum_types.(Qty level) =
+let monitor_blueprints ~evm_node_endpoint ~timeout Ethereum_types.(Qty level) =
   let open Lwt_result_syntax in
   let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
@@ -358,7 +358,7 @@ let close_monitor {closefn; _} = closefn ()
 
 let get_from_monitor {stream; _} = Lwt_stream.get stream
 
-let monitor_messages ~evm_node_endpoint ?timeout Ethereum_types.(Qty level) =
+let monitor_messages ~evm_node_endpoint ~timeout Ethereum_types.(Qty level) =
   let open Lwt_result_syntax in
   let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
@@ -383,7 +383,7 @@ let monitor_messages ~evm_node_endpoint ?timeout Ethereum_types.(Qty level) =
   in
   return {stream; closefn}
 
-let monitor_preconfirmations ?timeout evm_node_endpoint =
+let monitor_preconfirmations ~timeout evm_node_endpoint =
   let open Lwt_result_syntax in
   let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in

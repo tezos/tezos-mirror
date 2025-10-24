@@ -19,6 +19,7 @@ let controller_from_signer ~rpc_endpoint ~min_balance controller =
     Batch.call
       (module Rpc_encodings.Get_balance)
       ~keep_alive:true
+      ~timeout:Network_info.timeout
       ~evm_node_endpoint:rpc_endpoint
       (Account.address_et controller, Block_parameter Latest)
   in
@@ -130,6 +131,7 @@ let rec get_transaction_receipt rpc_endpoint txn_hash =
     Batch.call
       (module Rpc_encodings.Get_transaction_receipt)
       ~keep_alive:true
+      ~timeout:Network_info.timeout
       ~evm_node_endpoint:rpc_endpoint
       txn_hash
   in
@@ -345,6 +347,7 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
     Batch.call
       (module Rpc_encodings.Block_number)
       ~keep_alive:true
+      ~timeout:Network_info.timeout
       ~evm_node_endpoint:relay_endpoint
       ()
   in
@@ -352,12 +355,14 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
     Evm_services.get_time_between_blocks
       ~fallback:(Time_between_blocks 10.)
       ~evm_node_endpoint:rpc_endpoint
+      ~timeout:Network_info.timeout
       ()
   in
   Blueprints_follower.start
     ~multichain:false
     ~time_between_blocks
     ~evm_node_endpoint:relay_endpoint
+    ~rpc_timeout:Network_info.timeout
     ~next_blueprint_number
     ~on_new_blueprint:(fun number blueprint ->
       let*! () = Floodgate_events.received_blueprint number in

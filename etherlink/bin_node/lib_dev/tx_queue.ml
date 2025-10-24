@@ -9,7 +9,7 @@
 type parameters = {
   config : Configuration.tx_queue;
   keep_alive : bool;
-  timeout : float option;
+  timeout : float;
 }
 
 type queue_variant = [`Accepted | `Refused]
@@ -261,7 +261,7 @@ struct
     config : Configuration.tx_queue;
     keep_alive : bool;
     mutable locked : bool;
-    timeout : float option;
+    timeout : float;
   }
 
   module Types = struct
@@ -622,7 +622,7 @@ struct
               Rollup_services.call_service
                 ~keep_alive
                 ~base
-                ?timeout
+                ~timeout
                 (Batch.dispatch_batch_service ~path:Resto.Path.root)
                 ()
                 ()
@@ -634,15 +634,11 @@ struct
             check_missed_transactions ~self ~hashes ~responses
         | Websocket ws_client ->
             let timeout =
-              Option.map
-                (fun timeout ->
-                  Websocket_client.
-                    {
-                      timeout;
-                      on_timeout =
-                        (if keep_alive then `Retry_forever else `Fail);
-                    })
-                timeout
+              Websocket_client.
+                {
+                  timeout;
+                  on_timeout = (if keep_alive then `Retry_forever else `Fail);
+                }
             in
             let batch, hashes = build_batch transactions in
             let*! () =
@@ -652,7 +648,7 @@ struct
               List.map_ep
                 (fun req ->
                   let*! response =
-                    Websocket_client.send_jsonrpc_request ?timeout ws_client req
+                    Websocket_client.send_jsonrpc_request ~timeout ws_client req
                   in
                   return Rpc_encodings.JSONRPC.{value = response; id = req.id})
                 batch
@@ -1289,9 +1285,9 @@ struct
          {validate_tx; validation_state = initial_validation_state})
     |> handle_request_error
 
-  let start ~config ~keep_alive ?timeout () =
+  let start ~config ~keep_alive ~timeout () =
     let open Lwt_result_syntax in
-    let timeout = Option.map (min 5.) timeout in
+    let timeout = min timeout 5. in
     let* worker =
       Worker.launch table () {config; keep_alive; timeout} (module Handlers)
     in

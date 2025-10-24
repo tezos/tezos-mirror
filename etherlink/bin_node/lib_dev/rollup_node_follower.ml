@@ -216,7 +216,10 @@ let start ~keep_alive ?on_new_head ~rollup_node_endpoint
   Misc.unwrap_error_monad @@ fun () ->
   let open Lwt_result_syntax in
   let* oldest_rollup_node_known_l1_level =
-    Rollup_services.oldest_known_l1_level ~keep_alive rollup_node_endpoint
+    Rollup_services.oldest_known_l1_level
+      ~keep_alive
+      ~timeout:rollup_node_endpoint_timeout
+      rollup_node_endpoint
   in
   let* connection =
     connect_to_stream

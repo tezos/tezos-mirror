@@ -13,27 +13,27 @@ val get_from_monitor : 'a monitor -> 'a option Lwt.t
 
 val get_smart_rollup_address :
   keep_alive:bool ->
-  ?timeout:float ->
+  timeout:float ->
   Uri.t ->
   Tezos_crypto.Hashed.Smart_rollup_address.t tzresult Lwt.t
 
 val get_time_between_blocks :
   ?fallback:Configuration.time_between_blocks ->
-  ?timeout:float ->
+  timeout:float ->
   evm_node_endpoint:Uri.t ->
   unit ->
   Configuration.time_between_blocks tzresult Lwt.t
 
 val get_blueprint :
   keep_alive:bool ->
-  ?timeout:float ->
+  timeout:float ->
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
   Blueprint_types.Legacy.with_events tzresult Lwt.t
 
 val get_blueprints :
   keep_alive:bool ->
-  ?timeout:float ->
+  timeout:float ->
   evm_node_endpoint:Uri.t ->
   count:int64 ->
   Ethereum_types.quantity ->
@@ -41,14 +41,14 @@ val get_blueprints :
 
 val get_blueprint_with_events :
   keep_alive:bool ->
-  ?timeout:float ->
+  timeout:float ->
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
   Blueprint_types.with_events tzresult Lwt.t
 
 val get_blueprints_with_events :
   keep_alive:bool ->
-  ?timeout:float ->
+  timeout:float ->
   evm_node_endpoint:Uri.t ->
   count:int64 ->
   Ethereum_types.quantity ->
@@ -66,20 +66,23 @@ val register :
 
 val monitor_blueprints :
   evm_node_endpoint:Uri.t ->
-  ?timeout:float ->
+  timeout:float ->
   Ethereum_types.quantity ->
   Blueprint_types.Legacy.with_events Lwt_stream.t tzresult Lwt.t
 
 val monitor_messages :
   evm_node_endpoint:Uri.t ->
-  ?timeout:float ->
+  timeout:float ->
   Ethereum_types.quantity ->
   Broadcast.message monitor tzresult Lwt.t
 
-(** [monitor_preconfirmations evm_node_endpoint] connects to the given [evm_node_endpoint]
-    and starts monitoring the stream of incoming {!Broadcast.preconfirmation_message}.
-    Target node must support preconfirmation streaming, which only includes sequencers. *)
+(** [monitor_preconfirmations ~timeout evm_node_endpoint] connects to the given
+    [evm_node_endpoint] and starts monitoring the stream of incoming
+    {!Broadcast.preconfirmation_message}.  Target node must support
+    preconfirmation streaming, which only includes sequencers. Initial
+    connection to the node [evm_node_endpoint] has to be done within [timeout]
+    seconds. *)
 val monitor_preconfirmations :
-  ?timeout:float ->
+  timeout:float ->
   Uri.t ->
   Broadcast.preconfirmation_message monitor tzresult Lwt.t

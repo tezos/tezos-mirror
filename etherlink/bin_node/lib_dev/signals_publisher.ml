@@ -135,7 +135,6 @@ module Worker = struct
       Rollup_services.get_injected_dal_operations_statuses
         ~timeout:state.rollup_node_endpoint_timeout
         ~rollup_node_endpoint:state.rollup_node_endpoint
-        ()
     in
     let ready_injections =
       List.filter_map (is_signal_injection_ready ~finalized_level) statuses

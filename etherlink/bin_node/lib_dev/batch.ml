@@ -48,12 +48,13 @@ let dispatch_batch_service ~path =
 let call (type input output)
     (module R : Rpc_encodings.METHOD
       with type input = input
-       and type output = output) ~keep_alive ~evm_node_endpoint (input : input)
-    =
+       and type output = output) ~keep_alive ~timeout ~evm_node_endpoint
+    (input : input) =
   let open Lwt_result_syntax in
   let* response =
     Rollup_services.call_service
       ~keep_alive
+      ~timeout
       ~base:evm_node_endpoint
       (dispatch_batch_service ~path:Resto.Path.root)
       ()

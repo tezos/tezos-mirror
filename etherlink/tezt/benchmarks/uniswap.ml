@@ -94,6 +94,7 @@ let get_total_supply {infos; rpc_node; accounts; _} contract =
       (module Rpc_encodings.Eth_call)
       ~evm_node_endpoint:(Evm_node.endpoint rpc_node |> Uri.of_string)
       ~keep_alive:true
+      ~timeout:10.
       ( {
           from = Some (Account.address_et accounts.(0));
           to_ = Some (Ethereum_types.Address.of_string contract);
@@ -121,6 +122,7 @@ let get_balance {infos; rpc_node; _} contract sender =
       (module Rpc_encodings.Eth_call)
       ~evm_node_endpoint:(Evm_node.endpoint rpc_node |> Uri.of_string)
       ~keep_alive:true
+      ~timeout:10.
       ( {
           from = Some (Account.address_et sender);
           to_ = Some (Ethereum_types.Address.of_string contract);

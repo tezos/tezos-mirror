@@ -11,12 +11,14 @@
     true, or return an error otherwise. *)
 val send_raw_transaction :
   keep_alive:bool ->
+  timeout:float ->
   base:Uri.t ->
   raw_tx:string ->
   (Ethereum_types.hash, string) result tzresult Lwt.t
 
 val inject_transaction :
   keep_alive:bool ->
+  timeout:float ->
   base:Uri.t ->
   tx_object:Transaction_object.t ->
   raw_tx:string ->
@@ -24,6 +26,7 @@ val inject_transaction :
 
 val inject_tezlink_operation :
   keep_alive:bool ->
+  timeout:float ->
   base:Uri.t ->
   op:Tezos_types.Operation.t ->
   raw_op:bytes ->
@@ -31,6 +34,7 @@ val inject_tezlink_operation :
 
 val get_transaction_count :
   keep_alive:bool ->
+  timeout:float ->
   base:Uri.t ->
   Ethereum_types.address ->
   Ethereum_types.Block_parameter.extended ->
@@ -38,6 +42,7 @@ val get_transaction_count :
 
 val get_transaction_by_hash :
   keep_alive:bool ->
+  timeout:float ->
   base:Uri.t ->
   Ethereum_types.hash ->
   (Transaction_object.t option, string) result tzresult Lwt.t

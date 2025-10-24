@@ -107,6 +107,7 @@ let ray_trace_scanline {infos; contract; spp; rpc_node; height; _} sender
       (module Rpc_encodings.Eth_call)
       ~evm_node_endpoint:(Evm_node.endpoint rpc_node |> Uri.of_string)
       ~keep_alive:true
+      ~timeout:10.
       ( {
           from = Some (Account.address_et sender);
           to_ = Some (Ethereum_types.Address.of_string contract);

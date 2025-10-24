@@ -16,12 +16,13 @@ let construct_rpc_call ~method_ ~input_encoding parameters =
       id = Some (random_id ());
     }
 
-let call_rpc_service ~keep_alive ~base ~path request output_encoding =
+let call_rpc_service ~keep_alive ~timeout ~base ~path request output_encoding =
   let open Lwt_result_syntax in
   let* response =
     let open Rollup_services in
     call_service
       ~keep_alive
+      ~timeout
       ~base
       (dispatch_batch_service ~path)
       ()
@@ -58,25 +59,28 @@ let inject_tezlink_operation_request op raw_op =
     ~input_encoding:Inject_tezlink_operation.input_encoding
     (op, raw_op)
 
-let send_raw_transaction ~keep_alive ~base ~raw_tx =
+let send_raw_transaction ~keep_alive ~timeout ~base ~raw_tx =
   call_rpc_service
     ~keep_alive
+    ~timeout
     ~base
     ~path:Resto.Path.root
     (send_raw_transaction_request raw_tx)
     Send_raw_transaction.output_encoding
 
-let inject_transaction ~keep_alive ~base ~tx_object ~raw_tx =
+let inject_transaction ~keep_alive ~timeout ~base ~tx_object ~raw_tx =
   call_rpc_service
     ~keep_alive
+    ~timeout
     ~base
     ~path:Resto.Path.(root / "private")
     (inject_transaction_request tx_object raw_tx)
     Inject_transaction.output_encoding
 
-let inject_tezlink_operation ~keep_alive ~base ~op ~raw_op =
+let inject_tezlink_operation ~keep_alive ~timeout ~base ~op ~raw_op =
   call_rpc_service
     ~keep_alive
+    ~timeout
     ~base
     ~path:Resto.Path.(root / "private")
     (inject_tezlink_operation_request op raw_op)
@@ -88,9 +92,10 @@ let get_transaction_count_request address block_param =
     ~input_encoding:Get_transaction_count.input_encoding
     (address, block_param)
 
-let get_transaction_count ~keep_alive ~base address block_param =
+let get_transaction_count ~keep_alive ~timeout ~base address block_param =
   call_rpc_service
     ~keep_alive
+    ~timeout
     ~base
     ~path:Resto.Path.root
     (get_transaction_count_request address block_param)
@@ -102,9 +107,10 @@ let get_transaction_by_hash_request tx_hash =
     ~input_encoding:Get_transaction_by_hash.input_encoding
     tx_hash
 
-let get_transaction_by_hash ~keep_alive ~base tx_hash =
+let get_transaction_by_hash ~keep_alive ~timeout ~base tx_hash =
   call_rpc_service
     ~keep_alive
+    ~timeout
     ~base
     ~path:Resto.Path.root
     (get_transaction_by_hash_request tx_hash)

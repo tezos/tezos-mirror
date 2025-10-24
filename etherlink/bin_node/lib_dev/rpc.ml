@@ -72,10 +72,13 @@ module Forward_container
       val private_endpoint : Uri.t
 
       val keep_alive : bool
+
+      val timeout : float
     end)
     (Injector : sig
       val get_transaction_count :
         keep_alive:bool ->
+        timeout:float ->
         base:Uri.t ->
         Tx.address ->
         Ethereum_types.Block_parameter.extended ->
@@ -83,6 +86,7 @@ module Forward_container
 
       val inject_transaction :
         keep_alive:bool ->
+        timeout:float ->
         base:Uri.t ->
         tx_object:Tx.t ->
         raw_tx:string ->
@@ -90,6 +94,7 @@ module Forward_container
 
       val get_transaction_by_hash :
         keep_alive:bool ->
+        timeout:float ->
         base:Uri.t ->
         Ethereum_types.hash ->
         (Tx.t option, string) result tzresult Lwt.t
@@ -133,6 +138,7 @@ module Forward_container
     let* res =
       Injector.get_transaction_count
         ~keep_alive:C.keep_alive
+        ~timeout:C.timeout
         ~base:C.public_endpoint
         address
         (* The function [nonce] is only ever called when
@@ -156,6 +162,7 @@ module Forward_container
     in
     Injector.inject_transaction
       ~keep_alive:C.keep_alive
+      ~timeout:C.timeout
       ~base:C.private_endpoint
       ~tx_object
       ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
@@ -165,6 +172,7 @@ module Forward_container
     let* res =
       Injector.get_transaction_by_hash
         ~keep_alive:C.keep_alive
+        ~timeout:C.timeout
         ~base:C.public_endpoint
         hash
     in
@@ -210,7 +218,7 @@ module Forward_container
 end
 
 let container_forward_request (type f) ~(chain_family : f L2_types.chain_family)
-    ~public_endpoint ~private_endpoint ~keep_alive :
+    ~public_endpoint ~private_endpoint ~keep_alive ~timeout :
     f Services_backend_sig.tx_container =
   match chain_family with
   | EVM ->
@@ -223,6 +231,8 @@ let container_forward_request (type f) ~(chain_family : f L2_types.chain_family)
                     let private_endpoint = private_endpoint
 
                     let keep_alive = keep_alive
+
+                    let timeout = timeout
                   end)
                   (Injector))
   | Michelson ->
@@ -235,22 +245,27 @@ let container_forward_request (type f) ~(chain_family : f L2_types.chain_family)
                     let private_endpoint = private_endpoint
 
                     let keep_alive = keep_alive
+
+                    let timeout = timeout
                   end)
                   (struct
-                    let get_transaction_count ~keep_alive:_ ~base:_ _ _ =
+                    let get_transaction_count ~keep_alive:_ ~timeout:_ ~base:_ _
+                        _ =
                       failwith
                         "TODO: implement get_transaction_count in the Tezlink \
                          case (using counter RPC)"
 
-                    let inject_transaction ~keep_alive ~base ~tx_object ~raw_tx
-                        =
+                    let inject_transaction ~keep_alive ~timeout ~base ~tx_object
+                        ~raw_tx =
                       Injector.inject_tezlink_operation
                         ~keep_alive
+                        ~timeout
                         ~base
                         ~op:tx_object
                         ~raw_op:(Bytes.of_string raw_tx)
 
-                    let get_transaction_by_hash ~keep_alive:_ ~base:_ _ =
+                    let get_transaction_by_hash ~keep_alive:_ ~timeout:_ ~base:_
+                        _ =
                       failwith
                         "TODO: implement get_transaction_by_hash in the \
                          Tezlink case"
@@ -271,6 +286,7 @@ let main ~evm_node_endpoint ?evm_node_private_endpoint
     Evm_services.get_time_between_blocks
       ~fallback:(Time_between_blocks 10.)
       ~evm_node_endpoint
+      ~timeout:config.rpc_timeout
       ()
   in
   let pool =
@@ -280,7 +296,10 @@ let main ~evm_node_endpoint ?evm_node_private_endpoint
   in
   let* ctxt = Evm_ro_context.load ~pool config in
   let* () = Evm_ro_context.preload_known_kernels ctxt in
-  Block_storage_setup.enable ~keep_alive:config.keep_alive ctxt.store ;
+  Block_storage_setup.enable
+    ~keep_alive:config.keep_alive
+    ~timeout:config.rpc_timeout
+    ctxt.store ;
 
   let (module Rpc_backend) =
     Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint
@@ -298,6 +317,7 @@ let main ~evm_node_endpoint ?evm_node_private_endpoint
           (container_forward_request
              ~chain_family
              ~keep_alive:config.keep_alive
+             ~timeout:config.rpc_timeout
              ~public_endpoint:evm_node_endpoint
              ~private_endpoint)
     | None ->
@@ -372,6 +392,7 @@ let main ~evm_node_endpoint ?evm_node_private_endpoint
       ~multichain:enable_multichain
       ~time_between_blocks
       ~evm_node_endpoint
+      ~rpc_timeout:config.rpc_timeout
       ~next_blueprint_number
       ~on_new_blueprint:(fun (Qty number) blueprint ->
         let (Qty level) = blueprint.blueprint.number in

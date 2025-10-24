@@ -272,6 +272,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
           {
             rollup_node_endpoint = config.rollup_node_endpoint;
             keep_alive = config.keep_alive;
+            rpc_timeout = config.rpc_timeout;
             filter_event =
               (function
               | New_delayed_transaction _ | Upgrade_event _
@@ -334,6 +335,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         ~multichain:enable_multichain
         ~time_between_blocks
         ~evm_node_endpoint
+        ~rpc_timeout:config.rpc_timeout
         ~next_blueprint_number
         ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
         ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
@@ -349,7 +351,10 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
           on_preconfirmation;
         }
     and* () =
-      Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
+      Drift_monitor.run
+        ~evm_node_endpoint
+        ~timeout:config.rpc_timeout
+        Evm_context.next_blueprint_number
     and* () =
       Tx_container.tx_queue_beacon
         ~evm_node_endpoint:(Rpc evm_node_endpoint)

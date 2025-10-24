@@ -8,12 +8,15 @@
 
 type t = {mutable nonce : Z.t; mutable balance : Z.t; signer : Signer.t}
 
+let timeout = 10.
+
 let from_signer ~evm_node_endpoint signer =
   let open Lwt_result_syntax in
   let* (Qty nonce) =
     Batch.call
       (module Rpc_encodings.Get_transaction_count)
       ~keep_alive:true
+      ~timeout
       ~evm_node_endpoint
       (Signer.to_address signer, Block_parameter Latest)
   in
@@ -21,6 +24,7 @@ let from_signer ~evm_node_endpoint signer =
     Batch.call
       (module Rpc_encodings.Get_balance)
       ~keep_alive:true
+      ~timeout
       ~evm_node_endpoint
       (Signer.to_address signer, Block_parameter Latest)
   in

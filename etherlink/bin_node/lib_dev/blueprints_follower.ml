@@ -23,6 +23,7 @@ type parameters = {
   on_finalized_levels : on_finalized_levels_handler;
   time_between_blocks : Configuration.time_between_blocks;
   evm_node_endpoint : Uri.t;
+  rpc_timeout : float;
 }
 
 type error += Timeout
@@ -36,7 +37,7 @@ let timeout_from_tbb = function
       let*! _ = Lwt_unix.sleep (tbb +. 1.) in
       tzfail Timeout
 
-let local_head_too_old ?remote_head ~multichain ~evm_node_endpoint
+let local_head_too_old ?remote_head ~multichain ~evm_node_endpoint ~rpc_timeout
     (Qty next_blueprint_number) =
   let open Lwt_result_syntax in
   let open Rpc_encodings in
@@ -69,12 +70,14 @@ let local_head_too_old ?remote_head ~multichain ~evm_node_endpoint
           Batch.call
             (module Generic_block_number)
             ~keep_alive:true
+            ~timeout:rpc_timeout
             ~evm_node_endpoint
             ()
         else
           Batch.call
             (module Block_number)
             ~keep_alive:true
+            ~timeout:rpc_timeout
             ~evm_node_endpoint
             ()
   in
@@ -102,7 +105,8 @@ module Blueprints_sequence = struct
         | `Continue acc -> (fold [@tailcall]) f acc seq
         | `Cut c -> return (`Cut c))
 
-  let make_legacy_rpc ~multichain ~next_blueprint_number evm_node_endpoint : t =
+  let make_legacy_rpc ~multichain ~next_blueprint_number ~rpc_timeout
+      evm_node_endpoint : t =
     let open Lwt_result_syntax in
     Seq_es.ES.unfold
       (fun (remote_head, next_blueprint_number) ->
@@ -111,6 +115,7 @@ module Blueprints_sequence = struct
             ?remote_head
             ~multichain
             ~evm_node_endpoint
+            ~rpc_timeout
             next_blueprint_number
         in
         if is_too_old then
@@ -119,6 +124,7 @@ module Blueprints_sequence = struct
             Evm_services.get_blueprint_with_events
               ~keep_alive:true
               ~evm_node_endpoint
+              ~timeout:rpc_timeout
               next_blueprint_number
           in
           return
@@ -129,7 +135,7 @@ module Blueprints_sequence = struct
       (None, next_blueprint_number)
 
   let rec make_with_chunks ?remote_head ~multichain ~next_blueprint_number
-      evm_node_endpoint : t =
+      ~rpc_timeout evm_node_endpoint : t =
    fun () ->
     let open Lwt_result_syntax in
     let* is_too_old, remote_head =
@@ -137,6 +143,7 @@ module Blueprints_sequence = struct
         ?remote_head
         ~multichain
         ~evm_node_endpoint
+        ~rpc_timeout
         next_blueprint_number
     in
     if is_too_old then
@@ -144,6 +151,7 @@ module Blueprints_sequence = struct
         (* See {Note keep_alive} *)
         Evm_services.get_blueprints_with_events
           ~keep_alive:true
+          ~timeout:rpc_timeout
           ~evm_node_endpoint
           ~count:500L
           next_blueprint_number
@@ -160,6 +168,7 @@ module Blueprints_sequence = struct
               ~multichain
               ~next_blueprint_number:
                 (quantity_add next_blueprint_number (List.length blueprints))
+              ~rpc_timeout
               evm_node_endpoint
           in
           Seq_es.append (Seq_es.of_seq (List.to_seq blueprints)) next_chunks
@@ -173,15 +182,26 @@ module Blueprints_sequence = struct
           make_legacy_rpc
             ~multichain
             ~next_blueprint_number
+            ~rpc_timeout
             evm_node_endpoint
             ()
       | Error err -> fail err
     else return Seq_es.Nil
 
-  let make ~multichain ~next_blueprint_number evm_node_endpoint : t =
+  let make ~multichain ~next_blueprint_number ~rpc_timeout evm_node_endpoint : t
+      =
     if !legacy_rpc_fallback then
-      make_legacy_rpc ~multichain ~next_blueprint_number evm_node_endpoint
-    else make_with_chunks ~multichain ~next_blueprint_number evm_node_endpoint
+      make_legacy_rpc
+        ~multichain
+        ~next_blueprint_number
+        ~rpc_timeout
+        evm_node_endpoint
+    else
+      make_with_chunks
+        ~multichain
+        ~next_blueprint_number
+        ~rpc_timeout
+        evm_node_endpoint
 end
 
 let rec catchup ~multichain ~next_blueprint_number ~first_connection params :
@@ -203,6 +223,7 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection params :
     Blueprints_sequence.make
       ~multichain
       ~next_blueprint_number
+      ~rpc_timeout:params.rpc_timeout
       params.evm_node_endpoint
   in
 
@@ -224,6 +245,7 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection params :
       let*! call_result =
         Evm_services.monitor_messages
           ~evm_node_endpoint:params.evm_node_endpoint
+          ~timeout:params.rpc_timeout
           next_blueprint_number
       in
 
@@ -293,7 +315,7 @@ and stream_loop ~multichain (Qty next_blueprint_number) params monitor =
       Evm_services.close_monitor monitor ;
       fail err
 
-let start ~multichain ~time_between_blocks ~evm_node_endpoint
+let start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
     ~next_blueprint_number ~on_new_blueprint ~on_finalized_levels () =
   let open Lwt_result_syntax in
   let*! res =
@@ -304,6 +326,7 @@ let start ~multichain ~time_between_blocks ~evm_node_endpoint
       {
         time_between_blocks;
         evm_node_endpoint;
+        rpc_timeout;
         on_new_blueprint;
         on_finalized_levels;
       }

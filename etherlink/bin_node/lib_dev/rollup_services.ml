@@ -293,17 +293,14 @@ let uri_of_service base rpc b c =
 
 let with_timeout t base rpc b c f =
   let open Lwt_result_syntax in
-  match t with
-  | None -> f ()
-  | Some t ->
-      Lwt.pick
-        [
-          f ();
-          (let*! () = Lwt_unix.sleep t in
-           tzfail (Timeout (t, uri_of_service base rpc b c)));
-        ]
+  Lwt.pick
+    [
+      f ();
+      (let*! () = Lwt_unix.sleep t in
+       tzfail (Timeout (t, uri_of_service base rpc b c)));
+    ]
 
-let call_service ~base ?(media_types = Media_type.all_media_types) ?timeout rpc
+let call_service ~base ?(media_types = Media_type.all_media_types) ~timeout rpc
     b c input =
   let open Lwt_result_syntax in
   let*! res =
@@ -317,11 +314,11 @@ let call_service ~base ?(media_types = Media_type.all_media_types) ?timeout rpc
       @@ TzTrace.cons (Connection_error (uri_of_service base rpc b c)) trace
   | Error trace -> fail trace
 
-let call_service ~keep_alive ~base ?media_types ?timeout rpc b c input =
-  let f base = call_service ~base ?media_types ?timeout rpc b c input in
+let call_service ~keep_alive ~base ?media_types ~timeout rpc b c input =
+  let f base = call_service ~base ?media_types ~timeout rpc b c input in
   if keep_alive then retry_connection f base else f base
 
-let make_streamed_call ?timeout rollup_node_endpoint =
+let make_streamed_call ~timeout rollup_node_endpoint =
   let open Lwt_result_syntax in
   let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
@@ -349,17 +346,17 @@ let publish :
     ?order:Z.t ->
     keep_alive:bool ->
     rollup_node_endpoint:Uri.t ->
-    ?timeout:float ->
+    timeout:float ->
     [< `External of string] list ->
     unit tzresult Lwt.t =
- fun ?drop_duplicate ?order ~keep_alive ~rollup_node_endpoint ?timeout inputs ->
+ fun ?drop_duplicate ?order ~keep_alive ~rollup_node_endpoint ~timeout inputs ->
   let open Lwt_result_syntax in
   let inputs = List.map (function `External s -> s) inputs in
   let* _answer =
     call_service
       ~keep_alive
       ~base:rollup_node_endpoint
-      ?timeout
+      ~timeout
       batcher_injection
       ()
       {drop_duplicate; order}
@@ -369,34 +366,32 @@ let publish :
 
 let publish_on_dal :
     rollup_node_endpoint:Uri.t ->
-    ?timeout:float ->
+    timeout:float ->
     messages:string list ->
-    unit ->
     unit tzresult Lwt.t =
- fun ~rollup_node_endpoint ?timeout ~messages () ->
+ fun ~rollup_node_endpoint ~timeout ~messages ->
   call_service
     ~keep_alive:false
     ~base:rollup_node_endpoint
-    ?timeout
+    ~timeout
     dal_batcher_injection
     ()
     ()
     messages
 
 let get_injected_dal_operations_statuses :
-    ?timeout:float ->
     rollup_node_endpoint:Uri.t ->
-    unit ->
+    timeout:float ->
     (Tezos_crypto.Hashed.Injector_operations_hash.t
     * Rollup_node_services.message_status)
     list
     tzresult
     Lwt.t =
- fun ?timeout ~rollup_node_endpoint () ->
+ fun ~rollup_node_endpoint ~timeout ->
   call_service
     ~keep_alive:false
     ~base:rollup_node_endpoint
-    ?timeout
+    ~timeout
     dal_injected_operations_statuses
     ()
     ()
@@ -404,15 +399,14 @@ let get_injected_dal_operations_statuses :
 
 let set_dal_slot_indices :
     rollup_node_endpoint:Uri.t ->
-    ?timeout:float ->
+    timeout:float ->
     slot_indices:Tezos_dal_node_services.Types.slot_index list ->
-    unit ->
     unit tzresult Lwt.t =
- fun ~rollup_node_endpoint ?timeout ~slot_indices () ->
+ fun ~rollup_node_endpoint ~timeout ~slot_indices ->
   call_service
     ~keep_alive:false
     ~base:rollup_node_endpoint
-    ?timeout
+    ~timeout
     dal_slot_indices
     ()
     ()
@@ -420,14 +414,14 @@ let set_dal_slot_indices :
 
 let forget_dal_injection_id :
     rollup_node_endpoint:Uri.t ->
-    ?timeout:float ->
+    timeout:float ->
     Tezos_crypto.Hashed.Injector_operations_hash.t ->
     unit tzresult Lwt.t =
- fun ~rollup_node_endpoint ?timeout id ->
+ fun ~rollup_node_endpoint ~timeout id ->
   call_service
     ~keep_alive:false
     ~base:rollup_node_endpoint
-    ?timeout
+    ~timeout
     forget_dal_injection_id
     ((), id)
     ()
@@ -469,12 +463,12 @@ let durable_state_values :
 
 (** [smart_rollup_address base] asks for the smart rollup node's
     address, using the endpoint [base]. *)
-let smart_rollup_address ~keep_alive ?timeout base =
+let smart_rollup_address ~keep_alive ~timeout base =
   let open Lwt_result_syntax in
   let*! answer =
     call_service
       ~keep_alive
-      ?timeout
+      ~timeout
       ~base
       ~media_types:[Media_type.octet_stream]
       smart_rollup_address
@@ -486,12 +480,12 @@ let smart_rollup_address ~keep_alive ?timeout base =
   | Ok address -> return (Bytes.to_string address)
   | Error trace -> fail trace
 
-let oldest_known_l1_level ~keep_alive ?timeout base =
+let oldest_known_l1_level ~keep_alive ~timeout base =
   let open Lwt_result_syntax in
   let+ level, () =
     call_service
       ~keep_alive
-      ?timeout
+      ~timeout
       ~base
       ~media_types:[Media_type.json]
         (* Only JSON, we just look at a single field to be compatible with all
@@ -505,12 +499,12 @@ let oldest_known_l1_level ~keep_alive ?timeout base =
 
 (** [tezos_level base] asks for the smart rollup node's
     latest l1 level, using the endpoint [base]. *)
-let tezos_level ~keep_alive ?timeout base =
+let tezos_level ~keep_alive ~timeout base =
   let open Lwt_result_syntax in
   let* level_opt =
     call_service
       ~keep_alive
-      ?timeout
+      ~timeout
       ~base
       ~media_types:[Media_type.octet_stream]
       global_current_tezos_level

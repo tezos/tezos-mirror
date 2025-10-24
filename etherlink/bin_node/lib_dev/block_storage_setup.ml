@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let enable ~keep_alive ?evm_node_endpoint store =
+let enable ~keep_alive ~timeout ?evm_node_endpoint store =
   let get_block_from_store n =
     Evm_store.(
       use store @@ fun conn ->
@@ -15,6 +15,7 @@ let enable ~keep_alive ?evm_node_endpoint store =
     Batch.call
       (module Rpc_encodings.Get_block_by_number)
       ~keep_alive
+      ~timeout
       ~evm_node_endpoint
       (Ethereum_types.Block_parameter.(Number n), false)
   in

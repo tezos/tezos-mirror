@@ -203,6 +203,8 @@ module MakeBackend (Ctxt : sig
 
   val keep_alive : bool
 
+  val timeout : float
+
   val execution_pool : Lwt_domain.pool
 end) =
 struct
@@ -280,6 +282,7 @@ struct
           let* response =
             call_service
               ~keep_alive:Ctxt.keep_alive
+              ~timeout:Ctxt.timeout
               ~base:evm_node_endpoint
               (Batch.dispatch_batch_service ~path:Resto.Path.root)
               ()
@@ -406,6 +409,8 @@ module Make (Base : sig
   val evm_node_endpoint : Uri.t option
 
   val keep_alive : bool
+
+  val timeout : float
 
   val execution_pool : Lwt_domain.pool
 end) =
@@ -591,6 +596,8 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
     let evm_node_endpoint = evm_node_endpoint
 
     let keep_alive = config.Configuration.keep_alive
+
+    let timeout = config.rpc_timeout
 
     let execution_pool = ctxt.execution_pool
   end) in

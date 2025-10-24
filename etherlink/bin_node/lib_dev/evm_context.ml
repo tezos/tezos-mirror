@@ -1784,6 +1784,7 @@ module State = struct
 
       Block_storage_setup.enable
         ~keep_alive:configuration.keep_alive
+        ~timeout:configuration.rpc_timeout
         ?evm_node_endpoint
         ro_store ;
       return_unit
@@ -1989,6 +1990,7 @@ module State = struct
                 let* blueprint_pred =
                   Evm_services.get_blueprint_with_events
                     ~keep_alive:true
+                    ~timeout:ctxt.configuration.rpc_timeout
                     ~evm_node_endpoint
                     (Qty pred_number)
                 in

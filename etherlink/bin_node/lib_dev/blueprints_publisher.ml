@@ -144,7 +144,6 @@ module Worker = struct
       ~rollup_node_endpoint:state.rollup_node_endpoint
       ~timeout:state.rollup_node_endpoint_timeout
       ~messages:payloads
-      ()
 
   let publish_on_dal_precondition state use_dal_if_enabled level =
     state.enable_dal && use_dal_if_enabled && Z.(zero < level)
@@ -294,7 +293,6 @@ module Handlers = struct
             ~rollup_node_endpoint
             ~timeout:rollup_node_endpoint_timeout
             ~slot_indices:dal_slots
-            ()
     in
     return
       {

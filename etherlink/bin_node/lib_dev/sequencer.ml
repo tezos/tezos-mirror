@@ -88,7 +88,7 @@ let validate_and_add_tx (type f)
 
 let loop_sequencer (type f) multichain
     ~(tx_container : f Services_backend_sig.tx_container) ?sandbox_config
-    time_between_blocks =
+    ~rpc_timeout time_between_blocks =
   let open Lwt_result_syntax in
   match sandbox_config with
   | Some {parent_chain = Some evm_node_endpoint; _} ->
@@ -97,6 +97,7 @@ let loop_sequencer (type f) multichain
         ~multichain
         ~time_between_blocks
         ~evm_node_endpoint
+        ~rpc_timeout
         ~next_blueprint_number:head.next_blueprint_number
         ~on_new_blueprint:(fun (Qty number) blueprint ->
           let*! {next_blueprint_number = Qty expected_number; _} =
@@ -470,7 +471,12 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
     else
       let* () =
         Evm_events_follower.start
-          {rollup_node_endpoint; keep_alive; filter_event = (fun _ -> true)}
+          {
+            rollup_node_endpoint;
+            keep_alive;
+            rpc_timeout;
+            filter_event = (fun _ -> true);
+          }
       in
       let () =
         Rollup_node_follower.start
@@ -538,6 +544,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
     loop_sequencer
       enable_multichain
       ~tx_container
+      ~rpc_timeout:configuration.rpc_timeout
       ?sandbox_config
       sequencer_config.time_between_blocks
   and* () =

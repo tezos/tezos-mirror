@@ -22,7 +22,7 @@ let install_finalizer ~(tx_container : _ Services_backend_sig.tx_container)
   Evm_context.shutdown ()
 
 let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
-    ~evm_node_endpoint ~keep_alive :
+    ~evm_node_endpoint ~keep_alive ~timeout :
     f Services_backend_sig.tx_container tzresult =
   let (module Tx_container) =
     (module struct
@@ -37,6 +37,7 @@ let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
         | Some evm_node_endpoint ->
             Injector.send_raw_transaction
               ~keep_alive
+              ~timeout
               ~base:evm_node_endpoint
               ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
         | None ->
@@ -177,6 +178,8 @@ let main
 
     let keep_alive = keep_alive
 
+    let timeout = rpc_timeout
+
     let drop_duplicate_on_injection = drop_duplicate_on_injection
 
     let smart_rollup_address = smart_rollup_address
@@ -231,7 +234,11 @@ let main
           if enable_send_raw_transaction then evm_node_endpoint else None
         in
         let*? tx_container =
-          container_forward_tx ~chain_family ~evm_node_endpoint ~keep_alive
+          container_forward_tx
+            ~chain_family
+            ~evm_node_endpoint
+            ~keep_alive
+            ~timeout:config.rpc_timeout
         in
         return (None, tx_container)
   in
