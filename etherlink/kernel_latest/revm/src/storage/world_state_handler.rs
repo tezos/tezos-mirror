@@ -261,7 +261,7 @@ impl StorageAccount {
 
                 // Delete legacy account entries
                 for path in &[balance_path, nonce_path, code_hash_path, code_path] {
-                    match host.store_delete_value(path) {
+                    match host.store_delete(path) {
                         Ok(()) | Err(RuntimeError::PathNotFound) => (),
                         Err(err) => return Err(Error::Runtime(err)),
                     };
@@ -322,7 +322,7 @@ impl StorageAccount {
 
     pub fn delete_info(&mut self, host: &mut impl Runtime) -> Result<(), Error> {
         let path = concat(&self.path, &INFO_PATH)?;
-        match host.store_delete_value(&path) {
+        match host.store_delete(&path) {
             Ok(()) | Err(RuntimeError::PathNotFound) => (),
             Err(err) => return Err(Error::Runtime(err)),
         };
@@ -463,7 +463,7 @@ impl StorageAccount {
         deposit_id: &U256,
     ) -> Result<(), Error> {
         let deposit_path = self.deposit_path(deposit_id)?;
-        Ok(host.store_delete_value(&deposit_path)?)
+        Ok(host.store_delete(&deposit_path)?)
     }
 }
 
