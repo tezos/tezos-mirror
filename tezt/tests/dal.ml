@@ -5794,6 +5794,9 @@ module Skip_list_rpcs = struct
         let wait_mempool_injection =
           Node.wait_for node "operation_injected.v0" (fun _ -> Some ())
         in
+        let wait_for_dal_node =
+          wait_for_layer1_final_block dal_node (level - 1)
+        in
         let* commitment =
           Helpers.publish_and_store_slot
             client
@@ -5806,6 +5809,7 @@ module Skip_list_rpcs = struct
         let* () = wait_mempool_injection in
         let* () = bake_for client in
         let* _level = Node.wait_for_level node (level + 1) in
+        let* () = if level > 2 then wait_for_dal_node else unit in
         publish
           ~max_level
           (level + 1)
