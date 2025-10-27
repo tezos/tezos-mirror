@@ -116,6 +116,13 @@ Operation receipts
   metadata. It contains the addresses that have been newly indexed
   through the opcode ``INDEX_ADDRESS``. (MR :gl:`!18870`)
 
+- **Breaking change** Updated attestation and preattestation receipts metadata.
+  The ``consensus_power`` field is now divided in two parts: an integer field ``slots``,
+  which corresponds to the number of slots attributed to the delegate, and represents
+  its consensus power until "All Bakers Attest" activates, and a string field
+  ``stake`` parsed as an int64, which is the staking power of the delegate, and represents its consensus power
+  once "All Bakers Attest" activates. (MR :gl:`!18915`)
+
 
 Errors
 ------
