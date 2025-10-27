@@ -63,7 +63,8 @@ module type S = sig
     returns the gas used to execute the call. *)
   val estimate_gas :
     Ethereum_types.call ->
-    Ethereum_types.Block_parameter.t ->
+    Ethereum_types.Block_parameter.extended ->
+    Ethereum_types.state_override ->
     Simulation.call_result Simulation.simulation_result tzresult Lwt.t
 
   (** [storage_at address pos block_param] returns the value at index

@@ -8,6 +8,10 @@
 
 ### RPCs changes
 
+- Add support for state overrides in `eth_estimateGas` for EIP-7702, and
+  generalize block parameter of `eth_estimateGas` to support block
+  hashes. (!19737)
+
 ### Monitoring changes
 
 ### Command-line interface changes

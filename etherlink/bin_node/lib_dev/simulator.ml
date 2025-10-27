@@ -99,13 +99,15 @@ module Make (SimulationBackend : SimulationBackend) = struct
     in
     Lwt.return (Simulation.simulation_result bytes)
 
-  let call_estimate_gas call simulation_state =
+  let call_estimate_gas ?(state_override = Ethereum_types.state_override_empty)
+      call simulation_state =
     let open Lwt_result_syntax in
     let* bytes =
       call_simulation
         ~log_file:"estimate_gas"
         ~input_encoder:Simulation.encode
         ~input:call
+        ~state_override
         simulation_state
     in
     Lwt.return (Simulation.gas_estimation bytes)
@@ -156,7 +158,8 @@ module Make (SimulationBackend : SimulationBackend) = struct
     return da_fee
 
   let rec confirm_gas ~timestamp ~maximum_gas_per_transaction
-      ~simulation_version (call : Ethereum_types.call) gas simulation_state =
+      ~simulation_version ~state_override (call : Ethereum_types.call) gas
+      simulation_state =
     let open Ethereum_types in
     let open Lwt_result_syntax in
     let double (Qty z) = Qty Z.(mul (of_int 2) z) in
@@ -164,6 +167,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let new_call = {call with gas = Some gas} in
     let* result =
       call_estimate_gas
+        ~state_override
         (simulation_input
            ~timestamp
            ~simulation_version
@@ -188,6 +192,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
               ~timestamp
               ~maximum_gas_per_transaction
               ~simulation_version
+              ~state_override
               call
               (Qty maximum_gas_per_transaction)
               simulation_state
@@ -196,6 +201,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
               ~timestamp
               ~maximum_gas_per_transaction
               ~simulation_version
+              ~state_override
               call
               new_gas
               simulation_state
@@ -222,11 +228,9 @@ module Make (SimulationBackend : SimulationBackend) = struct
     | Ok (Ok {gas_used = None; _}) ->
         failwith "Internal error: gas used is missing from simulation"
 
-  let estimate_gas call block =
+  let estimate_gas call block_param state_override =
     let open Lwt_result_syntax in
-    let* simulation_state =
-      SimulationBackend.get_state ~block:(Block_parameter block) ()
-    in
+    let* simulation_state = SimulationBackend.get_state ~block:block_param () in
     let timestamp = Misc.now () in
     let* (Qty maximum_gas_per_transaction) =
       Etherlink_durable_storage.maximum_gas_per_transaction
@@ -235,6 +239,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     let* simulation_version = simulation_version simulation_state in
     let* res =
       call_estimate_gas
+        ~state_override
         (simulation_input
            ~timestamp
            ~simulation_version
@@ -256,6 +261,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
         let safe_gas = Z.(add safe_gas (cdiv safe_gas (of_int 50))) in
         let+ gas_used =
           confirm_gas
+            ~state_override
             ~timestamp
             ~maximum_gas_per_transaction
             ~simulation_version

@@ -270,7 +270,7 @@ module Eth_call :
 
 module Get_estimate_gas :
   METHOD
-    with type input = Ethereum_types.call * Ethereum_types.Block_parameter.t
+    with type input = Eth_call.input
      and type output = Ethereum_types.quantity
 
 module Txpool_content :
