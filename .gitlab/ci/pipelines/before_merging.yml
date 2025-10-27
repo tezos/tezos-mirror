@@ -4066,7 +4066,6 @@ etherlink.tezt-flaky:
   - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - etherlink.teztrec_etherlink.daily
   - select_tezts
@@ -4075,7 +4074,6 @@ etherlink.tezt-flaky:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - etherlink.teztrec_etherlink.daily
   - select_tezts
@@ -4171,7 +4169,6 @@ etherlink.tezt-extra:
   - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - etherlink.teztrec_etherlink.daily
   - select_tezts
@@ -4180,7 +4177,6 @@ etherlink.tezt-extra:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - etherlink.teztrec_etherlink.daily
   - select_tezts
@@ -4271,7 +4267,6 @@ etherlink.tezt-slow:
   - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - etherlink.teztrec_etherlink.daily
   - select_tezts
@@ -4280,7 +4275,6 @@ etherlink.tezt-slow:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - etherlink.teztrec_etherlink.daily
   - select_tezts
@@ -4370,7 +4364,6 @@ etherlink.tezt:
   - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - etherlink.teztrec_etherlink.daily
   - select_tezts
@@ -4379,7 +4372,6 @@ etherlink.tezt:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - etherlink.teztrec_etherlink.daily
   - select_tezts
