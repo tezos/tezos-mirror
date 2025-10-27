@@ -264,6 +264,7 @@ cemented with a dedicated operation injected in Layer 1, and the
 outbox messages can be executed by the Layer 1 by an explicit Layer 1
 operation (see :doc:`../shell/smart_rollup_node`), typically
 to transfer assets from the rollup to the Layer 1.
+Note that such withdrawals are possible during a limited time after cementation, given by the protocol constant ``smart_rollup_max_active_outbox_levels``, which currently corresponds to about 10 days.
 
 The outbox messages can follow three different formats. Firstly, the
 Layer 1 operations contained in the outbox messages can be left
