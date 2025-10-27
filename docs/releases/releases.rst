@@ -1,6 +1,9 @@
 Release System
 ==============
 
+Octez
+-----
+
 Octez releases include all the software needed to run the distributed
 consensus platform with its meta-consensus capability. This
 meta-consensus capability is supported by a protocol that is used to
@@ -14,77 +17,96 @@ from releases** (see :doc:`../protocols/naming`). For more details on
 the distinction between the protocol and the rest of the Tezos node
 software, see :doc:`../shell/the_big_picture`.
 
-Although a node is able to compile and upgrade to a new protocol
+Although a node can compile and upgrade to a new protocol
 on the fly, each release contains several embedded protocol versions.
-Consequently, Octez releases are created not only when new features are
+Therefore, Octez releases are published not only when new features are
 added or bugs are fixed, but also when new protocols are proposed or
 adopted.
 
-Starting with version 7.0, releases are named using a
-``<major>.<minor>`` numbering scheme. There are also release candidates
-suffixed by ``~rc<N>``, and beta versions suffixed by ``~beta<N>``.
+Octez releases are named using the ``octez-v<major>.<minor>`` numbering scheme.
+There are also release candidates suffixed by ``~rc<N>``, and beta
+versions suffixed by ``~beta<N>``.
 
-- **The major version number is incremented when a new release branch is
-  created from master.** Such branches thus include many new
-  features and possibly significant breaking changes, such as
-  improvements to the storage layer requiring a manual
-  upgrade that can take significant time.
+Release candidates and beta versions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **The minor version number is incremented when changes are backported
-  to an existing release branch.** Such versions usually include mostly
-  bug fixes and minor improvements. But they can also include new
-  economic protocols and/or new versions of the economic protocol
-  environment, so that users who do not want to migrate to newer major
-  versions yet (because of the possible breaking changes) can still
-  run a node and a baker for these new protocols.
+- **Release candidates** are not releases per se. They are published
+  versions of release branches that are believed to be ready but require
+  further testing by the broader community. After a few days or weeks,
+  release candidates are either considered stable releases
+  (losing their ``~rc<N>`` suffix), or a new release candidate is published
+  with an incremented ``N``. Usually, only major releases have release candidates.
 
-- Release candidates are not releases per se. They are published
-  versions of release branches that are believed to be ready but that
-  require further testing by the community at large. After a few days
-  or weeks, release candidates are either considered to be stable, in
-  which case they are actually released (losing their ``~rc<N>``
-  suffix), or a new release candidate is published with an increment
-  of ``N``. Usually, only major releases have release candidates.
+- **Beta versions** are early pre-versions of a major release. Unlike release
+  candidates, these are not considered ready for production use, but contain
+  the main features of the next major release that are "stable enough" for
+  public testing, including on public test networks.
 
-- Beta versions are early pre-versions of a major release. Unlike release candidates, these are not believed to be ready, but contain main features of the next major release which are "stable enough" for public testing, including public test networks.
-  It is not recommended to use them on Tezos Mainnet.
+Both RC and Beta versions are **not recommended** for use on Tezos Mainnet.
+
+Major releases
+~~~~~~~~~~~~~~
+
+A major release of Octez, ``octez-v<major>.0``, is a distribution of all Octez components.
+Major version numbers are incremented for distributions that include significant breaking changes,
+or when compatibility across all components is required for a new protocol.
+
+Minor releases
+~~~~~~~~~~~~~~
+
+A minor release, ``<component>-v<major>.<minor>``, is a distribution of a specific Octez component.
+In the specific case where ``component`` is ``Octez``, only the Layer 1 related software is distributed.
+Minor versions usually include bug fixes and minor improvements.
+:ref:`The next section<component_releases>` provides more details on components and their releases.
+
+.. _component_releases:
+
+Components
+----------
+
+An Octez component is defined as a sub-part of the monorepo (https://gitlab.com/tezos/tezos). For example: the Layer 1 executables, the rollup node, or Teztale.
+
+All components are released together with each Octez major release.
+However, each component has its own minor release cycle, meaning that components
+can be released independently with minor releases, following their own
+incrementation schedule.
+
+Distribution
+------------
 
 Releases are available in several forms:
 
--  in source form, from the Octez code repository
+-  **Source code**, from the Octez code repository
    (https://gitlab.com/tezos/tezos). Tags for each release are available
-   prefixed by ``v``, and there is also a ``latest-release`` tag, pointing to
-   the latest **stable release** (i.e., excluding release candidates).
+   prefixed by ``octez-v`` or ``<component>-v``.
+   There is also a ``latest-release`` tag pointing to
+   the latest **stable release** (excluding release candidates).
    Additionally, the version under development is available in the
    ``master`` branch.
--  packaged in various forms: as standalone binaries (with no dependencies),
-   as binary or source packages, and as Docker containers.
+-  **Packaged forms**: standalone binaries (with no dependencies),
+   binary or source packages, and Docker containers.
 
-The packaged forms are updated from the source form as follows:
+The packaged forms are updated from the source as follows:
 
--  static binaries:
+-  :ref:`Static binaries<getting_static_binaries>`:
 
-   -  automatically, at each stable release
-   -  For recent release candidates, the static binaries are available
-      as GitLab artifacts, pointed to in the `release page of the repository <https://gitlab.com/tezos/tezos/-/releases>`_.
+   - Updated automatically at each release
+   - Available on the `Release page <https://octez.tezos.com/releases/>`_
+-  :ref:`Docker containers <using_docker_images>`:
 
--  Docker containers: two kinds of images are generated, automatically:
+   - Two kinds of images are generated automatically:
 
-   -  release images: at each release, including release candidates
+     - Release images: at each release, including release candidates
+     - Master images: at each merge commit (after each merge request is merged)
+   - Available on `DockerHub <https://hub.docker.com/r/tezos/tezos>`_
+-  :ref:`OPAM packages<install_opam_packages>`:
 
-   -  master images: at each merge commit (i.e. after each merge request is merged)
+   - Updated at each stable release
+   - Published on `the Tezos fork of the opam repository <https://github.com/tezos/opam-repository>`_
+-  :ref:`APT and DNF binary packages<installing_deb>`:
 
--  OPAM packages:
-
-   -  at each stable release
-   -  This is currently a manual process performed by
-      `Nomadic Labs <https://www.nomadic-labs.com/>`_.
-
--  APT and DNF binary packages:
-
-   -  at each release, including release candidates
-   -  The process is currently performed manually by
-      `Serokell <https://serokell.io>`_.
+   - Updated at each release and release candidate
+   - Available on the `Nomadic Labs package repository <https://packages.nomadic-labs.com/>`_
 
 For installing Octez from these different forms of releases, see
 :doc:`../introduction/howtoget`.
