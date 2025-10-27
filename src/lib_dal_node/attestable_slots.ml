@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let is_slot_attestable_with_traps shards_store traps_fraction pkh
+let is_attestable_slot_with_traps shards_store traps_fraction pkh
     assigned_shard_indexes slot_id =
   let open Lwt_result_syntax in
   List.for_all_es
@@ -14,7 +14,7 @@ let is_slot_attestable_with_traps shards_store traps_fraction pkh
         Store.Shards.read shards_store slot_id shard_index
       in
       (* Note: here [pkh] should identify the baker using its delegate key
-           (not the consensus key) *)
+        (not the consensus key) *)
       let trap_res = Trap.share_is_trap pkh share ~traps_fraction in
       match trap_res with
       | Ok true ->
@@ -124,8 +124,8 @@ let is_attestable_slot ctxt ~pkh ~(slot_id : Types.slot_id) =
       if not last_known_parameters.incentives_enable then return all_stored
       else if not all_stored then return_false
       else
-        let* is_slot_attestable_with_traps =
-          is_slot_attestable_with_traps
+        let* is_attestable_slot_with_traps =
+          is_attestable_slot_with_traps
             shards_store
             last_known_parameters.traps_fraction
             pkh
@@ -133,7 +133,7 @@ let is_attestable_slot ctxt ~pkh ~(slot_id : Types.slot_id) =
             slot_id
           |> Errors.to_option_tzresult
         in
-        match is_slot_attestable_with_traps with
+        match is_attestable_slot_with_traps with
         | Some true -> return_true
         | _ -> return_false
 

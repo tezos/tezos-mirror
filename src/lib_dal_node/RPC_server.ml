@@ -467,7 +467,7 @@ module Profile_handlers = struct
                   return all_stored
                 else if not all_stored then return false
                 else
-                  Attestable_slots.is_slot_attestable_with_traps
+                  Attestable_slots.is_attestable_slot_with_traps
                     shards_store
                     last_known_parameters.traps_fraction
                     pkh

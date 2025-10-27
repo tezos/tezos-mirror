@@ -5,14 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [is_slot_attestable_with_traps shards_store traps_fraction pkh
+(** [is_attestable_slot_with_traps shards_store traps_fraction pkh
     assigned_shard_indexes slot_id] checks whether the slot identified by [slot_id]
     is attestable for delegate [pkh] with respect to the traps mechanism.
 
     The function iterates over the delegate’s [assigned_shard_indexes], reads each
     corresponding stored shard share from [shards_store], and evaluates
     [Trap.share_is_trap] on it using [traps_fraction].  *)
-val is_slot_attestable_with_traps :
+val is_attestable_slot_with_traps :
   Store.Shards.t ->
   Q.t ->
   Signature.public_key_hash ->
