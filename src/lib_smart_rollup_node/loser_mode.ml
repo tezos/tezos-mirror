@@ -70,7 +70,7 @@ let encoding =
         ~title:"Invalid_dal_parameters"
         (obj4
            (req "number_of_slots" int64)
-           (req "attestion_lag" int64)
+           (req "attestation_lag" int64)
            (req "slot_size" int64)
            (req "page_size" int64))
         (function
