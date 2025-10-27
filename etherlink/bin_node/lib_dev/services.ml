@@ -152,7 +152,7 @@ let configuration_handler config =
 
 let health_check_handler config mode db_liveness_check query =
   match mode with
-  | Configuration.Sequencer | Observer | Proxy ->
+  | Mode.Sequencer | Observer | Proxy ->
       let open Lwt_result_syntax in
       let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping
       and* () =
@@ -173,7 +173,7 @@ let health_check_handler config mode db_liveness_check query =
         fail_when has_timeout Stalled_database
       in
       return_unit
-  | Rpc {evm_node_endpoint} ->
+  | Rpc {evm_node_endpoint; _} ->
       Rollup_services.call_service
         ~keep_alive:false
         ~base:evm_node_endpoint
@@ -187,10 +187,10 @@ let health_check_handler config mode db_liveness_check query =
 let evm_mode_handler config evm_mode =
   let open Lwt_result_syntax in
   match evm_mode with
-  | Configuration.Sequencer -> return "sequencer"
+  | Mode.Sequencer -> return "sequencer"
   | Observer -> return "observer"
   | Proxy -> return "proxy"
-  | Rpc {evm_node_endpoint} ->
+  | Rpc {evm_node_endpoint; _} ->
       let+ evm_node_mode =
         Rollup_services.call_service
           ~keep_alive:false

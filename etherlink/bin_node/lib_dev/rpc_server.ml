@@ -145,7 +145,7 @@ let monitor_performances ~data_dir =
   (* Run in background *)
   ignore domain
 
-let start_public_server (type f) ~(mode : Configuration.mode)
+let start_public_server (type f) ~(mode : Mode.t)
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id
     ?evm_services (config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container) ctxt =
