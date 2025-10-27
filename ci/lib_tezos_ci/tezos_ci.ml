@@ -1457,6 +1457,7 @@ module Cache = struct
     |> append_variables
          ([
             (* force incremental build in cargo
+
               see https://github.com/mozilla/sccache?tab=readme-ov-file#known-caveats *)
             ("CARGO_INCREMENTAL", "0");
             (* we use GCP backend in r/w mode *)
