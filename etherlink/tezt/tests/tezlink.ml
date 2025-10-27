@@ -1999,6 +1999,8 @@ let test_tezlink_prevalidation =
       client_tezlink
   in
 
+  let hard_gas_limit_per_operation = 1_040_000 in
+
   (* case wrong gas limit *)
   let gas_limit_too_high_rex =
     rex "A transaction tried to exceed the hard limit on gas"
@@ -2009,7 +2011,7 @@ let test_tezlink_prevalidation =
         [
           make
             ~fee:1000
-            ~gas_limit:Int32.(max_int |> Int32.to_int)
+            ~gas_limit:(hard_gas_limit_per_operation + 1)
             ~counter:2
             ~source:Constant.bootstrap1
             (transfer ());
@@ -2040,6 +2042,36 @@ let test_tezlink_prevalidation =
       op_not_supported
       client_tezlink
   in
+
+  (* case gas limit of batch too high*)
+  let not_quite_too_high = hard_gas_limit_per_operation - 1000 in
+  let* op_wrong_gas_limit2 =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~gas_limit:not_quite_too_high
+            ~counter:2
+            ~source:Constant.bootstrap1
+            (transfer ());
+          make
+            ~fee:1000
+            ~gas_limit:not_quite_too_high
+            ~counter:3
+            ~source:Constant.bootstrap1
+            (transfer ());
+        ]
+        client)
+  in
+  let* _ =
+    Operation.inject
+      ~error:gas_limit_too_high_rex
+      ~dont_wait:true
+      op_wrong_gas_limit2
+      client_tezlink
+  in
+
   unit
 
 let () =
