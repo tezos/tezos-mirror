@@ -40,7 +40,7 @@ val hex_encode : string -> string
     `foo.wasm`) and returns a hex-encoded Wasm PVM boot sector, suitable for
     passing to [originate_sc_rollup].
 *)
-val read_kernel : ?base:string -> string -> string
+val read_kernel : ?base:string -> ?suffix:string -> string -> string
 
 module Installer_kernel_config : sig
   (** Moves path [from] at path [to_]. *)

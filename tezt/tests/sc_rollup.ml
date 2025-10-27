@@ -3424,6 +3424,28 @@ let test_refutation protocols ~kind =
         protocols)
     tests
 
+let test_invalid_dal_parameters protocols =
+  test_refutation_scenario
+    ~uses:(fun _protocol ->
+      [Constant.WASM.echo_dal_reveal; Constant.smart_rollup_installer])
+    ~kind:"wasm_2_0_0"
+    ~mode:Operator
+    ~challenge_window:10
+    ~timeout:160
+    ~commitment_period:10
+    ~variant:"invalid_dal_parameters"
+    ~boot_sector:
+      (read_kernel
+         ~base:""
+         ~suffix:""
+         (Uses.path Constant.WASM.echo_dal_reveal))
+    (refutation_scenario_parameters
+       ~loser_modes:["reveal_dal_parameters 6 6 6 6"]
+       (inputs_for 10)
+       ~final_level:160
+       ~priority:`Priority_honest)
+    protocols
+
 (** Run one of the refutation tests with an accuser instead of a full operator. *)
 let test_accuser protocols =
   test_refutation_scenario
@@ -7404,6 +7426,7 @@ let register_protocol_independent () =
   test_reveals_fails_on_unknown_hash protocols ;
   test_injector_auto_discard protocols ;
   test_accuser protocols ;
+  test_invalid_dal_parameters protocols ;
   test_bailout_refutation protocols ;
   test_multiple_batcher_key ~kind protocols ;
   test_batcher_order_msgs ~kind protocols ;

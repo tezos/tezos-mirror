@@ -185,6 +185,15 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
       | Reveal_dal_parameters ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
              Consider supporting revealing of historical DAL parameters. *)
+          let dal_parameters =
+            match
+              Loser_mode.is_invalid_dal_parameters node_ctxt.config.loser_mode
+            with
+            | None -> dal_parameters
+            | Some {number_of_slots; attestation_lag; slot_size; page_size} ->
+                Sc_rollup.Dal_parameters.
+                  {number_of_slots; attestation_lag; slot_size; page_size}
+          in
           Lwt.return
             (Data_encoding.Binary.to_string_exn
                Sc_rollup.Dal_parameters.encoding
