@@ -5,6 +5,7 @@
 TEZT_EXE=tezt/tests/main.exe
 SEND_JUNIT=no
 WITH_SELECT_TEZTS=unknown
+DATADOG_SERVICE=octez
 
 usage() {
   cat << EOF
@@ -17,7 +18,11 @@ SCRIPT_ARGUMENTS
         Defaults to 'tezt/tests/main.exe'.
 
     --send-junit PATH
-        If specified, JUnit file PATH is sent to DataDog.
+        If specified, JUnit file PATH is sent to Datadog.
+
+    --datadog-service SERVICE
+        Value of the --service argument to pass to datadog-ci
+        when uploading JUnit files to Datadog.
 
     --with-select-tezts, --without-select-tezts (must specify one or the other)
         Whether selected_tezts.tsl is expected to exist or not.
@@ -41,6 +46,11 @@ while true; do
   "--send-junit")
     shift
     SEND_JUNIT="$1"
+    shift
+    ;;
+  "--datadog-service")
+    shift
+    DATADOG_SERVICE="$1"
     shift
     ;;
   "--with-select-tezts")
@@ -112,7 +122,7 @@ if [ "$SEND_JUNIT" = no ]; then
 elif [ -f "$SEND_JUNIT" ]; then
   if [ -n "$DATADOG_API_KEY" ]; then
     echo "Uploading JUnit file $SEND_JUNIT to Datadog..."
-    DD_ENV=ci DATADOG_SITE=datadoghq.eu datadog-ci junit upload --service octez "$SEND_JUNIT"
+    DD_ENV=ci DATADOG_SITE=datadoghq.eu datadog-ci junit upload --service "$DATADOG_SERVICE" "$SEND_JUNIT"
     echo "datadog-cli exit code: $?"
   else
     echo "DATADOG_API_KEY is not set, will not try to send JUnit file $SEND_JUNIT."
