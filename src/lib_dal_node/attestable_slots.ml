@@ -89,76 +89,74 @@ let attested_just_after_migration ctxt ~attested_level =
     && migration_level < attested_level
     && attested_level <= Int32.add migration_level new_lag)
 
-let may_notify ctxt ~(slot_id : Types.slot_id) =
+(** [is_attestable_slot ctxt ~pkh ~slot_id] decides whether [~slot_id] is
+    attestable for delegate [pkh] at the time of calling. *)
+let is_attestable_slot ctxt ~pkh ~(slot_id : Types.slot_id) =
   let open Lwt_result_syntax in
   let open Node_context in
+  let published_level = slot_id.slot_level in
+  let*? lag = get_attestation_lag ctxt ~level:published_level in
+  let attested_level = Int32.(add published_level lag) in
+  let attestation_level = Int32.pred attested_level in
+  let*? should_drop = published_just_before_migration ctxt ~published_level in
+  if should_drop then return_false
+  else
+    let*? last_known_parameters =
+      get_proto_parameters ctxt ~level:(`Level attested_level)
+    in
+    let shards_store = Store.shards (get_store ctxt) in
+    (* For retrieving the assigned shard indexes, we consider the committee
+       at [attestation_level], because the (DAL) attestations in the blocks
+       at level [attested_level] refer to the predecessor level. *)
+    let* shard_indices =
+      fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
+    in
+    let number_of_assigned_shards = List.length shard_indices in
+    if number_of_assigned_shards = 0 || published_level < 1l then return_false
+    else
+      let* number_stored_shards =
+        Store.Shards.number_of_shards_available
+          shards_store
+          slot_id
+          shard_indices
+      in
+      let all_stored = number_stored_shards = number_of_assigned_shards in
+      if not last_known_parameters.incentives_enable then return all_stored
+      else if not all_stored then return_false
+      else
+        let* is_slot_attestable_with_traps =
+          is_slot_attestable_with_traps
+            shards_store
+            last_known_parameters.traps_fraction
+            pkh
+            shard_indices
+            slot_id
+          |> Errors.to_option_tzresult
+        in
+        match is_slot_attestable_with_traps with
+        | Some true -> return_true
+        | _ -> return_false
+
+let may_notify ctxt ~(slot_id : Types.slot_id) =
+  let open Lwt_result_syntax in
   let module T = Types.Attestable_slots_watcher_table in
   let attestable_slots_watcher_table =
-    get_attestable_slots_watcher_table ctxt
+    Node_context.get_attestable_slots_watcher_table ctxt
   in
   let subscribers = T.elements attestable_slots_watcher_table in
   if Seq.is_empty subscribers then return_unit
   else
-    let published_level = slot_id.slot_level in
-    let*? lag = get_attestation_lag ctxt ~level:published_level in
-    let attested_level = Int32.(add published_level lag) in
-    let attestation_level = Int32.pred attested_level in
-    let*? should_drop = published_just_before_migration ctxt ~published_level in
-    if should_drop then return_unit
-    else
-      let*? last_known_parameters =
-        get_proto_parameters ctxt ~level:(`Level attested_level)
-      in
-      let shards_store = Store.shards (get_store ctxt) in
-      (* For each subscribed pkh, if it has assigned shards for that level,
-         check if all those shards are available for [slot_id] and notify watcher,
-         accordingly. *)
-      let notify_if_attestable pkh =
-        (* For retrieving the assigned shard indexes, we consider the committee
-           at [attestation_level], because the (DAL) attestations in the blocks
-           at level [attested_level] refer to the predecessor level. *)
-        let* shard_indices =
-          fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
-        in
-        let number_of_assigned_shards = List.length shard_indices in
-        if number_of_assigned_shards = 0 then return_unit
-        else if published_level < 1l then return_unit
-        else
-          let* number_stored_shards =
-            Store.Shards.number_of_shards_available
-              shards_store
-              slot_id
-              shard_indices
-          in
-          let all_stored = number_stored_shards = number_of_assigned_shards in
-          if not last_known_parameters.incentives_enable then (
-            if all_stored then
-              T.notify_attestable_slot
-                attestable_slots_watcher_table
-                pkh
-                ~slot_id ;
-            return_unit)
-          else if not all_stored then return_unit
-          else
-            let* is_slot_attestable_with_traps =
-              is_slot_attestable_with_traps
-                shards_store
-                last_known_parameters.traps_fraction
-                pkh
-                shard_indices
-                slot_id
-              |> Errors.to_option_tzresult
-            in
-            (match is_slot_attestable_with_traps with
-            | Some true ->
-                T.notify_attestable_slot
-                  attestable_slots_watcher_table
-                  pkh
-                  ~slot_id
-            | _ -> ()) ;
-            return_unit
-      in
-      Seq.iter_ep notify_if_attestable subscribers
+    let notify_attestable_slot pkh =
+      let* is_attestable_slot = is_attestable_slot ctxt ~pkh ~slot_id in
+      if is_attestable_slot then
+        T.notify_attestable_slot attestable_slots_watcher_table pkh ~slot_id
+      else () ;
+      return_unit
+    in
+    (* For each subscribed pkh, if it has assigned shards for that level,
+       check if all those shards are available for [slot_id] and notify watcher,
+       accordingly. *)
+    Seq.iter_ep notify_attestable_slot subscribers
 
 let may_notify_not_in_committee ctxt committee ~attestation_level =
   let module T = Types.Attestable_slots_watcher_table in
