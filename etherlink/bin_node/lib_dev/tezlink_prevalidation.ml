@@ -460,6 +460,7 @@ let validate_tezlink_operation ?(check_signature = true) ~read raw =
         op;
         first_counter;
         fee = ctxt.fee;
+        gas_limit = ctxt.gas_limit;
       }
   in
   return (Ok operation)
@@ -474,6 +475,7 @@ type blueprint_validation_state = {
   michelson_config : config;
   addr_balance : Z.t String.Map.t;
   addr_nonce : Z.t String.Map.t;
+  gas : Z.t;
 }
 
 let init_blueprint_validation read () =
@@ -484,7 +486,15 @@ let init_blueprint_validation read () =
     michelson_config;
     addr_nonce = String.Map.empty;
     addr_balance = String.Map.empty;
+    gas = Z.zero;
   }
+
+let maximum_gas_per_block =
+  Tezos_types.Operation.gas_limit_to_z
+    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_block
+
+let could_fit state (operation : Tezos_types.Operation.t) =
+  Z.(state.gas + operation.gas_limit <= maximum_gas_per_block)
 
 let add_ source = String.Map.add (Signature.Public_key_hash.to_b58check source)
 
@@ -533,4 +543,5 @@ let validate_for_blueprint state (operation : Tezos_types.Operation.t) =
          state with
          addr_nonce = add_ operation.source new_counter state.addr_nonce;
          addr_balance = add_ operation.source new_balance state.addr_balance;
+         gas = Z.(state.gas + operation.gas_limit);
        })

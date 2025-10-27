@@ -88,6 +88,7 @@ module Operation = struct
     op : Tezlink_imports.Alpha_context.packed_operation;
     raw : bytes;
     fee : Tez.t;
+    gas_limit : Z.t;
   }
 
   let counter_to_z counter =
@@ -102,20 +103,29 @@ module Operation = struct
   let encoding : t Data_encoding.t =
     let open Data_encoding in
     conv
-      (fun {source; first_counter; length; op; raw; fee} ->
-        (source, first_counter, length, op, raw, fee))
-      (fun (source, first_counter, length, op, raw, fee) ->
-        {source; first_counter; length; op; raw; fee})
-      (tup6
+      (fun {source; first_counter; length; op; raw; fee; gas_limit} ->
+        (source, first_counter, length, op, raw, fee, gas_limit))
+      (fun (source, first_counter, length, op, raw, fee, gas_limit) ->
+        {source; first_counter; length; op; raw; fee; gas_limit})
+      (tup7
          Signature.Public_key_hash.encoding
          z
          int31
          (dynamic_size Tezlink_imports.Alpha_context.Operation.encoding)
          bytes
-         Tez.encoding)
+         Tez.encoding
+         z)
 
   let hash_operation
-      {source = _; first_counter = _; length = _; op; raw = _; fee = _} =
+      {
+        source = _;
+        first_counter = _;
+        length = _;
+        op;
+        raw = _;
+        fee = _;
+        gas_limit = _;
+      } =
     let hash = ImportedOperation.hash_packed op in
     let (`Hex hex) = Operation_hash.to_hex hash in
     Ethereum_types.Hash (Ethereum_types.Hex hex)

@@ -64,6 +64,7 @@ module Operation : sig
     op : Tezlink_imports.Alpha_context.packed_operation;
     raw : bytes;
     fee : Tez.t;
+    gas_limit : Z.t;
   }
 
   val counter_to_z :
