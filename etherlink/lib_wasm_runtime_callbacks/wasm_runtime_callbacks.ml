@@ -274,6 +274,15 @@ module Impl = struct
       (fun dls_scope -> create_scope dls_scope scope_name)
       (latest_dls_scope ())
 
+  let span_add_attrs attrs =
+    match latest_dls_scope () with
+    | None | Some (Root _) ->
+        (* No started scope to which to attach attributes *)
+        ()
+    | Some (Started {scope; _}) ->
+        Opentelemetry.Scope.add_attrs scope @@ fun () ->
+        List.map (fun (k, v) -> (k, `String v)) attrs
+
   let end_span () =
     match pop_latest_dls_scope () with
     | Root _ -> (* No started scope to close *) ()
@@ -320,6 +329,7 @@ let register () =
   (* Opentelemetry *)
   Callback.register "init_spans" init_spans ;
   Callback.register "start_span" start_span ;
+  Callback.register "span_add_attrs" span_add_attrs ;
   Callback.register "end_span" end_span
 
 module Internal_for_tests = struct

@@ -6,7 +6,9 @@
 
 use log::trace;
 
-use crate::types::{ContextHash, EvmTree, OCamlBytes, OCamlString, OpenTelemetryScope};
+use crate::types::{
+    ContextHash, EvmTree, OCamlBytes, OCamlString, OCamlStringPairList, OpenTelemetryScope,
+};
 use std::{
     error::Error,
     fmt::{Display, Formatter},
@@ -14,6 +16,17 @@ use std::{
 
 #[macro_export]
 macro_rules! otel_trace {
+    ($name:expr, $attrs:expr, $expr:expr) => {{
+        if crate::api::trace_host_funs_enabled() {
+            crate::bindings::start_span($name);
+            crate::bindings::span_add_attrs($attrs);
+            let __otel_result = { $expr };
+            crate::bindings::end_span();
+            __otel_result
+        } else {
+            $expr
+        }
+    }};
     ($name:expr, $expr:expr) => {{
         if crate::api::trace_host_funs_enabled() {
             crate::bindings::start_span($name);
@@ -78,8 +91,9 @@ mod ocaml_imports {
         pub fn layer2_store__store_write(evm_tree: EvmTree, key: &str, offset: usize, bytes: &[u8]) -> Result<(EvmTree, isize), isize>;
         pub fn layer2_store__store_write_all( evm_tree: EvmTree, key: &str, bytes: &[u8]) -> Result<EvmTree, isize>;
 
-        pub fn init_spans(scope: &OpenTelemetryScope, span_nem: &str);
+        pub fn init_spans(scope: &OpenTelemetryScope, span_name: &str);
         pub fn start_span(span_name: &str);
+        pub fn span_add_attrs(attrs: ocaml::List<ocaml::Value>);
         pub fn end_span();
     }
 }
@@ -370,6 +384,16 @@ pub fn init_spans(s: &OpenTelemetryScope, span_name: &str) -> Result<(), Binding
 
 pub fn start_span(span_name: &str) -> Result<(), BindingsError> {
     unsafe { ocaml_imports::start_span(&gc(), span_name).map_err(BindingsError::OCamlError)? };
+
+    Ok(())
+}
+
+pub fn span_add_attrs(attrs: Vec<(String, String)>) -> Result<(), BindingsError> {
+    unsafe {
+        let ocaml_value_attrs = OCamlStringPairList::new(attrs).to_value(&gc());
+        ocaml_imports::span_add_attrs(&gc(), ocaml_value_attrs)
+            .map_err(BindingsError::OCamlError)?
+    };
 
     Ok(())
 }
