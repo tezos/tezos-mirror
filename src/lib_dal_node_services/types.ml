@@ -790,10 +790,27 @@ module SlotIdSet =
 
 module Attestable_slots_watcher_table = struct
   module Attestable_event = struct
+    type backfill_payload = {
+      slot_ids : slot_id list;
+      no_shards_attestation_levels : level list;
+    }
+
     type t =
       | Attestable_slot of {slot_id : slot_id}
       | No_shards_assigned of {attestation_level : level}
       | Slot_has_trap of {slot_id : slot_id}
+      | Backfill of {backfill_payload : backfill_payload}
+
+    let backfill_payload_encoding =
+      let open Data_encoding in
+      conv
+        (fun {slot_ids; no_shards_attestation_levels} ->
+          (slot_ids, no_shards_attestation_levels))
+        (fun (slot_ids, no_shards_attestation_levels) ->
+          {slot_ids; no_shards_attestation_levels})
+        (obj2
+           (req "slot_ids" (list slot_id_encoding))
+           (req "no_shards_attestation_levels" (list int32)))
 
     let encoding =
       let open Data_encoding in
@@ -829,6 +846,16 @@ module Attestable_slots_watcher_table = struct
             (function
               | Slot_has_trap {slot_id} -> Some ((), slot_id) | _ -> None)
             (fun ((), slot_id) -> Slot_has_trap {slot_id});
+          case
+            ~title:"backfill"
+            (Tag 3)
+            (obj2
+               (req "kind" (constant "backfill"))
+               (req "backfill_payload" backfill_payload_encoding))
+            (function
+              | Backfill {backfill_payload} -> Some ((), backfill_payload)
+              | _ -> None)
+            (fun ((), backfill_payload) -> Backfill {backfill_payload});
         ]
   end
 
@@ -904,6 +931,12 @@ module Attestable_slots_watcher_table = struct
         if not @@ SlotIdSet.mem watcher.notified_slots slot_id then (
           SlotIdSet.add watcher.notified_slots slot_id ;
           Lwt_watcher.notify watcher.stream (Slot_has_trap {slot_id}))
+
+  let notify_backfill_payload t pkh ~backfill_payload =
+    match Signature.Public_key_hash.Table.find t pkh with
+    | None -> ()
+    | Some watcher ->
+        Lwt_watcher.notify watcher.stream (Backfill {backfill_payload})
 
   let remove = Signature.Public_key_hash.Table.remove
 
