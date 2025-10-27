@@ -506,11 +506,24 @@ let validate_for_blueprint state (operation : Tezos_types.Operation.t) =
               counter)
     else return @@ Ok Z.(add counter (Z.of_int operation.length))
   in
-  (* TODO check balance *)
-  (* TODO update balance *)
+  let* balance =
+    get_ state.michelson_config.get_balance state.addr_balance operation.source
+  in
+  let** new_balance =
+    let new_balance = Z.(balance - Tezos_types.Tez.to_mutez_z operation.fee) in
+    if new_balance >= Z.zero then return @@ Ok new_balance
+    else
+      return
+      @@ Error
+           (Format.asprintf
+              "Not enough funds to pay the fees %a"
+              Tez.pp
+              operation.fee)
+  in
   return
     (Ok
        {
          state with
          addr_nonce = add_ operation.source new_counter state.addr_nonce;
+         addr_balance = add_ operation.source new_balance state.addr_balance;
        })
