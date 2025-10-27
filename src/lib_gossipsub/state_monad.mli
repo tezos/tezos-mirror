@@ -57,13 +57,23 @@ module type S = sig
     ('pass -> ('state, 'fail) t) ->
     ('state, 'fail) t
 
-  (** [return_pass v] is the default constuctor of [`Pass] values in the
+  (** [bind_check m f] is the bind function for the [('state, 'a, 'fail) t] monad. *)
+  val bind_check :
+    ('state, 'a, 'fail) check ->
+    ('a -> ('state, 'pass, 'fail) check) ->
+    ('state, 'pass, 'fail) check
+
+  (** [return_pass v] is the default constructor of [`Pass] values in the
       [('state, 'pass, 'fail) check] monad. *)
   val return_pass : 'pass -> ('state, 'pass, 'fail) check
 
   (** [return_fail v] is the default constuctor of [`Fail] values in the
       [('state, 'pass, 'fail) check] monad. *)
   val return_fail : 'fail -> ('state, 'pass, 'fail) check
+
+  (** [map_fold f l] iteratively applies [f] to all elements of [l] updating
+      the state at each step. *)
+  val map_fold : ('a -> ('state, 'b) t) -> 'a list -> ('state, 'b list) t
 
   (** Infix notations and/or shorter aliases for the functions above. *)
   module Syntax : sig
@@ -78,6 +88,12 @@ module type S = sig
 
     (** Infix notation for {!get}. *)
     val ( let*! ) : ('state -> 'a) -> ('a -> ('state, 'b) t) -> ('state, 'b) t
+
+    (** Infix notation for {!bind_check}. *)
+    val ( let** ) :
+      ('state, 'a, 'fail) check ->
+      ('a -> ('state, 'pass, 'fail) check) ->
+      ('state, 'pass, 'fail) check
 
     (** Re-exporting {!return} function in this sub-module. *)
     val return : 'a -> ('state, 'a) t

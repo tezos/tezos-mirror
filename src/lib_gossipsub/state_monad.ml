@@ -43,9 +43,16 @@ module type S = sig
     ('pass -> ('state, 'fail) t) ->
     ('state, 'fail) t
 
+  val bind_check :
+    ('state, 'a, 'fail) check ->
+    ('a -> ('state, 'pass, 'fail) check) ->
+    ('state, 'pass, 'fail) check
+
   val return_pass : 'pass -> ('state, 'pass, 'fail) check
 
   val return_fail : 'fail -> ('state, 'pass, 'fail) check
+
+  val map_fold : ('a -> ('state, 'b) t) -> 'a list -> ('state, 'b list) t
 
   module Syntax : sig
     val ( let* ) : ('state, 'a) t -> ('a -> ('state, 'b) t) -> ('state, 'b) t
@@ -56,6 +63,11 @@ module type S = sig
       ('state, 'fail) t
 
     val ( let*! ) : ('state -> 'a) -> ('a -> ('state, 'b) t) -> ('state, 'b) t
+
+    val ( let** ) :
+      ('state, 'a, 'fail) check ->
+      ('a -> ('state, 'pass, 'fail) check) ->
+      ('state, 'pass, 'fail) check
 
     val return : 'a -> ('state, 'a) t
 
@@ -85,12 +97,26 @@ module M : S = struct
 
   let return_fail x = `Fail x |> return
 
+  let bind_check c f =
+    bind c (function `Pass res -> f res | `Fail e -> return_fail e)
+
+  let map_fold f l =
+    let rec bis acc state = function
+      | [] -> return (List.rev acc) state
+      | hd :: tl ->
+          let state, value = f hd state in
+          bis (value :: acc) state tl
+    in
+    fun state -> bis [] state l
+
   module Syntax = struct
     let ( let* ) = bind
 
     let ( let*? ) = check
 
     let ( let*! ) = get
+
+    let ( let** ) = bind_check
 
     let return = return
 

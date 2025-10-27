@@ -50,7 +50,12 @@ let rng =
 let () =
   let open Default_limits in
   let default_limits = default_limits () in
-  Test_unit.register rng default_limits parameters ;
+  Test_unit.register
+    ~message_handlings:
+      [Sequentially; In_batches {time_interval = Milliseconds.of_int_ms 100}]
+    rng
+    default_limits
+    parameters ;
   Test_integration_worker.register rng default_limits parameters ;
   Test_pbt.register rng default_limits parameters ;
   Test_message_cache.register ()

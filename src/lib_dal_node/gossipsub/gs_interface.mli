@@ -56,4 +56,14 @@ module Validate_message_hook : sig
     unit ->
     [`Valid | `Unknown | `Outdated | `Invalid]) ->
     unit
+
+  val set_batch :
+    ((Types.Peer.t
+     * Types.Topic.t
+     * Types.Message_id.t
+     * Types.Message.t
+     * Types.Peer.Set.t)
+     list ->
+    [`Invalid | `Outdated | `Unknown | `Valid] list) ->
+    unit
 end

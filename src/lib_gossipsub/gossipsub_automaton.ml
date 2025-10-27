@@ -84,6 +84,8 @@ module Make (C : AUTOMATON_CONFIG) :
 
   type set_application_score = {peer : Peer.t; score : float}
 
+  type message_handling = Sequentially | In_batches of {time_interval : span}
+
   (* FIXME not sure subtyping for output is useful. If it is, it is
      probably for few ouputs and could be removed. *)
   type _ output =
@@ -130,6 +132,12 @@ module Make (C : AUTOMATON_CONFIG) :
     | Invalid_message : [`Receive_message] output
     | Unknown_validity : [`Receive_message] output
     | Outdated : [`Receive_message] output
+    | To_include_in_batch :
+        (receive_message * Peer.Set.t)
+        -> [`Receive_message] output
+    | Batch_result :
+        (receive_message * [`Receive_message] output) list
+        -> [`Treated_batch] output
     | Already_joined : [`Join] output
     | Joining_topic : {to_graft : Peer.Set.t} -> [`Join] output
     | Not_joined : [`Leave] output
@@ -1150,15 +1158,19 @@ module Make (C : AUTOMATON_CONFIG) :
           in
           fail Invalid_message
 
-    let handle sender topic message_id message =
+    let initial_message_checks {topic; message_id; sender; _} :
+        ( state,
+          Peer.Set.t,
+          [`Receive_message] output )
+        Tezos_gossipsub__State_monad.check =
       let open Monad.Syntax in
       let*! mesh_opt = find_mesh topic in
-      let*? peers_in_mesh =
+      let** peers_in_mesh =
         match mesh_opt with
         | Some peers -> pass peers
         | None -> fail Not_subscribed
       in
-      let*? () =
+      let** () =
         let*! message_cache in
         match
           Message_cache.get_first_seen_time_and_senders message_id message_cache
@@ -1173,29 +1185,98 @@ module Make (C : AUTOMATON_CONFIG) :
             in
             fail Already_received
       in
-      let*? () = check_message_id_valid sender topic message_id in
-      let*? () = check_message_valid sender topic message message_id in
-      let peers = Peer.Set.remove sender peers_in_mesh in
-      let* () =
-        put_message_in_cache ~peer:(Some sender) message_id message topic
-      in
-      let* () =
-        update_score sender (fun stats ->
-            Score.first_message_delivered stats topic)
-      in
-      let* direct_peers = get_direct_peers topic in
-      let to_route = Peer.Set.union peers direct_peers in
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/5272
+      let** () = check_message_id_valid sender topic message_id in
+      pass peers_in_mesh
 
-         Filter out peers from which we already received the message, or an
-         IHave message? *)
-      Route_message {to_route} |> return
+    let peers_to_route sender peers_in_mesh topic =
+      let open Monad.Syntax in
+      let peers = Peer.Set.remove sender peers_in_mesh in
+      let* direct_peers = get_direct_peers topic in
+      return (Peer.Set.union peers direct_peers)
+
+    let handle ~batching_configuration
+        ({sender; topic; message_id; message} as receive_message) :
+        [`Receive_message] output Monad.t =
+      let open Monad.Syntax in
+      let*? peers_in_mesh = initial_message_checks receive_message in
+      match batching_configuration with
+      | Sequentially ->
+          let*? () = check_message_valid sender topic message message_id in
+          let* () =
+            put_message_in_cache ~peer:(Some sender) message_id message topic
+          in
+          let* () =
+            update_score sender (fun stats ->
+                Score.first_message_delivered stats topic)
+          in
+          let* to_route = peers_to_route sender peers_in_mesh topic in
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/5272
+             Filter out peers from which we already received the message, or an
+             IHave message? *)
+          Route_message {to_route} |> return
+      | In_batches _ ->
+          let* to_route = peers_to_route sender peers_in_mesh topic in
+          return (To_include_in_batch (receive_message, to_route))
   end
 
-  let handle_receive_message :
-      receive_message -> [`Receive_message] output Monad.t =
-   fun {sender; topic; message_id; message} ->
-    Receive_message.handle sender topic message_id message
+  let handle_receive_message ~batching_configuration receive_message :
+      [`Receive_message] output Monad.t =
+    Receive_message.handle ~batching_configuration receive_message
+
+  let check_message_batch batch =
+    let unfolded_batch =
+      List.map
+        (fun ({sender; topic; message_id; message}, peers) ->
+          (sender, topic, message_id, message, peers))
+        batch
+    in
+    List.combine
+      ~when_different_lengths:()
+      batch
+      (Message.valid_batch unfolded_batch)
+
+  let apply_batch (batch : (receive_message * Peer.Set.t) list) :
+      [`Treated_batch] output Monad.t =
+    let open Monad.Syntax in
+    match check_message_batch batch with
+    | Error () ->
+        let l =
+          List.map
+            (fun (received_msg, _peers) -> (received_msg, Unknown_validity))
+            batch
+        in
+        return (Batch_result l)
+    | Ok annotated_batch ->
+        let* l =
+          Monad.map_fold
+            (fun ( ( ({sender; topic; message_id; message} as received_msg),
+                     peers ),
+                   result ) ->
+              match result with
+              | `Valid ->
+                  let* () =
+                    put_message_in_cache
+                      ~peer:(Some sender)
+                      message_id
+                      message
+                      topic
+                  in
+                  let* () =
+                    update_score sender (fun stats ->
+                        Score.first_message_delivered stats topic)
+                  in
+                  return (received_msg, Route_message {to_route = peers})
+              | `Outdated -> return (received_msg, Outdated)
+              | `Unknown -> return (received_msg, Unknown_validity)
+              | `Invalid ->
+                  let* () =
+                    update_score sender (fun stats ->
+                        Score.invalid_message_delivered stats topic)
+                  in
+                  return (received_msg, Invalid_message))
+            annotated_batch
+        in
+        return (Batch_result l)
 
   module Publish_message = struct
     let check_not_seen message_id =
@@ -2416,7 +2497,9 @@ module Make (C : AUTOMATON_CONFIG) :
           "Route_message %a"
           Fmt.Dump.(record [field "to_route" Fun.id pp_peer_set])
           to_route
+    | To_include_in_batch _ -> fprintf fmtr "To include in batch"
     | Already_received -> fprintf fmtr "Already_received"
+    | Batch_result _res -> fprintf fmtr "Batch_result"
     | Not_subscribed -> fprintf fmtr "Not_subscribed"
     | Already_joined -> fprintf fmtr "Already_joined"
     | Joining_topic {to_graft} ->

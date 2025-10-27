@@ -23,6 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let string_of_validation_error = function
+  | `Invalid_degree_strictly_less_than_expected Cryptobox.{given; expected} ->
+      Format.sprintf
+        "Invalid_degree_strictly_less_than_expected. Given: %d, expected: %d"
+        given
+        expected
+  | `Invalid_shard -> "Invalid_shard"
+  | `Shard_index_out_of_range s ->
+      Format.sprintf "Shard_index_out_of_range(%s)" s
+  | `Shard_length_mismatch -> "Shard_length_mismatch"
+  | `Prover_SRS_not_loaded -> "Prover_SRS_not_loaded"
+
 (** [gossipsub_app_message_payload_validation ~disable_shard_validation cryptobox message
     message_id] allows checking whether the given [message] identified by
     [message_id] is valid with the current [cryptobox] parameters. The validity check is
@@ -56,20 +68,7 @@ let gossipsub_app_message_payload_validation ~disable_shard_validation cryptobox
     match res with
     | Ok () -> `Valid
     | Error err ->
-        let validation_error =
-          match err with
-          | `Invalid_degree_strictly_less_than_expected {given; expected} ->
-              Format.sprintf
-                "Invalid_degree_strictly_less_than_expected. Given: %d, \
-                 expected: %d"
-                given
-                expected
-          | `Invalid_shard -> "Invalid_shard"
-          | `Shard_index_out_of_range s ->
-              Format.sprintf "Shard_index_out_of_range(%s)" s
-          | `Shard_length_mismatch -> "Shard_length_mismatch"
-          | `Prover_SRS_not_loaded -> "Prover_SRS_not_loaded"
-        in
+        let validation_error = string_of_validation_error err in
         Event.emit_dont_wait__message_validation_error
           ~message_id
           ~validation_error ;
@@ -143,7 +142,7 @@ let gossipsub_message_id_validation ctxt proto_parameters message_id =
       gossipsub_message_id_topic_validation ctxt proto_parameters message_id
   | other -> other
 
-(** [gossipsub_app_messages_validation ctxt cryptobox head_level
+(** [gossipsub_app_messages_validation ctxt cryptobox ~head_level
     attestation_lag ?message ~message_id ()] checks for the validity of the
     given message (if any) and message id.
 
@@ -153,8 +152,8 @@ let gossipsub_message_id_validation ctxt proto_parameters message_id =
     {!gossipsub_message_id_validation}. Then, if a message is given,
     {!gossipsub_app_message_payload_validation} is used to check its
     validity. *)
-let gossipsub_app_messages_validation ctxt cryptobox head_level proto_parameters
-    ?message ~message_id () =
+let gossipsub_app_messages_validation ctxt cryptobox ~head_level
+    proto_parameters ?message ~message_id () =
   if Node_context.is_bootstrap_node ctxt then
     (* 1. As bootstrap nodes advertise their profiles to controller
        nodes, they shouldn't receive messages or messages ids. If this
@@ -210,3 +209,204 @@ let gossipsub_app_messages_validation ctxt cryptobox head_level proto_parameters
       | other ->
           (* 4. In the case the message id is not Valid. *)
           other
+
+type batch_identifier = {level : int32; slot_index : int}
+
+module Batch_identifier_hashable = struct
+  type t = batch_identifier
+
+  let equal a b = a.level = b.level && a.slot_index = b.slot_index
+
+  let hash = Hashtbl.hash
+end
+
+module Batch_tbl = Hashtbl.Make (Batch_identifier_hashable)
+
+type batch_elem = {
+  index : int;
+  id : Types.Message_id.t;
+  message : Types.Message.t;
+}
+
+type 'a batch_result = {
+  to_check_in_batch : batch_elem list Batch_tbl.t;
+  not_valid : (int * 'a) list;
+      (* List of indices in the original batch with the error to output for
+         this element. *)
+}
+
+let triage ctxt head_level proto_parameters batch =
+  let to_check_in_batch =
+    Batch_tbl.create proto_parameters.Types.number_of_slots
+  in
+  let not_valid =
+    List.fold_left_i
+      (fun index
+           not_valid
+           ( _peer,
+             _topic,
+             (Types.Message_id.{level; slot_index; _} as id),
+             message,
+             _peers ) ->
+        (* Have some slack for outdated messages. *)
+        let slack = 4 in
+        if
+          Int32.(
+            sub head_level level
+            > of_int (proto_parameters.Types.attestation_lag + slack))
+        then (index, `Outdated) :: not_valid
+        else
+          match gossipsub_message_id_validation ctxt proto_parameters id with
+          | `Valid ->
+              (* The shard is added to the right batch.
+                 Since the message id check has already been performed, we have
+                 the guarantee that all shards associated to a given
+                 (level, slot_index) pair have the commitment published on the L1,
+                 hence they all belong to the same slot, hence the shards can be
+                 passed to the function verifying several shards simultaneously. *)
+              let already_sorted =
+                Batch_tbl.find_opt to_check_in_batch {level; slot_index}
+              in
+              let new_entry =
+                match already_sorted with
+                | None -> [{index; id; message}]
+                | Some list -> {index; id; message} :: list
+              in
+              Batch_tbl.replace to_check_in_batch {level; slot_index} new_entry ;
+              not_valid
+          | other ->
+              (* In the case the message id is not Valid. *)
+              (index, other) :: not_valid)
+      []
+      batch
+  in
+  {to_check_in_batch; not_valid}
+
+let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
+    =
+  if Node_context.is_bootstrap_node ctxt then
+    (* As bootstrap nodes advertise their profiles to controller
+       nodes, they shouldn't receive messages or messages ids. If this
+       happens, received data are considered as spam (invalid), and the remote
+       peer might be punished, depending on the Gossipsub implementation. *)
+    List.map (fun _ -> `Invalid) batch
+  else
+    let batch_size = List.length batch in
+    let result = Array.init batch_size (fun _ -> `Unknown) in
+    let {to_check_in_batch; not_valid} =
+      triage ctxt head_level proto_parameters batch
+    in
+    List.iter (fun (index, error) -> result.(index) <- error) not_valid ;
+
+    let store = Node_context.get_store ctxt in
+    let traps_store = Store.traps store in
+
+    (* [treat_batch] does not invalidate a whole slot when a single shard is
+       invalid, otherwise it would be possible for a byzantine actor to craft
+       a wrong message with the id of the published slot to prevent the validation
+       of all the valid shards associated to this slot. *)
+    let rec treat_batch = function
+      | [] -> ()
+      | ({level; slot_index}, batch_list) :: remaining_to_treat -> (
+          let shards, proofs =
+            List.fold_left
+              (fun (shards, proofs) {message; id; _} ->
+                let Types.Message.{share; shard_proof} = message in
+                let Types.Message_id.{shard_index; _} = id in
+                let shard = Cryptobox.{share; index = shard_index} in
+                (shard :: shards, shard_proof :: proofs))
+              ([], [])
+              batch_list
+          in
+          (* We never add empty list in the to_check_in_batch table. *)
+          let {id = {commitment; _}; _} =
+            Option.value_f
+              ~default:(fun () -> assert false)
+              (List.hd batch_list)
+          in
+          let res =
+            if Node_context.get_disable_shard_validation ctxt then Ok ()
+            else
+              Dal_metrics.sample_time
+                ~sampling_frequency:
+                  Constants.shards_verification_sampling_frequency
+                ~metric_updater:Dal_metrics.update_shards_verification_time
+                ~to_sample:(fun () ->
+                  Cryptobox.verify_shard_multi
+                    cryptobox
+                    commitment
+                    shards
+                    proofs)
+              [@profiler.wrap_f
+                {driver_ids = [Opentelemetry]}
+                  (Opentelemetry_helpers.trace_slot
+                     ~name:"verify_shards"
+                     Types.Slot_id.{slot_level = level; slot_index})]
+          in
+          match res with
+          | Ok () ->
+              List.iter
+                (fun {index; id; message} ->
+                  (* We register traps only if the message is valid. *)
+                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
+                      The [proto_parameters] are those for the last known finalized
+                      level, which may differ from those of the slot level. This
+                      will be an issue when the value of the [traps_fraction]
+                      changes. (We cannot use {!Node_context.get_proto_parameters},
+                      as it is not monad-free; we'll need to use mapping from levels
+                      to parameters.) *)
+                  Slot_manager.maybe_register_trap
+                    traps_store
+                    ~traps_fraction:proto_parameters.traps_fraction
+                    id
+                    message ;
+                  result.(index) <- `Valid)
+                batch_list ;
+              treat_batch remaining_to_treat
+          | Error err ->
+              let validation_error = string_of_validation_error err in
+              Event.emit_dont_wait__batch_validation_error
+                ~level
+                ~slot_index
+                ~validation_error ;
+              let batch_size = List.length batch_list in
+              if batch_size = 1 then
+                List.iter
+                  (fun {index; _} -> result.(index) <- `Invalid)
+                  batch_list
+              else
+                (* Since [verify_multi] does not outputs which shards are the
+                   invalid ones and since we do not want to invalidate legitimate
+                   shards because a byzantine actor added some false shards, we
+                   revalidate all the shards by half recursiveley until we have
+                   identified the invalid shards. *)
+                let first_half, second_half =
+                  List.split_n (batch_size / 2) batch_list
+                in
+                treat_batch
+                  (({level; slot_index}, first_half)
+                  :: ({level; slot_index}, second_half)
+                  :: remaining_to_treat)
+          | exception exn ->
+              (* Don't crash if crypto raised an exception. *)
+              let validation_error = Printexc.to_string exn in
+              Event.emit_dont_wait__batch_validation_error
+                ~level
+                ~slot_index
+                ~validation_error ;
+              let batch_size = List.length batch_list in
+              if batch_size = 1 then
+                List.iter
+                  (fun {index; _} -> result.(index) <- `Invalid)
+                  batch_list
+              else
+                let first_half, second_half =
+                  List.split_n (batch_size / 2) batch_list
+                in
+                treat_batch
+                  (({level; slot_index}, first_half)
+                  :: ({level; slot_index}, second_half)
+                  :: remaining_to_treat))
+    in
+    treat_batch (Batch_tbl.to_seq to_check_in_batch |> List.of_seq) ;
+    Array.to_list result

@@ -75,7 +75,10 @@ let assert_in_message_cache ~__LOC__ message_id ~peer ~expected_message state =
       view.message_cache
   with
   | None ->
-      Test.fail "Expected entry in message cache for message id %d" message_id
+      Test.fail
+        ~__LOC__
+        "Expected entry in message cache for message id %d"
+        message_id
   | Some (_message_cache_state, message, _access) ->
       Check.(
         (message = expected_message)
@@ -578,10 +581,18 @@ let test_fanout rng limits parameters =
 (** Tests that receiving a message for a subscribed topic:
     - Returns peers to publish to.
     - Inserts message into message cache. *)
-let test_receiving_message rng limits parameters =
+let test_receiving_message ~batching_configuration rng limits parameters =
   Tezt_core.Test.register
     ~__FILE__
-    ~title:"Gossipsub: Test receiving message"
+    ~title:
+      ("Gossipsub: Test receiving message"
+      ^
+      match batching_configuration with
+      | GS.Sequentially -> ""
+      | GS.In_batches {time_interval} ->
+          Format.sprintf
+            " with batches of %fs"
+            (GS.Span.to_float_s time_interval))
     ~tags:["gossipsub"; "receiving_message"]
   @@ fun () ->
   let topic = "test" in
@@ -602,14 +613,17 @@ let test_receiving_message rng limits parameters =
   let message_id = 0 in
   (* Receive a message for a joined topic. *)
   let state, output =
-    GS.handle_receive_message {sender; topic; message_id; message} state
+    GS.handle_receive_message
+      ~batching_configuration
+      {sender; topic; message_id; message}
+      state
   in
   let peers_to_route =
     match output with
     | Already_received | Not_subscribed | Invalid_message | Unknown_validity
     | Outdated ->
         Test.fail ~__LOC__ "Handling of received message should succeed."
-    | Route_message {to_route} -> to_route
+    | Route_message {to_route} | To_include_in_batch (_, to_route) -> to_route
   in
   (* Should return [degree_optimal] peers to route the message to. *)
   Check.(
@@ -617,6 +631,18 @@ let test_receiving_message rng limits parameters =
       int
       ~error_msg:"Expected %R, got %L"
       ~__LOC__) ;
+  (* In batch mode, the message is added to cache only once the batch has been
+     treated. *)
+  let state =
+    match output with
+    | GS.Route_message _ | Already_received -> state
+    | To_include_in_batch out -> fst (GS.apply_batch [out] state)
+    | _ ->
+        Test.fail
+          ~__LOC__
+          "Output should have been Route_message, Already_received or \
+           To_include_in_batch"
+  in
   (* [message_id] should be added to the message cache. *)
   assert_in_message_cache
     ~__LOC__
@@ -647,10 +673,19 @@ let test_receiving_message rng limits parameters =
 
     It might be possible to simplify this setup (for instance, by having just
     one peer in the mesh?). *)
-let test_message_duplicate_score_bug rng _limits parameters =
+let test_message_duplicate_score_bug ~batching_configuration rng _limits
+    parameters =
   Tezt_core.Test.register
     ~__FILE__
-    ~title:"Gossipsub: Test message duplicate score bug"
+    ~title:
+      ("Gossipsub: Test message duplicate score bug"
+      ^
+      match batching_configuration with
+      | GS.Sequentially -> ""
+      | GS.In_batches {time_interval} ->
+          Format.sprintf
+            " with batches of %fs"
+            (GS.Span.to_float_s time_interval))
     ~tags:["gossipsub"; "duplicate_score_bug"]
   @@ fun () ->
   (* Ignore decays, for simplicity; they are used when refreshing score during
@@ -689,20 +724,44 @@ let test_message_duplicate_score_bug rng _limits parameters =
   let message = "some_data" in
   let state, _ = GS.handle_graft {peer = sender; topic} state in
   (* Receive a message for a joined topic. *)
-  let state, output =
-    GS.handle_receive_message {sender; topic; message_id = 0; message} state
+  let state, output1 =
+    GS.handle_receive_message
+      ~batching_configuration
+      {sender; topic; message_id = 0; message}
+      state
   in
   let () =
-    match output with
+    match output1 with
     | Already_received | Not_subscribed | Invalid_message | Unknown_validity
     | Outdated ->
         Test.fail ~__LOC__ "Handling of received message should succeed."
-    | Route_message _ -> ()
+    | Route_message _ | To_include_in_batch _ -> ()
   in
   (* Send one more message so that [sender]'s P2 score is greater than its P3
      score. In this way its score is positive, and [sender] is not pruned. *)
-  let state, _ =
-    GS.handle_receive_message {sender; topic; message_id = 1; message} state
+  let state, output2 =
+    GS.handle_receive_message
+      ~batching_configuration
+      {sender; topic; message_id = 1; message}
+      state
+  in
+  (* If we are in batch mode, the batch containing both messages as to be
+     treated. *)
+  let state =
+    match batching_configuration with
+    | Sequentially -> state
+    | In_batches _ ->
+        fst
+          (GS.apply_batch
+             (List.map
+                (function
+                  | GS.To_include_in_batch x -> x
+                  | _ ->
+                      Test.fail
+                        ~__LOC__
+                        "In batch mode, received message should be in batch.")
+                [output1; output2])
+             state)
   in
   (* Send the first message again. *)
   let per_topic_score_limits =
@@ -716,13 +775,16 @@ let test_message_duplicate_score_bug rng _limits parameters =
   let state, _ = GS.heartbeat state in
   assert_mesh_inclusion ~__LOC__ ~topic ~peer:sender ~is_included:true state ;
   let state, output =
-    GS.handle_receive_message {sender; topic; message_id = 0; message} state
+    GS.handle_receive_message
+      ~batching_configuration
+      {sender; topic; message_id = 0; message}
+      state
   in
   let () =
     match output with
     | Already_received -> ()
     | Not_subscribed | Invalid_message | Unknown_validity | Outdated
-    | Route_message _ ->
+    | Route_message _ | To_include_in_batch _ ->
         Test.fail ~__LOC__ "Handling should fail with Already_received."
   in
   let expected_score =
@@ -749,10 +811,19 @@ let test_message_duplicate_score_bug rng _limits parameters =
 
 (** Tests that we do not route the message when receiving a message
     for an unsubscribed topic. *)
-let test_receiving_message_for_unsusbcribed_topic rng limits parameters =
+let test_receiving_message_for_unsusbcribed_topic ~batching_configuration rng
+    limits parameters =
   Tezt_core.Test.register
     ~__FILE__
-    ~title:"Gossipsub: Test receiving message for unsubscribed topic"
+    ~title:
+      ("Gossipsub: Test receiving message for unsubscribed topic"
+      ^
+      match batching_configuration with
+      | GS.Sequentially -> ""
+      | GS.In_batches {time_interval} ->
+          Format.sprintf
+            " with batches of %fs"
+            (GS.Span.to_float_s time_interval))
     ~tags:["gossipsub"; "receive_message"; "fanout"]
   @@ fun () ->
   let topic = "topic" in
@@ -775,11 +846,14 @@ let test_receiving_message_for_unsusbcribed_topic rng limits parameters =
   let message = "some data" in
   let message_id = 0 in
   let _state, output =
-    GS.handle_receive_message {sender; topic; message_id; message} state
+    GS.handle_receive_message
+      ~batching_configuration
+      {sender; topic; message_id; message}
+      state
   in
   match output with
   | Already_received | Route_message _ | Invalid_message | Unknown_validity
-  | Outdated ->
+  | Outdated | To_include_in_batch _ ->
       Test.fail
         ~__LOC__
         "Handling of received message should fail with [Not_subscribed]."
@@ -2119,10 +2193,18 @@ let test_scoring_p1 rng _limits parameters =
 (** Test for P2 (First Message Deliveries).
 
     Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L3247 *)
-let test_scoring_p2 rng _limits parameters =
+let test_scoring_p2 ~batching_configuration rng _limits parameters =
   Tezt_core.Test.register
     ~__FILE__
-    ~title:"Gossipsub: Scoring P2"
+    ~title:
+      ("Gossipsub: Scoring P2"
+      ^
+      match batching_configuration with
+      | GS.Sequentially -> ""
+      | GS.In_batches {time_interval} ->
+          Format.sprintf
+            " with batches of %fs"
+            (GS.Span.to_float_s time_interval))
     ~tags:["gossipsub"; "scoring"; "p2"]
   @@ fun () ->
   let first_message_deliveries_weight = 2.0 in
@@ -2153,15 +2235,18 @@ let test_scoring_p2 rng _limits parameters =
   let receive_message ~__LOC__ peer message_id message state =
     let state, output =
       GS.handle_receive_message
+        ~batching_configuration
         {sender = peer; topic; message_id; message}
         state
     in
     match output with
     | GS.Route_message _ | Already_received -> state
+    | To_include_in_batch out -> fst (GS.apply_batch [out] state)
     | _ ->
         Test.fail
           ~__LOC__
-          "Output should have been Route_message or Already_received"
+          "Output should have been Route_message, Already_received or \
+           To_include_in_batch"
   in
   (* peer 0 delivers message first *)
   let message_id, message = gen_message () in
@@ -2230,10 +2315,18 @@ let test_scoring_p2 rng _limits parameters =
 
     Ported from: https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L3895
     and https://github.com/libp2p/rust-libp2p/blob/12b785e94ede1e763dd041a107d3a00d5135a213/protocols/gossipsub/src/behaviour/tests.rs#L3979 *)
-let test_scoring_p4 rng _limits parameters =
+let test_scoring_p4 ~batching_configuration rng _limits parameters =
   Tezt_core.Test.register
     ~__FILE__
-    ~title:"Gossipsub: Scoring P4"
+    ~title:
+      ("Gossipsub: Scoring P4"
+      ^
+      match batching_configuration with
+      | GS.Sequentially -> ""
+      | GS.In_batches {time_interval} ->
+          Format.sprintf
+            " with batches of %fs"
+            (GS.Span.to_float_s time_interval))
     ~tags:["gossipsub"; "scoring"; "p4"]
   @@ fun () ->
   let invalid_message_deliveries_weight = -2.0 in
@@ -2276,6 +2369,7 @@ let test_scoring_p4 rng _limits parameters =
            let message_id, message = gen_message () in
            let state, _ =
              GS.handle_receive_message
+               ~batching_configuration
                {sender = peer; topic; message_id; message}
                state
            in
@@ -2430,15 +2524,12 @@ let test_scoring_p7_grafts_before_backoff rng _limits parameters =
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/5293
    Add test for the described test scenario *)
 
-let register rng limits parameters =
+let register ~message_handlings rng limits parameters =
   test_ignore_graft_from_unknown_topic rng limits parameters ;
   test_handle_received_subscriptions rng limits parameters ;
   test_join_adds_peers_to_mesh rng limits parameters ;
   test_join_adds_fanout_to_mesh rng limits parameters ;
   test_publish_without_flood_publishing rng limits parameters ;
-  test_receiving_message_for_unsusbcribed_topic rng limits parameters ;
-  test_receiving_message rng limits parameters ;
-  test_message_duplicate_score_bug rng limits parameters ;
   test_fanout rng limits parameters ;
   test_handle_graft_for_joined_topic rng limits parameters ;
   test_handle_graft_for_not_joined_topic rng limits parameters ;
@@ -2465,7 +2556,21 @@ let register rng limits parameters =
   test_ignore_too_many_messages_in_ihave rng limits parameters ;
   test_heartbeat_scenario rng limits parameters ;
   test_scoring_p1 rng limits parameters ;
-  test_scoring_p2 rng limits parameters ;
-  test_scoring_p4 rng limits parameters ;
   test_scoring_p5 rng limits parameters ;
-  test_scoring_p7_grafts_before_backoff rng limits parameters
+  test_scoring_p7_grafts_before_backoff rng limits parameters ;
+  List.iter
+    (fun batching_configuration ->
+      test_receiving_message ~batching_configuration rng limits parameters ;
+      test_message_duplicate_score_bug
+        ~batching_configuration
+        rng
+        limits
+        parameters ;
+      test_receiving_message_for_unsusbcribed_topic
+        ~batching_configuration
+        rng
+        limits
+        parameters ;
+      test_scoring_p2 ~batching_configuration rng limits parameters ;
+      test_scoring_p4 ~batching_configuration rng limits parameters)
+    message_handlings

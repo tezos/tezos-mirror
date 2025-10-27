@@ -579,11 +579,17 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
       in
       return_unit
   in
+  Gossipsub.Worker.Validate_message_hook.set_batch
+    (Message_validation.gossipsub_batch_validation
+       ctxt
+       cryptobox
+       ~head_level:level
+       proto_parameters) ;
   Gossipsub.Worker.Validate_message_hook.set
     (Message_validation.gossipsub_app_messages_validation
        ctxt
        cryptobox
-       level
+       ~head_level:level
        proto_parameters) ;
   let*! () = remove_old_level_stored_data proto_parameters ctxt level in
   let* () =

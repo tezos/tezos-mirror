@@ -33,6 +33,8 @@ type neighbor = {addr : string; port : int}
 
 type history_mode = Rolling of {blocks : [`Auto | `Some of int]} | Full
 
+type batching_configuration = Disabled | Enabled of {time_interval : int}
+
 type experimental_features = unit
 
 let history_mode_encoding =
@@ -64,6 +66,27 @@ let history_mode_encoding =
         (fun () -> Full);
     ]
 
+let batching_configuration_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"disabled"
+        ~description:""
+        (Tag 0)
+        unit
+        (function Disabled -> Some () | Enabled _ -> None)
+        (fun () -> Disabled);
+      case
+        ~title:"enabled"
+        ~description:""
+        (Tag 1)
+        int31
+        (function
+          | Disabled -> None | Enabled {time_interval} -> Some time_interval)
+        (fun time_interval -> Enabled {time_interval});
+    ]
+
 type t = {
   data_dir : string;
   rpc_addr : P2p_point.Id.t;
@@ -85,6 +108,7 @@ type t = {
   verbose : bool;
   ignore_l1_config_peers : bool;
   disable_amplification : bool;
+  batching_configuration : batching_configuration;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -127,6 +151,19 @@ let default_experimental_features = ()
 
 let default_fetch_trusted_setup = true
 
+(* By default, when a shard is received, we wait for 0.1 seconds for other
+   shards of the same commitment before launching the cryptographic validation
+   of the shards.
+   Since there shards are supposed to be received several levels in advance,
+   the risk that this 0.1 second delay makes the validation happen too late
+   is very low.
+   It also slows down gossiping a bit, since messages are advertised only after
+   validation, so if a message has to go through several nodes before reaching
+   its final destination, the waiting delay accumulates and may be of a few
+   seconds. It looks fine with 8 blocks of attestation lag and 6 seconds block
+   time but if those values are reduced a lot, this might become an issue.*)
+let default_batching_configuration = Enabled {time_interval = 100}
+
 let default =
   {
     data_dir = default_data_dir;
@@ -149,6 +186,7 @@ let default =
     verbose = false;
     ignore_l1_config_peers = false;
     disable_amplification = false;
+    batching_configuration = default_batching_configuration;
   }
 
 let uri_encoding : Uri.t Data_encoding.t =
@@ -192,47 +230,50 @@ let encoding : t Data_encoding.t =
            verbose;
            ignore_l1_config_peers;
            disable_amplification;
+           batching_configuration;
          } ->
-      ( ( data_dir,
-          rpc_addr,
-          listen_addr,
-          public_addr,
-          peers,
-          expected_pow,
-          endpoint,
-          slots_backup_uris,
-          trust_slots_backup_uris,
-          metrics_addr ),
-        ( history_mode,
-          profile,
-          version,
-          service_name,
-          service_namespace,
-          experimental_features,
-          fetch_trusted_setup,
-          verbose,
-          ignore_l1_config_peers,
-          disable_amplification ) ))
-    (fun ( ( data_dir,
-             rpc_addr,
-             listen_addr,
-             public_addr,
-             peers,
-             expected_pow,
-             endpoint,
-             slots_backup_uris,
-             trust_slots_backup_uris,
-             metrics_addr ),
-           ( history_mode,
-             profile,
-             version,
-             service_name,
-             service_namespace,
-             experimental_features,
-             fetch_trusted_setup,
-             verbose,
-             ignore_l1_config_peers,
-             disable_amplification ) ) ->
+      ( ( ( data_dir,
+            rpc_addr,
+            listen_addr,
+            public_addr,
+            peers,
+            expected_pow,
+            endpoint,
+            slots_backup_uris,
+            trust_slots_backup_uris,
+            metrics_addr ),
+          ( history_mode,
+            profile,
+            version,
+            service_name,
+            service_namespace,
+            experimental_features,
+            fetch_trusted_setup,
+            verbose,
+            ignore_l1_config_peers,
+            disable_amplification ) ),
+        batching_configuration ))
+    (fun ( ( ( data_dir,
+               rpc_addr,
+               listen_addr,
+               public_addr,
+               peers,
+               expected_pow,
+               endpoint,
+               slots_backup_uris,
+               trust_slots_backup_uris,
+               metrics_addr ),
+             ( history_mode,
+               profile,
+               version,
+               service_name,
+               service_namespace,
+               experimental_features,
+               fetch_trusted_setup,
+               verbose,
+               ignore_l1_config_peers,
+               disable_amplification ) ),
+           batching_configuration ) ->
       {
         data_dir;
         rpc_addr;
@@ -254,109 +295,118 @@ let encoding : t Data_encoding.t =
         verbose;
         ignore_l1_config_peers;
         disable_amplification;
+        batching_configuration;
       })
     (merge_objs
-       (obj10
+       (merge_objs
+          (obj10
+             (dft
+                "data-dir"
+                ~description:"Location of the data dir"
+                string
+                default_data_dir)
+             (dft
+                "rpc-addr"
+                ~description:"RPC address"
+                P2p_point.Id.encoding
+                default_rpc_addr)
+             (dft
+                "net-addr"
+                ~description:"P2P listening address of this node"
+                P2p_point.Id.encoding
+                default_listen_addr)
+             (dft
+                "public-addr"
+                ~description:"P2P public address of this node"
+                P2p_point.Id.encoding
+                default_public_addr)
+             (dft
+                "peers"
+                ~description:"P2P addresses of remote peers"
+                (list string)
+                default_peers)
+             (dft
+                "expected-pow"
+                ~description:"Expected P2P identity's PoW"
+                float
+                default_expected_pow)
+             (dft
+                "endpoint"
+                ~description:"The Tezos node endpoint"
+                uri_encoding
+                default_endpoint)
+             (dft
+                "slots_backup_uris"
+                ~description:
+                  "Optional HTTP endpoints to fetch missing slots from."
+                (list uri_encoding)
+                [])
+             (dft
+                "trust_slots_backup_uris"
+                ~description:
+                  "Whether to trust the data downlaoded from the provided HTTP \
+                   backup URIs."
+                bool
+                false)
+             (dft
+                "metrics-addr"
+                ~description:"The point for the DAL node metrics server"
+                (Encoding.option P2p_point.Id.encoding)
+                None))
+          (obj10
+             (dft
+                "history_mode"
+                ~description:"The history mode for the DAL node"
+                history_mode_encoding
+                default_history_mode)
+             (dft
+                "profiles"
+                ~description:"The Octez DAL node profiles"
+                Profile_manager.unresolved_encoding
+                Profile_manager.Empty)
+             (req "version" ~description:"The configuration file version" int31)
+             (dft
+                "service_name"
+                ~description:"Name of the service"
+                Data_encoding.string
+                default.service_name)
+             (dft
+                "service_namespace"
+                ~description:"Namespace for the service"
+                Data_encoding.string
+                default.service_namespace)
+             (dft
+                "experimental_features"
+                ~description:"Experimental features"
+                experimental_features_encoding
+                default_experimental_features)
+             (dft
+                "fetch_trusted_setup"
+                ~description:"Install trusted setup"
+                bool
+                true)
+             (dft
+                "verbose"
+                ~description:
+                  "Whether to emit details about frequent logging events"
+                bool
+                default.verbose)
+             (dft
+                "ignore_l1_config_peers"
+                ~description:"Ignore the boot(strap) peers provided by L1"
+                bool
+                default.ignore_l1_config_peers)
+             (dft
+                "disable_amplification"
+                ~description:"Disable amplification"
+                bool
+                default.disable_amplification)))
+       (obj1
           (dft
-             "data-dir"
-             ~description:"Location of the data dir"
-             string
-             default_data_dir)
-          (dft
-             "rpc-addr"
-             ~description:"RPC address"
-             P2p_point.Id.encoding
-             default_rpc_addr)
-          (dft
-             "net-addr"
-             ~description:"P2P address of this node"
-             P2p_point.Id.encoding
-             default_listen_addr)
-          (dft
-             "public-addr"
-             ~description:"P2P address of this node"
-             P2p_point.Id.encoding
-             default_listen_addr)
-          (dft
-             "peers"
-             ~description:"P2P addresses of remote peers"
-             (list string)
-             default_peers)
-          (dft
-             "expected-pow"
-             ~description:"Expected P2P identity's PoW"
-             float
-             default_expected_pow)
-          (dft
-             "endpoint"
-             ~description:"The Tezos node endpoint"
-             uri_encoding
-             default_endpoint)
-          (dft
-             "slots_backup_uris"
-             ~description:"Optional HTTP endpoints to fetch missing slots from."
-             (list uri_encoding)
-             [])
-          (dft
-             "trust_slots_backup_uris"
-             ~description:
-               "Whether to trust the data downlaoded from the provided HTTP \
-                backup URIs."
-             bool
-             false)
-          (dft
-             "metrics-addr"
-             ~description:"The point for the DAL node metrics server"
-             (Encoding.option P2p_point.Id.encoding)
-             None))
-       (obj10
-          (dft
-             "history_mode"
-             ~description:"The history mode for the DAL node"
-             history_mode_encoding
-             default_history_mode)
-          (dft
-             "profiles"
-             ~description:"The Octez DAL node profiles"
-             Profile_manager.unresolved_encoding
-             Profile_manager.Empty)
-          (req "version" ~description:"The configuration file version" int31)
-          (dft
-             "service_name"
-             ~description:"Name of the service"
-             Data_encoding.string
-             default.service_name)
-          (dft
-             "service_namespace"
-             ~description:"Namespace for the service"
-             Data_encoding.string
-             default.service_namespace)
-          (dft
-             "experimental_features"
-             ~description:"Experimental features"
-             experimental_features_encoding
-             default_experimental_features)
-          (dft
-             "fetch_trusted_setup"
-             ~description:"Install trusted setup"
-             bool
-             true)
-          (dft
-             "verbose"
-             ~description:
-               "Whether to emit details about frequent logging events"
-             bool
-             default.verbose)
-          (dft
-             "ignore_l1_config_peers"
-             ~description:"Ignore the boot(strap) peers provided by L1"
-             bool
-             default.ignore_l1_config_peers)
-          (dft
-             "disable_amplification"
-             ~description:"Disable amplification"
-             bool
-             default.disable_amplification)))
+             "batching_configuration"
+             ~description:"Set the batching delay for shard verification"
+             batching_configuration_encoding
+             default.batching_configuration)))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 

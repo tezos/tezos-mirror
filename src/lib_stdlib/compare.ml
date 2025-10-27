@@ -91,6 +91,22 @@ module List (P : COMPARABLE) = Make (struct
         if hd <> 0 then hd else compare xs ys
 end)
 
+module Array (P : COMPARABLE) = Make (struct
+  type t = P.t array
+
+  let compare a b =
+    let len_a = Array.length a in
+    let len_b = Array.length b in
+    let rec loop i =
+      if i = len_a then if i = len_b then 0 else -1
+      else if i = len_b then 1
+      else
+        let c = P.compare a.(i) b.(i) in
+        if c <> 0 then c else loop (i + 1)
+    in
+    loop 0
+end)
+
 module Option (P : COMPARABLE) = Make (struct
   type t = P.t option
 
