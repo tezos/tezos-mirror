@@ -276,12 +276,21 @@ module Impl = struct
 
   let span_add_attrs attrs =
     match latest_dls_scope () with
-    | None | Some (Root _) ->
-        (* No started scope to which to attach attributes *)
-        ()
+    (* No started scope to which to attach attributes *)
+    | None | Some (Root _) -> ()
     | Some (Started {scope; _}) ->
         Opentelemetry.Scope.add_attrs scope @@ fun () ->
-        List.map (fun (k, v) -> (k, `String v)) attrs
+        List.map
+          (fun (k, v) ->
+            let (v : Opentelemetry.value) =
+              match v with
+              | `Bool b -> `Bool b
+              | `Int i -> `Int (Int32.to_int i)
+              | `Float f -> `Float f
+              | `String s -> `String s
+            in
+            (k, v))
+          attrs
 
   let end_span () =
     match pop_latest_dls_scope () with

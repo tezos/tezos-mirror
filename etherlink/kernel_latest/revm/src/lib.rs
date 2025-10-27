@@ -30,7 +30,9 @@ use revm::{
     Context, ExecuteCommitEvm, InspectCommitEvm, MainBuilder,
 };
 use tezos_ethereum::{block::BlockConstants, transaction::TRANSACTION_HASH_SIZE};
-use tezos_evm_logging::{__trace_kernel, __trace_kernel_add_attrs, tracing::instrument};
+use tezos_evm_logging::{
+    __trace_kernel, __trace_kernel_add_attrs, tracing::instrument, OTelAttrValue,
+};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
@@ -269,7 +271,10 @@ fn execute_transaction<'a, Host: Runtime>(
             // The following unwrap is safe, see condition above.
             let hash = B256::from(transaction_hash.unwrap());
             let pretty_hash = format!("{hash}");
-            let __attrs = [("etherlink.transaction.hash".to_string(), pretty_hash)];
+            let __attrs = [(
+                "etherlink.transaction.hash".to_string(),
+                OTelAttrValue::String(pretty_hash),
+            )];
             Box::new(move |__host| {
                 __trace_kernel_add_attrs!(__host, __attrs);
             })
