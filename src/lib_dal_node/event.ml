@@ -1264,6 +1264,15 @@ open struct
          migration level."
       ~level:Warning
       ("level", Data_encoding.int32)
+
+  let backfill_error =
+    declare_1
+      ~section
+      ~name:"backfill_error"
+      ~msg:"Backfill failed with error: {error}"
+      ~level:Error
+      ~pp1:Error_monad.pp_print_trace
+      ("error", Error_monad.trace_encoding)
 end
 
 (* DAL node event emission functions *)
@@ -1624,3 +1633,5 @@ let emit_reception_of_shard_detailed ~level ~slot_index ~shard_index ~sender =
   emit reception_of_shard_detailed (level, slot_index, shard_index, sender)
 
 let emit_skip_attesting_shards ~level = emit skip_attesting_shards level
+
+let emit_backfill_error ~error = emit backfill_error error

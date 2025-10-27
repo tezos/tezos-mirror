@@ -54,3 +54,4 @@ val subscribe :
   pkh:Signature.public_key_hash ->
   Types.Attestable_slots_watcher_table.Attestable_event.t
   Resto_directory.Answer.stream
+  Lwt.t
