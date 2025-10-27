@@ -23,13 +23,13 @@ type on_finalized_levels_handler =
   end_l2_level:Ethereum_types.quantity ->
   unit tzresult Lwt.t
 
-(** [start ~multichain ~time_between_blocks ~evm_node_endpoint
+(** [start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
     ~get_next_blueprint_number on_new_blueprint_handler
-    on_finalized_levels_handler] is a never-returning function which
-    iterates over blueprints streamed by [evm_node_endpoint], calling
+    on_finalized_levels_handler] is a never-returning function which iterates
+    over blueprints streamed by [evm_node_endpoint], calling
     [on_new_blueprint_handler] for each blueprint in order and
-    [on_finalized_levels_handler] for each finalized levels notified
-    by the remote EVM endpoint.
+    [on_finalized_levels_handler] for each finalized levels notified by the
+    remote EVM endpoint.
 
     [next_blueprint_number] is the height of the current local head, while
     [time_between_blocks] is used to detect when a connection to
@@ -39,6 +39,7 @@ val start :
   multichain:bool ->
   time_between_blocks:Configuration.time_between_blocks ->
   evm_node_endpoint:Uri.t ->
+  rpc_timeout:float ->
   next_blueprint_number:quantity ->
   on_new_blueprint:on_new_blueprint_handler ->
   on_finalized_levels:on_finalized_levels_handler ->

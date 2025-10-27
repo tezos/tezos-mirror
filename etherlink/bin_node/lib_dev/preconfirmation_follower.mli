@@ -11,11 +11,12 @@ type timestamp_handler = Time.Protocol.t -> unit tzresult Lwt.t
 
 type parameters = {
   evm_node_endpoint : Uri.t;
+  evm_node_endpoint_timeout : float;
   on_timestamp : timestamp_handler;
   on_preconfirmation : preconfirmation_handler;
 }
 
-(** 
+(**
   [start parameters] starts the monitoring process using the given [parameters].
   The process connects to the specified EVM node and listens for
   {!preconfirmation_message} values. When a [Block_timestamp] or

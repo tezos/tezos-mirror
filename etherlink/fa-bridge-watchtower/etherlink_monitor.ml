@@ -1001,6 +1001,9 @@ let start db ~config ~notify_ws_change ~first_block =
     tx_queue_beacon ()
   in
   let* () =
+    let timeout =
+      match config.rpc_timeout with Some t -> t.timeout | None -> 10.
+    in
     Tx_queue.start
       ~config:
         {
@@ -1010,6 +1013,7 @@ let start db ~config ~notify_ws_change ~first_block =
           tx_per_addr_limit = 10000L;
         }
       ~keep_alive:true
+      ~timeout
       ()
   in
   Lwt.dont_wait tx_queue_beacon ignore ;

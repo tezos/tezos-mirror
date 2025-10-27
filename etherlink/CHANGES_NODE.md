@@ -6,7 +6,14 @@
 
 ### Configuration changes
 
+- Every RPC made by the EVM node is now protected by a timeout which can be set
+  in a new field `rpc_timeout` of the configuration file (default to
+  30s). (!19718)
+
 ### RPCs changes
+
+- Prevent transactions from getting stuck when they are being sent to an
+  unresponsive node. (!19683, !19718)
 
 - Add support for state overrides in `eth_estimateGas` for EIP-7702, and
   generalize block parameter of `eth_estimateGas` to support block
@@ -15,6 +22,9 @@
 ### Monitoring changes
 
 ### Command-line interface changes
+
+- New CLI option `--rpc-timeout <seconds>` to set the global timeout for RPCs
+  made by the EVM node. (!19718)
 
 ### Execution changes
 
@@ -49,8 +59,6 @@ This release will not apply any migration to the node's store (version
   (which is the case by default). (!19665)
 - Disable [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) checks during
   `debug_traceCall` simulations in Ebisu. (!19669)
-- Prevent transactions from getting stuck when they are being sent to an
-  unresponsive node. (!19683)
 
 ### Experimental features changes
 

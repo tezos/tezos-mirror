@@ -22,7 +22,7 @@ let install_finalizer ~(tx_container : _ Services_backend_sig.tx_container)
   Evm_context.shutdown ()
 
 let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
-    ~evm_node_endpoint ~keep_alive :
+    ~evm_node_endpoint ~keep_alive ~timeout :
     f Services_backend_sig.tx_container tzresult =
   let (module Tx_container) =
     (module struct
@@ -37,6 +37,7 @@ let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
         | Some evm_node_endpoint ->
             Injector.send_raw_transaction
               ~keep_alive
+              ~timeout
               ~base:evm_node_endpoint
               ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
         | None ->
@@ -146,6 +147,7 @@ let main
     ({
        keep_alive;
        rollup_node_endpoint;
+       rpc_timeout;
        experimental_features = {drop_duplicate_on_injection; _};
        _;
      } as config :
@@ -154,6 +156,7 @@ let main
   let* smart_rollup_address =
     Rollup_services.smart_rollup_address
       ~keep_alive:config.keep_alive
+      ~timeout:rpc_timeout
       rollup_node_endpoint
   in
   let* () =
@@ -174,6 +177,8 @@ let main
     let base = rollup_node_endpoint
 
     let keep_alive = keep_alive
+
+    let timeout = rpc_timeout
 
     let drop_duplicate_on_injection = drop_duplicate_on_injection
 
@@ -210,7 +215,11 @@ let main
     | true, None ->
         let start, tx_container = Tx_queue.tx_container ~chain_family in
         let* () =
-          start ~config:config.tx_queue ~keep_alive:config.keep_alive ()
+          start
+            ~config:config.tx_queue
+            ~keep_alive:config.keep_alive
+            ~timeout:config.rpc_timeout
+            ()
         in
         return
         @@ ( Some
@@ -225,7 +234,11 @@ let main
           if enable_send_raw_transaction then evm_node_endpoint else None
         in
         let*? tx_container =
-          container_forward_tx ~chain_family ~evm_node_endpoint ~keep_alive
+          container_forward_tx
+            ~chain_family
+            ~evm_node_endpoint
+            ~keep_alive
+            ~timeout:config.rpc_timeout
         in
         return (None, tx_container)
   in
@@ -237,6 +250,7 @@ let main
       ~keep_alive:config.keep_alive
       ?on_new_head
       ~rollup_node_endpoint
+      ~rollup_node_endpoint_timeout:rpc_timeout
       ()
   in
 

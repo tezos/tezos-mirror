@@ -34,6 +34,8 @@ module MakeBackend (Base : sig
 
   val keep_alive : bool
 
+  val timeout : float
+
   val drop_duplicate_on_injection : bool
 
   val smart_rollup_address : string
@@ -65,6 +67,7 @@ end) : Services_backend_sig.Backend = struct
       call_service
         ~keep_alive:Base.keep_alive
         ~base:Base.base
+        ~timeout:Base.timeout
         durable_state_value
         ((), block_id)
         {key = path}
@@ -76,6 +79,7 @@ end) : Services_backend_sig.Backend = struct
         call_service
           ~keep_alive:Base.keep_alive
           ~base:Base.base
+          ~timeout:Base.timeout
           durable_state_subkeys
           ((), block_id)
           {key = path}
@@ -117,6 +121,7 @@ end) : Services_backend_sig.Backend = struct
         call_service
           ~keep_alive:Base.keep_alive
           ~base:Base.base
+          ~timeout:Base.timeout
           batcher_injection
           ()
           {
@@ -145,6 +150,7 @@ end) : Services_backend_sig.Backend = struct
         call_service
           ~keep_alive:Base.keep_alive
           ~base:Base.base
+          ~timeout:Base.timeout
           simulation
           ()
           ()
@@ -227,6 +233,8 @@ module Make (Base : sig
   val base : Uri.t
 
   val keep_alive : bool
+
+  val timeout : float
 
   val drop_duplicate_on_injection : bool
 

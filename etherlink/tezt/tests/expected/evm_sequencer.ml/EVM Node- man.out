@@ -34,13 +34,13 @@ Run commands:
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
-      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
-      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
-      [-v --verbose] [--restricted-rpcs <regexp>]
-      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
-      [--finalized-view] [--profiling [BOOL]]
-      [--preimages-dir <_evm_installer_preimages>]
+      [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
+      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
       [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
@@ -77,6 +77,7 @@ Run commands:
       concurrently.
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
+    --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
     --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
       `tx-pool-max-txs` instead. Maximum allowed addresses inside the
@@ -153,13 +154,13 @@ Run commands:
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
-      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
-      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
-      [-v --verbose] [--restricted-rpcs <regexp>]
-      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
-      [--finalized-view] [--profiling [BOOL]]
-      [--preimages-dir <_evm_installer_preimages>]
+      [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
+      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
       [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
@@ -195,6 +196,7 @@ Run commands:
       concurrently.
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
+    --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
     --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
       `tx-pool-max-txs` instead. Maximum allowed addresses inside the
@@ -253,13 +255,14 @@ Run commands:
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
-      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
-      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
-      [-v --verbose] [--restricted-rpcs <regexp>]
-      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
-      [--finalized-view] [--profiling [BOOL]] [--read-only]
-      [--ignore-block-param] [--evm-node-endpoint <url>]
+      [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
+      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--profiling [BOOL]] [--read-only] [--ignore-block-param]
+      [--evm-node-endpoint <url>]
     Start the EVM node in proxy mode.
     --data-dir <data-dir>: The path to the EVM node data directory. Default
       is $HOME/.octez-evm-node.
@@ -286,6 +289,7 @@ Run commands:
       concurrently.
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
+    --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
     --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
       `tx-pool-max-txs` instead. Maximum allowed addresses inside the
@@ -321,13 +325,13 @@ Run commands:
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
-      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
-      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
-      [-v --verbose] [--restricted-rpcs <regexp>]
-      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
-      [--finalized-view] [--profiling [BOOL]]
-      [--preimages-dir <_evm_installer_preimages>]
+      [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
+      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [--time-between-blocks <10.>]
       [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
       [--sequencer-key <edsk...>] [--maximum-blueprints-lag <LAG>]
@@ -364,6 +368,7 @@ Run commands:
       concurrently.
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
+    --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
     --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
       `tx-pool-max-txs` instead. Maximum allowed addresses inside the
@@ -429,12 +434,13 @@ Run commands:
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
-      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
-      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
-      [-v --verbose] [--restricted-rpcs <regexp>]
-      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
-      [--finalized-view] [--profiling [BOOL]] [--private-rpc-port <PORT>]
+      [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
+      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--profiling [BOOL]] [--private-rpc-port <PORT>]
       [--evm-node-endpoint <url>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
@@ -467,6 +473,7 @@ Run commands:
       concurrently.
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
+    --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
     --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
       `tx-pool-max-txs` instead. Maximum allowed addresses inside the
@@ -531,12 +538,13 @@ Run commands:
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
-      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
-      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
-      [-v --verbose] [--restricted-rpcs <regexp>]
-      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
-      [--finalized-view] [--profiling [BOOL]] [--evm-node-endpoint <url>]
+      [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
+      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--profiling [BOOL]] [--evm-node-endpoint <url>]
       [--evm-node-private-endpoint <url>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
@@ -566,6 +574,7 @@ Run commands:
       concurrently.
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
+    --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
     --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
       `tx-pool-max-txs` instead. Maximum allowed addresses inside the
@@ -626,13 +635,13 @@ Configuration commands:
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
-      [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
-      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
-      [-v --verbose] [--restricted-rpcs <regexp>]
-      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
-      [--finalized-view] [--profiling [BOOL]]
-      [--preimages-dir <_evm_installer_preimages>]
+      [--chunk-size <10>] [-K --keep-alive] [--rpc-timeout <sec>]
+      [--rollup-node-endpoint <url>] [--tx-pool-addr-limit <4_000>]
+      [--tx-pool-timeout-limit <4>] [--tx-pool-max-txs <1_000>]
+      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
+      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
       [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
@@ -672,6 +681,7 @@ Configuration commands:
       concurrently.
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
+    --rpc-timeout <sec>: Timeout in seconds for RPCs made by the EVM node.
     --rollup-node-endpoint <url>: The address of a rollup node.
     --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
       `tx-pool-max-txs` instead. Maximum allowed addresses inside the

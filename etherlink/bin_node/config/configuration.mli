@@ -228,6 +228,7 @@ type t = {
   gcp_kms : gcp_kms;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
+  rpc_timeout : float;
   verbose : Internal_event.level;
   experimental_features : experimental_features;
   fee_history : fee_history;
@@ -354,6 +355,7 @@ module Cli : sig
     ?network:supported_network ->
     ?history_mode:history_mode ->
     ?sunset_sec:int64 ->
+    ?rpc_timeout:float ->
     unit ->
     t
 
@@ -394,6 +396,7 @@ module Cli : sig
     ?history_mode:history_mode ->
     ?dal_slots:int list ->
     ?sunset_sec:int64 ->
+    ?rpc_timeout:float ->
     t ->
     t
 
@@ -435,6 +438,7 @@ module Cli : sig
     ?network:supported_network ->
     ?history_mode:history_mode ->
     ?sunset_sec:int64 ->
+    ?rpc_timeout:float ->
     string ->
     t tzresult Lwt.t
 end

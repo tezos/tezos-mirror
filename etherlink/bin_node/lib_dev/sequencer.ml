@@ -88,7 +88,7 @@ let validate_and_add_tx (type f)
 
 let loop_sequencer (type f) multichain
     ~(tx_container : f Services_backend_sig.tx_container) ?sandbox_config
-    time_between_blocks =
+    ~rpc_timeout time_between_blocks =
   let open Lwt_result_syntax in
   match sandbox_config with
   | Some {parent_chain = Some evm_node_endpoint; _} ->
@@ -97,6 +97,7 @@ let loop_sequencer (type f) multichain
         ~multichain
         ~time_between_blocks
         ~evm_node_endpoint
+        ~rpc_timeout
         ~next_blueprint_number:head.next_blueprint_number
         ~on_new_blueprint:(fun (Qty number) blueprint ->
           let*! {next_blueprint_number = Qty expected_number; _} =
@@ -193,7 +194,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       configuration.opentelemetry.config
   in
   let is_sandbox = Option.is_some sandbox_config in
-  let {rollup_node_endpoint; keep_alive; _} = configuration in
+  let {rollup_node_endpoint; rpc_timeout; keep_alive; _} = configuration in
   let sequencer_config = configuration.sequencer in
   let* rollup_node_smart_rollup_address =
     if Option.is_some sandbox_config then return_none
@@ -201,6 +202,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       let* sr1 =
         Rollup_services.smart_rollup_address
           ~keep_alive:configuration.keep_alive
+          ~timeout:configuration.rpc_timeout
           rollup_node_endpoint
       in
       return_some sr1
@@ -233,10 +235,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
   let* tx_container =
     let start, tx_container = Tx_queue.tx_container ~chain_family in
     let* () =
-      start
-        ~config:configuration.tx_queue
-        ~keep_alive:configuration.keep_alive
-        ()
+      start ~config:configuration.tx_queue ~keep_alive ~timeout:rpc_timeout ()
     in
     return tx_container
   in
@@ -370,6 +369,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
           ~signer
           ~smart_rollup_address:smart_rollup_address_b58
           ~rollup_node_endpoint
+          ~rollup_node_endpoint_timeout:rpc_timeout
           ())
       sequencer_config.blueprints_publisher_config.dal_slots
   in
@@ -397,6 +397,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
     Blueprints_publisher.start
       ~blueprints_range:(Evm_ro_context.blueprints_range ro_ctxt)
       ~rollup_node_endpoint
+      ~rollup_node_endpoint_timeout:rpc_timeout
       ~config:sequencer_config.blueprints_publisher_config
       ~latest_level_seen:(Z.pred next_blueprint_number)
       ~keep_alive
@@ -470,12 +471,18 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
     else
       let* () =
         Evm_events_follower.start
-          {rollup_node_endpoint; keep_alive; filter_event = (fun _ -> true)}
+          {
+            rollup_node_endpoint;
+            keep_alive;
+            rpc_timeout;
+            filter_event = (fun _ -> true);
+          }
       in
       let () =
         Rollup_node_follower.start
-          ~keep_alive:configuration.keep_alive
+          ~keep_alive
           ~rollup_node_endpoint
+          ~rollup_node_endpoint_timeout:rpc_timeout
           ()
       in
       return_unit
@@ -537,6 +544,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
     loop_sequencer
       enable_multichain
       ~tx_container
+      ~rpc_timeout:configuration.rpc_timeout
       ?sandbox_config
       sequencer_config.time_between_blocks
   and* () =

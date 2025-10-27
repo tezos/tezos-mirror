@@ -153,11 +153,13 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
   let* smart_rollup_address =
     Evm_services.get_smart_rollup_address
       ~keep_alive:config.keep_alive
-      ~evm_node_endpoint
+      ~timeout:config.rpc_timeout
+      evm_node_endpoint
   in
   let* time_between_blocks =
     Evm_services.get_time_between_blocks
       ~fallback:(Time_between_blocks 10.)
+      ~timeout:config.rpc_timeout
       ~evm_node_endpoint
       ()
   in
@@ -186,7 +188,13 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
 
   let* tx_container =
     let start, tx_container = Tx_queue.tx_container ~chain_family in
-    let* () = start ~config:config.tx_queue ~keep_alive:config.keep_alive () in
+    let* () =
+      start
+        ~config:config.tx_queue
+        ~keep_alive:config.keep_alive
+        ~timeout:config.rpc_timeout
+        ()
+    in
     return tx_container
   in
 
@@ -264,6 +272,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
           {
             rollup_node_endpoint = config.rollup_node_endpoint;
             keep_alive = config.keep_alive;
+            rpc_timeout = config.rpc_timeout;
             filter_event =
               (function
               | New_delayed_transaction _ | Upgrade_event _
@@ -276,6 +285,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         Rollup_node_follower.start
           ~keep_alive:config.keep_alive
           ~rollup_node_endpoint:config.rollup_node_endpoint
+          ~rollup_node_endpoint_timeout:config.rpc_timeout
           ()
       in
       return_unit
@@ -325,6 +335,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         ~multichain:enable_multichain
         ~time_between_blocks
         ~evm_node_endpoint
+        ~rpc_timeout:config.rpc_timeout
         ~next_blueprint_number
         ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
         ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
@@ -333,9 +344,17 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       when_ config.experimental_features.preconfirmation_stream_enabled
       @@ fun () ->
       Preconfirmation_follower.start
-        {evm_node_endpoint; on_timestamp; on_preconfirmation}
+        {
+          evm_node_endpoint;
+          evm_node_endpoint_timeout = config.rpc_timeout;
+          on_timestamp;
+          on_preconfirmation;
+        }
     and* () =
-      Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
+      Drift_monitor.run
+        ~evm_node_endpoint
+        ~timeout:config.rpc_timeout
+        Evm_context.next_blueprint_number
     and* () =
       Tx_container.tx_queue_beacon
         ~evm_node_endpoint:(Rpc evm_node_endpoint)

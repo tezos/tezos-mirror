@@ -172,6 +172,7 @@ let send_transactions_batch ~relay_endpoint transactions =
       Rollup_services.call_service
         ~keep_alive:true
         ~base:relay_endpoint
+        ~timeout:Network_info.timeout
         (Batch.dispatch_batch_service ~path:Resto.Path.root)
         ()
         ()

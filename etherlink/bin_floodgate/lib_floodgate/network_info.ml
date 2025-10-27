@@ -8,12 +8,15 @@
 
 type t = {chain_id : L2_types.chain_id; base_fee_per_gas : Z.t}
 
+let timeout = 10.
+
 let get_chain_id ~evm_node_endpoint =
   let open Lwt_result_syntax in
   let* chain_id =
     Batch.call
       (module Rpc_encodings.Chain_id)
       ~keep_alive:true
+      ~timeout
       ~evm_node_endpoint
       ()
   in
@@ -31,6 +34,7 @@ let get_base_fee_per_gas ~rpc_endpoint =
       (module Rpc_encodings.Eth_fee_history)
       ~evm_node_endpoint:rpc_endpoint
       ~keep_alive:true
+      ~timeout
       (Qty Z.one, Latest, [])
   in
   let (Qty base_fee_per_gas) = Stdlib.List.hd fee_history.base_fee_per_gas in
@@ -44,6 +48,7 @@ let get_gas_limit ?data ?from ?to_ ?(value = Z.one) ~rpc_endpoint
       (module Rpc_encodings.Get_estimate_gas)
       ~evm_node_endpoint:rpc_endpoint
       ~keep_alive:true
+      ~timeout
       ( {
           from;
           to_;

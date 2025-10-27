@@ -150,7 +150,7 @@ let configuration_handler config =
     (Configuration.encoding ())
     config
 
-let health_check_handler mode db_liveness_check query =
+let health_check_handler config mode db_liveness_check query =
   match mode with
   | Configuration.Sequencer | Observer | Proxy ->
       let open Lwt_result_syntax in
@@ -177,13 +177,14 @@ let health_check_handler mode db_liveness_check query =
       Rollup_services.call_service
         ~keep_alive:false
         ~base:evm_node_endpoint
+        ~timeout:config.Configuration.rpc_timeout
         ~media_types:[Media_type.json]
         health_check_service
         ()
         query
         ()
 
-let evm_mode_handler evm_mode =
+let evm_mode_handler config evm_mode =
   let open Lwt_result_syntax in
   match evm_mode with
   | Configuration.Sequencer -> return "sequencer"
@@ -194,6 +195,7 @@ let evm_mode_handler evm_mode =
         Rollup_services.call_service
           ~keep_alive:false
           ~base:evm_node_endpoint
+          ~timeout:config.Configuration.rpc_timeout
           ~media_types:[Media_type.json]
           mode_service
           ()
@@ -210,13 +212,13 @@ let configuration config dir =
   Evm_directory.register0 dir configuration_service (fun () () ->
       configuration_handler config |> Lwt.return_ok)
 
-let evm_mode evm_mode dir =
+let evm_mode config evm_mode dir =
   Evm_directory.register0 dir mode_service (fun () () ->
-      evm_mode_handler evm_mode)
+      evm_mode_handler config evm_mode)
 
-let health_check mode db_liveness_check dir =
+let health_check config mode db_liveness_check dir =
   Evm_directory.register0 dir health_check_service (fun query () ->
-      health_check_handler mode db_liveness_check query)
+      health_check_handler config mode db_liveness_check query)
 
 let get_block_by_number ~full_transaction_object block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
@@ -1513,8 +1515,8 @@ let directory (type f) ~(rpc_server_family : f Rpc_types.rpc_server_family) mode
             return_unit)
   in
 
-  dir |> version |> configuration config |> evm_mode mode
-  |> health_check mode db_liveness_check
+  dir |> version |> configuration config |> evm_mode config mode
+  |> health_check config mode db_liveness_check
   |> dispatch_public rpc_server_family rpc config tx_container backend
   |> dispatch_websocket_public rpc_server_family rpc config tx_container backend
 
@@ -1522,7 +1524,7 @@ let private_directory ~rpc_server_family mode rpc config
     (tx_container : _ Services_backend_sig.tx_container) backend
     ~block_production =
   Evm_directory.empty config.experimental_features.rpc_server
-  |> version |> evm_mode mode
+  |> version |> evm_mode config mode
   |> dispatch_private
        rpc_server_family
        rpc

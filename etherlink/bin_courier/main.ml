@@ -143,18 +143,21 @@ let start_blueprint_follower ~relay_endpoint =
       (module Rpc_encodings.Block_number)
       ~keep_alive:true
       ~evm_node_endpoint:relay_endpoint
+      ~timeout:10.
       ()
   in
   let* time_between_blocks =
     Evm_services.get_time_between_blocks
       ~fallback:(Time_between_blocks 10.)
       ~evm_node_endpoint:relay_endpoint
+      ~timeout:10.
       ()
   in
   Blueprints_follower.start
     ~multichain:false
     ~time_between_blocks
     ~evm_node_endpoint:relay_endpoint
+    ~rpc_timeout:10.
     ~next_blueprint_number
     ~on_new_blueprint:(fun number blueprint ->
       let*! () = Floodgate_events.received_blueprint number in
@@ -208,6 +211,7 @@ let withdraw ~endpoint ~infos value from receiver =
     Batch.call
       (module Rpc_encodings.Get_transaction_receipt)
       ~keep_alive:true
+      ~timeout:10.
       ~evm_node_endpoint:endpoint
       hash
   in

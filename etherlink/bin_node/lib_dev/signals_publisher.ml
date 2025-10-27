@@ -9,6 +9,7 @@ type parameters = {
   signer : Signer.map;
   smart_rollup_address : string;
   rollup_node_endpoint : Uri.t;
+  rollup_node_endpoint_timeout : float;
 }
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7453 *)
@@ -22,16 +23,28 @@ module Types = struct
     signer : Signer.map;
     smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
     rollup_node_endpoint : Uri.t;
+    rollup_node_endpoint_timeout : float;
   }
 
   let of_parameters
-      ({signer; smart_rollup_address; rollup_node_endpoint} : parameters) :
-      state tzresult Lwt.t =
+      ({
+         signer;
+         smart_rollup_address;
+         rollup_node_endpoint;
+         rollup_node_endpoint_timeout;
+       } :
+        parameters) : state tzresult Lwt.t =
     let open Lwt_result_syntax in
     let*? smart_rollup_address =
       Tezos_crypto.Hashed.Smart_rollup_address.of_string smart_rollup_address
     in
-    return {signer; smart_rollup_address; rollup_node_endpoint}
+    return
+      {
+        signer;
+        smart_rollup_address;
+        rollup_node_endpoint;
+        rollup_node_endpoint_timeout;
+      }
 end
 
 module Name = struct
@@ -120,6 +133,7 @@ module Worker = struct
     let state = state worker in
     let* statuses =
       Rollup_services.get_injected_dal_operations_statuses
+        ~timeout:state.rollup_node_endpoint_timeout
         ~rollup_node_endpoint:state.rollup_node_endpoint
     in
     let ready_injections =
@@ -137,6 +151,7 @@ module Worker = struct
               let* () =
                 Rollup_services.forget_dal_injection_id
                   ~rollup_node_endpoint:state.rollup_node_endpoint
+                  ~timeout:state.rollup_node_endpoint_timeout
                   injection_id
               in
               let*! () =
@@ -170,6 +185,7 @@ module Worker = struct
         Rollup_services.publish
           ~keep_alive:false
           ~rollup_node_endpoint:state.rollup_node_endpoint
+          ~timeout:state.rollup_node_endpoint_timeout
           [payload])
 end
 
@@ -232,9 +248,17 @@ let worker_add_request ~request =
   let*! (_pushed : bool) = Worker.Queue.push_request w request in
   return_unit
 
-let start ~signer ~smart_rollup_address ~rollup_node_endpoint () =
+let start ~signer ~smart_rollup_address ~rollup_node_endpoint
+    ~rollup_node_endpoint_timeout () =
   let open Lwt_result_syntax in
-  let parameters = {signer; smart_rollup_address; rollup_node_endpoint} in
+  let parameters =
+    {
+      signer;
+      smart_rollup_address;
+      rollup_node_endpoint;
+      rollup_node_endpoint_timeout;
+    }
+  in
   let* worker = Worker.launch table () parameters (module Handlers) in
   let*! () = Signals_publisher_events.publisher_is_ready () in
   Lwt.wakeup worker_waker worker ;

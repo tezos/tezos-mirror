@@ -13,6 +13,7 @@ type blueprints_range =
 val start :
   blueprints_range:blueprints_range ->
   rollup_node_endpoint:Uri.t ->
+  rollup_node_endpoint_timeout:float ->
   config:Configuration.blueprints_publisher_config ->
   latest_level_seen:Z.t ->
   keep_alive:bool ->

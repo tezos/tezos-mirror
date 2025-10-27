@@ -262,6 +262,7 @@ type t = {
   gcp_kms : gcp_kms;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
+  rpc_timeout : float;
   verbose : Internal_event.level;
   experimental_features : experimental_features;
   fee_history : fee_history;
@@ -347,6 +348,8 @@ let default_keep_alive = false
 let default_finalized_view = false
 
 let default_rollup_node_endpoint = Uri.of_string "http://localhost:8932"
+
+let default_rpc_timeout_s = 30. (* seconds *)
 
 let default_rollup_node_tracking = true
 
@@ -574,12 +577,9 @@ let observer_evm_node_endpoint = function
   | Testnet -> "https://relay.ghostnet.etherlink.com"
   | Shadownet -> "https://relay.shadownet.etherlink.com"
 
-let observer_config_dft ~evm_node_endpoint ?rollup_node_tracking () =
-  {
-    evm_node_endpoint;
-    rollup_node_tracking =
-      Option.value ~default:default_rollup_node_tracking rollup_node_tracking;
-  }
+let observer_config_dft ~evm_node_endpoint
+    ?(rollup_node_tracking = default_rollup_node_tracking) () =
+  {evm_node_endpoint; rollup_node_tracking}
 
 let log_filter_config_encoding : log_filter_config Data_encoding.t =
   let open Data_encoding in
@@ -1602,6 +1602,7 @@ let encoding ?network () : t Data_encoding.t =
            gcp_kms;
            keep_alive;
            rollup_node_endpoint;
+           rpc_timeout;
            verbose;
            experimental_features;
            fee_history;
@@ -1614,12 +1615,10 @@ let encoding ?network () : t Data_encoding.t =
            performance_profile;
          }
        ->
-      ( (data_dir, log_filter, sequencer, observer),
-        ( ( None,
-            None,
-            None,
-            keep_alive,
+      ( (data_dir, log_filter, sequencer, observer, None, None, None),
+        ( ( keep_alive,
             rollup_node_endpoint,
+            rpc_timeout,
             verbose,
             experimental_features,
             proxy,
@@ -1635,12 +1634,16 @@ let encoding ?network () : t Data_encoding.t =
             opentelemetry,
             tx_queue,
             performance_profile ) ) ))
-    (fun ( (data_dir, log_filter, sequencer, observer),
-           ( ( _tx_pool_timeout_limit,
-               _tx_pool_addr_limit,
-               _tx_pool_tx_per_addr_limit,
-               keep_alive,
+    (fun ( ( data_dir,
+             log_filter,
+             sequencer,
+             observer,
+             _tx_pool_timeout_limit,
+             _tx_pool_addr_limit,
+             _tx_pool_tx_per_addr_limit ),
+           ( ( keep_alive,
                rollup_node_endpoint,
+               rpc_timeout,
                verbose,
                experimental_features,
                proxy,
@@ -1669,6 +1672,7 @@ let encoding ?network () : t Data_encoding.t =
         gcp_kms;
         keep_alive;
         rollup_node_endpoint;
+        rpc_timeout;
         verbose;
         experimental_features;
         fee_history;
@@ -1681,7 +1685,7 @@ let encoding ?network () : t Data_encoding.t =
         performance_profile;
       })
     (merge_objs
-       (obj4
+       (obj7
           (dft
              "data_dir"
              ~description:"The path to the EVM node data directory."
@@ -1692,29 +1696,28 @@ let encoding ?network () : t Data_encoding.t =
              log_filter_config_encoding
              (default_filter_config ()))
           (dft "sequencer" sequencer_encoding (sequencer_config_dft ()))
-          (observer_field "observer" (observer_encoding ?network ())))
+          (observer_field "observer" (observer_encoding ?network ()))
+          (opt
+             "tx_pool_timeout_limit"
+             ~description:
+               "Transaction timeout limit inside the transaction pool. \
+                DEPRECATED: You should use \"tx_pool.max_lifespan\" instead."
+             int64)
+          (opt
+             "tx_pool_addr_limit"
+             ~description:
+               "Maximum allowed addresses inside the transaction pool. \
+                DEPRECATED: You should use \"tx_pool.max_size\" instead."
+             int64)
+          (opt
+             "tx_pool_tx_per_addr_limit"
+             ~description:
+               "Maximum allowed transactions per user address inside the \
+                transaction pool. DEPRECATED: You should use \
+                \"tx_pool.tx_per_addr_limit\" instead."
+             int64))
        (merge_objs
-          (obj10
-             (opt
-                "tx_pool_timeout_limit"
-                ~description:
-                  "Transaction timeout limit inside the transaction pool. \
-                   DEPRECATED: You should use \"tx_pool.max_lifespan\" \
-                   instead."
-                int64)
-             (opt
-                "tx_pool_addr_limit"
-                ~description:
-                  "Maximum allowed addresses inside the transaction pool. \
-                   DEPRECATED: You should use \"tx_pool.max_size\" instead."
-                int64)
-             (opt
-                "tx_pool_tx_per_addr_limit"
-                ~description:
-                  "Maximum allowed transactions per user address inside the \
-                   transaction pool. DEPRECATED: You should use \
-                   \"tx_pool.tx_per_addr_limit\" instead."
-                int64)
+          (obj8
              (dft
                 "keep_alive"
                 ~description:
@@ -1732,6 +1735,12 @@ let encoding ?network () : t Data_encoding.t =
                    Layer 1 blocks."
                 Tezos_rpc.Encoding.uri_encoding
                 default_rollup_node_endpoint)
+             (dft
+                "rpc_timeout"
+                ~description:
+                  "Timeout in seconds for RPC calls made by the EVM node."
+                float
+                default_rpc_timeout_s)
              (dft "verbose" Internal_event.Level.encoding Internal_event.Notice)
              (dft
                 "experimental_features"
@@ -2023,6 +2032,7 @@ module Cli = struct
       gcp_kms = default_gcp_kms;
       keep_alive = false;
       rollup_node_endpoint = default_rollup_node_endpoint;
+      rpc_timeout = default_rpc_timeout_s;
       verbose = Internal_event.Notice;
       experimental_features = default_experimental_features;
       fee_history = default_fee_history;
@@ -2071,7 +2081,7 @@ module Cli = struct
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?history_mode
-      ?dal_slots ?sunset_sec configuration =
+      ?dal_slots ?sunset_sec ?rpc_timeout configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -2090,6 +2100,9 @@ module Cli = struct
     in
     let keep_alive =
       Option.value keep_alive ~default:configuration.keep_alive
+    in
+    let rpc_timeout =
+      Option.value rpc_timeout ~default:configuration.rpc_timeout
     in
     let finalized_view =
       Option.value finalized_view ~default:configuration.finalized_view
@@ -2260,6 +2273,7 @@ module Cli = struct
       gcp_kms = configuration.gcp_kms;
       keep_alive = configuration.keep_alive || keep_alive;
       rollup_node_endpoint;
+      rpc_timeout;
       verbose;
       experimental_features = configuration.experimental_features;
       fee_history = configuration.fee_history;
@@ -2280,8 +2294,8 @@ module Cli = struct
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode ?sunset_sec ()
-      =
+      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode ?sunset_sec
+      ?rpc_timeout () =
     default ~data_dir ?network ?evm_node_endpoint ()
     |> patch_configuration_from_args
          ~data_dir
@@ -2320,6 +2334,7 @@ module Cli = struct
          ?dal_slots
          ?history_mode
          ?sunset_sec
+         ?rpc_timeout
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?cors_origins ?cors_headers ?enable_websocket ?tx_queue_max_lifespan
@@ -2331,7 +2346,7 @@ module Cli = struct
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?dal_slots
-      ?network ?history_mode ?sunset_sec config_file =
+      ?network ?history_mode ?sunset_sec ?rpc_timeout config_file =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -2391,6 +2406,7 @@ module Cli = struct
           ?history_mode
           ?dal_slots
           ?sunset_sec
+          ?rpc_timeout
           configuration
       in
       return configuration
@@ -2434,6 +2450,7 @@ module Cli = struct
           ?network
           ?history_mode
           ?sunset_sec
+          ?rpc_timeout
           ()
       in
       return config
