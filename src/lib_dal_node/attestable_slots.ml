@@ -158,6 +158,14 @@ let may_notify ctxt ~(slot_id : Types.slot_id) =
        accordingly. *)
     Seq.iter_ep notify_attestable_slot subscribers
 
+let is_not_in_committee committee ~pkh =
+  let assigned_shard_indices =
+    match Signature.Public_key_hash.Map.find pkh committee with
+    | None -> []
+    | Some (indexes, _) -> indexes
+  in
+  List.is_empty assigned_shard_indices
+
 let may_notify_not_in_committee ctxt committee ~attestation_level =
   let module T = Types.Attestable_slots_watcher_table in
   let attestable_slots_watcher_table =
@@ -166,12 +174,7 @@ let may_notify_not_in_committee ctxt committee ~attestation_level =
   let subscribers = T.elements attestable_slots_watcher_table in
   Seq.iter
     (fun pkh ->
-      let assigned_shard_indices =
-        match Signature.Public_key_hash.Map.find pkh committee with
-        | None -> []
-        | Some (indexes, _) -> indexes
-      in
-      if List.is_empty assigned_shard_indices then
+      if is_not_in_committee committee ~pkh then
         T.notify_no_shards_assigned
           attestable_slots_watcher_table
           pkh
