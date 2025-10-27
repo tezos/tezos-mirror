@@ -43,10 +43,11 @@ val published_just_before_migration :
 val attested_just_after_migration :
   Node_context.t -> attested_level:int32 -> bool tzresult
 
-(** [may_notify ctxt ~slot_id] checks, for each subscribed [pkh], whether all shards
-    assigned to [pkh] at the attestation level corresponding to [~slot_id] are available;
-    if so, it emits an event to that [pkh]’s stream. *)
-val may_notify : Node_context.t -> slot_id:Types.slot_id -> unit tzresult Lwt.t
+(** [may_notify_attestable_slot_or_trap ctxt ~slot_id] checks, for each subscribed [pkh],
+    whether all shards assigned to [pkh] at the attestation level corresponding to [~slot_id]
+    are available; if so, it emits an event to that [pkh]’s stream. *)
+val may_notify_attestable_slot_or_trap :
+  Node_context.t -> slot_id:Types.slot_id -> unit tzresult Lwt.t
 
 (** [may_notify_not_in_committee ctxt committee ~attestation_level] checks, for each
     subscribed [pkh], whether the delegate is in the [committee] for [~attestation_level].

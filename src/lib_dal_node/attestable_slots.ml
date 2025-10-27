@@ -140,7 +140,7 @@ let is_attestable_slot_or_trap ctxt ~pkh ~(slot_id : Types.slot_id) =
         | Some false -> return_some `Trap
         | None -> return_none
 
-let may_notify ctxt ~(slot_id : Types.slot_id) =
+let may_notify_attestable_slot_or_trap ctxt ~(slot_id : Types.slot_id) =
   let open Lwt_result_syntax in
   let module T = Types.Attestable_slots_watcher_table in
   let attestable_slots_watcher_table =
