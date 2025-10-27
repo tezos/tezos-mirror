@@ -42,6 +42,23 @@ module Plugin = struct
 
   let tb_slot_to_int tb_slot = Slot.to_int tb_slot
 
+  type error += Unexpected_RPC_outcome of string
+
+  let () =
+    Protocol_client_context.register_error_kind
+      `Permanent
+      ~id:"Unexpected_RPC_outcome"
+      ~title:"Unexpected outcome from L1 RPC"
+      ~description:"An RPC to the L1 node gave an unexpected answer"
+      ~pp:(fun ppf rpc_string ->
+        Format.fprintf
+          ppf
+          "The RPC %s to the L1 node gave an unexpected answer"
+          rpc_string)
+      Data_encoding.(obj1 (req "rpc" string))
+      (function Unexpected_RPC_outcome s -> Some s | _ -> None)
+      (fun s -> Unexpected_RPC_outcome s)
+
   let parametric_constants chain block ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Plugin.Constants_services.parametric cpctxt (chain, block)
@@ -240,29 +257,54 @@ module Plugin = struct
     let open Lwt_result_syntax in
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     let*? level = Raw_level.of_int32 level |> wrap in
-    let+ pkh_to_shards =
+    let* pkh_to_shards =
       Plugin.RPC.Dal.dal_shards cpctxt (`Main, `Head 0) ~level ()
     in
-    List.fold_left
+    let* pkh_to_tb_slot =
+      let* res =
+        Plugin.RPC.Attestation_rights.get
+          cpctxt
+          (`Main, `Head 0)
+          ~levels:[level]
+      in
+      match res with
+      | [{delegates_rights; _}] -> return delegates_rights
+      | _ ->
+          tzfail
+            (Unexpected_RPC_outcome
+               (Resto.Path.to_string
+                  Plugin.RPC.Attestation_rights.S.attestation_path))
+    in
+    let pkh_to_tb_slot_map =
+      List.fold_left
+        (fun map Plugin.RPC.Attestation_rights.{delegate; first_slot; _} ->
+          Signature.Public_key_hash.Map.add delegate first_slot map)
+        Signature.Public_key_hash.Map.empty
+        pkh_to_tb_slot
+    in
+    List.fold_left_es
       (fun acc ({delegate; indexes} : Plugin.RPC.Dal.S.shards_assignment) ->
-        let delegate = Tezos_crypto.Signature.Of_V2.public_key_hash delegate in
-        let tb_slot =
-          (* Associating delegate public key hash to Tenderbake attestation
-               slot can be done by matching the first DAL slot index of a given
-               attester as there is a DAL protocol invariant that enforces that
-               the first DAL slot index corresponds to the TB attestation slot
-               index of a give attester. *)
-          match List.hd indexes with
-          | Some slot -> slot
+        let delegate_pkh =
+          Tezos_crypto.Signature.Of_V2.public_key_hash delegate
+        in
+        let* tb_slot =
+          match
+            Signature.Public_key_hash.Map.find delegate_pkh pkh_to_tb_slot_map
+          with
+          | Some slot -> return (Slot.to_int slot)
           | None ->
               (* We assume that the set indexes associated to a delegate is
-                   never empty. *)
-              assert false
+                 never empty. *)
+              tzfail
+                (Unexpected_RPC_outcome
+                   (Resto.Path.to_string
+                      Tezos_rpc.Path.(Plugin.RPC.Dal.path / "shards")))
         in
-        Tezos_crypto.Signature.Public_key_hash.Map.add
-          delegate
-          (indexes, tb_slot)
-          acc)
+        return
+        @@ Tezos_crypto.Signature.Public_key_hash.Map.add
+             delegate_pkh
+             (indexes, tb_slot)
+             acc)
       Tezos_crypto.Signature.Public_key_hash.Map.empty
       pkh_to_shards
 

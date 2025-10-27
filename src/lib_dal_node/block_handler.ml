@@ -462,11 +462,7 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
     Node_context.fetch_committees ctxt ~level:attestation_level
   in
   (* [slot_to_committee] associates a Tenderbake attestation slot index to an
-     attester public key hash an its associated list of DAL slots indices. This
-     can be done by matching the TB attestation slot index and the first DAL
-     slot index of a given attester as there is a DAL invariant that enforces
-     the fact that the first DAL slot index corresponds to the TB attestation
-     slot index of a give attester. *)
+     attester public key hash and its list of DAL shards indices. *)
   let slot_to_committee =
     Signature.Public_key_hash.Map.fold
       (fun pkh (dal_slots, tb_slot) l -> (tb_slot, (pkh, dal_slots)) :: l)
