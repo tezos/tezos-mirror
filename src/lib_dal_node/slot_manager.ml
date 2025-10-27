@@ -605,7 +605,7 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
   in
   let shares =
-    Array.map (fun Cryptobox.{index = _; share} -> share) (Array.of_seq shards)
+    Array.of_seq @@ Seq.map (fun Cryptobox.{index = _; share} -> share) shards
   in
   Store.cache_entry node_store commitment slot shares shard_proofs ;
   return_unit
