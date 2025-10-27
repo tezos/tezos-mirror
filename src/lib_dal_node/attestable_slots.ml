@@ -39,28 +39,6 @@ let is_attestable_slot_with_traps shards_store traps_fraction pkh
           return_false)
     assigned_shard_indexes
 
-let subscribe ctxt ~pkh =
-  let open Node_context in
-  let module T = Types.Attestable_slots_watcher_table in
-  let proto_params =
-    Result.to_option
-    @@ get_proto_parameters ctxt ~level:(`Level (get_last_finalized_level ctxt))
-  in
-  let attestable_slots_watcher_table =
-    get_attestable_slots_watcher_table ctxt
-  in
-  let watcher = T.get_or_init attestable_slots_watcher_table pkh proto_params in
-  let stream, stopper = Lwt_watcher.create_stream (T.get_stream watcher) in
-  let next () = Lwt_stream.get stream in
-  let shutdown () =
-    (* stop this stream, then possibly remove the whole watcher if last subscriber *)
-    Lwt_watcher.shutdown stopper ;
-    T.set_num_subscribers watcher (T.get_num_subscribers watcher - 1) ;
-    if T.get_num_subscribers watcher <= 0 then
-      T.remove attestable_slots_watcher_table pkh
-  in
-  Resto_directory.Answer.{next; shutdown}
-
 let published_just_before_migration ctxt ~published_level =
   let open Result_syntax in
   let open Node_context in
@@ -188,3 +166,25 @@ let may_notify_not_in_committee ctxt committee ~attestation_level =
           pkh
           ~attestation_level)
     subscribers
+
+let subscribe ctxt ~pkh =
+  let open Node_context in
+  let module T = Types.Attestable_slots_watcher_table in
+  let proto_params =
+    Result.to_option
+    @@ get_proto_parameters ctxt ~level:(`Level (get_last_finalized_level ctxt))
+  in
+  let attestable_slots_watcher_table =
+    get_attestable_slots_watcher_table ctxt
+  in
+  let watcher = T.get_or_init attestable_slots_watcher_table pkh proto_params in
+  let stream, stopper = Lwt_watcher.create_stream (T.get_stream watcher) in
+  let next () = Lwt_stream.get stream in
+  let shutdown () =
+    (* stop this stream, then possibly remove the whole watcher if last subscriber *)
+    Lwt_watcher.shutdown stopper ;
+    T.set_num_subscribers watcher (T.get_num_subscribers watcher - 1) ;
+    if T.get_num_subscribers watcher <= 0 then
+      T.remove attestable_slots_watcher_table pkh
+  in
+  Resto_directory.Answer.{next; shutdown}

@@ -20,15 +20,6 @@ val is_attestable_slot_with_traps :
   Types.slot_id ->
   (bool, [> Errors.not_found | Errors.other]) result Lwt.t
 
-(** [subscribe ctxt ~pkh] opens a [Resto_directory.Answer] stream that yields
-    [Types.Attestable_slots_watcher_table.Attestable_event.t] values. The stream
-    only emits items produced after subscription. *)
-val subscribe :
-  Node_context.t ->
-  pkh:Signature.public_key_hash ->
-  Types.Attestable_slots_watcher_table.Attestable_event.t
-  Resto_directory.Answer.stream
-
 (** Let M = migration level (last block of the old protocol). This function
     attempts to determine whether [~published_level] is included in `[M - lag + 1 .. M]`
     (inclusively), where [lag] is the lag at [~published_level].
@@ -54,3 +45,12 @@ val may_notify_attestable_slot_or_trap :
     If so, it emits an event to that [pkh]'s stream. *)
 val may_notify_not_in_committee :
   Node_context.t -> Committee_cache.committee -> attestation_level:int32 -> unit
+
+(** [subscribe ctxt ~pkh] opens a [Resto_directory.Answer] stream that yields
+    [Types.Attestable_slots_watcher_table.Attestable_event.t] values. The stream
+    only emits items produced after subscription. *)
+val subscribe :
+  Node_context.t ->
+  pkh:Signature.public_key_hash ->
+  Types.Attestable_slots_watcher_table.Attestable_event.t
+  Resto_directory.Answer.stream
