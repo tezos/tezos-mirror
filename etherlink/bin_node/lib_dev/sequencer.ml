@@ -539,5 +539,11 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       ~tx_container
       ?sandbox_config
       sequencer_config.time_between_blocks
+  and* () =
+    when_ configuration.experimental_features.preconfirmation_stream_enabled
+    @@ fun () ->
+    Tx_container.tx_queue_beacon
+      ~evm_node_endpoint:Block_producer
+      ~tick_interval:0.01
   in
   return_unit

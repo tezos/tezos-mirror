@@ -68,6 +68,9 @@ module Types = struct
     sequencer_sunset_sec : int64;
     mutable sunset : bool;
     preconfirmation_stream_enabled : bool;
+    mutable validated_txns :
+      (string * Tx_queue_types.transaction_object_t) list;
+    mutable validation_state : int * Prevalidator.validation_state;
   }
 end
 
@@ -88,20 +91,43 @@ module Request = struct
     | Produce_block :
         (bool * Time.Protocol.t * bool)
         -> ([`Block_produced of int | `No_block], tztrace) t
+    | Preconfirm_transactions :
+        (string * Tx_queue_types.transaction_object_t) list
+        -> (unit, tztrace) t
 
   let name : type a b. (a, b) t -> string = function
     | Produce_block _ -> "Produce_block"
+    | Preconfirm_transactions _ -> "Preconfirm_transactions"
 
   type view = View : _ t -> view
 
   let view (req : _ t) = View req
+
+  let transaction_object_t_encoding =
+    let open Data_encoding in
+    let open Tx_queue_types in
+    union
+      [
+        case
+          Json_only
+          ~title:"EVM"
+          Transaction_object.encoding
+          (function Evm txn_object -> Some txn_object | _ -> None)
+          (fun txn_object -> Evm txn_object);
+        case
+          Json_only
+          ~title:"Michelson"
+          Tezos_types.Operation.encoding
+          (function Michelson op -> Some op | _ -> None)
+          (fun op -> Michelson op);
+      ]
 
   let encoding =
     let open Data_encoding in
     union
       [
         case
-          (Tag 0)
+          Json_only
           ~title:"Produce_block"
           (obj4
              (req "request" (constant "produce_block"))
@@ -111,9 +137,24 @@ module Request = struct
           (function
             | View (Produce_block (with_delayed_transactions, timestamp, force))
               ->
-                Some ((), with_delayed_transactions, timestamp, force))
+                Some ((), with_delayed_transactions, timestamp, force)
+            | _ -> None)
           (fun ((), with_delayed_transactions, timestamp, force) ->
             View (Produce_block (with_delayed_transactions, timestamp, force)));
+        case
+          Json_only
+          ~title:"Preconfirm_transactions"
+          (obj2
+             (req "request" (constant "preconfirm_transactions"))
+             (req
+                "transactions"
+                (list (tup2 string transaction_object_t_encoding))))
+          (function
+            | View (Preconfirm_transactions transactions) ->
+                Some ((), transactions)
+            | _ -> None)
+          (fun ((), transactions) ->
+            View (Preconfirm_transactions transactions));
       ]
 
   let pp _ppf (View _) = ()
@@ -219,8 +260,7 @@ let produce_block_with_transactions (type f)
         ~transactions_and_objects
         ~hash_of_tx_object:Tx_queue_types.Tezlink_operation.hash_of_tx_object
 
-let validate_tx ~preconfirmation_stream_enabled ~maximum_cumulative_size
-    ~(timestamp : Time.Protocol.t) (current_size, validation_state) raw_tx
+let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
     (tx_object : Transaction_object.t) =
   let open Lwt_result_syntax in
   let new_size = current_size + String.length raw_tx in
@@ -232,22 +272,15 @@ let validate_tx ~preconfirmation_stream_enabled ~maximum_cumulative_size
         tx_object
     in
     match validation_state_res with
-    | Ok validation_state ->
-        let () =
-          if preconfirmation_stream_enabled then
-            if Int.equal current_size 0 then
-              Broadcast.notify_new_block_timestamp timestamp ;
-          Broadcast.notify_preconfirmation tx_object
-        in
-        return (`Keep (new_size, validation_state))
+    | Ok validation_state -> return (`Keep (new_size, validation_state))
     | Error msg ->
         let hash = Transaction_object.hash tx_object in
         let*! () = Block_producer_events.transaction_rejected hash msg in
         return `Drop
 
 let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
-    (head_info : Evm_context.head) ~maximum_cumulative_size ~timestamp
-    ~preconfirmation_stream_enabled : f transaction_object_list tzresult Lwt.t =
+    (head_info : Evm_context.head) ~maximum_cumulative_size :
+    f transaction_object_list tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* Skip validation if chain_family is Michelson. *)
   match tx_container with
@@ -302,11 +335,7 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
         let* l =
           Tx_container.pop_transactions
             ~maximum_cumulative_size
-            ~validate_tx:
-              (validate_tx
-                 ~maximum_cumulative_size
-                 ~timestamp
-                 ~preconfirmation_stream_enabled)
+            ~validate_tx:(validate_tx ~maximum_cumulative_size)
             ~initial_validation_state
         in
         return (Evm_tx_objects l)
@@ -315,16 +344,13 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
     pool or if [force] is true. *)
 let produce_block_if_needed (type f) ~signer ~force ~timestamp ~delayed_hashes
     ~remaining_cumulative_size
-    ~(tx_container : f Services_backend_sig.tx_container)
-    ~preconfirmation_stream_enabled head_info =
+    ~(tx_container : f Services_backend_sig.tx_container) head_info =
   let open Lwt_result_syntax in
   let* transactions_and_objects =
     pop_valid_tx
       ~tx_container
       head_info
       ~maximum_cumulative_size:remaining_cumulative_size
-      ~timestamp
-      ~preconfirmation_stream_enabled
   in
   let n_txs =
     match transactions_and_objects with
@@ -370,11 +396,76 @@ let head_info_and_delayed_transactions ~with_delayed_transactions evm_state
   in
   return (delayed_hashes, remaining_cumulative_size)
 
+let init_michelson_validation_state () =
+  let open Lwt_result_syntax in
+  let config =
+    Prevalidator.
+      {
+        minimum_base_fee_per_gas = Qty Z.zero;
+        base_fee_per_gas = Qty Z.zero;
+        maximum_gas_limit = Qty Z.zero;
+        da_fee_per_byte = Qty Z.zero;
+        next_nonce = (fun _addr -> return None);
+        balance = (fun _addr -> return (Ethereum_types.Qty Z.zero));
+      }
+  in
+  return
+    ( 0,
+      Prevalidator.
+        {config; addr_balance = String.Map.empty; addr_nonce = String.Map.empty}
+    )
+
+let init_evm_validation_state () =
+  let open Lwt_result_syntax in
+  let*! head_info = Evm_context.head_info () in
+  let read = Evm_state.read head_info.evm_state in
+  let* minimum_base_fee_per_gas =
+    Etherlink_durable_storage.minimum_base_fee_per_gas read
+  in
+  let* base_fee_per_gas = Etherlink_durable_storage.base_fee_per_gas read in
+  let* maximum_gas_limit =
+    Etherlink_durable_storage.maximum_gas_per_transaction read
+  in
+  let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
+  let config =
+    Prevalidator.
+      {
+        minimum_base_fee_per_gas = Qty minimum_base_fee_per_gas;
+        base_fee_per_gas;
+        maximum_gas_limit;
+        da_fee_per_byte;
+        next_nonce = (fun addr -> Etherlink_durable_storage.nonce read addr);
+        balance = (fun addr -> Etherlink_durable_storage.balance read addr);
+      }
+  in
+  return
+    ( 0,
+      Prevalidator.
+        {config; addr_balance = String.Map.empty; addr_nonce = String.Map.empty}
+    )
+
+let init_validation_state ~(tx_container : Services_backend_sig.ex_tx_container)
+    =
+  match tx_container with
+  | Ex_tx_container tx_container -> (
+      match tx_container with
+      | Evm_tx_container _ -> init_evm_validation_state ()
+      | Michelson_tx_container _ -> init_michelson_validation_state ())
+
+let clear_preconfirmation_data ~(state : Types.state) =
+  let open Lwt_result_syntax in
+  state.validated_txns <- [] ;
+  let* validation_state =
+    init_validation_state ~tx_container:state.tx_container
+  in
+  state.validation_state <- validation_state ;
+  return_unit
+
 let produce_block (state : Types.state) ~force ~timestamp
     ~with_delayed_transactions =
   let open Lwt_result_syntax in
   match state.tx_container with
-  | Ex_tx_container tx_container ->
+  | Ex_tx_container tx_container -> (
       let (module Tx_container) =
         Services_backend_sig.tx_container_module tx_container
       in
@@ -423,15 +514,55 @@ let produce_block (state : Types.state) ~force ~timestamp
           (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
           return (`Block_produced (Seq.length hashes))
         else
-          produce_block_if_needed
-            ~signer
-            ~timestamp
-            ~force
-            ~delayed_hashes
-            ~remaining_cumulative_size
-            ~tx_container
-            ~preconfirmation_stream_enabled:state.preconfirmation_stream_enabled
-            head_info
+          let* result =
+            produce_block_if_needed
+              ~signer
+              ~timestamp
+              ~force
+              ~delayed_hashes
+              ~remaining_cumulative_size
+              ~tx_container
+              head_info
+          in
+          match result with
+          | `Block_produced _ ->
+              let* () =
+                when_ state.preconfirmation_stream_enabled (fun () ->
+                    clear_preconfirmation_data ~state)
+              in
+              return result
+          | `No_block -> return result)
+
+let preconfirm_transactions ~(state : Types.state) ~transactions =
+  let open Lwt_result_syntax in
+  let maximum_cumulative_size =
+    Sequencer_blueprint.maximum_usable_space_in_blueprint
+      state.maximum_number_of_chunks
+  in
+  let validate (validation_state, rev_txns) ((raw, tx_object) as entry) =
+    match tx_object with
+    | Tx_queue_types.Evm tx_object -> (
+        let+ res =
+          validate_tx ~maximum_cumulative_size validation_state raw tx_object
+        in
+        match res with
+        | `Drop -> (validation_state, rev_txns)
+        | `Keep latest_validation_state ->
+            if Int.equal (List.length state.validated_txns) 0 then
+              Broadcast.notify_new_block_timestamp (Time.Protocol.of_seconds 0L) ;
+            Broadcast.notify_preconfirmation tx_object ;
+            (latest_validation_state, entry :: rev_txns)
+        | `Stop -> (validation_state, rev_txns))
+    | Tx_queue_types.Michelson _ ->
+        (* Ignore tezlink operations for now *)
+        return (validation_state, rev_txns)
+  in
+  let* validation_state, rev_validated_txns =
+    List.fold_left_es validate (state.validation_state, []) transactions
+  in
+  state.validated_txns <- state.validated_txns @ List.rev rev_validated_txns ;
+  state.validation_state <- validation_state ;
+  return_unit
 
 module Handlers = struct
   type self = worker
@@ -445,6 +576,8 @@ module Handlers = struct
     | Request.Produce_block (with_delayed_transactions, timestamp, force) ->
         protect @@ fun () ->
         produce_block state ~force ~timestamp ~with_delayed_transactions
+    | Request.Preconfirm_transactions transactions ->
+        protect @@ fun () -> preconfirm_transactions ~state ~transactions
 
   type launch_error = error trace
 
@@ -457,7 +590,9 @@ module Handlers = struct
          preconfirmation_stream_enabled;
        } :
         Types.parameters) =
-    Lwt_result_syntax.return
+    let open Lwt_result_syntax in
+    let* validation_state = init_validation_state ~tx_container in
+    return
       Types.
         {
           sunset = false;
@@ -466,6 +601,8 @@ module Handlers = struct
           tx_container;
           sequencer_sunset_sec;
           preconfirmation_stream_enabled;
+          validation_state;
+          validated_txns = [];
         }
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
@@ -525,6 +662,14 @@ let produce_block ~with_delayed_transactions ~force ~timestamp =
   Worker.Queue.push_request_and_wait
     worker
     (Request.Produce_block (with_delayed_transactions, timestamp, force))
+  |> handle_request_error
+
+let preconfirm_transactions ~transactions =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  Worker.Queue.push_request_and_wait
+    worker
+    (Request.Preconfirm_transactions transactions)
   |> handle_request_error
 
 module Internal_for_tests = struct

@@ -2715,8 +2715,12 @@ let test_observer_receives_preconfirmations =
     3. Transaction is forwarded to the sequencer
     4. Sequencer validates the transaction
     5. Sequencer streams the result back to the observer
+    6. Sequencer produces block in order to access the receipt
+    7. Hashes are the same
   *)
-  let event = Evm_node.wait_for_preconfirmation observer in
+  let add = Evm_node.wait_for_tx_queue_add_transaction sequencer in
+  let next_ts = Evm_node.wait_for_preconfirmation_timestamp observer in
+  let preconf = Evm_node.wait_for_preconfirmation observer in
   let p =
     Eth_cli.transaction_send
       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
@@ -2725,9 +2729,10 @@ let test_observer_receives_preconfirmations =
       ~endpoint:(Evm_node.endpoint observer)
       ()
   in
-  let* _ = Evm_node.wait_for_tx_queue_add_transaction sequencer in
-  let* _ = produce_block sequencer in
-  let* streamed_txn_hash = event in
+  let* _ = add in
+  let* _ = next_ts in
+  let* streamed_txn_hash = preconf in
+  let* _res = produce_block sequencer in
   let* txn_hash = p in
   Check.(
     (txn_hash = streamed_txn_hash)
