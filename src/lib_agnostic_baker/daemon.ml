@@ -113,8 +113,8 @@ module Make_daemon (Agent : AGENT) :
 
   type state = {
     node_endpoint : string;
-    mutable current_baker : baker;
-    mutable old_baker : baker_to_kill option;
+    current_baker : baker;
+    old_baker : baker_to_kill option;
     keep_alive : bool;
     command : command;
     cctxt : Tezos_client_base.Client_context.full;
@@ -213,12 +213,12 @@ module Make_daemon (Agent : AGENT) :
       Events.(emit become_old_agent)
         (Agent.name, current_protocol_hash, level_to_kill_old_baker)
     in
-    state.old_baker <-
+    let old_baker =
       Some
-        {baker = state.current_baker; level_to_kill = level_to_kill_old_baker} ;
+        {baker = state.current_baker; level_to_kill = level_to_kill_old_baker}
+    in
     let* new_baker = spawn_baker state.cctxt state.command next_protocol_hash in
-    state.current_baker <- new_baker ;
-    return_unit
+    return {state with old_baker; current_baker = new_baker}
 
   (** [maybe_kill_old_baker state node_addr] checks whether the [old_baker] process
     from the [state] of the agnostic baker has surpassed its lifetime and it stops
@@ -226,7 +226,7 @@ module Make_daemon (Agent : AGENT) :
   let maybe_kill_old_baker state node_addr =
     let open Lwt_result_syntax in
     match state.old_baker with
-    | None -> return_unit
+    | None -> return state
     | Some {baker; level_to_kill} ->
         let* head_level =
           (Rpc_services.get_level
@@ -239,9 +239,8 @@ module Make_daemon (Agent : AGENT) :
           Lwt.wakeup
             baker.process.canceller
             (Ok ()) [@profiler.record_f {verbosity = Notice} "kill old baker"] ;
-          state.old_baker <- None ;
-          return_unit)
-        else return_unit
+          return {state with old_baker = None})
+        else return state
 
   (* ---- Baker and Chain Monitoring ---- *)
 
@@ -293,7 +292,7 @@ module Make_daemon (Agent : AGENT) :
     let*! () =
       Events.(emit period_status) (block_hash, period_kind, remaining)
     in
-    let* () =
+    let* state =
       (maybe_kill_old_baker
          state
          node_addr
@@ -317,7 +316,7 @@ module Make_daemon (Agent : AGENT) :
          ~level_to_kill_old_baker:
            (head_level + Parameters.extra_levels_for_old_baker)
        [@profiler.record_s {verbosity = Notice} "hot_swap_baker"])
-    else return_unit
+    else return state
 
   (* ---- Agnostic Baker Bootstrap ---- *)
 
@@ -413,7 +412,7 @@ module Make_daemon (Agent : AGENT) :
     let* pick = Lwt.choose [current_baker; old_baker; head_stream] in
     match pick with
     | New_head ->
-        let* () = monitor_voting_periods ~state in
+        let* state = monitor_voting_periods ~state in
         main_loop state
     | Head_stream_ended -> tzfail Lost_node_connection
     | Old_baker_stopped -> (
