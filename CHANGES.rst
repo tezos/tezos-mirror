@@ -28,6 +28,24 @@ General
 Node
 ----
 
+- **Breaking change** Only the short hash of blocks are output in the following
+  events from the block validator ``validation_or_application_failed``,
+  ``application_failed``, ``application_failure_after_validation``,
+  ``validation_failure``, ``validation_canceled``, ``commit_block_failure``,
+  ``validated_block``, ``validation_and_application_success`` and
+  ``updated_to_checkpoint`` events. From the prevalidator
+  ``request_completed_info`` event. And from the store ``<block_hash> (level:
+  <level>)`` into ``<short_block_hash> (level: <level>)`` events. (MR
+  :gl:`!19720`)
+
+- **Breaking change** events ``validator.block.validating_block`` level has been
+  changed from ``Debug`` to ``Info`` (output in the daily-logs) and now show the long
+  block hash, the level, predecessor, fitness and timestamp of the block. (MR
+  :gl:`!19720`)
+
+- **Breaking change** ``validator.chain.block_info`` level is now ``Debug``
+  (previously ``Info``) and is no longer output in daily-logs. (MR :gl:`!19720`)
+
 Client
 ------
 
