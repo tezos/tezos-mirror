@@ -2,7 +2,7 @@
 
 //! Types for values creating in the OCaml side, and passed to Rust code and back.
 
-use ocaml::{FromValue, Runtime, ToValue, Value};
+use ocaml::{FromValue, List, Runtime, ToValue, Value};
 
 #[derive(Clone)]
 pub struct EvmTree(Value);
@@ -118,5 +118,32 @@ unsafe impl ToValue for OpenTelemetryScope {
 unsafe impl FromValue for OpenTelemetryScope {
     fn from_value(value: Value) -> Self {
         OpenTelemetryScope(value)
+    }
+}
+
+pub struct OCamlStringPairList(Vec<(String, String)>);
+
+impl OCamlStringPairList {
+    pub fn new(str_pair_list: Vec<(String, String)>) -> Self {
+        Self(str_pair_list)
+    }
+
+    pub fn to_value(&self, gc: &Runtime) -> List<Value> {
+        unsafe {
+            let mut ocaml_list = List::empty();
+
+            for (key, value) in self.0.iter() {
+                let key = Value::string(key);
+                let value = Value::string(value);
+
+                let mut tuple = Value::alloc_tuple(2);
+                tuple.store_field(gc, 0, key);
+                tuple.store_field(gc, 1, value);
+
+                ocaml_list = ocaml_list.add(gc, &tuple);
+            }
+
+            ocaml_list
+        }
     }
 }
