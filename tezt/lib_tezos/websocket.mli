@@ -32,10 +32,10 @@ val send : t -> JSON.t -> unit Lwt.t
 val send_raw : t -> string -> unit Lwt.t
 
 (** Receive a JSON object on the websocket. *)
-val recv : t -> JSON.t Lwt.t
+val recv : ?timeout:float -> t -> JSON.t Lwt.t
 
 (** Send and receive response on websocket. *)
-val send_recv : t -> JSON.t -> JSON.t Lwt.t
+val send_recv : ?timeout:float -> t -> JSON.t -> JSON.t Lwt.t
 
 (** Send SIGSTOP to websocket client process. *)
 val pause : t -> unit

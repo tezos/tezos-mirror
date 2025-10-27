@@ -10935,19 +10935,24 @@ let test_websocket_subscription_rpcs_cant_be_called_via_http_requests =
 
 let produce_block_and_wait_for_sync ~sequencer evm_node =
   let*@ head = Rpc.block_number sequencer in
-  let wait_for =
-    Evm_node.wait_for_blueprint_applied evm_node Int32.(succ head |> to_int)
-  in
-  let*@ _ = produce_block sequencer in
-  let* _ = wait_for in
-  unit
+  let level = Int32.(succ head |> to_int) in
+  if Evm_node.can_apply_blueprint evm_node then
+    let wait_for =
+      Evm_node.wait_for_blueprint_applied evm_node Int32.(succ head |> to_int)
+    in
+    let*@ _ = produce_block sequencer in
+    let* () = wait_for in
+    return level
+  else
+    let*@ _ = produce_block sequencer in
+    return level
 
 let check_unsubscription ~websocket ~id ~sequencer evm_node =
   let* sub_status = Rpc.unsubscribe ~websocket ~id evm_node in
   Check.((sub_status = true) bool)
     ~error_msg:"Unsubscription should be successful" ;
   (* After unsubbing to the event, we shouldn't receive data anymore. *)
-  let* () = produce_block_and_wait_for_sync ~sequencer evm_node in
+  let* _ = produce_block_and_wait_for_sync ~sequencer evm_node in
   let* result =
     Lwt.pick
       [
@@ -10989,21 +10994,23 @@ let test_websocket_newHeads_event =
     let check_block_number () =
       (* We always wait for the observer to be synced, to know that the
          blueprint was fully propagated. *)
-      let* () = produce_block_and_wait_for_sync ~sequencer observer in
-      let* block = Websocket.recv websocket in
+      let* level = produce_block_and_wait_for_sync ~sequencer observer in
+      let* block = Websocket.recv ~timeout:10. websocket in
       let Block.{number; _} =
         JSON.(block |-> "params" |-> "result" |> Block.of_json)
       in
-      let*@ level = Rpc.block_number evm_node in
-      Check.((number = level) int32)
+      Check.((number = Int32.of_int level) int32)
         ~error_msg:"Received block level was %L, expected %R" ;
       unit
     in
     let* () = repeat 2 check_block_number in
     check_unsubscription ~websocket ~id ~sequencer evm_node
   in
+  let* rpc_node = run_new_rpc_endpoint sequencer in
   let* () = scenario sequencer in
-  scenario observer
+  let* () = scenario observer in
+  let* () = scenario rpc_node in
+  unit
 
 (* This test is flaky because Dream may not correctly detect websocket
    connections closed by the client. *)
@@ -11073,7 +11080,7 @@ let test_websocket_max_message_length () =
     ~error_msg:"Expected reason to match %R, got %L" ;
   Lwt.catch
     (fun () ->
-      let* _ = Websocket.recv websocket in
+      let* _ = Websocket.recv ~timeout:10. websocket in
       Test.fail ~__LOC__ "Connection was not closed.")
     (function
       | Websocket.Connection_closed ->
@@ -11314,6 +11321,7 @@ let test_websocket_newPendingTransactions_event =
       ~websockets:true
       sequencer
   in
+  let* rpc_node = run_new_rpc_endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let scenario evm_node transaction_hash =
     let* websocket = Evm_node.open_websocket evm_node in
@@ -11335,7 +11343,7 @@ let test_websocket_newPendingTransactions_event =
          (fun exn ->
            Log.debug "TX send failed because %s" (Printexc.to_string exn) ;
            unit)) ;
-    let* tx = Websocket.recv websocket in
+    let* tx = Websocket.recv ~timeout:10. websocket in
     let tx_hash = JSON.(tx |-> "params" |-> "result" |> as_string) in
     Check.((transaction_hash = tx_hash) string)
       ~error_msg:"Received tx_hash was %R, expected %L" ;
@@ -11348,9 +11356,19 @@ let test_websocket_newPendingTransactions_event =
       "0x1b5678a27af55582f2bd6fa07223ff59ee93e16c228e40a948d09ee593560d36"
   in
   Log.info "Scenario with observer" ;
-  scenario
-    observer
-    "0xf5e6dcb59cbf260cfe04d89d07a0f270c11e489a6de4df319916c7ddb19f3a34"
+  let* () =
+    scenario
+      observer
+      "0xf5e6dcb59cbf260cfe04d89d07a0f270c11e489a6de4df319916c7ddb19f3a34"
+  in
+  let* _ = produce_block_and_wait_for_sync ~sequencer observer in
+  Log.info "Scenario with RPC node" ;
+  let* () =
+    scenario
+      rpc_node
+      "0x10318840345abfa7d61f34ce6b09061176f375062802646f98dc2e88f0639bdf"
+  in
+  unit
 
 let test_websocket_logs_event =
   register_all
@@ -11409,7 +11427,7 @@ let test_websocket_logs_event =
            ~method_call:(Printf.sprintf "mint(%d)" value))
         sequencer
     in
-    let* json = Websocket.recv websocket in
+    let* json = Websocket.recv ~timeout:10. websocket in
     let logs =
       JSON.(json |-> "params" |-> "result" |> Transaction.logs_of_json)
     in
@@ -11452,7 +11470,7 @@ let test_websocket_logs_event =
            ~method_call:(Printf.sprintf "burn(%d)" value))
         sequencer
     in
-    let* json = Websocket.recv websocket in
+    let* json = Websocket.recv ~timeout:10. websocket in
     let sender_burn_logs =
       JSON.(json |-> "params" |-> "result" |> Transaction.logs_of_json)
     in
@@ -11467,8 +11485,11 @@ let test_websocket_logs_event =
       ~error_msg:"Expected topics %R, got %L" ;
     unit
   in
+  let* rpc_node = run_new_rpc_endpoint sequencer in
   let* () = scenario sequencer in
-  scenario observer
+  let* () = scenario observer in
+  let* () = scenario rpc_node in
+  unit
 
 let test_node_correctly_uses_batcher_heap =
   let max_blueprints_lag = 10 in
