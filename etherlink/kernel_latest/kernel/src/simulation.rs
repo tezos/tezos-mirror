@@ -790,6 +790,7 @@ mod tests {
             host,
             revm::primitives::hardfork::SpecId::SHANGHAI,
             &block,
+            None,
             EtherlinkPrecompiles::new(),
             caller,
             None,
