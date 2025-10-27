@@ -372,14 +372,121 @@ let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
         Lwt_watcher.shutdown stopper ;
         return true )
 
-(* In RPC mode, the EVM node acts as a proxy for `eth_subscribe`. *)
-let eth_subscribe_rpc_mode ~timeout ~(kind : Ethereum_types.Subscription.kind)
-    (ws_client : Websocket_client.t) =
+type 'a proxied_subscription = {
+  watcher : 'a Lwt_watcher.input;
+  unsubscribe : unit -> bool tzresult Lwt.t;
+  mutable subscribers : int;
+}
+
+module WsClientTable = Hashtbl.Make (struct
+  type t = Websocket_client.t * Ethereum_types.Subscription.kind
+
+  let equal (ws1, k1) (ws2, k2) =
+    Websocket_client.client_id ws1 = Websocket_client.client_id ws2 && k1 = k2
+
+  let hash (ws, k) = Hashtbl.hash (Websocket_client.client_id ws, k)
+end)
+
+let proxied_subscriptions = WsClientTable.create 4
+
+let create_proxied_subscription ws_client ~timeout kind =
   let open Lwt_result_syntax in
   let timeout = Websocket_client.{timeout; on_timeout = `Retry_forever} in
   let* {stream; unsubscribe} =
     Websocket_client.subscribe ws_client ~timeout kind
   in
+  let watcher = Lwt_watcher.create_input () in
+  Lwt.dont_wait
+    (fun () -> Lwt_stream.iter (Lwt_watcher.notify watcher) stream)
+    ignore ;
+  let unsubscribe () =
+    WsClientTable.remove proxied_subscriptions (ws_client, kind) ;
+    unsubscribe ()
+  in
+  let proxied = {watcher; unsubscribe; subscribers = 0} in
+  WsClientTable.replace proxied_subscriptions (ws_client, kind) proxied ;
+  return proxied
+
+let get_proxied_subscription ws_client ~timeout
+    (kind : Ethereum_types.Subscription.kind) =
+  let open Lwt_result_syntax in
+  let kind =
+    match kind with
+    | NewHeads -> (NewHeads : Ethereum_types.Subscription.kind)
+    | Logs _ ->
+        (* Subscribe to all logs *)
+        Logs {address = None; topics = None}
+    | NewPendingTransactions -> NewPendingTransactions
+    | Syncing -> Syncing
+    | Etherlink (L1_L2_levels _) ->
+        (* Don't fetch historic levels through websocket *)
+        Etherlink (L1_L2_levels None)
+  in
+  match WsClientTable.find proxied_subscriptions (ws_client, kind) with
+  | Some proxied -> return proxied
+  | None -> create_proxied_subscription ws_client ~timeout kind
+
+(* In RPC mode, the EVM node acts as a proxy to the server for
+   `eth_subscribe`. There is at most one subscription active per kind on the
+   server. *)
+let eth_subscribe_rpc_mode ~timeout ~(kind : Ethereum_types.Subscription.kind)
+    (ws_client : Websocket_client.t)
+    (module Backend_rpc : Services_backend_sig.S) =
+  let open Lwt_result_syntax in
+  let* proxied = get_proxied_subscription ws_client ~timeout kind in
+  let* stream, stopper =
+    match kind with
+    | NewHeads | NewPendingTransactions | Syncing ->
+        return @@ Lwt_watcher.create_stream proxied.watcher
+    | Logs {address; topics} ->
+        let stream, stopper = Lwt_watcher.create_stream proxied.watcher in
+        let filter = filter_from ~address ~topics in
+        let* bloom_filter = Filter_helpers.validate_bloom_filter filter in
+        let stream =
+          Lwt_stream.filter_map
+            (function
+              | Ok (Ethereum_types.Subscription.Logs log) ->
+                  Filter_helpers.filter_one_log bloom_filter log
+                  |> Option.map (fun l ->
+                         Ok (Ethereum_types.Subscription.Logs l))
+              | Ok _ -> None
+              | Error e -> Some (Error e))
+            stream
+        in
+        return (stream, stopper)
+    | Etherlink (L1_L2_levels from_l1_level) ->
+        let* extra =
+          match from_l1_level with
+          | None -> return_nil
+          | Some from_l1_level ->
+              let+ l1_l2 = Backend_rpc.list_l1_l2_levels ~from_l1_level in
+              List.rev_map
+                (fun ( l1_level,
+                       {
+                         Evm_store.L1_l2_finalized_levels.start_l2_level;
+                         end_l2_level;
+                       } )
+                   ->
+                  Ok
+                    (Ethereum_types.Subscription.Etherlink
+                       (L1_l2_levels {l1_level; start_l2_level; end_l2_level})))
+                l1_l2
+              |> List.rev
+        in
+        let stream, stopper = Lwt_watcher.create_stream proxied.watcher in
+        let stream = Lwt_stream.append (Lwt_stream.of_list extra) stream in
+        return (stream, stopper)
+  in
+  let unsubscribed = ref false in
+  let unsubscribe () =
+    if !unsubscribed then return_false
+    else (
+      unsubscribed := true ;
+      Lwt_watcher.shutdown stopper ;
+      proxied.subscribers <- proxied.subscribers - 1 ;
+      if proxied.subscribers <= 0 then proxied.unsubscribe () else return_true)
+  in
+  proxied.subscribers <- proxied.subscribers + 1 ;
   return (stream, unsubscribe)
 
 let eth_subscribe (config : Configuration.t) (mode : Mode.t) ~kind backend =
@@ -388,7 +495,11 @@ let eth_subscribe (config : Configuration.t) (mode : Mode.t) ~kind backend =
   let* stream, stopper =
     match mode with
     | Rpc {websocket = Some ws_client; _} ->
-        eth_subscribe_rpc_mode ~timeout:config.rpc_timeout ~kind ws_client
+        eth_subscribe_rpc_mode
+          ~timeout:config.rpc_timeout
+          ~kind
+          ws_client
+          backend
     | Rpc {websocket = None; _} ->
         failwith
           "Cannot call eth_subscribe on RPC node whose endpoint does not \

@@ -49,6 +49,9 @@ type monitoring = {ping_timeout : float; ping_interval : float}
 val create :
   ?monitoring:monitoring -> ?keep_alive:bool -> Media_type.t -> Uri.t -> t
 
+(** A uniquely identifying id for a websocket client. *)
+val client_id : t -> int
+
 (** [connect client] establishes the websocket connection with [client]. NOTE:
     the connection is established automatically when sending a request. *)
 val connect : t -> unit tzresult Lwt.t

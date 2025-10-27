@@ -46,6 +46,7 @@ type t = {
   monitoring : monitoring option;
   uri : Uri.t;
   keep_alive : bool;
+  client_id : int;
   mutable id : int;
   mutable current : conn Lwt.t option;
 }
@@ -530,8 +531,23 @@ let get_conn ({media; monitoring; uri; current; _} as client) =
       client.current <- Some conn ;
       conn
 
+let client_id {client_id; _} = client_id
+
+let next_client_id = ref 0
+
 let create ?monitoring ?(keep_alive = true) media uri =
-  let client = {media; monitoring; uri; keep_alive; id = 0; current = None} in
+  incr next_client_id ;
+  let client =
+    {
+      media;
+      monitoring;
+      uri;
+      keep_alive;
+      client_id = !next_client_id;
+      id = 0;
+      current = None;
+    }
+  in
   let conn =
     connect ?monitoring media uri ~on_close:(fun () -> client.current <- None)
   in
