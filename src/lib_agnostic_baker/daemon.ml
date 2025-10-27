@@ -118,16 +118,16 @@ module Make_daemon (Agent : AGENT) :
     keep_alive : bool;
     command : command;
     cctxt : Tezos_client_base.Client_context.full;
-    head_stream : string Lwt_stream.t;
+    head_stream : string Lwt_stream.t option;
   }
 
   type t = state
 
   (* ---- Baker Process Management ---- *)
 
-  let rec retry_on_disconnection ~emit node_addr f =
+  let rec retry_on_disconnection ~emit node_addr f arg =
     let open Lwt_result_syntax in
-    let*! result = f () in
+    let*! result = f arg in
     match result with
     | Ok res -> return res
     | Error (Lost_node_connection :: _ | Cannot_connect_to_node _ :: _) ->
@@ -141,7 +141,7 @@ module Make_daemon (Agent : AGENT) :
             (fun node_addr -> Rpc_services.get_level ~node_addr)
             node_addr
         in
-        retry_on_disconnection ~emit node_addr f
+        retry_on_disconnection ~emit node_addr f arg
     | Error trace -> fail trace
 
   (** [run_thread ~protocol_hash ~cancel_promise ~init_sapling_params cctxt
@@ -407,7 +407,7 @@ module Make_daemon (Agent : AGENT) :
     let head_stream =
       Lwt.map
         (function None -> Ok Head_stream_ended | Some _head -> Ok New_head)
-        (Lwt_stream.get state.head_stream)
+        (Lwt_stream.get head_stream)
     in
     let* pick = Lwt.choose [current_baker; old_baker; head_stream] in
     match pick with
@@ -448,25 +448,27 @@ module Make_daemon (Agent : AGENT) :
           ~emit:(Events.emit Events.cannot_connect)
           node_addr
           (fun () -> may_start_initial_baker cctxt command ~node_addr)
+          ()
       else may_start_initial_baker cctxt command ~node_addr
+    in
+    let state =
+      {
+        node_endpoint = node_addr;
+        current_baker;
+        old_baker = None;
+        keep_alive;
+        command;
+        cctxt;
+        head_stream = None;
+      }
     in
     retry_on_disconnection
       ~emit:(fun _ -> Lwt.return_unit)
       node_addr
-      (fun () ->
+      (fun state ->
         let* head_stream = monitor_heads ~node_addr in
-        let state =
-          {
-            node_endpoint = node_addr;
-            current_baker;
-            old_baker = None;
-            keep_alive;
-            command;
-            cctxt;
-            head_stream;
-          }
-        in
-        main_loop state)
+        main_loop {state with head_stream = Some head_stream})
+      state
 end
 
 module Baker : AGNOSTIC_DAEMON with type command = Baker_agent.command =
