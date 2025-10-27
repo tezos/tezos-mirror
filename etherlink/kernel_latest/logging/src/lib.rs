@@ -80,6 +80,20 @@ macro_rules! __trace_kernel {
     }};
 }
 
+#[cfg(all(feature = "tracing", feature = "alloc"))]
+#[macro_export]
+macro_rules! __trace_kernel_add_attrs {
+    ($host:expr, $attrs:expr) => {{
+        let attrs_str = $attrs
+            .iter()
+            .map(|(k, v)| format!("{}®{}®", k, v))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let msg = format!("[{}] [attrs] {}", tezos_evm_logging::Level::OTel, attrs_str);
+        $crate::debug_str!($host, &msg);
+    }};
+}
+
 // Must only be used by the procedural macro for kernel tracing.
 #[cfg(feature = "tracing")]
 pub fn internal_trace_kernel<H, F, R>(host: &mut H, name: &str, f: F) -> R
@@ -95,6 +109,12 @@ where
     crate::debug_str!(host, &msg);
 
     res
+}
+
+#[cfg(not(feature = "tracing"))]
+#[macro_export]
+macro_rules! __trace_kernel_add_attrs {
+    ($host:expr, $attrs:expr) => {{}};
 }
 
 #[cfg(not(feature = "tracing"))]

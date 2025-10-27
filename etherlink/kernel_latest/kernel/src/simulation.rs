@@ -493,6 +493,7 @@ impl Evaluation {
         match revm_run_transaction(
             host,
             &constants,
+            None,
             from,
             self.to,
             self.value.unwrap_or_default(),
@@ -789,6 +790,7 @@ mod tests {
             host,
             revm::primitives::hardfork::SpecId::SHANGHAI,
             &block,
+            None,
             EtherlinkPrecompiles::new(),
             caller,
             None,

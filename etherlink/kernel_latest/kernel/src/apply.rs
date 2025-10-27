@@ -30,7 +30,9 @@ use revm_etherlink::{
 };
 use tezos_ethereum::access_list::{AccessList, AccessListItem};
 use tezos_ethereum::block::{BlockConstants, BlockFees};
-use tezos_ethereum::transaction::{TransactionHash, TransactionType};
+use tezos_ethereum::transaction::{
+    TransactionHash, TransactionType, TRANSACTION_HASH_SIZE,
+};
 use tezos_ethereum::tx_common::{
     signed_authorization, AuthorizationList, EthereumTransactionCommon,
 };
@@ -302,6 +304,7 @@ fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &[u8
 pub fn revm_run_transaction<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
+    transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
     caller: H160,
     to: Option<H160>,
     value: U256,
@@ -334,6 +337,7 @@ pub fn revm_run_transaction<Host: Runtime>(
         host,
         *spec_id,
         block_constants,
+        transaction_hash,
         revm_etherlink::precompiles::provider::EtherlinkPrecompiles::new(),
         Address::from_slice(&caller.0),
         to.map(|to| Address::from_slice(&to.0)),
@@ -414,6 +418,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
     transaction: &EthereumTransactionCommon,
+    transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     is_delayed: bool,
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
@@ -442,6 +447,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     let execution_outcome = match revm_run_transaction(
         host,
         block_constants,
+        Some(transaction_hash),
         caller,
         to,
         value,
@@ -590,6 +596,7 @@ fn apply_fa_deposit<Host: Runtime>(
     host: &mut Host,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
+    transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
@@ -620,6 +627,7 @@ fn apply_fa_deposit<Host: Runtime>(
     let execution_outcome = match revm_run_transaction(
         host,
         &block_constants,
+        Some(transaction_hash),
         caller,
         to,
         value,
@@ -776,6 +784,7 @@ pub fn apply_transaction<Host: Runtime>(
             host,
             block_constants,
             tx,
+            transaction.tx_hash,
             false,
             tracer_input,
             spec_id,
@@ -785,6 +794,7 @@ pub fn apply_transaction<Host: Runtime>(
             host,
             block_constants,
             tx,
+            transaction.tx_hash,
             true,
             tracer_input,
             spec_id,
@@ -796,7 +806,14 @@ pub fn apply_transaction<Host: Runtime>(
         }
         TransactionContent::FaDeposit(fa_deposit) => {
             log!(host, Benchmarking, "Transaction type: FA_DEPOSIT");
-            apply_fa_deposit(host, fa_deposit, block_constants, tracer_input, spec_id)?
+            apply_fa_deposit(
+                host,
+                fa_deposit,
+                block_constants,
+                transaction.tx_hash,
+                tracer_input,
+                spec_id,
+            )?
         }
     };
 

@@ -284,6 +284,7 @@ fn execute_transaction(
         host,
         spec_id,
         &block_constants,
+        None,
         EtherlinkPrecompiles::new(),
         caller,
         address,
