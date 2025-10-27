@@ -89,9 +89,10 @@ let attested_just_after_migration ctxt ~attested_level =
     && migration_level < attested_level
     && attested_level <= Int32.add migration_level new_lag)
 
-(** [is_attestable_slot ctxt ~pkh ~slot_id] decides whether [~slot_id] is
-    attestable for delegate [pkh] at the time of calling. *)
-let is_attestable_slot ctxt ~pkh ~(slot_id : Types.slot_id) =
+(** [is_attestable_slot_or_trap ctxt ~pkh ~slot_id] decides whether [~slot_id] is
+    attestable for delegate [pkh] at the time of calling, and when DAL incentives
+    are enabled, whether it should be considered as a trap. *)
+let is_attestable_slot_or_trap ctxt ~pkh ~(slot_id : Types.slot_id) =
   let open Lwt_result_syntax in
   let open Node_context in
   let published_level = slot_id.slot_level in
@@ -99,7 +100,7 @@ let is_attestable_slot ctxt ~pkh ~(slot_id : Types.slot_id) =
   let attested_level = Int32.(add published_level lag) in
   let attestation_level = Int32.pred attested_level in
   let*? should_drop = published_just_before_migration ctxt ~published_level in
-  if should_drop then return_false
+  if should_drop then return_none
   else
     let*? last_known_parameters =
       get_proto_parameters ctxt ~level:(`Level attested_level)
@@ -112,7 +113,7 @@ let is_attestable_slot ctxt ~pkh ~(slot_id : Types.slot_id) =
       fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
     in
     let number_of_assigned_shards = List.length shard_indices in
-    if number_of_assigned_shards = 0 || published_level < 1l then return_false
+    if number_of_assigned_shards = 0 || published_level < 1l then return_none
     else
       let* number_stored_shards =
         Store.Shards.number_of_shards_available
@@ -121,8 +122,9 @@ let is_attestable_slot ctxt ~pkh ~(slot_id : Types.slot_id) =
           shard_indices
       in
       let all_stored = number_stored_shards = number_of_assigned_shards in
-      if not last_known_parameters.incentives_enable then return all_stored
-      else if not all_stored then return_false
+      if not last_known_parameters.incentives_enable then
+        if all_stored then return_some `Attestable_slot else return_none
+      else if not all_stored then return_none
       else
         let* is_attestable_slot_with_traps =
           is_attestable_slot_with_traps
@@ -134,8 +136,9 @@ let is_attestable_slot ctxt ~pkh ~(slot_id : Types.slot_id) =
           |> Errors.to_option_tzresult
         in
         match is_attestable_slot_with_traps with
-        | Some true -> return_true
-        | _ -> return_false
+        | Some true -> return_some `Attestable_slot
+        | Some false -> return_some `Trap
+        | None -> return_none
 
 let may_notify ctxt ~(slot_id : Types.slot_id) =
   let open Lwt_result_syntax in
@@ -146,17 +149,22 @@ let may_notify ctxt ~(slot_id : Types.slot_id) =
   let subscribers = T.elements attestable_slots_watcher_table in
   if Seq.is_empty subscribers then return_unit
   else
-    let notify_attestable_slot pkh =
-      let* is_attestable_slot = is_attestable_slot ctxt ~pkh ~slot_id in
-      if is_attestable_slot then
-        T.notify_attestable_slot attestable_slots_watcher_table pkh ~slot_id
-      else () ;
+    let notify_slot_attestable_or_trap pkh =
+      let* is_attestable_slot_or_trap =
+        is_attestable_slot_or_trap ctxt ~pkh ~slot_id
+      in
+      (match is_attestable_slot_or_trap with
+      | Some `Attestable_slot ->
+          T.notify_attestable_slot attestable_slots_watcher_table pkh ~slot_id
+      | Some `Trap ->
+          T.notify_slot_has_trap attestable_slots_watcher_table pkh ~slot_id
+      | None -> ()) ;
       return_unit
     in
     (* For each subscribed pkh, if it has assigned shards for that level,
        check if all those shards are available for [slot_id] and notify watcher,
        accordingly. *)
-    Seq.iter_ep notify_attestable_slot subscribers
+    Seq.iter_ep notify_slot_attestable_or_trap subscribers
 
 let is_not_in_committee committee ~pkh =
   let assigned_shard_indices =

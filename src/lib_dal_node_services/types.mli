@@ -420,6 +420,8 @@ module Attestable_slots_watcher_table : sig
           (** the [slot_id] is now attestable for the delegate *)
       | No_shards_assigned of {attestation_level : level}
           (** the delegate has no assigned shards at [attestation_level] *)
+      | Slot_has_trap of {slot_id : slot_id}
+          (** the [slot_id] is a trap for the delegate *)
 
     val encoding : t Data_encoding.t
   end
@@ -457,6 +459,11 @@ module Attestable_slots_watcher_table : sig
       [~attestation_level] to the stream for [pkh], if present. *)
   val notify_no_shards_assigned :
     t -> Signature.public_key_hash -> attestation_level:level -> unit
+
+  (** [notify_slot_has_trap t pkh ~slot_id] pushed a [Slot_has_trap] event for [~slot_id] to the
+      stream for [pkh], if present. *)
+  val notify_slot_has_trap :
+    t -> Signature.public_key_hash -> slot_id:slot_id -> unit
 
   (** [remove t pkh] removes the watcher entry for [pkh] from [t] if present. *)
   val remove : t -> Signature.public_key_hash -> unit

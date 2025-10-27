@@ -793,6 +793,7 @@ module Attestable_slots_watcher_table = struct
     type t =
       | Attestable_slot of {slot_id : slot_id}
       | No_shards_assigned of {attestation_level : level}
+      | Slot_has_trap of {slot_id : slot_id}
 
     let encoding =
       let open Data_encoding in
@@ -819,6 +820,15 @@ module Attestable_slots_watcher_table = struct
               | _ -> None)
             (fun ((), attestation_level) ->
               No_shards_assigned {attestation_level});
+          case
+            ~title:"slot_has_trap"
+            (Tag 2)
+            (obj2
+               (req "kind" (constant "slot_has_trap"))
+               (req "slot_id" slot_id_encoding))
+            (function
+              | Slot_has_trap {slot_id} -> Some ((), slot_id) | _ -> None)
+            (fun ((), slot_id) -> Slot_has_trap {slot_id});
         ]
   end
 
@@ -886,6 +896,14 @@ module Attestable_slots_watcher_table = struct
         Lwt_watcher.notify
           watcher.stream
           (No_shards_assigned {attestation_level})
+
+  let notify_slot_has_trap t pkh ~slot_id =
+    match Signature.Public_key_hash.Table.find t pkh with
+    | None -> ()
+    | Some watcher ->
+        if not @@ SlotIdSet.mem watcher.notified_slots slot_id then (
+          SlotIdSet.add watcher.notified_slots slot_id ;
+          Lwt_watcher.notify watcher.stream (Slot_has_trap {slot_id}))
 
   let remove = Signature.Public_key_hash.Table.remove
 
