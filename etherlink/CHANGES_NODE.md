@@ -18,6 +18,8 @@
 - Add support for state overrides in `eth_estimateGas` for EIP-7702, and
   generalize block parameter of `eth_estimateGas` to support block
   hashes. (!19737)
+- Websocket connections on an EVM node in RPC mode can now receive events
+  with `eth_subscribe`. (!19743)
 
 ### Monitoring changes
 
