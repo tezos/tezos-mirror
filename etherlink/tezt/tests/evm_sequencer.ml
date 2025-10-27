@@ -10988,28 +10988,40 @@ let test_websocket_newHeads_event =
       (* TODO #7843: Adapt this test to multichain context *)
       Register_without_feature
   @@ fun {sequencer; observer; _} _protocol ->
-  let scenario evm_node =
-    let* websocket = Evm_node.open_websocket evm_node in
-    let* id = Rpc.subscribe ~websocket ~kind:NewHeads evm_node in
+  let scenario evm_node nb_websockets =
+    let* websockets =
+      Lwt_list.map_p
+        (fun () ->
+          let* websocket = Evm_node.open_websocket evm_node in
+          let* id = Rpc.subscribe ~websocket ~kind:NewHeads evm_node in
+          return (websocket, id))
+        (List.init nb_websockets (fun _ -> ()))
+    in
     let check_block_number () =
       (* We always wait for the observer to be synced, to know that the
          blueprint was fully propagated. *)
       let* level = produce_block_and_wait_for_sync ~sequencer observer in
-      let* block = Websocket.recv ~timeout:10. websocket in
-      let Block.{number; _} =
-        JSON.(block |-> "params" |-> "result" |> Block.of_json)
-      in
-      Check.((number = Int32.of_int level) int32)
-        ~error_msg:"Received block level was %L, expected %R" ;
-      unit
+      Lwt_list.iter_s
+        (fun (websocket, _id) ->
+          let* block = Websocket.recv ~timeout:10. websocket in
+          let Block.{number; _} =
+            JSON.(block |-> "params" |-> "result" |> Block.of_json)
+          in
+          Check.((number = Int32.of_int level) int32)
+            ~error_msg:"Received block level was %L, expected %R" ;
+          unit)
+        websockets
     in
     let* () = repeat 2 check_block_number in
-    check_unsubscription ~websocket ~id ~sequencer evm_node
+    Lwt_list.iter_p
+      (fun (websocket, id) ->
+        check_unsubscription ~websocket ~id ~sequencer evm_node)
+      websockets
   in
   let* rpc_node = run_new_rpc_endpoint sequencer in
-  let* () = scenario sequencer in
-  let* () = scenario observer in
-  let* () = scenario rpc_node in
+  let* () = scenario sequencer 3 in
+  let* () = scenario observer 3 in
+  let* () = scenario rpc_node 3 in
   unit
 
 (* This test is flaky because Dream may not correctly detect websocket
