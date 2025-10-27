@@ -72,6 +72,8 @@ module Operation : sig
   val hash_operation : t -> Ethereum_types.hash
 
   val encoding : t Data_encoding.t
+
+  val gas_limit_to_z : Tezlink_imports.Alpha_context.Gas.Arith.integral -> Z.t
 end
 
 module Manager = Tezlink_imports.Imported_protocol.Manager_repr

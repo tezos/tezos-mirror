@@ -188,6 +188,7 @@ type batch_validation_context = {
   first_counter : Manager_counter.t;
   length : int;
   fee : Tez.t;
+  gas_limit : Z.t;
 }
 
 let is_tz4 pkh =
@@ -271,15 +272,15 @@ let validate_counter ~ctxt counter =
            construction *)
         failwith "unreachable"
 
+let hard_gas_limit_per_operation =
+  Tezos_types.Operation.gas_limit_to_z
+    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
+
 let validate_gas_limit gas_limit =
   let open Lwt_result_syntax in
-  (* TODO check gas limit high enough *)
-  let hard_gas_limit_per_operation =
-    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
-  in
-  match Gas.check_gas_limit ~hard_gas_limit_per_operation ~gas_limit with
-  | Ok () -> return (Ok ())
-  | Error _ -> tzfail_p @@ Imported_protocol.Gas_limit_repr.Gas_limit_too_high
+  if Z.Compare.(hard_gas_limit_per_operation > gas_limit && gas_limit >= Z.zero)
+  then return (Ok ())
+  else tzfail_p @@ Imported_protocol.Gas_limit_repr.Gas_limit_too_high
 
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
@@ -293,7 +294,11 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       let** () = validate_supported_operation ~ctxt operation in
       let** () = validate_source ~ctxt source in
       let** () = validate_counter ~ctxt counter in
-      let** () = validate_gas_limit gas_limit in
+      (* TODO check gas limit high enough *)
+      let overall_gas_limit =
+        Z.(ctxt.gas_limit + Tezos_types.Operation.gas_limit_to_z gas_limit)
+      in
+      let** () = validate_gas_limit overall_gas_limit in
       (* TODO check storage limit too *)
       let** ctxt = validate_balance ~ctxt ~fee in
       (* the update will be updated during the validation steps *)
@@ -304,6 +309,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
              previous_counter = Some ctxt.next_counter;
              next_counter = Manager_counter.succ ctxt.next_counter;
              length = ctxt.length + 1;
+             gas_limit = overall_gas_limit;
            })
   | _ -> tzfail @@ Not_a_manager_operation ctxt.error_clue
 
@@ -432,6 +438,7 @@ let validate_tezlink_operation ?(check_signature = true) ~read raw =
           first_counter;
           length = 0;
           fee = Tez.zero;
+          gas_limit = Z.zero;
         }
       (first :: rest)
   in

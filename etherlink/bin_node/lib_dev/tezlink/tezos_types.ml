@@ -97,6 +97,8 @@ module Operation = struct
       ~src:Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
       counter
 
+  let gas_limit_to_z = Tezlink_imports.Alpha_context.Gas.Arith.integral_to_z
+
   let encoding : t Data_encoding.t =
     let open Data_encoding in
     conv
