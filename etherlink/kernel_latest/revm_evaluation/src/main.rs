@@ -401,6 +401,7 @@ pub fn main() {
                         &mut host,
                         spec_id,
                         &block_constants,
+                        None,
                         EtherlinkPrecompiles::new(),
                         transaction.sender,
                         transaction.to,

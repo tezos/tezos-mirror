@@ -26,11 +26,11 @@ use revm::{
     context_interface::block::BlobExcessGasAndPrice,
     handler::{instructions::EthInstructions, EthFrame},
     interpreter::interpreter::EthInterpreter,
-    primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, U256},
+    primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, B256, U256},
     Context, ExecuteCommitEvm, InspectCommitEvm, MainBuilder,
 };
-use tezos_ethereum::block::BlockConstants;
-use tezos_evm_logging::{__trace_kernel, trace, tracing::instrument};
+use tezos_ethereum::{block::BlockConstants, transaction::TRANSACTION_HASH_SIZE};
+use tezos_evm_logging::{__trace_kernel, __trace_kernel_add_attrs, tracing::instrument};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
@@ -259,12 +259,36 @@ fn evm<'a, Host: Runtime>(
     .with_precompiles(precompiles)
 }
 
+fn execute_transaction<'a, Host: Runtime>(
+    evm: &mut EvmContext<'a, Host>,
+    tx: &'a TxEnv,
+    transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
+) -> Result<ExecutionResult, EVMError<Error>> {
+    let opt_attrs_fun: Box<dyn FnOnce(&mut Host)> =
+        if transaction_hash.is_some() && cfg!(feature = "tracing") {
+            // The following unwrap is safe, see condition above.
+            let hash = B256::from(transaction_hash.unwrap());
+            let pretty_hash = format!("{hash}");
+            let __attrs = [("etherlink.transaction.hash".to_string(), pretty_hash)];
+            Box::new(move |__host| {
+                __trace_kernel_add_attrs!(__host, __attrs);
+            })
+        } else {
+            Box::new(|__host| ())
+        };
+    __trace_kernel!(evm.db_mut().host, "evm.transact_commit", {
+        opt_attrs_fun(evm.db_mut().host);
+        evm.transact_commit(tx)
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
 pub fn run_transaction<'a, Host: Runtime>(
     host: &'a mut Host,
     spec_id: SpecId,
     block_constants: &'a BlockConstants,
+    transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
     precompiles: EtherlinkPrecompiles,
     caller: Address,
     destination: Option<Address>,
@@ -336,11 +360,7 @@ pub fn run_transaction<'a, Host: Runtime>(
             is_simulation,
         );
 
-        let execution_result = __trace_kernel!(
-            evm.db_mut().host,
-            "evm.transact_commit",
-            trace!("evm.transact_commit", evm.transact_commit(&tx))
-        )?;
+        let result = execute_transaction(&mut evm, &tx, transaction_hash)?;
 
         let withdrawals = evm.db_mut().take_withdrawals();
 
@@ -353,7 +373,7 @@ pub fn run_transaction<'a, Host: Runtime>(
         }
 
         Ok(ExecutionOutcome {
-            result: execution_result,
+            result,
             withdrawals,
         })
     }
