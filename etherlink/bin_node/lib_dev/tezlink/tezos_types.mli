@@ -48,6 +48,14 @@ module Contract : sig
   val of_hex : string -> Signature.public_key_hash option
 end
 
+module Tez : sig
+  include module type of Tezlink_imports.Alpha_context.Tez
+
+  val of_string_exn : string -> t
+
+  val to_mutez_z : t -> Z.t
+end
+
 module Operation : sig
   type t = {
     source : Signature.public_key_hash;
@@ -55,6 +63,7 @@ module Operation : sig
     length : int;
     op : Tezlink_imports.Alpha_context.packed_operation;
     raw : bytes;
+    fee : Tez.t;
   }
 
   val counter_to_z :
@@ -63,14 +72,6 @@ module Operation : sig
   val hash_operation : t -> Ethereum_types.hash
 
   val encoding : t Data_encoding.t
-end
-
-module Tez : sig
-  include module type of Tezlink_imports.Alpha_context.Tez
-
-  val of_string_exn : string -> t
-
-  val to_mutez_z : t -> Z.t
 end
 
 module Manager = Tezlink_imports.Imported_protocol.Manager_repr

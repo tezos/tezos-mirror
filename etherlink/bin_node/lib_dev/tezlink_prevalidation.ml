@@ -173,6 +173,8 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
        - the [source]
        - the [first_counter]
        - the [length] of the batch
+    To build the blueprint we'll need:
+       - the total [fee]
 *)
 type batch_validation_context = {
   source : public_key_hash;
@@ -185,6 +187,7 @@ type batch_validation_context = {
   error_clue : clue;
   first_counter : Manager_counter.t;
   length : int;
+  fee : Tez.t;
 }
 
 let is_tz4 pkh =
@@ -233,15 +236,21 @@ let validate_source ~ctxt second_source =
 
 let validate_balance ~ctxt ~fee =
   let open Lwt_result_syntax in
+  let tezrep_of t =
+    let open Imported_protocol in
+    t |> Tez.to_mutez |> Tez_repr.of_mutez
+    |> Option.value ~default:Tez_repr.zero
+    (* The conversion should not fail so the zero value won't be used *)
+  in
   match Tez.sub_opt ctxt.balance_left fee with
-  | Some balance_left -> return (Ok balance_left)
+  | Some balance_left -> (
+      match Tez.(ctxt.fee +? fee) with
+      | Ok fee -> return (Ok {ctxt with balance_left; fee})
+      | Error _ ->
+          tzfail_p
+          @@ Imported_protocol.Tez_repr.Addition_overflow
+               (tezrep_of ctxt.fee, tezrep_of fee))
   | None ->
-      let tezrep_of t =
-        let open Imported_protocol in
-        t |> Tez.to_mutez |> Tez_repr.of_mutez
-        |> Option.value ~default:Tez_repr.zero
-        (* The conversion should not fail so the zero value won't be used *)
-      in
       tzfail_p
       @@ Imported_protocol.Contract_storage.(
            Balance_too_low
@@ -286,7 +295,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       let** () = validate_counter ~ctxt counter in
       let** () = validate_gas_limit gas_limit in
       (* TODO check storage limit too *)
-      let** balance_left = validate_balance ~ctxt ~fee in
+      let** ctxt = validate_balance ~ctxt ~fee in
       (* the update will be updated during the validation steps *)
       return
         (Ok
@@ -295,7 +304,6 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
              previous_counter = Some ctxt.next_counter;
              next_counter = Manager_counter.succ ctxt.next_counter;
              length = ctxt.length + 1;
-             balance_left;
            })
   | _ -> tzfail @@ Not_a_manager_operation ctxt.error_clue
 
@@ -423,6 +431,7 @@ let validate_tezlink_operation ?(check_signature = true) ~read raw =
           error_clue;
           first_counter;
           length = 0;
+          fee = Tez.zero;
         }
       (first :: rest)
   in
@@ -435,9 +444,16 @@ let validate_tezlink_operation ?(check_signature = true) ~read raw =
       signature
   in
   let*? first_counter = Tezos_types.Operation.counter_to_z ctxt.first_counter in
-  let operation =
+  let operation : Tezos_types.Operation.t =
     Tezos_types.Operation.
-      {length = ctxt.length; source = ctxt.source; raw; op; first_counter}
+      {
+        length = ctxt.length;
+        source = ctxt.source;
+        raw;
+        op;
+        first_counter;
+        fee = ctxt.fee;
+      }
   in
   return (Ok operation)
 

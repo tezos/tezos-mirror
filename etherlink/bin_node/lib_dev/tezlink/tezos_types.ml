@@ -66,6 +66,18 @@ module Contract = struct
     Data_encoding.Binary.of_bytes_opt implicit_encoding bytes
 end
 
+module Tez = struct
+  include Tezlink_imports.Alpha_context.Tez
+
+  let of_string_exn str =
+    match of_string str with
+    | None ->
+        raise (Invalid_argument (Printf.sprintf "Invalid tez value: %s" str))
+    | Some s -> s
+
+  let to_mutez_z t = t |> to_mutez |> Z.of_int64
+end
+
 module Operation = struct
   module ImportedOperation = Tezlink_imports.Alpha_context.Operation
 
@@ -75,6 +87,7 @@ module Operation = struct
     length : int;
     op : Tezlink_imports.Alpha_context.packed_operation;
     raw : bytes;
+    fee : Tez.t;
   }
 
   let counter_to_z counter =
@@ -87,33 +100,23 @@ module Operation = struct
   let encoding : t Data_encoding.t =
     let open Data_encoding in
     conv
-      (fun {source; first_counter; length; op; raw} ->
-        (source, first_counter, length, op, raw))
-      (fun (source, first_counter, length, op, raw) ->
-        {source; first_counter; length; op; raw})
-      (tup5
+      (fun {source; first_counter; length; op; raw; fee} ->
+        (source, first_counter, length, op, raw, fee))
+      (fun (source, first_counter, length, op, raw, fee) ->
+        {source; first_counter; length; op; raw; fee})
+      (tup6
          Signature.Public_key_hash.encoding
          z
          int31
          (dynamic_size Tezlink_imports.Alpha_context.Operation.encoding)
-         bytes)
+         bytes
+         Tez.encoding)
 
-  let hash_operation {source = _; first_counter = _; length = _; op; raw = _} =
+  let hash_operation
+      {source = _; first_counter = _; length = _; op; raw = _; fee = _} =
     let hash = ImportedOperation.hash_packed op in
     let (`Hex hex) = Operation_hash.to_hex hash in
     Ethereum_types.Hash (Ethereum_types.Hex hex)
-end
-
-module Tez = struct
-  include Tezlink_imports.Alpha_context.Tez
-
-  let of_string_exn str =
-    match of_string str with
-    | None ->
-        raise (Invalid_argument (Printf.sprintf "Invalid tez value: %s" str))
-    | Some s -> s
-
-  let to_mutez_z t = t |> to_mutez |> Z.of_int64
 end
 
 module Manager = Tezlink_imports.Imported_protocol.Manager_repr
