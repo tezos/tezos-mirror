@@ -561,6 +561,14 @@ let test_activation_level =
     (fun level -> Format.asprintf "level %d" level)
     [8; 9; 10; 11; 12]
 
+let test_activation_with_zero_threshold =
+  init_constants ()
+  --> set
+        S.all_bakers_attest_activation_threshold
+        {numerator = 0; denominator = 1}
+  --> begin_test ~abaab_activation_levels:[None] ["bootstrap"]
+  --> check_abaab_activation_level ~loc:__LOC__ (Some 0l)
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -568,6 +576,8 @@ let tests =
        ( "Test abaab activation threshold when a non BLS baker gets deactivated",
          test_activation_threshold_with_deactivated_baker );
        ("Test abaab activation level", test_activation_level);
+       ( "Test abaab threshold zero activation",
+         test_activation_with_zero_threshold );
      ]
 
 let () =
