@@ -24,6 +24,7 @@ use revm_etherlink::precompiles::send_outbox_message::{
     FastWithdrawalInterface, RouterInterface, Withdrawal,
 };
 use revm_etherlink::storage::world_state_handler::StorageAccount;
+use revm_etherlink::GasData;
 use revm_etherlink::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
     ExecutionOutcome,
@@ -308,9 +309,10 @@ pub fn revm_run_transaction<Host: Runtime>(
     caller: H160,
     to: Option<H160>,
     value: U256,
-    gas_limit: u64,
     call_data: Vec<u8>,
+    gas_limit: u64,
     effective_gas_price: U256,
+    maximum_gas_per_transaction: u64,
     access_list: AccessList,
     authorization_list: Option<AuthorizationList>,
     spec_id: &SpecId,
@@ -333,6 +335,16 @@ pub fn revm_run_transaction<Host: Runtime>(
     // once we fully make the switch to REVM.
     let mut bytes = vec![0u8; 32];
     value.to_little_endian(&mut bytes);
+    let effective_gas_price = u128::from_le_bytes(if effective_gas_price.bits() < 128 {
+        effective_gas_price.low_u128().to_le_bytes()
+    } else {
+        return Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
+            "Given amount does not fit in a u128".to_string(),
+        ))
+        .into());
+    });
+    let gas_data =
+        GasData::new(gas_limit, effective_gas_price, maximum_gas_per_transaction);
     revm_etherlink::run_transaction(
         host,
         *spec_id,
@@ -342,15 +354,7 @@ pub fn revm_run_transaction<Host: Runtime>(
         Address::from_slice(&caller.0),
         to.map(|to| Address::from_slice(&to.0)),
         Bytes::from(call_data),
-        gas_limit,
-        u128::from_le_bytes(if effective_gas_price.bits() < 128 {
-            effective_gas_price.low_u128().to_le_bytes()
-        } else {
-            return Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
-                "Given amount does not fit in a u128".to_string(),
-            ))
-            .into());
-        }),
+        gas_data,
         revm::primitives::U256::from_le_slice(&bytes),
         revm::context::transaction::AccessList::from(
             access_list
@@ -451,9 +455,10 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         caller,
         to,
         value,
-        gas_limit,
         call_data,
+        gas_limit,
         effective_gas_price,
+        limits.maximum_gas_limit,
         transaction.access_list.clone(),
         transaction.authorization_list.clone(),
         spec_id,
@@ -599,6 +604,7 @@ fn apply_fa_deposit<Host: Runtime>(
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
     tracer_input: Option<TracerInput>,
     spec_id: &SpecId,
+    limits: &EvmLimits,
 ) -> Result<ExecutionResult<TransactionResult>, Error> {
     // Fees are set to zero, this is an internal call from the system address to the FA bridge solidity contract.
     // We do not require the system address to pay for the execution cost.
@@ -631,9 +637,10 @@ fn apply_fa_deposit<Host: Runtime>(
         caller,
         to,
         value,
-        gas_limit,
         call_data,
+        gas_limit,
         effective_gas_price,
+        limits.maximum_gas_limit,
         Vec::new(),
         None,
         spec_id,
@@ -813,6 +820,7 @@ pub fn apply_transaction<Host: Runtime>(
                 transaction.tx_hash,
                 tracer_input,
                 spec_id,
+                limits,
             )?
         }
     };

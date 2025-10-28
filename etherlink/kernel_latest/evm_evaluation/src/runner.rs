@@ -11,7 +11,7 @@ use revm_etherlink::helpers::legacy::{h256_to_alloy, u256_to_alloy};
 use revm_etherlink::precompiles::provider::EtherlinkPrecompiles;
 use revm_etherlink::storage::code::CodeStorage;
 use revm_etherlink::storage::world_state_handler::StorageAccount;
-use revm_etherlink::{run_transaction, Error, ExecutionOutcome};
+use revm_etherlink::{run_transaction, Error, ExecutionOutcome, GasData};
 use tezos_ethereum::access_list::AccessList;
 use tezos_ethereum::access_list::AccessListItem;
 use tezos_ethereum::block::{BlockConstants, BlockFees};
@@ -289,8 +289,7 @@ fn execute_transaction(
         caller,
         address,
         Bytes::from(call_data),
-        gas_limit,
-        u256_to_u128(env.tx.gas_price),
+        GasData::new(gas_limit, u256_to_u128(env.tx.gas_price), gas_limit),
         revm::primitives::U256::from_le_slice(&bytes),
         access_list,
         // TODO: add authorization list when Prague tests are enabled.

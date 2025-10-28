@@ -562,6 +562,10 @@ fn migrate_to<Host: Runtime>(
             // Dummy migration for the blueprint generation
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V40 => {
+            store_evm_version(host, &EVMVersion::Osaka)?;
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 

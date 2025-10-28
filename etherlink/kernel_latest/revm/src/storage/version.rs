@@ -15,8 +15,9 @@ const EVM_VERSION: RefPath = RefPath::assert_from(b"/evm/evm_version");
 pub enum EVMVersion {
     Shanghai = 0,
     Cancun = 1,
-    #[default]
     Prague = 2,
+    #[default]
+    Osaka = 3,
 }
 
 impl EVMVersion {
@@ -29,6 +30,7 @@ impl EVMVersion {
             0 => EVMVersion::Shanghai,
             1 => EVMVersion::Cancun,
             2 => EVMVersion::Prague,
+            3 => EVMVersion::Osaka,
             _ => EVMVersion::default(),
         }
     }
@@ -40,6 +42,7 @@ impl From<EVMVersion> for SpecId {
             EVMVersion::Shanghai => SpecId::SHANGHAI,
             EVMVersion::Cancun => SpecId::CANCUN,
             EVMVersion::Prague => SpecId::PRAGUE,
+            EVMVersion::Osaka => SpecId::OSAKA,
         }
     }
 }

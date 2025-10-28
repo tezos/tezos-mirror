@@ -57,7 +57,7 @@ let generate_json_string ~label ~contract ~path ~evm_version =
 
 let compile_contract ~source ~label ~contract evm_version =
   (* Construct the JSON input for solc *)
-  let evm_version = Evm_version.to_string evm_version in
+  let evm_version = Evm_version.to_solidity_evm_version evm_version in
   let input_json =
     generate_json_string ~label ~contract ~path:source ~evm_version
   in
