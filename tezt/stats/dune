@@ -1,0 +1,8 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (libraries
+  clap
+  tezt.core))
