@@ -20,7 +20,8 @@ let pp_clue = Operation_hash.pp
 
 let clue_encoding = Operation_hash.encoding
 
-let tzfail_p e = Lwt_result_syntax.tzfail @@ Imported_env.Ecoproto_error e
+(** Fail with a protocol error *)
+let tzfail_p e = Lwt_result_syntax.tzfail @@ Imported_env.wrap_tzerror e
 
 type error +=
   | Parsing_failure of clue * Data_encoding.Binary.read_error
@@ -389,7 +390,6 @@ let validate_first_counter ~read ~source ~first_counter =
 
 let validate_size ~raw ~error_clue =
   let open Lwt_result_syntax in
-  let open Tezlink_imports.Alpha_context in
   let length = Bytes.length raw in
   if length <= Constants.max_operation_data_length then return (Ok ())
   else
@@ -438,17 +438,12 @@ let validate_signature ~check_signature shell contents pk signature =
     else tzfail_p @@ Imported_protocol.Operation_repr.Invalid_signature
 
 let validate_tezlink_operation ?(check_signature = true) ~read raw =
-  let open Tezlink_imports.Alpha_context in
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
   let error_clue = Operation_hash.hash_bytes [raw] in
   let** () = validate_size ~raw ~error_clue in
   let* op =
-    match
-      Data_encoding.Binary.of_bytes
-        Tezlink_imports.Alpha_context.Operation.encoding
-        raw
-    with
+    match Data_encoding.Binary.of_bytes Operation.encoding raw with
     | Error e -> tzfail @@ Parsing_failure (error_clue, e)
     | Ok op -> return op
   in
