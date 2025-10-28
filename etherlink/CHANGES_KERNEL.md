@@ -6,6 +6,10 @@
 
 - Optimize computation of receipt and transaction root. Receipt root is now
   Ethereum standard compatible (EIP 2718) (!19300)
+- Etherlink's VM version was bumped from Prague to Osaka, it now supports (!19753):
+  - [EIP-7951](https://eips.ethereum.org/EIPS/eip-7951) Precompile for secp256r1 Curve Support.
+  - [EIP-7939](https://eips.ethereum.org/EIPS/eip-7939) Count leading zeros (CLZ) opcode.
+  - [EIP-7883](https://eips.ethereum.org/EIPS/eip-7883) ModExp Gas Cost Increase.
 
 ### Bug fixes
 
