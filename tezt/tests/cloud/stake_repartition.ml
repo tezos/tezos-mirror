@@ -78,7 +78,7 @@ module Dal = struct
         | Mimic {network; max_nb_bakers} ->
             let network_string =
               match network with
-              | `Mainnet | `Ghostnet | `Rionet | `Seoulnet -> to_string network
+              | `Mainnet | `Ghostnet | `Seoulnet -> to_string network
               | _ ->
                   failwith
                     (Format.sprintf

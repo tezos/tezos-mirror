@@ -89,7 +89,6 @@ let get_snapshot_info_network node snapshot_path =
   let json = JSON.parse ~origin:"snapshot_info" info in
   (match JSON.(json |-> "snapshot_header" |-> "chain_name" |> as_string) with
   | "TEZOS_ITHACANET_2022-01-25T15:00:00Z" -> "ghostnet"
-  | "TEZOS_RIONET_2025-02-19T12:45:00Z" -> "rionet"
   | "TEZOS_SEOULNET_2025-07-11T08:00:00Z" -> "seoulnet"
   | "TEZOS_MAINNET" -> "mainnet"
   | "TEZOS" | _ -> "sandbox")
