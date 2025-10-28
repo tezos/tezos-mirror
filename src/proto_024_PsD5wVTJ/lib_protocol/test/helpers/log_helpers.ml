@@ -22,3 +22,5 @@ let batch_color = Log.Color.(BG.green ++ FG.black)
 let assert_block_color = Log.Color.(BG.blue ++ FG.gray)
 
 let tez_color = Log.Color.FG.bright_white
+
+let check_color = Log.Color.FG.gray

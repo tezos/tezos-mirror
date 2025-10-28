@@ -17,20 +17,6 @@ open State_account
 open Tez_helpers.Ez_tez
 open Scenario
 
-let check_is_active ~loc src_name =
-  let open Lwt_result_syntax in
-  exec_unit @@ fun (block, state) ->
-  let src = State.find_account src_name state in
-  let* b = Context.Delegate.deactivated (B block) src.pkh in
-  Assert.is_true ~loc (not b)
-
-let check_is_not_active ~loc src_name =
-  let open Lwt_result_syntax in
-  exec_unit @@ fun (block, state) ->
-  let src = State.find_account src_name state in
-  let* b = Context.Delegate.deactivated (B block) src.pkh in
-  Assert.is_true ~loc b
-
 let check_rights_aux ~loc ~expect_rights src_name =
   exec_unit @@ fun (block, state) ->
   let src = State.find_account src_name state in
