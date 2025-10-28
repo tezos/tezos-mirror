@@ -2024,6 +2024,22 @@ let test_tezlink_prevalidation =
       client_tezlink
   in
 
+  (* case tz4 *)
+  let* tz4 = Client.gen_and_show_keys ~sig_alg:"bls" client_tezlink in
+  let* op_not_supported =
+    Operation.Manager.(
+      operation
+        [make ~fee:1000 ~source:Constant.bootstrap1 (transfer ~dest:tz4 ())]
+        client)
+  in
+  let unsupported_rex = rex "evm_node.dev.tezlink.bls_is_not_allowed" in
+  let* _ =
+    Operation.inject
+      ~error:unsupported_rex
+      ~dont_wait:true
+      op_not_supported
+      client_tezlink
+  in
   unit
 
 let () =
