@@ -473,10 +473,11 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
             check_finalized_current_block = [];
             previous_metadata = None;
             operation_mode = Bake;
-            (* The grandparent is only used to get the consensus key, so it is
+            (* The (grand)grandparent(s) is only used to get the consensus key, so it is
                fine to set it to Genesis here. If needed in the future, an option
                type would be more appropriate. *)
             grandparent = block;
+            grandgrandparent = block;
           }
       in
       let* () =
