@@ -117,7 +117,7 @@ module Request = struct
   let pp ppf (View r) =
     match r with
     | Flush (hash, _, _, _) ->
-        Format.fprintf ppf "switching to new head %a" Block_hash.pp hash
+        Format.fprintf ppf "switching to new head %a" Block_hash.pp_short hash
     | Notify (id, {Mempool.known_valid; pending}) ->
         Format.fprintf
           ppf

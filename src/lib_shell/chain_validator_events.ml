@@ -34,7 +34,7 @@ let updated_to_checkpoint =
     ~name:"updated_to_checkpoint"
     ~msg:"updated to checkpoint {block_hash} (running in mode {history_mode})"
     ~level:Notice
-    ~pp1:Block_hash.pp
+    ~pp1:Block_hash.pp_short
     ~pp2:History_mode.Legacy.pp
     ("block_hash", Block_hash.encoding)
     ("history_mode", History_mode.Legacy.encoding)
@@ -205,7 +205,7 @@ let block_info =
     ~section
     ~name:"block_info"
     ~msg:"treated block has timestamp {timestamp} with fitness {fitness}"
-    ~level:Info
+    ~level:Debug
     ~pp1:Time.Protocol.pp_hum
     ~pp2:Fitness.pp
     ("timestamp", Time.Protocol.encoding)

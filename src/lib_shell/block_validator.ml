@@ -191,7 +191,15 @@ let with_retry_to_load_protocol (bv : Types.state) ~peer f =
 let validate_block worker ?canceler bv peer chain_db chain_store ~predecessor
     block_header block_hash operations bv_operations =
   let open Lwt_result_syntax in
-  let*! () = Events.(emit validating_block) block_hash in
+  let*! () =
+    let block_header = block_header.Block_header.shell in
+    Events.(emit validating_block)
+      ( block_hash,
+        block_header.level,
+        block_header.predecessor,
+        block_header.fitness,
+        block_header.timestamp )
+  in
   let*! r =
     protect ~canceler:(Worker.canceler worker) (fun () ->
         protect ?canceler (fun () ->

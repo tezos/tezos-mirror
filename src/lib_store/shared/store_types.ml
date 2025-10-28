@@ -137,7 +137,7 @@ let block_descriptor_encoding =
   tup2 Block_hash.encoding int32
 
 let pp_block_descriptor fmt (hash, level) =
-  Format.fprintf fmt "%a (level: %ld)" Block_hash.pp hash level
+  Format.fprintf fmt "%a (level: %ld)" Block_hash.pp_short hash level
 
 (* chain_config *)
 
