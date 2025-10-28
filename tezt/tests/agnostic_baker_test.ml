@@ -63,8 +63,9 @@ let remote_sign client =
 
 (* Performs a protocol migration thanks to a UAU and the agnostic baker. *)
 let perform_protocol_migration ?node_name ?client_name ?parameter_file
-    ?(use_remote_signer = false) ~blocks_per_cycle ~migration_level
-    ~migrate_from ~migrate_to ~baked_blocks_after_migration () =
+    ?(use_remote_signer = false) ?(extra_run_arguments = []) ?on_new_baker_ready
+    ~blocks_per_cycle ~migration_level ~migrate_from ~migrate_to
+    ~baked_blocks_after_migration () =
   assert (migration_level >= blocks_per_cycle) ;
   Log.info "Node starting" ;
   let* client, node =
@@ -83,7 +84,7 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
     wait_for_active_protocol_waiting baker
   in
   Log.info "Starting agnostic baker" ;
-  let* () = Agnostic_baker.run baker in
+  let* () = Agnostic_baker.run ~extra_arguments:extra_run_arguments baker in
   Log.info "Starting agnostic accuser" ;
   let* () = Accuser.run accuser in
 
@@ -106,6 +107,11 @@ let perform_protocol_migration ?node_name ?client_name ?parameter_file
     (Protocol.tag migrate_from) ;
   let* () = wait_for_become_old_baker in
   let* () = wait_for_become_old_accuser in
+  let* () =
+    match on_new_baker_ready with
+    | None -> Lwt.return_unit
+    | Some f -> f ~node ~client ~baker
+  in
   (* Ensure that the block before migration is consistent *)
   Log.info "Checking migration block consistency" ;
   let* () =
@@ -190,6 +196,116 @@ let migrate ~migrate_from ~migrate_to ~use_remote_signer =
         (2 * consensus_rights_delay * blocks_per_cycle)
       ()
   in
+  unit
+
+let reconnect_after_migration ~migrate_from ~migrate_to =
+  let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
+  Test.register
+    ~__FILE__
+    ~title:
+      (Format.asprintf
+         "Protocol migration reconnect from %s to %s"
+         (Protocol.tag migrate_from)
+         (Protocol.tag migrate_to))
+    ~tags:
+      [
+        "protocol";
+        "migration";
+        "agnostic";
+        "baker";
+        "reconnect";
+        Protocol.tag migrate_from;
+        Protocol.tag migrate_to;
+        "flaky";
+      ]
+    ~uses:[Constant.octez_agnostic_baker]
+  @@ fun () ->
+  let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  let consensus_rights_delay =
+    JSON.(get "consensus_rights_delay" parameters |> as_int)
+  in
+  let baked_blocks_after_migration =
+    2 * consensus_rights_delay * blocks_per_cycle
+  in
+  let migration_level = blocks_per_cycle in
+
+  Log.info "Node starting" ;
+  let* client, node =
+    Protocol_migration.user_migratable_node_init ~migration_level ~migrate_to ()
+  in
+  Log.info "Node %s initialized" (Node.name node) ;
+  let baker = Agnostic_baker.create node client in
+
+  let wait_for_active_protocol_waiting =
+    wait_for_active_protocol_waiting baker
+  in
+  let wait_for_ready () = Agnostic_baker.wait_for_ready baker in
+  let wait_for_period_status () =
+    Agnostic_baker.wait_for baker "period_status.v0" (fun _ -> Some ())
+  in
+  let wait_for_become_old_baker = wait_for_become_old_baker baker in
+  let wait_for_stopping_baker = wait_for_stopping_baker baker in
+
+  let timeout message seconds =
+    let* () = Lwt_unix.sleep seconds in
+    Test.fail message
+  in
+
+  Log.info "Starting agnostic baker" ;
+  let* () = Agnostic_baker.run ~extra_arguments:["--keep-alive"] baker in
+  let* () = wait_for_active_protocol_waiting in
+  let* () = wait_for_ready () in
+  let* () =
+    Client.activate_protocol ~protocol:migrate_from client ~timestamp:Client.Now
+  in
+  Log.info "Protocol %s activated" (Protocol.hash migrate_from) ;
+  Log.info "Baking at least %d blocks to trigger migration" migration_level ;
+  let* _level = Node.wait_for_level node migration_level in
+  Log.info
+    "Check that the baking process for %s is not killed"
+    (Protocol.tag migrate_from) ;
+  let* () = wait_for_become_old_baker in
+
+  (* Prepare watchers for the restart before it happens. *)
+  let wait_ready_after_restart = wait_for_ready () in
+  let wait_period_status_after_restart = wait_for_period_status () in
+
+  Log.info "Restarting node to check baker reconnection" ;
+  let* () = Node.terminate node in
+  let* () = Lwt_unix.sleep 1. in
+  let* () = Node.run node [] in
+  let* () = Node.wait_for_ready node in
+  let* () =
+    Lwt.pick
+      [
+        (let* () = wait_ready_after_restart in
+         Log.info "Agnostic baker reported ready after node restart" ;
+         Lwt.return_unit);
+        timeout "Baker did not report ready after node restart" 60.;
+      ]
+  in
+  let* () =
+    Lwt.pick
+      [
+        (let* () = wait_period_status_after_restart in
+         Log.info "Agnostic baker emitted period_status after node restart" ;
+         Lwt.return_unit);
+        timeout "Baker did not emit period_status after node restart" 120.;
+      ]
+  in
+
+  Log.info
+    "Check that baker for protocol %s is killed after %d levels"
+    (Protocol.tag migrate_from)
+    Agnostic_baker.extra_levels_for_old_baker ;
+  let kill_level =
+    migration_level + Agnostic_baker.extra_levels_for_old_baker
+  in
+  let* _level = Node.wait_for_level node kill_level in
+  let* () = wait_for_stopping_baker in
+
+  let* _level = Node.wait_for_level node baked_blocks_after_migration in
+  let* () = Agnostic_baker.terminate baker in
   unit
 
 let test_start_and_stop () =
@@ -336,6 +452,7 @@ let register ~protocols =
 
 let register_migration ~migrate_from ~migrate_to =
   migrate ~migrate_from ~migrate_to ~use_remote_signer:false ;
+  reconnect_after_migration ~migrate_from ~migrate_to ;
   migrate ~migrate_from ~migrate_to ~use_remote_signer:true
 
 let register_protocol_independent () =
