@@ -2074,10 +2074,10 @@ let test_tezlink_prevalidation =
 
   unit
 
-let test_tezlink_validation =
+let test_tezlink_validation_gas_limit =
   register_tezlink_test
-    ~title:"Test Tezlink validation"
-    ~tags:["kernel"; "validation"]
+    ~title:"Test Tezlink validation of block gas limit"
+    ~tags:["kernel"; "validation"; "gas_limit"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
     ~time_between_blocks:Evm_node.Nothing
   @@ fun {sequencer; _} _protocol ->
@@ -2145,6 +2145,58 @@ let test_tezlink_validation =
   in
   unit
 
+let test_tezlink_validation_counter =
+  register_tezlink_test
+    ~title:"Test Tezlink validation of counters"
+    ~tags:["kernel"; "validation"; "counter"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+    ~time_between_blocks:Evm_node.Nothing
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client_tezlink = Client.init ~endpoint () in
+
+  (* make sure there are no transactions in the queue *)
+  let* () = produce_block_and_wait_for ~sequencer 1 in
+  let* () = produce_block_and_wait_for ~sequencer 2 in
+  let* (`OpHash op1) =
+    Operation.inject_transfer
+      ~counter:1
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      client_tezlink
+  in
+  let* (`OpHash op2) =
+    Operation.inject_transfer
+      ~counter:2
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      client_tezlink
+  in
+  let* (`OpHash _) =
+    Operation.inject_transfer
+      ~counter:2
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      client_tezlink
+  in
+  let* (`OpHash op3) =
+    Operation.inject_transfer
+      ~counter:1
+      ~source:Constant.bootstrap2
+      ~dest:Constant.bootstrap1
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () =
+    check_operations ~client:client_tezlink ~block:"3" ~expected:[op1; op2; op3]
+  in
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -2184,6 +2236,7 @@ let () =
   test_tezlink_internal_operation [Alpha] ;
   test_tezlink_internal_receipts [Alpha] ;
   test_tezlink_prevalidation [Alpha] ;
-  test_tezlink_validation [Alpha] ;
+  test_tezlink_validation_gas_limit [Alpha] ;
+  test_tezlink_validation_counter [Alpha] ;
   test_tezlink_origination [Alpha] ;
   test_tezlink_forge_operations [Alpha]
