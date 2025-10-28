@@ -197,7 +197,9 @@ let test_delegate_forbidden =
   init_constants ~blocks_per_cycle:32l ()
   --> (Tag "non tz4" --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
       |+ Tag "tz4"
-         --> begin_test ~algo:Bls ["delegate"; "bootstrap1"; "bootstrap2"])
+         --> begin_test
+               ~default_algo:Bls
+               ["delegate"; "bootstrap1"; "bootstrap2"])
   --> set_baker "bootstrap1"
   --> (Tag "Is not forbidden until first denunciation"
        --> loop 14 (double_bake "delegate")
