@@ -636,7 +636,7 @@ module Proxy = struct
 end
 
 module Mockup = struct
-  type answer = [`Response of string]
+  type answer = [`Response of string | `Stream of string Lwt_stream.t]
 
   type route = {
     path_pattern : Re.Pcre.regexp;
@@ -675,7 +675,13 @@ module Mockup = struct
           | None -> Cohttp_lwt_unix.Server.respond_not_found ()
           | Some (`Response body) ->
               Log.debug "[%s] responding with mock: '%s'" t.name body ;
-              Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ())
+              Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ()
+          | Some (`Stream stream) ->
+              let headers =
+                Cohttp.Header.init_with "content-type" "application/json"
+              in
+              let body = Cohttp_lwt.Body.of_stream stream in
+              Cohttp_lwt_unix.Server.respond ~headers ~status:`OK ~body ())
       | None ->
           Log.warn "[%s] no mock route for: '%s', failing." t.name uri_str ;
           Cohttp_lwt_unix.Server.respond_error
@@ -697,8 +703,47 @@ end
 module Mockup_for_baker = struct
   type t = Mockup.t
 
+  let json_backfill_event ~slot_ids ~no_shards_levels =
+    let open Ezjsonm in
+    let slot_id_to_json (level, index) =
+      dict [("slot_level", int level); ("slot_index", int index)]
+    in
+    value_to_string
+      (dict
+         [
+           ("kind", string "backfill");
+           ( "backfill_payload",
+             dict
+               [
+                 ("slot_ids", list slot_id_to_json slot_ids);
+                 ("no_shards_attestation_levels", list int no_shards_levels);
+               ] );
+         ])
+
+  (* Emit a single [Backfill] line that covers a range of published levels on
+     slot_index=0 so the baker’s cache contains the bit we need for the test's
+     attested_level. *)
+  let monitor_route ~published_levels =
+    let path_pattern =
+      "^/profiles/(tz[1234][A-Za-z0-9]+)/monitor/attestable_slots/?$"
+    in
+    Mockup.route ~path_pattern ~callback:(fun ~path ->
+        let re = Re.Pcre.regexp path_pattern in
+        let _attester =
+          match Re.exec_opt re path with
+          | Some groups -> Re.Group.get groups 1
+          | None -> Test.fail "failed to extract pkh from %s" path
+        in
+        let slot_ids = List.init published_levels (fun i -> (i + 1, 0)) in
+        let body_line =
+          json_backfill_event ~slot_ids ~no_shards_levels:[] ^ "\n"
+        in
+        let stream = Lwt_stream.of_list [body_line] in
+        Lwt.return_some (`Stream stream))
+
   let routes ~attestation_lag ~attesters ~attestable_slots =
     [
+      monitor_route ~published_levels:20;
       (let path_pattern =
          Format.sprintf
            "/profiles/(tz[1234][a-zA-Z0-9]+)/attested_levels/([1-9][0-9]*)/attestable_slots"
@@ -709,7 +754,7 @@ module Mockup_for_baker = struct
            let attester =
              match Re.exec_opt re path with
              | Some groups -> Re.Group.get groups 1
-             | None -> Test.fail "failed to extract attested_level from %s" path
+             | None -> Test.fail "failed to extract pkh from %s" path
            in
            let attested_level =
              match Re.exec_opt re path with

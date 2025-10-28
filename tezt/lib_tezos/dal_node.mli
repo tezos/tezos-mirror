@@ -294,7 +294,7 @@ module Mockup : sig
   type t
 
   (** Represents a possible response from a mocked-up route. *)
-  type answer = [`Response of string]
+  type answer = [`Response of string | `Stream of string Lwt_stream.t]
 
   (** A route definition. *)
   type route
