@@ -72,8 +72,7 @@ let matches tsl test =
       file = test.file;
       title = test.title;
       tags = test.tags;
-      (* The following is only available in an unreleased version of Tezt. *)
-      (* memory = test.peak_memory_usage; *)
-      (* duration = duration_ns test; *)
+      memory = test.peak_memory_usage |> Option.value ~default:0;
+      duration = Int64.to_float (duration_ns test) /. 1_000_000.;
     }
     tsl
