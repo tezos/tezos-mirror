@@ -497,9 +497,10 @@ impl Evaluation {
             from,
             self.to,
             self.value.unwrap_or_default(),
-            gas,
             self.data.clone(),
+            gas,
             gas_price,
+            max_gas_limit,
             // TODO: Replace this by the decoded access lists if any.
             empty_access_list(),
             None,

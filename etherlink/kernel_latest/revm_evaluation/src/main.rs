@@ -18,7 +18,7 @@ use revm::{
 };
 use revm_etherlink::{
     precompiles::provider::EtherlinkPrecompiles, run_transaction,
-    storage::world_state_handler::StorageAccount, ExecutionOutcome,
+    storage::world_state_handler::StorageAccount, ExecutionOutcome, GasData,
 };
 use std::{
     ffi::OsStr,
@@ -406,8 +406,11 @@ pub fn main() {
                         transaction.sender,
                         transaction.to,
                         transaction.data[indexes.data].clone(),
-                        transaction.gas_limit[indexes.gas],
-                        effective_gas_price,
+                        GasData::new(
+                            transaction.gas_limit[indexes.gas],
+                            effective_gas_price,
+                            transaction.gas_limit[indexes.gas],
+                        ),
                         transaction.value[indexes.value],
                         access_lists,
                         transaction.authorization_list.clone(),
