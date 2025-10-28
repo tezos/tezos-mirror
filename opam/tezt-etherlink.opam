@@ -18,6 +18,9 @@ depends: [
   "ppx_deriving" {with-test}
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "bls12-381" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.20" }
+  "octez-alcotezt" {with-test}
+  "octez-l2-libs" {with-test}
   "octez-evm-node-libs" { with-test & = version }
   "tezos-protocol-alpha" {with-test}
 ]

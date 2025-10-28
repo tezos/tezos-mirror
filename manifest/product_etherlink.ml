@@ -437,6 +437,8 @@ let etherlink_tezts =
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
+        (* This executable includes the tests of [lib_wasm_runtime_callbacks]. *)
+        wasm_runtime_callbacks_tests;
         evm_node_lib_dev_encoding;
         Protocol.(main alpha);
       ]
