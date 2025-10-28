@@ -392,19 +392,51 @@ let proxied_subscriptions = WsClientTable.create 4
 let create_proxied_subscription ws_client ~timeout kind =
   let open Lwt_result_syntax in
   let timeout = Websocket_client.{timeout; on_timeout = `Retry_forever} in
-  let* {stream; unsubscribe} =
-    Websocket_client.subscribe ws_client ~timeout kind
-  in
   let watcher = Lwt_watcher.create_input () in
-  Lwt.dont_wait
-    (fun () -> Lwt_stream.iter (Lwt_watcher.notify watcher) stream)
-    ignore ;
+  let upstream_unsubscribe = ref (fun () -> return_false) in
   let unsubscribe () =
     WsClientTable.remove proxied_subscriptions (ws_client, kind) ;
-    unsubscribe ()
+    !upstream_unsubscribe ()
   in
   let proxied = {watcher; unsubscribe; subscribers = 0} in
   WsClientTable.replace proxied_subscriptions (ws_client, kind) proxied ;
+  let upstream_subscribe () =
+    let rec resubscribe () =
+      let open Lwt_syntax in
+      if proxied.subscribers <= 0 then
+        (* no more subscribers *)
+        return_unit
+      else
+        (* Resubscribing after small delay *)
+        let* () = Lwt_unix.sleep 1. in
+        let* sub = Websocket_client.subscribe ws_client ~timeout kind in
+        upstream_subscribe_loop sub
+    and upstream_subscribe_loop =
+      let open Lwt_syntax in
+      function
+      | Error e ->
+          (* Notify error and attempt resubscription *)
+          Lwt_watcher.notify watcher (Error e) ;
+          resubscribe ()
+      | Ok Websocket_client.{stream; unsubscribe} ->
+          (* Subscription success, register new unsubscribe *)
+          (* TODO: maybe add missing elements in the stream while
+             disconnected. *)
+          upstream_unsubscribe := unsubscribe ;
+          Lwt.dont_wait
+            (fun () ->
+              let* () = Lwt_stream.iter (Lwt_watcher.notify watcher) stream in
+              (* Upstream subscription stream stopped, resubscribe if there are
+                  any subscribers left. *)
+              resubscribe ())
+            ignore ;
+          return_unit
+    in
+    let* sub = Websocket_client.subscribe ws_client ~timeout kind in
+    let*! () = upstream_subscribe_loop (Ok sub) in
+    return_unit
+  in
+  let* () = upstream_subscribe () in
   return proxied
 
 let get_proxied_subscription ws_client ~timeout
