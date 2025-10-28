@@ -191,6 +191,7 @@ type batch_validation_context = {
   length : int;
   fee : Tez.t;
   gas_limit : Z.t;
+  signature_check_cost : Gas.cost;
 }
 
 let is_tz4 pkh =
@@ -312,9 +313,14 @@ let validate_gas_limit ~ctxt overall_gas_limit gas_limit operation =
         && overall_gas_limit >= Z.zero)
   then tzfail_p @@ Imported_protocol.Gas_limit_repr.Gas_limit_too_high
   else
-    (* TODO: add signature cost for first operation *)
     let fixed_cost =
-      Imported_protocol.Michelson_v1_gas.Cost_of.manager_operation
+      if ctxt.length = 0 then
+        (* The gas cost of signature verification is included in the first
+           operation cost *)
+        Gas.(
+          Imported_protocol.Michelson_v1_gas.Cost_of.manager_operation
+          +@ ctxt.signature_check_cost)
+      else Imported_protocol.Michelson_v1_gas.Cost_of.manager_operation
     in
     let*? remaining_gas =
       Imported_env.wrap_tzresult
@@ -335,7 +341,6 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       let** () = validate_supported_operation ~ctxt operation in
       let** () = validate_source ~ctxt source in
       let** () = validate_counter ~ctxt counter in
-      (* TODO check gas limit high enough *)
       let overall_gas_limit =
         Z.(ctxt.gas_limit + Tezos_types.Operation.gas_limit_to_z gas_limit)
       in
@@ -437,6 +442,14 @@ let validate_signature ~check_signature shell contents pk signature =
     then return (Ok ())
     else tzfail_p @@ Imported_protocol.Operation_repr.Invalid_signature
 
+(** [signature_cost pk op] unpacks [op] then returns the gas cost of the
+    signature check.*)
+let signature_cost pk {shell; protocol_data = Operation_data protocol_data} =
+  Imported_protocol.Operation_costs.check_signature_cost
+    (Imported_protocol.Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key
+       pk)
+    {shell; protocol_data}
+
 let validate_tezlink_operation ?(check_signature = true) ~read raw =
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
@@ -458,6 +471,7 @@ let validate_tezlink_operation ?(check_signature = true) ~read raw =
   let** pk, source, first_counter =
     validate_manager_info ~read ~error_clue first
   in
+  let signature_check_cost = signature_cost pk op in
   let* balance_left =
     Tezlink_durable_storage.balance read
     @@ Tezos_types.Contract.of_implicit source
@@ -476,6 +490,7 @@ let validate_tezlink_operation ?(check_signature = true) ~read raw =
           length = 0;
           fee = Tez.zero;
           gas_limit = Z.zero;
+          signature_check_cost;
         }
       (first :: rest)
   in
