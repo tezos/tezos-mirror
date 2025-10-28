@@ -8,6 +8,8 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::path::{concat, OwnedPath, Path};
 use tezos_storage::{read_optional_rlp, read_rlp, store_rlp};
 
+use crate::migration::allow_path_not_found;
+
 /// Doubly linked list using the durable storage.
 ///
 /// The list is generic over element and index.
@@ -206,12 +208,12 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>, Elt: Encodable + Decodable>
         host: &mut impl Runtime,
         prefix: &impl Path,
     ) -> Result<()> {
-        let path = hex::encode(&self.id);
-        let path: Vec<u8> = format!("/{path}").into();
-        let path = OwnedPath::try_from(path)?;
-        let path = concat(prefix, &path)?;
-        host.store_delete(&path)
-            .context("cannot remove the pointer")
+        let pointer_path = self.path(prefix)?;
+        let data_path = self.data_path(prefix)?;
+        host.store_delete(&pointer_path)
+            .context("cannot remove the pointer")?;
+        host.store_delete(&data_path)
+            .context("cannot remove the pointer's data")
     }
 }
 
@@ -493,9 +495,9 @@ where
 
     /// Deletes the entire list
     pub fn delete(&mut self, host: &mut impl Runtime) -> Result<()> {
-        if host.store_has(&self.path)?.is_some() {
-            host.store_delete(&self.path)?;
-        };
+        let metadata_path = Self::metadata_path(&self.path)?;
+        allow_path_not_found(host.store_delete(&metadata_path))?;
+        while self.pop_first(host)?.is_some() {}
         self.pointers = None;
         Ok(())
     }
@@ -509,7 +511,6 @@ mod tests {
     use rlp::{Decodable, DecoderError, Encodable};
     use std::collections::HashMap;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_smart_rollup_debug::Runtime;
     use tezos_smart_rollup_host::path::RefPath;
 
     #[derive(Clone, PartialEq, Debug)]
@@ -598,15 +599,6 @@ mod tests {
         list: &LinkedList<Hash, u8>,
         expected_len: u64,
     ) {
-        // Both the linked list pointers and the element pointers lies under
-        // the `list.path`.
-        let keys = host.store_count_subkeys(&list.path).unwrap_or(0u64);
-        // Removes the linked list pointers to compute the actual length.
-        let actual_length = keys.saturating_sub(1u64);
-        assert_eq!(
-            expected_len, actual_length,
-            "Unexpected length for the list"
-        );
         let traverse_length = traverse(host, list);
         assert_eq!(
             expected_len, traverse_length as u64,
