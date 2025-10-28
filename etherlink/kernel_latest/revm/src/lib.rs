@@ -455,12 +455,7 @@ mod test {
 
         use crate::test::GAS_LIMIT;
 
-        // The default SpecId is set to Prague.
-        // It isn't modular like it was in the previous evm execution.
-        // This value was normally retrived from the old execution storage. Once we fully
-        // make the switch to REVM this part will become modular again.
-        // For now we keep it at Prague which is the latest EVM version Etherlink supports.
-        pub(crate) const DEFAULT_SPEC_ID: SpecId = SpecId::PRAGUE;
+        pub(crate) const DEFAULT_SPEC_ID: SpecId = SpecId::OSAKA;
         const ETHERLINK_CHAIN_ID: u64 = 42793;
 
         pub(crate) fn block_constants_with_fees() -> BlockConstants {
