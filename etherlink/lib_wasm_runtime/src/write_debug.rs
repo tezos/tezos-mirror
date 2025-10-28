@@ -6,7 +6,10 @@
 
 use log::{debug, error, info, warn};
 
-use crate::bindings::{end_span, span_add_attrs, start_span};
+use crate::{
+    bindings::{end_span, span_add_attrs, start_span},
+    types::OTelAttrValue,
+};
 
 const INFO_TAG: &'static str = "[Info] ";
 const DEBUG_TAG: &'static str = "[Debug] ";
@@ -20,7 +23,25 @@ fn trim_log<'a, 'b>(tag: &'a str, msg: &'b str) -> &'b str {
     msg[tag.len()..].trim()
 }
 
-fn parse_attrs(log: &str) -> Vec<(String, String)> {
+fn raw_value_to_otel_attribute(type_tag: &str, val_str: &str) -> OTelAttrValue {
+    match type_tag {
+        "bool" => match val_str.parse::<bool>() {
+            Ok(b) => OTelAttrValue::Bool(b),
+            Err(_) => OTelAttrValue::String(val_str.to_string()),
+        },
+        "int" => match val_str.parse::<i32>() {
+            Ok(i) => OTelAttrValue::Int(i),
+            Err(_) => OTelAttrValue::String(val_str.to_string()),
+        },
+        "float" => match val_str.parse::<f64>() {
+            Ok(f) => OTelAttrValue::Float(f),
+            Err(_) => OTelAttrValue::String(val_str.to_string()),
+        },
+        "string" | _ => OTelAttrValue::String(val_str.to_string()),
+    }
+}
+
+fn parse_attrs(log: &str) -> Vec<(String, OTelAttrValue)> {
     let trimmed = trim_log(OTEL_ATTRS_TAG, log);
     let mut attrs = Vec::new();
 
@@ -32,7 +53,16 @@ fn parse_attrs(log: &str) -> Vec<(String, String)> {
 
     let mut iter = parts.chunks_exact(2);
     for chunk in iter.by_ref() {
-        attrs.push((chunk[0].to_string(), chunk[1].to_string()));
+        let key = chunk[0].to_string();
+        let raw_value = chunk[1];
+
+        let mut split = raw_value.splitn(2, ':');
+        let type_tag = split.next().unwrap_or("string").to_lowercase();
+        let val_str = split.next().unwrap_or("");
+
+        let value = raw_value_to_otel_attribute(type_tag.as_str(), val_str);
+
+        attrs.push((key, value));
     }
 
     attrs

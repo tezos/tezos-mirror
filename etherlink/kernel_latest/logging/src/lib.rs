@@ -80,15 +80,38 @@ macro_rules! __trace_kernel {
     }};
 }
 
+pub enum OTelAttrValue {
+    Bool(bool),
+    Int(i32),
+    // Floats are forbidden in the kernel, we use a string representation instead.
+    // It's not statically typed so the values must be actual rust floats inside
+    // the string otherwise they will be interpreted as strings and not floats.
+    // Note that nothing will panic or crash, in the worst case the value will not
+    // be interpreted with the proper type.
+    Float(String),
+    String(String),
+}
+
 #[cfg(all(feature = "tracing", feature = "alloc"))]
 #[macro_export]
 macro_rules! __trace_kernel_add_attrs {
     ($host:expr, $attrs:expr) => {{
+        use $crate::OTelAttrValue;
+
         let attrs_str = $attrs
             .iter()
-            .map(|(k, v)| format!("{}®{}®", k, v))
+            .map(|(k, v)| {
+                let value_str = match v {
+                    OTelAttrValue::Bool(b) => format!("bool:{}", b),
+                    OTelAttrValue::Int(i) => format!("int:{}", i),
+                    OTelAttrValue::Float(f) => format!("float:{}", f),
+                    OTelAttrValue::String(s) => format!("string:{}", s),
+                };
+                format!("{}®{}®", k, value_str)
+            })
             .collect::<Vec<_>>()
             .join(" ");
+
         let msg = format!("[{}] [attrs] {}", tezos_evm_logging::Level::OTel, attrs_str);
         $crate::debug_str!($host, &msg);
     }};

@@ -7,7 +7,7 @@
 use log::trace;
 
 use crate::types::{
-    ContextHash, EvmTree, OCamlBytes, OCamlString, OCamlStringPairList, OpenTelemetryScope,
+    ContextHash, EvmTree, OCamlBytes, OCamlPairList, OCamlString, OTelAttrValue, OpenTelemetryScope,
 };
 use std::{
     error::Error,
@@ -388,9 +388,9 @@ pub fn start_span(span_name: &str) -> Result<(), BindingsError> {
     Ok(())
 }
 
-pub fn span_add_attrs(attrs: Vec<(String, String)>) -> Result<(), BindingsError> {
+pub fn span_add_attrs(attrs: Vec<(String, OTelAttrValue)>) -> Result<(), BindingsError> {
     unsafe {
-        let ocaml_value_attrs = OCamlStringPairList::new(attrs).to_value(&gc());
+        let ocaml_value_attrs = OCamlPairList::new(attrs).to_value(&gc());
         ocaml_imports::span_add_attrs(&gc(), ocaml_value_attrs)
             .map_err(BindingsError::OCamlError)?
     };

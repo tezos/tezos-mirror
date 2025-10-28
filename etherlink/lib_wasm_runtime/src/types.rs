@@ -121,10 +121,17 @@ unsafe impl FromValue for OpenTelemetryScope {
     }
 }
 
-pub struct OCamlStringPairList(Vec<(String, String)>);
+pub enum OTelAttrValue {
+    Bool(bool),
+    Int(i32),
+    Float(f64),
+    String(String),
+}
 
-impl OCamlStringPairList {
-    pub fn new(str_pair_list: Vec<(String, String)>) -> Self {
+pub struct OCamlPairList(Vec<(String, OTelAttrValue)>);
+
+impl OCamlPairList {
+    pub fn new(str_pair_list: Vec<(String, OTelAttrValue)>) -> Self {
         Self(str_pair_list)
     }
 
@@ -134,7 +141,18 @@ impl OCamlStringPairList {
 
             for (key, value) in self.0.iter() {
                 let key = Value::string(key);
-                let value = Value::string(value);
+                let value = match value {
+                    OTelAttrValue::Bool(b) => {
+                        Value::hash_variant(gc, "Bool", Some(Value::bool(*b)))
+                    }
+                    OTelAttrValue::Int(i) => Value::hash_variant(gc, "Int", Some(Value::int32(*i))),
+                    OTelAttrValue::Float(f) => {
+                        Value::hash_variant(gc, "Float", Some(Value::double(*f)))
+                    }
+                    OTelAttrValue::String(s) => {
+                        Value::hash_variant(gc, "String", Some(Value::string(s)))
+                    }
+                };
 
                 let mut tuple = Value::alloc_tuple(2);
                 tuple.store_field(gc, 0, key);
