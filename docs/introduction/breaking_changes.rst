@@ -216,3 +216,21 @@ For features deprecated or broken in older Octez versions and protocols, see :do
    :hidden:
 
    deprecated
+
+Upcoming changes
+================
+
+.. warning::
+
+   Changes described in this section concern code that has been merged into the master branch but **has not been released yet**!
+   They are meant as a heads-up for developers wanting to known in advance how future releases and protocols may impact developers and users.
+
+Upcoming release
+----------------
+
+N/A
+
+Development protocol Alpha
+--------------------------
+
+N/A
