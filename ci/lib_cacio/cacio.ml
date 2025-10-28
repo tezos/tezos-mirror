@@ -38,12 +38,10 @@ type sccache_config = {
   error_log : string option;
   idle_timeout : string option;
   log : string option;
-  path : string option;
-  cache_size : string option;
 }
 
-let sccache ?key ?error_log ?idle_timeout ?log ?path ?cache_size () =
-  {key; error_log; idle_timeout; log; path; cache_size}
+let sccache ?key ?error_log ?idle_timeout ?log () =
+  {key; error_log; idle_timeout; log}
 
 type dune_cache_config = {
   key : string option;
@@ -466,14 +464,12 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
               let maybe_enable_sccache job =
                 match sccache with
                 | None -> job
-                | Some {key; error_log; idle_timeout; log; path; cache_size} ->
+                | Some {key; error_log; idle_timeout; log} ->
                     Tezos_ci.Cache.enable_sccache
                       ?key
                       ?error_log
                       ?idle_timeout
                       ?log
-                      ?path
-                      ?cache_size
                       job
               in
               let maybe_enable_dune_cache job =

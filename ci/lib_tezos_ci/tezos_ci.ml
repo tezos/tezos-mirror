@@ -1444,20 +1444,16 @@ module Cache = struct
     |> append_after_script
          ["eval $(opam env)"; "dune cache trim --size=" ^ cache_size]
 
-  let enable_sccache ?key ?error_log ?idle_timeout ?log
-      ?(path = "$CI_PROJECT_DIR/_sccache") ?(cache_size = "5G") job =
+  let enable_sccache ?key ?error_log ?idle_timeout ?log job =
     let _key =
       Option.value
         ~default:("sccache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
         key
     in
-    let _path = path in
-    let _cache_size = cache_size in
     job
     |> append_variables
          ([
             (* force incremental build in cargo
-
               see https://github.com/mozilla/sccache?tab=readme-ov-file#known-caveats *)
             ("CARGO_INCREMENTAL", "0");
             (* we use GCP backend in r/w mode *)

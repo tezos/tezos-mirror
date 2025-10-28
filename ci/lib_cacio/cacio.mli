@@ -57,8 +57,6 @@ val sccache :
   ?error_log:string ->
   ?idle_timeout:string ->
   ?log:string ->
-  ?path:string ->
-  ?cache_size:string ->
   unit ->
   sccache_config
 

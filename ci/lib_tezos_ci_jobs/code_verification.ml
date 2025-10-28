@@ -196,7 +196,6 @@ module Opam = struct
       ~key:"opam-sccache"
       ~error_log:"$CI_PROJECT_DIR/opam_logs/sccache.log"
       ~idle_timeout:"0"
-      ~path:"$CI_PROJECT_DIR/_build/_sccache"
     |> enable_cargo_cache
 
   let jobs_opam_packages ?dependencies pipeline_type : tezos_job list =
@@ -375,7 +374,6 @@ let job_build_x86_64_release =
     ~storage:Ramfs
     ~dependencies:(dependencies_needs_start pipeline_type)
     ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
-    ~sccache_size:"2G"
     ()
 
 (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
@@ -709,8 +707,7 @@ let jobs pipeline_type =
           "eval $(opam env)";
           "make octez";
         ]
-      |> enable_cargo_cache
-      |> enable_sccache ~cache_size:"2G"
+      |> enable_cargo_cache |> enable_sccache
     in
     [
       job_build_arm64_release;
