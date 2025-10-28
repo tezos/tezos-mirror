@@ -558,6 +558,7 @@ type proxy_info =
       dns_domain : string;
       external_port : int;
       internal_info : proxy_internal_info;
+      activate_ssl : bool;
     }
 
 let proxy_internal_info = function
@@ -571,9 +572,9 @@ let proxy_internal_endpoint proxy_info =
   let {path; port} = proxy_internal_info proxy_info in
   Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme ~port ())
 
-let proxy_external_endpoint ~runner ~dns_domain ~activate_ssl = function
+let proxy_external_endpoint ~runner ~dns_domain = function
   | No_proxy {port; path} -> build_endpoint ?path ~runner ~dns_domain port
-  | Proxy {dns_domain; external_port; internal_info = _} ->
+  | Proxy {dns_domain; external_port; activate_ssl; internal_info = _} ->
       let scheme = if activate_ssl then "https" else "http" in
       Client.Foreign_endpoint
         (Endpoint.make ~host:dns_domain ~scheme ~port:external_port ())
@@ -581,7 +582,7 @@ let proxy_external_endpoint ~runner ~dns_domain ~activate_ssl = function
 let nginx_reverse_proxy_config ~(ssl : Ssl.t option) ~proxy =
   match proxy with
   | No_proxy _ -> None
-  | Proxy {dns_domain; external_port; internal_info = _} -> (
+  | Proxy {dns_domain; external_port; activate_ssl = _; internal_info = _} -> (
       let internal_endpoint = proxy_internal_endpoint proxy in
       let proxy_pass =
         (* The trailing / is mandatory, otherwise the reverse proxy
@@ -655,6 +656,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                  command line."
             else Some dns_domain
       in
+      let activate_ssl = Cli.activate_ssl in
       let sequencer_proxy_info =
         let path = Some "/tezlink" in
         match dns_domain with
@@ -669,6 +671,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 internal_info = {port = internal_port; path};
                 external_port;
                 dns_domain;
+                activate_ssl;
               }
       in
       (* The proxy endpoint is the https endpoint we want to provide
@@ -677,11 +680,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         proxy_internal_endpoint sequencer_proxy_info
       in
       let tezlink_proxy_endpoint =
-        proxy_external_endpoint
-          ~runner
-          ~dns_domain
-          ~activate_ssl:Cli.activate_ssl
-          sequencer_proxy_info
+        proxy_external_endpoint ~runner ~dns_domain sequencer_proxy_info
       in
       let* () =
         add_service
@@ -724,14 +723,11 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                     internal_info = {port = internal_port; path};
                     dns_domain;
                     external_port;
+                    activate_ssl;
                   }
           in
           let external_tzkt_api_endpoint =
-            proxy_external_endpoint
-              ~runner
-              ~dns_domain
-              ~activate_ssl:Cli.activate_ssl
-              tzkt_proxy
+            proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
           in
           let* () =
             add_service
@@ -784,11 +780,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~time_between_blocks:Cli.time_between_blocks
             and* () =
               let external_tzkt_api_endpoint =
-                proxy_external_endpoint
-                  ~runner
-                  ~dns_domain
-                  ~activate_ssl:Cli.activate_ssl
-                  tzkt_proxy
+                proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
               in
               init_umami
                 tezlink_sequencer_agent
@@ -824,11 +816,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                     ~url:(sf "%s/info" (Client.string_of_endpoint faucet_api))
                 in
                 let external_tzkt_api_endpoint =
-                  proxy_external_endpoint
-                    ~runner
-                    ~dns_domain
-                    ~activate_ssl:Cli.activate_ssl
-                    tzkt_proxy
+                  proxy_external_endpoint ~runner ~dns_domain tzkt_proxy
                 in
                 let* faucet_frontend =
                   init_faucet_frontend
