@@ -137,7 +137,12 @@ module Slot_id_cache =
 
 let download_confirmed_slot_pages =
   let open Lwt_result_syntax in
-  let cache = Slot_id_cache.create 32 in
+  (* The size below was chosen arbitrarily, but it should be sufficient for
+     Etherlink, given that slots are pulled and processed in some order and only
+     once. In general a kernel may request data it previously processed during
+     normal operation (i.e., not for refutation games). This size can then be
+     adapted as needed. *)
+  let cache = Slot_id_cache.create 16 in
   fun dal_cctxt ~published_level ~index ->
     let slot_id =
       Slot_id.
@@ -153,7 +158,12 @@ let download_confirmed_slot_pages =
 (* Adaptive DAL is not supported anymore *)
 let get_slot_header_attestation_info =
   let open Lwt_result_syntax in
-  let cache = Slot_id_cache.create 160 in
+  (* The size was chosen arbitrarily, but it should be sufficient for Etherlink,
+     given that slots statuses are pulled and processed in some order and only
+     once. In general a kernel may request data it previously processed during
+     normal operation (i.e., not for refutation games). This size can then be
+     adapted as needed. *)
+  let cache = Slot_id_cache.create 16 in
   fun dal_cctxt ~published_level ~index ->
     let slot_id =
       Slot_id.
