@@ -277,11 +277,50 @@ let hard_gas_limit_per_operation =
   Tezos_types.Operation.gas_limit_to_z
     Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
 
-let validate_gas_limit gas_limit =
+let consume_decoding_gas gas_limit expr =
+  let open Result_syntax in
+  match Script.consume_decoding_gas gas_limit expr with
+  | Ok r -> return r
+  | Error _ ->
+      tzfail
+      @@ Imported_env.wrap_tzerror
+           Imported_protocol.Validate_errors.Manager
+           .Gas_quota_exceeded_init_deserialize
+
+let validate_variable_gas_cost ~ctxt remaining_gas (Manager operation) =
+  let open Result_syntax in
+  match operation with
+  | Transaction {parameters; _} ->
+      let* _ = consume_decoding_gas remaining_gas parameters in
+      return_unit
+  | Origination {script; _} ->
+      let* remaining_gas = consume_decoding_gas remaining_gas script.code in
+      let* _ = consume_decoding_gas remaining_gas script.storage in
+      return_unit
+  | Reveal _ ->
+      (* only checking a Bls proof has a cost here, and we don't do Bls *)
+      return_unit
+  | _ -> tzfail @@ Unsupported_manager_operation ctxt.error_clue
+
+let validate_gas_limit ~ctxt overall_gas_limit gas_limit operation =
   let open Lwt_result_syntax in
-  if Z.Compare.(hard_gas_limit_per_operation > gas_limit && gas_limit >= Z.zero)
-  then return (Ok ())
-  else tzfail_p @@ Imported_protocol.Gas_limit_repr.Gas_limit_too_high
+  if
+    not
+      Z.Compare.(
+        hard_gas_limit_per_operation >= overall_gas_limit
+        && overall_gas_limit >= Z.zero)
+  then tzfail_p @@ Imported_protocol.Gas_limit_repr.Gas_limit_too_high
+  else
+    (* TODO: add signature cost for first operation *)
+    let fixed_cost =
+      Imported_protocol.Michelson_v1_gas.Cost_of.manager_operation
+    in
+    let*? remaining_gas =
+      Imported_env.wrap_tzresult
+      @@ Gas.consume_from (Gas.Arith.fp gas_limit) fixed_cost
+    in
+    let*? () = validate_variable_gas_cost ~ctxt remaining_gas operation in
+    return (Ok ())
 
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
@@ -299,7 +338,9 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       let overall_gas_limit =
         Z.(ctxt.gas_limit + Tezos_types.Operation.gas_limit_to_z gas_limit)
       in
-      let** () = validate_gas_limit overall_gas_limit in
+      let** () =
+        validate_gas_limit ~ctxt overall_gas_limit gas_limit (Manager operation)
+      in
       (* TODO check storage limit too *)
       let** ctxt = validate_balance ~ctxt ~fee in
       (* the update will be updated during the validation steps *)
