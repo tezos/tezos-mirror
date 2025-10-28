@@ -148,3 +148,6 @@
 
 ./octez-client rpc get /chains/main/blocks/head/helpers/tz4_baker_number_ratio
 "0.00%"
+
+./octez-client rpc get /chains/main/blocks/head/helpers/all_bakers_attest_activation_level
+null

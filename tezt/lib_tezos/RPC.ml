@@ -2043,6 +2043,19 @@ let get_tz4_baker_number_ratio ?(chain = "main") ?(block = "head") ?cycle () =
     ["chains"; chain; "blocks"; block; "helpers"; "tz4_baker_number_ratio"]
     Fun.id
 
+let get_abaab_activation_level ?(chain = "main") ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "helpers";
+      "all_bakers_attest_activation_level";
+    ]
+    Fun.id
+
 let get_chain_block_context_destination_index ?(chain = "main")
     ?(block = "head") destination =
   make
