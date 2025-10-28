@@ -95,6 +95,11 @@ RPC Changes
   Rollup addresses, etc.), or ``null`` if the destination has not been
   indexed by the opcode ``INDEX_ADDRESS`` yet. (MR :gl:`!18944`)
 
+- Added a new RPC ``GET
+  /chains/<chain_id>/blocks/<block_id>/helpers/all_bakers_attest_activation_level``.
+  It returns the first level at which the All Bakers Attest feature activates. If this
+  level is not yet set, it returns ``null`` instead. (MR :gl:`!19757`)
+
 
 Blocks and block receipts
 -------------------------
