@@ -145,8 +145,10 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
     ?(force_attest_all = false) ?(force_preattest_all = false)
     ?(check_finalized_every_block = []) ?(disable_default_checks = false)
     ?(rng_state = Random.State.make_self_init ())
-    (default_bootstrap_name_list : string list) : (constants, t) scenarios =
-  exec (fun (constants : constants) ->
+    ?(abaab_activation_levels = []) (default_bootstrap_name_list : string list)
+    : (constants, t) scenarios =
+  let f abaab_activation_level =
+    let g constants =
       let open Lwt_result_syntax in
       let make_bootstrap_full (bootstrap_info : bootstrap_info) :
           bootstrap_full_info =
@@ -277,10 +279,31 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
           ctxt
           bootstrap_accounts_list
       in
-      (* Genesis *)
-      let* block =
-        Block.genesis_with_parameters ~prepare_context:set_companion parameters
+      (* abaab activation level overwrite *)
+      let abaab_activation_level_overwrite =
+        match abaab_activation_level with
+        | None -> return
+        | Some level ->
+            fun ctxt ->
+              let level =
+                Protocol.Raw_level_repr.of_int32_exn (Int32.of_int level)
+              in
+              let cycle_eras = Protocol.Raw_context.cycle_eras ctxt in
+              let level =
+                Protocol.Level_repr.level_from_raw ~cycle_eras level
+              in
+              let*! ctxt =
+                Protocol.Storage.All_bakers_attest_activation.add ctxt level
+              in
+              return ctxt
       in
+      (* Genesis *)
+      let prepare_context ctxt =
+        let* ctxt = set_companion ctxt in
+        let* ctxt = abaab_activation_level_overwrite ctxt in
+        return ctxt
+      in
+      let* block = Block.genesis_with_parameters ~prepare_context parameters in
       let*? init_level = Context.get_level (B block) in
       (* init state *)
       let account_map =
@@ -375,4 +398,16 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
         if not disable_default_checks then check_all_balances () (block, state)
         else return_unit
       in
-      return (block, state))
+      return (block, state)
+    in
+    exec g
+  in
+  match abaab_activation_levels with
+  | [] -> f None
+  | _ :: _ ->
+      fold_tag_f
+        f
+        (function
+          | None -> "abaab initially off"
+          | Some level -> Format.asprintf "abaab activation at level %d" level)
+        abaab_activation_levels
