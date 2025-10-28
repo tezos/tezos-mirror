@@ -26,9 +26,9 @@ fi
 CARGO_CACHE_DIR=$CI_PROJECT_DIR/.cargo/registry/cache
 DUNE_CACHE_ROOT=$CI_PROJECT_DIR/_dune_cache
 SCCACHE_DIR=$CI_PROJECT_DIR/_sccache
-RUST_DEPS_TARGET_DIR=$CI_PROJECT_DIR/_target/rust_deps
-RUSTZCASH_DEPS_TARGET_DIR=$CI_PROJECT_DIR/_target/rustzcash_deps
-ETHERLINK_WASM_RUNTIME_TARGET_DIR=$CI_PROJECT_DIR/_target/etherlink_wasm_runtime
+RUST_DEPS_TARGET_DIR=$CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
+RUSTZCASH_DEPS_TARGET_DIR=$CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
+ETHERLINK_WASM_RUNTIME_TARGET_DIR=$CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
 
 CACHE_MEASURES=""
 

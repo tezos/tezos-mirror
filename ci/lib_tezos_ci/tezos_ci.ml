@@ -1488,7 +1488,7 @@ module Cache = struct
           ("rust-targets-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
         key
     in
-    let cache_dir = "$CI_PROJECT_DIR" // "_target" in
+    let cache_dir = "$CI_PROJECT_DIR/.cargo_targets" // "_target" in
     job
     |> append_variables
          [
