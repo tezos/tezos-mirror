@@ -2275,4 +2275,77 @@ mod test {
             assert_eq!(withdrawal_counter, U256::ZERO);
         }
     }
+
+    #[test]
+    fn test_osaka_clz_is_enabled() {
+        let mut host = MockKernelHost::default();
+        let precompiles = EtherlinkPrecompiles::new();
+        let block_constants = block_constants_with_fees();
+
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let contract =
+            Address::from_hex("2222222222222222222222222222222222222222").unwrap();
+
+        let value_sent = U256::from(5);
+
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
+
+        caller_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
+
+        let mut contract_account = StorageAccount::from_address(&contract).unwrap();
+
+        // PUSH32 0x000...001  # value to count leading zeros
+        // CLZ                 # count leading zeros
+        let raw_bytecode = Bytes::from_hex(
+            "7f00000000000000000000000000000000000000000000000000000000000000001e",
+        )
+        .unwrap();
+
+        let bytecode = Bytecode::new_raw(raw_bytecode);
+        let contract_info = AccountInfo {
+            balance: U256::ZERO,
+            nonce: 0,
+            code_hash: bytes_hash(bytecode.original_byte_slice()),
+            code: Some(bytecode),
+        };
+
+        contract_account.set_info(&mut host, contract_info).unwrap();
+
+        let execution_result = run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            None,
+            precompiles,
+            caller,
+            Some(contract),
+            Bytes::new(),
+            GasData::new(GAS_LIMIT, 1, GAS_LIMIT),
+            value_sent,
+            AccessList(vec![]),
+            None,
+            None,
+            false,
+        )
+        .unwrap();
+
+        match execution_result.result {
+            ExecutionResult::Success { gas_used, .. } => {
+                assert!(gas_used > 0);
+            }
+            ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
+                panic!("Simple transfer should have succeeded")
+            }
+        }
+    }
 }
