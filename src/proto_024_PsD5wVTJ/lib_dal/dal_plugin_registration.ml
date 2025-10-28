@@ -415,13 +415,16 @@ module Plugin = struct
                 commitment;
               }
 
-    let proto_attestation_status cell =
-      Option.some
-      @@
-      match Dal.Slots_history.(content cell) with
-      | Dal.Slots_history.Unpublished _ -> `Unpublished
-      | Published {is_proto_attested; _} ->
-          if is_proto_attested then `Attested else `Unattested
+    let proto_attestation_status =
+      let legacy_attestation_lag = 8 in
+      fun cell ->
+        Option.some
+        @@
+        match Dal.Slots_history.(content cell) with
+        | Dal.Slots_history.Unpublished _ -> `Unpublished
+        | Published {is_proto_attested; _} ->
+            if is_proto_attested then `Attested legacy_attestation_lag
+            else `Unattested
   end
 
   module RPC = struct

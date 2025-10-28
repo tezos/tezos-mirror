@@ -467,8 +467,9 @@ module Plugin = struct
       @@
       match Dal.Slots_history.(content cell) with
       | Dal.Slots_history.Unpublished _ -> `Unpublished
-      | Published {is_proto_attested; _} ->
-          if is_proto_attested then `Attested else `Unattested
+      | Published {is_proto_attested; attestation_lag; _} ->
+          let lag = Dal.Slots_history.attestation_lag_value attestation_lag in
+          if is_proto_attested then `Attested lag else `Unattested
   end
 
   module RPC = struct

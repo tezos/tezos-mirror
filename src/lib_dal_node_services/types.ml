@@ -348,7 +348,10 @@ type slot_set = {slots : bool list; published_level : int32}
 type attestable_slots = Attestable_slots of slot_set | Not_in_committee
 
 type header_status =
-  [`Waiting_attestation | `Attested | `Unattested | `Unpublished]
+  [ `Waiting_attestation
+  | `Attested of attestation_lag
+  | `Unattested
+  | `Unpublished ]
 
 type shard_index = int
 
@@ -424,9 +427,8 @@ let attestable_slots_encoding : attestable_slots Data_encoding.t =
         (function () -> Not_in_committee);
     ]
 
-(* Note: this encoding is used to store statuses on disk using the
-   [Key_value_store] module. As such, it's important that this is a
-   fixed-size encoding. *)
+let legacy_attestation_lag = 8
+
 let header_status_encoding : header_status Data_encoding.t =
   let open Data_encoding in
   union
@@ -441,8 +443,8 @@ let header_status_encoding : header_status Data_encoding.t =
         ~title:"attested"
         (Tag 1)
         (constant "attested")
-        (function `Attested -> Some () | _ -> None)
-        (function () -> `Attested);
+        (function _ -> None (* Don't encode with this case anymore *))
+        (function () -> `Attested legacy_attestation_lag);
       case
         ~title:"unattested"
         (Tag 2)
@@ -455,11 +457,18 @@ let header_status_encoding : header_status Data_encoding.t =
         (constant "unpublished")
         (function `Unpublished -> Some () | _ -> None)
         (function () -> `Unpublished);
+      case
+        ~title:"attested_with_lag"
+        (Tag 4)
+        (obj2 (req "kind" (constant "attested")) (req "attestation_lag" uint8))
+        (function
+          | `Attested attestation_lag -> Some ((), attestation_lag) | _ -> None)
+        (function (), attestation_lag -> `Attested attestation_lag);
     ]
 
 let pp_header_status fmt = function
   | `Waiting_attestation -> Format.fprintf fmt "waiting_attestation"
-  | `Attested -> Format.fprintf fmt "attested"
+  | `Attested lag -> Format.fprintf fmt "attested(lag:%d)" lag
   | `Unattested -> Format.fprintf fmt "unattested"
   | `Unpublished -> Format.fprintf fmt "unpublished"
 

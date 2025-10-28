@@ -202,7 +202,7 @@ module RPC : sig
   (* The status of a slot id (published level + slot index) on L1. *)
   type slot_id_status =
     | Waiting_attestation
-    | Attested
+    | Attested of int (* of attestation lag *)
     | Unattested
     | Unpublished
 

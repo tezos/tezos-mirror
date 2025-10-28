@@ -671,14 +671,14 @@ module Statuses_cache = struct
 
   let get_slot_status = Slot_map.find_opt
 
-  let update_slot_headers_attestation ~published_level ~number_of_slots t
-      attested =
+  let update_slot_headers_attestation ~published_level ~number_of_slots
+      ~attestation_lag t attested =
     List.iter
       (fun slot_index ->
         let index = Types.Slot_id.{slot_level = published_level; slot_index} in
         if attested slot_index then (
           Dal_metrics.slot_attested ~set:true slot_index ;
-          add_status t `Attested index)
+          add_status t (`Attested attestation_lag) index)
         else
           let old_data_opt = get_slot_status t index in
           Dal_metrics.slot_attested ~set:false slot_index ;
@@ -693,7 +693,12 @@ module Statuses_cache = struct
   let update_selected_slot_headers_statuses ~block_level ~attestation_lag
       ~number_of_slots attested t =
     let published_level = Int32.(sub block_level (of_int attestation_lag)) in
-    update_slot_headers_attestation ~published_level ~number_of_slots t attested
+    update_slot_headers_attestation
+      ~published_level
+      ~number_of_slots
+      ~attestation_lag
+      t
+      attested
 end
 
 module Commitment_indexed_cache =

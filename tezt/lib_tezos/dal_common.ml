@@ -196,7 +196,7 @@ module Dal_RPC = struct
 
   type slot_id_status =
     | Waiting_attestation
-    | Attested
+    | Attested of int (* of attestation lag *)
     | Unattested
     | Unpublished
 
@@ -209,17 +209,28 @@ module Dal_RPC = struct
 
   let pp_slot_id_status fmt = function
     | Waiting_attestation -> Format.fprintf fmt "Waiting_attestation"
-    | Attested -> Format.fprintf fmt "Attested"
+    | Attested lag -> Format.fprintf fmt "Attested(lag:%d)" lag
     | Unattested -> Format.fprintf fmt "Unattested"
     | Unpublished -> Format.fprintf fmt "Unpublished"
 
-  let slot_id_status_of_json json =
-    match String.lowercase_ascii @@ JSON.as_string json with
-    | "waiting_attestation" -> Waiting_attestation
-    | "attested" -> Attested
-    | "unattested" -> Unattested
-    | "unpublished" -> Unattested
-    | s -> failwith @@ Format.sprintf "Unknown slot_id status %s" s
+  let slot_id_status_of_json =
+    let legacy_attestation_lag = 8 in
+    fun json ->
+      match String.lowercase_ascii @@ JSON.as_string json with
+      | "waiting_attestation" -> Waiting_attestation
+      | "attested" -> Attested legacy_attestation_lag
+      | "unattested" -> Unattested
+      | "unpublished" -> Unattested
+      | exception _exn -> (
+          match
+            JSON.
+              ( json |-> "kind" |> as_string,
+                json |-> "attestation_lag" |> as_int )
+          with
+          | "attested", lag -> Attested lag
+          | (exception _) | _ ->
+              failwith @@ Format.sprintf "Unknown slot_id status")
+      | s -> failwith @@ Format.sprintf "Unknown slot_id status %s" s
 
   let slot_header_of_json json =
     let open JSON in

@@ -191,7 +191,7 @@ module type T = sig
        The function returns [None] for older protocols that do not expose
        the necessary information to access the status. *)
     val proto_attestation_status :
-      cell -> [`Attested | `Unattested | `Unpublished] option
+      cell -> [`Attested of attestation_lag | `Unattested | `Unpublished] option
   end
 
   module RPC : sig

@@ -162,7 +162,7 @@ let check_attestations node dal_node ~lag ~number_of_slots ~published_level =
         else x
   in
   let num_attested, indexes =
-    match Map.find_opt Dal_RPC.Attested map with
+    match Map.find_opt (Dal_RPC.Attested lag) map with
     | None -> (0, [])
     | Some (c, l) -> (c, l)
   in
