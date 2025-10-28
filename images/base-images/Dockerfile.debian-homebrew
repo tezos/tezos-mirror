@@ -15,6 +15,7 @@ COPY scripts/kiss-fetch.sh /usr/local/bin/
 # install datadog static binary
 COPY images/scripts/install_datadog_static.sh /tmp
 COPY scripts/packaging/homebrew_install.sh /tmp
+COPY images/scripts/install-gsutil-apt.sh /tmp
 
 ENV PATH=/usr/local/bin:$PATH
 
@@ -23,13 +24,14 @@ RUN apt-get update && \
     apt-get install -y \
     curl autoconf cmake g++ libev-dev libffi-dev libgmp-dev git \
     libprotobuf-dev libsqlite3-dev protobuf-compiler libhidapi-dev \
-    pkg-config zlib1g-dev libpq-dev cargo && \
+    pkg-config zlib1g-dev libpq-dev cargo gpg && \
   /tmp/install_datadog_static.sh && \
+  /tmp/install-gsutil-apt.sh && \
   touch /.dockerenv && \
   /tmp/homebrew_install.sh && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* && \
-  rm -f /tmp/install_datadog_static.sh /tmp/homebrew_install.sh
+  rm -f /tmp/install_datadog_static.sh /tmp/install-gsutil-apt.sh /tmp/homebrew_install.sh
 
 ENV HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew
 ENV HOMEBREW_CELLAR=/home/linuxbrew/.linuxbrew/Cellar

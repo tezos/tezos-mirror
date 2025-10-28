@@ -259,7 +259,7 @@ oc.create-homebrew-formula:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/install-gsutil.sh
+  - images/scripts/install-gsutil-apt.sh
   - ./scripts/packaging/homebrew_release.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
