@@ -569,6 +569,42 @@ let test_activation_with_zero_threshold =
   --> begin_test ~abaab_activation_levels:[None] ["bootstrap"]
   --> check_abaab_activation_level ~loc:__LOC__ (Some 0l)
 
+let test_total_consensus_power =
+  let consensus_rights_delay =
+    Default_parameters.constants_mainnet.consensus_rights_delay
+  in
+  init_constants ()
+  --> set
+        S.all_bakers_attest_activation_threshold
+        {numerator = 2; denominator = 1}
+  --> set
+        S.consensus_committee_size
+        Default_parameters.constants_mainnet.consensus_committee_size
+  --> set
+        S.consensus_threshold_size
+        Default_parameters.constants_mainnet.consensus_threshold_size
+  --> begin_test
+        ~abaab_activation_levels:[Some 0; None]
+        ~bootstrap_info_list:
+          [
+            make "baker" ~balance:12_000_000_000L;
+            make
+              "future_big_baker"
+              ~delegate:"baker"
+              ~balance:12_000_000_000_000L;
+          ]
+        []
+  --> force_attest_all true
+  --> set_delegate "future_big_baker" (Some "future_big_baker")
+  --> stake "future_big_baker" All
+  --> exec (bake_until (`Cycle (consensus_rights_delay, `Last_level)))
+  --> force_attest_all false --> attest_with "baker"
+  (* future big baker cannot attest yet *)
+  -->
+  (* We expect the next block to pass the required threshold,
+     even though future big baker is now active, increasing the total stake *)
+  next_block
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -578,6 +614,7 @@ let tests =
        ("Test abaab activation level", test_activation_level);
        ( "Test abaab threshold zero activation",
          test_activation_with_zero_threshold );
+       ("Test abaab total consensus power", test_total_consensus_power);
      ]
 
 let () =
