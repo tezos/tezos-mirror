@@ -118,7 +118,7 @@ module Make_daemon (Agent : AGENT) :
     keep_alive : bool;
     command : command;
     cctxt : Tezos_client_base.Client_context.full;
-    head_stream : string Lwt_stream.t option;
+    head_stream : string Lwt_stream.t;
   }
 
   type t = state
@@ -271,8 +271,8 @@ module Make_daemon (Agent : AGENT) :
     ignore (loop () : unit Lwt.t) ;
     return stream
 
-  (** [monitor_voting_periods ~state head_stream] continuously monitors [heads_stream]
-    to detect protocol changes. It will:
+  (** [monitor_voting_periods ~state] continuously monitors chain data to detect
+    protocol changes. It will:
     - Shut down an old baker it its time has come;
     - Spawn and "hot-swap" to a new baker if the next protocol hash is different.
     The voting period information is used for logging purposes. *)
@@ -389,7 +389,7 @@ module Make_daemon (Agent : AGENT) :
     | Old_baker_stopped
     | Current_baker_stopped
 
-  let rec main_loop state =
+  let main_iteration state =
     let open Lwt_result_syntax in
     let current_baker =
       Lwt_result.map
@@ -402,19 +402,24 @@ module Make_daemon (Agent : AGENT) :
           Lwt_result.map
             (fun () -> Old_baker_stopped)
             old_baker.baker.process.thread
-      | None -> Lwt_utils.never_ending ()
+      | None ->
+          (* If there is no [old_baker], this promise is not expected to resolve
+             anytime. *)
+          Lwt_utils.never_ending ()
     in
     let head_stream =
       Lwt.map
         (function None -> Ok Head_stream_ended | Some _head -> Ok New_head)
-        (Lwt_stream.get head_stream)
+        (Lwt_stream.get state.head_stream)
     in
     let* pick = Lwt.choose [current_baker; old_baker; head_stream] in
     match pick with
     | New_head ->
         let* state = monitor_voting_periods ~state in
-        main_loop state
-    | Head_stream_ended -> tzfail Lost_node_connection
+        return (Some state)
+    | Head_stream_ended ->
+        let* head_stream = monitor_heads ~node_addr:state.node_endpoint in
+        return (Some {state with head_stream})
     | Old_baker_stopped -> (
         match state.old_baker with
         | None -> assert false
@@ -426,11 +431,24 @@ module Make_daemon (Agent : AGENT) :
             in
             if head_level >= old_baker.level_to_kill then
               (* The old baker is expired, it is expected. *)
-              main_loop state
-            else return_unit)
+              return (Some {state with old_baker = None})
+            else failwith "Old baker was killed unexpectedly")
     | Current_baker_stopped ->
         (* It's not supposed to stop. *)
-        return_unit
+        failwith "Current baker stopped unexpectedly"
+
+  let rec main_loop state =
+    let open Lwt_result_syntax in
+    let* result =
+      retry_on_disconnection
+        ~emit:(fun _ -> Lwt.return_unit)
+        state.node_endpoint
+        main_iteration
+        state
+    in
+    match result with
+    | None -> return_unit
+    | Some next_state -> main_loop next_state
 
   let run ~keep_alive ~command cctxt =
     let open Lwt_result_syntax in
@@ -451,6 +469,15 @@ module Make_daemon (Agent : AGENT) :
           ()
       else may_start_initial_baker cctxt command ~node_addr
     in
+    let* head_stream =
+      (* Useful if the baker is started before the node or restarted while the
+         node is down. *)
+      retry_on_disconnection
+        ~emit:(fun _ -> Lwt.return_unit)
+        node_addr
+        (fun node_addr -> monitor_heads ~node_addr)
+        node_addr
+    in
     let state =
       {
         node_endpoint = node_addr;
@@ -459,16 +486,10 @@ module Make_daemon (Agent : AGENT) :
         keep_alive;
         command;
         cctxt;
-        head_stream = None;
+        head_stream;
       }
     in
-    retry_on_disconnection
-      ~emit:(fun _ -> Lwt.return_unit)
-      node_addr
-      (fun state ->
-        let* head_stream = monitor_heads ~node_addr in
-        main_loop {state with head_stream = Some head_stream})
-      state
+    main_loop state
 end
 
 module Baker : AGNOSTIC_DAEMON with type command = Baker_agent.command =
