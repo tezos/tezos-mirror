@@ -2074,6 +2074,77 @@ let test_tezlink_prevalidation =
 
   unit
 
+let test_tezlink_validation =
+  register_tezlink_test
+    ~title:"Test Tezlink validation"
+    ~tags:["kernel"; "validation"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+    ~time_between_blocks:Evm_node.Nothing
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client_tezlink = Client.init ~endpoint () in
+  let hard_gas_limit_per_block = 1_386_666 in
+
+  (* make sure there are no transactions in the queue *)
+  let* () = produce_block_and_wait_for ~sequencer 1 in
+  let* () = produce_block_and_wait_for ~sequencer 2 in
+
+  let almost_half_block = (hard_gas_limit_per_block / 2) - 1 in
+
+  (* Sanity check: can fit two op in a blueprint *)
+  let* (`OpHash op1) =
+    Operation.inject_transfer
+      ~counter:1
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      ~gas_limit:almost_half_block
+      client_tezlink
+  in
+  let* (`OpHash op2) =
+    Operation.inject_transfer
+      ~counter:2
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      ~gas_limit:almost_half_block
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () =
+    check_operations ~client:client_tezlink ~block:"3" ~expected:[op1; op2]
+  in
+
+  (* check: with just a bit more gas_limit two op don't fit in a blueprint *)
+  let* (`OpHash op3) =
+    Operation.inject_transfer
+      ~counter:3
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      ~gas_limit:(almost_half_block + 100)
+      client_tezlink
+  in
+  let* (`OpHash op4) =
+    Operation.inject_transfer
+      ~counter:4
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      ~gas_limit:(almost_half_block + 100)
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 4 in
+  let* () = produce_block_and_wait_for ~sequencer 5 in
+  let* () =
+    check_operations ~client:client_tezlink ~block:"4" ~expected:[op3]
+  in
+  let* () =
+    check_operations ~client:client_tezlink ~block:"5" ~expected:[op4]
+  in
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -2113,5 +2184,6 @@ let () =
   test_tezlink_internal_operation [Alpha] ;
   test_tezlink_internal_receipts [Alpha] ;
   test_tezlink_prevalidation [Alpha] ;
+  test_tezlink_validation [Alpha] ;
   test_tezlink_origination [Alpha] ;
   test_tezlink_forge_operations [Alpha]

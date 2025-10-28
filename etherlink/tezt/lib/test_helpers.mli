@@ -319,3 +319,12 @@ val deposit :
   l2_address:string ->
   Client.t ->
   unit Lwt.t
+
+(** [check_operations ~client ~block ~expected] compute the list of hashes of
+    the operations manager of [block] and check it's equal to [expected]. *)
+val check_operations :
+  client:Client.t -> block:string -> expected:string list -> unit Lwt.t
+
+(** [produce_block_and_wait_for ~sequencer n] Produces a block and wait for
+    blueprint [n] to be applied. *)
+val produce_block_and_wait_for : sequencer:Evm_node.t -> int -> unit Lwt.t
