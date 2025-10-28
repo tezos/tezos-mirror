@@ -109,7 +109,8 @@ let lib_etherlink_wasm_runtime =
              ];
            ])
 
-let tezt ?(deps = []) = tezt ~deps:(bls12_381_archive :: deps)
+let tezt ?(deps = []) =
+  tezt ~deps:(bls12_381_archive :: deps) ~include_in_main_tezt_exe:false
 
 let wasm_runtime_callbacks =
   octez_evm_node_lib
@@ -128,7 +129,7 @@ let wasm_runtime_callbacks =
         opentelemetry_lwt;
       ]
 
-let _wasm_runtime_callbacks_tests =
+let wasm_runtime_callbacks_tests =
   tezt
     ["test_vector"; "test_store"]
     ~path:"etherlink/lib_wasm_runtime_callbacks/test"
@@ -416,7 +417,7 @@ let _octez_evm_node_tests =
         octez_client_base_unix;
       ]
 
-let _tezt_etherlink =
+let etherlink_tezts =
   tezt
     [
       "evm_rollup";
@@ -740,3 +741,20 @@ let _fa_bridge_watchtower =
             ];
           ];
         ]
+
+(* The main Tezt executable for Etherlink tests, for use in the Etherlink Tezt CI jobs. *)
+let _main_tezt_exe =
+  test
+    "main"
+    ~with_macos_security_framework:true
+    ~alias:""
+    ~path:"etherlink/ci/tezt"
+    ~bisect_ppx:With_sigterm
+    ~opam:""
+    ~deps:
+      [
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        (* Below is the list of libraries that register tests that we want to run in the CI. *)
+        wasm_runtime_callbacks_tests;
+        etherlink_tezts;
+      ]

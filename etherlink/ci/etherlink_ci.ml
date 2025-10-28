@@ -203,6 +203,110 @@ let job_test_revm_compatibility =
       "./revm-evaluation-assessor --test-cases ./evm_fixtures/";
     ]
 
+let job_build_tezt =
+  CI.job
+    "build_tezt"
+    ~__POS__
+    ~stage:Build
+    ~description:"Build the Etherlink Tezt executable."
+    ~image:Tezos_ci.Images.CI.build
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~name:"etherlink_tezt_exe"
+         ~when_:On_success
+         ~expire_in:(Duration (Days 1))
+         ["_build/default/etherlink/ci/tezt/main.exe"])
+    ~dune_cache:
+      (Cacio.dune_cache
+         ~key:
+           ("dune-build-cache-"
+           ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id))
+         ())
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    ~cargo_target_caches:true
+    [
+      "./scripts/ci/take_ownership.sh";
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      "dune build etherlink/ci/tezt/main.exe";
+    ]
+
+(* Specialization of Cacio's [tezt_job] with defaults that are specific to this component. *)
+(* Note: for now the changeset is the same as the one for regular Tezt jobs,
+   but to follow the vision for the monorepo, it should be limited to Etherlink.
+   This is something that can be done later, once we feel ready. *)
+let tezt_job ?(retry_tests = 1) =
+  CI.tezt_job
+    ~tezt_exe:"etherlink/ci/tezt/main.exe"
+    ~fetch_records_from:"etherlink.daily"
+    ~only_if_changed:
+      (Tezos_ci.Changeset.encode Tezos_ci_jobs.Changesets.changeset_octez)
+    ~needs:[(Artifacts, job_build_tezt)]
+    ~needs_legacy:
+      [
+        ( Artifacts,
+          Tezos_ci_jobs.Code_verification.job_build_x86_64_release
+            Before_merging );
+        ( Artifacts,
+          Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_exp
+            Before_merging );
+        ( Artifacts,
+          Tezos_ci_jobs.Code_verification.job_build_kernels Before_merging );
+      ]
+    ~retry_tests
+
+let job_tezt =
+  Cacio.parameterize @@ fun pipeline ->
+  tezt_job
+    ""
+    ~pipeline
+    ~description:"Run normal Etherlink Tezt tests."
+    ~test_coverage:true
+    ~test_selection:
+      (Tezos_ci_jobs.Tezt.tests_tag_selector [Not (Has_tag "flaky")])
+    ~parallel_jobs:17
+    ~parallel_tests:6
+    ~retry_jobs:2
+
+let job_tezt_slow =
+  Cacio.parameterize @@ fun pipeline ->
+  tezt_job
+    "slow"
+    ~pipeline
+    ~description:"Run Etherlink Tezt tests tagged as slow."
+    ~test_selection:(Tezos_ci_jobs.Tezt.tests_tag_selector ~slow:true [])
+    ~test_timeout:No_timeout
+    ~parallel_jobs:6
+    ~parallel_tests:3
+    ~retry_jobs:2
+
+let job_tezt_extra =
+  Cacio.parameterize @@ fun pipeline ->
+  tezt_job
+    "extra"
+    ~pipeline
+    ~description:"Run Etherlink Tezt tests tagged as extra and not flaky."
+    ~test_selection:
+      (Tezos_ci_jobs.Tezt.tests_tag_selector
+         ~extra:true
+         [Not (Has_tag "flaky")])
+    ~parallel_jobs:5
+    ~parallel_tests:6
+    ~retry_jobs:2
+
+let job_tezt_flaky =
+  Cacio.parameterize @@ fun pipeline ->
+  tezt_job
+    "flaky"
+    ~pipeline
+    ~description:"Run Etherlink Tezt tests tagged as flaky."
+    ~test_coverage:true
+    ~allow_failure:Yes
+    ~test_selection:(Tezos_ci_jobs.Tezt.tests_tag_selector [Has_tag "flaky"])
+    ~retry_jobs:2
+    ~retry_tests:3
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -216,12 +320,22 @@ let register () =
       (Auto, job_test_firehose Before_merging);
       (Auto, job_test_evm_compatibility Before_merging);
       (Auto, job_test_revm_compatibility Before_merging);
+      (Auto, job_tezt `merge_request);
+      (Manual, job_tezt_slow `merge_request);
+      (Manual, job_tezt_extra `merge_request);
+      (Manual, job_tezt_flaky `merge_request);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for Etherlink."
     ~legacy_jobs:
-      [Tezos_ci_jobs.Code_verification.job_build_kernels Schedule_extended_test]
+      [
+        Tezos_ci_jobs.Code_verification.job_build_x86_64_release
+          Schedule_extended_test;
+        Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_exp
+          Schedule_extended_test;
+        Tezos_ci_jobs.Code_verification.job_build_kernels Schedule_extended_test;
+      ]
     [
       (Auto, job_build_evm_node_static Amd64);
       (Auto, job_build_evm_node_static Arm64);
@@ -231,5 +345,9 @@ let register () =
       (Auto, job_test_firehose Schedule_extended_test);
       (Auto, job_test_evm_compatibility Before_merging);
       (Auto, job_test_revm_compatibility Before_merging);
+      (Auto, job_tezt `scheduled);
+      (Auto, job_tezt_slow `scheduled);
+      (Auto, job_tezt_extra `scheduled);
+      (Auto, job_tezt_flaky `scheduled);
     ] ;
   ()
