@@ -679,7 +679,7 @@ mod tests {
     use revm::primitives::Address;
     use revm_etherlink::{
         precompiles::provider::EtherlinkPrecompiles, run_transaction,
-        storage::world_state_handler::StorageAccount,
+        storage::world_state_handler::StorageAccount, GasData,
     };
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -796,8 +796,7 @@ mod tests {
             caller,
             None,
             call_data.into(),
-            gas_limit,
-            gas_price.try_into().unwrap(),
+            GasData::new(gas_limit, gas_price.try_into().unwrap(), gas_limit),
             revm::primitives::U256::ZERO,
             vec![].into(),
             None,
