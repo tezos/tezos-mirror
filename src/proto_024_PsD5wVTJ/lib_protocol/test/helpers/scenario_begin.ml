@@ -85,14 +85,20 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
       (Protocol.Issuance_bonus_repr.max_bonus_parameter_of_Q_exn Q.zero)
   else Empty
 
-type algo = Any_algo | Ed25519 | Secp256k1 | P256 | Bls
+type algo = Any_algo | Ed25519 | Secp256k1 | P256 | Bls | Not_Bls
 
-let algo_to_algo = function
+let algo_to_algo ~rng_state = function
   | Ed25519 -> Some Signature.Ed25519
   | Secp256k1 -> Some Secp256k1
   | P256 -> Some P256
   | Bls -> Some Bls
   | Any_algo -> None
+  | Not_Bls -> (
+      match Random.State.int rng_state 3 with
+      | 0 -> Some Signature.Ed25519
+      | 1 -> Some Secp256k1
+      | 2 -> Some P256
+      | _ -> assert false)
 
 (* None = not set, Some None = set to None (not the same) *)
 (* type before applying defaults *)
@@ -234,12 +240,18 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
         List.map
           (fun x ->
             let account =
-              Account.new_account ?algo:(algo_to_algo x.algo) ~rng_state ()
+              Account.new_account
+                ?algo:(algo_to_algo ~rng_state x.algo)
+                ~rng_state
+                ()
             in
             let consensus_key =
               Option.map
                 (fun algo ->
-                  Account.new_account ?algo:(algo_to_algo algo) ~rng_state ())
+                  Account.new_account
+                    ?algo:(algo_to_algo ~rng_state algo)
+                    ~rng_state
+                    ())
                 x.consensus_key_algo_opt
             in
             let companion_key =
