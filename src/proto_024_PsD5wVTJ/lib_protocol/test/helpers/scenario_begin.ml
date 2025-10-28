@@ -98,7 +98,9 @@ let algo_to_algo = function
 (* type before applying defaults *)
 type bootstrap_info = {
   name : string;
+  balance_opt : int64 option;
   algo_opt : algo option;
+  delegate_opt : string option;
   consensus_key_algo_opt_opt : algo option option;
   companion_key_flag_opt : bool option;
 }
@@ -106,14 +108,26 @@ type bootstrap_info = {
 (** Used to build bootstrap detailed info.
     @param algo defines the algorithm to use for the given bootstrap.
     Set to [Any_algo] to choose one randomly.
+    @param balance is the initial balance of the bootstrap account. Defaults to
+    whatever {!Account.make_bootstrap_accounts} sets it to, which should be
+    {!Default_parameters.Internal_for_tests.bootstrap_balance}
+    @param delegate is the name of the initial delegate of the account. If set, then the
+    bootstrap account will not be a self delegate. It cannot be set at the same time as the consensus key.
     @param consensus_key [None] means that the bootstrap account does not have a consensus key.
     [Some algo] will set a consensus key with the given algo.
     @param companion_key is a flag that sets a BLS companion key iff the parameter is set to [true].
 *)
-let make ?algo ?consensus_key ?companion_key name =
+let make ?algo ?balance ?delegate ?consensus_key ?companion_key name =
+  (match (delegate, consensus_key) with
+  | Some _, Some _ ->
+      Stdlib.failwith
+        "Cannot set both delegate and consensus key for bootstrap account."
+  | _ -> ()) ;
   {
     name;
+    balance_opt = balance;
     algo_opt = algo;
+    delegate_opt = delegate;
     consensus_key_algo_opt_opt = consensus_key;
     companion_key_flag_opt = companion_key;
   }
@@ -122,6 +136,8 @@ let make ?algo ?consensus_key ?companion_key name =
 type bootstrap_full_info = {
   name : string;
   algo : algo;
+  balance_opt : int64 option;
+  delegate_opt : string option;
   consensus_key_algo_opt : algo option;
   companion_key_flag : bool;
 }
@@ -129,10 +145,32 @@ type bootstrap_full_info = {
 (* type after creating accounts *)
 type bootstrap_accounts = {
   name : string;
-  delegate : Account.t;
+  balance : int64 option;
+  account : Account.t;
+  delegate : string option;
   consensus_key : Account.t option;
   companion_key : Account.t option;
 }
+
+let pp_bootstrap_info fmt (info : bootstrap_accounts) =
+  let fs = Format.asprintf in
+  let consensus_key =
+    Option.map
+      (fun (x : Account.t) ->
+        fs " (consensus key: %a)" Signature.Public_key_hash.pp x.pkh)
+      info.consensus_key
+  in
+  let delegate = Option.map (fun x -> fs " (delegate: %s)" x) info.delegate in
+  Format.fprintf
+    fmt
+    "%s: %a%a%a"
+    info.name
+    Signature.Public_key_hash.pp
+    info.account.pkh
+    Format.(pp_print_option pp_print_string)
+    consensus_key
+    Format.(pp_print_option pp_print_string)
+    delegate
 
 (** Initialize the test, given some initial parameters.
     [algo] defines the algorithm used for the [delegates_name_list].
@@ -154,6 +192,8 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
           bootstrap_full_info =
         {
           name = bootstrap_info.name;
+          balance_opt = bootstrap_info.balance_opt;
+          delegate_opt = bootstrap_info.delegate_opt;
           algo = Option.value ~default:default_algo bootstrap_info.algo_opt;
           consensus_key_algo_opt =
             Option.value
@@ -169,6 +209,8 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
         make_bootstrap_full
           {
             name;
+            balance_opt = None;
+            delegate_opt = None;
             algo_opt = None;
             consensus_key_algo_opt_opt = None;
             companion_key_flag_opt = None;
@@ -191,7 +233,7 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
       let bootstrap_accounts_list =
         List.map
           (fun x ->
-            let delegate =
+            let account =
               Account.new_account ?algo:(algo_to_algo x.algo) ~rng_state ()
             in
             let consensus_key =
@@ -204,22 +246,43 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
               if not x.companion_key_flag then None
               else Some (Account.new_account ~algo:Bls ~rng_state ())
             in
-            {name = x.name; delegate; consensus_key; companion_key})
+            {
+              name = x.name;
+              balance = x.balance_opt;
+              account;
+              delegate = x.delegate_opt;
+              consensus_key;
+              companion_key;
+            })
           bootstrap_info_list
       in
       (* Setup the bootstrap accounts in the parameters *)
-      let bootstrap_accounts =
-        List.map (fun a -> a.delegate) bootstrap_accounts_list
+      let get_consensus_key_pk_opt =
+       fun a -> Option.map (fun x -> x.Account.pk) a.consensus_key
       in
-      let bootstrap_consensus_keys =
+      let get_delegate_pkh_opt =
+       fun a ->
+        Option.map
+          (fun delegate_name ->
+            let delegate =
+              Stdlib.List.find
+                (fun x -> String.equal x.name delegate_name)
+                bootstrap_accounts_list
+            in
+            delegate.account.pkh)
+          a.delegate
+      in
+      let bootstrap_accounts_packed =
         List.map
-          (fun a -> Option.map (fun x -> x.Account.pk) a.consensus_key)
+          (fun a ->
+            ( a.account,
+              a.balance,
+              get_delegate_pkh_opt a,
+              get_consensus_key_pk_opt a ))
           bootstrap_accounts_list
       in
       let bootstrap_accounts =
-        Account.make_bootstrap_accounts
-          ~bootstrap_consensus_keys
-          bootstrap_accounts
+        Account.make_bootstrap_accounts_packed bootstrap_accounts_packed
       in
       let parameters =
         Tezos_protocol_024_PsD5wVTJ_parameters.Default_parameters
@@ -227,6 +290,10 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
           ~bootstrap_accounts
           constants
       in
+      Log.info
+        "Starting chain with bootstrap accounts:@.%a@."
+        (Format.pp_print_list ~pp_sep:Format.pp_print_newline pp_bootstrap_info)
+        bootstrap_accounts_list ;
       (* Hack-in the companion keys in the context *)
       let set_companion ctxt =
         List.fold_left_es
@@ -234,7 +301,7 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
             match bootstrap.companion_key with
             | None -> return ctxt
             | Some ck ->
-                let key = bootstrap.delegate.Account.pkh in
+                let key = bootstrap.account.Account.pkh in
                 (* Add the companion key to the global cks storage *)
                 let*! ctxt = Protocol.Storage.Consensus_keys.add ctxt ck.pkh in
                 (* Set the companion key for the bootstrap *)
@@ -312,10 +379,24 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
             let name = bootstrap_account.name in
             let contract =
               Protocol.Alpha_context.Contract.Implicit
-                bootstrap_account.delegate.pkh
+                bootstrap_account.account.pkh
             in
-            let liquid = Account.default_initial_spendable_balance in
-            let init_staked = Account.default_initial_staked_balance in
+            let initial_full =
+              Option.map Tez.of_mutez bootstrap_account.balance
+              |> Option.value ~default:Account.default_initial_full_balance
+            in
+            let delegate =
+              Option.value ~default:name bootstrap_account.delegate
+            in
+            let self_delegate = String.equal delegate name in
+            let init_staked =
+              if not self_delegate then Tez.zero
+              else
+                Account.bootstrap_initial_staked_balance
+                  ~constants
+                  ~initial_full_balance:initial_full
+            in
+            let liquid = Tez.(initial_full -! init_staked) in
             let frozen_deposits = Frozen_tez.init init_staked name name in
             let frozen_rights =
               List.fold_left
@@ -336,19 +417,23 @@ let begin_test ?(bootstrap_info_list = ([] : bootstrap_info list))
                   (* by construction, the companion keys built previously are BLS *))
                 bootstrap_account.companion_key
             in
+            let last_seen_activity =
+              if self_delegate then
+                Some Cycle.(add root constants.consensus_rights_delay)
+              else None
+            in
             let account =
               init_account
                 ~name
                 ~revealed:true
-                ~delegate:name
+                ~delegate
                 ~pkh
                 ~contract
                 ~parameters:default_params
                 ~liquid
                 ~frozen_deposits
                 ~frozen_rights
-                ~last_seen_activity:
-                  Cycle.(add root constants.consensus_rights_delay)
+                ?last_seen_activity
                 ?consensus_key
                 ?companion_key
                 ()
