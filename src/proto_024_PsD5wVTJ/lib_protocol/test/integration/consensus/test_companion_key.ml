@@ -208,6 +208,30 @@ let update_key ?proof_signer ?force_no_signer ~kind ~ck_name src =
   | Companion ->
       update_companion_key ?proof_signer ?force_no_signer ~ck_name src
 
+let test_init_with_cks_for_bootstraps =
+  let check_finalized_every_block = [(fun _ -> check_all_cks)] in
+  init_constants ()
+  --> begin_test
+        ~check_finalized_every_block
+        ~force_attest_all:true
+        ~bootstrap_info_list:
+          [
+            make "no_ck";
+            make "with_consensus_key" ~consensus_key:(Some Any_algo);
+            make "with_companion_key" ~companion_key:true;
+            make "with_both_tz4" ~consensus_key:(Some Bls) ~companion_key:true;
+          ]
+        []
+  --> exec_unit check_all_cks
+  (* Bake a bit, check at each block *)
+  --> next_block
+  --> next_block
+  (* With some DAL, to test the companion key *)
+  --> exec_state (fun (_block, state) ->
+          Lwt_result.return {state with State.force_attest_all = false})
+  --> attest_aggreg_with ~delegates_with_dal:[("with_both_tz4", Z.of_int 7)] []
+  --> next_block
+
 let test_simple_register_consensus_and_companion_keys =
   let bootstrap_accounts = ["bootstrap1"; "bootstrap2"] in
   let delegate = "delegate" in
@@ -1040,6 +1064,8 @@ let test_batch =
 let tests =
   tests_of_scenarios
   @@ [
+       ( "Test bootstrap accounts with initial consensus and companion keys",
+         test_init_with_cks_for_bootstraps );
        ( "Simple update ck for delegate",
          test_simple_register_consensus_and_companion_keys );
        ("Register other accounts as ck", test_register_other_accounts_as_ck);
