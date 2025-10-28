@@ -335,6 +335,15 @@ let validate_gas_limit ~ctxt gas_limit operation =
     let*? () = validate_variable_gas_cost ~ctxt remaining_gas operation in
     return (Ok overall_gas_limit)
 
+let validate_storage_limit storage_limit =
+  error_unless
+    Compare.Z.(
+      storage_limit
+      <= Tezlink_constants.all_constants.parametric
+           .hard_storage_limit_per_operation
+      && storage_limit >= Z.zero)
+    (Imported_env.wrap_tzerror Fees.Storage_limit_too_high)
+
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
   let open Lwt_result_syntax in
@@ -343,14 +352,14 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       tzfail_p
       @@ Imported_protocol.Validate_errors.Manager.Incorrect_reveal_position
   | Manager_operation
-      {source; fee; counter; operation; gas_limit; storage_limit = _} ->
+      {source; fee; counter; operation; gas_limit; storage_limit} ->
       let** () = validate_supported_operation ~ctxt operation in
       let** () = validate_source ~ctxt source in
       let** () = validate_counter ~ctxt counter in
       let** gas_limit =
         validate_gas_limit ~ctxt gas_limit (Manager operation)
       in
-      (* TODO check storage limit too *)
+      let*? () = validate_storage_limit storage_limit in
       let** ctxt = validate_balance ~ctxt ~fee in
       (* the update will be updated during the validation steps *)
       return
