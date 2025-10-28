@@ -954,6 +954,9 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         "./scripts/ci/tezt.sh"
         [
           ["--send-junit"; "${JUNIT}"];
+          (match Component.name with
+          | None -> []
+          | Some name -> ["--datadog-service"; name]);
           (match tezt_exe with
           | None -> []
           | Some path -> ["--tezt-exe"; SH.quote path]);
