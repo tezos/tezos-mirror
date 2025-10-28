@@ -269,7 +269,9 @@ let create_block_watcher_service first_block watcher =
     fun () ->
       if !first_call then (
         first_call := false ;
-        return (Result.to_option first_block |> Option.join))
+        match Result.to_option first_block |> Option.join with
+        | Some block -> return_some block
+        | None -> Lwt_stream.get block_stream)
       else Lwt_stream.get block_stream
   in
   Tezos_rpc.Answer.return_stream {next; shutdown}

@@ -105,6 +105,11 @@ Smart Rollup node
 - New RPC **GET** ``/global/monitor_finalized_blocks`` to stream only finalized
   blocks (similarly to ``/global/monitor_blocks``). (MR :gl:`!19568`)
 
+- Fix streaming RPC ``/global/monitor_blocks``
+  (resp. ``/global/monitor_finalized_blocks``) which could return an empty body
+  if they were called before the first (resp. finalized) block is produced. (MR
+  :gl:`!19569`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
