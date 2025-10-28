@@ -417,7 +417,7 @@ let _octez_evm_node_tests =
         octez_client_base_unix;
       ]
 
-let etherlink_tezts =
+let _etherlink_tezts =
   tezt
     [
       "evm_rollup";
@@ -743,20 +743,3 @@ let _fa_bridge_watchtower =
             ];
           ];
         ]
-
-(* The main Tezt executable for Etherlink tests, for use in the Etherlink Tezt CI jobs. *)
-let _main_tezt_exe =
-  test
-    "main"
-    ~with_macos_security_framework:true
-    ~alias:""
-    ~path:"etherlink/ci/tezt"
-    ~bisect_ppx:With_sigterm
-    ~opam:""
-    ~deps:
-      [
-        tezt_wrapper |> open_ |> open_ ~m:"Base";
-        (* Below is the list of libraries that register tests that we want to run in the CI. *)
-        wasm_runtime_callbacks_tests;
-        etherlink_tezts;
-      ]
