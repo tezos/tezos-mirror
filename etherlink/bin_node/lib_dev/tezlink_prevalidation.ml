@@ -304,8 +304,11 @@ let validate_variable_gas_cost ~ctxt remaining_gas (Manager operation) =
       return_unit
   | _ -> tzfail @@ Unsupported_manager_operation ctxt.error_clue
 
-let validate_gas_limit ~ctxt overall_gas_limit gas_limit operation =
+let validate_gas_limit ~ctxt gas_limit operation =
   let open Lwt_result_syntax in
+  let overall_gas_limit =
+    Z.(ctxt.gas_limit + Tezos_types.Operation.gas_limit_to_z gas_limit)
+  in
   if
     not
       Z.Compare.(
@@ -313,6 +316,8 @@ let validate_gas_limit ~ctxt overall_gas_limit gas_limit operation =
         && overall_gas_limit >= Z.zero)
   then tzfail_p @@ Imported_protocol.Gas_limit_repr.Gas_limit_too_high
   else
+    (* There is a fixed cost for all manager operations. See
+           [check_contents] in {!lib_protocol/validate.ml}.*)
     let fixed_cost =
       if ctxt.length = 0 then
         (* The gas cost of signature verification is included in the first
@@ -322,12 +327,13 @@ let validate_gas_limit ~ctxt overall_gas_limit gas_limit operation =
           +@ ctxt.signature_check_cost)
       else Imported_protocol.Michelson_v1_gas.Cost_of.manager_operation
     in
+    (* validate fixed cost *)
     let*? remaining_gas =
       Imported_env.wrap_tzresult
       @@ Gas.consume_from (Gas.Arith.fp gas_limit) fixed_cost
     in
     let*? () = validate_variable_gas_cost ~ctxt remaining_gas operation in
-    return (Ok ())
+    return (Ok overall_gas_limit)
 
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
@@ -341,11 +347,8 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       let** () = validate_supported_operation ~ctxt operation in
       let** () = validate_source ~ctxt source in
       let** () = validate_counter ~ctxt counter in
-      let overall_gas_limit =
-        Z.(ctxt.gas_limit + Tezos_types.Operation.gas_limit_to_z gas_limit)
-      in
-      let** () =
-        validate_gas_limit ~ctxt overall_gas_limit gas_limit (Manager operation)
+      let** gas_limit =
+        validate_gas_limit ~ctxt gas_limit (Manager operation)
       in
       (* TODO check storage limit too *)
       let** ctxt = validate_balance ~ctxt ~fee in
@@ -357,7 +360,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
              previous_counter = Some ctxt.next_counter;
              next_counter = Manager_counter.succ ctxt.next_counter;
              length = ctxt.length + 1;
-             gas_limit = overall_gas_limit;
+             gas_limit;
            })
   | _ -> tzfail @@ Not_a_manager_operation ctxt.error_clue
 
