@@ -39,13 +39,13 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.install-homebrew:
+oc.build-homebrew-formula:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie
   stage: build
   tags:
   - gcp_very_high_cpu
   needs:
-  - oc.build-homebrew
+  - oc.create-homebrew-formula
   dependencies: []
   allow_failure: false
   timeout: 60 minutes
@@ -62,7 +62,7 @@ oc.install-homebrew:
     DUNE_BUILD_JOBS: -j 12
     CARGO_NET_OFFLINE: "false"
 
-oc.build-homebrew:
+oc.create-homebrew-formula:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie
   stage: build
   tags:
@@ -80,16 +80,14 @@ oc.build-homebrew:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    CARGO_NET_OFFLINE: "false"
 
-oc.install-homebrew-macosx:
+oc.build-homebrew-formula-macosx:
   image: macos-15-xcode-16
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.build-homebrew
+  - oc.create-homebrew-formula
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
