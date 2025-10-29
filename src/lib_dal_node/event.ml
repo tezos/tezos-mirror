@@ -521,9 +521,9 @@ open struct
       ("level", Data_encoding.int32)
       ("elements", Data_encoding.int31)
       ("percentage", Data_encoding.float)
-      ~pp4:(fun fmt -> Format.fprintf fmt "%1f%%")
+      ~pp4:(fun fmt -> Format.fprintf fmt "%.2f%%")
       ("validation_duration", Data_encoding.float)
-      ~pp5:(fun fmt -> Format.fprintf fmt "%3f")
+      ~pp5:(fun fmt -> Format.fprintf fmt "%.4f")
 
   let pp_print_array_i ?(pp_sep = Format.pp_print_cut) pp_v ppf v =
     let pp_print_iter ?(pp_sep = Format.pp_print_cut) iter pp_v ppf v =
@@ -569,6 +569,7 @@ open struct
       ("total_shard_processed", Data_encoding.int31)
       ("total_batches_processed", Data_encoding.int31)
       ("validation_duration", Data_encoding.float)
+      ~pp4:(fun ppf -> Format.fprintf ppf "%.3f")
 
   let p2p_server_is_ready =
     declare_1
