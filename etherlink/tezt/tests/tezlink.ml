@@ -1443,13 +1443,13 @@ let test_tezlink_internal_operation =
   let* () =
     Client.transfer
       ~endpoint
-      ~fee:Tez.zero
+      ~fee:Tez.one
       ~amount:Tez.zero
       ~giver:Constant.bootstrap1.alias
       ~receiver:faucet.address
       ~burn_cap:Tez.one
       ~entrypoint:"fund"
-      ~arg:"1000000"
+      ~arg:"2000000"
       client
   in
   let*@ _ = produce_block sequencer in
@@ -1481,7 +1481,7 @@ let test_tezlink_internal_receipts =
   let* () =
     Client.transfer
       ~endpoint
-      ~fee:Tez.zero
+      ~fee:Tez.one
       ~amount:Tez.zero
       ~giver:Constant.bootstrap1.alias
       ~receiver:faucet.address
@@ -1607,7 +1607,7 @@ let test_tezlink_origination =
   let* deployed_faucet =
     Client.originate_contract
       ~endpoint
-      ~amount:Tez.one
+      ~amount:(Tez.of_int 2)
       ~alias:"faucet"
       ~src:Constant.bootstrap1.public_key_hash
       ~init:faucet.initial_storage
@@ -1619,7 +1619,7 @@ let test_tezlink_origination =
   let* faucet_balance =
     Client.get_balance_for ~endpoint ~account:deployed_faucet client
   in
-  Check.((Tez.to_mutez faucet_balance = Tez.(to_mutez one)) int)
+  Check.((Tez.to_mutez faucet_balance = Tez.(to_mutez (of_int 2))) int)
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   let* bootstrap_balance =
     Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
@@ -1627,13 +1627,13 @@ let test_tezlink_origination =
   let* () =
     Client.transfer
       ~endpoint
-      ~fee:Tez.zero
+      ~fee:Tez.one
       ~amount:Tez.zero
       ~giver:Constant.bootstrap1.alias
       ~receiver:deployed_faucet
       ~burn_cap:Tez.one
       ~entrypoint:"fund"
-      ~arg:"1000000"
+      ~arg:"2000000"
       client
   in
   let*@ _ = produce_block sequencer in

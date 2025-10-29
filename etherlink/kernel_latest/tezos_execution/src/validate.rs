@@ -170,6 +170,10 @@ fn validate_source<Host: Runtime>(
     Ok((pk, account))
 }
 
+/// This constant is needed to reject operation with fees too low.
+/// It should be removed when the simulation will be working on Tezlink
+const MINIMUM_FEES: u64 = 1u64;
+
 fn validate_individual_operation<Host: Runtime>(
     host: &Host,
     content: ManagerOperation<OperationContent>,
@@ -200,6 +204,12 @@ fn validate_individual_operation<Host: Runtime>(
         &content.storage_limit,
         hard_storage_limit
     );
+
+    // Verify that the fees of the operation is greater than the minimum requested for an operation
+    let minimum_fees: Narith = MINIMUM_FEES.into();
+    if content.fee < minimum_fees {
+        return Err(ValidityError::FeesTooLow(minimum_fees));
+    }
 
     // The manager account must be solvent to pay the announced fees.
     *account_balance = account_balance
