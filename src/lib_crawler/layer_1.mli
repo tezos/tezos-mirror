@@ -66,6 +66,9 @@ val create :
     exit. *)
 val shutdown : t -> unit Lwt.t
 
+(** [get_chain_id t] retreives the chain id of the chain [t] is connected to. *)
+val get_chain_id : t -> Chain_id.t tzresult Lwt.t
+
 (** [iter_heads ?name t f] calls [f] on all new heads appearing in the layer 1
     chain. In case of a disconnection with the layer 1 node, it reconnects
     automatically. If [f] returns an error (other than a disconnection),

@@ -164,6 +164,8 @@ let create ~name ~reconnection_delay ~l1_blocks_cache_size ?protocols
 
 let shutdown {l1; _} = shutdown l1
 
+let get_chain_id {l1; _} = Layer_1.get_chain_id l1
+
 let cache_shell_header {headers_cache; _} hash header =
   Blocks_cache.put headers_cache hash (Lwt.return_ok header)
 
