@@ -56,7 +56,10 @@ fn skip_dir(dir_name: &OsStr) -> bool {
         // cloned and not linked via symbolic links.
         ".git" |
         // Blobs are not supported on Etherlink.
-        "eip7516_blobgasfee" | "eip4844_blobs"
+        "eip7516_blobgasfee" | "eip4844_blobs" |
+        // Etherlink transaction's gas limit cap isn't the same
+        // as on Ethereum.
+        "eip7825_transaction_gas_limit_cap"
     )
 }
 
