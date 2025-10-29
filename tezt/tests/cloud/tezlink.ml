@@ -554,7 +554,8 @@ index 1d28850f..fbd54ed7 100644
     rpc_url
     tzkt_api_url
 
-let init_umami agent ~sequencer_proxy ~tzkt_proxy =
+let init_umami agent ~sequencer_proxy ~tzkt_proxy ~umami_proxy =
+  ignore umami_proxy ;
   let runner = Agent.runner agent in
   let external_tzkt_api_endpoint = proxy_external_endpoint ~runner tzkt_proxy in
   let tezlink_proxy_endpoint =
@@ -678,6 +679,8 @@ type faucet_proxys = {
   faucet_api_proxy : proxy_info;
   faucet_frontend_proxy : proxy_info;
 }
+
+type umami_proxys = {tzkt_proxy : proxy_info; umami_proxy : proxy_info}
 
 let add_service cloud ~name ~url =
   let () = toplog "New service: %s: %s" name url in
@@ -835,6 +838,21 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                deactivated (see the --tzkt option)."
         | (None | Some _), false -> none
       in
+      let* umami_proxys_opt =
+        match tzkt_proxy_opt with
+        | Some tzkt_proxy ->
+            let umami_proxy =
+              make_proxy
+                tezlink_sequencer_agent
+                ~path:None
+                ~dns_domain:
+                  (Option.map (fun doms -> doms.umami_domain) dns_domains)
+                None
+                activate_ssl
+            in
+            some {tzkt_proxy; umami_proxy}
+        | _ -> none
+      in
       let* () =
         add_services
           cloud
@@ -863,10 +881,14 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               ~sequencer_proxy
               ~time_between_blocks:Cli.time_between_blocks
       and* () =
-        match tzkt_proxy_opt with
+        match umami_proxys_opt with
         | None -> unit
-        | Some tzkt_proxy ->
-            init_umami tezlink_sequencer_agent ~sequencer_proxy ~tzkt_proxy
+        | Some {tzkt_proxy; umami_proxy} ->
+            init_umami
+              tezlink_sequencer_agent
+              ~sequencer_proxy
+              ~tzkt_proxy
+              ~umami_proxy
       and* () =
         match faucet_proxys_opt with
         | None -> unit
