@@ -14,6 +14,7 @@ use revm_etherlink::storage::world_state_handler::StorageAccount;
 use revm_etherlink::ExecutionOutcome;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
+use tezos_ethereum::rlp_helpers::{decode_field_u256_le, decode_option_explicit};
 use tezos_ethereum::{
     rlp_helpers::{decode_field, next},
     wei::eth_from_mutez,
@@ -43,6 +44,8 @@ const DEPOSIT_EXECUTION_GAS_COST: u64 = 9100;
 pub enum BridgeError {
     #[error("Invalid deposit receiver address: {0:?}")]
     InvalidDepositReceiver(Vec<u8>),
+    #[error("Invalid RLP bytes: {0}")]
+    RlpError(DecoderError),
 }
 
 alloy_sol_types::sol! {
@@ -54,6 +57,38 @@ alloy_sol_types::sol! {
     );
 }
 
+#[derive(Debug, PartialEq)]
+pub struct DepositInfo {
+    pub receiver: H160,
+    pub chain_id: Option<U256>,
+}
+
+impl DepositInfo {
+    fn decode(bytes: &[u8]) -> Result<Self, DecoderError> {
+        let version = bytes[0];
+        let decoder = Rlp::new(&bytes[1..]);
+        if version == 1u8 {
+            if !decoder.is_list() {
+                return Err(DecoderError::RlpExpectedToBeList);
+            }
+            if decoder.item_count()? != 2 {
+                return Err(DecoderError::RlpIncorrectListLen);
+            }
+            let mut it = decoder.iter();
+            let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
+            let chain_id: Option<U256> = decode_option_explicit(
+                &next(&mut it)?,
+                "chain_id",
+                decode_field_u256_le,
+            )?;
+            Ok(Self { receiver, chain_id })
+        } else {
+            Err(DecoderError::Custom(
+                "Unexpected version for Deposit informations",
+            ))
+        }
+    }
+}
 /// Native token deposit
 #[derive(Debug, PartialEq, Clone, RlpEncodable)]
 pub struct Deposit {
@@ -73,23 +108,28 @@ impl Deposit {
     const RECEIVER_AND_CHAIN_ID_LENGTH: usize =
         Self::RECEIVER_LENGTH + std::mem::size_of::<U256>();
 
-    fn parse_receiver(
-        input: MichelsonBytes,
-    ) -> Result<(H160, Option<U256>), BridgeError> {
+    fn parse_deposit_info(input: MichelsonBytes) -> Result<DepositInfo, BridgeError> {
         let input_bytes = input.0;
         let input_length = input_bytes.len();
         if input_length == Self::RECEIVER_LENGTH {
             // Legacy format, input is exactly the receiver EVM address
             let receiver = H160::from_slice(&input_bytes);
-            Ok((receiver, None))
+            Ok(DepositInfo {
+                receiver,
+                chain_id: None,
+            })
         } else if input_length == Self::RECEIVER_AND_CHAIN_ID_LENGTH {
             // input is receiver followed by chain id
             let receiver = H160::from_slice(&input_bytes[..Self::RECEIVER_LENGTH]);
             let chain_id =
                 U256::from_little_endian(&input_bytes[Self::RECEIVER_LENGTH..]);
-            Ok((receiver, Some(chain_id)))
+            Ok(DepositInfo {
+                receiver,
+                chain_id: Some(chain_id),
+            })
         } else {
-            Err(BridgeError::InvalidDepositReceiver(input_bytes))
+            // From now on, bytes are versionned rlp
+            DepositInfo::decode(&input_bytes).map_err(BridgeError::RlpError)
         }
     }
 
@@ -113,16 +153,16 @@ impl Deposit {
 
         // EVM address of the receiver and chain id both come from the
         // Michelson byte parameter.
-        let (receiver, chain_id) = Self::parse_receiver(receiver)?;
+        let info = Self::parse_deposit_info(receiver)?;
 
         Ok((
             Self {
                 amount,
-                receiver,
+                receiver: info.receiver,
                 inbox_level,
                 inbox_msg_id,
             },
-            chain_id,
+            info.chain_id,
         ))
     }
 
@@ -254,8 +294,9 @@ mod tests {
     use alloy_sol_types::SolEvent;
     use num_bigint::BigInt;
     use primitive_types::{H160, U256};
-    use rlp::Decodable;
+    use rlp::{Decodable, RlpStream};
     use tezos_crypto_rs::hash::ContractKt1Hash;
+    use tezos_ethereum::rlp_helpers::{append_option_explicit, append_u256_le};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup::{
         michelson::{ticket::FA2_1Ticket, MichelsonNat, MichelsonOption, MichelsonPair},
@@ -263,7 +304,7 @@ mod tests {
     };
     use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
 
-    use crate::bridge::{DepositResult, DEPOSIT_EVENT_TOPIC};
+    use crate::bridge::{DepositInfo, DepositResult, DEPOSIT_EVENT_TOPIC};
 
     use super::{execute_deposit, Deposit};
 
@@ -347,6 +388,97 @@ mod tests {
             }
         );
         pretty_assertions::assert_eq!(chain_id, Some(U256::one()))
+    }
+
+    #[test]
+    fn ensure_deposit_legacy_and_deposit_have_no_collision() {
+        let receiver = H160::from_slice(&[1u8; 20]);
+        let chain_id: U256 = 15544u64.into();
+        let mut chain_id_encoded = [0u8; 32];
+        chain_id.to_little_endian(&mut chain_id_encoded);
+
+        // Receiver representation should be 20 bytes long
+        let legacy_receiver = MichelsonBytes(receiver.as_bytes().to_vec());
+
+        assert_eq!(legacy_receiver.0.len(), Deposit::RECEIVER_LENGTH);
+
+        // Receiver and chain_id old representation should be 52 bytes long
+        let mut legacy_receiver_and_chain_id = MichelsonBytes(vec![]);
+        legacy_receiver_and_chain_id
+            .0
+            .extend_from_slice(receiver.as_bytes());
+        legacy_receiver_and_chain_id
+            .0
+            .extend_from_slice(&chain_id_encoded);
+
+        assert_eq!(
+            legacy_receiver_and_chain_id.0.len(),
+            Deposit::RECEIVER_AND_CHAIN_ID_LENGTH
+        );
+
+        // DepositInfo with no chain_id representation should be 24 bytes long
+        const RLP_DEPOSIT_NO_CHAIN_ID: usize = 24;
+        let deposit_info = DepositInfo {
+            receiver,
+            chain_id: None,
+        };
+        let mut stream = RlpStream::new();
+        stream.append(&1u8);
+        stream.begin_list(2);
+        stream.append(&deposit_info.receiver);
+        stream.append(&deposit_info.chain_id);
+        let deposit_info_no_chain_id = MichelsonBytes(stream.as_raw().to_vec());
+
+        assert_eq!(deposit_info_no_chain_id.0.len(), RLP_DEPOSIT_NO_CHAIN_ID);
+
+        // DepositInfo with no chain_id representation should be 56 bytes long
+        const RLP_DEPOSIT_CHAIN_ID: usize = 56;
+        let deposit_info = DepositInfo {
+            receiver,
+            chain_id: Some(chain_id),
+        };
+        let mut stream = RlpStream::new();
+        stream.append(&1u8);
+        stream.begin_list(2);
+        stream.append(&deposit_info.receiver);
+        append_option_explicit(&mut stream, &deposit_info.chain_id, append_u256_le);
+
+        let deposit_info_chain_id = MichelsonBytes(stream.as_raw().to_vec());
+
+        assert_eq!(deposit_info_chain_id.0.len(), RLP_DEPOSIT_CHAIN_ID);
+
+        let ticket =
+            create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 0, &[0u8], 2.into());
+        let result_legacy_receiver =
+            Deposit::try_parse(ticket, legacy_receiver, 0, 0).expect("Failed to parse");
+
+        let ticket =
+            create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 0, &[0u8], 2.into());
+        let result_legacy_receiver_chain_id =
+            Deposit::try_parse(ticket, legacy_receiver_and_chain_id, 0, 0)
+                .expect("Failed to parse");
+
+        let ticket =
+            create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 0, &[0u8], 2.into());
+        let result_deposit_info_no_chain_id =
+            Deposit::try_parse(ticket, deposit_info_no_chain_id, 0, 0)
+                .expect("Failed to parse");
+
+        let ticket =
+            create_fa_ticket("KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT", 0, &[0u8], 2.into());
+        let result_deposit_info_chain_id =
+            Deposit::try_parse(ticket, deposit_info_chain_id, 0, 0)
+                .expect("Failed to parse");
+
+        pretty_assertions::assert_eq!(
+            result_legacy_receiver,
+            result_deposit_info_no_chain_id,
+        );
+
+        pretty_assertions::assert_eq!(
+            result_legacy_receiver_chain_id,
+            result_deposit_info_chain_id,
+        );
     }
 
     #[test]
