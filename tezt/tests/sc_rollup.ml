@@ -3180,7 +3180,7 @@ let test_can_stake ~kind =
 
 let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp ?boot_sector
-    ?(extra_tags = []) ({allow_degraded; _} as scenario) =
+    ?(extra_tags = []) ?with_dal ({allow_degraded; _} as scenario) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
@@ -3210,7 +3210,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       variant = Some variant;
       description = "refutation games winning strategies";
     }
-    (test_refutation_scenario_aux ~mode ~kind scenario)
+    (test_refutation_scenario_aux ?with_dal ~mode ~kind scenario)
 
 let test_refutation protocols ~kind =
   let challenge_window = 10 in
