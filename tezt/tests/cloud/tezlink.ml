@@ -862,13 +862,13 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             unit
       in
       let* () =
-        let* rpc_nginx_node =
+        let* rpc_nginx_config =
           nginx_reverse_proxy_config
             ~agent:tezlink_sequencer_agent
             ~proxy:sequencer_proxy
         in
-        match rpc_nginx_node with
-        | Some rpc_nginx_node ->
+        match rpc_nginx_config with
+        | Some rpc_nginx_config ->
             let* tzkt_nginx_config =
               match tzkt_proxy_opt with
               | None -> none
@@ -880,7 +880,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             Nginx_reverse_proxy.init
               ~agent:tezlink_sequencer_agent
               ~site:"tezlink"
-              (rpc_nginx_node @ Option.value ~default:[] tzkt_nginx_config)
+              (rpc_nginx_config @ Option.value ~default:[] tzkt_nginx_config)
         | None -> unit
       in
       let () = toplog "Starting main loop" in
