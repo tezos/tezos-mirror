@@ -8,6 +8,7 @@ use std::{fs, path::PathBuf};
 
 use crate::{
     bindings::{self, end_span, start_span, BindingsError, Key},
+    otel_trace,
     reveal::{self, RevealPreimageError},
 };
 
@@ -380,13 +381,12 @@ fn store_write(
     }
 }
 
-fn reveal_metadata(
+fn reveal_metadata_internal(
     mut env: FunctionEnvMut<Env>,
     dst_ptr: u32,
     max_bytes: u32,
 ) -> Result<i32, RuntimeError> {
     trace!("reveal_metadata");
-    start_span("reaveal_metadata");
     let (runtime_env, store) = env.data_and_store_mut();
     let memory = runtime_env.memory();
     let memory_view = memory.view(&store);
@@ -410,8 +410,18 @@ fn reveal_metadata(
         )?;
     }
 
-    end_span();
     Ok(to_write as i32)
+}
+
+fn reveal_metadata(
+    mut env: FunctionEnvMut<Env>,
+    dst_ptr: u32,
+    max_bytes: u32,
+) -> Result<i32, RuntimeError> {
+    otel_trace!(
+        "reveal_metadata",
+        reveal_metadata_internal(env, dst_ptr, max_bytes)
+    )
 }
 
 fn reveal_preimage(
