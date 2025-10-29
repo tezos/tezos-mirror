@@ -166,10 +166,28 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
               (* This happens when, for example, the kernel requests a page from a future level. *)
               Lwt.fail (Error_wrapper error)
           | Ok data_opt -> (
+              let data_opt =
+                let published_level =
+                  Raw_level.to_int32 dal_page.slot_id.published_level
+                in
+                let slot_index = Dal.Slot_index.to_int dal_page.slot_id.index in
+                let page_index = dal_page.page_index in
+                match
+                  Loser_mode.is_invalid_dal_page
+                    node_ctxt.config.loser_mode
+                    ~published_level
+                    ~slot_index
+                    ~page_index
+                    ~page_size:(Int64.to_int dal_parameters.page_size)
+                    ~honest_payload:data_opt
+                with
+                | Either.Left () -> data_opt
+                | Either.Right data_opt -> data_opt
+              in
               match data_opt with
               | None ->
                   (* The page was not confirmed by L1.
-                 We return empty string in this case, as done in the slow executon. *)
+                     We return empty string in this case, as done in the slow executon. *)
                   Lwt.return ""
               | Some b -> Lwt.return (Bytes.to_string b)))
       | Reveal_dal_parameters ->
