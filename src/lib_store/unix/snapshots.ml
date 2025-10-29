@@ -2405,6 +2405,23 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     in
     return (export_block, pred_block, minimum_level_needed)
 
+  let retrieve_floating_block_list chain_store ~from_block ~to_block =
+    let open Lwt_result_syntax in
+    (* Invariant: the list of blocks returned by the
+       [Store.Chain_traversal.path] contains metadata for the block
+       target and its predecessor as the metadata were read during the
+       early steps of the snapshot export and are stored in the
+       cache. Having metadata for theses blocks is mandatory. *)
+    let*! o = Store.Chain_traversal.path chain_store ~from_block ~to_block in
+    match o with
+    | None -> tzfail Cannot_retrieve_block_interval
+    | Some floating_blocks ->
+        (* Don't forget to add the first block as
+           [Chain_traversal.path] does not include the lower-bound
+           block *)
+        let floating_blocks = from_block :: floating_blocks in
+        return_some floating_blocks
+
   (* Returns the list of cemented files to export and an optional list
      of remaining blocks. If the export block is cemented, we need to cut
      the cycle containing the export block accordingly and retrieve the
@@ -2415,7 +2432,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let* o = Cemented_block_store.load_table src_cemented_dir in
     match o with
     | None -> return ([], None)
-    | Some table_arr -> (
+    | Some table_arr ->
         let table_len = Array.length table_arr in
         let table = Array.to_list table_arr in
         (* Check whether the export_block is in the cemented blocks *)
@@ -2470,20 +2487,13 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                   Store.Block.read_block_by_level chain_store caboose_level
                 else return first_block_in_cycle
               in
-              let*! o =
-                Store.Chain_traversal.path
+              let* floating_blocks =
+                retrieve_floating_block_list
                   chain_store
                   ~from_block:first_block
                   ~to_block:export_block
               in
-              match o with
-              | None -> tzfail Cannot_retrieve_block_interval
-              | Some floating_blocks ->
-                  (* Don't forget to add the first block as
-                     [Chain_traversal.path] does not include the lower-bound
-                     block *)
-                  let floating_blocks = first_block :: floating_blocks in
-                  return (filtered_table, Some floating_blocks))
+              return (filtered_table, floating_blocks)
 
   (* Ensures that the history mode requested to export is compatible
      with the current storage. *)
