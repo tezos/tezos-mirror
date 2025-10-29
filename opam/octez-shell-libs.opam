@@ -28,8 +28,7 @@ depends: [
   "aches-lwt" { >= "1.1.0" }
   "index" { >= "1.6.0" & < "1.7.0" }
   "camlzip" { >= "1.13" }
-  "tar"
-  "tar-unix" { >= "2.0.1" & < "3.0.0" }
+  "octez-tar-helpers" { = version }
   "ppx_expect"
   "octez-rust-deps" { with-test & = version }
   "ocplib-endian"

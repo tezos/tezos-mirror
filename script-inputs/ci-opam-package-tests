@@ -76,6 +76,7 @@ octez-smart-rollup-node-PtSeouLo	all	1
 octez-smart-rollup-node-PtTALLiN	all	1
 octez-smart-rollup-node-alpha	all	1
 octez-smart-rollup-node-lib	all	2
+octez-tar-helpers	all	6
 octez-version	exec	6
 tezos-benchmark	all	6
 tezos-client-demo-counter	all	3
@@ -115,4 +116,4 @@ tezos-protocol-demo-counter	all	5
 tezos-protocol-demo-noops	all	6
 tezos-protocol-genesis	all	6
 tezt-migration-registry	all	6
-tezt-tezos	all	6
+tezt-tezos	all	7
