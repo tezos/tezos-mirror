@@ -22,10 +22,10 @@ git clone https://github.com/ethereum/execution-spec-tests
 
 2. Follow the instructions from the repository's [README](https://github.com/ethereum/execution-spec-tests/blob/main/README.md) to install all dependencies and generate all the needed fixture files.
 
-As an example, a command to generate Prague's fixtures should look like:
+As an example, a command to generate Osaka's fixtures should look like:
 
 ```
-uv run fill -v tests/prague/ --fork=Prague -m state_test --clean
+uv run fill -v tests/osaka/ --fork=Osaka -m state_test --clean
 ```
 
 3. Clone [evm-fixtures](https://github.com/functori/evm-fixtures).
