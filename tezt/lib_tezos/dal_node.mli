@@ -255,7 +255,7 @@ module Proxy : sig
   type proxy
 
   (** Represents a possible response from a proxy route. *)
-  type answer = [`Response of string]
+  type answer = [`Response of string | `Stream of Cohttp_lwt.Body.t]
 
   (** A route definition. *)
   type route
@@ -273,11 +273,18 @@ module Proxy : sig
     callback:
       (path:string ->
       fetch_answer:(unit -> Ezjsonm.t Lwt.t) ->
+      fetch_stream:(unit -> (Cohttp.Response.t * Cohttp_lwt.Body.t) Lwt.t) ->
       answer option Lwt.t) ->
     route
 
   (** Creates a new proxy instance. *)
-  val make : name:string -> routes:route list -> proxy
+  val make :
+    name:string ->
+    attestation_lag:int ->
+    number_of_slots:int ->
+    faulty_delegate:string ->
+    target_attested_level:int ->
+    proxy
 
   (** Starts running the proxy server. *)
   val run : proxy -> honest_dal_node:t -> faulty_dal_node:t -> unit

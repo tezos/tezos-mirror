@@ -10636,25 +10636,28 @@ let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
      [faulty_delegate] misbehaves. Specifically, it:
 
      - Creates a DAL node [proxy] whose role is to mimick the honest
-     [dal_node] by forwarding to the honest DAL node each RPC call
-     except for [/profiles/<tz>/attested_levels/<n>/attestable_slots],
-     where [<tz>] is the [faulty_delegate] and [<n>] is the level [2 *
-     blocks_per_cycle + 1]. For this RPC path, it will declare for the
-     [faulty_delegate] each slot attestable by replacing the honest
-     DAL node answer field ['attestable_slots_set'] to an array of
-     ['true'] values.
+       [dal_node] by forwarding to the honest DAL node each RPC call,
+       except for the attestable-slots endpoints for the [faulty_delegate]:
+         - the streamed RPC [/profiles/<tz>/monitor/attestable_slots], where
+           the proxy rewrites the JSON stream so that, at
+           [<n> = 2 * blocks_per_cycle + 1] (the target attested level),
+           the delegate appears to have all slots attestable (by adding
+           the corresponding slot_ids in the backfill and/or live events);
+         - the legacy per-level RPC [/profiles/<tz>/attested_levels/<n>/attestable_slots],
+           which is also overridden for compatibility by flipping the returned
+           ['attestable_slots_set'] array to all ['true'].
 
      The test proceeds as follows:
 
      1. Bakes [blocks_per_cycle] blocks to avoid the period in which
-     the DAL node is not able to inject an accusation because of the
-     accusation delay introduced by the migration.
+        the DAL node is not able to inject an accusation because of the
+        accusation delay introduced by the migration.
 
      2. Bakes [blocks_per_cycle] blocks while publishing on slot index
-     [0] and checks that [faulty_delegate] is not denounced at the end.
+        [0] and checks that [faulty_delegate] is not denounced at the end.
 
      3. Bakes again [blocks_per_cycle] blocks to finally reach [3 *
-     blocks_per_cycle] blocks.
+        blocks_per_cycle] blocks.
 
      - Finally, the test
 
@@ -10662,8 +10665,8 @@ let test_denunciation_next_cycle protocol dal_parameters cryptobox node client
              the third cycle and verifies that:
              - Multiple DAL attesting rewards were minted.
              - The delegates that lost the DAL rewards are the [faulty_delegate]
-             and the ones that lost the consensus attesting rewards because they
-             haven't revealed nonces.
+               and the ones that lost the consensus attesting rewards because they
+               haven't revealed nonces.
 
         - b) retrieves the [faulty_delegate] DAL participation at the
              end of the third cycle, minus one block (i.e "head~1")
@@ -10683,36 +10686,12 @@ let test_e2e_trap_faulty_dal_node protocol dal_parameters _cryptobox node client
   let target_attested_level = (2 * blocks_per_cycle) + 1 in
   let faulty_delegate = Constant.bootstrap1.Account.public_key_hash in
   let proxy =
-    let routes =
-      [
-        (let path =
-           Re.Str.regexp
-           @@ Format.sprintf
-                "/profiles/%s/attested_levels/%d/attestable_slots"
-                faulty_delegate
-                target_attested_level
-         in
-         Dal_node.Proxy.route ~path ~callback:(fun ~path:_ ~fetch_answer ->
-             let open Ezjsonm in
-             let* dal_node_answer = fetch_answer () in
-             let v = value dal_node_answer in
-             let kind = find v ["kind"] |> get_string in
-             let new_v =
-               if String.equal kind "attestable_slots_set" then
-                 let attestable_slots_set =
-                   (* Declare each slot attestable. *)
-                   find v ["attestable_slots_set"]
-                   |> get_list get_bool
-                   |> List.map (fun _ -> true)
-                   |> list bool
-                 in
-                 update v ["attestable_slots_set"] (Some attestable_slots_set)
-               else v
-             in
-             return (Some (`Response (value_to_string new_v)))));
-      ]
-    in
-    Dal_node.Proxy.make ~name:"proxy-dal-node" ~routes
+    Dal_node.Proxy.make
+      ~name:"proxy-dal-node"
+      ~attestation_lag:dal_parameters.Dal.Parameters.attestation_lag
+      ~number_of_slots:dal_parameters.Dal.Parameters.number_of_slots
+      ~faulty_delegate
+      ~target_attested_level
   in
   let faulty_dal_node =
     Dal_node.create
