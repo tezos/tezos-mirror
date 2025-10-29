@@ -122,9 +122,9 @@ let is_attestable_slot_or_trap ctxt ~pkh ~(slot_id : Types.slot_id) =
           shard_indices
       in
       let all_stored = number_stored_shards = number_of_assigned_shards in
-      if not last_known_parameters.incentives_enable then
-        if all_stored then return_some `Attestable_slot else return_none
-      else if not all_stored then return_none
+      if not all_stored then return_none
+      else if not last_known_parameters.incentives_enable then
+        return_some `Attestable_slot
       else
         let* is_attestable_slot_with_traps =
           is_attestable_slot_with_traps
