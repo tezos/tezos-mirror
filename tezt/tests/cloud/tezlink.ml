@@ -697,7 +697,7 @@ let add_proxy_service cloud runner name ?(url = Fun.id) proxy =
   add_service cloud ~name ~url:(url endpoint)
 
 let add_services cloud runner ~sequencer_proxy ~tzkt_proxy_opt
-    ~faucet_proxys_opt =
+    ~faucet_proxys_opt ~umami_proxys_opt =
   let add_proxy_service = add_proxy_service cloud runner in
   let* () =
     add_proxy_service
@@ -731,6 +731,11 @@ let add_services cloud runner ~sequencer_proxy ~tzkt_proxy_opt
             faucet_api_proxy
         in
         add_proxy_service "Faucet" faucet_frontend_proxy
+  in
+  let* () =
+    match umami_proxys_opt with
+    | None -> unit
+    | Some {umami_proxy; _} -> add_proxy_service "Umami" umami_proxy
   in
   unit
 
@@ -864,6 +869,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           ~sequencer_proxy
           ~tzkt_proxy_opt
           ~faucet_proxys_opt
+          ~umami_proxys_opt
       in
       let () = toplog "Starting Tezlink sequencer" in
       let* () =
