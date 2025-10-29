@@ -134,6 +134,10 @@ workflow:
     variables:
       PIPELINE_TYPE: debian.daily
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "rpm.daily"
+    variables:
+      PIPELINE_TYPE: rpm.daily
+    when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_RPC_TESTS"
     variables:
       PIPELINE_TYPE: schedule_extended_rpc_test
@@ -355,6 +359,10 @@ include:
 - local: .gitlab/ci/pipelines/debian.daily.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "debian.daily"
+    when: always
+- local: .gitlab/ci/pipelines/rpm.daily.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "rpm.daily"
     when: always
 - local: .gitlab/ci/pipelines/schedule_extended_rpc_test.yml
   rules:

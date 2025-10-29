@@ -1,19 +1,6 @@
 # This file was automatically generated, do not edit.
 # Edit file ci/bin/main.ml instead.
 
-default:
-  interruptible: true
-  retry:
-    max: 2
-    when:
-    - script_failure
-    - runner_system_failure
-
-workflow:
-  rules:
-  - if: $foo != "bar" || $foo == "bar"
-    when: always
-
 stages:
 - start
 - images
@@ -30,6 +17,7 @@ datadog_pipeline_trace:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -49,6 +37,7 @@ oc.docker-build-rockylinux-dependencies:
   - $TAGS
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -83,6 +72,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
   - $TAGS
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -124,6 +114,7 @@ oc.build-rockylinux:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -173,6 +164,7 @@ oc.build-rockylinux-data:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -220,6 +212,7 @@ rpm_repo_rockylinux:
   - oc.build-rockylinux
   - oc.build-rockylinux-data
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -247,6 +240,7 @@ oc.docker-build-fedora-dependencies:
   - $TAGS
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -282,6 +276,7 @@ oc.docker-systemd-tests-rpm-fedora:
   - $TAGS
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -324,6 +319,7 @@ oc.build-fedora:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -374,6 +370,7 @@ oc.build-fedora-data:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -422,6 +419,7 @@ rpm_repo_fedora:
   - oc.build-fedora
   - oc.build-fedora-data
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -451,6 +449,7 @@ oc.install_bin_fedora_39.doc:
   - rpm_repo_fedora
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -473,6 +472,7 @@ oc.install_bin_fedora_39_systemd:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -503,6 +503,7 @@ oc.install_bin_rockylinux_9.3.doc:
   - rpm_repo_rockylinux
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -525,6 +526,7 @@ oc.install_bin_rockylinux_93_systemd:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
