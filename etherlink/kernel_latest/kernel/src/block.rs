@@ -1108,7 +1108,7 @@ mod tests {
         assert_eq!(Manager::NotRevealed(src), manager);
 
         // Reveal bootstrap 1 manager
-        let reveal = make_reveal_operation(1, 1, 0, 0, bootstrap);
+        let reveal = make_reveal_operation(1, 1, 500, 0, bootstrap);
 
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
@@ -1171,7 +1171,7 @@ mod tests {
         .expect("Public key creation should have succeed");
 
         // Reveal bootstrap 1 manager
-        let reveal = make_reveal_operation(1, 1, 0, 0, boostrap1.clone());
+        let reveal = make_reveal_operation(1, 1, 500, 0, boostrap1.clone());
 
         // Bootstrap 1 will transfer 35 mutez to bootstrap 2
 
@@ -1193,7 +1193,7 @@ mod tests {
         let transfer = make_transaction_operation(
             1,
             2,
-            0,
+            3000,
             0,
             boostrap1,
             35_u64.into(),

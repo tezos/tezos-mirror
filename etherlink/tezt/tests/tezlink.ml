@@ -1722,6 +1722,7 @@ let test_tezlink_prevalidation =
       ~source:Constant.bootstrap1
       ~dest:unrevealed
       ~fee:2000
+      ~gas_limit:5000
       client_tezlink
   in
 
@@ -2411,6 +2412,7 @@ let test_tezlink_validation_balance =
       ~source:Constant.bootstrap1
       ~dest:new_account
       ~amount
+      ~gas_limit:5000
       client_tezlink
   in
   let* () = produce_block_and_wait_for ~sequencer 3 in
