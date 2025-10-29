@@ -14,7 +14,6 @@
 
 - Prevent transactions from getting stuck when they are being sent to an
   unresponsive node. (!19683, !19718)
-
 - Add support for state overrides in `eth_estimateGas` for EIP-7702, and
   generalize block parameter of `eth_estimateGas` to support block
   hashes. (!19737)
@@ -22,6 +21,9 @@
   with `eth_subscribe`. (!19743)
 
 ### Monitoring changes
+
+- Websocket client now emits traces when profiling with Opentelemetry is
+  enabled. (!19763)
 
 ### Command-line interface changes
 
