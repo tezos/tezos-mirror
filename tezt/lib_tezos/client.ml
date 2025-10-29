@@ -1890,8 +1890,8 @@ let write_stresstest_sources_file ?runner ~sources filename =
       Helpers.write_file ~runner filename ~contents:(JSON.encode_u sources)
 
 let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
-    ?transfers ?tps ?fresh_probability ?smart_contract_parameters client
-    sources_filename =
+    ?transfers ?tps ?fresh_probability ?smart_contract_parameters ?strategy
+    ?level_limit client sources_filename =
   let seed =
     (* Note: Tezt does not call [Random.self_init] so this is not
        randomized from one run to the other (if the exact same tests
@@ -1909,6 +1909,10 @@ let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
   in
   let make_float_opt_arg (name : string) = function
     | Some (arg : float) -> [name; Float.to_string arg]
+    | None -> []
+  in
+  let make_string_int_opt_arg (name : string) s = function
+    | Some (arg : int) -> [name; sf "%s%s" s (Int.to_string arg)]
     | None -> []
   in
   let fee_arg =
@@ -1955,6 +1959,8 @@ let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
   @ make_int_opt_arg "--tps" tps
   @ make_float_opt_arg "--fresh-probability" fresh_probability
   @ smart_contract_parameters_arg
+  @ make_string_int_opt_arg "--level-limit" "+" level_limit
+  @ make_string_int_opt_arg "--strategy" "fixed:" strategy
 
 let spawn_stresstest ?env ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps

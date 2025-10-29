@@ -1462,6 +1462,8 @@ val spawn_stresstest_with_filename :
   ?tps:int ->
   ?fresh_probability:float ->
   ?smart_contract_parameters:(string * stresstest_contract_parameters) list ->
+  ?strategy:int ->
+  ?level_limit:int ->
   t ->
   string ->
   Process.t
