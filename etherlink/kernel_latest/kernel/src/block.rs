@@ -1093,7 +1093,7 @@ mod tests {
         account
             .allocate(&mut host)
             .expect("Contract initialization should have succeeded");
-
+        account.set_balance(&mut host, &10u64.into()).unwrap();
         let pk = PublicKey::from_b58check(
             "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
         )
@@ -1106,7 +1106,7 @@ mod tests {
         assert_eq!(Manager::NotRevealed(src), manager);
 
         // Reveal bootstrap 1 manager
-        let reveal = make_reveal_operation(0, 1, 0, 0, bootstrap);
+        let reveal = make_reveal_operation(1, 1, 0, 0, bootstrap);
 
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
@@ -1169,7 +1169,7 @@ mod tests {
         .expect("Public key creation should have succeed");
 
         // Reveal bootstrap 1 manager
-        let reveal = make_reveal_operation(0, 1, 0, 0, boostrap1.clone());
+        let reveal = make_reveal_operation(1, 1, 0, 0, boostrap1.clone());
 
         // Bootstrap 1 will transfer 35 mutez to bootstrap 2
 
@@ -1189,7 +1189,7 @@ mod tests {
 
         // Bootstrap 1 transfer 35 mutez to bootstrap 2
         let transfer = make_transaction_operation(
-            0,
+            1,
             2,
             0,
             0,
@@ -1231,7 +1231,8 @@ mod tests {
         // Bootstrap 1 should have sent 35 mutez to Bootstrap 2
         let bootstrap1_balance = bootstrap1.balance(&host).unwrap();
 
-        assert_eq!(bootstrap1_balance, 15_u64.into());
+        // bootstrap 1 should have pay 2 mutez in fees (for reveal and transfer)
+        assert_eq!(bootstrap1_balance, 13_u64.into());
 
         let bootstrap2_balance = bootstrap2.balance(&host).unwrap();
 
@@ -1286,9 +1287,8 @@ mod tests {
         bootstrap1
             .set_manager_public_key(&mut host, &pk)
             .expect("Set manager should have succeed");
-
         let origination = make_origination_operation(
-            0,
+            1,
             1,
             1000,
             0,
@@ -1306,7 +1306,7 @@ mod tests {
             ));
 
         let call = make_transaction_operation(
-            0,
+            1,
             2,
             1000,
             0,
