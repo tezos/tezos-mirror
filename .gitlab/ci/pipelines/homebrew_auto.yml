@@ -80,8 +80,6 @@ oc.build-homebrew:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    CARGO_NET_OFFLINE: "false"
 
 oc.install-homebrew-macosx:
   image: macos-15-xcode-16

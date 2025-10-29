@@ -270,8 +270,8 @@ oc.docker:arm64:
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables
 
-oc.install-release-homebrew:
-  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian:bookworm
+oc.build-homebrew:
+  image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie
   stage: build
   tags:
   - gcp
@@ -284,15 +284,11 @@ oc.install-release-homebrew:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/install-gsutil.sh
-  - apt install -y git build-essential
-  - ./scripts/packaging/homebrew_install.sh
-  - eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
   - ./scripts/packaging/homebrew_release.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
-    name: build-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
     - public/homebrew/*
@@ -333,11 +329,11 @@ gitlab:publish:
   needs:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
-  - oc.install-release-homebrew
+  - oc.build-homebrew
   dependencies:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
-  - oc.install-release-homebrew
+  - oc.build-homebrew
   timeout: 60 minutes
   interruptible: false
   before_script:
