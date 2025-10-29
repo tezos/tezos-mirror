@@ -621,20 +621,25 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
   in
   let input_validation_state = {state.validation_state with current_size} in
   let validate (validation_state, rev_txns) ((raw, tx_object) as entry) =
-    match tx_object with
-    | Tx_queue_types.Evm tx_object -> (
-        let+ res =
-          validate_tx ~maximum_cumulative_size validation_state raw tx_object
-        in
-        match res with
-        | `Drop -> (validation_state, rev_txns)
-        | `Keep latest_validation_state ->
-            Broadcast.notify_inclusion (Common (Evm raw)) ;
-            (latest_validation_state, entry :: rev_txns)
-        | `Stop -> (validation_state, rev_txns))
-    | Tx_queue_types.Michelson _ ->
-        (* Ignore tezlink operations for now *)
-        return (validation_state, rev_txns)
+    let+ res, wrapped_raw =
+      match tx_object with
+      | Tx_queue_types.Evm tx_object ->
+          let+ res =
+            validate_tx ~maximum_cumulative_size validation_state raw tx_object
+          in
+          (res, Broadcast.Evm raw)
+      | Tx_queue_types.Michelson operation ->
+          let+ res =
+            validate_op ~maximum_cumulative_size validation_state raw operation
+          in
+          (res, Broadcast.Michelson raw)
+    in
+    match res with
+    | `Drop -> (validation_state, rev_txns)
+    | `Keep latest_validation_state ->
+        Broadcast.notify_inclusion (Common wrapped_raw) ;
+        (latest_validation_state, entry :: rev_txns)
+    | `Stop -> (validation_state, rev_txns)
   in
   let* validation_state, rev_validated_txns =
     List.fold_left_es validate (input_validation_state, []) transactions
