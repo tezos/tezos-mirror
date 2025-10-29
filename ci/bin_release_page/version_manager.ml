@@ -53,6 +53,8 @@ let version_to_rss_item ~component version =
   let version_str = Version.to_string version in
   let title = sf "%s %s" (String.capitalize_ascii component.name) version_str in
   let guid = sf "%s-%s" component.name version_str in
+  (* TODO: Deduce from command line arguments. *)
+  let link = "https://octez.tezos.com/releases" in
   let pubDate = version.publication_date |> Unix.gmtime in
   let description =
     sf
@@ -62,7 +64,7 @@ let version_to_rss_item ~component version =
       version.minor
       (match version.rc with Some rc -> sf "-rc%d" rc | None -> "")
   in
-  Rss.make_item ~title ~description ~guid ~pubDate
+  Rss.make_item ~title ~description ~guid ~link ~pubDate
 
 let () =
   Clap.description

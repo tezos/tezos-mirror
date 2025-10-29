@@ -11,11 +11,12 @@ type item = {
   title : string;
   description : string;
   guid : string;
+  link : string;
   pubDate : Unix.tm;
 }
 
-let make_item ~title ~description ~guid ~pubDate =
-  {title; description; guid; pubDate}
+let make_item ~title ~description ~guid ~link ~pubDate =
+  {title; description; guid; link; pubDate}
 
 type channel = {
   title : string;
@@ -75,17 +76,19 @@ let show_time (time : Unix.tm) =
     time.tm_sec
 
 (* [show_item_rss channel] converts [item] to string.*)
-let show_item_rss {title; description; guid; pubDate} =
+let show_item_rss {title; description; guid; link; pubDate} =
   sf
     "    <item>\n\
     \      <title>%s</title>\n\
     \      <description>%s</description>\n\
-    \      <guid>%s</guid>\n\
+    \      <guid isPermaLink=\"false\">%s</guid>\n\
+    \      <link>%s</link>\n\
     \      <pubDate>%s</pubDate>\n\
     \    </item>"
     (escape_xml_text title)
     (escape_xml_text description)
     (escape_xml_text guid)
+    (escape_xml_text link)
     (show_time pubDate)
 
 (* [show_channel_rss channel] converts [channel] to string. *)
