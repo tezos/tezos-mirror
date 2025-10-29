@@ -54,6 +54,8 @@ let scheduled = pipeline_source_eq Schedule
 let schedule_extended_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_TESTS"
 
+let debian_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "debian.daily"
+
 let schedule_extended_rpc_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_RPC_TESTS"
 

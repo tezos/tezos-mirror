@@ -799,13 +799,6 @@ let jobs pipeline_type =
         ~dependencies:dependencies_needs_start
         Debian_repository.child_pipeline_partial_auto
     in
-    let job_debian_repository_trigger_full : tezos_job =
-      trigger_job
-        ~__POS__
-        ~dependencies:(Dependent [])
-        ~stage:Stages.test
-        Debian_repository.child_pipeline_full
-    in
 
     (* rpm counterpart of the debian tests *)
     let job_rpm_repository_trigger_auto =
@@ -1514,7 +1507,6 @@ let jobs pipeline_type =
           ]
       | Schedule_extended_test ->
           [
-            job_debian_repository_trigger_full;
             job_rpm_repository_trigger_full;
             job_homebrew_trigger_full;
             job_base_images_trigger;

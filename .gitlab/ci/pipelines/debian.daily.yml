@@ -1,19 +1,6 @@
 # This file was automatically generated, do not edit.
 # Edit file ci/bin/main.ml instead.
 
-default:
-  interruptible: true
-  retry:
-    max: 2
-    when:
-    - script_failure
-    - runner_system_failure
-
-workflow:
-  rules:
-  - if: $foo != "bar" || $foo == "bar"
-    when: always
-
 stages:
 - start
 - images
@@ -30,6 +17,7 @@ datadog_pipeline_trace:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -49,6 +37,7 @@ oc.docker-systemd_tests_debian:
   - $TAGS
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -84,6 +73,7 @@ oc.docker-systemd_tests_ubuntu:
   - $TAGS
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -119,6 +109,7 @@ oc.docker-build-debian-dependencies:
   - $TAGS
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -161,6 +152,7 @@ oc.build-debian:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -202,6 +194,7 @@ oc.build-data_packages:
   - oc.docker-build-debian-dependencies
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -235,6 +228,7 @@ apt_repo_debian:
   - oc.build-debian
   - oc.build-data_packages
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -263,6 +257,7 @@ oc.docker-build-ubuntu-dependencies:
   - $TAGS
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -305,6 +300,7 @@ oc.build-ubuntu:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -349,6 +345,7 @@ apt_repo_ubuntu:
   - oc.build-ubuntu
   - oc.build-data_packages
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -380,6 +377,7 @@ oc.lintian_debian:
   dependencies:
   - oc.build-debian
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -404,6 +402,7 @@ oc.install_bin_debian_bookworm:
   - apt_repo_debian
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -427,6 +426,7 @@ oc.install_bin_debian_bookworm_systemd_test:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -460,6 +460,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -492,6 +493,7 @@ oc.lintian_ubuntu:
   dependencies:
   - oc.build-ubuntu
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -516,6 +518,7 @@ oc.install_bin_ubunty_jammy:
   - apt_repo_ubuntu
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -537,6 +540,7 @@ oc.install_bin_ubunty_noble:
   - apt_repo_ubuntu
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -560,6 +564,7 @@ oc.install_bin_ubuntu_noble_systemd:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -593,6 +598,7 @@ oc.upgrade_bin_ubuntu_jammy_systemd_test:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -626,6 +632,7 @@ oc.upgrade_bin_ubuntu_noble_systemd_test:
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh

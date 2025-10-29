@@ -347,6 +347,14 @@ let () =
        pipelines run only subset of all jobs depending on files modified by \
        the MR. This \"safety net\"-pipeline ensures that all jobs run at least \
        daily." ;
+  register
+    "debian.daily"
+    debian_daily
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace :: Debian_repository.(jobs Full)
+      |> List.map (with_interruptible false))
+    ~description:
+      "Daily pipeline containing all Debian jobs (build and extended tests)." ;
   let custom_extended_test_jobs = Custom_extended_test_pipeline.jobs () in
   register
     "schedule_extended_rpc_test"
