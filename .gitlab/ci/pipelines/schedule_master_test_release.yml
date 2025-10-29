@@ -270,7 +270,7 @@ oc.docker:arm64:
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
 
-oc.build-homebrew:
+oc.create-homebrew-formula:
   image: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian-homebrew:trixie
   stage: build
   tags:
@@ -329,11 +329,11 @@ gitlab:publish:
   needs:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
-  - oc.build-homebrew
+  - oc.create-homebrew-formula
   dependencies:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
-  - oc.build-homebrew
+  - oc.create-homebrew-formula
   timeout: 60 minutes
   interruptible: false
   before_script:

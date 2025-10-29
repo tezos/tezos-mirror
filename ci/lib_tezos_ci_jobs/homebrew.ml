@@ -19,7 +19,7 @@ let stage = Stages.build
 let job_create_homebrew_formula : tezos_job =
   job
     ~__POS__
-    ~name:"oc.build-homebrew"
+    ~name:"oc.create-homebrew-formula"
     ~arch:Amd64
     ~image
     ~stage
@@ -32,7 +32,7 @@ let job_create_homebrew_formula : tezos_job =
 let job_build_homebrew_formula : tezos_job =
   job
     ~__POS__
-    ~name:"oc.install-homebrew"
+    ~name:"oc.build-homebrew-formula"
     ~arch:Amd64
     ~cpu:Very_high
     ~allow_failure:No
@@ -46,7 +46,7 @@ let job_build_homebrew_formula : tezos_job =
 let job_build_homebrew_formula_macosx : tezos_job =
   job
     ~__POS__
-    ~name:"oc.install-homebrew-macosx"
+    ~name:"oc.build-homebrew-formula-macosx"
     ~image:Images.macosx_15
     ~variables:[("TAGS", "saas-macos-large-m2pro")]
     ~dependencies:(Dependent [Job job_create_homebrew_formula])
