@@ -8,8 +8,13 @@ For the list of changes brought by Rio with respect to Quebec, see :doc:`./022_r
 For a higher-level overview of the most salient new features see the
 `announcement blog <https://research-development.nomadic-labs.com/seoul-announcement.html>`__.
 
-The code can be found in directory :src:`src/proto_023_PtSeouLo` of the ``master``
-branch of Octez and the full documentation in :doc:`this page <../active/index>`.
+An overview of breaking changes and deprecations introduced in
+protocol Seoul can be found :ref:`here<seoul_breaking_changes>`.
+
+The code is available in directory :src:`src/proto_023_PtSeouLo` of
+the ``master`` branch of Octez and the full documentation in
+:doc:`this page <../active/index>`.
+
 
 Environment Version
 -------------------
@@ -49,7 +54,7 @@ Michelson
 Gas improvements
 ----------------
 
-.. _seoul_breaking_changes:
+.. _seoul_changelog_breaking_changes:
 
 Breaking Changes
 ----------------
