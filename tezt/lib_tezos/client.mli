@@ -1534,6 +1534,9 @@ val stresstest_fund_accounts_from_source :
   ?env:string String_map.t ->
   ?endpoint:endpoint ->
   source_key_pkh:string ->
+  ?burn_cap:int ->
+  ?fee_cap:int ->
+  ?default_gas_limit:int ->
   ?batch_size:int ->
   ?batches_per_block:int ->
   ?initial_amount:Tez.t ->

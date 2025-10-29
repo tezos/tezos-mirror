@@ -2120,13 +2120,17 @@ let stresstest_originate_smart_contracts ?endpoint (source : Account.key) client
   |> Process.check
 
 let stresstest_fund_accounts_from_source ?env ?endpoint ~source_key_pkh
-    ?batch_size ?batches_per_block ?initial_amount client =
+    ?burn_cap ?fee_cap ?default_gas_limit ?batch_size ?batches_per_block
+    ?initial_amount client =
   spawn_command
     ?env
     ?endpoint
     client
     (["stresstest"; "fund"; "accounts"; "from"; source_key_pkh]
     @ optional_arg "batch-size" string_of_int batch_size
+    @ optional_arg "burn-cap" string_of_int burn_cap
+    @ optional_arg "fee-cap" string_of_int fee_cap
+    @ optional_arg "default-gas-limit" string_of_int default_gas_limit
     @ optional_arg "batches-per-block" string_of_int batches_per_block
     @ optional_arg
         "initial-amount"
