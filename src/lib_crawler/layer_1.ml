@@ -567,10 +567,16 @@ let trace_name service =
   String.concat " " [meth; path]
 
 let client_context_with_timeout (obj : #Client_context.full) timeout :
-    Client_context.full =
+    Client_context.full tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let+ chain_id =
+    Tezos_shell_services.Shell_services.Chain.chain_id obj ~chain:obj#chain ()
+  in
   let open Lwt_syntax in
   object
     inherit Client_context.proxy_context (obj :> Client_context.full)
+
+    method! chain = `Hash chain_id
 
     method! call_service :
         'm 'p 'q 'i 'o.
