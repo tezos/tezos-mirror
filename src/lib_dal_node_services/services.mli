@@ -223,11 +223,12 @@ val get_attestable_slots :
 (** Stream attestable slot_ids for the given public key hash [pkh].
     A slot is attestable at level [L] if it was published at [L - attestation_lag]
     and *all* shards assigned at level [L] to [pkh] are available in the DAL
-    node's store. *)
+    node's store. Returns a "not in committee" message if that is the case
+    for [pkh] at level [L]. *)
 val monitor_attestable_slots :
   < meth : [`GET]
   ; input : unit
-  ; output : Types.slot_id
+  ; output : Types.Attestable_slots_watcher_table.Attestable_event.t
   ; prefix : unit
   ; params : unit * Signature.public_key_hash
   ; query : unit >

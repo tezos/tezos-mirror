@@ -412,10 +412,24 @@ module Health : sig
 end
 
 module Attestable_slots_watcher_table : sig
+  module Attestable_event : sig
+    (** DAL attestability items emitted on a per-delegate stream.
+      The delegate is implicit, as each stream is bound to a single delegate. *)
+    type t =
+      | Attestable_slot of {slot_id : slot_id}
+          (** the [slot_id] is now attestable for the delegate *)
+      | No_shards_assigned of {attestation_level : level}
+          (** the delegate has no assigned shards at [attestation_level] *)
+      | Slot_has_trap of {slot_id : slot_id}
+          (** the [slot_id] is a trap for the delegate *)
+
+    val encoding : t Data_encoding.t
+  end
+
   type watcher
 
   (** Returns the stream currently stored in the watcher. *)
-  val get_stream : watcher -> slot_id Lwt_watcher.input
+  val get_stream : watcher -> Attestable_event.t Lwt_watcher.input
 
   (** Returns the number of subscribers to the stream currently stored in the watcher. *)
   val get_num_subscribers : watcher -> shard_index
@@ -436,8 +450,20 @@ module Attestable_slots_watcher_table : sig
   val get_or_init :
     t -> Signature.public_key_hash -> proto_parameters option -> watcher
 
-  (** [notify t pkh ~slot_id] pushes [slot_id] to the stream for [pkh] if present. *)
-  val notify : t -> Signature.public_key_hash -> slot_id:slot_id -> unit
+  (** [notify_attestable_slot t pkh ~slot_id] pushes an [Attestable_slot] event for [~slot_id]
+      to the stream for [pkh], if present. *)
+  val notify_attestable_slot :
+    t -> Signature.public_key_hash -> slot_id:slot_id -> unit
+
+  (** [notify_no_shards_assigned t pkh ~attestation_level] pushes a [No_shards_assigned] event for
+      [~attestation_level] to the stream for [pkh], if present. *)
+  val notify_no_shards_assigned :
+    t -> Signature.public_key_hash -> attestation_level:level -> unit
+
+  (** [notify_slot_has_trap t pkh ~slot_id] pushed a [Slot_has_trap] event for [~slot_id] to the
+      stream for [pkh], if present. *)
+  val notify_slot_has_trap :
+    t -> Signature.public_key_hash -> slot_id:slot_id -> unit
 
   (** [remove t pkh] removes the watcher entry for [pkh] from [t] if present. *)
   val remove : t -> Signature.public_key_hash -> unit

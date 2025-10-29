@@ -628,9 +628,17 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
         Int32.(
           pred @@ add level (of_int proto_parameters.Types.attestation_lag))
       in
-      let* (_committee : (int trace * int) Signature.Public_key_hash.Map.t) =
+      let* (committee : (int trace * int) Signature.Public_key_hash.Map.t) =
         Node_context.fetch_committees ctxt ~level:attestation_level
       in
+      (* Note that, when the baker and DAL node are synchronized, then if
+         the baker is at level L, then in this function `block_level = L - 2`.
+         We therefore need the committee at `block_level + 2`. So, as long as
+         `attestation_lag > 2`, there should be no issue. *)
+      Attestable_slots.may_notify_not_in_committee
+        ctxt
+        committee
+        ~attestation_level ;
       return_unit
   in
   Gossipsub.Worker.Validate_message_hook.set_batch

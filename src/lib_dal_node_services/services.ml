@@ -406,7 +406,7 @@ let get_attestable_slots :
 let monitor_attestable_slots :
     < meth : [`GET]
     ; input : unit
-    ; output : Types.slot_id
+    ; output : Types.Attestable_slots_watcher_table.Attestable_event.t
     ; prefix : unit
     ; params : unit * Signature.public_key_hash
     ; query : unit >
@@ -420,7 +420,7 @@ let monitor_attestable_slots :
        detected as traps for the baker, the slot should not be attested, so \
        the id is not sent via the stream."
     ~query:Tezos_rpc.Query.empty
-    ~output:Types.slot_id_encoding
+    ~output:Types.Attestable_slots_watcher_table.Attestable_event.encoding
     Tezos_rpc.Path.(
       open_root / "profiles" /: Signature.Public_key_hash.rpc_arg / "monitor"
       / "attestable_slots")

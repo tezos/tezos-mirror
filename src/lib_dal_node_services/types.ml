@@ -789,15 +789,58 @@ module SlotIdSet =
     end)
 
 module Attestable_slots_watcher_table = struct
+  module Attestable_event = struct
+    type t =
+      | Attestable_slot of {slot_id : slot_id}
+      | No_shards_assigned of {attestation_level : level}
+      | Slot_has_trap of {slot_id : slot_id}
+
+    let encoding =
+      let open Data_encoding in
+      union
+        [
+          case
+            ~title:"attestable_slot"
+            (Tag 0)
+            (obj2
+               (req "kind" (constant "attestable_slot"))
+               (req "slot_id" slot_id_encoding))
+            (function
+              | Attestable_slot {slot_id} -> Some ((), slot_id) | _ -> None)
+            (fun ((), slot_id) -> Attestable_slot {slot_id});
+          case
+            ~title:"no_shards_assigned"
+            (Tag 1)
+            (obj2
+               (req "kind" (constant "no_shards_assigned"))
+               (req "attestation_level" int32))
+            (function
+              | No_shards_assigned {attestation_level} ->
+                  Some ((), attestation_level)
+              | _ -> None)
+            (fun ((), attestation_level) ->
+              No_shards_assigned {attestation_level});
+          case
+            ~title:"slot_has_trap"
+            (Tag 2)
+            (obj2
+               (req "kind" (constant "slot_has_trap"))
+               (req "slot_id" slot_id_encoding))
+            (function
+              | Slot_has_trap {slot_id} -> Some ((), slot_id) | _ -> None)
+            (fun ((), slot_id) -> Slot_has_trap {slot_id});
+        ]
+  end
+
   (** A watcher used to stream newly-attestable slots for a given delegate (pkh).
       - [stream] is the push endpoint used by the DAL node to notify consumers
-        (RPC layer / baker) that a specific [slot_id] has become attestable.
+        (RPC layer / baker) with [attestable_event] information.
       - [num_subscribers] is the number of active consumers currently subscribed to
         this pkh’s stream.
       - [notified_slots] is an LRU set of slot ids already notified, so that we avoid
         sending duplicates in the stream. *)
   type watcher = {
-    stream : slot_id Lwt_watcher.input;
+    stream : Attestable_event.t Lwt_watcher.input;
     mutable num_subscribers : int;
     notified_slots : SlotIdSet.t;
   }
@@ -838,13 +881,29 @@ module Attestable_slots_watcher_table = struct
         Signature.Public_key_hash.Table.add t pkh watcher ;
         watcher
 
-  let notify t pkh ~slot_id =
+  let notify_attestable_slot t pkh ~slot_id =
     match Signature.Public_key_hash.Table.find t pkh with
     | None -> ()
     | Some watcher ->
         if not @@ SlotIdSet.mem watcher.notified_slots slot_id then (
           SlotIdSet.add watcher.notified_slots slot_id ;
-          Lwt_watcher.notify watcher.stream slot_id)
+          Lwt_watcher.notify watcher.stream (Attestable_slot {slot_id}))
+
+  let notify_no_shards_assigned t pkh ~attestation_level =
+    match Signature.Public_key_hash.Table.find t pkh with
+    | None -> ()
+    | Some watcher ->
+        Lwt_watcher.notify
+          watcher.stream
+          (No_shards_assigned {attestation_level})
+
+  let notify_slot_has_trap t pkh ~slot_id =
+    match Signature.Public_key_hash.Table.find t pkh with
+    | None -> ()
+    | Some watcher ->
+        if not @@ SlotIdSet.mem watcher.notified_slots slot_id then (
+          SlotIdSet.add watcher.notified_slots slot_id ;
+          Lwt_watcher.notify watcher.stream (Slot_has_trap {slot_id}))
 
   let remove = Signature.Public_key_hash.Table.remove
 
