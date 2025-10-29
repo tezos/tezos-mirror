@@ -732,6 +732,7 @@ type dns_domains = {
   tzkt_api_domain : string;
   faucet_domain : string;
   faucet_api_domain : string;
+  umami_domain : string;
 }
 
 let nginx_config_of_proxy_opt agent = function
@@ -778,6 +779,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               tzkt_api_domain = make_domain "api.tzkt";
               faucet_domain = make_domain "faucet";
               faucet_api_domain = make_domain "faucet.api";
+              umami_domain = make_domain "umami";
             })
           Cli.parent_dns_domain
       in
