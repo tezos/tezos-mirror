@@ -700,6 +700,10 @@ type dns_domains = {
   faucet_api_domain : string;
 }
 
+let nginx_config_of_proxy_opt agent = function
+  | None -> Lwt.return_nil
+  | Some proxy -> nginx_reverse_proxy_config ~agent ~proxy
+
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
   let name = "tezlink-sequencer" in
@@ -864,10 +868,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             ~proxy:sequencer_proxy
         in
         let* tzkt_nginx_config =
-          match tzkt_proxy_opt with
-          | None -> return []
-          | Some proxy ->
-              nginx_reverse_proxy_config ~agent:tezlink_sequencer_agent ~proxy
+          nginx_config_of_proxy_opt tezlink_sequencer_agent tzkt_proxy_opt
         in
         match rpc_nginx_config @ tzkt_nginx_config with
         | [] -> unit
