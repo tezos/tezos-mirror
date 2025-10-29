@@ -167,8 +167,9 @@ fn validate_individual_operation<Host: Runtime>(
     account_pkh: &PublicKeyHash,
     account_balance: &mut Narith,
     account_counter: &mut Narith,
-    gas: TezlinkOperationGas,
+    mut gas: TezlinkOperationGas,
 ) -> Result<ValidatedOperation, ValidityError> {
+    gas.consume(crate::gas::Cost::manager_operation())?;
     check_and_increment_counter(host, account_counter, &content.counter)?;
     // TODO: hard storage limit per operation is a Tezos constant, for now we took the one from ghostnet
     let hard_storage_limit = 60000_u64;

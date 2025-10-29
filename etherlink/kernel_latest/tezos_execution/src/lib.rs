@@ -40,6 +40,7 @@ use tezos_tezlink::{
 };
 
 use crate::address::OriginationNonce;
+use crate::gas::Cost;
 use crate::mir_ctx::{convert_big_map_diff, BlockCtx, Ctx, ExecCtx, OperationCtx, TcCtx};
 
 extern crate alloc;
@@ -157,6 +158,10 @@ fn execute_internal_operations<'a, Host: Runtime>(
     for (index, OperationInfo { operation, counter }) in
         internal_operations.into_iter().enumerate()
     {
+        tc_ctx
+            .gas
+            .consume(Cost::manager_operation())
+            .map_err(|_| TransferError::OutOfGas)?;
         log!(
             tc_ctx.host,
             Debug,
@@ -333,6 +338,11 @@ fn transfer<'a, Host: Runtime>(
 ) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
+            tc_ctx
+                .gas
+                .consume(Cost::transaction())
+                .map_err(|_| TransferError::OutOfGas)?;
+
             if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Err(TransferError::NonSmartContractExecutionCall);
             }

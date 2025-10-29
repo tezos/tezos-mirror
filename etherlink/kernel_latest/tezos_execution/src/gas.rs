@@ -27,9 +27,31 @@ pub enum GasLimitError {
     CannotConvertToU32(num_bigint::TryFromBigIntError<num_bigint::BigUint>),
 }
 
+pub struct Cost {
+    value: u32,
+}
+impl Cost {
+    /// This corresponds to the defaults costs in gas.
+    /// Currently can be found in Tezos source code at: src/proto_alpha/lib_protocol/michelson_v1_gas.ml
+    const GAS_COST_MANAGER_OPERATION: u32 = 100_000;
+    const GAS_COST_TRANSACTION: u32 = 2_000_000;
+
+    pub fn manager_operation() -> Self {
+        Cost {
+            value: Self::GAS_COST_MANAGER_OPERATION,
+        }
+    }
+
+    pub fn transaction() -> Self {
+        Cost {
+            value: Self::GAS_COST_TRANSACTION,
+        }
+    }
+}
+
 impl TezlinkOperationGas {
     /// This corresponds to the default value of the `hard_gas_limit_per_operation` parametric constant.
-    /// Currently can be found in Tezos source code at: src/proto_023_PtSeouLo/lib_parameters/default_parameter.ml
+    /// Currently can be found in Tezos source code at: src/proto_alpha/lib_parameters/default_parameter.ml
     pub const MAX_GAS_UNIT_AMOUNT: u32 = 1_040_000;
 
     pub fn start(
@@ -93,8 +115,8 @@ impl TezlinkOperationGas {
         Narith::from(consumed as u64)
     }
 
-    pub fn _consume(&mut self, amount: u32) -> Result<(), gas::OutOfGas> {
-        self.current_gas.consume(amount)
+    pub fn consume(&mut self, cost: Cost) -> Result<(), gas::OutOfGas> {
+        self.current_gas.consume(cost.value)
     }
 }
 

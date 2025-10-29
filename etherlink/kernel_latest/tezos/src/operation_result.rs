@@ -10,6 +10,7 @@ use crate::operation::{
     ManagerOperation, ManagerOperationContent, OperationContent, RevealContent,
     TransferContent,
 };
+use mir::gas;
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/apply_result.ml` to represent the result of an operation
 /// In Tezlink, operation is equivalent to manager operation because there is no other type of operation that interests us.
 use nom::error::ParseError;
@@ -70,6 +71,13 @@ pub enum ValidityError {
     MultipleSources,
     #[error("Cannot set gas limit due to : {0}")]
     GasLimitSetError(String),
+    #[error("Gas exhaustion")]
+    OutOfGas,
+}
+impl From<gas::OutOfGas> for ValidityError {
+    fn from(_: gas::OutOfGas) -> Self {
+        ValidityError::OutOfGas
+    }
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
@@ -141,6 +149,8 @@ pub enum TransferError {
     MirNarithToAmountError(String),
     #[error("Transactions of 0 tez towards a contract without code are forbidden")]
     EmptyImplicitTransfer,
+    #[error("Gas exhaustion")]
+    OutOfGas,
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader)]
