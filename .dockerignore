@@ -86,6 +86,7 @@ courier
 /etherlink/kernel_latest/revm_evaluation/fixtures/shanghai
 /etherlink/kernel_latest/revm_evaluation/fixtures/cancun
 /etherlink/kernel_latest/revm_evaluation/fixtures/prague
+/etherlink/kernel_latest/revm_evaluation/fixtures/osaka
 
 # Rust
 **/target
