@@ -2408,10 +2408,10 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
   let retrieve_floating_block_list chain_store ~from_block ~to_block =
     let open Lwt_result_syntax in
     (* Invariant: the list of blocks returned by the
-       [Store.Chain_traversal.path] contains metadata for the block
-       target and its predecessor as the metadata were read during the
-       early steps of the snapshot export and are stored in the
-       cache. Having metadata for theses blocks is mandatory. *)
+       [Store.Chain_traversal.path] contains metadata for the block target and
+       its predecessor as the metadata were read during the early steps of the
+       snapshot export and are stored in the cache. Having metadata for theses
+       blocks is mandatory. *)
     let*! o = Store.Chain_traversal.path chain_store ~from_block ~to_block in
     match o with
     | None -> tzfail Cannot_retrieve_block_interval
@@ -2466,9 +2466,82 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
             let extra_cycle =
               List.hd extra_cycles |> WithExceptions.Option.get ~loc:__LOC__
             in
-            (* If the export block is the last block in cycle, append the cycle *)
+            (* If the export block is the last block of the extra_cycle, we need
+               to put the complete extra_cycle in the floating store to ensure
+               block metadata. *)
             if Compare.Int32.(export_block_level = extra_cycle.end_level) then
-              return (filtered_table @ [extra_cycle], Some [])
+              let block_store = Store.Unsafe.get_block_store chain_store in
+              let cemented_store =
+                Block_store.cemented_block_store block_store
+              in
+              let* from_block =
+                let* res =
+                  Cemented_block_store.get_cemented_block_by_level
+                    ~read_metadata:true
+                    cemented_store
+                    extra_cycle.start_level
+                in
+                match res with
+                | Some block -> Store.Unsafe.block_of_repr block |> return
+                | None -> tzfail Cannot_retrieve_block_interval
+              in
+              let* to_block =
+                let* res =
+                  Cemented_block_store.get_cemented_block_by_level
+                    ~read_metadata:true
+                    cemented_store
+                    extra_cycle.end_level
+                in
+                match res with
+                | Some block -> Store.Unsafe.block_of_repr block |> return
+                | None -> tzfail Cannot_retrieve_block_interval
+              in
+              let* floating_blocks =
+                retrieve_floating_block_list chain_store ~from_block ~to_block
+              in
+              return (filtered_table, floating_blocks)
+            else if Compare.Int32.(export_block_level = extra_cycle.start_level)
+            then
+              (* When the export level is set to the very first block of a
+                 cycle, it's preceding block (that needs to be exported with
+                 metadata) is stored in the preceding cycle -- without metadata.
+                 To handle that, the two last cycles are stored in the floating
+                 store of the exported snapshot. *)
+              let block_store = Store.Unsafe.get_block_store chain_store in
+              let cemented_store =
+                Block_store.cemented_block_store block_store
+              in
+              let last_filtered_cycle, remaining_filtered_cycles =
+                match List.rev filtered_table with
+                | hd :: tl -> (hd, tl)
+                | [] -> (* Invariant: the table is not empty here*) assert false
+              in
+              let* from_block =
+                let* res =
+                  Cemented_block_store.get_cemented_block_by_level
+                    ~read_metadata:true
+                    cemented_store
+                    last_filtered_cycle.start_level
+                in
+                match res with
+                | Some block -> Store.Unsafe.block_of_repr block |> return
+                | None -> tzfail Cannot_retrieve_block_interval
+              in
+              let* to_block =
+                let* res =
+                  Cemented_block_store.get_cemented_block_by_level
+                    ~read_metadata:true
+                    cemented_store
+                    export_block_level
+                in
+                match res with
+                | Some block -> Store.Unsafe.block_of_repr block |> return
+                | None -> tzfail Cannot_retrieve_block_interval
+              in
+              let* floating_blocks =
+                retrieve_floating_block_list chain_store ~from_block ~to_block
+              in
+              return (remaining_filtered_cycles, floating_blocks)
             else
               let* first_block =
                 let* first_block_in_cycle =
@@ -2597,8 +2670,12 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         Lwt_stream.of_list
           (List.filter_map
              (fun b ->
-               if Store.Block.level b = export_pred_level then
-                 Some (Store.Unsafe.repr_of_block b)
+               if Store.Block.level b = export_pred_level then (
+                 let b = Store.Unsafe.repr_of_block b in
+                 (* Enforce metadata in predecessor's block. The invariant might
+                    be broken in case of Store cache issue. *)
+                 assert (Option.is_some (Block_repr.metadata b)) ;
+                 Some b)
                else Some {(Store.Unsafe.repr_of_block b) with metadata = None})
              floating_blocks)
       in
