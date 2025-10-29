@@ -10,6 +10,7 @@
 /// Every Gas Related Function or Constant should be defined here.
 use mir::gas;
 use tezos_data_encoding::types::Narith;
+use tezos_smart_rollup::types::PublicKey;
 use thiserror::Error;
 
 pub struct TezlinkOperationGas {
@@ -46,6 +47,22 @@ impl Cost {
         Cost {
             value: Self::GAS_COST_TRANSACTION,
         }
+    }
+
+    /// Calculates the gas cost for signature verification based on the public key type and message length.
+    /// Currently can be found in Tezos source code at: src/proto_alpha/lib_protocol/michelson_v1_gas.ml
+    /// And also in MIR : contrib/mir/src/gas.rs
+    /// TODO: !19851, call MIR instead of duplicating this function
+    pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Self {
+        // Saturate msg.len() to u32::MAX then cast to u32
+        let len = msg.len().min(u32::MAX as usize) as u32;
+        let value = match k {
+            PublicKey::Ed25519(..) => 65_800 + ((len >> 3) + len),
+            PublicKey::Secp256k1(..) => 51_600 + ((len >> 3) + len),
+            PublicKey::P256(..) => 341_000 + ((len >> 3) + len),
+            PublicKey::Bls(..) => 1_570_000 + (3 * len),
+        };
+        Cost { value }
     }
 }
 

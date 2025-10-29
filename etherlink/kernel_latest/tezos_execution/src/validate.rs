@@ -5,7 +5,7 @@
 use num_bigint::{BigInt, Sign, TryFromBigIntError};
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::PublicKeySignatureVerifier;
-use tezos_data_encoding::{enc::BinError, types::Narith};
+use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
@@ -225,10 +225,15 @@ pub struct ValidatedBatch {
 pub fn verify_signature(
     operation: Operation,
     pk: &PublicKey,
-    _validation_gas: &mut TezlinkOperationGas,
-) -> Result<bool, BinError> {
+    validation_gas: &mut TezlinkOperationGas,
+) -> Result<bool, ValidityError> {
     let serialized_unsigned_operation =
-        serialize_unsigned_operation(&operation.branch, &operation.content)?;
+        serialize_unsigned_operation(&operation.branch, &operation.content)
+            .map_err(|_| ValidityError::InvalidSignature)?;
+    validation_gas.consume(crate::gas::Cost::check_signature(
+        pk,
+        &serialized_unsigned_operation,
+    ))?;
     let signature = &operation.signature.into();
     // The verify_signature function never returns false. If the verification
     // is incorrect the function will return an Error and it's up to us to
