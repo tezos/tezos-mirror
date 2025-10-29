@@ -165,11 +165,13 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                  a tzresult. *)
               (* This happens when, for example, the kernel requests a page from a future level. *)
               Lwt.fail (Error_wrapper error)
-          | Ok None ->
-              (* The page was not confirmed by L1.
+          | Ok data_opt -> (
+              match data_opt with
+              | None ->
+                  (* The page was not confirmed by L1.
                  We return empty string in this case, as done in the slow executon. *)
-              Lwt.return ""
-          | Ok (Some b) -> Lwt.return (Bytes.to_string b))
+                  Lwt.return ""
+              | Some b -> Lwt.return (Bytes.to_string b)))
       | Reveal_dal_parameters ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/6562
              Consider supporting revealing of historical DAL parameters. *)
