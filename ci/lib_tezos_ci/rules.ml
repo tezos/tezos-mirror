@@ -58,6 +58,8 @@ let debian_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "debian.daily"
 
 let rpm_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "rpm.daily"
 
+let homebrew_daily = scheduled && var "TZ_SCHEDULE_KIND" == str "homebrew.daily"
+
 let schedule_extended_rpc_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_RPC_TESTS"
 

@@ -1728,18 +1728,6 @@ opam:all_7:
       - octez-distributed-internal
       - octez-alcotezt
 
-trigger:homebrew:
-  stage: test
-  variables:
-    PIPELINE_TYPE: schedule_extended_test-homebrew
-    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  rules:
-  - when: always
-  needs: []
-  trigger:
-    include: .gitlab/ci/pipelines/homebrew.yml
-    strategy: depend
-
 trigger:base_images:
   stage: images
   variables:
