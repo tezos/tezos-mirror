@@ -7,6 +7,7 @@
 (*****************************************************************************)
 open Tezlink_imports
 open Tezlink_imports.Alpha_context
+open Validation_types
 
 let ( let** ) v f =
   let open Lwt_result_syntax in
@@ -465,29 +466,13 @@ let validate_tezlink_operation ?(check_signature = true) ~read raw =
   in
   return (Ok operation)
 
-type config = {
-  get_balance : Tezos_types.Contract.t -> Z.t tzresult Lwt.t;
-  get_counter : Tezos_types.Contract.t -> Z.t tzresult Lwt.t;
-}
-
-(* TODO: merge with Prevalidator.validation_state *)
-type blueprint_validation_state = {
-  michelson_config : config;
-  addr_balance : Z.t String.Map.t;
-  addr_nonce : Z.t String.Map.t;
-  gas : Z.t;
-}
-
 let init_blueprint_validation read () =
   let get_counter = Tezlink_durable_storage.counter read in
   let get_balance = Tezlink_durable_storage.balance_z read in
   let michelson_config = {get_balance; get_counter} in
-  {
-    michelson_config;
-    addr_nonce = String.Map.empty;
-    addr_balance = String.Map.empty;
-    gas = Z.zero;
-  }
+  empty_validation_state
+    ~michelson_config
+    ~evm_config:Validation_types.dummy_evm_config
 
 let maximum_gas_per_block =
   Tezos_types.Operation.gas_limit_to_z

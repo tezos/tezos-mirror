@@ -349,12 +349,9 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
         in
         let initial_validation_state =
           ( 0,
-            Validation_types.
-              {
-                evm_config;
-                addr_balance = String.Map.empty;
-                addr_nonce = String.Map.empty;
-              } )
+            Validation_types.empty_validation_state
+              ~michelson_config:Validation_types.dummy_michelson_config
+              ~evm_config )
         in
         let* l =
           Tx_container.pop_transactions
@@ -422,25 +419,11 @@ let head_info_and_delayed_transactions ~with_delayed_transactions evm_state
 
 let init_michelson_validation_state () =
   let open Lwt_result_syntax in
-  let evm_config =
-    Validation_types.
-      {
-        minimum_base_fee_per_gas = Qty Z.zero;
-        base_fee_per_gas = Qty Z.zero;
-        maximum_gas_limit = Qty Z.zero;
-        da_fee_per_byte = Qty Z.zero;
-        next_nonce = (fun _addr -> return None);
-        balance = (fun _addr -> return (Ethereum_types.Qty Z.zero));
-      }
-  in
   return
     ( 0,
-      Validation_types.
-        {
-          evm_config;
-          addr_balance = String.Map.empty;
-          addr_nonce = String.Map.empty;
-        } )
+      Validation_types.empty_validation_state
+        ~michelson_config:Validation_types.dummy_michelson_config
+        ~evm_config:Validation_types.dummy_evm_config )
 
 let init_evm_validation_state () =
   let open Lwt_result_syntax in
@@ -467,12 +450,9 @@ let init_evm_validation_state () =
   in
   return
     ( 0,
-      Validation_types.
-        {
-          evm_config;
-          addr_balance = String.Map.empty;
-          addr_nonce = String.Map.empty;
-        } )
+      Validation_types.empty_validation_state
+        ~michelson_config:Validation_types.dummy_michelson_config
+        ~evm_config )
 
 let init_validation_state ~(tx_container : Services_backend_sig.ex_tx_container)
     =
