@@ -71,27 +71,11 @@ val prevalidate_raw_transaction_tezlink :
   string ->
   (Tezos_types.Operation.t prevalidation_result, string) result tzresult Lwt.t
 
-type validation_config = {
-  minimum_base_fee_per_gas : Ethereum_types.quantity;
-  base_fee_per_gas : Ethereum_types.quantity;
-  maximum_gas_limit : Ethereum_types.quantity;
-  da_fee_per_byte : Ethereum_types.quantity;
-  next_nonce :
-    Ethereum_types.address -> Ethereum_types.quantity option tzresult Lwt.t;
-  balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t;
-}
-
-type validation_state = {
-  config : validation_config;
-  addr_balance : Z.t String.Map.t;
-  addr_nonce : Z.t String.Map.t;
-}
-
 (** [validate_balance_gas_nonce_with_validation_state validation_state transaction]
     validates a transaction against the current [validation_state]:
 
     - the transaction nonce matches the expected next nonce of the caller;
-    - the caller has enough balance to pay for the transaction total cost 
+    - the caller has enough balance to pay for the transaction total cost
       (value + gas * fee);
     - the receiver's balance is updated if the transaction transfers value;
     - the caller's balance is updated after deducting the total cost;
@@ -101,6 +85,6 @@ type validation_state = {
     @param transaction The transaction to validate and apply.
     @return A [tzresult Lwt.t] containing the updated validation state. *)
 val validate_balance_gas_nonce_with_validation_state :
-  validation_state ->
+  Validation_types.validation_state ->
   Transaction_object.t ->
-  (validation_state, string) result tzresult Lwt.t
+  (Validation_types.validation_state, string) result tzresult Lwt.t

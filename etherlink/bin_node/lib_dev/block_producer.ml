@@ -71,7 +71,7 @@ module Types = struct
     mutable selected_delayed_txns : Evm_events.Delayed_transaction.t list;
     mutable validated_txns :
       (string * Tx_queue_types.transaction_object_t) list;
-    mutable validation_state : int * Prevalidator.validation_state;
+    mutable validation_state : int * Validation_types.validation_state;
     mutable next_block_timestamp : Time.System.t option;
   }
 end
@@ -334,8 +334,8 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
           Etherlink_durable_storage.maximum_gas_per_transaction read
         in
         let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
-        let config =
-          Prevalidator.
+        let evm_config =
+          Validation_types.
             {
               minimum_base_fee_per_gas = Qty minimum_base_fee_per_gas;
               base_fee_per_gas;
@@ -349,9 +349,9 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
         in
         let initial_validation_state =
           ( 0,
-            Prevalidator.
+            Validation_types.
               {
-                config;
+                evm_config;
                 addr_balance = String.Map.empty;
                 addr_nonce = String.Map.empty;
               } )
@@ -422,8 +422,8 @@ let head_info_and_delayed_transactions ~with_delayed_transactions evm_state
 
 let init_michelson_validation_state () =
   let open Lwt_result_syntax in
-  let config =
-    Prevalidator.
+  let evm_config =
+    Validation_types.
       {
         minimum_base_fee_per_gas = Qty Z.zero;
         base_fee_per_gas = Qty Z.zero;
@@ -435,9 +435,12 @@ let init_michelson_validation_state () =
   in
   return
     ( 0,
-      Prevalidator.
-        {config; addr_balance = String.Map.empty; addr_nonce = String.Map.empty}
-    )
+      Validation_types.
+        {
+          evm_config;
+          addr_balance = String.Map.empty;
+          addr_nonce = String.Map.empty;
+        } )
 
 let init_evm_validation_state () =
   let open Lwt_result_syntax in
@@ -451,8 +454,8 @@ let init_evm_validation_state () =
     Etherlink_durable_storage.maximum_gas_per_transaction read
   in
   let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
-  let config =
-    Prevalidator.
+  let evm_config =
+    Validation_types.
       {
         minimum_base_fee_per_gas = Qty minimum_base_fee_per_gas;
         base_fee_per_gas;
@@ -464,9 +467,12 @@ let init_evm_validation_state () =
   in
   return
     ( 0,
-      Prevalidator.
-        {config; addr_balance = String.Map.empty; addr_nonce = String.Map.empty}
-    )
+      Validation_types.
+        {
+          evm_config;
+          addr_balance = String.Map.empty;
+          addr_nonce = String.Map.empty;
+        } )
 
 let init_validation_state ~(tx_container : Services_backend_sig.ex_tx_container)
     =
