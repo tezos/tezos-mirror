@@ -231,6 +231,8 @@ let () =
       in
       let title = String.capitalize_ascii component.name in
       let description = sf "%s releases" component.name in
+      (* TODO: Deduce from command line arguments. *)
+      let link = "https://octez.tezos.com/releases" in
       let lastBuildDate = Unix.time () |> Unix.gmtime in
       let versions = Base.Version.load_from_storage ~path:component.path in
       let items =
@@ -239,7 +241,7 @@ let () =
           versions
       in
       let channel =
-        Rss.make_channel ~title ~description ~lastBuildDate ~items
+        Rss.make_channel ~title ~description ~link ~lastBuildDate ~items
       in
       Rss.generate_rss channel ;
       Format.printf "Generated RSS feed: feed.xml@."

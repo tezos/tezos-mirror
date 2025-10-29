@@ -20,12 +20,13 @@ let make_item ~title ~description ~guid ~pubDate =
 type channel = {
   title : string;
   description : string;
+  link : string;
   lastBuildDate : Unix.tm;
   items : item list;
 }
 
-let make_channel ~title ~description ~lastBuildDate ~items =
-  {title; description; lastBuildDate; items}
+let make_channel ~title ~description ~link ~lastBuildDate ~items =
+  {title; description; link; lastBuildDate; items}
 
 (* [escape_xml_text text] escapes special XML characters in text *)
 let escape_xml_text text =
@@ -88,17 +89,19 @@ let show_item_rss {title; description; guid; pubDate} =
     (show_time pubDate)
 
 (* [show_channel_rss channel] converts [channel] to string. *)
-let show_channel_rss {title; description; lastBuildDate; items} =
+let show_channel_rss {title; description; link; lastBuildDate; items} =
   Format.asprintf
     {|  <channel>
           <title>%s</title>
           <description>%s</description>
           <language>en</language>
+          <link>%s</link>
           <lastBuildDate>%s</lastBuildDate>
           %a
         </channel>|}
     (escape_xml_text title)
     (escape_xml_text description)
+    (escape_xml_text link)
     (show_time lastBuildDate)
     (Format.pp_print_list
        ~pp_sep:(fun fmt () -> Format.pp_print_string fmt "\n          ")
