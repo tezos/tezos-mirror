@@ -132,10 +132,12 @@ module Version = struct
     latest : bool;
     active : bool;
     announcement : string option;
+    publication_date : float;
   }
 
-  let make ~major ~minor ?rc ~latest ~active ?announcement () =
-    {major; minor; rc; latest; active; announcement}
+  let make ~major ~minor ?rc ~latest ~active ?announcement ~publication_date ()
+      =
+    {major; minor; rc; latest; active; announcement; publication_date}
 
   let to_string {major; minor; rc; _} =
     match rc with
@@ -153,6 +155,8 @@ module Version = struct
         latest = json |-> "latest" |> as_bool_opt |> Option.value ~default:false;
         active = json |-> "active" |> as_bool_opt |> Option.value ~default:false;
         announcement = json |-> "announcement" |> as_string_opt;
+        publication_date =
+          json |-> "pubDate" |> as_float_opt |> Option.value ~default:0.;
       }
     with
     | Error error ->
@@ -162,13 +166,15 @@ module Version = struct
           (sf "Unexpected error parsing version: %s" (Printexc.to_string exn))
 
   (* [to_json version] converts a version record to a JSON object. *)
-  let to_json {major; minor; rc; latest; active; announcement} : JSON.u =
+  let to_json {major; minor; rc; latest; active; announcement; publication_date}
+      : JSON.u =
     `O
       ([
          ("major", `Float (Int.to_float major));
          ("minor", `Float (Int.to_float minor));
          ("latest", `Bool latest);
          ("active", `Bool active);
+         ("pubDate", `Float publication_date);
        ]
       @ (match rc with
         | None -> []

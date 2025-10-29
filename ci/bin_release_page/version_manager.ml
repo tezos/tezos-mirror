@@ -18,7 +18,7 @@ let parse_rc_opt = function
 let show_rc = function Stable -> "stable" | Rc rc -> sf "%i" rc
 
 let create_version_from_args ?major ?minor ?(active = false) ?announcement ?rc
-    () =
+    ?(publication_date = 0.) () =
   match (major, minor) with
   | None, _ -> failwith "Missing argument for [--major]"
   | _, None -> failwith "Missing argument for [--minor]"
@@ -26,7 +26,15 @@ let create_version_from_args ?major ?minor ?(active = false) ?announcement ?rc
       let rc =
         match rc with None | Some Stable -> None | Some (Rc rc) -> Some rc
       in
-      make ?announcement ~major ~minor ?rc ~latest:false ~active ()
+      make
+        ?announcement
+        ~major
+        ~minor
+        ?rc
+        ~latest:false
+        ~active
+        ~publication_date
+        ()
 
 let predicate_from_args ?major ?minor ?rc () =
  fun version ->
@@ -151,8 +159,15 @@ let () =
           Format.printf "  %s%s@." (to_string version) latest_mark)
         versions
   | `add ->
+      let publication_date = Unix.time () in
       let new_version =
-        create_version_from_args ?announcement ?rc ?major ?minor ()
+        create_version_from_args
+          ?announcement
+          ?rc
+          ?major
+          ?minor
+          ~publication_date
+          ()
       in
       ignore @@ update_in_storage ~path:s3_path (add_version new_version) ;
       Format.printf "Added %s@." (to_string new_version)
