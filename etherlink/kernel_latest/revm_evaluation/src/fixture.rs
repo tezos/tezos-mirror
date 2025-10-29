@@ -128,6 +128,7 @@ pub enum SpecName {
     Shanghai,
     Cancun,
     Prague,
+    Osaka,
     #[serde(other)]
     Unknown,
 }
@@ -138,6 +139,7 @@ impl From<SpecName> for SpecId {
             SpecName::Shanghai => SpecId::SHANGHAI,
             SpecName::Cancun => SpecId::CANCUN,
             SpecName::Prague => SpecId::PRAGUE,
+            SpecName::Osaka => SpecId::OSAKA,
             SpecName::Unknown => panic!("Unknown EVM spec id"),
         }
     }
