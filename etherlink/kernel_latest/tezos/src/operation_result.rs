@@ -46,8 +46,6 @@ pub enum ValidityError {
     CantPayFees(Narith),
     #[error("Empty implicit contract.")]
     EmptyImplicitContract,
-    #[error("Gas limit is too high.")]
-    GasLimitTooHigh,
     #[error("Storage limit is too high.")]
     StorageLimitTooHigh,
     #[error("Invalid signature.")]

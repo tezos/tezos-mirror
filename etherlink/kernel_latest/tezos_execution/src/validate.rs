@@ -120,18 +120,6 @@ fn get_revealed_key<Host: Runtime>(
     }
 }
 
-// Inspired from `check_gas_limit` in `src/proto_alpha/lib_protocol/gas_limit_repr.ml`
-fn check_gas_limit(
-    hard_gas_limit_per_operation: &Narith,
-    gas_limit: &Narith,
-) -> Result<(), ValidityError> {
-    if gas_limit.0 <= hard_gas_limit_per_operation.0 {
-        Ok(())
-    } else {
-        Err(ValidityError::GasLimitTooHigh)
-    }
-}
-
 // Inspired from `check_storage_limit` in `src/proto_alpha/lib_protocol/validate.ml`
 fn check_storage_limit(
     hard_storage_limit_per_operation: &Narith,
@@ -182,17 +170,6 @@ fn validate_individual_operation<Host: Runtime>(
     gas: TezlinkOperationGas,
 ) -> Result<ValidatedOperation, ValidityError> {
     check_and_increment_counter(host, account_counter, &content.counter)?;
-    // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
-    let hard_gas_limit = 1040000_u64;
-    check_gas_limit(&hard_gas_limit.into(), &content.gas_limit)?;
-    log!(
-        host,
-        Debug,
-        "Validation: OK - the gas_limit {:?} does not exceed the {:?} threshold.",
-        &content.gas_limit,
-        hard_gas_limit
-    );
-
     // TODO: hard storage limit per operation is a Tezos constant, for now we took the one from ghostnet
     let hard_storage_limit = 60000_u64;
     check_storage_limit(&hard_storage_limit.into(), &content.storage_limit)?;
