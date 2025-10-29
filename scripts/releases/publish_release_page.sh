@@ -109,6 +109,13 @@ else
   echo "No tag found. No asset will be added to the release page."
 fi
 
+# Generate RSS feed for all releases
+echo "Generating RSS feed..."
+dune exec ./ci/bin_release_page/version_manager.exe -- \
+  --path "${S3_BUCKET}${BUCKET_PATH}" \
+  generate-rss \
+  --base-url "${URL:-https://${S3_BUCKET}}"
+
 echo "Building older releases page (inactive versions only)"
 dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
   --title 'Octez older releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
@@ -126,7 +133,8 @@ dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
 echo "Syncing html files to remote s3 bucket"
 if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH}/" --cache-control "max-age=30, must-revalidate" --region "${REGION}" &&
   aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}" &&
-  aws s3 cp "./older_releases.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"; then
+  aws s3 cp "./older_releases.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}" &&
+  aws s3 cp "./feed.xml" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"; then
   echo "Deployment successful!"
 else
   echo "Deployment failed. Please check the configuration and try again."
