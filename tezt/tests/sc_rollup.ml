@@ -3427,7 +3427,9 @@ let test_refutation protocols ~kind =
 let test_invalid_dal_parameters protocols =
   test_refutation_scenario
     ~uses:(fun _protocol ->
-      [Constant.WASM.echo_dal_reveal; Constant.smart_rollup_installer])
+      [
+        Constant.WASM.echo_dal_reveal_parameters; Constant.smart_rollup_installer;
+      ])
     ~kind:"wasm_2_0_0"
     ~mode:Operator
     ~challenge_window:10
@@ -3438,7 +3440,7 @@ let test_invalid_dal_parameters protocols =
       (read_kernel
          ~base:""
          ~suffix:""
-         (Uses.path Constant.WASM.echo_dal_reveal))
+         (Uses.path Constant.WASM.echo_dal_reveal_parameters))
     (refutation_scenario_parameters
        ~loser_modes:["reveal_dal_parameters 6 6 6 6"]
        (inputs_for 10)
