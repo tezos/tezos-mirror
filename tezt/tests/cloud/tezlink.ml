@@ -946,9 +946,15 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           in
           nginx_config_of_proxy_opt tezlink_sequencer_agent faucet_proxy
         in
+        let* umami_nginx_config =
+          let umami_proxy =
+            Option.map (fun proxys -> proxys.umami_proxy) umami_proxys_opt
+          in
+          nginx_config_of_proxy_opt tezlink_sequencer_agent umami_proxy
+        in
         match
           rpc_nginx_config @ tzkt_nginx_config @ faucet_api_nginx_config
-          @ faucet_nginx_config
+          @ faucet_nginx_config @ umami_nginx_config
         with
         | [] -> unit
         | nginx_configs ->
