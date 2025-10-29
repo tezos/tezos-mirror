@@ -26,6 +26,7 @@ type validation_state = {
   addr_balance : Z.t String.Map.t;
   addr_nonce : Z.t String.Map.t;
   gas : Z.t;
+  current_size : int;
 }
 
 let dummy_michelson_config =
@@ -53,4 +54,5 @@ let empty_validation_state ~evm_config ~michelson_config =
     addr_balance = String.Map.empty;
     addr_nonce = String.Map.empty;
     gas = Z.zero;
+    current_size = 0;
   }

@@ -71,7 +71,7 @@ module Types = struct
     mutable selected_delayed_txns : Evm_events.Delayed_transaction.t list;
     mutable validated_txns :
       (string * Tx_queue_types.transaction_object_t) list;
-    mutable validation_state : int * Validation_types.validation_state;
+    mutable validation_state : Validation_types.validation_state;
     mutable next_block_timestamp : Time.System.t option;
   }
 end
@@ -262,10 +262,11 @@ let produce_block_with_transactions (type f)
         ~transactions_and_objects
         ~hash_of_tx_object:Tx_queue_types.Tezlink_operation.hash_of_tx_object
 
-let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
+let validate_tx ~maximum_cumulative_size
+    (validation_state : Validation_types.validation_state) raw_tx
     (tx_object : Transaction_object.t) =
   let open Lwt_result_syntax in
-  let new_size = current_size + String.length raw_tx in
+  let new_size = validation_state.current_size + String.length raw_tx in
   if new_size > maximum_cumulative_size then return `Stop
   else
     let* validation_state_res =
@@ -274,23 +275,25 @@ let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
         tx_object
     in
     match validation_state_res with
-    | Ok validation_state -> return (`Keep (new_size, validation_state))
+    | Ok validation_state ->
+        return (`Keep {validation_state with current_size = new_size})
     | Error msg ->
         let hash = Transaction_object.hash tx_object in
         let*! () = Block_producer_events.transaction_rejected hash msg in
         return `Drop
 
-let validate_op ~maximum_cumulative_size (current_size, state) raw_op
+let validate_op ~maximum_cumulative_size
+    (state : Validation_types.validation_state) raw_op
     (operation : Tezos_types.Operation.t) =
   let open Lwt_result_syntax in
-  let new_size = current_size + String.length raw_op in
+  let new_size = state.current_size + String.length raw_op in
   if new_size > maximum_cumulative_size then return `Stop
   else if not (Tezlink_prevalidation.could_fit state operation) then
     return `Stop
   else
     let* res = Tezlink_prevalidation.validate_for_blueprint state operation in
     match res with
-    | Ok state -> return (`Keep (new_size, state))
+    | Ok state -> return (`Keep {state with current_size = new_size})
     | Error msg ->
         let hash = Operation_hash.hash_bytes [operation.raw] in
         let*! () = Block_producer_events.operation_rejected hash msg in
@@ -308,7 +311,7 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
       else
         let read = Evm_state.read head_info.evm_state in
         let initial_validation_state =
-          (0, Tezlink_prevalidation.init_blueprint_validation read ())
+          Tezlink_prevalidation.init_blueprint_validation read ()
         in
         let* l =
           Tx_container.pop_transactions
@@ -348,10 +351,9 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
             }
         in
         let initial_validation_state =
-          ( 0,
-            Validation_types.empty_validation_state
-              ~michelson_config:Validation_types.dummy_michelson_config
-              ~evm_config )
+          Validation_types.empty_validation_state
+            ~michelson_config:Validation_types.dummy_michelson_config
+            ~evm_config
         in
         let* l =
           Tx_container.pop_transactions
@@ -420,10 +422,9 @@ let head_info_and_delayed_transactions ~with_delayed_transactions evm_state
 let init_michelson_validation_state () =
   let open Lwt_result_syntax in
   return
-    ( 0,
-      Validation_types.empty_validation_state
-        ~michelson_config:Validation_types.dummy_michelson_config
-        ~evm_config:Validation_types.dummy_evm_config )
+    (Validation_types.empty_validation_state
+       ~michelson_config:Validation_types.dummy_michelson_config
+       ~evm_config:Validation_types.dummy_evm_config)
 
 let init_evm_validation_state () =
   let open Lwt_result_syntax in
@@ -449,10 +450,9 @@ let init_evm_validation_state () =
       }
   in
   return
-    ( 0,
-      Validation_types.empty_validation_state
-        ~michelson_config:Validation_types.dummy_michelson_config
-        ~evm_config )
+    (Validation_types.empty_validation_state
+       ~michelson_config:Validation_types.dummy_michelson_config
+       ~evm_config)
 
 let init_validation_state ~(tx_container : Services_backend_sig.ex_tx_container)
     =
@@ -611,15 +611,15 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
       state.maximum_number_of_chunks
   in
-  let size, input_validation_state = state.validation_state in
   let* current_size =
     (* Accumulator empty and at least one transaction = start next future block *)
     if state.validated_txns = [] && transactions <> [] then (
       Broadcast.notify_next_block_timestamp (Time.System.to_protocol timestamp) ;
       let* remaining_cumulative_size = preconfirm_delayed_transactions ~state in
       return (Int.sub maximum_cumulative_size remaining_cumulative_size))
-    else return size
+    else return state.validation_state.current_size
   in
+  let input_validation_state = {state.validation_state with current_size} in
   let validate (validation_state, rev_txns) ((raw, tx_object) as entry) =
     match tx_object with
     | Tx_queue_types.Evm tx_object -> (
@@ -637,10 +637,7 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
         return (validation_state, rev_txns)
   in
   let* validation_state, rev_validated_txns =
-    List.fold_left_es
-      validate
-      ((current_size, input_validation_state), [])
-      transactions
+    List.fold_left_es validate (input_validation_state, []) transactions
   in
   state.validated_txns <- state.validated_txns @ List.rev rev_validated_txns ;
   state.validation_state <- validation_state ;
