@@ -215,7 +215,7 @@ let job_build_tezt =
          ~name:"etherlink_tezt_exe"
          ~when_:On_success
          ~expire_in:(Duration (Days 1))
-         ["_build/default/etherlink/ci/tezt/main.exe"])
+         ["_build/default/etherlink/tezt/tests/main.exe"])
     ~dune_cache:
       (Cacio.dune_cache
          ~key:
@@ -229,7 +229,7 @@ let job_build_tezt =
       "./scripts/ci/take_ownership.sh";
       ". ./scripts/version.sh";
       "eval $(opam env)";
-      "dune build etherlink/ci/tezt/main.exe";
+      "dune build etherlink/tezt/tests/main.exe";
     ]
 
 (* Specialization of Cacio's [tezt_job] with defaults that are specific to this component. *)
@@ -238,7 +238,7 @@ let job_build_tezt =
    This is something that can be done later, once we feel ready. *)
 let tezt_job ?(retry_tests = 1) =
   CI.tezt_job
-    ~tezt_exe:"etherlink/ci/tezt/main.exe"
+    ~tezt_exe:"etherlink/tezt/tests/main.exe"
     ~fetch_records_from:"etherlink.daily"
     ~only_if_changed:
       (Tezos_ci.Changeset.encode Tezos_ci_jobs.Changesets.changeset_octez)
