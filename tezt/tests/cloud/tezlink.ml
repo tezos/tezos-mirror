@@ -362,9 +362,14 @@ let create_config_file ~agent destination format =
     (Format.formatter_of_out_channel ch)
     format
 
-let init_faucet_backend ~agent ~tezlink_sandbox_endpoint ~faucet_private_key
-    ~dns_domain =
-  let faucet_api_port = Agent.next_available_port agent in
+let init_faucet_backend ~agent ~sequencer_proxy ~faucet_private_key
+    ~faucet_api_proxy =
+  let tezlink_sandbox_endpoint = proxy_internal_endpoint sequencer_proxy in
+  let faucet_api_port = proxy_internal_port faucet_api_proxy in
+  let dns_domain = match faucet_api_proxy with
+    | No_proxy _ -> None
+    | Proxy {dns_domain; _} -> Some dns_domain
+  in
   let faucet_backend_dir = "faucet-backend" in
   (* Clone faucet backend from personal fork because upstream depends on a RPC which we don't yet support (forge_operation). *)
   let* () =
@@ -807,7 +812,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             and* () =
         match faucet_proxys_opt with
         | None -> unit
-        | Some {tzkt_proxy; faucet_api_proxy = _; faucet_frontend_proxy = _} ->
+        | Some {tzkt_proxy; faucet_api_proxy; faucet_frontend_proxy = _} ->
                 let () = toplog "Starting faucet" in
                 let faucet_account = Constant.bootstrap1 in
                 let faucet_pkh = faucet_account.public_key_hash in
@@ -819,9 +824,9 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 let* faucet_api =
                   init_faucet_backend
                     ~agent:tezlink_sequencer_agent
-                    ~tezlink_sandbox_endpoint:tezlink_proxy_endpoint
+                    ~sequencer_proxy
                     ~faucet_private_key
-                    ~dns_domain
+                    ~faucet_api_proxy
                 in
                 let* () =
                   add_service
