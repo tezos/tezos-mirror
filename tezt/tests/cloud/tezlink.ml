@@ -393,7 +393,7 @@ index 1d28850f..5c3058c4 100644
  };
 
 +export const TEZLINK: Network = {
-+  name: "Tezlink",
++  name: "custom",
 +  rpcUrl: "%s",
 +  tzktApiUrl: "%s",
 +  tzktExplorerUrl: "",
