@@ -5399,6 +5399,7 @@ let octez_dal_node_lib =
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
+        octez_bees;
         octez_dal_node_services |> open_;
         octez_dal_node_migrations;
         octez_protocol_updater |> open_;
