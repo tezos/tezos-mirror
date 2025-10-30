@@ -34,14 +34,14 @@ let () =
   register_error_kind
     `Permanent
     ~id:"evm_node.dev.tezlink.bls_is_not_allowed"
-    ~title:"Failed to prevalidate an operation: tz4 are forbidden"
+    ~title:"Failed to validate an operation: tz4 are forbidden"
     ~description:
-      "Prevalidation of the operation failed because tz4 addresses are not \
+      "Validation of the operation failed because tz4 addresses are not \
        supported."
     ~pp:(fun ppf (clue, key) ->
       Format.fprintf
         ppf
-        "Failed to prevaliate operation %a: tz4 keys are forbidden %a"
+        "Failed to validate operation %a: tz4 keys are forbidden %a"
         pp_clue
         clue
         Signature.Public_key_hash.pp
@@ -55,12 +55,12 @@ let () =
   register_error_kind
     `Permanent
     ~id:"evm_node.dev.tezlink.parsing_failure"
-    ~title:"Failed to prevalidate an operation: could not parse the operation"
-    ~description:"Prevalidation of the operation failed during parsing."
+    ~title:"Failed to validate an operation: could not parse the operation"
+    ~description:"Validation of the operation failed during parsing."
     ~pp:(fun ppf (clue, err) ->
       Format.fprintf
         ppf
-        "Failed to prevaliate operation %a: error during parsing %a"
+        "Failed to validate operation %a: error during parsing %a"
         pp_clue
         clue
         Data_encoding.Binary.pp_read_error
@@ -74,15 +74,14 @@ let () =
   register_error_kind
     `Permanent
     ~id:"evm_node.dev.tezlink.not_a_manager_operation"
-    ~title:
-      "Failed to prevalidate an operation: only manager operation are allowed"
+    ~title:"Failed to validate an operation: only manager operation are allowed"
     ~description:
-      "Prevalidation of the operation failed because it was not recognized as \
-       a manager operation."
+      "Validation of the operation failed because it was not recognized as a \
+       manager operation."
     ~pp:(fun ppf raw ->
       Format.fprintf
         ppf
-        "Failed to prevaliate an operation: not a manager_operation %a"
+        "Failed to validate operation %a: not a manager_operation"
         pp_clue
         raw)
     Data_encoding.(obj1 (req "operation" clue_encoding))
@@ -91,16 +90,16 @@ let () =
   register_error_kind
     `Permanent
     ~id:"evm_node.dev.tezlink.unsupported_manager_operation"
-    ~title:"Failed to prevalidate an operation: unsupported manager operation."
+    ~title:"Failed to validate an operation: unsupported manager operation."
     ~description:
-      "Prevalidation of the operation failed because it contains at least one \
+      "Validation of the operation failed because it contains at least one \
        unsupported operation. The only supported operations are reveal, \
        transaction and origination."
     ~pp:(fun ppf op ->
       Format.fprintf
         ppf
-        "Failed to prevalidate an operation: it contains at least one \
-         unsupported operation %a"
+        "Failed to validate operation %a: it contains at least one unsupported \
+         operation"
         pp_clue
         op)
     Data_encoding.(obj1 (req "operation" clue_encoding))
@@ -109,14 +108,14 @@ let () =
   register_error_kind
     `Temporary
     ~id:"evm_node.dev.tezlink.too_big"
-    ~title:"Failed to prevalidate an operation: too big."
+    ~title:"Failed to validate an operation: too big."
     ~description:
-      "Prevalidation of the operation failed because the operation is too big."
+      "Validation of the operation failed because the operation is too big."
     ~pp:(fun ppf (op, size, max) ->
       Format.fprintf
         ppf
-        "Failed to prevalidate an operation: oversized operation %a (size: %d, \
-         max: %d)"
+        "Failed to validate operation %a: oversized operation (size: %d, max: \
+         %d)"
         pp_clue
         op
         size
@@ -128,6 +127,9 @@ let () =
       | _ -> None)
     (fun (clue, size, max) -> Oversized_operation (clue, size, max))
 
+(** Search for the manager info (public key, counter), and checks that it is
+    valid: the public key must be already revealed, or be the reveal must be
+    the first operation of the batch. *)
 let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
   let open Lwt_result_syntax in
   match op with
@@ -141,12 +143,14 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
                (Implicit source)
       | Some (Public_key pk), _op -> return (Ok (pk, source, counter))
       | Some (Hash _), Reveal {public_key; _} ->
-          (* the revealed public key might be the one we're searching for *)
+          (* The operation might be the reveal of the public key we're
+             searching for. *)
           let open Signature in
           let pkh_revealed = Public_key.hash public_key in
           if Public_key_hash.equal source pkh_revealed then
             return @@ Ok (public_key, source, counter)
           else
+            (* Each public key must be revealed by the corresponding address. *)
             tzfail_p
             @@ Imported_protocol.Contract_manager_storage.(
                  Inconsistent_hash
@@ -160,6 +164,8 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
           @@ Imported_protocol.Contract_manager_storage.Unrevealed_manager_key
                (Implicit source)
       | None, _ ->
+          (* If an address is not known, it doesn't hold any tez and can't send
+             operations. *)
           tzfail_p
           @@ Imported_protocol.Contract_storage.Empty_implicit_contract source)
   | _ -> tzfail @@ Not_a_manager_operation error_clue
@@ -219,6 +225,7 @@ let validate_transaction ctxt (Transaction {destination; _}) =
       tzfail @@ Bls_is_not_allowed (ctxt.error_clue, destination)
   | _ -> return (Ok ())
 
+(** Not all the operation defined in the protocol are supported by Tezlink. *)
 let validate_supported_operation (type kind) ~ctxt
     (operation : kind manager_operation) =
   let open Lwt_result_syntax in
@@ -240,14 +247,18 @@ let validate_source ~ctxt second_source =
 
 let validate_balance ~ctxt ~fee =
   let open Lwt_result_syntax in
+  (* Convert a Tez.t into a Tez_repr.t: we reuse the appropriate errors from
+     the protocol but they are not defined on Tez.t *)
   let tezrep_of t =
     let open Imported_protocol in
     t |> Tez.to_mutez |> Tez_repr.of_mutez
     |> Option.value ~default:Tez_repr.zero
-    (* The conversion should not fail so the zero value won't be used *)
+    (* The conversion should not fail so the zero value won't be used. *)
   in
   match Tez.sub_opt ctxt.balance_left fee with
   | Some balance_left -> (
+      (* The source can pay for the fees, we compute the total fee for the
+         batch. *)
       match Tez.(ctxt.fee +? fee) with
       | Ok fee -> return (Ok {ctxt with balance_left; fee})
       | Error _ ->
@@ -255,6 +266,7 @@ let validate_balance ~ctxt ~fee =
           @@ Imported_protocol.Tez_repr.Addition_overflow
                (tezrep_of ctxt.fee, tezrep_of fee))
   | None ->
+      (* The source can't pay for the fees. *)
       tzfail_p
       @@ Imported_protocol.Contract_storage.(
            Balance_too_low
@@ -271,8 +283,8 @@ let validate_counter ~ctxt counter =
              Inconsistent_counters
                {source = ctxt.source; previous_counter; counter})
     | None ->
-        (* the first counter in the batch is equal to ctxt.counter by
-           construction *)
+        (* The first counter in the batch is equal to ctxt.counter by
+           construction. *)
         failwith "unreachable"
 
 let hard_gas_limit_per_operation =
@@ -300,7 +312,7 @@ let validate_variable_gas_cost ~ctxt remaining_gas (Manager operation) =
       let* _ = consume_decoding_gas remaining_gas script.storage in
       return_unit
   | Reveal _ ->
-      (* only checking a Bls proof has a cost here, and we don't do Bls *)
+      (* Only checking a Bls proof has a cost here, and we don't do Bls. *)
       return_unit
   | _ -> tzfail @@ Unsupported_manager_operation ctxt.error_clue
 
@@ -321,7 +333,7 @@ let validate_gas_limit ~ctxt gas_limit operation =
     let fixed_cost =
       if ctxt.length = 0 then
         (* The gas cost of signature verification is included in the first
-           operation cost *)
+           operation's cost. *)
         Gas.(
           Imported_protocol.Michelson_v1_gas.Cost_of.manager_operation
           +@ ctxt.signature_check_cost)
@@ -361,7 +373,6 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       in
       let*? () = validate_storage_limit storage_limit in
       let** ctxt = validate_balance ~ctxt ~fee in
-      (* the update will be updated during the validation steps *)
       return
         (Ok
            {
@@ -400,7 +411,6 @@ let validate_first_counter ~read ~source ~first_counter =
       Imported_protocol.Manager_counter_repr.Internal_for_tests.of_int
       @@ Z.to_int first_counter
     in
-
     tzfail_p
     @@ Imported_protocol.Contract_storage.(
          Counter_in_the_past {contract = Implicit source; expected; found})
@@ -420,7 +430,10 @@ let get_signature signature =
   | None -> tzfail_p @@ Imported_protocol.Operation_repr.Missing_signature
   | Some signature -> return (Ok signature)
 
-(** Checks only existence of signature if `check_signature` is true. Used to fail early if there is no signature but one is required. *)
+(** Checks only existence of signature if `check_signature` is true. Used to
+    fail early if there is no signature but one is required. The option
+    `check_signature` is used during simulation, where the signature is not
+    available. *)
 let signature_exists ~check_signature signature =
   let open Lwt_result_syntax in
   if not check_signature then return (Ok ())
@@ -428,7 +441,7 @@ let signature_exists ~check_signature signature =
     let** _signature = get_signature signature in
     return (Ok ())
 
-(** We can't reuse [Alpha_context.check_signature] because it's asking for the
+(** We can't reuse {!Alpha_context.check_signature} because it's asking for the
    context to check attestation and preattestation Bls signatures. So we
    implement a simplified version of the underlying
    [Operation_repr.check_signature] which is unavailable to us because of type.
@@ -444,8 +457,8 @@ let validate_signature ~check_signature shell contents pk signature =
         (shell, contents)
     in
     if
-      (* That watermark is used for all operations except endorsement, which we
-       don't support. *)
+      (* That watermark ({!Generic_operation}) is used for all operations
+         except endorsement, which we don't support. *)
       Signature.check
         ~watermark:Generic_operation
         pk
@@ -462,7 +475,7 @@ let signature_cost pk {shell; protocol_data = Operation_data protocol_data} =
        pk)
     {shell; protocol_data}
 
-let validate_tezlink_operation ?(check_signature = true) ~read raw =
+let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
   let open Lwt_result_syntax in
   let raw = Bytes.of_string raw in
   let error_clue = Operation_hash.hash_bytes [raw] in
@@ -489,23 +502,21 @@ let validate_tezlink_operation ?(check_signature = true) ~read raw =
     @@ Tezos_types.Contract.of_implicit source
   in
   let** () = validate_first_counter ~read ~source ~first_counter in
-  let** ctxt =
-    validate_batch
-      ~ctxt:
-        {
-          source;
-          balance_left;
-          previous_counter = None;
-          next_counter = first_counter;
-          error_clue;
-          first_counter;
-          length = 0;
-          fee = Tez.zero;
-          gas_limit = Z.zero;
-          signature_check_cost;
-        }
-      (first :: rest)
+  let initial_context =
+    {
+      source;
+      balance_left;
+      previous_counter = None;
+      next_counter = first_counter;
+      error_clue;
+      first_counter;
+      length = 0;
+      fee = Tez.zero;
+      gas_limit = Z.zero;
+      signature_check_cost;
+    }
   in
+  let** ctxt = validate_batch ~ctxt:initial_context (first :: rest) in
   let** () =
     validate_signature
       ~check_signature
@@ -544,7 +555,8 @@ let maximum_gas_per_block =
 let could_fit state (operation : Tezos_types.Operation.t) =
   Z.(state.gas + operation.gas_limit <= maximum_gas_per_block)
 
-let add_ source = String.Map.add (Signature.Public_key_hash.to_b58check source)
+let add_ source cache =
+  String.Map.add (Signature.Public_key_hash.to_b58check source) cache
 
 let get_ read cache source =
   let open Lwt_result_syntax in
