@@ -708,6 +708,43 @@ let process_trace_result trace =
       let msg = Format.asprintf "%a" pp_print_trace e in
       rpc_error (Rpc_errors.internal_error msg)
 
+let send_raw_transaction (type f)
+    (tx_container : f Services_backend_sig.tx_container) ~wait_confirmation =
+  let open Lwt_result_syntax in
+  let f raw_tx =
+    let txn = Ethereum_types.hex_to_bytes raw_tx in
+    let* is_valid = Prevalidator.prevalidate_raw_transaction txn in
+    match is_valid with
+    | Error err ->
+        let*! () = Tx_pool_events.invalid_transaction ~transaction:raw_tx in
+        rpc_error (Rpc_errors.transaction_rejected err None)
+    | Ok {next_nonce; transaction_object} -> (
+        Octez_telemetry.Trace.(
+          add_attrs (fun () ->
+              Telemetry.Attributes.
+                [Transaction.hash @@ Transaction_object.hash transaction_object])) ;
+
+        let* (module Tx_container) =
+          match tx_container with
+          | Evm_tx_container m -> return m
+          | Michelson_tx_container _ ->
+              failwith
+                "Unsupported JSONRPC method in Tezlink: sendRawTransaction"
+        in
+        let* tx_hash =
+          Tx_container.add
+            ~next_nonce
+            transaction_object
+            ~raw_tx
+            ~wait_confirmation
+        in
+        match tx_hash with
+        | Ok tx_hash -> rpc_ok tx_hash
+        | Error reason ->
+            rpc_error (Rpc_errors.transaction_rejected reason None))
+  in
+  f
+
 let dispatch_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) (config : Configuration.t)
@@ -1067,41 +1104,51 @@ let dispatch_request (type f) ~websocket
                     transactions"
                    None
             else
-              let f raw_tx =
-                let txn = Ethereum_types.hex_to_bytes raw_tx in
-                let* is_valid = Prevalidator.prevalidate_raw_transaction txn in
-                match is_valid with
-                | Error err ->
-                    let*! () =
-                      Tx_pool_events.invalid_transaction ~transaction:raw_tx
-                    in
-                    rpc_error (Rpc_errors.transaction_rejected err None)
-                | Ok {next_nonce; transaction_object} -> (
-                    Octez_telemetry.Trace.(
-                      add_attrs (fun () ->
-                          Telemetry.Attributes.
-                            [
-                              Transaction.hash
-                              @@ Transaction_object.hash transaction_object;
-                            ])) ;
-
-                    let* (module Tx_container) =
-                      match tx_container with
-                      | Evm_tx_container m -> return m
-                      | Michelson_tx_container _ ->
-                          failwith
-                            "Unsupported JSONRPC method in Tezlink: \
-                             sendRawTransaction"
-                    in
-                    let* tx_hash =
-                      Tx_container.add ~next_nonce transaction_object ~raw_tx
-                    in
-                    match tx_hash with
-                    | Ok tx_hash -> rpc_ok tx_hash
-                    | Error reason ->
-                        rpc_error (Rpc_errors.transaction_rejected reason None))
+              let f =
+                send_raw_transaction tx_container ~wait_confirmation:false
               in
               build_with_input ~f module_ parameters
+        | Send_raw_transaction_sync.Method ->
+            let f (raw_tx, timeout) =
+              let promise =
+                send_raw_transaction tx_container raw_tx ~wait_confirmation:true
+              in
+              let* hash =
+                match timeout with
+                | 0L -> promise
+                | timeout ->
+                    let timeout = Int64.to_float timeout in
+                    (*milliseconds to seconds*)
+                    let timeout = timeout /. 1000. in
+                    Lwt.catch
+                      (fun () ->
+                        Lwt_unix.with_timeout timeout (fun () -> promise))
+                      (function
+                        | Lwt_unix.Timeout ->
+                            rpc_error
+                              (Rpc_errors.transaction_rejected
+                                 (Format.sprintf
+                                    "The transaction was added to the mempool \
+                                     but wasn't processed in %d ms"
+                                    (int_of_float timeout))
+                                 None)
+                        | exn -> Lwt.fail exn)
+              in
+              match hash with
+              | Ok hash -> (
+                  let* receipt =
+                    Backend_rpc.Etherlink_block_storage.transaction_receipt hash
+                  in
+                  match receipt with
+                  | Some receipt -> rpc_ok receipt
+                  | None ->
+                      rpc_error
+                        (Rpc_errors.transaction_rejected
+                           "Transaction not found"
+                           None))
+              | Error reason -> rpc_error reason
+            in
+            build_with_input ~f module_ parameters
         | Eth_call.Method ->
             let f (call, block_param, state_override) =
               let* call_result =
@@ -1351,7 +1398,10 @@ let dispatch_private_request (type f) ~websocket
         build ~f module_ parameters
     | Method (Inject_transaction.Method, module_) ->
         let open Lwt_result_syntax in
-        let f ((transaction_object : Transaction_object.t), raw_txn) =
+        let f
+            ( (transaction_object : Transaction_object.t),
+              raw_txn,
+              wait_confirmation ) =
           Octez_telemetry.Trace.(
             add_attrs (fun () ->
                 Telemetry.Attributes.
@@ -1391,6 +1441,7 @@ let dispatch_private_request (type f) ~websocket
                          injectTransaction"
                 in
                 Tx_container.add
+                  ~wait_confirmation
                   ~next_nonce
                   transaction_object
                   ~raw_tx:transaction

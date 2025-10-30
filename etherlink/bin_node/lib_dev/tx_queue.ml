@@ -1209,12 +1209,41 @@ struct
       (Inject {next_nonce; payload = txn; tx_object; callback})
     |> handle_request_error
 
-  let add ~next_nonce tx_object ~raw_tx =
+  let add ?(wait_confirmation = false) ~next_nonce tx_object ~raw_tx =
     let open Lwt_result_syntax in
-    let* res = inject ~next_nonce tx_object raw_tx in
-    match res with
-    | Ok () -> return (Ok (Tx.hash_of_tx_object tx_object))
-    | Error errs -> return (Error errs)
+    let callback, return_hash =
+      let return_hash = function
+        | Ok () -> return (Ok (Tx.hash_of_tx_object tx_object))
+        | Error errs -> return (Error errs)
+      in
+      if wait_confirmation then
+        let wait_confirmation, wait_confirmation_wakener = Lwt.wait () in
+        let callback =
+         fun status ->
+          match status with
+          | `Accepted -> Lwt.return_unit
+          | `Confirmed ->
+              Lwt.wakeup wait_confirmation_wakener (Ok ()) ;
+              Lwt.return_unit
+          | `Dropped ->
+              Lwt.wakeup wait_confirmation_wakener (Error "Transaction dropped") ;
+              Lwt.return_unit
+          | `Refused ->
+              Lwt.wakeup wait_confirmation_wakener (Error "Transaction refused") ;
+              Lwt.return_unit
+        in
+        let wait_confirmation injection_res =
+          match injection_res with
+          | Ok () ->
+              let*! res = wait_confirmation in
+              return_hash res
+          | Error errs -> return (Error errs)
+        in
+        (Some callback, wait_confirmation)
+      else (None, return_hash)
+    in
+    let* injection_res = inject ?callback ~next_nonce tx_object raw_tx in
+    return_hash injection_res
 
   let find txn_hash =
     let open Lwt_result_syntax in

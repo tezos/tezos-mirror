@@ -32,7 +32,7 @@ let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
 
       let nonce ~next_nonce _address = Lwt_result.return next_nonce
 
-      let add ~next_nonce:_ _tx_object ~raw_tx =
+      let add ?wait_confirmation:_ ~next_nonce:_ _tx_object ~raw_tx =
         match evm_node_endpoint with
         | Some evm_node_endpoint ->
             Injector.send_raw_transaction

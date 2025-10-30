@@ -47,11 +47,11 @@ let send_raw_transaction_request raw_tx =
     ~input_encoding:Send_raw_transaction.input_encoding
     (Ethereum_types.hex_encode_string raw_tx)
 
-let inject_transaction_request tx_object raw_tx =
+let inject_transaction_request tx_object raw_tx wait_confirmation =
   construct_rpc_call
     ~method_:Inject_transaction.method_
     ~input_encoding:Inject_transaction.input_encoding
-    (tx_object, raw_tx)
+    (tx_object, raw_tx, wait_confirmation)
 
 let inject_tezlink_operation_request op raw_op =
   construct_rpc_call
@@ -68,13 +68,14 @@ let send_raw_transaction ~keep_alive ~timeout ~base ~raw_tx =
     (send_raw_transaction_request raw_tx)
     Send_raw_transaction.output_encoding
 
-let inject_transaction ~keep_alive ~timeout ~base ~tx_object ~raw_tx =
+let inject_transaction ~keep_alive ~timeout ~base ~tx_object ~raw_tx
+    ~wait_confirmation =
   call_rpc_service
     ~keep_alive
     ~timeout
     ~base
     ~path:Resto.Path.(root / "private")
-    (inject_transaction_request tx_object raw_tx)
+    (inject_transaction_request tx_object raw_tx wait_confirmation)
     Inject_transaction.output_encoding
 
 let inject_tezlink_operation ~keep_alive ~timeout ~base ~op ~raw_op =
