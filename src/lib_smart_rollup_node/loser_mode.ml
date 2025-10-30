@@ -23,6 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["smart_rollup_node"; "loser_mode"]
+
+  let loser_mode_dal_decision =
+    declare_4
+      ~section
+      ~name:"loser_mode_dal_decision"
+      ~msg:
+        "loser_mode {decision} published at level {published_level}, slot \
+         {slot_index}, and page {page_index})"
+      ~level:Notice
+      ("published_level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("page_index", Data_encoding.int31)
+      ("decision", Data_encoding.string)
+
+  let emit_dal_decision ~published_level ~slot_index ~page_index ~decision =
+    emit
+      loser_mode_dal_decision
+      (published_level, slot_index, page_index, decision)
+end
+
 type failure = {level : int; message_index : int; message_tick : int64}
 
 let failure_encoding =
@@ -192,9 +216,10 @@ let is_invalid_dal_parameters = function
 
 let is_invalid_dal_page ~published_level ~slot_index ~page_index ~page_size
     ~honest_payload =
+  let open Lwt_syntax in
   let eq_or_wildcard v = function None -> true | Some w -> v = w in
   function
-  | Failure _ | Invalid_dal_parameters _ -> Either.left ()
+  | Failure _ | Invalid_dal_parameters _ -> return @@ Either.left ()
   | Invalid_dal_page
       {
         published_level = pl;
@@ -202,19 +227,36 @@ let is_invalid_dal_page ~published_level ~slot_index ~page_index ~page_size
         page_index = pi;
         page_payload_strategy;
       } ->
+      let emit decision =
+        Event.emit_dal_decision
+          ~published_level
+          ~slot_index
+          ~page_index
+          ~decision
+      in
       if
         eq_or_wildcard published_level pl
         && eq_or_wildcard slot_index si
         && eq_or_wildcard page_index pi
       then
-        Either.right
-        @@
-        match (page_payload_strategy, honest_payload) with
-        | `Flip, Some _ -> None
-        | `Flip, None -> Some (Bytes.make page_size 'L')
-        | `Alter, None -> None
-        | `Alter, Some data ->
-            let lll = Bytes.make page_size 'L' in
-            let zzz = Bytes.make page_size 'Z' in
-            Option.some (if Bytes.equal data lll then zzz else lll)
-      else Either.left ()
+        let* res =
+          match (page_payload_strategy, honest_payload) with
+          | `Flip, Some _ ->
+              let+ () = emit "flipped <Some data>" in
+              None
+          | `Flip, None ->
+              let+ () = emit "flipped <None>" in
+              Some (Bytes.make page_size 'L')
+          | `Alter, None ->
+              let+ () = emit "cannot alter <None>" in
+              None
+          | `Alter, Some data ->
+              let lll = Bytes.make page_size 'L' in
+              let zzz = Bytes.make page_size 'Z' in
+              let+ () = emit "altered <Some data>" in
+              Option.some (if Bytes.equal data lll then zzz else lll)
+        in
+        return @@ Either.right res
+      else
+        let+ () = emit "didn't match" in
+        Either.left ()

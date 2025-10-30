@@ -98,4 +98,4 @@ val is_invalid_dal_page :
   page_size:int ->
   honest_payload:bytes option ->
   t ->
-  (unit, bytes option) Either.t
+  (unit, bytes option) Either.t Lwt.t
