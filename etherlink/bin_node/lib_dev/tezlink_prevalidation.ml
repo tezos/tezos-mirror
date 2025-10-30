@@ -291,6 +291,10 @@ let hard_gas_limit_per_operation =
   Tezos_types.Operation.gas_limit_to_z
     Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
 
+let hard_gas_limit_per_block =
+  Tezos_types.Operation.gas_limit_to_z
+    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_block
+
 let consume_decoding_gas gas_limit expr =
   let open Result_syntax in
   match Script.consume_decoding_gas gas_limit expr with
@@ -318,14 +322,19 @@ let validate_variable_gas_cost ~ctxt remaining_gas (Manager operation) =
 
 let validate_gas_limit ~ctxt gas_limit operation =
   let open Lwt_result_syntax in
-  let overall_gas_limit =
-    Z.(ctxt.gas_limit + Tezos_types.Operation.gas_limit_to_z gas_limit)
-  in
+  let gas_limit_z = Tezos_types.Operation.gas_limit_to_z gas_limit in
+  let overall_gas_limit = Z.(ctxt.gas_limit + gas_limit_z) in
+  (* We have two limits to check:
+     - the operation can't have a gas limit higher than
+     hard_gas_limit_per_operation,
+     - the batch can't have a gas limit higher than hard_gas_limit_per_block.
+  *)
   if
     not
       Z.Compare.(
-        hard_gas_limit_per_operation >= overall_gas_limit
-        && overall_gas_limit >= Z.zero)
+        hard_gas_limit_per_operation >= gas_limit_z
+        && hard_gas_limit_per_block >= overall_gas_limit
+        && gas_limit_z >= Z.zero)
   then tzfail_p @@ Imported_protocol.Gas_limit_repr.Gas_limit_too_high
   else
     (* There is a fixed cost for all manager operations. See

@@ -2000,6 +2000,7 @@ let test_tezlink_prevalidation =
   in
 
   let hard_gas_limit_per_operation = 1_040_000 in
+  let hard_gas_limit_per_block = 1_386_666 in
 
   (* case wrong gas limit *)
   let gas_limit_too_high_rex =
@@ -2044,7 +2045,7 @@ let test_tezlink_prevalidation =
   in
 
   (* case gas limit of batch too high*)
-  let not_quite_too_high = hard_gas_limit_per_operation - 1000 in
+  let not_quite_too_high = hard_gas_limit_per_block - 1000 in
   let* op_wrong_gas_limit2 =
     Operation.Manager.(
       operation
