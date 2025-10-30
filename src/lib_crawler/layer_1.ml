@@ -562,26 +562,12 @@ let timeout_promise service timeout =
   in
   Lwt_result_syntax.tzfail (RPC_timeout {path; timeout})
 
-let trace_name service =
-  let meth =
-    Tezos_rpc.Service.meth service |> Tezos_rpc.Service.string_of_meth
-  in
-  let path = Tezos_rpc.Service.path service |> Resto.Path.to_string in
-  String.concat " " [meth; path]
-
-let client_context_with_timeout (obj : #Client_context.full) timeout :
-    Client_context.full tzresult Lwt.t =
-  let open Lwt_result_syntax in
-  let+ chain_id =
-    Tezos_shell_services.Shell_services.Chain.chain_id obj ~chain:obj#chain ()
-  in
-  let open Lwt_syntax in
+class with_timeout timeout (obj : #Tezos_rpc.Context.generic) :
+  Tezos_rpc.Context.generic =
   object
-    inherit Client_context.proxy_context (obj :> Client_context.full)
+    method base = obj#base
 
-    method! chain = `Hash chain_id
-
-    method! call_service :
+    method call_service :
         'm 'p 'q 'i 'o.
         (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
         'p ->
@@ -589,19 +575,13 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
         'i ->
         'o tzresult Lwt.t =
       fun service params query body ->
-        let trace_name = trace_name service in
-        Octez_telemetry.Trace.with_tzresult
-          ~service_name:"L1_rpc_client"
-          ~kind:Span_kind_client
-          trace_name
-        @@ fun _ ->
         Lwt.pick
           [
             obj#call_service service params query body;
             timeout_promise service timeout;
           ]
 
-    method! call_streamed_service :
+    method call_streamed_service :
         'm 'p 'q 'i 'o.
         (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
         on_chunk:('o -> unit) ->
@@ -611,12 +591,6 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
         'i ->
         (unit -> unit) tzresult Lwt.t =
       fun service ~on_chunk ~on_close params query body ->
-        let trace_name = trace_name service in
-        Octez_telemetry.Trace.with_tzresult
-          ~service_name:"L1_rpc_client"
-          ~kind:Span_kind_client
-          trace_name
-        @@ fun _ ->
         Lwt.pick
           [
             obj#call_streamed_service
@@ -629,19 +603,29 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
             timeout_promise service timeout;
           ]
 
-    method! generic_media_type_call meth ?body uri =
+    method generic_media_type_call meth ?body uri =
       let timeout_promise =
+        let open Lwt_syntax in
         let* () = Lwt_unix.sleep timeout in
         Lwt_result_syntax.tzfail
           (RPC_timeout {path = Uri.to_string uri; timeout})
       in
-      let trace_name =
-        String.concat " " [Tezos_rpc.Service.string_of_meth meth; Uri.path uri]
-      in
-      Octez_telemetry.Trace.with_tzresult
-        ~service_name:"L1_rpc_client"
-        ~kind:Span_kind_client
-        trace_name
-      @@ fun _ ->
       Lwt.pick [obj#generic_media_type_call meth ?body uri; timeout_promise]
+  end
+
+let client_context (obj : #Client_context.full) ~timeout :
+    Client_context.full tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let+ chain_id =
+    Tezos_shell_services.Shell_services.Chain.chain_id obj ~chain:obj#chain ()
+  in
+  object
+    inherit Client_context.proxy_context (obj :> Client_context.full)
+
+    inherit!
+      Octez_telemetry.Rpc_context.with_telemetry
+        ~service_name:"L1_rpc_client"
+        (new with_timeout timeout obj)
+
+    method! chain = `Hash chain_id
   end
