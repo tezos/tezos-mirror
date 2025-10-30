@@ -93,7 +93,6 @@ let job_opam_packages ?dependencies group batch_index packages : tezos_job =
            At the time of writing, the opam tests were quite flaky.
            Therefore, a retry was added. This should be removed once the
            underlying tests have been fixed. *)
-    ~retry:{max = 2; when_ = []}
     ~timeout:(Minutes 90)
     ~rules:[job_rule ~when_:(Delayed (Minutes batch_index)) ()]
     ~variables:
