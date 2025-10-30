@@ -381,8 +381,7 @@ let () =
     "opam.daily"
     opam_daily
     ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace
-       :: Code_verification.Opam.jobs_opam_packages ()
+      (Tezos_ci.job_datadog_pipeline_trace :: Opam.jobs_opam_packages ()
       |> List.map (with_interruptible false))
     ~description:"Daily pipeline containing all OPAM jobs." ;
   let custom_extended_test_jobs = Custom_extended_test_pipeline.jobs () in
