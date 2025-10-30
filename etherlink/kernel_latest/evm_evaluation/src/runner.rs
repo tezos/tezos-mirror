@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2021-2023 draganrakita
 // SPDX-FileCopyrightText: 2024 Trilitech <contact@trili.tech>
 //
@@ -8,7 +8,6 @@ use revm::context::result::EVMError;
 use revm::primitives::{hardfork::SpecId, keccak256, Address, Bytes, B256};
 use revm::state::AccountInfo;
 use revm_etherlink::helpers::legacy::{h256_to_alloy, u256_to_alloy};
-use revm_etherlink::precompiles::provider::EtherlinkPrecompiles;
 use revm_etherlink::storage::code::CodeStorage;
 use revm_etherlink::storage::world_state_handler::StorageAccount;
 use revm_etherlink::{run_transaction, Error, ExecutionOutcome, GasData};
@@ -285,7 +284,6 @@ fn execute_transaction(
         spec_id,
         &block_constants,
         None,
-        EtherlinkPrecompiles::new(),
         caller,
         address,
         Bytes::from(call_data),

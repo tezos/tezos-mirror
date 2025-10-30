@@ -350,7 +350,6 @@ pub fn revm_run_transaction<Host: Runtime>(
         *spec_id,
         block_constants,
         transaction_hash,
-        revm_etherlink::precompiles::provider::EtherlinkPrecompiles::new(),
         Address::from_slice(&caller.0),
         to.map(|to| Address::from_slice(&to.0)),
         Bytes::from(call_data),

@@ -318,7 +318,6 @@ pub fn run_transaction<'a, Host: Runtime>(
     spec_id: SpecId,
     block_constants: &'a BlockConstants,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
-    precompiles: EtherlinkPrecompiles,
     caller: Address,
     destination: Option<Address>,
     call_data: Bytes,
@@ -345,14 +344,15 @@ pub fn run_transaction<'a, Host: Runtime>(
     let db = EtherlinkVMDB::new(host, block_constants)?;
 
     if let Some(tracer_input) = tracer_input {
-        let inspector = get_inspector_from(tracer_input, precompiles.clone(), spec_id);
+        let inspector =
+            get_inspector_from(tracer_input, EtherlinkPrecompiles::new(), spec_id);
 
         let mut evm = evm_inspect(
             db,
             &block_env,
             &tx,
             gas_data.maximum_gas_per_transaction,
-            precompiles,
+            EtherlinkPrecompiles::new(),
             block_constants.chain_id.as_u64(),
             spec_id,
             inspector,
@@ -383,7 +383,7 @@ pub fn run_transaction<'a, Host: Runtime>(
             &block_env,
             &tx,
             gas_data.maximum_gas_per_transaction,
-            precompiles,
+            EtherlinkPrecompiles::new(),
             block_constants.chain_id.as_u64(),
             spec_id,
             is_simulation,
