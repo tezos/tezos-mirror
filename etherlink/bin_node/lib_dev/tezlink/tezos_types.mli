@@ -75,6 +75,10 @@ module Operation : sig
   val encoding : t Data_encoding.t
 
   val gas_limit_to_z : Tezlink_imports.Alpha_context.Gas.Arith.integral -> Z.t
+
+  (** Underapproximation of the size of the smallest operation, defined as a
+      Reveal of tz1 key, with zero fees/gas limit/storage limit/....*)
+  val minimum_operation_size : int
 end
 
 module Manager = Tezlink_imports.Imported_protocol.Manager_repr

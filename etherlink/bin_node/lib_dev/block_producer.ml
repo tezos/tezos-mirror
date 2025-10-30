@@ -302,8 +302,8 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
   (* Skip validation if chain_family is Michelson. *)
   match tx_container with
   | Michelson_tx_container (module Tx_container) ->
-      if maximum_cumulative_size <= minimum_ethereum_transaction_size then
-        return (Michelson_tx_objects [])
+      if maximum_cumulative_size <= Tezos_types.Operation.minimum_operation_size
+      then return (Michelson_tx_objects [])
       else
         let read = Evm_state.read head_info.evm_state in
         let initial_validation_state =

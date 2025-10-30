@@ -129,6 +129,50 @@ module Operation = struct
     let hash = ImportedOperation.hash_packed op in
     let (`Hex hex) = Operation_hash.to_hex hash in
     Ethereum_types.Hash (Ethereum_types.Hex hex)
+
+  let minimum_operation =
+    let open Tezlink_imports.Alpha_context in
+    let open Tezlink_imports.Alpha_context.Operation in
+    let open Tezlink_imports.Imported_env in
+    let shell : Operation.shell_header =
+      {branch = Tezos_crypto.Hashed.Block_hash.zero}
+    in
+    let signature = Some Signature.zero in
+    let source = Signature.Public_key_hash.zero in
+    let protocol_data : packed_protocol_data =
+      Operation_data
+        {
+          contents =
+            Single
+              (Manager_operation
+                 {
+                   source;
+                   fee = Tez.zero;
+                   counter = Manager_counter.Internal_for_tests.of_int 0;
+                   gas_limit = Gas.Arith.zero;
+                   storage_limit = Z.zero;
+                   operation =
+                     Reveal
+                       {
+                         public_key =
+                           Signature.Public_key.of_b58check_exn
+                             "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2";
+                         proof = None;
+                       };
+                 });
+          signature;
+        }
+    in
+    let op : packed_operation = {shell; protocol_data} in
+    op
+
+  let minimum_operation_size =
+    let raw =
+      Data_encoding.Binary.to_bytes_exn
+        Tezlink_imports.Alpha_context.Operation.encoding
+        minimum_operation
+    in
+    Bytes.length raw
 end
 
 module Manager = Tezlink_imports.Imported_protocol.Manager_repr
