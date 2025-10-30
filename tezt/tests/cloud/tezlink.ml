@@ -761,7 +761,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         match tzkt_proxy_opt with
         | None -> unit
         | Some tzkt_proxy ->
-            let* () =
               let () = toplog "Starting TzKT" in
               init_tzkt
                 ~tzkt_proxy
@@ -769,8 +768,14 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~sequencer_proxy
                 ~time_between_blocks:Cli.time_between_blocks
             and* () =
+        match tzkt_proxy_opt with
+        | None -> unit
+        | Some tzkt_proxy ->
               init_umami tezlink_sequencer_agent ~sequencer_proxy ~tzkt_proxy
             and* () =
+        match tzkt_proxy_opt with
+        | None -> unit
+        | Some tzkt_proxy ->
               if Cli.faucet then
                 let () = toplog "Starting faucet" in
                 let faucet_account = Constant.bootstrap1 in
@@ -816,8 +821,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                   ~name:"Faucet"
                   ~url:(Client.string_of_endpoint faucet_frontend)
               else unit
-            in
-            unit
       in
       let* () =
         match dns_domain with
