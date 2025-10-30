@@ -414,7 +414,9 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_proxy ~faucet_pkh
     ~tzkt_proxy ~faucet_frontend_proxy =
   let runner = Agent.runner agent in
   let faucet_api = proxy_external_endpoint ~runner faucet_api_proxy in
-  let tezlink_sandbox_endpoint = proxy_internal_endpoint sequencer_proxy in
+  let tezlink_sandbox_endpoint =
+    proxy_external_endpoint ~runner sequencer_proxy
+  in
   let faucet_frontend_port = proxy_internal_port faucet_frontend_proxy in
   let tzkt_api = proxy_external_endpoint ~runner tzkt_proxy in
   let faucet_frontend_dir = "faucet-frontend" in
