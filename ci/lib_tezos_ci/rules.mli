@@ -78,6 +78,12 @@ val rpm_daily : If.t
     [TZ_SCHEDULE_KIND] set to [homebrew.daily]. *)
 val homebrew_daily : If.t
 
+(** A rule that is true for daily Base Images test pipelines.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [base_images.daily]. *)
+val base_images_daily : If.t
+
 (** A rule that is true for scheduled extended RPC test pipelines.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and

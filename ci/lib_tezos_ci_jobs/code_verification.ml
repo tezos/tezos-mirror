@@ -819,15 +819,6 @@ let jobs pipeline_type =
         Homebrew.child_pipeline_full_auto
     in
 
-    let job_base_images_trigger =
-      trigger_job
-        ~__POS__
-        ~rules:(make_rules ~manual:No ~changes:changeset_base_images ())
-        ~stage:Stages.images
-        ~dependencies:(Dependent [])
-        Base_images.child_pipeline
-    in
-
     (* check that ksy files are still up-to-date with octez *)
     let job_kaitai_checks =
       job
@@ -1482,7 +1473,7 @@ let jobs pipeline_type =
       ]
     in
 
-    let jobs_debian =
+    let jobs_packaging =
       match pipeline_type with
       | Before_merging | Merge_train ->
           [
@@ -1490,10 +1481,10 @@ let jobs pipeline_type =
             job_rpm_repository_trigger_auto;
             job_homebrew_trigger_auto;
           ]
-      | Schedule_extended_test -> [job_base_images_trigger]
+      | Schedule_extended_test -> []
     in
-    jobs_debian @ jobs_misc @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_kernels
-    @ jobs_unit @ jobs_install_octez
+    jobs_packaging @ jobs_misc @ jobs_sdk_rust @ jobs_sdk_bindings
+    @ jobs_kernels @ jobs_unit @ jobs_install_octez
   in
 
   (* Coverage jobs *)
