@@ -13354,7 +13354,7 @@ let expect_failure msg k =
     (fun _ -> unit)
 
 let produce_proxy_owned_fa_deposit_and_claim ~client ~sequencer
-    ~sc_rollup_address ~evm_version ~l1_contracts =
+    ~sc_rollup_address ~evm_version ~l1_contracts ?(regression = false) () =
   let* ticketer_bytes = ticket_creator l1_contracts.fa_deposit in
   let* content_bytes = ticket_content 0 in
   let ticketer = ticketer_bytes |> Hex.of_bytes |> Hex.show in
@@ -13391,11 +13391,13 @@ let produce_proxy_owned_fa_deposit_and_claim ~client ~sequencer
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for_and_wait client in
-
   let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
 
   let*@ _ = produce_block sequencer in
+
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  if regression then capture_logs ~header:"Queue deposit" receipt.logs ;
 
   let* nonce = get_deposit_nonce_from_latest_block sequencer in
 
@@ -13439,6 +13441,7 @@ let test_fa_deposit_can_be_claimed_and_withdrawn =
       ~sc_rollup_address
       ~evm_version
       ~l1_contracts
+      ()
   in
 
   let*@ block =
@@ -13520,6 +13523,7 @@ let test_fast_fa_deposit_can_be_claimed_and_withdrawn =
       ~sc_rollup_address
       ~evm_version
       ~l1_contracts
+      ()
   in
 
   let*@ block =
@@ -13586,6 +13590,8 @@ let test_claim_deposit_event =
       ~sc_rollup_address
       ~evm_version
       ~l1_contracts
+      ~regression:true
+      ()
   in
   let* receipt = get_one_receipt_from_latest_or_fail sequencer in
   capture_logs ~header:"Claimed deposit" receipt.logs ;
