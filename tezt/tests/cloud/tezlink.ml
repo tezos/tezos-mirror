@@ -651,6 +651,12 @@ let rec loop n =
   let* () = Lwt_unix.sleep 1. in
   loop n
 
+type faucet_proxys = {
+  tzkt_proxy : proxy_info;
+  faucet_api_proxy : proxy_info;
+  faucet_frontend_proxy : proxy_info;
+}
+
 let add_service cloud ~name ~url =
   let () = toplog "New service: %s: %s" name url in
   Cloud.add_service cloud ~name ~url
@@ -661,11 +667,43 @@ let add_proxy_service cloud runner name ?(url = Fun.id) proxy =
   in
   add_service cloud ~name ~url:(url endpoint)
 
-type faucet_proxys = {
-  tzkt_proxy : proxy_info;
-  faucet_api_proxy : proxy_info;
-  faucet_frontend_proxy : proxy_info;
-}
+let add_services cloud runner ~sequencer_proxy ~tzkt_proxy_opt
+    ~faucet_proxys_opt =
+  let add_proxy_service = add_proxy_service cloud runner in
+  let* () =
+    add_proxy_service
+      "Check Tezlink RPC endpoint"
+      ~url:(sf "%s/version")
+      sequencer_proxy
+  in
+  let* () = add_proxy_service "Tezlink RPC endpoint" sequencer_proxy in
+  let* () =
+    match tzkt_proxy_opt with
+    | None -> unit
+    | Some tzkt_proxy ->
+        let* () = add_proxy_service "TzKT API" tzkt_proxy in
+        let* () =
+          add_proxy_service "Check TzKT API" ~url:(sf "%s/v1/head") tzkt_proxy
+        in
+        add_proxy_service
+          "TzKT Explorer"
+          ~url:(sf "http://sandbox.tzkt.io/blocks?tzkt_api_url=%s")
+          tzkt_proxy
+  in
+  let* () =
+    match faucet_proxys_opt with
+    | None -> unit
+    | Some {faucet_api_proxy; faucet_frontend_proxy; _} ->
+        let* () = add_proxy_service "Faucet API" faucet_api_proxy in
+        let* () =
+          add_proxy_service
+            "Check Faucet API"
+            ~url:(sf "%s/info")
+            faucet_api_proxy
+        in
+        add_proxy_service "Faucet" faucet_frontend_proxy
+  in
+  unit
 
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
@@ -714,19 +752,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           Cli.public_rpc_port
           activate_ssl
       in
-      let add_proxy_service = add_proxy_service cloud runner in
-      let* () =
-        add_proxy_service
-          "Tezlink RPC endpoint"
-          sequencer_proxy
-      in
-      let* () =
-        add_proxy_service
-          "Check Tezlink RPC endpoint"
-          ~url:
-            (sf "%s/version")
-          sequencer_proxy
-      in
       let* tzkt_proxy_opt =
         if Cli.tzkt then
           let tzkt_proxy =
@@ -736,29 +761,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               ~dns_domain
               Cli.tzkt_api_port
               activate_ssl
-          in
-          let* () =
-            add_proxy_service
-              "TzKT API"
-              tzkt_proxy
-          in
-          let* () =
-            add_proxy_service
-              "Check TzKT API"
-              ~url:
-                (sf
-                   "%s/v1/head"
-                   )
-              tzkt_proxy
-          in
-          let* () =
-            add_proxy_service
-              "TzKT Explorer"
-              ~url:
-                (sf
-                   "http://sandbox.tzkt.io/blocks?tzkt_api_url=%s"
-                   )
-              tzkt_proxy
           in
           some tzkt_proxy
         else none
@@ -788,6 +790,14 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               "The faucet service relies an TzKT, but the latter is \
                deactivated (see the --tzkt option)."
         | (None | Some _), false -> none
+      in
+      let* () =
+        add_services
+          cloud
+          runner
+          ~sequencer_proxy
+          ~tzkt_proxy_opt
+          ~faucet_proxys_opt
       in
       let () = toplog "Starting Tezlink sequencer" in
       let* () =
@@ -832,17 +842,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~faucet_private_key
                 ~faucet_api_proxy
             in
-            let* () =
-              add_proxy_service
-                "Faucet API"
-                faucet_api_proxy
-            in
-            let* () =
-              add_proxy_service
-                "Check Faucet API"
-                ~url:(sf "%s/info")
-                faucet_api_proxy
-            in
             let* (_faucet_frontend : Client.endpoint) =
               init_faucet_frontend
                 ~agent:tezlink_sequencer_agent
@@ -852,9 +851,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~tzkt_proxy
                 ~faucet_frontend_proxy
             in
-            add_proxy_service
-              "Faucet"
-              faucet_frontend_proxy
+            unit
       in
       let* () =
         match dns_domain with
