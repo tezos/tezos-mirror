@@ -44,7 +44,10 @@ let make_unix_cctxt endpoint =
   let rpc_config =
     {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
   in
-  new unix_cctxt ~rpc_config
+  let cctxt = new unix_cctxt ~rpc_config in
+  new Octez_telemetry.Rpc_context.with_telemetry
+    ~service_name:"DAL_node_client"
+    cctxt
 
 let call (cctxt : #cctxt) = cctxt#call_service
 
