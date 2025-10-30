@@ -377,6 +377,14 @@ let () =
       |> List.map (with_interruptible false))
     ~description:
       "Daily pipeline containing all Base Images jobs (build and merge)." ;
+  register
+    "opam.daily"
+    opam_daily
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace
+       :: Code_verification.Opam.jobs_opam_packages_daily
+      |> List.map (with_interruptible false))
+    ~description:"Daily pipeline containing all OPAM jobs." ;
   let custom_extended_test_jobs = Custom_extended_test_pipeline.jobs () in
   register
     "schedule_extended_rpc_test"
