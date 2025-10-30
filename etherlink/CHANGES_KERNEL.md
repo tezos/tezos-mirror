@@ -13,7 +13,8 @@
 
 ### Bug fixes
 
-- FA deposit events are now emitted by the FA bridge address: `0xff00000000000000000000000000000000000002` (!19239)
+- `QueuedDeposit` event is now emitted by the FA bridge address: `0xff00000000000000000000000000000000000002` (!19239) (!19793)
+- `QueuedDeposit` event first topic is now correctly computed as the keccak256 of its signature: `QueuedDeposit(uint256,address,uint256,address,uint256,uint256,uint256)`. Hex value is `0xb02d79c5657e344e23d91529b954c3087c60a974d598939583904a4f0b959614`. (!19239) (!19793)
 - Disable [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) on simulation (`eth_call`). (!19643)
 - Fixes `callTracer` not tracing all transactions in a block if a user
   sent multiples transactions in that same block. (!19649)
