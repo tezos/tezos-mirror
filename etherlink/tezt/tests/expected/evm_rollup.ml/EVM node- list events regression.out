@@ -49,6 +49,24 @@ block_producer_locked:
     { /* block_producer_locked version 0 */
       "block_producer_locked.v0": any }
   
+block_producer_operation_rejected:
+  description: operation {op_hash} is not valid with current state: {error}
+  level: debug
+  section: evm_node.dev
+  json format:
+    { /* block_producer_operation_rejected version 0 */
+      "block_producer_operation_rejected.v0":
+        { "op_hash": $Operation_hash,
+          "error": $unistring } }
+    $Operation_hash:
+      /* A Tezos operation ID (Base58Check-encoded) */
+      $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 block_producer_started:
   description: block producer has been started
   level: notice
