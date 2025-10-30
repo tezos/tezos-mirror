@@ -808,7 +808,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         match faucet_proxys_opt with
         | None -> unit
         | Some {tzkt_proxy; faucet_api_proxy = _; faucet_frontend_proxy = _} ->
-              if Cli.faucet then
                 let () = toplog "Starting faucet" in
                 let faucet_account = Constant.bootstrap1 in
                 let faucet_pkh = faucet_account.public_key_hash in
@@ -852,7 +851,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                   cloud
                   ~name:"Faucet"
                   ~url:(Client.string_of_endpoint faucet_frontend)
-              else unit
       in
       let* () =
         match dns_domain with
