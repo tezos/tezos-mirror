@@ -517,7 +517,10 @@ index 1d28850f..fbd54ed7 100644
     rpc_url
     tzkt_api_url
 
-let init_umami agent ~tezlink_proxy_endpoint ~external_tzkt_api_endpoint =
+let init_umami agent ~sequencer_proxy ~tzkt_proxy =
+  let runner = Agent.runner agent in
+  let external_tzkt_api_endpoint = proxy_external_endpoint ~runner tzkt_proxy in
+  let tezlink_proxy_endpoint = proxy_external_endpoint ~runner sequencer_proxy in
   let rpc_url = Client.string_of_endpoint tezlink_proxy_endpoint in
   let tzkt_api_url = Client.string_of_endpoint external_tzkt_api_endpoint in
   let patch = umami_patch ~rpc_url ~tzkt_api_url in
@@ -767,13 +770,10 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~sequencer_proxy
                 ~time_between_blocks:Cli.time_between_blocks
             and* () =
-              let external_tzkt_api_endpoint =
-                proxy_external_endpoint ~runner tzkt_proxy
-              in
               init_umami
                 tezlink_sequencer_agent
-                ~tezlink_proxy_endpoint
-                ~external_tzkt_api_endpoint
+                ~sequencer_proxy
+                ~tzkt_proxy
             and* () =
               if Cli.faucet then
                 let () = toplog "Starting faucet" in
