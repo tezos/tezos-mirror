@@ -158,6 +158,21 @@ module WASM = struct
       ~path:"tezt/tests/kernels/echo_dal_reveal_parameters.wasm"
       ()
 
+  (* Toy kernel "echo_dal_reveal_pages".
+
+     - On each kernel_run, asks to reveal exactly one DAL page:
+     published level = 15, slot = 1, page_index = 2.
+
+     - The revealed bytes are written to the key "/dal/page" next to the pages
+     that were already written, if any.
+
+     - No per-page loop, no L1-level watcher, and no strict size/error checks. *)
+  let echo_dal_reveal_pages =
+    Uses.make
+      ~tag:"echo_dal_reveal_pages"
+      ~path:"tezt/tests/kernels/echo_dal_reveal_pages.wasm"
+      ()
+
   let evm_kernel =
     Uses.make
       ~how_to_build:"make -f etherlink.mk build"
