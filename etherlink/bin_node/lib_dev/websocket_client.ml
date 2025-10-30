@@ -35,7 +35,9 @@ type monitoring = {ping_timeout : float; ping_interval : float}
 type conn = {
   media : Media_type.t;
   conn : Websocket_lwt_unix.conn;
-  pending_requests : ((JSONRPC.value, exn) result -> unit) Request_table.t;
+  pending_requests :
+    (((JSONRPC.value, exn) result -> unit) * Opentelemetry.Scope.t)
+    Request_table.t;
   subscriptions : (Data_encoding.json option -> unit) Subscription_table.t;
   binary : bool;
   process : unit Lwt.t;
@@ -286,13 +288,29 @@ let parse_message (media : Media_type.t) message =
           let* () = Event.(emit decoding_error) (e1, e2) in
           return_none)
 
+let encrich_response_scope scope (value : JSONRPC.value) =
+  Opentelemetry.Scope.add_event scope (fun () ->
+      Opentelemetry_lwt.Event.make "received_response") ;
+  Opentelemetry.Scope.add_attrs scope (fun () ->
+      match value with
+      | Ok _ -> []
+      | Error {code; message; _} ->
+          Opentelemetry.Scope.set_status
+            scope
+            {message; code = Status_code_error} ;
+          [
+            ("rpc.jsonrpc.error_code", `Int code);
+            ("rpc.jsonrpc.error_message", `String message);
+          ])
+
 let handle_response pending_requests subscriptions message =
   let open Lwt_syntax in
   function
   | Response {id; value} -> (
       match Request_table.find pending_requests id with
       | None -> Event.(emit ignored_message) message
-      | Some callback ->
+      | Some (callback, scope) ->
+          encrich_response_scope scope value ;
           callback (Ok value) ;
           return_unit)
   | Notification {params = {result; subscription}} -> (
@@ -385,9 +403,32 @@ let resolver =
   let rewrites = [("", Resolver_lwt_unix.system_resolver)] in
   Resolver_lwt.init ~service ~rewrites ()
 
+let rec endp_peer_port (endp : [< Conduit.endp]) =
+  match endp with
+  | `TCP (addr, port) -> (Ipaddr.to_string addr, Some (`Int port))
+  | `TLS (_tunnel, endp) -> endp_peer_port endp
+  | `Vchan_domain_socket (name, port) -> (name, Some (`String port))
+  | `Unix_domain_socket socket -> (socket, None)
+  | `Unknown name -> (name, None)
+  | `Vchan_direct (dom_id, port) ->
+      (Format.sprintf "Domain(%d)" dom_id, Some (`String port))
+
+let network_attributes endp =
+  let peer_addr, peer_port = endp_peer_port endp in
+  [("network.peer.address", `String peer_addr)]
+  @ Option.(to_list (map (fun port -> ("network.peer.port", port)) peer_port))
+
 let connect ?monitoring ?(on_close = Fun.id) media uri =
   let open Lwt_syntax in
+  Opentelemetry_lwt.Trace.with_ ~service_name:"Websocket_client" "connect"
+  @@ fun scope ->
   let* endp = Resolver_lwt.resolve_uri ~uri resolver in
+  Opentelemetry.Scope.add_attrs scope (fun () ->
+      Octez_telemetry.HTTP_client.span_attributes [media] `GET uri
+      @ network_attributes endp) ;
+  Format.eprintf
+    "Connected on %s@."
+    (Conduit.sexp_of_endp endp |> Sexplib0.Sexp.to_string_hum) ;
   let ctx = Lazy.force Conduit_lwt_unix.default_ctx in
   let* client = Conduit_lwt_unix.endp_to_client ~ctx endp in
   let accept_header = Tezos_rpc_http.Media_type.accept_header [media] in
@@ -494,7 +535,7 @@ let connect ?monitoring ?(on_close = Fun.id) media uri =
     let* () = loop () in
     Request_table.to_seq_values pending_requests
     |> List.of_seq
-    |> List.iter (fun callback -> callback (Error Connection_closed)) ;
+    |> List.iter (fun (callback, _) -> callback (Error Connection_closed)) ;
     Subscription_table.to_seq_values subscriptions
     |> List.of_seq
     |> List.iter (fun push -> push None) ;
@@ -560,13 +601,25 @@ let connect client =
   let*! (_ : conn) = get_conn client in
   return_unit
 
-let simple_write conn opcode content =
+let simple_write conn scope opcode content =
+  Opentelemetry_lwt.Trace.with_
+    ~service_name:"Websocket_client"
+    ~kind:Span_kind_client
+    ~scope
+    "write"
+  @@ fun scope ->
+  Opentelemetry.Scope.add_attrs scope (fun () ->
+      [
+        ("message.size", `Int (String.length content));
+        ( "websocket.frame.opcode",
+          `String (Websocket.Frame.Opcode.to_string opcode) );
+      ]) ;
   Websocket_lwt_unix.write conn (Websocket.Frame.create ~opcode ~content ())
 
-let retry_write_until ~timeout ~on_timeout response conn opcode content =
+let retry_write_until ~timeout ~on_timeout response conn scope opcode content =
   let open Lwt_syntax in
   let rec retry on_timeout =
-    let* () = simple_write conn opcode content in
+    let* () = simple_write conn scope opcode content in
     let timeout_p =
       let+ () = Lwt_unix.sleep timeout in
       Error `Timeout
@@ -624,18 +677,53 @@ let with_reconnect : type a. t -> (conn -> a Lwt.t) -> a Lwt.t =
 let send_jsonrpc_request_conn (conn : conn) ?timeout (request : JSONRPC.request)
     =
   let open Lwt_syntax in
+  Opentelemetry_lwt.Trace.with_
+    ~service_name:"Websocket_client"
+    ~kind:Span_kind_client
+    "send_jsonrpc"
+  @@ fun scope ->
+  Opentelemetry.Scope.add_attrs scope (fun () ->
+      let id_attrs =
+        match request.id with
+        | None -> []
+        | Some id ->
+            let v =
+              match id with
+              | Id_string s -> s
+              | Id_float f ->
+                  let ft = truncate f in
+                  if float_of_int ft = f then string_of_int ft
+                  else string_of_float f
+            in
+            [("rpc.jsonrpc.request_id", `String v)]
+      in
+      [
+        ("rpc.system", `String "jsonrpc");
+        ("rpc.method", `String request.method_);
+        ("rpc.jsonrpc.version", `String "2.0");
+      ]
+      @ id_attrs) ;
   let message = conn.media.construct JSONRPC.request_encoding request in
   let opcode = if conn.binary then Websocket.Frame.Opcode.Binary else Text in
   let response, resolver = Lwt.task () in
-  Request_table.replace conn.pending_requests request.id (fun v ->
-      try Lwt.wakeup_later_result resolver v with _ -> ()) ;
+  Request_table.replace
+    conn.pending_requests
+    request.id
+    ((fun v -> try Lwt.wakeup_later_result resolver v with _ -> ()), scope) ;
   let* response =
     match timeout with
     | None ->
-        let* () = simple_write conn.conn opcode message in
+        let* () = simple_write conn.conn scope opcode message in
         response
     | Some {timeout; on_timeout} ->
-        retry_write_until ~timeout ~on_timeout response conn.conn opcode message
+        retry_write_until
+          ~timeout
+          ~on_timeout
+          response
+          conn.conn
+          scope
+          opcode
+          message
   in
   Request_table.remove conn.pending_requests request.id ;
   return response
