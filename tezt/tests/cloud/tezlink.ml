@@ -673,7 +673,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             else Some dns_domain
       in
       let activate_ssl = Cli.activate_ssl in
-      let sequencer_proxy_info =
+      let sequencer_proxy =
         make_proxy
           tezlink_sequencer_agent
           ~path:(Some "/tezlink")
@@ -684,10 +684,10 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       (* The proxy endpoint is the https endpoint we want to provide
          to the external world, it has no /tezlink path. *)
       let tezlink_sandbox_endpoint =
-        proxy_internal_endpoint sequencer_proxy_info
+        proxy_internal_endpoint sequencer_proxy
       in
       let tezlink_proxy_endpoint =
-        proxy_external_endpoint ~runner sequencer_proxy_info
+        proxy_external_endpoint ~runner sequencer_proxy
       in
       let* () =
         add_service
@@ -702,7 +702,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           ~url:
             (sf "%s/version" (Client.string_of_endpoint tezlink_proxy_endpoint))
       in
-      let* tzkt_proxy =
+      let* tzkt_proxy_opt =
         if Cli.tzkt then
           let tzkt_proxy =
             make_proxy
@@ -748,12 +748,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         init_tezlink_sequencer
           cloud
           name
-          ~rpc_port:(proxy_internal_port sequencer_proxy_info)
+          ~rpc_port:(proxy_internal_port sequencer_proxy)
           Cli.verbose
           Cli.time_between_blocks
           tezlink_sequencer_agent
       and* () =
-        match tzkt_proxy with
+        match tzkt_proxy_opt with
         | None -> unit
         | Some tzkt_proxy ->
             let internal_tzkt_api_port = proxy_internal_port tzkt_proxy in
@@ -832,13 +832,13 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             in
             let* () =
               let rpc_nginx_node =
-                nginx_reverse_proxy_config ~ssl ~proxy:sequencer_proxy_info
+                nginx_reverse_proxy_config ~ssl ~proxy:sequencer_proxy
               in
               match rpc_nginx_node with
               | None -> unit
               | Some rpc_nginx_node ->
                   let tzkt_nginx_config =
-                    match tzkt_proxy with
+                    match tzkt_proxy_opt with
                     | None -> None
                     | Some proxy -> nginx_reverse_proxy_config ~ssl ~proxy
                   in
