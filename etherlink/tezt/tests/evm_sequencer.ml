@@ -10654,6 +10654,77 @@ let test_relay_restricted_rpcs =
   let*@? _ = Rpc.tez_kernelVersion sequencer in
   unit
 
+let test_eth_send_raw_transaction_sync_rpc =
+  register_all
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "delayed_transaction"]
+    ~title:"eth_sendRawTransactionSync waits for receipt"
+  @@ fun {sequencer; observer; _} _protocol ->
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let receiver = Eth_account.bootstrap_accounts.(1) in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:(Int32.to_int gas_price)
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 10)
+      ~address:receiver.address
+      ()
+  in
+  let* rpc_observer_node = run_new_rpc_endpoint observer in
+  let receipt_promise =
+    Rpc.eth_send_raw_transaction_sync ~raw_tx rpc_observer_node
+  in
+  let* _ = Evm_node.wait_for_tx_queue_injecting_transaction observer in
+  Check.((Lwt.is_sleeping receipt_promise = true) bool)
+    ~error_msg:"eth_sendRawTransactionSync should wait for inclusion" ;
+  let*@ _ = produce_block sequencer in
+  let*@ receipt = receipt_promise in
+  Check.(
+    (receipt.status = true)
+      bool
+      ~error_msg:"Transaction should have been included and successful") ;
+  unit
+
+let test_eth_send_raw_transaction_sync_rpc_timeouts =
+  register_all
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "delayed_transaction"]
+    ~title:"eth_sendRawTransactionSync timeouts"
+  @@ fun {sequencer; observer; _} _protocol ->
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let receiver = Eth_account.bootstrap_accounts.(1) in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:(Int32.to_int gas_price)
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 10)
+      ~address:receiver.address
+      ()
+  in
+  let* rpc_observer_node = run_new_rpc_endpoint observer in
+  let receipt_promise =
+    Rpc.eth_send_raw_transaction_sync ~raw_tx ~timeout:5000 rpc_observer_node
+  in
+  let* _ = Evm_node.wait_for_tx_queue_injecting_transaction observer in
+  Check.((Lwt.is_sleeping receipt_promise = true) bool)
+    ~error_msg:"eth_sendRawTransactionSync should wait for inclusion" ;
+  let* receipt = receipt_promise in
+  match receipt with
+  | Ok _ ->
+      Test.fail
+        "eth_sendRawTransactionSync should have timed out, but got a receipt"
+  | Error _ -> unit
+
 let test_tx_pool_pending_nonce () =
   register_sandbox
     ~tags:["evm"; "tx_pool"]
@@ -14456,6 +14527,8 @@ let () =
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
   test_proxy_node_can_forward_to_evm_endpoint protocols ;
+  test_eth_send_raw_transaction_sync_rpc protocols ;
+  test_eth_send_raw_transaction_sync_rpc_timeouts protocols ;
   test_tx_pool_pending_nonce () ;
   test_da_fees_after_execution protocols ;
   test_trace_transaction_calltracer_failed_create protocols ;

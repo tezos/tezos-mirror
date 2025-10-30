@@ -183,6 +183,7 @@ let run_new_rpc_endpoint evm_node =
     Evm_node.create
       ~data_dir:(Evm_node.data_dir evm_node)
       ~mode:(Rpc Evm_node.(mode evm_node))
+      ?config_file:Evm_node.(config_file evm_node)
       (Evm_node.endpoint evm_node)
   in
   let* () = Evm_node.run rpc_node in

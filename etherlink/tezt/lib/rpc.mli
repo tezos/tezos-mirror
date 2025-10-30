@@ -37,6 +37,9 @@ module Request : sig
 
   val eth_sendRawTransaction : raw_tx:string -> Evm_node.request
 
+  val eth_sendRawTransactionSync :
+    raw_tx:string -> timeout:string -> Evm_node.request
+
   val eth_getTransactionReceipt : tx_hash:string -> Evm_node.request
 
   val eth_estimateGas :
@@ -217,6 +220,15 @@ val send_raw_transaction :
   raw_tx:string ->
   Evm_node.t ->
   (string, error) result Lwt.t
+
+(** [eth_send_raw_transaction_sync ~raw_tx evm_node] calls
+    [eth_sendRawTransactionSync] with [raw_tx] as argument. *)
+val eth_send_raw_transaction_sync :
+  ?websocket:Websocket.t ->
+  raw_tx:string ->
+  ?timeout:int ->
+  Evm_node.t ->
+  (Transaction.transaction_receipt, error) result Lwt.t
 
 (** [get_transaction_receipt ~tx_hash evm_node] calls
     [eth_getTransactionReceipt] with [tx_hash] as argument. *)
