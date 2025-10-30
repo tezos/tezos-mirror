@@ -318,7 +318,6 @@ pub fn run_transaction<'a, Host: Runtime>(
     spec_id: SpecId,
     block_constants: &'a BlockConstants,
     transaction_hash: Option<[u8; TRANSACTION_HASH_SIZE]>,
-    precompiles: EtherlinkPrecompiles,
     caller: Address,
     destination: Option<Address>,
     call_data: Bytes,
@@ -345,14 +344,15 @@ pub fn run_transaction<'a, Host: Runtime>(
     let db = EtherlinkVMDB::new(host, block_constants)?;
 
     if let Some(tracer_input) = tracer_input {
-        let inspector = get_inspector_from(tracer_input, precompiles.clone(), spec_id);
+        let inspector =
+            get_inspector_from(tracer_input, EtherlinkPrecompiles::new(), spec_id);
 
         let mut evm = evm_inspect(
             db,
             &block_env,
             &tx,
             gas_data.maximum_gas_per_transaction,
-            precompiles,
+            EtherlinkPrecompiles::new(),
             block_constants.chain_id.as_u64(),
             spec_id,
             inspector,
@@ -383,7 +383,7 @@ pub fn run_transaction<'a, Host: Runtime>(
             &block_env,
             &tx,
             gas_data.maximum_gas_per_transaction,
-            precompiles,
+            EtherlinkPrecompiles::new(),
             block_constants.chain_id.as_u64(),
             spec_id,
             is_simulation,
@@ -468,9 +468,7 @@ mod test {
         },
         test::utilities::CallAndRevert::{self, callAndRevertCall},
     };
-    use crate::{
-        precompiles::provider::EtherlinkPrecompiles, run_transaction, ExecutionOutcome,
-    };
+    use crate::{run_transaction, ExecutionOutcome};
 
     mod utilities {
         use alloy_sol_types::sol;
@@ -513,7 +511,6 @@ mod test {
     #[test]
     fn test_simple_transfer() {
         let mut host = MockKernelHost::default();
-        let precompiles = EtherlinkPrecompiles::new();
         let block_constants = block_constants_with_no_fees();
 
         let caller =
@@ -549,7 +546,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            precompiles,
             caller,
             Some(destination),
             Bytes::new(),
@@ -582,7 +578,6 @@ mod test {
     #[test]
     fn test_contract_call_sload_sstore() {
         let mut host = MockKernelHost::default();
-        let precompiles = EtherlinkPrecompiles::new();
         let block_constants = block_constants_with_fees();
 
         let caller =
@@ -631,7 +626,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            precompiles,
             caller,
             Some(contract),
             Bytes::new(),
@@ -664,7 +658,6 @@ mod test {
     #[test]
     fn test_contract_deployment() {
         let mut host = MockKernelHost::default();
-        let precompiles = EtherlinkPrecompiles::new();
         let block_constants = block_constants_with_fees();
 
         let caller =
@@ -687,7 +680,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            precompiles,
             caller,
             None,
             // # Deployment code for:
@@ -707,8 +699,7 @@ mod test {
             AccessList(vec![]),
             None,
             None,
-                        false,
-
+            false,
         );
 
         match result {
@@ -780,7 +771,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            EtherlinkPrecompiles::new(),
             caller,
             Some(WITHDRAWAL_SOL_ADDR),
             Bytes::from_hex(calldata).unwrap(),
@@ -859,7 +849,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            EtherlinkPrecompiles::new(),
             caller,
             Some(CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS),
             Bytes::copy_from_slice(&calldata),
@@ -920,7 +909,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            EtherlinkPrecompiles::new(),
             caller,
             None,
             // # Deployment code for: Tasuku Nakamura's IERC20's contract.
@@ -950,7 +938,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            EtherlinkPrecompiles::new(),
             caller,
             Some(contract_address),
             // # Call data for: Tasuku Nakamura's IERC20's contract 'mint(uint256)' entrypoint.
@@ -991,7 +978,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            EtherlinkPrecompiles::new(),
             caller,
             None,
             deploy_call_and_revert_bytecode,
@@ -1072,7 +1058,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            EtherlinkPrecompiles::new(),
             caller,
             Some(revert_contract_address),
             Bytes::from(call_and_revert_call.abi_encode()),
@@ -1127,7 +1112,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            EtherlinkPrecompiles::new(),
             caller,
             None,
             deploy_create_and_revert_bytecode,
@@ -1165,7 +1149,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            EtherlinkPrecompiles::new(),
             caller,
             Some(revert_contract_address),
             Bytes::from(create_and_revert_call.abi_encode()),
@@ -1239,7 +1222,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            EtherlinkPrecompiles::new(),
             caller,
             Some(FA_BRIDGE_SOL_ADDR),
             FABridge::claimCall {
@@ -1263,7 +1245,6 @@ mod test {
     #[test]
     fn test_empty_authorization_list_are_prohibited() {
         let mut host = MockKernelHost::default();
-        let precompiles = EtherlinkPrecompiles::new();
         let block_constants = block_constants_with_no_fees();
 
         let caller =
@@ -1299,7 +1280,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            precompiles,
             caller,
             Some(destination),
             Bytes::new(),
@@ -1344,7 +1324,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            EtherlinkPrecompiles::new(),
             FEED_DEPOSIT_ADDR,
             Some(FA_BRIDGE_SOL_ADDR),
             FABridge::queueCall { deposit }.abi_encode().into(),
@@ -1364,7 +1343,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            EtherlinkPrecompiles::new(),
             caller,
             Some(FA_BRIDGE_SOL_ADDR),
             FABridge::claimCall {
@@ -1430,7 +1408,6 @@ mod test {
             precompiles::{
                 constants::{FA_BRIDGE_SOL_ADDR, FEED_DEPOSIT_ADDR},
                 initializer::init_precompile_bytecodes,
-                provider::EtherlinkPrecompiles,
             },
             run_transaction,
             storage::{code::CodeStorage, world_state_handler::StorageAccount},
@@ -1541,7 +1518,6 @@ mod test {
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
                 None,
-                EtherlinkPrecompiles::new(),
                 FEED_DEPOSIT_ADDR,
                 Some(FA_BRIDGE_SOL_ADDR),
                 queueCall { deposit }.abi_encode().into(),
@@ -1571,7 +1547,6 @@ mod test {
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
                 None,
-                EtherlinkPrecompiles::new(),
                 caller,
                 Some(FA_BRIDGE_SOL_ADDR),
                 claimCall {
@@ -1612,7 +1587,6 @@ mod test {
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
                 None,
-                EtherlinkPrecompiles::new(),
                 caller,
                 Some(destination),
                 call_data,
@@ -1646,7 +1620,6 @@ mod test {
                 DEFAULT_SPEC_ID,
                 &block_constants_with_no_fees(),
                 None,
-                EtherlinkPrecompiles::new(),
                 caller,
                 None,
                 calldata,
@@ -2279,7 +2252,6 @@ mod test {
     #[test]
     fn test_osaka_clz_is_enabled() {
         let mut host = MockKernelHost::default();
-        let precompiles = EtherlinkPrecompiles::new();
         let block_constants = block_constants_with_fees();
 
         let caller =
@@ -2326,7 +2298,6 @@ mod test {
             DEFAULT_SPEC_ID,
             &block_constants,
             None,
-            precompiles,
             caller,
             Some(contract),
             Bytes::new(),
