@@ -204,10 +204,12 @@ let git_clone agent ?branch repo_url directory =
     @ (match branch with None -> [] | Some branch -> ["-b"; branch])
     @ [repo_url; directory])
 
-let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
+let init_tzkt ~tzkt_proxy ~agent ~sequencer_proxy
     ~time_between_blocks =
   (* Set of functions helpful for Tzkt setup *)
   let run = run agent in
+  let tezlink_sandbox_endpoint = proxy_internal_endpoint sequencer_proxy in
+  let tzkt_api_port = proxy_internal_port tzkt_proxy in
   (* Run a psql command (a specific database can be set as a target) *)
   let psql ?db command =
     run
@@ -757,13 +759,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         match tzkt_proxy_opt with
         | None -> unit
         | Some tzkt_proxy ->
-            let internal_tzkt_api_port = proxy_internal_port tzkt_proxy in
             let* () =
               let () = toplog "Starting TzKT" in
               init_tzkt
-                ~tzkt_api_port:internal_tzkt_api_port
+                ~tzkt_proxy
                 ~agent:tezlink_sequencer_agent
-                ~tezlink_sandbox_endpoint
+                ~sequencer_proxy
                 ~time_between_blocks:Cli.time_between_blocks
             and* () =
               let external_tzkt_api_endpoint =
