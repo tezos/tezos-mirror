@@ -110,6 +110,9 @@ Smart Rollup node
   if they were called before the first (resp. finalized) block is produced. (MR
   :gl:`!19569`)
 
+- Reduce number of RPCs to L1 node by fetching chain id on startup. (MR
+  :gl:`!19788`)
+
 Smart Rollup WASM Debugger
 --------------------------
 
