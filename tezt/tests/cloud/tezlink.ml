@@ -13,6 +13,101 @@ module Cli = Scenarios_cli
 open Scenarios_helpers
 open Tezos
 
+let build_endpoint ?path ~runner ~dns_domain port =
+  let host = Option.value ~default:(Runner.address runner) dns_domain in
+  Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme:"http" ~port ())
+
+(* The sequencer and the TzKT API may be proxified by a Nginx
+   reverse-proxy to support HTTPS and, in the case of the sequencer,
+   add a /tezlink path prefix. *)
+type proxy_internal_info = {port : int; path : string option}
+
+type proxy_info =
+  | No_proxy of proxy_internal_info
+  | Proxy of {
+      dns_domain : string;
+      external_port : int;
+      internal_info : proxy_internal_info;
+      activate_ssl : bool;
+    }
+
+let proxy_internal_info = function
+  | No_proxy internal_info | Proxy {internal_info; _} -> internal_info
+
+let proxy_internal_port proxy_info = (proxy_internal_info proxy_info).port
+
+let proxy_internal_endpoint proxy_info =
+  let host = "127.0.0.1" in
+  let scheme = "http" in
+  let {path; port} = proxy_internal_info proxy_info in
+  Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme ~port ())
+
+let proxy_external_endpoint ~runner = function
+  | No_proxy {port; path} -> build_endpoint ?path ~runner ~dns_domain:None port
+  | Proxy {dns_domain; external_port; activate_ssl; internal_info = _} ->
+      let scheme = if activate_ssl then "https" else "http" in
+      Client.Foreign_endpoint
+        (Endpoint.make ~host:dns_domain ~scheme ~port:external_port ())
+
+let nginx_reverse_proxy_config ~(ssl : Ssl.t option) ~proxy =
+  match proxy with
+  | No_proxy _ -> None
+  | Proxy {dns_domain; external_port; activate_ssl = _; internal_info = _} -> (
+      let internal_endpoint = proxy_internal_endpoint proxy in
+      let proxy_pass =
+        (* The trailing / is mandatory, otherwise the reverse proxy
+           won't be able to serve services with a path. *)
+        Client.string_of_endpoint internal_endpoint ^ "/"
+      in
+      match ssl with
+      | Some ssl ->
+          let () =
+            if not (List.mem dns_domain Tezt_cloud_cli.dns_domains) then
+              Test.fail "Please add --dns-domain %s" dns_domain
+          in
+          let config =
+            Nginx_reverse_proxy.simple_ssl_node
+              ~server_name:dns_domain
+              ~port:external_port
+              ~location:"/"
+              ~proxy_pass
+              ~certificate:ssl.certificate
+              ~certificate_key:ssl.key
+          in
+          Some config
+      | None ->
+          let config =
+            Nginx_reverse_proxy.make_simple_config
+              ~server_name:dns_domain
+              ~port:external_port
+              ~location:"/"
+              ~proxy_pass
+          in
+          Some config)
+
+let port_of_option agent = function
+  | None -> Agent.next_available_port agent
+  | Some port -> port
+
+let make_proxy agent ~path ~dns_domain public_port activate_ssl =
+  let public_port = port_of_option agent public_port in
+  match dns_domain with
+  | None ->
+      (* No DNS so no proxy, so we must use the public port. *)
+      No_proxy {port = public_port; path}
+  | Some dns_domain ->
+      (* We let the system choose a fresh internal node port.
+         Note that it will be publicy exposed, it's just that we don't need to
+         share this one. *)
+      let internal_port = Agent.next_available_port agent in
+      Proxy
+        {
+          internal_info = {port = internal_port; path};
+          dns_domain;
+          external_port = public_port;
+          activate_ssl;
+        }
+
 module Tzkt_process = struct
   module Parameters = struct
     type persistent_state = unit
@@ -88,10 +183,6 @@ module Faucet_frontend_process = struct
       ]
 end
 
-let port_of_option agent = function
-  | None -> Agent.next_available_port agent
-  | Some port -> port
-
 let polling_period = function
   | Evm_node.Nothing -> 500
   | Time_between_blocks t ->
@@ -112,10 +203,6 @@ let git_clone agent ?branch repo_url directory =
     (["clone"]
     @ (match branch with None -> [] | Some branch -> ["-b"; branch])
     @ [repo_url; directory])
-
-let build_endpoint ?path ~runner ~dns_domain port =
-  let host = Option.value ~default:(Runner.address runner) dns_domain in
-  Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme:"http" ~port ())
 
 let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
     ~time_between_blocks =
@@ -546,93 +633,6 @@ let rec loop n =
 let add_service cloud ~name ~url =
   let () = toplog "New service: %s: %s" name url in
   Cloud.add_service cloud ~name ~url
-
-(* The sequencer and the TzKT API may be proxified by a Nginx
-   reverse-proxy to support HTTPS and, in the case of the sequencer,
-   add a /tezlink path prefix. *)
-type proxy_internal_info = {port : int; path : string option}
-
-type proxy_info =
-  | No_proxy of proxy_internal_info
-  | Proxy of {
-      dns_domain : string;
-      external_port : int;
-      internal_info : proxy_internal_info;
-      activate_ssl : bool;
-    }
-
-let proxy_internal_info = function
-  | No_proxy internal_info | Proxy {internal_info; _} -> internal_info
-
-let proxy_internal_port proxy_info = (proxy_internal_info proxy_info).port
-
-let proxy_internal_endpoint proxy_info =
-  let host = "127.0.0.1" in
-  let scheme = "http" in
-  let {path; port} = proxy_internal_info proxy_info in
-  Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme ~port ())
-
-let proxy_external_endpoint ~runner = function
-  | No_proxy {port; path} -> build_endpoint ?path ~runner ~dns_domain:None port
-  | Proxy {dns_domain; external_port; activate_ssl; internal_info = _} ->
-      let scheme = if activate_ssl then "https" else "http" in
-      Client.Foreign_endpoint
-        (Endpoint.make ~host:dns_domain ~scheme ~port:external_port ())
-
-let nginx_reverse_proxy_config ~(ssl : Ssl.t option) ~proxy =
-  match proxy with
-  | No_proxy _ -> None
-  | Proxy {dns_domain; external_port; activate_ssl = _; internal_info = _} -> (
-      let internal_endpoint = proxy_internal_endpoint proxy in
-      let proxy_pass =
-        (* The trailing / is mandatory, otherwise the reverse proxy
-           won't be able to serve services with a path. *)
-        Client.string_of_endpoint internal_endpoint ^ "/"
-      in
-      match ssl with
-      | Some ssl ->
-          let () =
-            if not (List.mem dns_domain Tezt_cloud_cli.dns_domains) then
-              Test.fail "Please add --dns-domain %s" dns_domain
-          in
-          let config =
-            Nginx_reverse_proxy.simple_ssl_node
-              ~server_name:dns_domain
-              ~port:external_port
-              ~location:"/"
-              ~proxy_pass
-              ~certificate:ssl.certificate
-              ~certificate_key:ssl.key
-          in
-          Some config
-      | None ->
-          let config =
-            Nginx_reverse_proxy.make_simple_config
-              ~server_name:dns_domain
-              ~port:external_port
-              ~location:"/"
-              ~proxy_pass
-          in
-          Some config)
-
-let make_proxy agent ~path ~dns_domain public_port activate_ssl =
-  let public_port = port_of_option agent public_port in
-  match dns_domain with
-  | None ->
-      (* No DNS so no proxy, so we must use the public port. *)
-      No_proxy {port = public_port; path}
-  | Some dns_domain ->
-      (* We let the system choose a fresh internal node port.
-         Note that it will be publicy exposed, it's just that we don't need to
-         share this one. *)
-      let internal_port = Agent.next_available_port agent in
-      Proxy
-        {
-          internal_info = {port = internal_port; path};
-          dns_domain;
-          external_port = public_port;
-          activate_ssl;
-        }
 
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
