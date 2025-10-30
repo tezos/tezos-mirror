@@ -12125,7 +12125,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~attestation_threshold:100
-    ~attestation_lag:16
+    ~attestation_lag:8
     ~activation_timestamp:Now
     ~number_of_slots:8
     ~operator_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
