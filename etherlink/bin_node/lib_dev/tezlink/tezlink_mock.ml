@@ -108,16 +108,22 @@ module Operation_metadata = struct
       (fun message -> Unsupported_operation_kind message)
 
   let hard_gas_limit_per_operation =
-    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
+    Gas.Arith.integral_to_z
+      Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
 
-  let consumed_gas = Gas.Arith.fp hard_gas_limit_per_operation
+  (** A safe value of gas to return after simulation: almost the hard cap, with
+      a little of room because client add a little extra to be safe *)
+  let safe_value = Z.(hard_gas_limit_per_operation - of_int 1000 |> to_int)
 
-  let manager_op_result (type kind) (hash : Operation_hash.t)
+  let consumed_gas length =
+    Gas.Arith.fp @@ Gas.Arith.integral_of_int_exn (safe_value / length)
+
+  let manager_op_result (type kind) (length : int) (hash : Operation_hash.t)
       (contents : kind manager_operation) :
       kind successful_manager_operation_result tzresult =
     let open Result_syntax in
     match contents with
-    | Reveal _ -> return (Reveal_result {consumed_gas})
+    | Reveal _ -> return (Reveal_result {consumed_gas = consumed_gas length})
     | Transaction _ ->
         return
           (Transaction_result
@@ -128,7 +134,7 @@ module Operation_metadata = struct
                   balance_updates = [];
                   ticket_receipt = [];
                   originated_contracts = [];
-                  consumed_gas;
+                  consumed_gas = consumed_gas length;
                   storage_size = Z.zero;
                   paid_storage_size_diff = Z.zero;
                   allocated_destination_contract = false;
@@ -142,7 +148,7 @@ module Operation_metadata = struct
                lazy_storage_diff = None;
                balance_updates = [];
                originated_contracts = [kt1];
-               consumed_gas;
+               consumed_gas = consumed_gas length;
                storage_size = Z.zero;
                paid_storage_size_diff = Z.zero;
              })
@@ -152,12 +158,12 @@ module Operation_metadata = struct
              "only supported kinds are 'reveal' and 'transaction' and \
               'origination'")
 
-  let contents_result (type kind) (hash : Operation_hash.t)
+  let contents_result (type kind) (length : int) (hash : Operation_hash.t)
       (contents : kind contents) : kind contents_result tzresult =
     let open Result_syntax in
     match contents with
     | Manager_operation {operation; _} ->
-        let* result = manager_op_result hash operation in
+        let* result = manager_op_result length hash operation in
         return
           (Manager_operation_result
              {
@@ -169,24 +175,30 @@ module Operation_metadata = struct
         tzfail
           (Unsupported_operation_kind "only manager operations are supported")
 
+  let rec size : type kind. kind contents_list -> int =
+   fun contents ->
+    match contents with Single _ -> 1 | Cons (_, rest) -> 1 + size rest
+
   let rec contents_list_result : type kind.
+      int ->
       Operation_hash.t ->
       kind contents_list ->
       kind contents_result_list tzresult =
-   fun hash contents ->
+   fun length hash contents ->
     let open Result_syntax in
     match contents with
     | Single contents ->
-        let* result = contents_result hash contents in
+        let* result = contents_result length hash contents in
         return (Single_result result)
     | Cons (contents, contents_list) ->
-        let* result = contents_result hash contents in
-        let* result_list = contents_list_result hash contents_list in
+        let* result = contents_result length hash contents in
+        let* result_list = contents_list_result length hash contents_list in
         return (Cons_result (result, result_list))
 
   let operation_metadata (hash : Operation_hash.t) (Operation_data op) =
     let open Result_syntax in
-    let* contents = contents_list_result hash op.contents in
+    let length = size op.contents in
+    let* contents = contents_list_result length hash op.contents in
     return (Operation_metadata {contents})
 end
 
