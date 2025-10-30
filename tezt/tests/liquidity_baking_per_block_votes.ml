@@ -175,6 +175,18 @@ let test_all_per_block_votes =
 
   let* baker = Agnostic_baker.init node client in
 
+  Log.info "Test no voting file" ;
+
+  let* baker =
+    Lwt.catch
+      (fun () ->
+        let* _ = run_vote_file baker in
+        Test.fail
+          "The baker was supposed to fail, it's missing the liquidity baking \
+           vote.")
+      (fun _exn -> return baker)
+  in
+
   Log.info "Test [off] vote file" ;
   let* baker =
     let votefile = Agnostic_baker.liquidity_baking_votefile Off in

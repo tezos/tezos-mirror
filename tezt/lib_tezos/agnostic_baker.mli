@@ -63,6 +63,15 @@ val run :
 val spawn_run :
   ?env:string String_map.t -> ?extra_arguments:string list -> t -> Process.t
 
+(** Spawn [octez-baker].
+
+    Similar to {!run} but takes all its arguments from [arguments]. *)
+val raw : arguments:string list -> t -> unit Lwt.t
+
+(** Spawn [octez-baker] similarly to {!spawn_run} but doesn't have any arguments
+    other than [arguments]. *)
+val spawn_raw : arguments:string list -> t -> Process.t
+
 (** Liquidity baking vote values. *)
 type liquidity_baking_vote = Off | On | Pass
 
