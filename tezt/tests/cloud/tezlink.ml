@@ -366,11 +366,6 @@ let init_faucet_backend ~agent ~sequencer_proxy ~faucet_private_key
     ~faucet_api_proxy =
   let tezlink_sandbox_endpoint = proxy_internal_endpoint sequencer_proxy in
   let faucet_api_port = proxy_internal_port faucet_api_proxy in
-  let dns_domain =
-    match faucet_api_proxy with
-    | No_proxy _ -> None
-    | Proxy {dns_domain; _} -> Some dns_domain
-  in
   let faucet_backend_dir = "faucet-backend" in
   (* Clone faucet backend from personal fork because upstream depends on a RPC which we don't yet support (forge_operation). *)
   let* () =
@@ -411,8 +406,7 @@ DIFFICULTY=4
       (sf "cd %s && npm install typescript && npm run build" faucet_backend_dir)
   in
   let runner = Agent.runner agent in
-  let* () = Faucet_backend_process.run ?runner ~path:faucet_backend_dir () in
-  return (build_endpoint ~runner ~dns_domain faucet_api_port)
+  Faucet_backend_process.run ?runner ~path:faucet_backend_dir ()
 
 let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_proxy ~faucet_pkh
     ~tzkt_proxy ~faucet_frontend_proxy =
@@ -420,11 +414,6 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_proxy ~faucet_pkh
   let faucet_api = proxy_external_endpoint ~runner faucet_api_proxy in
   let tezlink_sandbox_endpoint = proxy_internal_endpoint sequencer_proxy in
   let faucet_frontend_port = proxy_internal_port faucet_frontend_proxy in
-  let dns_domain =
-    match faucet_frontend_proxy with
-    | No_proxy _ -> None
-    | Proxy {dns_domain; _} -> Some dns_domain
-  in
   let tzkt_api = proxy_external_endpoint ~runner tzkt_proxy in
   let faucet_frontend_dir = "faucet-frontend" in
   (* Clone faucet frontend from personal fork because upstream does
@@ -472,14 +461,11 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_proxy ~faucet_pkh
           mkdir -p build && cp public/config.json build/"
          faucet_frontend_dir)
   in
-  let* () =
-    Faucet_frontend_process.run
-      ?runner
-      ~path:faucet_frontend_dir
-      ~port:faucet_frontend_port
-      ()
-  in
-  return (build_endpoint ~runner ~dns_domain faucet_frontend_port)
+  Faucet_frontend_process.run
+    ?runner
+    ~path:faucet_frontend_dir
+    ~port:faucet_frontend_port
+    ()
 
 let umami_patch ~rpc_url ~tzkt_api_url =
   (* The Tezlink TzKT explorer requires some URL parameters suffixed to the
@@ -835,14 +821,14 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               | Unencrypted key -> key
               | _ -> assert false
             in
-            let* (_faucet_api : Client.endpoint) =
+            let* () =
               init_faucet_backend
                 ~agent:tezlink_sequencer_agent
                 ~sequencer_proxy
                 ~faucet_private_key
                 ~faucet_api_proxy
             in
-            let* (_faucet_frontend : Client.endpoint) =
+            let* () =
               init_faucet_frontend
                 ~agent:tezlink_sequencer_agent
                 ~faucet_api_proxy
