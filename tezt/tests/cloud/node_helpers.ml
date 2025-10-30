@@ -115,7 +115,6 @@ let may_init_from_snapshot node ?data_dir ?dal_config ~network ~snapshot
                 | Some "mainnet" -> set_mainnet_network ()
                 | Some "ghostnet" -> set_ghostnet_network ()
                 | Some "shadownet" -> set_shadownet_network ()
-                | Some "rionet" -> set_rionet_network ()
                 | Some "seoulnet" -> set_seoulnet_network ()
                 | _ -> set_sandbox_network))
           in

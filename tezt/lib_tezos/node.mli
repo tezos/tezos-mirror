@@ -383,10 +383,6 @@ module Config_file : sig
       (genesis, genesis_parameters, chain_name and sandboxed_chain_name *)
   val ghostnet_network_config : JSON.u
 
-  (** Basic network configuration for rionet
-      (genesis, genesis_parameters, chain_name and sandboxed_chain_name *)
-  val rionet_network_config : JSON.u
-
   (** Basic network configuration for mainnet
       (genesis, chain_name and sandboxed_chain_name *)
   val mainnet_network_config : JSON.u
@@ -452,12 +448,6 @@ module Config_file : sig
 
       [user_activated_upgrades] can be given to add user-activated upgrades. *)
   val set_ghostnet_sandbox_network :
-    ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
-
-  (** Set the network config to a Rionet network.
-
-      [user_activated_upgrades] can be given to add user-activated upgrades. *)
-  val set_rionet_network :
     ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
 
   (** Set the network config to a Seoulnet network.
