@@ -18,7 +18,7 @@ pub struct TezlinkOperationGas {
 }
 
 #[derive(Debug, Error)]
-pub enum TezlinkGasError {
+pub enum GasLimitError {
     #[error(
         "The gas limit provided is too high the limit is {0} gas units but {1} gas units were given"
     )]
@@ -34,9 +34,9 @@ impl TezlinkOperationGas {
 
     pub fn start(
         operation_gas_limit: &tezos_data_encoding::types::Narith,
-    ) -> Result<Self, TezlinkGasError> {
+    ) -> Result<Self, GasLimitError> {
         if operation_gas_limit.0 > num_bigint::BigUint::from(Self::MAX_GAS_UNIT_AMOUNT) {
-            return Err(TezlinkGasError::GasLimitTooHigh(
+            return Err(GasLimitError::GasLimitTooHigh(
                 Self::MAX_GAS_UNIT_AMOUNT,
                 operation_gas_limit.0.clone(),
             ));
@@ -46,7 +46,7 @@ impl TezlinkOperationGas {
         // Should never fail because of the previous check
         let milligas_limit = operation_miligas_limit
             .try_into()
-            .map_err(TezlinkGasError::CannotConvertToU32)?;
+            .map_err(GasLimitError::CannotConvertToU32)?;
         Ok(Self {
             milligas_limit,
             current_gas: gas::Gas::new(milligas_limit),
