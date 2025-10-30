@@ -30,6 +30,9 @@ open Alpha_context
 
 type t = B of Block.t | I of Incremental.t
 
+type raw_context_modifier =
+  Raw_context.t -> Raw_context.t Environment.Error_monad.tzresult Lwt.t
+
 val get_alpha_ctxt : t -> context tzresult Lwt.t
 
 val branch : t -> Block_hash.t
@@ -454,17 +457,20 @@ val init3 :
 
 val init_with_constants_gen :
   ?algo:Signature.algo ->
+  ?prepare_context:raw_context_modifier ->
   (Alpha_context.Contract.t, 'contracts) tup ->
   Constants.Parametric.t ->
   (Block.t * 'contracts) tzresult Lwt.t
 
 val init_with_constants_n :
   ?algo:Signature.algo ->
+  ?prepare_context:raw_context_modifier ->
   Constants.Parametric.t ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
 
 val init_with_constants_algo_list :
+  ?prepare_context:raw_context_modifier ->
   Constants.Parametric.t ->
   Signature.algo option list ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
@@ -482,6 +488,7 @@ val init_with_constants2 :
     accounts. The number of bootstrap accounts, and the structure of the
     returned contracts, are specified by the [tup] argument. *)
 val init_with_parameters_gen :
+  ?prepare_context:raw_context_modifier ->
   (Alpha_context.Contract.t, 'contracts) tup ->
   Parameters.t ->
   (Block.t * 'contracts) tzresult Lwt.t

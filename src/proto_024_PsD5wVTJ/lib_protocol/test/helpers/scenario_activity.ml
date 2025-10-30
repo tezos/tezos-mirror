@@ -46,3 +46,25 @@ let update_activity name state current_activity_cycle : State.t =
     name
     (update_activity_account state.constants current_activity_cycle)
     state
+
+let check_is_active ~loc src_name =
+  let open Lwt_result_syntax in
+  Scenario_dsl.exec_unit @@ fun (block, state) ->
+  Log.info
+    ~color:Log_helpers.check_color
+    "Check baker activity: [active] \"%s\""
+    src_name ;
+  let src = State.find_account src_name state in
+  let* b = Context.Delegate.deactivated (B block) src.pkh in
+  Assert.is_true ~loc (not b)
+
+let check_is_not_active ~loc src_name =
+  let open Lwt_result_syntax in
+  Scenario_dsl.exec_unit @@ fun (block, state) ->
+  Log.info
+    ~color:Log_helpers.check_color
+    "Check baker activity: [not active] \"%s\""
+    src_name ;
+  let src = State.find_account src_name state in
+  let* b = Context.Delegate.deactivated (B block) src.pkh in
+  Assert.is_true ~loc b

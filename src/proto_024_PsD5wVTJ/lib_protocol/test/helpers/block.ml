@@ -526,7 +526,7 @@ let initial_alpha_context ?(commitments = []) constants
   in
   return result
 
-let genesis_with_parameters parameters =
+let genesis_with_parameters ?prepare_context parameters =
   let open Lwt_result_wrap_syntax in
   let hash =
     Block_hash.of_b58check_exn
@@ -567,6 +567,21 @@ let genesis_with_parameters parameters =
   in
   let chain_id = Chain_id.of_block_hash hash in
   let*@ {context; _} = Main.init chain_id ctxt shell in
+  let* context =
+    match prepare_context with
+    | None -> return context
+    | Some f ->
+        let*@ context, _balance_updates, _origination_results =
+          Init_storage.prepare
+            context
+            ~level:0l
+            ~predecessor_timestamp:Time.Protocol.epoch
+            ~timestamp:Time.Protocol.epoch
+        in
+        let*@ context = f context in
+        let context = Raw_context.recover context in
+        return context
+  in
   return
     {
       hash;

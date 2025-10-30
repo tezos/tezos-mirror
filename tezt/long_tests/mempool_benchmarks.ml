@@ -131,7 +131,15 @@ let init_node_client_with_protocol ?(sig_algo = "ed25519")
   in
   let additional_bootstrap_accounts =
     List.map
-      (fun x -> (x, Some 500_000_000_000_000, true))
+      (fun x ->
+        ( x,
+          Some
+            {
+              Protocol.balance = Some 500_000_000_000_000;
+              consensus_key = None;
+              delegate = None;
+            },
+          true ))
       additional_bootstrap_account
   in
   let parameters =

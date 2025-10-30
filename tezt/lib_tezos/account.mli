@@ -86,6 +86,18 @@ val secret_key_typ : secret_key Check.typ
    faster. *)
 val write : key list -> base_dir:string -> unit
 
+(** [generate_new_key ~algo ~alias] generates a new key using the given [algo], and
+    the Tezos crypto library. Even though an [alias] is given, this key is not
+    registered in a client, and must be registered manually.
+    Typically, this can be used to generate keys for bootstrap accounts, and include
+    them in [overwrite_bootstrap_accounts] when calling [Protocol.write_parameter_file].
+    At this point it is possible to specify the delegate and consensus keys of an
+    arbitrary number of bootstrap accounts.
+    To use these keys in a client and start baking, it is necessary to include them using
+    [Client.import_secret_key] (which is usually not needed for the default
+    bootstrap accounts). *)
+val generate_new_key : algo:Tezos_crypto.Signature.algo -> alias:string -> key
+
 module Bootstrap : sig
   (** Standard name for a bootstrap account parameterised by an
       integer. This alias can be used to name new bootstrap

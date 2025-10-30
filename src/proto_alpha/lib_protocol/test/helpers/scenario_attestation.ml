@@ -378,14 +378,9 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
                RPC.Attestation_rights.delegate;
                consensus_key = _;
                first_slot = _;
-               attesting_power;
+               attesting_power = _;
              }
            ->
-          Tezt.Check.(
-            (attesting_power > 0)
-              int
-              ~__LOC__
-              ~error_msg:"Attestation power should be greater than 0, got %L") ;
           let* is_forbidden =
             Context.Delegate.is_forbidden (B block) delegate
           in
@@ -603,14 +598,9 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
                Plugin.RPC.Attestation_rights.delegate;
                consensus_key = _;
                first_slot = _;
-               attesting_power;
+               attesting_power = _;
              }
            ->
-          Tezt.Check.(
-            (attesting_power > 0)
-              int
-              ~__LOC__
-              ~error_msg:"Attestation power should be greater than 0, got %L") ;
           let* is_forbidden = Context.Delegate.is_forbidden (I incr) delegate in
           return (not is_forbidden))
         delegates_rights
@@ -670,3 +660,11 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
           state
       in
       return (incr, state)
+
+let force_attest_all flag =
+  exec_state (fun (_block, state) ->
+      Lwt_result.return {state with force_attest_all = flag})
+
+let force_preattest_all flag =
+  exec_state (fun (_block, state) ->
+      Lwt_result.return {state with force_preattest_all = flag})

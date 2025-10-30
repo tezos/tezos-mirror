@@ -208,6 +208,30 @@ let update_key ?proof_signer ?force_no_signer ~kind ~ck_name src =
   | Companion ->
       update_companion_key ?proof_signer ?force_no_signer ~ck_name src
 
+let test_init_with_cks_for_bootstraps =
+  let check_finalized_every_block = [(fun _ -> check_all_cks)] in
+  init_constants ()
+  --> begin_test
+        ~check_finalized_every_block
+        ~force_attest_all:true
+        ~bootstrap_info_list:
+          [
+            make "no_ck";
+            make "with_consensus_key" ~consensus_key:(Some Any_algo);
+            make "with_companion_key" ~companion_key:true;
+            make "with_both_tz4" ~consensus_key:(Some Bls) ~companion_key:true;
+          ]
+        []
+  --> exec_unit check_all_cks
+  (* Bake a bit, check at each block *)
+  --> next_block
+  --> next_block
+  (* With some DAL, to test the companion key *)
+  --> exec_state (fun (_block, state) ->
+          Lwt_result.return {state with State.force_attest_all = false})
+  --> attest_aggreg_with ~delegates_with_dal:[("with_both_tz4", Z.of_int 7)] []
+  --> next_block
+
 let test_simple_register_consensus_and_companion_keys =
   let bootstrap_accounts = ["bootstrap1"; "bootstrap2"] in
   let delegate = "delegate" in
@@ -228,7 +252,7 @@ let test_simple_register_consensus_and_companion_keys =
          --> begin_test
                ~force_attest_all:true
                ~check_finalized_every_block
-               ~algo:Bls
+               ~default_algo:Bls
                bootstrap_accounts
          --> add_account_with_funds
                delegate
@@ -329,7 +353,7 @@ let test_register_other_accounts_as_ck =
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~check_finalized_every_block:[(fun _ -> check_all_cks)]
         ~force_attest_all:true
         ["delegate"; "victim_1"; "victim_2"]
@@ -392,7 +416,7 @@ let test_self_register_as_companion =
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_attest_all:true
         ~check_finalized_every_block
         [delegate]
@@ -596,7 +620,7 @@ let test_register_same_key_multiple_times =
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_attest_all:true
         ~check_finalized_every_block
         [delegate]
@@ -630,7 +654,7 @@ let test_register_new_key_every_cycle =
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_attest_all:true
         ~check_finalized_every_block
         [delegate]
@@ -646,7 +670,7 @@ let test_register_key_end_of_cycle =
   --> set S.allow_tz4_delegate_enable true
   --> set S.consensus_rights_delay consensus_rights_delay
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_attest_all:true
         ~check_finalized_every_block
         [delegate]
@@ -671,7 +695,7 @@ let test_registration_override =
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_attest_all:true
         ~check_finalized_every_block
         [delegate]
@@ -771,7 +795,7 @@ let test_in_registration_table_twice =
   --> set S.cache_stake_distribution_cycles (consensus_rights_delay + 3)
   --> set S.cache_sampler_state_cycles (consensus_rights_delay + 3)
   --> begin_test
-        ~algo:Bls
+        ~default_algo:Bls
         ~force_attest_all:true
         ~check_finalized_every_block
         [delegate]
@@ -932,7 +956,7 @@ let test_fail_already_registered =
   let delegate = "delegate" in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
-  --> begin_test ~force_attest_all:true ~algo:Bls [delegate; "ck"]
+  --> begin_test ~force_attest_all:true ~default_algo:Bls [delegate; "ck"]
   --> fold_tag
         (fun kind ->
           assert_failure
@@ -977,7 +1001,7 @@ let test_fail_wrong_signer =
   let delegate = "delegate" in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
-  --> begin_test ~force_attest_all:true ~algo:Bls [delegate; "signer"]
+  --> begin_test ~force_attest_all:true ~default_algo:Bls [delegate; "signer"]
   --> add_account ~algo:Bls "ck"
   --> fold_tag
         (fun kind ->
@@ -1000,7 +1024,7 @@ let test_fail_companion_not_tz4 =
   let delegate = "delegate" in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
-  --> begin_test ~force_attest_all:true ~algo:Bls [delegate; "signer"]
+  --> begin_test ~force_attest_all:true ~default_algo:Bls [delegate; "signer"]
   --> fold_tag
         (fun algo -> add_account ~algo "ck")
         [("Ed25519", Ed25519); ("Secp256k1", Secp256k1); ("P256", P256)]
@@ -1040,6 +1064,8 @@ let test_batch =
 let tests =
   tests_of_scenarios
   @@ [
+       ( "Test bootstrap accounts with initial consensus and companion keys",
+         test_init_with_cks_for_bootstraps );
        ( "Simple update ck for delegate",
          test_simple_register_consensus_and_companion_keys );
        ("Register other accounts as ck", test_register_other_accounts_as_ck);

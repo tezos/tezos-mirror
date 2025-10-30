@@ -19,6 +19,9 @@ module Set = struct
       (c : t) =
     {c with delegate_parameters_activation_delay}
 
+  let tolerated_inactivity_period tolerated_inactivity_period (c : t) =
+    {c with tolerated_inactivity_period}
+
   let blocks_per_cycle blocks_per_cycle (c : t) = {c with blocks_per_cycle}
 
   let blocks_per_commitment blocks_per_commitment (c : t) =
@@ -116,6 +119,16 @@ module Set = struct
   module Dal = struct
     let number_of_slots number_of_slots (c : t) =
       dal {c.dal with number_of_slots} c
+
+    let cryptobox_parameters cryptobox_parameters (c : t) =
+      dal {c.dal with cryptobox_parameters} c
+
+    module Cryptobox_parameters = struct
+      let number_of_shards number_of_shards (c : t) =
+        cryptobox_parameters
+          {c.dal.cryptobox_parameters with number_of_shards}
+          c
+    end
   end
 
   let sc_rollup sc_rollup (c : t) = {c with sc_rollup}

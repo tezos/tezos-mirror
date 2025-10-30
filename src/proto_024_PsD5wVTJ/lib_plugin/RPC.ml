@@ -4374,6 +4374,9 @@ let consecutive_round_zero ctxt block =
 
 let stake_info ctxt block = RPC_context.make_call0 S.stake_info ctxt block () ()
 
+let tz4_baker_number_ratio ctxt ?cycle block =
+  RPC_context.make_call0 S.tz4_baker_number_ratio ctxt block cycle ()
+
 let rpc_services =
   register () ;
   RPC_directory.merge rpc_services !Registration.patched_services

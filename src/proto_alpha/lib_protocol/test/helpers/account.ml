@@ -189,3 +189,11 @@ let rec make_bootstrap_accounts ?(bootstrap_balances = [])
            ~bootstrap_consensus_keys
            accounts
   | [] -> []
+
+let make_bootstrap_accounts_packed =
+  List.map (fun (account, balance, delegate_to, consensus_key) ->
+      make_bootstrap_account
+        ?balance:(Option.map Tez.of_mutez_exn balance)
+        ~delegate_to
+        ~consensus_key
+        account)

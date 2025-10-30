@@ -191,6 +191,14 @@ let fold_tag :
   let f (s, x) = Tag s --> f x in
   fold f
 
+let fold_tag_opt :
+    ('a -> ('b, 'c) scenarios) ->
+    (string option * 'a) list ->
+    ('b, 'c) scenarios =
+ fun f ->
+  let f (s, x) = (match s with Some s -> Tag s | None -> Empty) --> f x in
+  fold f
+
 (** [fold_tag_f f tag l] folds [f] over [l], [tag] returns a tag for each element of [l].
     Fails on empty list. *)
 let fold_tag_f :

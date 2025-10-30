@@ -118,10 +118,25 @@ val make_bootstrap_account :
     [bootstrap_balances], [bootstrap_delegations] and [bootstrap_consensus_keys]
     to create a list of {!Parameters.bootstrap_account} using
     [make_bootstrap_account].
+    The balances, delegations and consensus keys are given in the same order as the
+    [accounts], and if they get exhausted, the following bootstrap accounts will be
+    initialized with default values: {!default_initial_full_balance} for the balance,
+    and [None] for the delegate and consensus key.
 *)
 val make_bootstrap_accounts :
   ?bootstrap_balances:int64 list ->
   ?bootstrap_delegations:Signature.public_key_hash option list ->
   ?bootstrap_consensus_keys:Signature.public_key option list ->
   t list ->
+  Parameters.bootstrap_account list
+
+(** [make_bootstrap_accounts_packed accounts_packed] creates bootstrap accounts
+    from each element [(account, balance, delegate_to, consensus_key)] of the given list,
+    by calling [make_bootstrap_account ~balance ~delegate_to ~consensus_key account]. *)
+val make_bootstrap_accounts_packed :
+  (t
+  * int64 option
+  * Signature.public_key_hash option
+  * Signature.public_key option)
+  list ->
   Parameters.bootstrap_account list

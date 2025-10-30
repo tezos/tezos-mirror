@@ -95,6 +95,17 @@ let key_typ : key Check.typ =
       && String.equal key1.public_key key2.public_key
       && secret_key_equal key1.secret_key key2.secret_key)
 
+(* The key is not added to a client, it must be manually added later *)
+let generate_new_key ~algo ~alias =
+  let open Tezos_crypto.Signature in
+  let pkh, pk, sk = generate_key ~algo () in
+  {
+    alias;
+    public_key = Public_key.to_b58check pk;
+    public_key_hash = Public_key_hash.to_b58check pkh;
+    secret_key = Unencrypted (Secret_key.to_b58check sk);
+  }
+
 module Wallet : sig
   val write : key list -> base_dir:string -> unit
 end = struct

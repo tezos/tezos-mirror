@@ -68,6 +68,12 @@ let exclude_bakers bakers : (t, t) scenarios =
       return
         {state with State.baking_policy = Some (Block.Excluding bakers_pkh)})
 
+(** Reset the baking policy to [None], i.e the default policy *)
+let reset_baking_policy : (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec_state (fun (_block, state) ->
+      return {state with State.baking_policy = None})
+
 let set_payload_round (payload_round : int option) : (t, t) scenarios =
   let open Lwt_result_syntax in
   exec_state (fun (_block, state) -> return {state with State.payload_round})

@@ -163,7 +163,11 @@ val genesis :
   Parameters.bootstrap_account list ->
   block tzresult Lwt.t
 
-val genesis_with_parameters : Parameters.t -> block tzresult Lwt.t
+val genesis_with_parameters :
+  ?prepare_context:
+    (Raw_context.t -> Raw_context.t Environment.Error_monad.tzresult Lwt.t) ->
+  Parameters.t ->
+  block tzresult Lwt.t
 
 (** [alpha_context <opts> accounts] : instantiates an alpha_context with the
     given constants [<opts>] and initializes [accounts] with their

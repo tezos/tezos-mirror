@@ -107,7 +107,8 @@ let double_consensus_init
       (if Protocol.number protocol >= 024 then
          JSON.(
            slots |> as_list |> List.hd |-> "delegates" |> as_list |> List.hd
-           |-> "rounds" |> as_list)
+           |-> "attestation_slot")
+         :: []
        else JSON.(slots |> as_list |> List.hd |-> "slots" |> as_list))
   in
   Log.info "Inject valid %s." consensus_name ;

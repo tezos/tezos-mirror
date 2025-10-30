@@ -690,12 +690,27 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         let bootstrap_accounts =
           List.mapi
             (fun i Baker_helpers.{delegate; _} ->
-              (delegate, Some (List.nth stake i * 1_000_000_000_000)))
+              ( delegate,
+                Some
+                  {
+                    Protocol.balance =
+                      Some (List.nth stake i * 1_000_000_000_000);
+                    consensus_key = None;
+                    delegate = None;
+                  } ))
             (List.flatten baker_accounts)
         in
         let additional_bootstrap_accounts =
           List.map
-            (fun key -> (key, Some 1_000_000_000_000, false))
+            (fun key ->
+              ( key,
+                Some
+                  {
+                    Protocol.balance = Some 1_000_000_000_000;
+                    consensus_key = None;
+                    delegate = None;
+                  },
+                false ))
             (producer_accounts @ etherlink_rollup_operator_key
            @ etherlink_batching_operator_keys @ echo_rollup_keys)
         in
@@ -724,7 +739,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           | None -> []
         in
         Protocol.write_parameter_file
-          ~bootstrap_accounts
+          ~overwrite_bootstrap_accounts:(Some bootstrap_accounts)
           ~additional_bootstrap_accounts
           ~base
           overrides

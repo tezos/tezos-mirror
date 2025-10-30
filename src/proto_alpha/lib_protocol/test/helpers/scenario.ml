@@ -16,3 +16,4 @@ include Scenario_begin
 include Scenario_constants
 include Scenario_bake
 include Scenario_attestation
+include Scenario_activity

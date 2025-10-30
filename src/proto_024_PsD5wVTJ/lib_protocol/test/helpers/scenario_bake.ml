@@ -369,6 +369,7 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
       check_finalized_current_block = [];
       previous_metadata = Some metadata;
       grandparent = previous_block;
+      grandgrandparent = state.grandparent;
     }
   in
   return (block, state)
@@ -389,10 +390,11 @@ let rec repeat n f acc =
     repeat (n - 1) f acc
 
 (* adopted from tezt/lib_tezos/client.ml *)
-let bake_until_level ~target_level : t -> t tzresult Lwt.t =
+let bake_until_level ?(log_message = true) ~target_level : t -> t tzresult Lwt.t
+    =
  fun (init_block, init_state) ->
   let open Lwt_result_syntax in
-  Log.info "Bake until level %d." target_level ;
+  if log_message then Log.info "Bake until level %d." target_level ;
   let current_level = Int32.to_int @@ Block.current_level init_block in
   if target_level < current_level then
     Test.fail
@@ -407,18 +409,27 @@ let bake_until_level ~target_level : t -> t tzresult Lwt.t =
     ~error_msg:"Expected level=%R, got %L" ;
   return (final_block, final_state)
 
-let bake_until ~target_cycle condition : t -> t tzresult Lwt.t =
+let bake_until condition : t -> t tzresult Lwt.t =
  fun (init_block, init_state) ->
   let blocks_per_cycle = Int32.to_int init_block.constants.blocks_per_cycle in
-  let target_level, str =
+  let fs = Format.asprintf in
+  let target_level, log_str =
     match condition with
-    | `New_cycle -> (target_cycle * blocks_per_cycle, "first block")
-    | `Cycle_end -> (((target_cycle + 1) * blocks_per_cycle) - 1, "last block")
-    | `Cycle_end_but_one ->
-        (((target_cycle + 1) * blocks_per_cycle) - 2, "last but one block")
+    | `Level n -> (n, fs "Bake until level %d" n)
+    | `Cycle (target_cycle, level_cond) ->
+        let cycle_offset = target_cycle * blocks_per_cycle in
+        let level, str =
+          match level_cond with
+          | `Level n -> (cycle_offset + n, fs "level position %d" n)
+          | `First_level -> (cycle_offset, "first level")
+          | `Last_level -> (cycle_offset + blocks_per_cycle - 1, "last level")
+          | `Before_last_level ->
+              (cycle_offset + blocks_per_cycle - 2, "level before last level")
+        in
+        (level, fs "Bake until cycle %d, %s (level %d)" target_cycle str level)
   in
-  Log.info "Bake until cycle %d (level %d); %s" target_cycle target_level str ;
-  bake_until_level ~target_level (init_block, init_state)
+  Log.info "%s" log_str ;
+  bake_until_level ~log_message:false ~target_level (init_block, init_state)
 
 (** Bake until a cycle is reached, using [bake] instead of [Block.bake] *)
 let bake_until_next_cycle : t -> t tzresult Lwt.t =
@@ -427,7 +438,7 @@ let bake_until_next_cycle : t -> t tzresult Lwt.t =
     Int32.to_int @@ Cycle.to_int32 @@ Cycle.succ
     @@ Block.current_cycle init_block
   in
-  bake_until `New_cycle ~target_cycle:next_cycle (init_block, init_state)
+  bake_until (`Cycle (next_cycle, `First_level)) (init_block, init_state)
 
 (** Bake all the remaining blocks of the current cycle *)
 let bake_until_dawn_of_next_cycle : t -> t tzresult Lwt.t =
@@ -435,7 +446,7 @@ let bake_until_dawn_of_next_cycle : t -> t tzresult Lwt.t =
   let current_cycle =
     Int32.to_int @@ Cycle.to_int32 @@ Block.current_cycle init_block
   in
-  bake_until `Cycle_end ~target_cycle:current_cycle (init_block, init_state)
+  bake_until (`Cycle (current_cycle, `Last_level)) (init_block, init_state)
 
 let bake_until_next_cycle_end_but_one : t -> t tzresult Lwt.t =
  fun (init_block, init_state) ->
@@ -449,7 +460,7 @@ let bake_until_next_cycle_end_but_one : t -> t tzresult Lwt.t =
   let target_cycle =
     if Block.last_block_of_cycle init_block then next_cycle else current_cycle
   in
-  bake_until `Cycle_end_but_one ~target_cycle (init_block, init_state)
+  bake_until (`Cycle (target_cycle, `Before_last_level)) (init_block, init_state)
 
 (* ======== Operations ======== *)
 
