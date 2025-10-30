@@ -678,8 +678,7 @@ mod tests {
     use primitive_types::H256;
     use revm::primitives::Address;
     use revm_etherlink::{
-        precompiles::provider::EtherlinkPrecompiles, run_transaction,
-        storage::world_state_handler::StorageAccount, GasData,
+        run_transaction, storage::world_state_handler::StorageAccount, GasData,
     };
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -792,7 +791,6 @@ mod tests {
             revm::primitives::hardfork::SpecId::SHANGHAI,
             &block,
             None,
-            EtherlinkPrecompiles::new(),
             caller,
             None,
             call_data.into(),
