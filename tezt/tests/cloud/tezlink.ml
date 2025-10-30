@@ -641,6 +641,12 @@ let add_service cloud ~name ~url =
   let () = toplog "New service: %s: %s" name url in
   Cloud.add_service cloud ~name ~url
 
+type faucet_proxys = {
+  tzkt_proxy : proxy_info;
+  faucet_api_proxy : proxy_info;
+  faucet_frontend_proxy : proxy_info;
+}
+
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
   let name = "tezlink-sequencer" in
@@ -748,6 +754,32 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           some tzkt_proxy
         else none
       in
+      let* faucet_proxys_opt =
+        match (tzkt_proxy_opt, Cli.faucet) with
+        | Some tzkt_proxy, true ->
+            let faucet_api_proxy =
+              make_proxy
+                tezlink_sequencer_agent
+                ~path:None
+                ~dns_domain
+                None
+                activate_ssl
+            in
+            let faucet_frontend_proxy =
+              make_proxy
+                tezlink_sequencer_agent
+                ~path:None
+                ~dns_domain
+                None
+                activate_ssl
+            in
+            some {tzkt_proxy; faucet_api_proxy; faucet_frontend_proxy}
+        | None, true ->
+            Test.fail
+              "The faucet service relies an TzKT, but the latter is \
+               deactivated (see the --tzkt option)."
+        | (None | Some _), false -> none
+      in
       let () = toplog "Starting Tezlink sequencer" in
       let* () =
         init_tezlink_sequencer
@@ -773,9 +805,9 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | Some tzkt_proxy ->
               init_umami tezlink_sequencer_agent ~sequencer_proxy ~tzkt_proxy
             and* () =
-        match tzkt_proxy_opt with
+        match faucet_proxys_opt with
         | None -> unit
-        | Some tzkt_proxy ->
+        | Some {tzkt_proxy; faucet_api_proxy = _; faucet_frontend_proxy = _} ->
               if Cli.faucet then
                 let () = toplog "Starting faucet" in
                 let faucet_account = Constant.bootstrap1 in
