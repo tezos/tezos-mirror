@@ -75,20 +75,7 @@ let get_versions ~component =
   try
     Storage.get_file ~path:component.path "versions.json" ;
     parse_file (Filename.concat Storage.temp_dir "versions.json")
-    |> as_list
-    |> List.map (fun version ->
-           {
-             major = version |-> "major" |> as_int;
-             minor = version |-> "minor" |> as_int;
-             rc = version |-> "rc" |> as_int_opt;
-             latest =
-               version |-> "latest" |> as_bool_opt
-               |> Option.value ~default:false;
-             announcement = version |-> "announcement" |> as_string_opt;
-             active =
-               version |-> "active" |> as_bool_opt
-               |> Option.value ~default:false;
-           })
+    |> as_list |> List.map of_json
   with Error error ->
     failwith
       ("Failed to read versions.json in " ^ component.path ^ ": "

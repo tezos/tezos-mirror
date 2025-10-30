@@ -7,19 +7,27 @@
 
 open Base
 
-type item = {title : string; description : string; guid : string}
+type item = {
+  title : string;
+  description : string;
+  guid : string;
+  link : string;
+  pubDate : Unix.tm;
+}
 
-let make_item ~title ~description ~guid = {title; description; guid}
+let make_item ~title ~description ~guid ~link ~pubDate =
+  {title; description; guid; link; pubDate}
 
 type channel = {
   title : string;
   description : string;
+  link : string;
   lastBuildDate : Unix.tm;
   items : item list;
 }
 
-let make_channel ~title ~description ~lastBuildDate ~items =
-  {title; description; lastBuildDate; items}
+let make_channel ~title ~description ~link ~lastBuildDate ~items =
+  {title; description; link; lastBuildDate; items}
 
 (* [escape_xml_text text] escapes special XML characters in text *)
 let escape_xml_text text =
@@ -34,18 +42,6 @@ let escape_xml_text text =
       | c -> Buffer.add_char buf c)
     text ;
   Buffer.contents buf
-
-(* [show_item_rss channel] converts [item] to string.*)
-let show_item_rss {title; description; guid} =
-  sf
-    "    <item>\n\
-    \      <title>%s</title>\n\
-    \      <description>%s</description>\n\
-    \      <guid>%s</guid>\n\
-    \    </item>"
-    (escape_xml_text title)
-    (escape_xml_text description)
-    (escape_xml_text guid)
 
 let show_time (time : Unix.tm) =
   sf
@@ -79,18 +75,36 @@ let show_time (time : Unix.tm) =
     time.tm_min
     time.tm_sec
 
+(* [show_item_rss channel] converts [item] to string.*)
+let show_item_rss {title; description; guid; link; pubDate} =
+  sf
+    "    <item>\n\
+    \      <title>%s</title>\n\
+    \      <description>%s</description>\n\
+    \      <guid isPermaLink=\"false\">%s</guid>\n\
+    \      <link>%s</link>\n\
+    \      <pubDate>%s</pubDate>\n\
+    \    </item>"
+    (escape_xml_text title)
+    (escape_xml_text description)
+    (escape_xml_text guid)
+    (escape_xml_text link)
+    (show_time pubDate)
+
 (* [show_channel_rss channel] converts [channel] to string. *)
-let show_channel_rss {title; description; lastBuildDate; items} =
+let show_channel_rss {title; description; link; lastBuildDate; items} =
   Format.asprintf
     {|  <channel>
           <title>%s</title>
           <description>%s</description>
           <language>en</language>
+          <link>%s</link>
           <lastBuildDate>%s</lastBuildDate>
           %a
         </channel>|}
     (escape_xml_text title)
     (escape_xml_text description)
+    (escape_xml_text link)
     (show_time lastBuildDate)
     (Format.pp_print_list
        ~pp_sep:(fun fmt () -> Format.pp_print_string fmt "\n          ")
