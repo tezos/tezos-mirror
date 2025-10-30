@@ -4818,7 +4818,7 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
         loop (attested_level + 1)
       else unit
     in
-    let* () = loop (first_level + old_lag + 1) in
+    let* () = loop (first_level + old_lag + 2) in
     unit
   in
   test_l1_migration_scenario
@@ -4828,7 +4828,7 @@ let test_migration_with_attestation_lag_change ~migrate_from ~migrate_to =
     ~uses:[Constant.octez_agnostic_baker]
     ~activation_timestamp:Now
     ~operator_profiles:[slot_index]
-    ~migration_level:12
+    ~migration_level:13
     ~migrate_from
     ~migrate_to
     ()
