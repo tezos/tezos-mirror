@@ -173,14 +173,9 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint
     psql ~db:tzkt_db (sf "GRANT ALL ON SCHEMA public TO %s;" tzkt_db_user)
   in
 
-  (* Clone TZKT sources on head-streaming branch as it supports Seoul and fast
-     indexing. *)
+  (* Clone TZKT sources. *)
   let* () =
-    git_clone
-      agent
-      ~branch:"head-streaming"
-      "https://github.com/baking-bad/tzkt"
-      "tzkt"
+    git_clone agent ~branch:"master" "https://github.com/baking-bad/tzkt" "tzkt"
   in
   (* Compile Tzkt indexer and API. The output of the compilation is sent
      to different directory to prevent collision. *)
