@@ -321,12 +321,14 @@ let lwt_stream_iter_es f stream =
 
 let start_new_head_monitor ~ws_uri =
   let open Lwt_result_syntax in
-  let*! ws_client =
-    Websocket_client.connect
+  let ws_client =
+    Websocket_client.create
       ~monitoring:{ping_timeout = 60.; ping_interval = 10.}
+      ~keep_alive:false
       Media_type.json
       ws_uri
   in
+  let* () = Websocket_client.connect ws_client in
   let* heads_subscription = Websocket_client.subscribe_newHeads ws_client in
   lwt_stream_iter_es
     (fun head ->

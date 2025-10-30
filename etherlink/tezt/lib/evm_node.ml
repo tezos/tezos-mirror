@@ -377,9 +377,12 @@ let wait_for_blueprint_applied ?timeout evm_node level =
           ~event:event_blueprint_applied_name
           promise
   | Running {session_state = {ready = true; _}; _} ->
-      failwith "EVM node cannot produce blueprints"
+      Format.ksprintf
+        failwith
+        "EVM node %s cannot apply blueprints"
+        evm_node.name
   | Not_running | Running {session_state = {ready = false; _}; _} ->
-      failwith "EVM node is not ready"
+      Format.ksprintf failwith "EVM node %s is not ready" evm_node.name
 
 let wait_for_blueprint_invalid_applied evm_node =
   wait_for_event evm_node ~event:"blueprint_invalid_applied.v0" @@ fun _ ->

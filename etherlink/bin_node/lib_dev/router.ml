@@ -306,15 +306,15 @@ let make_jsonrpc_websocket_route path
               send_error output_media websocket (Rpc_errors.internal_error msg))
         (Lwt_stream.wrap_exn stream)
     in
-    stopper () ;
     Stdlib.Hashtbl.remove subscriptions id ;
+    let* (_ : bool tzresult) = stopper () in
     return_unit
   in
   let async_write_stream subscription =
     Lwt.dont_wait
       (fun () -> write_stream subscription)
       (fun exn ->
-        subscription.stopper () ;
+        let (_ : bool tzresult Lwt.t) = subscription.stopper () in
         Stdlib.Hashtbl.remove subscriptions subscription.id ;
         Dream.error @@ fun log ->
         log
@@ -334,7 +334,11 @@ let make_jsonrpc_websocket_route path
            subscriptions)"
           (Dream.client request)
           (Stdlib.Hashtbl.length subscriptions) ;
-        Stdlib.Hashtbl.iter (fun _id stopper -> stopper ()) subscriptions ;
+        Stdlib.Hashtbl.iter
+          (fun _id stopper ->
+            let (_ : bool tzresult Lwt.t) = stopper () in
+            ())
+          subscriptions ;
         Stdlib.Hashtbl.clear subscriptions ;
         Dream.close_websocket websocket
     | Some message ->

@@ -40,11 +40,21 @@ type (_, _) call =
 
 type monitoring = {ping_timeout : float; ping_interval : float}
 
-(** [connect ?monitoring media uri] connects to an EVM node websocket server on
-    [uri], communication is either JSON or binary depending on [media]. If
-    [monitoring] is provided, the connection is monitored with the given
-    parameters. *)
-val connect : ?monitoring:monitoring -> Media_type.t -> Uri.t -> t Lwt.t
+(** [create ?monitoring ?keep_alive media uri] creates an EVM node websocket
+    client to an EVM node websocket server on [uri], communication is either
+    JSON or binary depending on [media]. If [monitoring] is provided, the
+    connection is monitored with the given parameters. If [keep_alive] is [true]
+    (the default), requests will be retried (and the connection reestablished)
+    if the connection is dropped. *)
+val create :
+  ?monitoring:monitoring -> ?keep_alive:bool -> Media_type.t -> Uri.t -> t
+
+(** A uniquely identifying id for a websocket client. *)
+val client_id : t -> int
+
+(** [connect client] establishes the websocket connection with [client]. NOTE:
+    the connection is established automatically when sending a request. *)
+val connect : t -> unit tzresult Lwt.t
 
 (** Disconnect the websocket client by sending a close frame and closing the
     connection. *)

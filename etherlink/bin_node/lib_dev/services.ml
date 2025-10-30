@@ -152,7 +152,7 @@ let configuration_handler config =
 
 let health_check_handler config mode db_liveness_check query =
   match mode with
-  | Configuration.Sequencer | Observer | Proxy ->
+  | Mode.Sequencer | Observer | Proxy ->
       let open Lwt_result_syntax in
       let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping
       and* () =
@@ -173,7 +173,7 @@ let health_check_handler config mode db_liveness_check query =
         fail_when has_timeout Stalled_database
       in
       return_unit
-  | Rpc {evm_node_endpoint} ->
+  | Rpc {evm_node_endpoint; _} ->
       Rollup_services.call_service
         ~keep_alive:false
         ~base:evm_node_endpoint
@@ -187,10 +187,10 @@ let health_check_handler config mode db_liveness_check query =
 let evm_mode_handler config evm_mode =
   let open Lwt_result_syntax in
   match evm_mode with
-  | Configuration.Sequencer -> return "sequencer"
+  | Mode.Sequencer -> return "sequencer"
   | Observer -> return "observer"
   | Proxy -> return "proxy"
-  | Rpc {evm_node_endpoint} ->
+  | Rpc {evm_node_endpoint; _} ->
       let+ evm_node_mode =
         Rollup_services.call_service
           ~keep_alive:false
@@ -260,8 +260,10 @@ let block_transaction_count block =
 
 type sub_stream = {
   kind : Ethereum_types.Subscription.kind;
-  stream : Transaction_object.t Ethereum_types.Subscription.output Lwt_stream.t;
-  stopper : unit -> unit;
+  stream :
+    Transaction_object.t Ethereum_types.Subscription.output tzresult
+    Lwt_stream.t;
+  stopper : unit -> bool tzresult Lwt.t;
 }
 
 let subscriptions :
@@ -310,10 +312,9 @@ let produce_logs_stream ~bloom_filter stream =
       |> List.map (fun l -> Ethereum_types.Subscription.Logs l))
     stream
 
-let eth_subscribe ~(kind : Ethereum_types.Subscription.kind)
+let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
     (module Backend_rpc : Services_backend_sig.S) =
   let open Lwt_result_syntax in
-  let id = make_id ~id:(generate_id ()) in
   let* stream, stopper =
     match kind with
     | NewHeads -> return @@ Lwt_watcher.create_stream Evm_context.head_watcher
@@ -365,19 +366,189 @@ let eth_subscribe ~(kind : Ethereum_types.Subscription.kind)
         in
         return (stream, stopper)
   in
+  return
+    ( Lwt_stream.map Result.ok stream,
+      fun () ->
+        Lwt_watcher.shutdown stopper ;
+        return true )
+
+type 'a proxied_subscription = {
+  watcher : 'a Lwt_watcher.input;
+  unsubscribe : unit -> bool tzresult Lwt.t;
+  mutable subscribers : int;
+}
+
+module WsClientTable = Hashtbl.Make (struct
+  type t = Websocket_client.t * Ethereum_types.Subscription.kind
+
+  let equal (ws1, k1) (ws2, k2) =
+    Websocket_client.client_id ws1 = Websocket_client.client_id ws2 && k1 = k2
+
+  let hash (ws, k) = Hashtbl.hash (Websocket_client.client_id ws, k)
+end)
+
+let proxied_subscriptions = WsClientTable.create 4
+
+let create_proxied_subscription ws_client ~timeout kind =
+  let open Lwt_result_syntax in
+  let timeout = Websocket_client.{timeout; on_timeout = `Retry_forever} in
+  let watcher = Lwt_watcher.create_input () in
+  let upstream_unsubscribe = ref (fun () -> return_false) in
+  let unsubscribe () =
+    WsClientTable.remove proxied_subscriptions (ws_client, kind) ;
+    !upstream_unsubscribe ()
+  in
+  let proxied = {watcher; unsubscribe; subscribers = 0} in
+  WsClientTable.replace proxied_subscriptions (ws_client, kind) proxied ;
+  let upstream_subscribe () =
+    let rec resubscribe () =
+      let open Lwt_syntax in
+      if proxied.subscribers <= 0 then
+        (* no more subscribers *)
+        return_unit
+      else
+        (* Resubscribing after small delay *)
+        let* () = Lwt_unix.sleep 1. in
+        let* sub = Websocket_client.subscribe ws_client ~timeout kind in
+        upstream_subscribe_loop sub
+    and upstream_subscribe_loop =
+      let open Lwt_syntax in
+      function
+      | Error e ->
+          (* Notify error and attempt resubscription *)
+          Lwt_watcher.notify watcher (Error e) ;
+          resubscribe ()
+      | Ok Websocket_client.{stream; unsubscribe} ->
+          (* Subscription success, register new unsubscribe *)
+          (* TODO: maybe add missing elements in the stream while
+             disconnected. *)
+          upstream_unsubscribe := unsubscribe ;
+          Lwt.dont_wait
+            (fun () ->
+              let* () = Lwt_stream.iter (Lwt_watcher.notify watcher) stream in
+              (* Upstream subscription stream stopped, resubscribe if there are
+                  any subscribers left. *)
+              resubscribe ())
+            ignore ;
+          return_unit
+    in
+    let* sub = Websocket_client.subscribe ws_client ~timeout kind in
+    let*! () = upstream_subscribe_loop (Ok sub) in
+    return_unit
+  in
+  let* () = upstream_subscribe () in
+  return proxied
+
+let get_proxied_subscription ws_client ~timeout
+    (kind : Ethereum_types.Subscription.kind) =
+  let open Lwt_result_syntax in
+  let kind =
+    match kind with
+    | NewHeads -> (NewHeads : Ethereum_types.Subscription.kind)
+    | Logs _ ->
+        (* Subscribe to all logs *)
+        Logs {address = None; topics = None}
+    | NewPendingTransactions -> NewPendingTransactions
+    | Syncing -> Syncing
+    | Etherlink (L1_L2_levels _) ->
+        (* Don't fetch historic levels through websocket *)
+        Etherlink (L1_L2_levels None)
+  in
+  match WsClientTable.find proxied_subscriptions (ws_client, kind) with
+  | Some proxied -> return proxied
+  | None -> create_proxied_subscription ws_client ~timeout kind
+
+(* In RPC mode, the EVM node acts as a proxy to the server for
+   `eth_subscribe`. There is at most one subscription active per kind on the
+   server. *)
+let eth_subscribe_rpc_mode ~timeout ~(kind : Ethereum_types.Subscription.kind)
+    (ws_client : Websocket_client.t)
+    (module Backend_rpc : Services_backend_sig.S) =
+  let open Lwt_result_syntax in
+  let* proxied = get_proxied_subscription ws_client ~timeout kind in
+  let* stream, stopper =
+    match kind with
+    | NewHeads | NewPendingTransactions | Syncing ->
+        return @@ Lwt_watcher.create_stream proxied.watcher
+    | Logs {address; topics} ->
+        let stream, stopper = Lwt_watcher.create_stream proxied.watcher in
+        let filter = filter_from ~address ~topics in
+        let* bloom_filter = Filter_helpers.validate_bloom_filter filter in
+        let stream =
+          Lwt_stream.filter_map
+            (function
+              | Ok (Ethereum_types.Subscription.Logs log) ->
+                  Filter_helpers.filter_one_log bloom_filter log
+                  |> Option.map (fun l ->
+                         Ok (Ethereum_types.Subscription.Logs l))
+              | Ok _ -> None
+              | Error e -> Some (Error e))
+            stream
+        in
+        return (stream, stopper)
+    | Etherlink (L1_L2_levels from_l1_level) ->
+        let* extra =
+          match from_l1_level with
+          | None -> return_nil
+          | Some from_l1_level ->
+              let+ l1_l2 = Backend_rpc.list_l1_l2_levels ~from_l1_level in
+              List.rev_map
+                (fun ( l1_level,
+                       {
+                         Evm_store.L1_l2_finalized_levels.start_l2_level;
+                         end_l2_level;
+                       } )
+                   ->
+                  Ok
+                    (Ethereum_types.Subscription.Etherlink
+                       (L1_l2_levels {l1_level; start_l2_level; end_l2_level})))
+                l1_l2
+              |> List.rev
+        in
+        let stream, stopper = Lwt_watcher.create_stream proxied.watcher in
+        let stream = Lwt_stream.append (Lwt_stream.of_list extra) stream in
+        return (stream, stopper)
+  in
+  let unsubscribed = ref false in
+  let unsubscribe () =
+    if !unsubscribed then return_false
+    else (
+      unsubscribed := true ;
+      Lwt_watcher.shutdown stopper ;
+      proxied.subscribers <- proxied.subscribers - 1 ;
+      if proxied.subscribers <= 0 then proxied.unsubscribe () else return_true)
+  in
+  proxied.subscribers <- proxied.subscribers + 1 ;
+  return (stream, unsubscribe)
+
+let eth_subscribe (config : Configuration.t) (mode : Mode.t) ~kind backend =
+  let open Lwt_result_syntax in
+  let id = make_id ~id:(generate_id ()) in
+  let* stream, stopper =
+    match mode with
+    | Rpc {websocket = Some ws_client; _} ->
+        eth_subscribe_rpc_mode
+          ~timeout:config.rpc_timeout
+          ~kind
+          ws_client
+          backend
+    | Rpc {websocket = None; _} ->
+        failwith
+          "Cannot call eth_subscribe on RPC node whose endpoint does not \
+           support websockets."
+    | _ -> eth_subscribe_direct ~kind backend
+  in
   let stopper () =
     Stdlib.Hashtbl.remove subscriptions id ;
-    Lwt_watcher.shutdown stopper
+    stopper ()
   in
   Stdlib.Hashtbl.add subscriptions id {kind; stream; stopper} ;
   return (id, (stream, stopper))
 
 let eth_unsubscribe ~id =
   match Stdlib.Hashtbl.find_opt subscriptions id with
-  | Some {stopper; _} ->
-      stopper () ;
-      true
-  | None -> false
+  | Some {stopper; _} -> stopper ()
+  | None -> Lwt_result_syntax.return_false
 
 let decode : type a.
     (module METHOD with type input = a) -> Data_encoding.json -> a =
@@ -1324,22 +1495,32 @@ let websocket_response_of_response response = {response; subscription = None}
 
 let encode_subscription_response subscription r =
   let result =
-    Data_encoding.Json.construct
-      (Ethereum_types.Subscription.output_encoding Transaction_object.encoding)
-      r
+    match r with
+    | Ok r ->
+        Data_encoding.Json.construct
+          (Ethereum_types.Subscription.output_encoding
+             Transaction_object.encoding)
+          r
+    | Error err ->
+        let msg =
+          match err with [] -> "" | e :: _ -> (find_info_of_error e).id
+        in
+        let data = Data_encoding.Json.construct trace_encoding err in
+        Rpc_errors.internal_error msg ~data
+        |> Data_encoding.Json.construct JSONRPC.error_encoding
   in
   Rpc_encodings.Subscription.{params = {result; subscription}}
 
 let empty_stream =
   let stream, push = Lwt_stream.create () in
   push None ;
-  (stream, fun () -> ())
+  (stream, fun () -> Lwt_result_syntax.return_false)
 
 let empty_sid = Ethereum_types.(Subscription.Id (Hex ""))
 
 let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) config tx_container ctx (input : JSONRPC.request)
-    =
+    (rpc : Configuration.rpc) config mode tx_container ctx
+    (input : JSONRPC.request) =
   let open Lwt_syntax in
   match
     map_method_name
@@ -1351,17 +1532,8 @@ let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
       let sub_stream = ref empty_stream in
       let sid = ref empty_sid in
       let f (kind : Ethereum_types.Subscription.kind) =
-        let* id_stream = eth_subscribe ~kind (fst ctx) in
-        let id, stream =
-          match id_stream with
-          | Ok id_stream -> id_stream
-          | Error err ->
-              Format.kasprintf
-                Stdlib.failwith
-                "The websocket `logs` event produced the following error: %a"
-                pp_print_trace
-                err
-        in
+        let open Lwt_result_syntax in
+        let* id, stream = eth_subscribe config mode ~kind (fst ctx) in
         (* This is an optimization to avoid having to search in the map
            of subscriptions for `stream` and `id`. *)
         sub_stream := stream ;
@@ -1379,7 +1551,8 @@ let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
         {response; subscription = Some {id = subscription_id; stream; stopper}}
   | Method (Unsubscribe.Method, module_) ->
       let f (id : Ethereum_types.Subscription.id) =
-        let status = eth_unsubscribe ~id in
+        let open Lwt_result_syntax in
+        let* status = eth_unsubscribe ~id in
         rpc_ok status
       in
       let+ value = build_with_input ~f module_ input.parameters in
@@ -1399,8 +1572,8 @@ let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
 
 let dispatch_private_websocket
     (rpc_server_family : _ Rpc_types.rpc_server_family) ~block_production
-    (rpc : Configuration.rpc) config tx_container ctx (input : JSONRPC.request)
-    =
+    (rpc : Configuration.rpc) config _mode tx_container ctx
+    (input : JSONRPC.request) =
   let open Lwt_syntax in
   let+ response =
     dispatch_private_request
@@ -1459,8 +1632,8 @@ let dispatch_private (type f)
        rpc
        ~block_production)
 
-let generic_websocket_dispatch (config : Configuration.t) tx_container ctx dir
-    path dispatch_websocket =
+let generic_websocket_dispatch (config : Configuration.t) mode tx_container ctx
+    dir path dispatch_websocket =
   match config.websockets with
   | None -> dir
   | Some {max_message_length; monitor_heartbeat; _} ->
@@ -1469,14 +1642,15 @@ let generic_websocket_dispatch (config : Configuration.t) tx_container ctx dir
         ~max_message_length
         dir
         path
-        (dispatch_websocket config tx_container ctx)
+        (dispatch_websocket config mode tx_container ctx)
 
 let dispatch_websocket_public (type f)
     (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) config
+    (rpc : Configuration.rpc) config mode
     (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_websocket_dispatch
     config
+    mode
     tx_container
     ctx
     dir
@@ -1485,10 +1659,11 @@ let dispatch_websocket_public (type f)
 
 let dispatch_websocket_private (type f)
     (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) ~block_production config
+    (rpc : Configuration.rpc) ~block_production config mode
     (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_websocket_dispatch
     config
+    mode
     tx_container
     ctx
     dir
@@ -1518,7 +1693,13 @@ let directory (type f) ~(rpc_server_family : f Rpc_types.rpc_server_family) mode
   dir |> version |> configuration config |> evm_mode config mode
   |> health_check config mode db_liveness_check
   |> dispatch_public rpc_server_family rpc config tx_container backend
-  |> dispatch_websocket_public rpc_server_family rpc config tx_container backend
+  |> dispatch_websocket_public
+       rpc_server_family
+       rpc
+       config
+       mode
+       tx_container
+       backend
 
 let private_directory ~rpc_server_family mode rpc config
     (tx_container : _ Services_backend_sig.tx_container) backend
@@ -1536,6 +1717,7 @@ let private_directory ~rpc_server_family mode rpc config
        rpc_server_family
        rpc
        config
+       mode
        tx_container
        backend
        ~block_production

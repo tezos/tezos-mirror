@@ -134,6 +134,8 @@ type history_mode =
 (** Returns the mode of the EVM node. *)
 val mode : t -> mode
 
+val can_apply_blueprint : t -> bool
+
 (** Returns the name of the EVM node. *)
 val name : t -> string
 

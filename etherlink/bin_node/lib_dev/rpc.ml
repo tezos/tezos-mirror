@@ -355,9 +355,30 @@ let main ~evm_node_endpoint ?evm_node_private_endpoint
 
   let* () = Prevalidator.start ~chain_family Minimal (module Rpc_backend) in
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
+  let ws_client =
+    match rpc_config.websockets with
+    | None -> None
+    | Some ws ->
+        let monitoring =
+          match ws.monitor_heartbeat with
+          | None -> Websocket_client.{ping_interval = 10.; ping_timeout = 10.}
+          | Some {ping_interval; ping_timeout} ->
+              Websocket_client.{ping_interval; ping_timeout}
+        in
+        let ws_client =
+          Websocket_client.create
+            ~monitoring
+            ~keep_alive:true
+            Media_type.json
+            (Uri.with_path
+               evm_node_endpoint
+               (Uri.path evm_node_endpoint ^ "/ws"))
+        in
+        Some ws_client
+  in
   let* server_public_finalizer =
     Rpc_server.start_public_server
-      ~mode:(Rpc {evm_node_endpoint})
+      ~mode:(Rpc {evm_node_endpoint; websocket = ws_client})
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(evm_services_methods ctxt time_between_blocks)

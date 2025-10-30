@@ -394,7 +394,7 @@ val map_method_name :
 type websocket_subscription = {
   id : Ethereum_types.Subscription.id;
   stream : Subscription.notification Lwt_stream.t;
-  stopper : unit -> unit;
+  stopper : unit -> bool tzresult Lwt.t;
 }
 
 type websocket_response = {

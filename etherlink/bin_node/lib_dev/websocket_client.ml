@@ -30,14 +30,25 @@ module Subscription_table = Hashtbl.Make (struct
   let hash = Hashtbl.hash
 end)
 
-type t = {
+type monitoring = {ping_timeout : float; ping_interval : float}
+
+type conn = {
   media : Media_type.t;
   conn : Websocket_lwt_unix.conn;
   pending_requests : ((JSONRPC.value, exn) result -> unit) Request_table.t;
   subscriptions : (Data_encoding.json option -> unit) Subscription_table.t;
   binary : bool;
-  mutable id : int;
   process : unit Lwt.t;
+}
+
+type t = {
+  media : Media_type.t;
+  monitoring : monitoring option;
+  uri : Uri.t;
+  keep_alive : bool;
+  client_id : int;
+  mutable id : int;
+  mutable current : conn Lwt.t option;
 }
 
 type 'a subscription = {
@@ -349,8 +360,6 @@ let monitor_connection ~ping_timeout ~ping_interval conn monitor_mbox =
   in
   loop ~push:true 0
 
-type monitoring = {ping_timeout : float; ping_interval : float}
-
 let is_tls_service = function "wss" | "https" | "imaps" -> true | _ -> false
 
 let system_service name =
@@ -376,7 +385,7 @@ let resolver =
   let rewrites = [("", Resolver_lwt_unix.system_resolver)] in
   Resolver_lwt.init ~service ~rewrites ()
 
-let connect ?monitoring media uri =
+let connect ?monitoring ?(on_close = Fun.id) media uri =
   let open Lwt_syntax in
   let* endp = Resolver_lwt.resolve_uri ~uri resolver in
   let ctx = Lazy.force Conduit_lwt_unix.default_ctx in
@@ -475,29 +484,81 @@ let connect ?monitoring media uri =
     let rec loop () =
       let* frame = get_frame () in
       match frame with
-      | None -> return_unit
+      | None ->
+          on_close () ;
+          return_unit
       | Some frame ->
           let* () = process_frame frame in
           loop ()
     in
-    let+ () = loop () in
-    Request_table.iter
-      (fun _ callback -> callback (Error Connection_closed))
-      pending_requests ;
-    Subscription_table.iter (fun _ callback -> callback None) subscriptions
+    let* () = loop () in
+    Request_table.to_seq_values pending_requests
+    |> List.of_seq
+    |> List.iter (fun callback -> callback (Error Connection_closed)) ;
+    Subscription_table.to_seq_values subscriptions
+    |> List.of_seq
+    |> List.iter (fun push -> push None) ;
+    Request_table.clear pending_requests ;
+    Subscription_table.clear subscriptions ;
+    return_unit
   in
   return
     {
       media;
       conn;
       process;
-      id = 0;
       binary = is_binary media;
       pending_requests;
       subscriptions;
     }
 
-let disconnect {conn; _} = disconnect conn
+let disconnect client =
+  let open Lwt_syntax in
+  match client.current with
+  | None -> return_unit
+  | Some current ->
+      let* current in
+      disconnect current.conn
+
+let get_conn ({media; monitoring; uri; current; _} as client) =
+  match current with
+  | Some conn -> conn
+  | None ->
+      let conn =
+        connect ?monitoring media uri ~on_close:(fun () ->
+            client.current <- None)
+      in
+      client.current <- Some conn ;
+      conn
+
+let client_id {client_id; _} = client_id
+
+let next_client_id = ref 0
+
+let create ?monitoring ?(keep_alive = true) media uri =
+  incr next_client_id ;
+  let client =
+    {
+      media;
+      monitoring;
+      uri;
+      keep_alive;
+      client_id = !next_client_id;
+      id = 0;
+      current = None;
+    }
+  in
+  let conn =
+    connect ?monitoring media uri ~on_close:(fun () -> client.current <- None)
+  in
+  client.current <- Some conn ;
+  client
+
+let connect client =
+  let open Lwt_result_syntax in
+  protect @@ fun () ->
+  let*! (_ : conn) = get_conn client in
+  return_unit
 
 let simple_write conn opcode content =
   Websocket_lwt_unix.write conn (Websocket.Frame.create ~opcode ~content ())
@@ -535,31 +596,53 @@ let retry_write_until ~timeout ~on_timeout response conn opcode content =
   in
   retry on_timeout
 
-let send_jsonrpc_request client ?timeout (request : JSONRPC.request) =
+let with_reconnect : type a. t -> (conn -> a Lwt.t) -> a Lwt.t =
+ fun client f ->
   let open Lwt_syntax in
-  let message = client.media.construct JSONRPC.request_encoding request in
-  let opcode = if client.binary then Websocket.Frame.Opcode.Binary else Text in
+  let rec retry delay =
+    Lwt.catch
+      (fun () ->
+        let* conn = get_conn client in
+        f conn)
+      (function
+        | Unix.(Unix_error (ECONNREFUSED, _, _))
+        | Connection_closed | Lwt_io.Channel_closed _
+          when client.keep_alive ->
+            client.current <- None ;
+            (* We don't use a custom event here because some tests explicitly
+               look for it. *)
+            let* () = Events.retrying_connect ~endpoint:client.uri ~delay in
+            let* () = Lwt_unix.sleep delay in
+            let delay = delay *. 2. |> min 30. in
+            retry delay
+        | exn ->
+            client.current <- None ;
+            Lwt.reraise exn)
+  in
+  retry 0.5
+
+let send_jsonrpc_request_conn (conn : conn) ?timeout (request : JSONRPC.request)
+    =
+  let open Lwt_syntax in
+  let message = conn.media.construct JSONRPC.request_encoding request in
+  let opcode = if conn.binary then Websocket.Frame.Opcode.Binary else Text in
   let response, resolver = Lwt.task () in
-  Request_table.replace
-    client.pending_requests
-    request.id
-    (Lwt.wakeup_later_result resolver) ;
+  Request_table.replace conn.pending_requests request.id (fun v ->
+      try Lwt.wakeup_later_result resolver v with _ -> ()) ;
   let* response =
     match timeout with
     | None ->
-        let* () = simple_write client.conn opcode message in
+        let* () = simple_write conn.conn opcode message in
         response
     | Some {timeout; on_timeout} ->
-        retry_write_until
-          ~timeout
-          ~on_timeout
-          response
-          client.conn
-          opcode
-          message
+        retry_write_until ~timeout ~on_timeout response conn.conn opcode message
   in
-  Request_table.remove client.pending_requests request.id ;
+  Request_table.remove conn.pending_requests request.id ;
   return response
+
+let send_jsonrpc_request client ?timeout request =
+  with_reconnect client @@ fun conn ->
+  send_jsonrpc_request_conn conn ?timeout request
 
 type (_, _) call =
   | Call :
@@ -567,8 +650,11 @@ type (_, _) call =
       * 'input
       -> ('input, 'output) call
 
-let send_jsonrpc : type input output.
-    t -> ?timeout:timeout -> (input, output) call -> output tzresult Lwt.t =
+let send_jsonrpc' : type input output.
+    t ->
+    ?timeout:timeout ->
+    (input, output) call ->
+    (output * conn) tzresult Lwt.t =
  fun client ?timeout (Call ((module M), input)) ->
   let open Lwt_result_syntax in
   let id = new_id client in
@@ -580,23 +666,31 @@ let send_jsonrpc : type input output.
         id = Some id;
       }
   in
-  let*! response = send_jsonrpc_request client ?timeout request in
+  with_reconnect client @@ fun conn ->
+  let*! response = send_jsonrpc_request_conn conn ?timeout request in
   match response with
   | Error e -> tzfail (Request_failed (request, e))
   | Ok response ->
-      return @@ Data_encoding.Json.destruct M.output_encoding response
+      return (Data_encoding.Json.destruct M.output_encoding response, conn)
+
+let send_jsonrpc client ?timeout call =
+  let open Lwt_result_syntax in
+  let+ res, _conn = send_jsonrpc' client ?timeout call in
+  res
 
 let subscribe' client ?timeout ~output_encoding
     (kind : Ethereum_types.Subscription.kind) =
   let open Lwt_result_syntax in
-  let* subscription_id =
-    send_jsonrpc client ?timeout (Call ((module Subscribe), kind))
+  let* subscription_id, conn =
+    send_jsonrpc' client ?timeout (Call ((module Subscribe), kind))
   in
   let stream, push = Lwt_stream.create () in
   let push x =
     let v =
       match x with
-      | None -> None
+      | None ->
+          Subscription_table.remove conn.subscriptions subscription_id ;
+          None
       | Some x -> (
           try
             Data_encoding.Json.destruct output_encoding x
@@ -612,9 +706,9 @@ let subscribe' client ?timeout ~output_encoding
               (Result_syntax.tzfail
                  (Cannot_destruct (kind, subscription_id, err))))
     in
-    push v
+    try push v with _ -> ()
   in
-  Subscription_table.replace client.subscriptions subscription_id push ;
+  Subscription_table.replace conn.subscriptions subscription_id push ;
   let unsubscribe () =
     let* r =
       send_jsonrpc client (Call ((module Unsubscribe), subscription_id))
