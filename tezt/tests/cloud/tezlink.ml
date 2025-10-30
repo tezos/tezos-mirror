@@ -655,6 +655,12 @@ let add_service cloud ~name ~url =
   let () = toplog "New service: %s: %s" name url in
   Cloud.add_service cloud ~name ~url
 
+let add_proxy_service cloud runner name ?(url = Fun.id) proxy =
+  let endpoint =
+    Client.string_of_endpoint (proxy_external_endpoint ~runner proxy)
+  in
+  add_service cloud ~name ~url:(url endpoint)
+
 type faucet_proxys = {
   tzkt_proxy : proxy_info;
   faucet_api_proxy : proxy_info;
