@@ -540,7 +540,8 @@ module Profile_handlers = struct
           ~attested_level)
 
   let monitor_attestable_slots ctxt pkh () () =
-    let Resto_directory.Answer.{next; shutdown} =
+    let open Lwt_syntax in
+    let* Resto_directory.Answer.{next; shutdown} =
       Attestable_slots.subscribe ctxt ~pkh
     in
     Tezos_rpc.Answer.return_stream {next; shutdown}

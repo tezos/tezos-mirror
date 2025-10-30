@@ -413,6 +413,13 @@ end
 
 module Attestable_slots_watcher_table : sig
   module Attestable_event : sig
+    type backfill_payload = {
+      slot_ids : slot_id list;
+          (** All slots that should be marked attestable for this delegate *)
+      no_shards_attestation_levels : level list;
+          (** All attestation levels where this delegate has no shards *)
+    }
+
     (** DAL attestability items emitted on a per-delegate stream.
       The delegate is implicit, as each stream is bound to a single delegate. *)
     type t =
@@ -422,6 +429,8 @@ module Attestable_slots_watcher_table : sig
           (** the delegate has no assigned shards at [attestation_level] *)
       | Slot_has_trap of {slot_id : slot_id}
           (** the [slot_id] is a trap for the delegate *)
+      | Backfill of {backfill_payload : backfill_payload}
+          (** information about the delegate attestation status from the past *)
 
     val encoding : t Data_encoding.t
   end
@@ -464,6 +473,14 @@ module Attestable_slots_watcher_table : sig
       stream for [pkh], if present. *)
   val notify_slot_has_trap :
     t -> Signature.public_key_hash -> slot_id:slot_id -> unit
+
+  (** [notify_backfill_payload t pkh ~backfill_payload] pushes a [Backfill] event for
+      [~backfill_payload] to the stream for [pkh], if present. *)
+  val notify_backfill_payload :
+    t ->
+    Signature.public_key_hash ->
+    backfill_payload:Attestable_event.backfill_payload ->
+    unit
 
   (** [remove t pkh] removes the watcher entry for [pkh] from [t] if present. *)
   val remove : t -> Signature.public_key_hash -> unit

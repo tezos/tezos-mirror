@@ -39,28 +39,6 @@ let is_attestable_slot_with_traps shards_store traps_fraction pkh
           return_false)
     assigned_shard_indexes
 
-let subscribe ctxt ~pkh =
-  let open Node_context in
-  let module T = Types.Attestable_slots_watcher_table in
-  let proto_params =
-    Result.to_option
-    @@ get_proto_parameters ctxt ~level:(`Level (get_last_finalized_level ctxt))
-  in
-  let attestable_slots_watcher_table =
-    get_attestable_slots_watcher_table ctxt
-  in
-  let watcher = T.get_or_init attestable_slots_watcher_table pkh proto_params in
-  let stream, stopper = Lwt_watcher.create_stream (T.get_stream watcher) in
-  let next () = Lwt_stream.get stream in
-  let shutdown () =
-    (* stop this stream, then possibly remove the whole watcher if last subscriber *)
-    Lwt_watcher.shutdown stopper ;
-    T.set_num_subscribers watcher (T.get_num_subscribers watcher - 1) ;
-    if T.get_num_subscribers watcher <= 0 then
-      T.remove attestable_slots_watcher_table pkh
-  in
-  Resto_directory.Answer.{next; shutdown}
-
 let published_just_before_migration ctxt ~published_level =
   let open Result_syntax in
   let open Node_context in
@@ -188,3 +166,109 @@ let may_notify_not_in_committee ctxt committee ~attestation_level =
           pkh
           ~attestation_level)
     subscribers
+
+(** [get_backfill_payload ctxt ~pkh] computes a compact “backfill” payload for
+    the freshly subscribed delegate [~pkh].
+
+    The payload can be used to pre-populate a structure that requires information from
+    the past of the creation of the stream corresponding to [~pkh] with:
+      - all attestable [slot_id]'s observed in a recent window;
+      - attestation levels where [pkh] has no assigned shards.
+
+    The "backfill" window is calculated in the following way:
+      - Let [L] be the current last-finalized level at subscription time;
+      - `start = max (1, L - attestation_lag + 1)`, as this is the oldest level where
+      slots can be published and attested in the near future;
+      - `stop = L`, as this is the newest level where we did not have time to obtain
+      the information about the published slots. 
+    
+    For each level in [start .. stop] (inclusively), we accumulate the attestation status
+    information about each slot id. *)
+let get_backfill_payload ctxt ~pkh =
+  let open Lwt_result_syntax in
+  let open Node_context in
+  let module E = Types.Attestable_slots_watcher_table.Attestable_event in
+  let last_finalized_level = get_last_finalized_level ctxt in
+  let*? attestation_lag =
+    get_attestation_lag ctxt ~level:last_finalized_level
+  in
+  let published_levels =
+    let count = Int32.(to_int @@ min last_finalized_level attestation_lag) in
+    Stdlib.List.init count (fun i ->
+        Int32.(sub last_finalized_level (of_int i)))
+    |> List.rev
+  in
+  List.fold_left_es
+    (fun acc published_level ->
+      let attestation_level =
+        Int32.(pred (add published_level attestation_lag))
+      in
+      let* committee =
+        Node_context.fetch_committees ctxt ~level:attestation_level
+      in
+      if is_not_in_committee committee ~pkh then
+        (* If not in committee, record and skip per-slot checks. *)
+        return
+          E.
+            {
+              acc with
+              no_shards_attestation_levels =
+                attestation_level :: acc.no_shards_attestation_levels;
+            }
+      else
+        let*? proto_params =
+          get_proto_parameters ctxt ~level:(`Level published_level)
+        in
+        (* Check each slot for attestability. *)
+        let number_of_slots = proto_params.number_of_slots in
+        let slot_indices = Stdlib.List.init number_of_slots Fun.id in
+        List.fold_left_es
+          (fun acc slot_index ->
+            let slot_id =
+              Types.Slot_id.{slot_level = published_level; slot_index}
+            in
+            let* is_attestable_slot_or_trap =
+              is_attestable_slot_or_trap ctxt ~pkh ~slot_id
+            in
+            match is_attestable_slot_or_trap with
+            | Some `Attestable_slot ->
+                return E.{acc with slot_ids = slot_id :: acc.slot_ids}
+            | Some `Trap | None -> return acc)
+          acc
+          slot_indices)
+    {slot_ids = []; no_shards_attestation_levels = []}
+    published_levels
+
+let subscribe ctxt ~pkh =
+  let open Lwt_syntax in
+  let open Node_context in
+  let module T = Types.Attestable_slots_watcher_table in
+  let proto_params =
+    Result.to_option
+    @@ get_proto_parameters ctxt ~level:(`Level (get_last_finalized_level ctxt))
+  in
+  let attestable_slots_watcher_table =
+    get_attestable_slots_watcher_table ctxt
+  in
+  let watcher = T.get_or_init attestable_slots_watcher_table pkh proto_params in
+  let stream, stopper = Lwt_watcher.create_stream (T.get_stream watcher) in
+  let* () =
+    let* backfill_payload = get_backfill_payload ctxt ~pkh in
+    match backfill_payload with
+    | Ok backfill_payload ->
+        T.notify_backfill_payload
+          attestable_slots_watcher_table
+          pkh
+          ~backfill_payload ;
+        return_unit
+    | Error error -> Event.emit_backfill_error ~error
+  in
+  let next () = Lwt_stream.get stream in
+  let shutdown () =
+    (* stop this stream, then possibly remove the whole watcher if last subscriber *)
+    Lwt_watcher.shutdown stopper ;
+    T.set_num_subscribers watcher (T.get_num_subscribers watcher - 1) ;
+    if T.get_num_subscribers watcher <= 0 then
+      T.remove attestable_slots_watcher_table pkh
+  in
+  return Resto_directory.Answer.{next; shutdown}
