@@ -173,6 +173,8 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
        - the [source]
        - the [first_counter]
        - the [length] of the batch
+    To build the blueprint we'll need:
+       - the total [fee]
 *)
 type batch_validation_context = {
   source : public_key_hash;
@@ -185,6 +187,8 @@ type batch_validation_context = {
   error_clue : clue;
   first_counter : Manager_counter.t;
   length : int;
+  fee : Tez.t;
+  gas_limit : Z.t;
 }
 
 let is_tz4 pkh =
@@ -233,15 +237,21 @@ let validate_source ~ctxt second_source =
 
 let validate_balance ~ctxt ~fee =
   let open Lwt_result_syntax in
+  let tezrep_of t =
+    let open Imported_protocol in
+    t |> Tez.to_mutez |> Tez_repr.of_mutez
+    |> Option.value ~default:Tez_repr.zero
+    (* The conversion should not fail so the zero value won't be used *)
+  in
   match Tez.sub_opt ctxt.balance_left fee with
-  | Some balance_left -> return (Ok balance_left)
+  | Some balance_left -> (
+      match Tez.(ctxt.fee +? fee) with
+      | Ok fee -> return (Ok {ctxt with balance_left; fee})
+      | Error _ ->
+          tzfail_p
+          @@ Imported_protocol.Tez_repr.Addition_overflow
+               (tezrep_of ctxt.fee, tezrep_of fee))
   | None ->
-      let tezrep_of t =
-        let open Imported_protocol in
-        t |> Tez.to_mutez |> Tez_repr.of_mutez
-        |> Option.value ~default:Tez_repr.zero
-        (* The conversion should not fail so the zero value won't be used *)
-      in
       tzfail_p
       @@ Imported_protocol.Contract_storage.(
            Balance_too_low
@@ -262,15 +272,15 @@ let validate_counter ~ctxt counter =
            construction *)
         failwith "unreachable"
 
+let hard_gas_limit_per_operation =
+  Tezos_types.Operation.gas_limit_to_z
+    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
+
 let validate_gas_limit gas_limit =
   let open Lwt_result_syntax in
-  (* TODO check gas limit high enough *)
-  let hard_gas_limit_per_operation =
-    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_operation
-  in
-  match Gas.check_gas_limit ~hard_gas_limit_per_operation ~gas_limit with
-  | Ok () -> return (Ok ())
-  | Error _ -> tzfail_p @@ Imported_protocol.Gas_limit_repr.Gas_limit_too_high
+  if Z.Compare.(hard_gas_limit_per_operation > gas_limit && gas_limit >= Z.zero)
+  then return (Ok ())
+  else tzfail_p @@ Imported_protocol.Gas_limit_repr.Gas_limit_too_high
 
 let validate_operation_in_batch ~(ctxt : batch_validation_context)
     (Contents operation : packed_contents) =
@@ -284,9 +294,13 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       let** () = validate_supported_operation ~ctxt operation in
       let** () = validate_source ~ctxt source in
       let** () = validate_counter ~ctxt counter in
-      let** () = validate_gas_limit gas_limit in
+      (* TODO check gas limit high enough *)
+      let overall_gas_limit =
+        Z.(ctxt.gas_limit + Tezos_types.Operation.gas_limit_to_z gas_limit)
+      in
+      let** () = validate_gas_limit overall_gas_limit in
       (* TODO check storage limit too *)
-      let** balance_left = validate_balance ~ctxt ~fee in
+      let** ctxt = validate_balance ~ctxt ~fee in
       (* the update will be updated during the validation steps *)
       return
         (Ok
@@ -295,7 +309,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
              previous_counter = Some ctxt.next_counter;
              next_counter = Manager_counter.succ ctxt.next_counter;
              length = ctxt.length + 1;
-             balance_left;
+             gas_limit = overall_gas_limit;
            })
   | _ -> tzfail @@ Not_a_manager_operation ctxt.error_clue
 
@@ -423,6 +437,8 @@ let validate_tezlink_operation ?(check_signature = true) ~read raw =
           error_clue;
           first_counter;
           length = 0;
+          fee = Tez.zero;
+          gas_limit = Z.zero;
         }
       (first :: rest)
   in
@@ -435,8 +451,97 @@ let validate_tezlink_operation ?(check_signature = true) ~read raw =
       signature
   in
   let*? first_counter = Tezos_types.Operation.counter_to_z ctxt.first_counter in
-  let operation =
+  let operation : Tezos_types.Operation.t =
     Tezos_types.Operation.
-      {length = ctxt.length; source = ctxt.source; raw; op; first_counter}
+      {
+        length = ctxt.length;
+        source = ctxt.source;
+        raw;
+        op;
+        first_counter;
+        fee = ctxt.fee;
+        gas_limit = ctxt.gas_limit;
+      }
   in
   return (Ok operation)
+
+type config = {
+  get_balance : Tezos_types.Contract.t -> Z.t tzresult Lwt.t;
+  get_counter : Tezos_types.Contract.t -> Z.t tzresult Lwt.t;
+}
+
+(* TODO: merge with Prevalidator.validation_state *)
+type blueprint_validation_state = {
+  michelson_config : config;
+  addr_balance : Z.t String.Map.t;
+  addr_nonce : Z.t String.Map.t;
+  gas : Z.t;
+}
+
+let init_blueprint_validation read () =
+  let get_counter = Tezlink_durable_storage.counter read in
+  let get_balance = Tezlink_durable_storage.balance_z read in
+  let michelson_config = {get_balance; get_counter} in
+  {
+    michelson_config;
+    addr_nonce = String.Map.empty;
+    addr_balance = String.Map.empty;
+    gas = Z.zero;
+  }
+
+let maximum_gas_per_block =
+  Tezos_types.Operation.gas_limit_to_z
+    Tezlink_constants.all_constants.parametric.hard_gas_limit_per_block
+
+let could_fit state (operation : Tezos_types.Operation.t) =
+  Z.(state.gas + operation.gas_limit <= maximum_gas_per_block)
+
+let add_ source = String.Map.add (Signature.Public_key_hash.to_b58check source)
+
+let get_ read cache source =
+  let open Lwt_result_syntax in
+  match
+    String.Map.find (Signature.Public_key_hash.to_b58check source) cache
+  with
+  | Some v -> return v
+  | None -> read (Tezlink_imports.Alpha_context.Contract.Implicit source)
+
+let validate_for_blueprint state (operation : Tezos_types.Operation.t) =
+  let open Lwt_result_syntax in
+  let* counter =
+    get_ state.michelson_config.get_counter state.addr_nonce operation.source
+  in
+  let** new_counter =
+    if not Z.(equal (succ counter) operation.first_counter) then
+      return
+      @@ Error
+           (Format.asprintf
+              "Operation counter %a does not follow the current counter %a"
+              Z.pp_print
+              operation.first_counter
+              Z.pp_print
+              counter)
+    else return @@ Ok Z.(add counter (Z.of_int operation.length))
+  in
+  let* balance =
+    get_ state.michelson_config.get_balance state.addr_balance operation.source
+  in
+  let** new_balance =
+    let new_balance = Z.(balance - Tezos_types.Tez.to_mutez_z operation.fee) in
+    if new_balance >= Z.zero then return @@ Ok new_balance
+    else
+      return
+      @@ Error
+           (Format.asprintf
+              "Not enough funds to pay the fees %a"
+              Tez.pp
+              operation.fee)
+  in
+  return
+    (Ok
+       {
+         state with
+         addr_nonce = add_ operation.source new_counter state.addr_nonce;
+         addr_balance = add_ operation.source new_balance state.addr_balance;
+         gas = Z.(state.gas + operation.gas_limit);
+       })

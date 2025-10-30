@@ -66,6 +66,18 @@ module Contract = struct
     Data_encoding.Binary.of_bytes_opt implicit_encoding bytes
 end
 
+module Tez = struct
+  include Tezlink_imports.Alpha_context.Tez
+
+  let of_string_exn str =
+    match of_string str with
+    | None ->
+        raise (Invalid_argument (Printf.sprintf "Invalid tez value: %s" str))
+    | Some s -> s
+
+  let to_mutez_z t = t |> to_mutez |> Z.of_int64
+end
+
 module Operation = struct
   module ImportedOperation = Tezlink_imports.Alpha_context.Operation
 
@@ -75,6 +87,8 @@ module Operation = struct
     length : int;
     op : Tezlink_imports.Alpha_context.packed_operation;
     raw : bytes;
+    fee : Tez.t;
+    gas_limit : Z.t;
   }
 
   let counter_to_z counter =
@@ -84,34 +98,81 @@ module Operation = struct
       ~src:Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
       counter
 
+  let gas_limit_to_z = Tezlink_imports.Alpha_context.Gas.Arith.integral_to_z
+
   let encoding : t Data_encoding.t =
     let open Data_encoding in
     conv
-      (fun {source; first_counter; length; op; raw} ->
-        (source, first_counter, length, op, raw))
-      (fun (source, first_counter, length, op, raw) ->
-        {source; first_counter; length; op; raw})
-      (tup5
+      (fun {source; first_counter; length; op; raw; fee; gas_limit} ->
+        (source, first_counter, length, op, raw, fee, gas_limit))
+      (fun (source, first_counter, length, op, raw, fee, gas_limit) ->
+        {source; first_counter; length; op; raw; fee; gas_limit})
+      (tup7
          Signature.Public_key_hash.encoding
          z
          int31
          (dynamic_size Tezlink_imports.Alpha_context.Operation.encoding)
-         bytes)
+         bytes
+         Tez.encoding
+         z)
 
-  let hash_operation {source = _; first_counter = _; length = _; op; raw = _} =
+  let hash_operation
+      {
+        source = _;
+        first_counter = _;
+        length = _;
+        op;
+        raw = _;
+        fee = _;
+        gas_limit = _;
+      } =
     let hash = ImportedOperation.hash_packed op in
     let (`Hex hex) = Operation_hash.to_hex hash in
     Ethereum_types.Hash (Ethereum_types.Hex hex)
-end
 
-module Tez = struct
-  include Tezlink_imports.Alpha_context.Tez
+  let minimum_operation =
+    let open Tezlink_imports.Alpha_context in
+    let open Tezlink_imports.Alpha_context.Operation in
+    let open Tezlink_imports.Imported_env in
+    let shell : Operation.shell_header =
+      {branch = Tezos_crypto.Hashed.Block_hash.zero}
+    in
+    let signature = Some Signature.zero in
+    let source = Signature.Public_key_hash.zero in
+    let protocol_data : packed_protocol_data =
+      Operation_data
+        {
+          contents =
+            Single
+              (Manager_operation
+                 {
+                   source;
+                   fee = Tez.zero;
+                   counter = Manager_counter.Internal_for_tests.of_int 0;
+                   gas_limit = Gas.Arith.zero;
+                   storage_limit = Z.zero;
+                   operation =
+                     Reveal
+                       {
+                         public_key =
+                           Signature.Public_key.of_b58check_exn
+                             "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2";
+                         proof = None;
+                       };
+                 });
+          signature;
+        }
+    in
+    let op : packed_operation = {shell; protocol_data} in
+    op
 
-  let of_string_exn str =
-    match of_string str with
-    | None ->
-        raise (Invalid_argument (Printf.sprintf "Invalid tez value: %s" str))
-    | Some s -> s
+  let minimum_operation_size =
+    let raw =
+      Data_encoding.Binary.to_bytes_exn
+        Tezlink_imports.Alpha_context.Operation.encoding
+        minimum_operation
+    in
+    Bytes.length raw
 end
 
 module Manager = Tezlink_imports.Imported_protocol.Manager_repr

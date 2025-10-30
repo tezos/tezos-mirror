@@ -1999,6 +1999,8 @@ let test_tezlink_prevalidation =
       client_tezlink
   in
 
+  let hard_gas_limit_per_operation = 1_040_000 in
+
   (* case wrong gas limit *)
   let gas_limit_too_high_rex =
     rex "A transaction tried to exceed the hard limit on gas"
@@ -2009,7 +2011,7 @@ let test_tezlink_prevalidation =
         [
           make
             ~fee:1000
-            ~gas_limit:Int32.(max_int |> Int32.to_int)
+            ~gas_limit:(hard_gas_limit_per_operation + 1)
             ~counter:2
             ~source:Constant.bootstrap1
             (transfer ());
@@ -2040,6 +2042,268 @@ let test_tezlink_prevalidation =
       op_not_supported
       client_tezlink
   in
+
+  (* case gas limit of batch too high*)
+  let not_quite_too_high = hard_gas_limit_per_operation - 1000 in
+  let* op_wrong_gas_limit2 =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~gas_limit:not_quite_too_high
+            ~counter:2
+            ~source:Constant.bootstrap1
+            (transfer ());
+          make
+            ~fee:1000
+            ~gas_limit:not_quite_too_high
+            ~counter:3
+            ~source:Constant.bootstrap1
+            (transfer ());
+        ]
+        client)
+  in
+  let* _ =
+    Operation.inject
+      ~error:gas_limit_too_high_rex
+      ~dont_wait:true
+      op_wrong_gas_limit2
+      client_tezlink
+  in
+
+  unit
+
+let test_tezlink_validation_gas_limit =
+  register_tezlink_test
+    ~title:"Test Tezlink validation of block gas limit"
+    ~tags:["kernel"; "validation"; "gas_limit"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+    ~time_between_blocks:Evm_node.Nothing
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client_tezlink = Client.init ~endpoint () in
+  let hard_gas_limit_per_block = 1_386_666 in
+
+  (* make sure there are no transactions in the queue *)
+  let* () = produce_block_and_wait_for ~sequencer 1 in
+  let* () = produce_block_and_wait_for ~sequencer 2 in
+
+  let almost_half_block = (hard_gas_limit_per_block / 2) - 1 in
+
+  (* Sanity check: can fit two op in a blueprint *)
+  let* (`OpHash op1) =
+    Operation.inject_transfer
+      ~counter:1
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      ~gas_limit:almost_half_block
+      client_tezlink
+  in
+  let* (`OpHash op2) =
+    Operation.inject_transfer
+      ~counter:2
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      ~gas_limit:almost_half_block
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () =
+    check_operations ~client:client_tezlink ~block:"3" ~expected:[op1; op2]
+  in
+
+  (* check: with just a bit more gas_limit two op don't fit in a blueprint *)
+  let* (`OpHash op3) =
+    Operation.inject_transfer
+      ~counter:3
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      ~gas_limit:(almost_half_block + 100)
+      client_tezlink
+  in
+  let* (`OpHash op4) =
+    Operation.inject_transfer
+      ~counter:4
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      ~gas_limit:(almost_half_block + 100)
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 4 in
+  let* () = produce_block_and_wait_for ~sequencer 5 in
+  let* () =
+    check_operations ~client:client_tezlink ~block:"4" ~expected:[op3]
+  in
+  let* () =
+    check_operations ~client:client_tezlink ~block:"5" ~expected:[op4]
+  in
+  unit
+
+let test_tezlink_validation_counter =
+  register_tezlink_test
+    ~title:"Test Tezlink validation of counters"
+    ~tags:["kernel"; "validation"; "counter"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+    ~time_between_blocks:Evm_node.Nothing
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client_tezlink = Client.init ~endpoint () in
+
+  (* make sure there are no transactions in the queue *)
+  let* () = produce_block_and_wait_for ~sequencer 1 in
+  let* () = produce_block_and_wait_for ~sequencer 2 in
+  let* (`OpHash op1) =
+    Operation.inject_transfer
+      ~counter:1
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      client_tezlink
+  in
+  let* (`OpHash op2) =
+    Operation.inject_transfer
+      ~counter:2
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      client_tezlink
+  in
+  let* (`OpHash _) =
+    Operation.inject_transfer
+      ~counter:2
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      client_tezlink
+  in
+  let* (`OpHash op3) =
+    Operation.inject_transfer
+      ~counter:1
+      ~source:Constant.bootstrap2
+      ~dest:Constant.bootstrap1
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () =
+    check_operations ~client:client_tezlink ~block:"3" ~expected:[op1; op2; op3]
+  in
+  unit
+
+let test_tezlink_validation_balance =
+  register_tezlink_test
+    ~title:"Test Tezlink validation of balance"
+    ~tags:["kernel"; "validation"; "balance"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+    ~time_between_blocks:Evm_node.Nothing
+  @@ fun {sequencer; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* client_tezlink = Client.init ~endpoint () in
+  let new_account = Constant.bootstrap3 in
+
+  (* make sure there are no transactions in the queue *)
+  let* () = produce_block_and_wait_for ~sequencer 1 in
+  let* () = produce_block_and_wait_for ~sequencer 2 in
+
+  (* setup *)
+  let amount = 100_000_000 in
+  let* _ =
+    Operation.inject_transfer
+      ~counter:1
+      ~source:Constant.bootstrap1
+      ~dest:new_account
+      ~amount
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* reveal =
+    Operation.Manager.(
+      operation [make ~fee:1000 ~source:new_account (reveal new_account ())])
+      client_tezlink
+  in
+  let* (`OpHash op_reveal) =
+    Operation.inject ~dont_wait:true reveal client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 4 in
+  let* () =
+    check_operations ~client:client_tezlink ~block:"4" ~expected:[op_reveal]
+  in
+
+  (* sanity check *)
+  let* balance =
+    Client.get_balance_for ~account:new_account.alias client_tezlink
+  in
+  Check.(
+    (balance > Tez.zero)
+      Tez.typ
+      ~error_msg:
+        (sf
+           "Expected %s to have some funds but got %%L"
+           new_account.public_key_hash)) ;
+
+  (* test that amount isn't taken into account for insertion *)
+  let* (`OpHash big_transfer) =
+    Operation.inject_transfer
+      ~counter:2
+      ~source:new_account
+      ~dest:Constant.bootstrap2
+      ~amount:(amount + 10)
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 5 in
+  (* big transfer should go in but fail *)
+  let* () =
+    check_operations ~client:client_tezlink ~block:"5" ~expected:[big_transfer]
+  in
+  let* receipt =
+    Client.get_receipt_for ~operation:big_transfer client_tezlink
+  in
+  Check.(
+    (receipt =~ rex ".*This operation FAILED.*")
+      ~error_msg:"Operation should have failed. Receipt was %L") ;
+
+  (* test that balance is checked against fees:
+     - first should be included, not second *)
+  let half_amount = amount / 2 in
+
+  let* (`OpHash big_but_in) =
+    Operation.inject_transfer
+      ~counter:3
+      ~source:new_account
+      ~dest:Constant.bootstrap2
+      ~fee:half_amount
+      client_tezlink
+  in
+
+  (* Following transfer won't be in the block because the previous transactions
+     will decrease the balance too much, but should still be injected as on it's
+     own it's valid. It's be rejected before the blueprint is produced. *)
+  let* (`OpHash _out) =
+    Operation.inject_transfer
+      ~counter:4
+      ~source:new_account
+      ~dest:Constant.bootstrap2
+      ~fee:half_amount
+      client_tezlink
+  in
+  let* () = produce_block_and_wait_for ~sequencer 6 in
+  let* () =
+    check_operations ~client:client_tezlink ~block:"6" ~expected:[big_but_in]
+  in
+  let* () = produce_block_and_wait_for ~sequencer 7 in
+  let* () = check_operations ~client:client_tezlink ~block:"7" ~expected:[] in
   unit
 
 let () =
@@ -2081,5 +2345,8 @@ let () =
   test_tezlink_internal_operation [Alpha] ;
   test_tezlink_internal_receipts [Alpha] ;
   test_tezlink_prevalidation [Alpha] ;
+  test_tezlink_validation_gas_limit [Alpha] ;
+  test_tezlink_validation_counter [Alpha] ;
+  test_tezlink_validation_balance [Alpha] ;
   test_tezlink_origination [Alpha] ;
   test_tezlink_forge_operations [Alpha]
