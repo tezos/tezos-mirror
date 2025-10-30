@@ -45,6 +45,21 @@ of blocks. This means that the actual duration of the maximal allowed
 period of withdrawal has decreased from ~14 days in protocol Seoul to
 ~10 days in protocol T024.
 
+Consensus changes
+^^^^^^^^^^^^^^^^^
+
+With the All Bakers Attest feature implemented in protocol T024 comes changes to
+the consensus. Most of these changes will take effect only when the feature activates,
+but in some cases, the format of operations or RPCs have been updated to include
+more information.
+
+In particular, the attestation and preattestation receipts metadata have been updated.
+The ``consensus_power`` field is now divided in two parts: an integer field ``slots``,
+which corresponds to the number of slots attributed to the delegate, and represents
+its consensus power until "All Bakers Attest" activates, and a string field
+``stake`` parsed as an int64, which is the staking power of the delegate, and represents its consensus power
+once All Bakers Attest activates.
+
 
 Breaking changes to RPCs
 ^^^^^^^^^^^^^^^^^^^^^^^^
