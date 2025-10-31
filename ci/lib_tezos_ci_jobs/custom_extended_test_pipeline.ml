@@ -18,7 +18,7 @@
    See [ci/bin/main.ml] for the list of custom extended test pipelines. *)
 
 open Tezos_ci
-open Common
+open Common.Build
 
 (* The build_x86_64 jobs are split in two to keep the artifact size
    under the 1GB hard limit set by GitLab. *)

@@ -16,6 +16,7 @@ open Gitlab_ci.Util
 open Tezos_ci
 open Tezos_ci.Cache
 open Common
+open Common.Helpers
 
 let build_debian_packages_image =
   Image.mk_external

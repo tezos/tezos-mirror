@@ -17,6 +17,7 @@
 
 open Tezos_ci
 open Tezos_ci.Cache
+open Common.Build
 open Common
 
 (** Type of release tag pipelines.

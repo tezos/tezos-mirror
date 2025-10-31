@@ -12,6 +12,7 @@
 
 open Gitlab_ci.Types
 open Tezos_ci
+open Common.Helpers
 open Common
 
 (* This is a dynamic image declaration that is going to be instantiated using

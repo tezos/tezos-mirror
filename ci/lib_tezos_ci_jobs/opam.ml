@@ -27,7 +27,7 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 open Tezos_ci.Cache
-open Common
+open Common.Helpers
 
 (** Opam package group.
 
