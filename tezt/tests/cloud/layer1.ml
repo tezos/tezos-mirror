@@ -1315,8 +1315,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
       in
       let now = Ptime_clock.now () in
       let offset =
-        Ptime.(to_float_s timestamp -. to_float_s now)
-        |> truncate |> string_of_int
+        Ptime.(to_float_s timestamp -. to_float_s now) |> truncate |> sf "%+d"
       in
       Lwt_list.iter_s
         (fun agent -> Tezt_cloud.Cloud.set_faketime agent offset)
