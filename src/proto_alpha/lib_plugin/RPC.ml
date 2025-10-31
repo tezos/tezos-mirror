@@ -4283,6 +4283,15 @@ module S = struct
       ~query:cycle_query
       ~output:Data_encoding.(string Plain)
       RPC_path.(path / "tz4_baker_number_ratio")
+
+  let abaab_activation_level =
+    RPC_service.get_service
+      ~description:
+        "Returns the activation level of All Bakers Attest. If the level is \
+         not set, returns `null`."
+      ~query:RPC_query.empty
+      ~output:Data_encoding.(option Level_repr.encoding)
+      RPC_path.(path / "all_bakers_attest_activation_level")
 end
 
 type Environment.Error_monad.error += Negative_level_offset
@@ -4376,7 +4385,13 @@ let register () =
       let whole_part, rest = Z.(div_rem num den) in
       let decimals = Z.(div (mul rest (of_int 100)) den) in
       return
-      @@ Format.asprintf "%d.%02d%%" (Z.to_int whole_part) (Z.to_int decimals))
+      @@ Format.asprintf "%d.%02d%%" (Z.to_int whole_part) (Z.to_int decimals)) ;
+  Registration.register0
+    ~chunked:false
+    S.abaab_activation_level
+    (fun ctxt () () ->
+      Storage.All_bakers_attest_activation.find
+        (Alpha_context.Internal_for_tests.to_raw ctxt))
 
 let current_level ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.current_level ctxt block {offset} ()
