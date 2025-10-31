@@ -113,6 +113,9 @@ Smart Rollup node
 - Reduce number of RPCs to L1 node by fetching chain id on startup. (MR
   :gl:`!19788`)
 
+- The rollup node now properly supports DAL on Shadownet. (MRs :gl:`!19765`,
+  :gl:`!19809`)
+
 Smart Rollup WASM Debugger
 --------------------------
 

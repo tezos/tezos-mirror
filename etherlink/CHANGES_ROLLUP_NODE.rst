@@ -3,6 +3,34 @@
 Changelog Smart Rollup Node
 '''''''''''''''''''''''''''
 
+Version 20251031 (2025-10-31) 🎃
+================================
+
+- Update opentelemetry library to 0.12 which should fix the issue where a log
+  protobuf encoding crashes the node when telemetry is activated. (MR
+  :gl:`!19516`)
+
+- Ensure metrics are initialized before starting metrics server. (MR
+  :gl:`!19707`)
+
+- Allow to only monitor finalized L1 blocks with CLI switch
+  ``--l1-monitor-finalized``. This allows a more efficient processing when the
+  consumer is only interested in finalized blocks. (MR :gl:`!19568`)
+
+- New RPC **GET** ``/global/monitor_finalized_blocks`` to stream only finalized
+  blocks (similarly to ``/global/monitor_blocks``). (MR :gl:`!19568`)
+
+- Fix streaming RPC ``/global/monitor_blocks``
+  (resp. ``/global/monitor_finalized_blocks``) which could return an empty body
+  if they were called before the first (resp. finalized) block is produced. (MR
+  :gl:`!19569`)
+
+- Reduce number of RPCs to L1 node by fetching chain id on startup. (MR
+  :gl:`!19788`)
+
+- The rollup node now properly supports DAL on Shadownet. (MRs :gl:`!19765`,
+  :gl:`!19809`)
+
 Version 20250911 (2025-09-11)
 =============================
 
