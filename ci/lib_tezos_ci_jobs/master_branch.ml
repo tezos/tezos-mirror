@@ -15,8 +15,8 @@
    - static binaries, and
    - documentation. *)
 
-open Common
 open Common.Build
+open Common.Docker
 open Gitlab_ci
 open Gitlab_ci.Util
 open Tezos_ci

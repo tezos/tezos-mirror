@@ -389,7 +389,8 @@ module Build = struct
     |> enable_cargo_cache |> enable_sccache
 end
 
-(** Type of Docker build jobs.
+module Docker = struct
+  (** Type of Docker build jobs.
 
     The semantics of the type is summed up in this table:
 
@@ -410,31 +411,31 @@ end
     - [Test_manual] Docker builds are started manually, put in the stage
       [manual] and their failure is allowed. The other types are in the build
       stage, run [on_success] and are not allowed to fail. *)
-type docker_build_type =
-  | Experimental
-  | Release
-  | Octez_evm_node_release
-  | Test
-  | Test_manual
+  type docker_build_type =
+    | Experimental
+    | Release
+    | Octez_evm_node_release
+    | Test
+    | Test_manual
 
-(** Creates a Docker build job of the given [arch] and [docker_build_type]. *)
-let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?storage
-    docker_build_type : tezos_job =
-  let arch_string = Runner.Arch.show_uniform arch in
-  let ci_docker_hub =
-    match docker_build_type with
-    | Release | Octez_evm_node_release | Experimental -> true
-    | Test | Test_manual -> false
-  in
-  (* Whether to include evm artifacts.
+  (** Creates a Docker build job of the given [arch] and [docker_build_type]. *)
+  let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?storage
+      docker_build_type : tezos_job =
+    let arch_string = Runner.Arch.show_uniform arch in
+    let ci_docker_hub =
+      match docker_build_type with
+      | Release | Octez_evm_node_release | Experimental -> true
+      | Test | Test_manual -> false
+    in
+    (* Whether to include evm artifacts.
      Including these artifacts requires the rust-toolchain image. *)
-  let with_evm_artifacts =
-    match (arch, docker_build_type) with
-    | Amd64, (Test_manual | Experimental) -> true
-    | _ -> false
-  in
-  let image_dependencies =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7293
+    let with_evm_artifacts =
+      match (arch, docker_build_type) with
+      | Amd64, (Test_manual | Experimental) -> true
+      | _ -> false
+    in
+    let image_dependencies =
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7293
 
        In reality, we actually require both
        {!Images.CI.runtime} and
@@ -442,68 +443,69 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?storage
        created by the same job, and depending on them both will create
        a duplicated dependency on that single job, which GitLab CI
        does not allow. This should be somehow handled by CIAO. *)
-    [Images.CI.runtime]
-    @ if with_evm_artifacts then [Images.rust_toolchain] else []
-  in
-  let variables =
-    [
-      ( "DOCKER_BUILD_TARGET",
-        if with_evm_artifacts then "with-evm-artifacts"
-        else "without-evm-artifacts" );
-      ("IMAGE_ARCH_PREFIX", arch_string ^ "_");
-      ( "EXECUTABLE_FILES",
-        match docker_build_type with
-        | Release -> "script-inputs/released-executables"
-        | Octez_evm_node_release -> "script-inputs/octez-evm-node-executable"
-        | Test | Test_manual | Experimental ->
-            "script-inputs/released-executables \
-             script-inputs/experimental-executables" );
-    ]
-  in
-  let stage =
-    match docker_build_type with
-    | Test_manual -> Stages.manual
-    | _ -> Stages.build
-  in
-  let name = "oc.docker:" ^ arch_string in
-  job_docker_authenticated
-    ?rules
-    ?dependencies
-    ~image_dependencies
-    ~ci_docker_hub
-    ~__POS__
-    ~stage
-    ~arch
-    ?storage
-    ~name
-    ~variables
-    ["./scripts/ci/docker_release.sh"]
+      [Images.CI.runtime]
+      @ if with_evm_artifacts then [Images.rust_toolchain] else []
+    in
+    let variables =
+      [
+        ( "DOCKER_BUILD_TARGET",
+          if with_evm_artifacts then "with-evm-artifacts"
+          else "without-evm-artifacts" );
+        ("IMAGE_ARCH_PREFIX", arch_string ^ "_");
+        ( "EXECUTABLE_FILES",
+          match docker_build_type with
+          | Release -> "script-inputs/released-executables"
+          | Octez_evm_node_release -> "script-inputs/octez-evm-node-executable"
+          | Test | Test_manual | Experimental ->
+              "script-inputs/released-executables \
+               script-inputs/experimental-executables" );
+      ]
+    in
+    let stage =
+      match docker_build_type with
+      | Test_manual -> Stages.manual
+      | _ -> Stages.build
+    in
+    let name = "oc.docker:" ^ arch_string in
+    job_docker_authenticated
+      ?rules
+      ?dependencies
+      ~image_dependencies
+      ~ci_docker_hub
+      ~__POS__
+      ~stage
+      ~arch
+      ?storage
+      ~name
+      ~variables
+      ["./scripts/ci/docker_release.sh"]
 
-let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
-    ~job_docker_arm64 : tezos_job =
-  job_docker_authenticated
-    ~__POS__
-    ~stage:Stages.publish
-    ~name:"docker:merge_manifests"
-    ~tag:Gcp_not_interruptible
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-      (* This job merges the images produced in the jobs
+  let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
+      ~job_docker_arm64 : tezos_job =
+    job_docker_authenticated
+      ~__POS__
+      ~stage:Stages.publish
+      ~name:"docker:merge_manifests"
+      ~tag:Gcp_not_interruptible
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+        (* This job merges the images produced in the jobs
          [docker:{amd64,arm64}] into a single multi-architecture image, and
          so must be run after these jobs. *)
-    ~dependencies:(Dependent [Job job_docker_amd64; Job job_docker_arm64])
-    ~ci_docker_hub
-    ["./scripts/ci/docker_merge_manifests.sh"]
+      ~dependencies:(Dependent [Job job_docker_amd64; Job job_docker_arm64])
+      ~ci_docker_hub
+      ["./scripts/ci/docker_merge_manifests.sh"]
 
-let job_docker_promote_to_latest ?dependencies ~ci_docker_hub () : tezos_job =
-  job_docker_authenticated
-    ~__POS__
-    ?dependencies
-    ~stage:Stages.publish
-    ~name:"docker:promote_to_latest"
-    ~ci_docker_hub
-    ["./scripts/ci/docker_promote_to_latest.sh"]
-    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-    ~tag:Gcp_not_interruptible
+  let job_docker_promote_to_latest ?dependencies ~ci_docker_hub () : tezos_job =
+    job_docker_authenticated
+      ~__POS__
+      ?dependencies
+      ~stage:Stages.publish
+      ~name:"docker:promote_to_latest"
+      ~ci_docker_hub
+      ["./scripts/ci/docker_promote_to_latest.sh"]
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~tag:Gcp_not_interruptible
+end
 
 type bin_package_target = Rpm
 
