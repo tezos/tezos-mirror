@@ -295,7 +295,8 @@ type lwt_stream_iter_with_timeout_ended = Closed | Timeout of float
 
 let timeout_factor = 10.
 
-let get_chain_id t = Tezos_shell_services.Chain_services.chain_id t.cctxt ()
+let get_chain_id t =
+  Tezos_shell_services.Chain_services.chain_id t.cctxt ~chain:t.chain ()
 
 (** This function is similar to {!Lwt_stream.iter_s} excepted that it resolves
     with {!Get_timeout} if waiting for the next element takes more than some
