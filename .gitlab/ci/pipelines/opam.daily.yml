@@ -139,7 +139,6 @@ opam:all_6:
     paths:
     - opam_logs/
     when: always
-  retry: 2
   parallel:
     matrix:
     - package:
@@ -213,7 +212,6 @@ opam:exec_6:
     paths:
     - opam_logs/
     when: always
-  retry: 2
   parallel:
     matrix:
     - package:
@@ -274,7 +272,6 @@ opam:all_2:
     paths:
     - opam_logs/
     when: always
-  retry: 2
   parallel:
     matrix:
     - package:
@@ -350,7 +347,6 @@ opam:all_1:
     paths:
     - opam_logs/
     when: always
-  retry: 2
   parallel:
     matrix:
     - package:
@@ -417,7 +413,6 @@ opam:all_3:
     paths:
     - opam_logs/
     when: always
-  retry: 2
   parallel:
     matrix:
     - package:
@@ -493,7 +488,6 @@ opam:exec_4:
     paths:
     - opam_logs/
     when: always
-  retry: 2
   parallel:
     matrix:
     - package:
@@ -553,7 +547,6 @@ opam:all_4:
     paths:
     - opam_logs/
     when: always
-  retry: 2
   parallel:
     matrix:
     - package:
@@ -628,7 +621,6 @@ opam:exec_1:
     paths:
     - opam_logs/
     when: always
-  retry: 2
   parallel:
     matrix:
     - package:
@@ -696,7 +688,6 @@ opam:all_5:
     paths:
     - opam_logs/
     when: always
-  retry: 2
   parallel:
     matrix:
     - package:
@@ -772,7 +763,6 @@ opam:all_7:
     paths:
     - opam_logs/
     when: always
-  retry: 2
   parallel:
     matrix:
     - package:
