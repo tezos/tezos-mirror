@@ -36,13 +36,16 @@ type dal_parameters = {
 (** DAL page selector and payload-forging strategy.
 
     Optional fields act as wildcards:
-    - [None] means "match any value" for that dimension.
-      Example:
-        { published_level = None; slot_index = Some 3; page_index = None; _ }
+    - [None] means "match any value" for that dimension. Example:
+
+        { inbox_level = None; published_level = None; slot_index = Some 3;
+        page_index = None; _ }
+
       matches every page of slot index 3 at any level.
 
     Fields:
-    - [published_level]: L1 level at which the slot was published (or [None]).
+    - [inbox_level]: L1 level at which the slot is being imported (or [None]).
+    - [published_level]: L1 level at which the slot was supposed to be published (or [None]).
     - [slot_index]: Index of the target slot at that level (or [None]).
     - [page_index]: Index of the target page within the slot (or [None]).
     - [page_payload_strategy]: How the faulty/losing node derives the payload
@@ -52,6 +55,7 @@ type dal_parameters = {
         - [`Flip]: Toggle presence: [None] -> [Some bytes],
                    [Some _] -> [None]. *)
 type dal_page = {
+  inbox_level : int32 option;
   published_level : int32 option;
   slot_index : int option;
   page_index : int option;
@@ -81,10 +85,11 @@ val is_invalid_dal_parameters : t -> dal_parameters option
 
 (** Decide whether to corrupt a DAL page and, if so, how.
 
-    Given the current [published_level], [slot_index], [page_index], [page_size],
-    the honest page payload ([honest_payload]), and a failure plan [t], this
-    function checks whether an [Invalid_dal_page] rule matches (wildcards allowed
-    via [None] in the rule). If no rule applies, returns [Either.left ()].
+    Given the current [inbox_level], [published_level], [slot_index],
+    [page_index], [page_size], the honest page payload ([honest_payload]), and a
+    failure plan [t], this function checks whether an [Invalid_dal_page] rule
+    matches (wildcards allowed via [None] in the rule). If no rule applies,
+    returns [Either.left ()].
 
     If a rule applies, returns [Either.right forged]:
     - [forged = None]    -> payload is removed (flip from [Some _] to [None]).
@@ -92,6 +97,7 @@ val is_invalid_dal_parameters : t -> dal_parameters option
 
     See {!dal_page} above for forge strategies. *)
 val is_invalid_dal_page :
+  inbox_level:int32 ->
   published_level:int32 ->
   slot_index:int ->
   page_index:int ->

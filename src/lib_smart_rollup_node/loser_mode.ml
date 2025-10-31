@@ -29,22 +29,25 @@ module Event = struct
   let section = ["smart_rollup_node"; "loser_mode"]
 
   let loser_mode_dal_decision =
-    declare_4
+    declare_5
       ~section
       ~name:"loser_mode_dal_decision"
       ~msg:
-        "loser_mode {decision} published at level {published_level}, slot \
-         {slot_index}, and page {page_index})"
+        "loser_mode {decision} at inbox level {inbox_level} for page \
+         {page_index} of slot {slot_index} published at level \
+         {published_level}"
       ~level:Notice
+      ("inbox_level", Data_encoding.int32)
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("page_index", Data_encoding.int31)
       ("decision", Data_encoding.string)
 
-  let emit_dal_decision ~published_level ~slot_index ~page_index ~decision =
+  let emit_dal_decision ~inbox_level ~published_level ~slot_index ~page_index
+      ~decision =
     emit
       loser_mode_dal_decision
-      (published_level, slot_index, page_index, decision)
+      (inbox_level, published_level, slot_index, page_index, decision)
 end
 
 type failure = {level : int; message_index : int; message_tick : int64}
@@ -79,6 +82,7 @@ type dal_parameters = {
 
 (** See the mli file for the doc. *)
 type dal_page = {
+  inbox_level : int32 option;
   published_level : int32 option;
   slot_index : int option;
   page_index : int option;
@@ -128,24 +132,32 @@ let encoding =
       case
         (Tag 2)
         ~title:"Invalid_dal_page"
-        (obj4
+        (obj5
+           (opt "inbox_level" int32)
            (opt "published_level" int32)
            (opt "slot_index" uint8)
            (opt "page_index" uint16)
            (req "page_payload_strategy" string))
         (function
           | Invalid_dal_page
-              {published_level; slot_index; page_index; page_payload_strategy}
-            ->
+              {
+                inbox_level;
+                published_level;
+                slot_index;
+                page_index;
+                page_payload_strategy;
+              } ->
               Some
-                ( published_level,
+                ( inbox_level,
+                  published_level,
                   slot_index,
                   page_index,
                   page_payload_strategy_to_string page_payload_strategy )
           | _ -> None)
-        (fun (published_level, slot_index, page_index, strat) ->
+        (fun (inbox_level, published_level, slot_index, page_index, strat) ->
           Invalid_dal_page
             {
+              inbox_level;
               published_level;
               slot_index;
               page_index;
@@ -155,7 +167,18 @@ let encoding =
 
 let no_failures = Failure []
 
-let wildcard_or_value f str = match str with "*" -> None | _ -> Some (f str)
+(* An example of reveal_dal_page, when used in tests:
+
+   "reveal_dal_page published_level:15 slot_index:1 page_index:2 strategy:flip inbox_level:3" *)
+let rec parse_reveal_dal_page_arg l f arg_name =
+  match l with
+  | [] -> None
+  | e :: l -> (
+      match e with
+      | [name; value] when String.equal arg_name name ->
+          if value = "*" then None else Some (f value)
+      | [_; _] -> parse_reveal_dal_page_arg l f arg_name
+      | _ -> Stdlib.failwith "Unreachable")
 
 let make s =
   let tokens = String.split_on_char ' ' s in
@@ -175,14 +198,31 @@ let make s =
              slot_size = Int64.of_string slot_size;
              page_size = Int64.of_string page_size;
            })
-  | ["reveal_dal_page"; published_level; slot_index; page_index; strategy] ->
+  | "reveal_dal_page" :: parameters ->
+      let parameters =
+        List.map
+          (fun e ->
+            match String.split_on_char ':' e with
+            | [_; _] as res -> res
+            | _ ->
+                Stdlib.failwith
+                  ("Argument " ^ e
+                 ^ "provided to reveal_dal_page is not of the shape NAME:VALUE"
+                  ))
+          parameters
+      in
+      let parse f arg_name = parse_reveal_dal_page_arg parameters f arg_name in
       Some
         (Invalid_dal_page
            {
-             published_level = wildcard_or_value Int32.of_string published_level;
-             slot_index = wildcard_or_value int_of_string slot_index;
-             page_index = wildcard_or_value int_of_string page_index;
-             page_payload_strategy = page_payload_strategy_of_string strategy;
+             inbox_level = parse Int32.of_string "inbox_level";
+             published_level = parse Int32.of_string "published_level";
+             slot_index = parse int_of_string "slot_index";
+             page_index = parse int_of_string "page_index";
+             page_payload_strategy =
+               Option.value
+                 (parse page_payload_strategy_of_string "strategy")
+                 ~default:`Flip;
            })
   | _ -> (
       let rec chop = function
@@ -214,14 +254,15 @@ let is_invalid_dal_parameters = function
   | Failure _ | Invalid_dal_page _ -> None
   | Invalid_dal_parameters parameters -> Some parameters
 
-let is_invalid_dal_page ~published_level ~slot_index ~page_index ~page_size
-    ~honest_payload =
+let is_invalid_dal_page ~inbox_level ~published_level ~slot_index ~page_index
+    ~page_size ~honest_payload =
   let open Lwt_syntax in
   let eq_or_wildcard v = function None -> true | Some w -> v = w in
   function
   | Failure _ | Invalid_dal_parameters _ -> return @@ Either.left ()
   | Invalid_dal_page
       {
+        inbox_level = il;
         published_level = pl;
         slot_index = si;
         page_index = pi;
@@ -229,13 +270,15 @@ let is_invalid_dal_page ~published_level ~slot_index ~page_index ~page_size
       } ->
       let emit decision =
         Event.emit_dal_decision
+          ~inbox_level
           ~published_level
           ~slot_index
           ~page_index
           ~decision
       in
       if
-        eq_or_wildcard published_level pl
+        eq_or_wildcard inbox_level il
+        && eq_or_wildcard published_level pl
         && eq_or_wildcard slot_index si
         && eq_or_wildcard page_index pi
       then

@@ -150,12 +150,13 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                    is either [Request_dal_page] or [Request_adal_page] *)
                 assert false
           in
+          let inbox_level = Int32.of_int level in
           let*! content =
             Dal_pages_request.page_content
               constants.dal
               ~dal_activation_level
               ~dal_attested_slots_validity_lag
-              ~inbox_level:(Int32.of_int level)
+              ~inbox_level
               node_ctxt
               dal_page
           in
@@ -175,6 +176,7 @@ module Make_fueled (F : Fuel.S) : FUELED_PVM with type fuel = F.t = struct
                 let*! is_invalid_dal_page =
                   Loser_mode.is_invalid_dal_page
                     node_ctxt.config.loser_mode
+                    ~inbox_level
                     ~published_level
                     ~slot_index
                     ~page_index
