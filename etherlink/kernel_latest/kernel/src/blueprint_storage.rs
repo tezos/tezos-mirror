@@ -935,7 +935,6 @@ mod tests {
             },
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
-            garbage_collect_blocks: false,
         };
 
         let dummy_tx_hash = Hash([0u8; TRANSACTION_HASH_SIZE]);

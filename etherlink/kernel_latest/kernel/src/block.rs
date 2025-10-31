@@ -584,6 +584,9 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 mod tests {
     use super::*;
     use crate::block_storage;
+    use crate::block_storage::internal_for_tests::{
+        read_transaction_receipt, read_transaction_receipt_status,
+    };
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
@@ -595,7 +598,6 @@ mod tests {
     use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
     use crate::storage::read_block_in_progress;
     use crate::storage::read_last_info_per_level_timestamp;
-    use crate::storage::{read_transaction_receipt, read_transaction_receipt_status};
     use crate::transaction::Transaction;
     use crate::transaction::TransactionContent;
     use crate::transaction::TransactionContent::Ethereum;
@@ -1666,56 +1668,6 @@ mod tests {
 
         assert_eq!(dest_balance, expected_dest_balance);
         assert_eq!(sender_balance, expected_sender_balance, "sender balance");
-    }
-
-    #[test]
-    fn test_blocks_are_indexed() {
-        let mut host = MockKernelHost::default();
-        crate::storage::store_minimum_base_fee_per_gas(
-            &mut host,
-            DUMMY_BASE_FEE_PER_GAS.into(),
-        )
-        .unwrap();
-
-        let chain_config = dummy_evm_config(SpecId::default());
-        let blocks_index = block_storage::internal_for_tests::init_blocks_index(
-            &chain_config.storage_root_path(),
-        )
-        .unwrap();
-
-        store_blueprints::<_, EvmChainConfig>(&mut host, vec![blueprint(vec![])]);
-
-        let number_of_blocks_indexed = blocks_index.length(&host).unwrap();
-        let sender = dummy_eth_caller();
-        set_balance(&mut host, &sender, U256::from(10000000000000000000u64));
-        store_block_fees(&mut host, &dummy_block_fees()).unwrap();
-        produce(
-            &mut host,
-            &chain_config,
-            &mut dummy_configuration(),
-            None,
-            None,
-        )
-        .expect("The block production failed.");
-
-        let new_number_of_blocks_indexed = blocks_index.length(&host).unwrap();
-
-        let current_block_hash = block_storage::read_current(
-            &mut host,
-            &chain_config.storage_root_path(),
-            &chain_config.get_chain_family(),
-        )
-        .unwrap()
-        .hash()
-        .as_bytes()
-        .to_vec();
-
-        assert_eq!(number_of_blocks_indexed + 1, new_number_of_blocks_indexed);
-
-        assert_eq!(
-            Ok(current_block_hash),
-            blocks_index.get_value(&host, new_number_of_blocks_indexed - 1)
-        );
     }
 
     fn first_block<MockHost: Runtime>(host: &mut MockHost) -> BlockConstants {

@@ -26,6 +26,8 @@ type t = {
   contractAddress : address option;
 }
 
+val of_rlp_item : block_hash -> Rlp.item -> t
+
 val of_rlp_bytes : block_hash -> bytes -> t
 
 val encoding : t Data_encoding.t

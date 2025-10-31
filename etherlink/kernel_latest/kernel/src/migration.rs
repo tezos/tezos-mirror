@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::block_storage;
+use crate::block_storage::{self, read_current_hash, read_current_number, store_current};
 use crate::blueprint_storage::{
     blueprint_path, clear_all_blueprints, store_current_block_header,
 };
@@ -12,6 +12,7 @@ use crate::chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
 use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
+use crate::l2block::L2Block;
 use crate::migration::legacy::{
     account_path, init_account_storage, ENABLE_FAST_FA_WITHDRAWAL,
     ENABLE_FAST_WITHDRAWAL, NATIVE_TOKEN_TICKETER_PATH, SYSTEM_ACCOUNT_ADDRESS,
@@ -20,8 +21,8 @@ use crate::migration::legacy::{
 use crate::storage::{
     read_chain_id, read_storage_version, store_backlog, store_dal_slots,
     store_storage_version, tweak_dal_activation, StorageVersion, DELAYED_BRIDGE,
-    ENABLE_FA_BRIDGE, KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE,
-    SEQUENCER_GOVERNANCE,
+    ENABLE_FA_BRIDGE, EVM_TRANSACTIONS_OBJECTS, EVM_TRANSACTIONS_RECEIPTS,
+    KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE, SEQUENCER_GOVERNANCE,
 };
 use primitive_types::U256;
 use revm_etherlink::storage::block::BLOCKS_STORED;
@@ -29,7 +30,7 @@ use revm_etherlink::storage::version::{store_evm_version, EVMVersion};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::storage::path::RefPath;
-use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::path::{concat, OwnedPath};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 
 #[derive(Eq, PartialEq)]
@@ -79,28 +80,29 @@ mod legacy {
     // some migration step to access the storage using the fields
     // which were present at the time.
 
+    use crate::chains::ChainFamily;
+
     use super::*;
-    use primitive_types::H160;
+    use primitive_types::{H160, H256};
     use revm::state::AccountInfo;
     use revm_etherlink::{
         helpers::legacy::{alloy_to_u256, u256_to_alloy},
         storage::world_state_handler::StorageAccount,
     };
+    use tezos_smart_rollup_host::path::Path;
     use tezos_smart_rollup_storage::storage::Storage;
-    use tezos_storage::error::Error as GenStorageError;
+    use tezos_storage::read_h256_be;
     use thiserror::Error;
 
     pub fn read_next_blueprint_number<Host: Runtime>(
         host: &Host,
-    ) -> anyhow::Result<U256> {
+    ) -> Result<U256, crate::Error> {
         match block_storage::read_current_number(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)
         {
-            Err(err) => match err.downcast_ref() {
-                Some(GenStorageError::Runtime(RuntimeError::PathNotFound)) => {
-                    Ok(U256::zero())
-                }
-                _ => Err(err),
-            },
+            Err(crate::Error::Storage(StorageError::Runtime(
+                RuntimeError::PathNotFound,
+            ))) => Ok(U256::zero()),
+            Err(err) => Err(err),
             Ok(block_number) => Ok(block_number.saturating_add(U256::one())),
         }
     }
@@ -254,6 +256,46 @@ mod legacy {
     pub fn account_path(address: &H160) -> Result<OwnedPath, DurableStorageError> {
         let path_string = alloc::format!("/{}", hex::encode(address.to_fixed_bytes()));
         OwnedPath::try_from(path_string).map_err(DurableStorageError::from)
+    }
+
+    const CURRENT_HASH: RefPath = RefPath::assert_from(b"/blocks/current/hash");
+
+    pub fn current_hash(
+        root: &impl Path,
+    ) -> Result<OwnedPath, tezos_smart_rollup_host::path::PathError> {
+        concat(root, &CURRENT_HASH)
+    }
+
+    pub fn blocks(
+        root: &impl Path,
+    ) -> Result<OwnedPath, tezos_smart_rollup_host::path::PathError> {
+        concat(root, &RefPath::assert_from(b"/blocks"))
+    }
+
+    pub fn path(root: &impl Path, hash: H256) -> anyhow::Result<OwnedPath> {
+        let hash = hex::encode(hash);
+        let raw_hash_path: Vec<u8> = format!("/{}", &hash).into();
+        let hash_path = OwnedPath::try_from(raw_hash_path)?;
+        Ok(concat(&blocks(root)?, &hash_path)?)
+    }
+
+    pub fn read_current_hash(
+        host: &impl Runtime,
+        root: &impl Path,
+    ) -> anyhow::Result<H256> {
+        read_h256_be(host, &current_hash(root)?)
+    }
+
+    pub fn read_current(
+        host: &mut impl Runtime,
+        root: &impl Path,
+        chain_family: &ChainFamily,
+    ) -> anyhow::Result<L2Block> {
+        let hash = read_current_hash(host, root)?;
+        let block_path = path(root, hash)?;
+        let bytes = &host.store_read_all(&block_path)?;
+        let block_from_bytes = L2Block::try_from_bytes(chain_family, bytes)?;
+        Ok(block_from_bytes)
     }
 }
 
@@ -432,7 +474,7 @@ fn migrate_to<Host: Runtime>(
         }
         StorageVersion::V27 => {
             // Initialize the next_blueprint_info field
-            match block_storage::read_current(
+            match legacy::read_current(
                 host,
                 &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                 &crate::chains::ChainFamily::Evm,
@@ -564,6 +606,58 @@ fn migrate_to<Host: Runtime>(
         }
         StorageVersion::V40 => {
             store_evm_version(host, &EVMVersion::Osaka)?;
+            Ok(MigrationStatus::Done)
+        }
+        StorageVersion::V41 => {
+            // Clean all transactions, they are unused by the kernel. We will only save the last block ones in a new format.
+            if let Ok(block_hash) =
+                read_current_hash(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)
+            {
+                let raw_hash_path: Vec<u8> =
+                    format!("/{}", &hex::encode(block_hash)).into();
+                let hash_path = OwnedPath::try_from(raw_hash_path)?;
+                let block = host.store_read_all(&concat(
+                    &concat(
+                        &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                        &RefPath::assert_from(b"/blocks"),
+                    )?,
+                    &hash_path,
+                )?)?;
+                let block_from_bytes =
+                    L2Block::try_from_bytes(&crate::chains::ChainFamily::Evm, &block)?;
+                allow_path_not_found(host.store_delete(&concat(
+                    &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                    &RefPath::assert_from(b"/blocks"),
+                )?))?;
+                store_current(
+                    host,
+                    &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                    &block_from_bytes,
+                )?;
+            } else {
+                allow_path_not_found(host.store_delete(&concat(
+                    &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                    &RefPath::assert_from(b"/blocks"),
+                )?))?;
+            }
+            if let Ok(current_number) =
+                read_current_number(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH)
+            {
+                let last_to_keep = current_number.as_u64().saturating_sub(BLOCKS_STORED);
+                let paths_indexed_blocks = concat(
+                    &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+                    &RefPath::assert_from(b"/indexes/blocks"),
+                )?;
+                for i in last_to_keep..current_number.as_u64() {
+                    let path: Vec<u8> = format!("/{i}").into();
+                    let owned_path = RefPath::assert_from(&path);
+                    allow_path_not_found(
+                        host.store_delete(&concat(&paths_indexed_blocks, &owned_path)?),
+                    )?;
+                }
+            }
+            allow_path_not_found(host.store_delete(&EVM_TRANSACTIONS_RECEIPTS))?;
+            allow_path_not_found(host.store_delete(&EVM_TRANSACTIONS_OBJECTS))?;
             Ok(MigrationStatus::Done)
         }
     }

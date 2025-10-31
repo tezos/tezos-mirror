@@ -167,15 +167,21 @@ end
 module Block = struct
   type number = Current | Nth of Z.t
 
-  let blocks ~root = root ^ "/blocks"
+  let by_hash ~root (Block_hash (Hex hash)) = root ^ "/blocks" ^ "/" ^ hash
 
-  let number = "/number"
+  let current_block_parent ~root = root ^ "/blocks/current"
 
-  let by_hash ~root (Block_hash (Hex hash)) = blocks ~root ^ "/" ^ hash
+  let current_block ~root = current_block_parent ~root ^ "/block"
 
-  let current_number ~root = blocks ~root ^ "/current" ^ number
+  let current_number ~root = current_block_parent ~root ^ "/number"
 
-  let current_hash ~root = blocks ~root ^ "/current/hash"
+  let current_hash ~root = current_block_parent ~root ^ "/hash"
+
+  let current_receipts ~root =
+    current_block_parent ~root ^ "/transactions_receipts"
+
+  let current_transactions_objects ~root =
+    current_block_parent ~root ^ "/transactions_objects"
 end
 
 module Indexes = struct

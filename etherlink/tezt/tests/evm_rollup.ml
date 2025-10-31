@@ -3218,6 +3218,20 @@ let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
       ~proxy
       ()
   in
+  (* Verify migration v41 delete blocks *)
+  let* blocks =
+    Sc_rollup_node.RPC.call
+      evm_setup.sc_rollup_node
+      ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind
+         ~operation:Sc_rollup_rpc.Subkeys
+         ~key:"/evm/world_state/blocks"
+         ()
+  in
+  let expected_blocks = ["current"] in
+  Check.((blocks = expected_blocks) (list string))
+    ~error_msg:"Expected blocks to be deleted after migration v41, got %R" ;
   scenario_after ~evm_setup ~sanity_check
 
 let test_mainnet_latest_kernel_migration =

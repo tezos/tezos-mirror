@@ -12,7 +12,6 @@ use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
 use crate::l2block::L2Block;
-use crate::storage;
 use crate::tick_model;
 use crate::transaction::{Transaction, Transactions, Transactions::EthTxs};
 use alloy_consensus::proofs::ordered_trie_root_with_encoder;
@@ -393,21 +392,9 @@ impl EthBlockInProgress {
         // extend BIP's logs bloom
         self.logs_bloom.accrue_bloom(&receipt.logs_bloom);
 
-        // store info
-        let receipt_size = storage::store_transaction_receipt(host, &receipt)
-            .context("Failed to store the receipt")?;
         self.cumulative_receipts.push(receipt);
         let tx_object = self.make_object(object_info);
-        let obj_size = storage::store_transaction_object(host, &tx_object)
-            .context("Failed to store the transaction object")?;
         self.cumulative_tx_objects.push(tx_object);
-
-        // account for registering ticks
-        self.add_ticks(tick_model::ticks_of_register(
-            receipt_size,
-            obj_size,
-            receipt_bloom_size,
-        ));
 
         // keep track of execution gas used
         self.cumulative_execution_gas += execution_gas_used;
@@ -463,7 +450,17 @@ impl EthBlockInProgress {
     ) -> Result<L2Block, anyhow::Error> {
         let state_root = Self::safe_store_get_hash(host, &EVM_ACCOUNTS_PATH)?;
         let receipts_root = self.receipts_root();
+        block_storage::store_current_transactions_receipts(
+            host,
+            &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            &self.cumulative_receipts,
+        )?;
         let transactions_root = self.transactions_root();
+        block_storage::store_current_transactions_objects(
+            host,
+            &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            &self.cumulative_tx_objects,
+        )?;
         let base_fee_per_gas = base_fee_per_gas(
             host,
             self.timestamp,

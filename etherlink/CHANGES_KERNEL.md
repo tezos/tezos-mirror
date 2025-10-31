@@ -2,6 +2,13 @@
 
 ## Version NEXT
 
+Important information: Rollup nodes configured to use the full history mode will require
+up to twice the disk space they are currently using in the two weeks following
+the activation of this kernel, due to how our storage backend (Irmin) performs
+garbage collection. (!19744)
+
+Furthermore, this kernel requires the Octez EVM node version 0.47 or higher.
+
 ### Features
 
 - Optimize computation of receipt and transaction root. Receipt root is now
@@ -22,6 +29,8 @@
   `debug_traceCall` simulations. (!19668)
 
 ### Internal
+
+- Change the block storage to save only latest block. (!19744)
 
 ## Etherlink 5 (Ebisu)
 

@@ -7,7 +7,7 @@
 
 use crate::blueprint_storage::store_sequencer_blueprint;
 use crate::bridge::Deposit;
-use crate::chains::{ChainConfigTrait, ChainFamily, EvmChainConfig};
+use crate::chains::{ChainConfigTrait, EvmChainConfig};
 use crate::configuration::{DalConfiguration, TezosContracts};
 use crate::dal::fetch_and_parse_sequencer_blueprint_from_dal;
 use crate::dal_slot_import_signal::DalSlotImportSignals;
@@ -39,7 +39,6 @@ use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::public_key::PublicKey;
-use tezos_smart_rollup_host::path::Path;
 
 #[derive(Debug, PartialEq)]
 pub struct ProxyInboxContent {
@@ -376,9 +375,6 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
     host: &mut impl Runtime,
     input: Input<Mode>,
     inbox_content: &mut Mode::Inbox,
-    root: &impl Path,
-    chain_family: &ChainFamily,
-    garbage_collect_blocks: bool,
 ) -> anyhow::Result<()> {
     match input {
         Input::ModeSpecific(input) => Mode::handle_input(host, input, inbox_content)?,
@@ -390,10 +386,6 @@ pub fn handle_input<Mode: Parsable + InputHandler>(
         Input::Info(info) => {
             // New inbox level detected, remove all previous events.
             clear_events(host)?;
-            if garbage_collect_blocks {
-                log!(host, Debug, "Garbage collection of old blocks");
-                crate::block_storage::garbage_collect_blocks(host, root, chain_family)?;
-            }
             store_last_info_per_level_timestamp(host, info.info.predecessor_timestamp)?;
             store_l1_level(host, info.level)?
         }
@@ -427,7 +419,6 @@ fn read_and_dispatch_input<
     inbox_is_empty: &mut bool,
     res: &mut Mode::Inbox,
     enable_fa_bridge: bool,
-    garbage_collect_blocks: bool,
     chain_configuration: &ChainConfig,
 ) -> anyhow::Result<ReadStatus> {
     let input: InputResult<Mode> = read_input(
@@ -462,14 +453,7 @@ fn read_and_dispatch_input<
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {
-            handle_input(
-                host,
-                input,
-                res,
-                &chain_configuration.storage_root_path(),
-                &chain_configuration.get_chain_family(),
-                garbage_collect_blocks,
-            )?;
+            handle_input(host, input, res)?;
             Ok(ReadStatus::Ongoing)
         }
     }
@@ -480,7 +464,6 @@ pub fn read_proxy_inbox<Host: Runtime>(
     smart_rollup_address: [u8; 20],
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
-    garbage_collect_blocks: bool,
     chain_configuration: &EvmChainConfig,
 ) -> Result<Option<ProxyInboxContent>, anyhow::Error> {
     let mut res = ProxyInboxContent {
@@ -500,7 +483,6 @@ pub fn read_proxy_inbox<Host: Runtime>(
             &mut inbox_is_empty,
             &mut res,
             enable_fa_bridge,
-            garbage_collect_blocks,
             chain_configuration,
         ) {
             Err(err) =>
@@ -553,7 +535,6 @@ pub fn read_sequencer_inbox<Host: Runtime, ChainConfig: ChainConfigTrait>(
     enable_fa_bridge: bool,
     maximum_allowed_ticks: u64,
     dal: Option<DalConfiguration>,
-    garbage_collect_blocks: bool,
     chain_configuration: &ChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error> {
     // The mutable variable is used to retrieve the information of whether the
@@ -592,7 +573,6 @@ pub fn read_sequencer_inbox<Host: Runtime, ChainConfig: ChainConfigTrait>(
             &mut inbox_is_empty,
             delayed_inbox,
             enable_fa_bridge,
-            garbage_collect_blocks,
             chain_configuration,
         ) {
             Err(err) =>
@@ -785,7 +765,6 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            false,
             &test_evm_chain_config(),
         )
         .unwrap()
@@ -816,7 +795,6 @@ mod tests {
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
-            false,
             false,
             &test_evm_chain_config(),
         )
@@ -874,7 +852,6 @@ mod tests {
                 kernel_security_governance: None,
             },
             false,
-            false,
             &test_evm_chain_config(),
         )
         .unwrap()
@@ -920,7 +897,6 @@ mod tests {
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
-            false,
             false,
             &test_evm_chain_config(),
         )
@@ -973,7 +949,6 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            false,
             &test_evm_chain_config(),
         )
         .unwrap();
@@ -1012,7 +987,6 @@ mod tests {
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
-            false,
             false,
             &test_evm_chain_config(),
         )
@@ -1070,7 +1044,6 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            false,
             &test_evm_chain_config(),
         )
         .unwrap()
@@ -1091,7 +1064,6 @@ mod tests {
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
-            false,
             false,
             &test_evm_chain_config(),
         )
@@ -1155,7 +1127,6 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            false,
             &test_evm_chain_config(),
         )
         .unwrap()
@@ -1180,7 +1151,6 @@ mod tests {
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
             false,
-            false,
             &test_evm_chain_config(),
         )
         .unwrap();
@@ -1191,7 +1161,6 @@ mod tests {
             &mut host,
             SMART_ROLLUP_ADDRESS,
             &TezosContracts::default(),
-            false,
             false,
             &test_evm_chain_config(),
         )
@@ -1299,7 +1268,6 @@ mod tests {
             false,
             MAX_ALLOWED_TICKS,
             None,
-            false,
             &test_evm_chain_config(),
         )
         .unwrap();

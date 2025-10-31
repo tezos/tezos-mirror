@@ -34,9 +34,7 @@ use tezos_storage::{
 use crate::error::{Error, StorageError};
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_ethereum::rlp_helpers::{FromRlpBytes, VersionedEncoding};
-use tezos_ethereum::transaction::{
-    TransactionHash, TransactionObject, TransactionReceipt,
-};
+use tezos_ethereum::transaction::TransactionHash;
 
 use primitive_types::{H160, U256};
 
@@ -75,6 +73,7 @@ pub enum StorageVersion {
     V38,
     V39,
     V40,
+    V41,
 }
 
 impl From<StorageVersion> for u64 {
@@ -89,7 +88,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V40;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V41;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 
@@ -194,20 +193,6 @@ const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
 const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: RefPath =
     RefPath::assert_from(b"/evm/max_blueprint_lookahead_in_seconds");
 
-pub fn receipt_path(receipt_hash: &TransactionHash) -> Result<OwnedPath, Error> {
-    let hash = hex::encode(receipt_hash);
-    let raw_receipt_path: Vec<u8> = format!("/{}", &hash).into();
-    let receipt_path = OwnedPath::try_from(raw_receipt_path)?;
-    concat(&EVM_TRANSACTIONS_RECEIPTS, &receipt_path).map_err(Error::from)
-}
-
-pub fn object_path(object_hash: &TransactionHash) -> Result<OwnedPath, Error> {
-    let hash = hex::encode(object_hash);
-    let raw_object_path: Vec<u8> = format!("/{}", &hash).into();
-    let object_path = OwnedPath::try_from(raw_object_path)?;
-    concat(&EVM_TRANSACTIONS_OBJECTS, &object_path).map_err(Error::from)
-}
-
 pub fn chain_config_path(chain_id: &U256) -> Result<OwnedPath, Error> {
     let raw_chain_id_path: Vec<u8> = format!("/{chain_id}").into();
     let chain_id_path = OwnedPath::try_from(raw_chain_id_path)?;
@@ -221,41 +206,6 @@ pub fn store_simulation_result<Host: Runtime, T: Decodable + Encodable>(
     let encoded = result.to_bytes();
     host.store_write(&SIMULATION_RESULT, &encoded, 0)
         .context("Failed to write the simulation result.")
-}
-
-// DO NOT RENAME: function name is used during benchmark
-// Never inlined when the kernel is compiled for benchmarks, to ensure the
-// function is visible in the profiling results.
-#[cfg_attr(feature = "benchmark", inline(never))]
-pub fn store_transaction_receipt<Host: Runtime>(
-    host: &mut Host,
-    receipt: &TransactionReceipt,
-) -> Result<u64, anyhow::Error> {
-    let receipt_path = receipt_path(&receipt.hash)?;
-    let src: &[u8] = &receipt.rlp_bytes();
-    log!(host, Benchmarking, "Storing receipt of size {}", src.len());
-    host.store_write(&receipt_path, src, 0)?;
-    Ok(src.len().try_into()?)
-}
-
-// DO NOT RENAME: function name is used during benchmark
-// Never inlined when the kernel is compiled for benchmarks, to ensure the
-// function is visible in the profiling results.
-#[cfg_attr(feature = "benchmark", inline(never))]
-pub fn store_transaction_object<Host: Runtime>(
-    host: &mut Host,
-    object: &TransactionObject,
-) -> Result<u64, anyhow::Error> {
-    let object_path = object_path(&object.hash)?;
-    let encoded: &[u8] = &object.rlp_bytes();
-    log!(
-        host,
-        Benchmarking,
-        "Storing transaction object of size {}",
-        encoded.len()
-    );
-    host.store_write(&object_path, encoded, 0)?;
-    Ok(encoded.len().try_into()?)
 }
 
 const CHUNKED_TRANSACTIONS: RefPath = RefPath::assert_from(b"/chunked_transactions");
@@ -951,36 +901,6 @@ pub fn read_chain_family(
     let chain_family = String::from_utf8(bytes)?;
     Ok(chain_family.into())
 }
-
-#[cfg(test)]
-mod internal_for_tests {
-    use super::*;
-
-    use tezos_ethereum::transaction::TransactionStatus;
-
-    /// Reads status from the receipt in storage.
-    pub fn read_transaction_receipt_status<Host: Runtime>(
-        host: &mut Host,
-        tx_hash: &TransactionHash,
-    ) -> Result<TransactionStatus, Error> {
-        let receipt = read_transaction_receipt(host, tx_hash)?;
-        Ok(receipt.status)
-    }
-
-    /// Reads a transaction receipt from storage.
-    pub fn read_transaction_receipt<Host: Runtime>(
-        host: &mut Host,
-        tx_hash: &TransactionHash,
-    ) -> Result<TransactionReceipt, Error> {
-        let receipt_path = receipt_path(tx_hash)?;
-        let bytes = host.store_read_all(&receipt_path)?;
-        let receipt = TransactionReceipt::from_rlp_bytes(&bytes)?;
-        Ok(receipt)
-    }
-}
-
-#[cfg(test)]
-pub use internal_for_tests::*;
 
 /// Smart Contract of the delayed bridge
 ///

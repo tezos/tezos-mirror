@@ -32,7 +32,6 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
     smart_rollup_address: [u8; RAW_ROLLUP_ADDRESS_SIZE],
     tezos_contracts: &TezosContracts,
     enable_fa_bridge: bool,
-    garbage_collect_blocks: bool,
     chain_configuration: &EvmChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error> {
     if let Some(ProxyInboxContent { transactions }) = read_proxy_inbox(
@@ -40,7 +39,6 @@ pub fn fetch_proxy_blueprints<Host: Runtime>(
         smart_rollup_address,
         tezos_contracts,
         enable_fa_bridge,
-        garbage_collect_blocks,
         chain_configuration,
     )? {
         let timestamp =
@@ -127,7 +125,6 @@ fn fetch_sequencer_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
     dal: Option<DalConfiguration>,
     maximum_allowed_ticks: u64,
     enable_fa_bridge: bool,
-    garbage_collect_blocks: bool,
     chain_configuration: &ChainConfig,
 ) -> Result<StageOneStatus, anyhow::Error> {
     match read_sequencer_inbox(
@@ -140,7 +137,6 @@ fn fetch_sequencer_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
         enable_fa_bridge,
         maximum_allowed_ticks,
         dal,
-        garbage_collect_blocks,
         chain_configuration,
     )? {
         StageOneStatus::Done => {
@@ -189,7 +185,6 @@ pub fn fetch_blueprints<Host: Runtime>(
             dal.clone(),
             config.maximum_allowed_ticks,
             config.enable_fa_bridge,
-            config.garbage_collect_blocks,
             &**chain_config,
         ),
         (
@@ -212,7 +207,6 @@ pub fn fetch_blueprints<Host: Runtime>(
             dal.clone(),
             config.maximum_allowed_ticks,
             config.enable_fa_bridge,
-            config.garbage_collect_blocks,
             chain_config,
         ),
         (ChainConfig::Evm(chain_config), ConfigurationMode::Proxy) => {
@@ -221,7 +215,6 @@ pub fn fetch_blueprints<Host: Runtime>(
                 smart_rollup_address,
                 &config.tezos_contracts,
                 config.enable_fa_bridge,
-                config.garbage_collect_blocks,
                 chain_config,
             )
         }
@@ -317,7 +310,6 @@ mod tests {
             },
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
-            garbage_collect_blocks: false,
         }
     }
 
@@ -331,7 +323,6 @@ mod tests {
             mode: ConfigurationMode::Proxy,
             maximum_allowed_ticks: MAX_ALLOWED_TICKS,
             enable_fa_bridge: false,
-            garbage_collect_blocks: false,
         }
     }
 
@@ -642,7 +633,6 @@ mod tests {
             &mut host,
             DEFAULT_SR_ADDRESS,
             &conf.tezos_contracts,
-            false,
             false,
             &chain_config,
         )
