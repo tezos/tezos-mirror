@@ -1366,7 +1366,7 @@ let generate_reveals cctxt ~sources ~fee ~gas_limit ~storage_limit =
 let generate_starter_ops cctxt ~sources ~amount ~batch_size =
   let open Lwt_result_syntax in
   let fee = Tez.of_mutez_exn 1_000L in
-  let gas_limit = Gas.Arith.integral_of_int_exn 2200 in
+  let gas_limit = Gas.Arith.integral_of_int_exn 4000 in
   let storage_limit = Z.of_int 257 in
   let parameters =
     let open Tezos_micheline in
