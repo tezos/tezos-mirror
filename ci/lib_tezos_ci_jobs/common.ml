@@ -27,14 +27,6 @@ open Tezos_ci.Cache
 *)
 type repository_pipeline = Full | Partial | Release
 
-let retry_default_config =
-  Gitlab_ci.Types.
-    {
-      image = None;
-      interruptible = Some true;
-      retry = Some {max = 2; when_ = [Script_failure; Runner_system_failure]};
-    }
-
 let cargo_home =
   (* Note:
      - We want [CARGO_HOME] to be in a sub-folder of
@@ -44,6 +36,14 @@ let cargo_home =
   Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
 
 module Helpers = struct
+  let retry_default_config =
+    Gitlab_ci.Types.
+      {
+        image = None;
+        interruptible = Some true;
+        retry = Some {max = 2; when_ = [Script_failure; Runner_system_failure]};
+      }
+
   (** The default [before_script:] section.
 
     In general, the result of this script should be used as the
