@@ -67,4 +67,4 @@ val remove_old_level_stored_data :
   Tezos_dal_node_services.Types.proto_parameters ->
   Node_context.t ->
   int32 ->
-  unit Lwt.t
+  (unit, tztrace) result Lwt.t

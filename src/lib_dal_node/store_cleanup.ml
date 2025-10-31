@@ -88,7 +88,7 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
     let rec clean_up_at_level level =
       if level > last_level then return_unit
       else
-        let*! () =
+        let* () =
           Block_handler.remove_old_level_stored_data proto_parameters ctxt level
         in
         let* () =
@@ -184,7 +184,7 @@ let clean_up_store_and_catch_up_for_no_refutation_support ctxt
       let*! () = Event.emit_end_catchup () in
       return_unit
     else
-      let*! () =
+      let* () =
         Block_handler.remove_old_level_stored_data proto_parameters ctxt level
       in
       L1_crawler_status.catching_up_or_synced_status
