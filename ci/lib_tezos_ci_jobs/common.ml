@@ -20,13 +20,6 @@ open Gitlab_ci.Util
 open Tezos_ci
 open Tezos_ci.Cache
 
-(* types for the repositories pipelines.
-   - Release: we run all the release jobs, but no tests
-   - Partial: we run only a subset of the tests jobs
-   - Full: we run the complete test matrix
-*)
-type repository_pipeline = Full | Partial | Release
-
 module Helpers = struct
   let retry_default_config =
     Gitlab_ci.Types.
@@ -78,52 +71,6 @@ module Helpers = struct
 end
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []
-
-(** {2 Child repositories pipelines} *)
-
-(** Return a tuple (ARCHITECTURES, <archs>) based on the type
-    of repository pipeline. *)
-let archs_variables pipeline =
-  let archs : Runner.Arch.t list =
-    match pipeline with Partial -> [Amd64] | Full | Release -> [Amd64; Arm64]
-  in
-  [
-    ( "ARCHITECTURES",
-      String.concat " " (List.map Runner.Arch.show_uniform archs) );
-  ]
-
-let make_job_build_packages ~__POS__ ~name ~matrix ~script ~dependencies
-    ~variables ~image =
-  job
-    ~__POS__
-    ~name
-    ~image
-    ~stage:Stages.build
-    ~variables
-    ~parallel:(Matrix matrix)
-    ~dependencies
-    ~tag:Dynamic
-    ~retry:Gitlab_ci.Types.{max = 1; when_ = [Stuck_or_timeout_failure]}
-    ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
-    [
-      (* This is a hack to enable Cargo networking for jobs in child pipelines.
-
-         Global variables of the parent pipeline
-         are passed to the child pipeline. Inside the child
-         pipeline, variables received from the parent pipeline take
-         precedence over job-level variables. It's bit strange. So
-         to override the default [CARGO_NET_OFFLINE=true], we cannot
-         just set it in the job-level variables of this job.
-
-         [enable_sccache] adds the cache directive for [$CI_PROJECT_DIR/_sccache].
-
-         See
-         {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
-         for more info. *)
-      "export CARGO_NET_OFFLINE=false";
-      script;
-    ]
-  |> enable_sccache ~idle_timeout:"0"
 
 module Build = struct
   (* This version of the job builds both released and experimental executables.
@@ -499,8 +446,65 @@ module Docker = struct
       ~tag:Gcp_not_interruptible
 end
 
-type bin_package_target = Rpm
+module Packaging = struct
+  (* types for the repositories pipelines.
+   - Release: we run all the release jobs, but no tests
+   - Partial: we run only a subset of the tests jobs
+   - Full: we run the complete test matrix
+*)
+  type repository_pipeline = Full | Partial | Release
 
-type bin_package_group = A | B
+  (** {2 Child repositories pipelines} *)
 
-let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
+  (** Return a tuple (ARCHITECTURES, <archs>) based on the type
+    of repository pipeline. *)
+  let archs_variables pipeline =
+    let archs : Runner.Arch.t list =
+      match pipeline with
+      | Partial -> [Amd64]
+      | Full | Release -> [Amd64; Arm64]
+    in
+    [
+      ( "ARCHITECTURES",
+        String.concat " " (List.map Runner.Arch.show_uniform archs) );
+    ]
+
+  let make_job_build_packages ~__POS__ ~name ~matrix ~script ~dependencies
+      ~variables ~image =
+    job
+      ~__POS__
+      ~name
+      ~image
+      ~stage:Stages.build
+      ~variables
+      ~parallel:(Matrix matrix)
+      ~dependencies
+      ~tag:Dynamic
+      ~retry:Gitlab_ci.Types.{max = 1; when_ = [Stuck_or_timeout_failure]}
+      ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
+      [
+        (* This is a hack to enable Cargo networking for jobs in child pipelines.
+
+         Global variables of the parent pipeline
+         are passed to the child pipeline. Inside the child
+         pipeline, variables received from the parent pipeline take
+         precedence over job-level variables. It's bit strange. So
+         to override the default [CARGO_NET_OFFLINE=true], we cannot
+         just set it in the job-level variables of this job.
+
+         [enable_sccache] adds the cache directive for [$CI_PROJECT_DIR/_sccache].
+
+         See
+         {{:https://docs.gitlab.com/ee/ci/variables/index.html#cicd-variable-precedence}here}
+         for more info. *)
+        "export CARGO_NET_OFFLINE=false";
+        script;
+      ]
+    |> enable_sccache ~idle_timeout:"0"
+
+  type bin_package_target = Rpm
+
+  type bin_package_group = A | B
+
+  let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
+end
