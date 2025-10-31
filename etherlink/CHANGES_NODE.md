@@ -1,8 +1,15 @@
 # Changelog
 
-## Unreleased
+## Version 0.47 (2025-10-31) 🎃
 
-### Breaking changes
+This release improves robustness of the EVM node by protecting all network calls
+with a configurable timeout (also preventing transactions from getting stuck in
+the queue). It also improves compatibility of RPC `eth_estimateGas` by allowing
+state overrides and allows RPC nodes to receive notifications on websockets for
+`eth_subscribe`.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
 
 ### Configuration changes
 
@@ -37,14 +44,7 @@
 
 ### Storage changes
 
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
+- Shadownet snapshots available to use without warning. (!19726)
 
 ## Version 0.46 (2025-10-21)
 
