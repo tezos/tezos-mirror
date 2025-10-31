@@ -330,6 +330,17 @@ let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
     | Syncing ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7642 *)
         Stdlib.failwith "The websocket event [syncing] is not implemented yet."
+    | NewIncludedTransactions ->
+        let stream, stopper = Broadcast.create_preconfirmation_stream () in
+        let stream =
+          Lwt_stream.filter_map
+            (function
+              | Broadcast.Preconfirmed_transaction tx ->
+                  Some (Ethereum_types.Subscription.NewIncludedTransactions tx)
+              | _ -> None)
+            stream
+        in
+        return (stream, stopper)
     | Etherlink (L1_L2_levels from_l1_level) ->
         let* () =
           unless (Evm_events_follower.available ()) @@ fun () ->
@@ -449,6 +460,7 @@ let get_proxied_subscription ws_client ~timeout
         (* Subscribe to all logs *)
         Logs {address = None; topics = None}
     | NewPendingTransactions -> NewPendingTransactions
+    | NewIncludedTransactions -> NewIncludedTransactions
     | Syncing -> Syncing
     | Etherlink (L1_L2_levels _) ->
         (* Don't fetch historic levels through websocket *)
@@ -468,7 +480,7 @@ let eth_subscribe_rpc_mode ~timeout ~(kind : Ethereum_types.Subscription.kind)
   let* proxied = get_proxied_subscription ws_client ~timeout kind in
   let* stream, stopper =
     match kind with
-    | NewHeads | NewPendingTransactions | Syncing ->
+    | NewHeads | NewPendingTransactions | Syncing | NewIncludedTransactions ->
         return @@ Lwt_watcher.create_stream proxied.watcher
     | Logs {address; topics} ->
         let stream, stopper = Lwt_watcher.create_stream proxied.watcher in
