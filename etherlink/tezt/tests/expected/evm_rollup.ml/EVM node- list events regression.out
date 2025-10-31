@@ -1391,14 +1391,6 @@ new_access_token:
     { /* new_access_token version 0 */
       "new_access_token.v0": any }
   
-no_default_snapshot_provider_for_shadownet:
-  description: the default snapshots provider for Etherlink Shadownet may not be available yet
-  level: warning
-  section: evm_node
-  json format:
-    { /* no_default_snapshot_provider_for_shadownet version 0 */
-      "no_default_snapshot_provider_for_shadownet.v0": any }
-  
 no_l1_latest_level:
   description: no l1 level processed, no EVM events catch up will occur
   level: warning
