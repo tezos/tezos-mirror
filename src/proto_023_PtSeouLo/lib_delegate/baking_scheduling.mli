@@ -45,8 +45,8 @@ val retry :
   ?max_delay:float ->
   delay:float ->
   factor:float ->
-  tries:int ->
-  ?msg:string ->
+  ?tries:int ->
+  ?msg:(tztrace -> string) ->
   ('a -> 'b tzresult Lwt.t) ->
   'a ->
   'b tzresult Lwt.t
@@ -145,6 +145,7 @@ val create_initial_state :
   chain:Chain_services.chain ->
   Baking_configuration.t ->
   Operation_worker.t ->
+  Round.round_durations ->
   current_proposal:proposal ->
   ?constants:Constants.t ->
   Baking_state_types.Key.t list ->

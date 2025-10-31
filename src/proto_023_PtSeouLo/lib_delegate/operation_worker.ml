@@ -36,14 +36,35 @@ module Events = struct
 
   let pp_int = Format.pp_print_int
 
-  let loop_failed =
+  let node_unreachable_crash =
+    declare_0
+      ~section
+      ~name:"node_unreachable_crash"
+      ~level:Error
+      ~msg:
+        "Node unreachable via the monitor_operations RPC. Unable to monitor \
+         quorum. Shutting down baker..."
+      ()
+
+  let monitor_operations_retry =
     declare_1
       ~section
-      ~name:"loop_failed"
-      ~level:Error
-      ~msg:"loop failed with {trace}"
-      ~pp1:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
+      ~name:"monitor_operations_retry"
+      ~level:Warning
+      ~msg:"{msg}"
+      ~pp1:Format.pp_print_string
+      ("msg", Data_encoding.string)
+
+  let monitor_operations_stream_timeout =
+    declare_1
+      ~section
+      ~name:"monitor_operations_stream_timeout"
+      ~level:Warning
+      ~msg:
+        "No data received from monitor_operations RPC for {timeout} seconds. \
+         Assuming the stream is stalled and refreshing it."
+      ~pp1:Format.pp_print_float
+      ("timeout", Data_encoding.float)
 
   let ended =
     declare_1
@@ -717,7 +738,7 @@ let flush_operation_pool state (head_level, head_round) =
   let operation_pool = {Operation_pool.empty with consensus = attestations} in
   state.operation_pool <- operation_pool
 
-let run ?(monitor_node_operations = true) ~constants
+let run ?(monitor_node_operations = true) ~constants ~round_durations
     (cctxt : #Protocol_client_context.full) =
   let open Lwt_syntax in
   let state =
@@ -731,13 +752,17 @@ let run ?(monitor_node_operations = true) ~constants
       (* If the call to [monitor_operations] RPC fails, retry 5 times during 25
          seconds before crashing the worker . *)
       Utils.retry
-        ~emit:(cctxt#message "%s")
+        ~emit:Events.(emit monitor_operations_retry)
         ~max_delay:10.
         ~delay:1.
         ~factor:2.
-        ~tries:5
+        ~tries:10
         ~is_error:(function _ -> true)
-        ~msg:"unable to call monitor operations RPC."
+        ~msg:(fun errs ->
+          Format.asprintf
+            "Failed to reach the node via the monitor_operations RPC@,%a"
+            pp_print_trace
+            errs)
         (fun () ->
           (monitor_operations
              cctxt
@@ -745,8 +770,14 @@ let run ?(monitor_node_operations = true) ~constants
         ()
     in
     match result with
-    | Error err -> Events.(emit loop_failed err)
-    | Ok (head, operation_stream, op_stream_stopper) ->
+    | Error _ ->
+        (* The baker failed to reach the node via the monitor_operations
+           RPC after multiple retries. Because it can no longer monitor the
+           consensus, it is unable to attest or bake. Rather than remain in this
+           degraded state or retry indefinitely, we shut it down explicitly. *)
+        let* () = Events.(emit node_unreachable_crash ()) in
+        Lwt_exit.exit_and_raise (*ECONNREFUSED*) 111
+    | Ok (((_, round) as head), operation_stream, op_stream_stopper) ->
         () [@profiler.stop] ;
         ()
         [@profiler.record
@@ -769,10 +800,34 @@ let run ?(monitor_node_operations = true) ~constants
           state
           head
         [@profiler.record_f {verbosity = Notice} "update operations pool"] ;
+        let stream_timeout =
+          Round.round_duration round_durations (Round.succ round)
+          |> Period.to_seconds |> Int64.to_float
+        in
         let rec loop () =
-          let* ops = Lwt_stream.get operation_stream in
-          match ops with
-          | None ->
+          let* result =
+            Lwt.pick
+              [
+                (let* ops = Lwt_stream.get operation_stream in
+                 return (`Stream ops));
+                (let* () = Lwt_unix.sleep stream_timeout in
+                 return `Timeout);
+              ]
+          in
+          match result with
+          | `Timeout ->
+              (* The monitor_operations RPC has neither produced new data nor
+                 closed the stream for some time. This can occur naturally, but
+                 may also indicate a stalled stream. Restarting it is
+                 inexpensive and can prevent the baker from hanging
+                 indefinitely. *)
+              let* () =
+                Events.(emit monitor_operations_stream_timeout stream_timeout)
+              in
+              op_stream_stopper () ;
+              let* () = reset_monitoring state in
+              worker_loop ()
+          | `Stream None ->
               (* When the stream closes, it means a new head has been set,
                  we reset the monitoring and flush current operations *)
               let* () = Events.(emit end_of_stream ()) in
@@ -786,7 +841,7 @@ let run ?(monitor_node_operations = true) ~constants
               in
               () [@profiler.stop] ;
               worker_loop ()
-          | Some ops ->
+          | `Stream (Some ops) ->
               (state.operation_pool <-
                 Operation_pool.add_operations state.operation_pool ops)
               [@profiler.aggregate_f {verbosity = Info} "add operations"] ;
@@ -802,16 +857,11 @@ let run ?(monitor_node_operations = true) ~constants
         (loop
            () [@profiler.record_s {verbosity = Notice} "operations processing"])
   in
-  Lwt.dont_wait
-    (fun () ->
-      Lwt.finalize
-        (fun () ->
-          if state.monitor_node_operations then worker_loop () else return_unit)
-        (fun () ->
-          let* _ = shutdown_worker state in
-          return_unit))
-    (fun exn ->
-      Events.(emit__dont_wait__use_with_care ended (Printexc.to_string exn))) ;
+  if state.monitor_node_operations then
+    Lwt.dont_wait
+      (fun () -> worker_loop ())
+      (fun exn ->
+        Events.(emit__dont_wait__use_with_care ended (Printexc.to_string exn))) ;
   return state
 
 let retrieve_pending_operations cctxt state =

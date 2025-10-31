@@ -59,21 +59,21 @@ val copy_file : src:string -> dst:string -> unit
 val copy_dir :
   ?perm:int -> ?progress:string * Terminal.Color.t -> string -> string -> unit
 
-(** [retry ?max_delay ~delay ~factor ~tries ~is_error ~emit ?msg f x]
-    retries applying [f x] [tries] until it succeeds or returns an error
-    when [is_error] is false, at most [tries] number of times. After
-    each try it waits for a number of seconds, but not more than [max_delay], if
-    given. The wait time between tries is given by the initial [delay],
-    multiplied by [factor] at each subsequent try. At each failure, [msg]
-    together with the current delay is printed using [emit]. *)
+(** [retry ?max_delay ~delay ~factor ~tries ~is_error ~emit ?msg f x] retries
+    applying [f x] [tries] until it succeeds or returns an error when [is_error]
+    is false, at most [tries] number of times. After each try it waits for a
+    number of seconds, but not more than [max_delay], if given. The wait time
+    between tries is given by the initial [delay], multiplied by [factor] at
+    each subsequent try. At each failure, [msg] can print the error together
+    with the current delay using [emit]. *)
 val retry :
   ?max_delay:float ->
   delay:float ->
   factor:float ->
-  tries:int ->
+  ?tries:int ->
   is_error:('err -> bool) ->
   emit:(string -> unit Lwt.t) ->
-  ?msg:string ->
+  ?msg:('err list -> string) ->
   ('a -> ('b, 'err list) result Lwt.t) ->
   'a ->
   ('b, 'err list) result Lwt.t

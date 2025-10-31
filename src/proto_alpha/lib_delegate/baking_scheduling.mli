@@ -45,8 +45,8 @@ val retry :
   ?max_delay:float ->
   delay:float ->
   factor:float ->
-  tries:int ->
-  ?msg:string ->
+  ?tries:int ->
+  ?msg:(tztrace -> string) ->
   ('a -> 'b tzresult Lwt.t) ->
   'a ->
   'b tzresult Lwt.t

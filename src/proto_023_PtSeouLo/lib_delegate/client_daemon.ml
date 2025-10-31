@@ -37,12 +37,7 @@ let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
       let* () =
         Client_confirmations.wait_for_bootstrapped
           ~retry:
-            (Baking_scheduling.retry
-               cctxt
-               ~max_delay:10.
-               ~delay:1.
-               ~factor:1.5
-               ~tries:max_int)
+            (Baking_scheduling.retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5)
           cctxt
       in
       retry_on_disconnection cctxt f
