@@ -27,14 +27,6 @@ open Tezos_ci.Cache
 *)
 type repository_pipeline = Full | Partial | Release
 
-let cargo_home =
-  (* Note:
-     - We want [CARGO_HOME] to be in a sub-folder of
-       {!ci_project_dir} to enable GitLab CI caching.
-     - We want [CARGO_HOME] to be hidden from dune
-       (thus the dot-prefix). *)
-  Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
-
 module Helpers = struct
   let retry_default_config =
     Gitlab_ci.Types.
