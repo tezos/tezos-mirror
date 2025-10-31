@@ -70,8 +70,6 @@ module Helpers = struct
     @ before_script
 end
 
-let opt_var name f = function Some value -> [(name, f value)] | None -> []
-
 module Build = struct
   (* This version of the job builds both released and experimental executables.
    It is used in the following pipelines:
@@ -501,10 +499,4 @@ module Packaging = struct
         script;
       ]
     |> enable_sccache ~idle_timeout:"0"
-
-  type bin_package_target = Rpm
-
-  type bin_package_group = A | B
-
-  let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
 end
