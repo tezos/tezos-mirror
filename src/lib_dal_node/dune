@@ -35,6 +35,7 @@
   octez-shell-libs.shell-services
   opentelemetry
   opentelemetry-client-cohttp-lwt
+  octez-libs.octez-telemetry
   octez-libs.prometheus-app
   octez-libs.prometheus
   octez-crawler

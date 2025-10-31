@@ -5425,6 +5425,7 @@ let octez_dal_node_lib =
         octez_shell_services |> open_;
         opentelemetry;
         opentelemetry_client_cohttp_lwt;
+        octez_telemetry;
         prometheus_app;
         prometheus;
         octez_crawler |> open_;
