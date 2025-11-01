@@ -60,7 +60,11 @@ let attested_just_after_migration ctxt ~attested_level =
   let* new_lag = get_attestation_lag ctxt ~level:attested_level in
   let* old_lag =
     let published_level = Int32.(sub attested_level new_lag) in
-    get_attestation_lag ctxt ~level:published_level
+    if published_level < 1l then
+      (* This makes the condition below false; which is correct assuming there's
+         no migration before level [new_lag + 1] (or so). *)
+      return new_lag
+    else get_attestation_lag ctxt ~level:published_level
   in
   return
     (old_lag > new_lag

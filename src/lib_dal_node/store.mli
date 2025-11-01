@@ -93,18 +93,10 @@ module Statuses_cache : sig
 
   type t
 
-  (** [update_selected_slot_headers_statuses ~block_level
-      ~attestation_lag ~number_of_slots attested is_attested store]
-      updates the status of all accepted slots at level [block_level -
-      attestation_lag] to either `Attested ([attested] returns [true])
-      or `Unattested (when [attested] returns [false]). *)
-  val update_selected_slot_headers_statuses :
-    block_level:int32 ->
-    attestation_lag:int ->
-    number_of_slots:int ->
-    (int -> bool) ->
-    t ->
-    unit
+  (** [update_slot_header_status store slot_id status] updates the status of the
+      [slot_id] to [status]. *)
+  val update_slot_header_status :
+    t -> Types.slot_id -> Types.header_status -> unit
 
   (** [get_slot_status cache ~slot_id] returns the status associated
       to the given [slot_id], if any. *)
@@ -278,7 +270,8 @@ module Skip_list_cells : sig
     (Skip_list_hash.t
     * Skip_list_cell.t
     * Types.slot_index
-    * Types.attestation_lag)
+    * Types.attestation_lag
+    * Types.header_status option)
     list ->
     unit tzresult Lwt.t
 

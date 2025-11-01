@@ -793,15 +793,9 @@ module Statuses = struct
         | Error e -> fail (`Other e))
 end
 
-let update_selected_slot_headers_statuses ~block_level ~attestation_lag
-    ~number_of_slots attested_slots node_store =
+let update_slot_header_status node_store slot_id status =
   let statuses_cache = Store.statuses_cache node_store in
-  Store.Statuses_cache.update_selected_slot_headers_statuses
-    ~block_level
-    ~attestation_lag
-    ~number_of_slots
-    attested_slots
-    statuses_cache
+  Store.Statuses_cache.update_slot_header_status statuses_cache slot_id status
 
 let get_slot_status ~slot_id ctxt = Statuses.find_status ctxt slot_id
 

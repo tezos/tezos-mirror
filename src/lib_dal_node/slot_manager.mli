@@ -180,23 +180,11 @@ val store_slot_headers :
   Store.t ->
   unit Lwt.t
 
-(** [update_selected_slot_headers_statuses ~block_level ~attestation_lag
-    ~number_of_slots attested_slots store] updates the statuses of the
-    previously selected slots at level [block_level] - [attestation_lag] and
-    that were waiting for attestation.
-
-    Slot headers whose indexes are in [attested_slots] are now set as
-    {!`Attested} in [store]. Those which are not are marked as
-    {!`Unattested} in the [store] if they previously had a "waiting for
-    attestation" status.
-*)
-val update_selected_slot_headers_statuses :
-  block_level:int32 ->
-  attestation_lag:int ->
-  number_of_slots:int ->
-  (Dal_plugin.slot_index -> bool) ->
-  Store.t ->
-  unit
+(** [update_slot_header_status store slot_id status] updates the status of
+    [slot_id] setting it to [status], if the previous status was not present in
+    the store or was {!`Waiting_attestation}. *)
+val update_slot_header_status :
+  Store.t -> Types.slot_id -> Types.header_status -> unit
 
 (** [get_slot_status ~slot_id store] returns the status associated to the
     accepted slot of id [slot_id] or [None] if no status is currently

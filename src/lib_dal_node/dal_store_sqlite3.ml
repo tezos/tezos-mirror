@@ -272,7 +272,7 @@ module Skip_list_cells = struct
     let open Lwt_result_syntax in
     with_connection store conn @@ fun conn ->
     List.iter_es
-      (fun (cell_hash, cell, slot_index, attestation_lag) ->
+      (fun (cell_hash, cell, slot_index, attestation_lag, _status_opt) ->
         let published_level =
           Int32.(sub attested_level (of_int attestation_lag))
         in

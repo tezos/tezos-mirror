@@ -5767,14 +5767,14 @@ let test_attestation_through_p2p ~batching_time_interval _protocol
   Log.info "Slot sucessfully attested" ;
   unit
 
-module History_rpcs = struct
+module Skip_list_rpcs = struct
   (* In the following function, no migration is performed (expect from genesis
      to alpha) when [migration_level] is equal to or smaller than 1. *)
-  let main_scenario ?(migration_level = 1) ~slot_index ~first_cell_level
-      ~first_dal_level ~last_confirmed_published_level protocol dal_parameters
-      client node dal_node =
+  let main_scenario ?(migration_level = 1) ~slot_index
+      ~last_confirmed_published_level protocol dal_parameters client node
+      dal_node =
     let module Map_int = Map.Make (Int) in
-    Log.info "slot_index = %d first_dal_level = %d" slot_index first_dal_level ;
+    Log.info "slot_index = %d" slot_index ;
     let client = Client.with_dal_node client ~dal_node in
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
     let lag = dal_parameters.attestation_lag in
@@ -5794,6 +5794,9 @@ module History_rpcs = struct
         let wait_mempool_injection =
           Node.wait_for node "operation_injected.v0" (fun _ -> Some ())
         in
+        let wait_for_dal_node =
+          wait_for_layer1_final_block dal_node (level - 1)
+        in
         let* commitment =
           Helpers.publish_and_store_slot
             client
@@ -5806,46 +5809,66 @@ module History_rpcs = struct
         let* () = wait_mempool_injection in
         let* () = bake_for client in
         let* _level = Node.wait_for_level node (level + 1) in
+        let* () = if level > 2 then wait_for_dal_node else unit in
         publish
           ~max_level
           (level + 1)
           (Map_int.add published_level commitment commitments)
     in
-    Log.info
-      "Publishing commitments in the previous protocol, from published level \
-       %d to %d"
-      (starting_level + 1)
-      (migration_level + 1) ;
+    if migration_level > 1 then
+      Log.info
+        "Publishing commitments in the previous protocol, from published level \
+         %d to %d"
+        (starting_level + 1)
+        migration_level ;
     let* commitments =
-      publish ~max_level:migration_level starting_level Map_int.empty
+      publish ~max_level:(migration_level - 1) starting_level Map_int.empty
     in
 
-    Log.info "Migrated to the next protocol." ;
+    if migration_level > 1 then Log.info "Migrated to the next protocol." ;
+
+    let* new_proto_params =
+      Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+    in
+    let new_lag =
+      JSON.(
+        new_proto_params |-> "dal_parametric" |-> "attestation_lag" |> as_int)
+    in
+    if new_lag <> lag then Log.info "new attestation_lag = %d" new_lag ;
 
     let last_attested_level = last_confirmed_published_level + lag in
-
+    (* The maximum level that needs to be reached (we use +2 to make last
+       attested level final). *)
+    let max_level = last_attested_level + 2 in
+    Log.info
+      "last published_level = %d, last attested_level = %d, last level = %d"
+      last_confirmed_published_level
+      last_attested_level
+      max_level ;
     let wait_for_dal_node =
       wait_for_layer1_final_block dal_node last_attested_level
     in
 
     let* second_level_new_proto = Client.level client in
-    assert (second_level_new_proto = migration_level + 1) ;
+    assert (second_level_new_proto = migration_level) ;
     Log.info
       "Publish commitments in the new protocol, from published level %d to %d"
       (second_level_new_proto + 1)
-      (last_confirmed_published_level + 1) ;
+      last_confirmed_published_level ;
     let* commitments =
       publish
-        ~max_level:last_confirmed_published_level
+        ~max_level:(last_confirmed_published_level - 1)
         second_level_new_proto
         commitments
     in
-    let* () =
-      (* The maximum level that needs to be reached (we use +2 to make last
+
+    (* The maximum level that needs to be reached (we use +2 to make last
        attested level final). *)
-      let max_level = last_attested_level + 2 in
+    let max_level = last_attested_level + 2 in
+    let* () =
       let* current_level = Node.get_level node in
-      let count = max_level + 1 - current_level in
+      let count = max_level - current_level in
+      Log.info "Current level is %d. Bake %d more blocks." current_level count ;
       bake_for ~count client
     in
 
@@ -5858,35 +5881,12 @@ module History_rpcs = struct
     let at_least_one_attested_status = ref false in
 
     let rec check_cell cell ~check_level =
-      let* lag_at_check_level =
-        let block = Option.map string_of_int check_level in
-        let* dal_parameters = Dal.Parameters.from_client ?block client in
-        return dal_parameters.attestation_lag
-      in
-      let* lag_at_pred_check_level =
-        let block =
-          Option.fold
-            ~none:None
-            ~some:(fun level ->
-              if level <= 1 then None else Some (string_of_int (level - 1)))
-            check_level
-        in
-        let* dal_parameters = Dal.Parameters.from_client ?block client in
-        return dal_parameters.attestation_lag
-      in
-      (* Select the right lag while taking care of the false returned lag in the
-         migration block (pevious lag used for validation but parameters patched
-         at block finalization). *)
-      let lag =
-        if lag_at_check_level = lag_at_pred_check_level then lag_at_check_level
-        else lag_at_pred_check_level
-      in
-
       let skip_list_kind = JSON.(cell |-> "kind" |> as_string) in
       let expected_skip_list_kind = "dal_skip_list" in
       Check.(
         (skip_list_kind = expected_skip_list_kind)
           string
+          ~__LOC__
           ~error_msg:"Unexpected skip list kind: got %L, expected %R") ;
       let skip_list = JSON.(cell |-> "skip_list") in
       let cell_index = JSON.(skip_list |-> "index" |> as_int) in
@@ -5898,14 +5898,16 @@ module History_rpcs = struct
 
         (match check_level with
         | Some level ->
-            assert (level >= first_dal_level) ;
+            assert (level >= 1) ;
             let expected_published_level =
-              if level = first_dal_level then (* the "level" of genesis *) 0
+              if level = 1 then (* the "level" of genesis *) 0
+              else if level > migration_level then level - new_lag
               else level - lag
             in
             Check.(
               (cell_level = expected_published_level)
                 int
+                ~__LOC__
                 ~error_msg:
                   "Unexpected cell's published level: got %L, expected %R")
         | None -> ()) ;
@@ -5915,7 +5917,7 @@ module History_rpcs = struct
           | None -> ()
           | Some level ->
               let expected_slot_index =
-                if level = first_dal_level then
+                if level = 1 then
                   (* the "slot index" of genesis *)
                   0
                 else number_of_slots - 1
@@ -5923,23 +5925,28 @@ module History_rpcs = struct
               Check.(
                 (cell_slot_index = expected_slot_index)
                   int
+                  ~__LOC__
                   ~error_msg:"Unexpected slot index: got %L, expected %R")
         in
         (if cell_index > 0 then
            let expected_cell_index =
-             ((cell_level - 1 - first_cell_level) * number_of_slots)
-             + cell_slot_index
+             ((cell_level - 1) * number_of_slots) + cell_slot_index
            in
            Check.(
              (cell_index = expected_cell_index)
                int
+               ~__LOC__
                ~error_msg:"Unexpected cell index: got %L, expected %R")) ;
         let cell_kind = JSON.(content |-> "kind" |> as_string) in
         let published cell_level =
           (* - Cond 1: we publish at [slot_index]
              - Cond 2: the (published) [cell_level] is greater than
-             [starting_level] *)
-          cell_slot_index = slot_index && cell_level > starting_level
+             [starting_level]
+             - Cond 3: the (published) [cell_level] is smaller or equal to
+             [last_confirmed_published_level] *)
+          cell_slot_index = slot_index
+          && cell_level > starting_level
+          && cell_level <= last_confirmed_published_level
         in
         let expected_kind =
           if not (published cell_level) then "unpublished"
@@ -5950,12 +5957,14 @@ module History_rpcs = struct
         Check.(
           (cell_kind = expected_kind)
             string
+            ~__LOC__
             ~error_msg:"Unexpected cell kind: got %L, expected %R") ;
         (if cell_kind = "published" || cell_kind = "attested" then
            let commitment = JSON.(content |-> "commitment" |> as_string) in
            Check.(
              (commitment = Map_int.find cell_level commitments)
                string
+               ~__LOC__
                ~error_msg:"Unexpected commitment: got %L, expected %R")) ;
         let back_pointers =
           JSON.(skip_list |-> "back_pointers" |> as_list)
@@ -5995,11 +6004,12 @@ module History_rpcs = struct
     in
     let* () = wait_for_dal_node in
     Log.info "Check skip-list using commitments_history RPCs" ;
-    let* () = check_history first_dal_level in
+    let* () = check_history 1 in
 
     Check.(
       (!at_least_one_attested_status = true)
         bool
+        ~__LOC__
         ~error_msg:"No cell with the 'attested' status has been visited") ;
 
     let rec call_cells_of_level level =
@@ -6013,10 +6023,16 @@ module History_rpcs = struct
         in
         let cells = JSON.as_list cells in
         let num_cells = List.length cells in
-        let expected_num_cells = if level < lag then 0 else 32 in
+        let expected_num_cells =
+          if level < lag then 0
+          else if level = migration_level + 1 then
+            (lag - new_lag + 1) * number_of_slots
+          else number_of_slots
+        in
         Check.(
           (num_cells = expected_num_cells)
             int
+            ~__LOC__
             ~error_msg:"Unexpected number of cells: got %L, expected %R") ;
         let* () =
           Lwt_list.iter_s
@@ -6048,22 +6064,50 @@ module History_rpcs = struct
         Check.(
           (commitment = expected_commitment)
             string
+            ~__LOC__
             ~error_msg:
               (let msg = sf "Unexpected commitment at level %d: " level in
-               msg ^ ": got %L, expected %R")) ;
+               msg ^ "got %L, expected %R")) ;
         call_get_commitment (level + 1)
     in
     Log.info "Check fetching commitments from the skip-list store" ;
     let* () = call_get_commitment 2 in
 
+    let rec call_get_status level =
+      (* At [max_level] we'd get 404; at [max_level - 1] we get answer because
+         statuses are inserted at L1 head level + 1. *)
+      if level >= max_level then unit
+      else
+        let* status =
+          Dal_RPC.(
+            call dal_node @@ get_level_slot_status ~slot_level:level ~slot_index)
+        in
+        let expected_status =
+          if level <= migration_level - lag then Dal_RPC.Attested lag
+          else if level == migration_level + 1 - lag then Dal_RPC.Unattested
+          else if new_lag <> lag && level <= migration_level then
+            Dal_RPC.Unattested
+          else if level <= last_confirmed_published_level then
+            Dal_RPC.Attested lag
+          else Dal_RPC.Unpublished
+        in
+        Check.(
+          (status = expected_status)
+            Dal_common.Check.slot_id_status_typ
+            ~__LOC__
+            ~error_msg:
+              (let msg = sf "Unexpected status at level %d: " level in
+               msg ^ "got %L, expected %R")) ;
+        call_get_status (level + 1)
+    in
+    Log.info "Check fetching statuses from the skip-list store" ;
+    let* () = call_get_status 2 in
     unit
 
-  let test_commitments_history_rpcs protocols =
+  let test_skip_list_rpcs protocols =
     let scenario protocol dal_parameters _ client node dal_node =
       main_scenario
         ~slot_index:3
-        ~first_cell_level:0
-        ~first_dal_level:1
         ~last_confirmed_published_level:3
         protocol
         dal_parameters
@@ -6072,7 +6116,7 @@ module History_rpcs = struct
         dal_node
     in
     let tags = ["rpc"; "skip_list"] in
-    let description = "commitments history RPCs" in
+    let description = "skip-list RPCs" in
     scenario_with_layer1_and_dal_nodes
       ~tags
       ~operator_profiles:[3; 15]
@@ -6080,7 +6124,7 @@ module History_rpcs = struct
       scenario
       protocols
 
-  let test_commitments_history_rpcs_with_migration ~migrate_from ~migrate_to
+  let test_skip_list_rpcs_with_migration ~migrate_from ~migrate_to
       ~migration_level =
     let slot_index = 3 in
     let scenario ~migrate_to ~migration_level dal_parameters =
@@ -6097,15 +6141,13 @@ module History_rpcs = struct
       let last_confirmed_published_level = migration_level + 3 in
       main_scenario
         ~slot_index
-        ~first_cell_level:0
-        ~first_dal_level:1
         ~last_confirmed_published_level
         ~migration_level
         migrate_to
         dal_parameters
     in
 
-    let description = "test commitments history with migration" in
+    let description = "test skip-list RPCs with migration" in
     let tags = ["rpc"; "skip_list"] in
     test_l1_migration_scenario
       ~migrate_from
@@ -12087,7 +12129,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~attestation_threshold:100
-    ~attestation_lag:16
+    ~attestation_lag:8
     ~activation_timestamp:Now
     ~number_of_slots:8
     ~operator_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
@@ -12200,7 +12242,7 @@ let register ~protocols =
     ~prover:false
     test_operator_profile
     protocols ;
-  History_rpcs.test_commitments_history_rpcs protocols ;
+  Skip_list_rpcs.test_skip_list_rpcs protocols ;
   scenario_with_layer1_and_dal_nodes
     ~tags:["amplification"]
     ~bootstrap_profile:true
@@ -12510,7 +12552,7 @@ let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
 
 let register_migration ~migrate_from ~migrate_to =
   test_migration_plugin ~migration_level:11 ~migrate_from ~migrate_to ;
-  History_rpcs.test_commitments_history_rpcs_with_migration
+  Skip_list_rpcs.test_skip_list_rpcs_with_migration
     ~migration_level:11
     ~migrate_from
     ~migrate_to ;
