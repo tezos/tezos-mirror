@@ -11,16 +11,16 @@ open Tezos_ci
 
 (** Modifying these files will unconditionally execute all conditional jobs.
 
-        If the CI configuration of [before_merging] or [merge_train]
-        pipelines change, we execute all jobs of these merge request
-        pipelines. (We cannot currently have a finer grain and run only
-        the jobs that are modified.)
+    If the CI configuration of [before_merging] or [merge_train]
+    pipelines change, we execute all jobs of these merge request
+    pipelines. (We cannot currently have a finer grain and run only
+    the jobs that are modified.)
 
-        As Changesets should only be present in merge request pipelines,
-        other pipelines' files need not be in the changeset.
+    As Changesets should only be present in merge request pipelines,
+    other pipelines' files need not be in the changeset.
 
-        [changeset_base] should be included in all Changesets below, any
-        exceptions should be explained. *)
+    [changeset_base] should be included in all Changesets below, any
+    exceptions should be explained. *)
 let changeset_base =
   Changeset.make
     [
@@ -116,8 +116,8 @@ let changeset_octez_docs =
 let changeset_octez_docs_rst = Changeset.(changeset_base @ make ["**/*.rst"])
 
 (* Job [documentation:manuals] requires the build jobs, because it needs
-       to run Octez executables to generate the man pages.
-       So the build jobs need to be included if the documentation changes. *)
+   to run Octez executables to generate the man pages.
+   So the build jobs need to be included if the documentation changes. *)
 let changeset_octez_or_doc = Changeset.(changeset_octez @ changeset_octez_docs)
 
 let changeset_octez_or_kernels_or_doc =
@@ -197,8 +197,8 @@ let changeset_homebrew =
 
 (** The set of [changes:] that select opam jobs.
 
-        Note: unlike all other Changesets, this one does not include {!changeset_base}.
-        This is to avoid running these costly jobs too often. *)
+    Note: unlike all other Changesets, this one does not include {!changeset_base}.
+    This is to avoid running these costly jobs too often. *)
 let changeset_opam_jobs =
   Changeset.(
     make
@@ -218,8 +218,8 @@ let changeset_opam_jobs =
 
 let changeset_kaitai_e2e_files, changeset_kaitai_checks_files =
   (* this is an over approximation considering all scripts used
-         in both Changesets, that mainly differ because of the image
-         use to run the jobs *)
+     in both Changesets, that mainly differ because of the image
+     use to run the jobs *)
   let changeset_kaitai =
     Changeset.make
       [
@@ -250,7 +250,7 @@ let changeset_lift_limits_patch =
         ])
 
 (* The linting job runs over the set of [source_directories]
-       defined in [scripts/lint.sh] that must be included here: *)
+   defined in [scripts/lint.sh] that must be included here: *)
 let changeset_lint_files =
   Changeset.(
     changeset_base
@@ -286,7 +286,7 @@ let changeset_semgrep_files =
 let changeset_jsonnet_fmt_files = Changeset.(make ["**/*.jsonnet"])
 
 (* We only need to run the [oc.script:snapshot_alpha_and_link] job if
-       protocol Alpha or if the scripts changed. *)
+   protocol Alpha or if the scripts changed. *)
 let changeset_script_snapshot_alpha_and_link =
   Changeset.(
     changeset_base
