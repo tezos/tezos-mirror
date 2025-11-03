@@ -71,6 +71,9 @@ fn compute_fees_balance_updates(
     source: &PublicKeyHash,
     amount: &Narith,
 ) -> Result<Vec<BalanceUpdate>, TryFromBigIntError<BigInt>> {
+    if amount.eq(&0_u64.into()) {
+        return Ok(vec![]);
+    };
     let source_delta = BigInt::from_biguint(Sign::Minus, amount.into());
     let block_fees = BigInt::from_biguint(Sign::Plus, amount.into());
 

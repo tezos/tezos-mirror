@@ -637,6 +637,9 @@ fn compute_storage_balance_updates(
     source: &TezlinkImplicitAccount,
     fee: BigUint,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
+    if fee.eq(&0_u64.into()) {
+        return Ok(vec![]);
+    };
     let source_delta = BigInt::from_biguint(num_bigint::Sign::Minus, fee.clone());
     let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, fee);
 
