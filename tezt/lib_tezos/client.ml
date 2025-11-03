@@ -1890,8 +1890,8 @@ let write_stresstest_sources_file ?runner ~sources filename =
       Helpers.write_file ~runner filename ~contents:(JSON.encode_u sources)
 
 let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
-    ?transfers ?tps ?fresh_probability ?smart_contract_parameters client
-    sources_filename =
+    ?transfers ?tps ?fresh_probability ?smart_contract_parameters ?strategy
+    ?level_limit client sources_filename =
   let seed =
     (* Note: Tezt does not call [Random.self_init] so this is not
        randomized from one run to the other (if the exact same tests
@@ -1909,6 +1909,10 @@ let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
   in
   let make_float_opt_arg (name : string) = function
     | Some (arg : float) -> [name; Float.to_string arg]
+    | None -> []
+  in
+  let make_string_int_opt_arg (name : string) s = function
+    | Some (arg : int) -> [name; sf "%s%s" s (Int.to_string arg)]
     | None -> []
   in
   let fee_arg =
@@ -1955,6 +1959,8 @@ let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
   @ make_int_opt_arg "--tps" tps
   @ make_float_opt_arg "--fresh-probability" fresh_probability
   @ smart_contract_parameters_arg
+  @ make_string_int_opt_arg "--level-limit" "+" level_limit
+  @ make_string_int_opt_arg "--strategy" "fixed:" strategy
 
 let spawn_stresstest ?env ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
@@ -2114,13 +2120,17 @@ let stresstest_originate_smart_contracts ?endpoint (source : Account.key) client
   |> Process.check
 
 let stresstest_fund_accounts_from_source ?env ?endpoint ~source_key_pkh
-    ?batch_size ?batches_per_block ?initial_amount client =
+    ?burn_cap ?fee_cap ?default_gas_limit ?batch_size ?batches_per_block
+    ?initial_amount client =
   spawn_command
     ?env
     ?endpoint
     client
     (["stresstest"; "fund"; "accounts"; "from"; source_key_pkh]
     @ optional_arg "batch-size" string_of_int batch_size
+    @ optional_arg "burn-cap" string_of_int burn_cap
+    @ optional_arg "fee-cap" string_of_int fee_cap
+    @ optional_arg "default-gas-limit" string_of_int default_gas_limit
     @ optional_arg "batches-per-block" string_of_int batches_per_block
     @ optional_arg
         "initial-amount"
