@@ -265,6 +265,29 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~dependencies:(Dependent [Job job_docker_merge])
       ()
   in
+  let job_dispatch_call =
+    job
+      ~__POS__
+      ~image:Images.CI.prebuild
+      ~stage:Stages.publish
+      ~description:
+        "A job release that triggers pipelines from other repositories after a \
+         release.\n\
+         For now, it triggers the release pipeline from \
+         tez-capital/tezos-macos-pipeline"
+      ~interruptible:false
+      ~name:"dispatch-call"
+      ~dependencies:
+        (Dependent [Job job_release_page; Job job_gitlab_release_or_publish])
+      [
+        "curl -L -X POST -H \"Accept: application/vnd.github+json\" -H \
+         \"Authorization: Bearer ${TEZCAPITAL_GITHUB_TOKEN}\" -H \
+         \"X-GitHub-Api-Version: 2022-11-28\" \
+         https://api.github.com/repos/tez-capital/tezos-macos-pipeline/actions/workflows/macos.yml/dispatches \
+         -d '{\"ref\":\"main\",\"inputs\":{\"version\": \
+         \"${CI_COMMIT_TAG}\"}}'";
+      ]
+  in
   let job_trigger_monitoring =
     trigger_job
       ~__POS__
@@ -294,9 +317,8 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
      else [])
   @
   match (test, release_tag_pipeline_type) with
-  (* for the moment the apt repository are not official, so we do not add to the release
-     pipeline . *)
-  | false, Release_tag -> [job_opam_release (); job_release_page]
+  | false, Release_tag ->
+      [job_opam_release (); job_release_page; job_dispatch_call]
   | true, Release_tag ->
       [
         (* This job normally runs in the {!Octez_latest_release} pipeline
@@ -307,6 +329,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
         job_promote_to_latest_test;
         job_opam_release ~dry_run:true ();
         job_release_page;
+        job_dispatch_call;
       ]
   | _ -> []
 
