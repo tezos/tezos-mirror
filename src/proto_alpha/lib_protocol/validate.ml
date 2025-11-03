@@ -2503,9 +2503,8 @@ module Anonymous = struct
                })
         in
         let* attestation_lag =
-          let* migration_level = First_level_of_protocol.get ctxt in
           let+ parameters =
-            Alpha_context.Dal.Past_parameters.parameters ctxt migration_level
+            Alpha_context.Dal.Past_parameters.parameters ctxt level.level
           in
           parameters.attestation_lag
         in
