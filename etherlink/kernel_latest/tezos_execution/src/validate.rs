@@ -70,7 +70,7 @@ fn check_and_increment_counter(
 fn compute_fees_balance_updates(
     source: &PublicKeyHash,
     amount: &Narith,
-) -> Result<(BalanceUpdate, BalanceUpdate), TryFromBigIntError<BigInt>> {
+) -> Result<Vec<BalanceUpdate>, TryFromBigIntError<BigInt>> {
     let source_delta = BigInt::from_biguint(Sign::Minus, amount.into());
     let block_fees = BigInt::from_biguint(Sign::Plus, amount.into());
 
@@ -86,7 +86,7 @@ fn compute_fees_balance_updates(
         update_origin: UpdateOrigin::BlockApplication,
     };
 
-    Ok((source_update, block_fees))
+    Ok(vec![source_update, block_fees])
 }
 
 /// In order to validate an operation, we need to check its signature,
@@ -216,11 +216,11 @@ fn validate_individual_operation<Host: Runtime>(
         account_balance
     );
 
-    let (src_delta, block_fees) = compute_fees_balance_updates(account_pkh, &content.fee)
+    let balance_updates = compute_fees_balance_updates(account_pkh, &content.fee)
         .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
 
     Ok(ValidatedOperation {
-        balance_updates: vec![src_delta, block_fees],
+        balance_updates,
         gas,
         content,
     })
