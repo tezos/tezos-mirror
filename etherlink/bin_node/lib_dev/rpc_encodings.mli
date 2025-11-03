@@ -262,7 +262,8 @@ module Send_raw_transaction :
 
 module Send_raw_transaction_sync :
   METHOD
-    with type input = Ethereum_types.hex * int64
+    with type input =
+      Ethereum_types.hex * int64 * Ethereum_types.Block_parameter.t
      and type output = Transaction_receipt.t
 
 module Eth_call :

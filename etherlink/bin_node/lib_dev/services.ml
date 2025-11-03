@@ -769,7 +769,7 @@ let send_raw_transaction (type f)
 
 let dispatch_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) (config : Configuration.t)
+    (rpc : Configuration.rpc) (config : Configuration.t) (mode : Mode.t)
     (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
@@ -1131,36 +1131,31 @@ let dispatch_request (type f) ~websocket
               in
               build_with_input ~f module_ parameters
         | Send_raw_transaction_sync.Method ->
-            let f (raw_tx, timeout) =
-              let promise =
-                send_raw_transaction tx_container raw_tx ~wait_confirmation:true
-              in
-              let* hash =
-                match timeout with
-                | 0L -> promise
-                | timeout ->
-                    let timeout = Int64.to_float timeout in
-                    (*milliseconds to seconds*)
-                    let timeout = timeout /. 1000. in
-                    Lwt.catch
-                      (fun () ->
-                        Lwt_unix.with_timeout timeout (fun () -> promise))
-                      (function
-                        | Lwt_unix.Timeout ->
-                            rpc_error
-                              (Rpc_errors.transaction_rejected
-                                 (Format.sprintf
-                                    "The transaction was added to the mempool \
-                                     but wasn't processed in %d ms"
-                                    (int_of_float timeout))
-                                 None)
-                        | exn -> Lwt.fail exn)
-              in
-              match hash with
-              | Ok hash -> (
-                  let* receipt =
-                    Backend_rpc.Etherlink_block_storage.transaction_receipt hash
-                  in
+            let wait_or_timeout timeout f =
+              match timeout with
+              | 0L -> f ()
+              | timeout ->
+                  let timeout = Int64.to_float timeout in
+                  (*milliseconds to seconds*)
+                  let timeout = timeout /. 1000. in
+                  Lwt.catch
+                    (fun () -> Lwt_unix.with_timeout timeout f)
+                    (function
+                      | Lwt_unix.Timeout ->
+                          rpc_error
+                            (Rpc_errors.transaction_rejected
+                               (Format.sprintf
+                                  "The transaction was added to the mempool \
+                                   but wasn't processed in %d ms"
+                                  (int_of_float timeout))
+                               None)
+                      | exn -> Lwt.fail exn)
+            in
+            let tx_hash_to_receipt f tx_hash =
+              match tx_hash with
+              | Error reason -> rpc_error reason
+              | Ok tx_hash -> (
+                  let* receipt = f tx_hash in
                   match receipt with
                   | Some receipt -> rpc_ok receipt
                   | None ->
@@ -1168,7 +1163,67 @@ let dispatch_request (type f) ~websocket
                         (Rpc_errors.transaction_rejected
                            "Transaction not found"
                            None))
-              | Error reason -> rpc_error reason
+            in
+            let f (raw_tx, timeout, block_parameter) =
+              match (block_parameter, mode) with
+              (* Forward to the observer directly *)
+              | ( Ethereum_types.Block_parameter.Pending,
+                  Rpc {evm_node_endpoint; _} ) -> (
+                  let* res =
+                    Injector.send_raw_transaction_sync
+                      ~keep_alive:true
+                      ~timeout:10.
+                      ~base:evm_node_endpoint
+                      ~raw_tx
+                      ~internal_timeout:timeout
+                      ~block_parameter:Ethereum_types.Block_parameter.Pending
+                  in
+                  match res with
+                  | Ok receipt -> rpc_ok receipt
+                  | Error err -> rpc_error (Rpc_errors.internal_error err))
+              (* Use preconfirmation stream *)
+              | Ethereum_types.Block_parameter.Pending, _ ->
+                  wait_or_timeout timeout (fun () ->
+                      let receipt_stream, stopper =
+                        Broadcast.create_receipt_stream ()
+                      in
+                      let* hash =
+                        send_raw_transaction
+                          tx_container
+                          raw_tx
+                          ~wait_confirmation:false
+                      in
+                      let receipt_from_stream hash =
+                        let*! receipt =
+                          Lwt_stream.find
+                            (fun (r : Transaction_receipt.t) ->
+                              r.transactionHash = hash)
+                            receipt_stream
+                        in
+                        return receipt
+                      in
+                      let+ receipt =
+                        tx_hash_to_receipt receipt_from_stream hash
+                      in
+                      Lwt_watcher.shutdown stopper ;
+                      receipt)
+              (* Use normal execution infos *)
+              | Ethereum_types.Block_parameter.Latest, _ ->
+                  wait_or_timeout timeout (fun () ->
+                      let* hash =
+                        send_raw_transaction
+                          tx_container
+                          raw_tx
+                          ~wait_confirmation:true
+                      in
+                      tx_hash_to_receipt
+                        Backend_rpc.Etherlink_block_storage.transaction_receipt
+                        hash)
+              | _ ->
+                  rpc_error
+                    (Rpc_errors.invalid_params
+                       "The block parameter for sendRawTransactionSync must be \
+                        'latest' or 'pending'")
             in
             build_with_input ~f module_ parameters
         | Eth_call.Method ->
@@ -1352,7 +1407,7 @@ let dispatch_request (type f) ~websocket
 
 let dispatch_private_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) (_config : Configuration.t)
+    (rpc : Configuration.rpc) (_config : Configuration.t) (_ : Mode.t)
     (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
@@ -1541,12 +1596,13 @@ let can_process_batch size = function
   | Configuration.Limit l -> size <= l
   | Unlimited -> true
 
-let dispatch_handler ~service_name (rpc : Configuration.rpc) config tx_container
-    ctx dispatch_request (input : JSONRPC.request batched_request) =
+let dispatch_handler ~service_name (rpc : Configuration.rpc) config mode
+    tx_container ctx dispatch_request (input : JSONRPC.request batched_request)
+    =
   let open Lwt_syntax in
   match input with
   | Singleton request ->
-      let* response = dispatch_request config tx_container ctx request in
+      let* response = dispatch_request config mode tx_container ctx request in
       return (Singleton response)
   | Batch requests ->
       let batch_size = List.length requests in
@@ -1554,7 +1610,7 @@ let dispatch_handler ~service_name (rpc : Configuration.rpc) config tx_container
       @@ fun _scope ->
       let process =
         if can_process_batch batch_size rpc.batch_limit then
-          dispatch_request config tx_container ctx
+          dispatch_request config mode tx_container ctx
         else fun req ->
           let value =
             Error Rpc_errors.(invalid_request "too many requests in batch")
@@ -1637,6 +1693,7 @@ let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
           rpc_server_family
           rpc
           config
+          mode
           tx_container
           ctx
           input
@@ -1645,7 +1702,7 @@ let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
 
 let dispatch_private_websocket
     (rpc_server_family : _ Rpc_types.rpc_server_family) ~block_production
-    (rpc : Configuration.rpc) config _mode tx_container ctx
+    (rpc : Configuration.rpc) config mode tx_container ctx
     (input : JSONRPC.request) =
   let open Lwt_syntax in
   let+ response =
@@ -1655,19 +1712,21 @@ let dispatch_private_websocket
       ~block_production
       rpc
       config
+      mode
       tx_container
       ctx
       input
   in
   websocket_response_of_response response
 
-let generic_dispatch ~service_name (rpc : Configuration.rpc) config tx_container
-    ctx dir path dispatch_request =
+let generic_dispatch ~service_name (rpc : Configuration.rpc) config mode
+    tx_container ctx dir path dispatch_request =
   Evm_directory.register0 dir (dispatch_batch_service ~path) (fun () input ->
       dispatch_handler
         ~service_name
         rpc
         config
+        mode
         tx_container
         ctx
         dispatch_request
@@ -1675,12 +1734,13 @@ let generic_dispatch ~service_name (rpc : Configuration.rpc) config tx_container
       |> Lwt_result.ok)
 
 let dispatch_public (type f) (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) config
+    (rpc : Configuration.rpc) config (mode : Mode.t)
     (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_dispatch
     ~service_name:"public_rpc"
     rpc
     config
+    mode
     tx_container
     ctx
     dir
@@ -1689,12 +1749,13 @@ let dispatch_public (type f) (rpc_server_family : _ Rpc_types.rpc_server_family)
 
 let dispatch_private (type f)
     (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) ~block_production config
+    (rpc : Configuration.rpc) ~block_production config (mode : Mode.t)
     (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_dispatch
     ~service_name:"private_rpc"
     rpc
     config
+    mode
     tx_container
     ctx
     dir
@@ -1765,7 +1826,7 @@ let directory (type f) ~(rpc_server_family : f Rpc_types.rpc_server_family) mode
 
   dir |> version |> configuration config |> evm_mode config mode
   |> health_check config mode db_liveness_check
-  |> dispatch_public rpc_server_family rpc config tx_container backend
+  |> dispatch_public rpc_server_family rpc config mode tx_container backend
   |> dispatch_websocket_public
        rpc_server_family
        rpc
@@ -1783,6 +1844,7 @@ let private_directory ~rpc_server_family mode rpc config
        rpc_server_family
        rpc
        config
+       mode
        tx_container
        backend
        ~block_production
