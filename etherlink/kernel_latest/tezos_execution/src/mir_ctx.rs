@@ -22,11 +22,14 @@ use num_bigint::BigUint;
 use primitive_types::H256;
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::ChainId;
+use tezos_data_encoding::enc::BinWriter;
+use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup::types::{Contract, Timestamp};
 use tezos_storage::{read_nom_value, store_bin};
-use tezos_tezlink::enc_wrappers::BlockNumber;
+use tezos_tezlink::enc_wrappers::{BlockNumber, ScriptExprHash};
 use tezos_tezlink::lazy_storage_diff::{
     Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
 };
@@ -128,20 +131,24 @@ impl<'a, Host: Runtime> TypecheckingCtx<'a> for TcCtx<'a, Host> {
         &mut self,
         id: &BigMapId,
     ) -> Result<Option<(Type, Type)>, LazyStorageError> {
-        let big_map_path = big_map_path(self.context, id)?;
-        if self.host.store_has(&big_map_path)?.is_none() {
-            return Ok(None);
-        }
-
         let arena = Arena::new();
         let key_type_path = key_type_path(self.context, id)?;
         let value_type_path = value_type_path(self.context, id)?;
 
-        let encoded_key_type = self.host.store_read_all(&key_type_path)?;
+        let encoded_key_type = match self.host.store_read_all(&key_type_path) {
+            Ok(key_type) => Ok(key_type),
+            Err(RuntimeError::PathNotFound) => return Ok(None),
+            Err(err) => Err(err),
+        }?;
+
         let key_type =
             Micheline::decode_raw(&arena, &encoded_key_type)?.parse_ty(self.gas())?;
 
-        let encoded_value_type = self.host.store_read_all(&value_type_path)?;
+        let encoded_value_type = match self.host.store_read_all(&value_type_path) {
+            Ok(key_type) => Ok(key_type),
+            Err(RuntimeError::PathNotFound) => return Ok(None),
+            Err(err) => Err(err),
+        }?;
         let value_type =
             Micheline::decode_raw(&arena, &encoded_value_type)?.parse_ty(self.gas())?;
 
@@ -319,6 +326,48 @@ pub fn convert_big_map_diff(
     }
 }
 
+#[derive(Debug, BinWriter, NomReader)]
+struct BigMapKeys {
+    #[encoding(list)]
+    keys: Vec<ScriptExprHash>,
+}
+
+impl BigMapKeys {
+    #[cfg(test)]
+    fn get(host: &mut impl Runtime, context: &Context, id: &BigMapId) -> Self {
+        let path = keys_of_big_map(context, id).unwrap();
+        read_nom_value(host, &path).unwrap()
+    }
+
+    fn add_key(
+        host: &mut impl Runtime,
+        context: &Context,
+        id: &BigMapId,
+        key: &[u8],
+    ) -> Result<(), LazyStorageError> {
+        let path = keys_of_big_map(context, id)?;
+        let size = host.store_value_size(&path).unwrap_or(0usize);
+        host.store_write(&path, key, size)?;
+        Ok(())
+    }
+
+    fn remove_key(
+        host: &mut impl Runtime,
+        context: &Context,
+        id: &BigMapId,
+        key: &[u8],
+    ) -> Result<(), LazyStorageError> {
+        let path = keys_of_big_map(context, id)?;
+        let key = ScriptExprHash(H256::from_slice(key));
+        let mut big_map_keys: Self = read_nom_value(host, &path)
+            .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
+        big_map_keys.keys.retain(|elt| elt != &key);
+        store_bin(&big_map_keys, host, &path)
+            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+        Ok(())
+    }
+}
+
 impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
     fn big_map_get(
         &mut self,
@@ -363,6 +412,7 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
             None => {
                 if self.host.store_has(&value_path)?.is_some() {
                     self.host.store_delete(&value_path)?;
+                    BigMapKeys::remove_key(self.host, self.context, id, &key_hashed)?;
                 }
 
                 // Write the update in the big_map_diff
@@ -372,6 +422,11 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
             Some(v) => {
                 let arena = Arena::new();
                 let encoded = v.into_micheline_optimized_legacy(&arena).encode();
+                if self.host.store_has(&value_path)?.is_none() {
+                    // We should write the key in the list only if it's an add in the big_map not an update
+                    BigMapKeys::add_key(self.host, self.context, id, &key_hashed)?;
+                }
+
                 self.host.store_write_all(&value_path, &encoded)?;
 
                 // Write the update in the big_map_diff
@@ -484,11 +539,10 @@ mod tests {
         assert_eq!(stored_key_type, key_type);
         assert_eq!(stored_value_type, value_type);
 
-        let big_map_path = big_map_path(ctx.context, id).unwrap();
         let nb_passed_keys = content.len();
-        let nb_stored_keys = ctx.host.store_count_subkeys(&big_map_path).unwrap();
+        let nb_stored_keys = BigMapKeys::get(ctx.host, ctx.context, id).keys.len();
         // The big_map storage contains the key_type and value_type subkeys followed by the other keys corresponding to values
-        assert_eq!(nb_passed_keys + 2, nb_stored_keys.try_into().unwrap());
+        assert_eq!(nb_passed_keys, nb_stored_keys);
 
         for (key, value) in &content {
             let stored_value = ctx
@@ -554,6 +608,13 @@ mod tests {
             )
             .unwrap();
 
+        let big_map_keys_before = BigMapKeys::get(storage.host, storage.context, &map_id);
+        assert_eq!(
+            big_map_keys_before.keys.len(),
+            3usize,
+            "{big_map_keys_before:?}"
+        );
+
         storage
             .big_map_update(&map_id, TypedValue::int(2), None)
             .unwrap();
@@ -564,6 +625,21 @@ mod tests {
                 Some(TypedValue::String("gamma".into())),
             )
             .unwrap();
+
+        let big_map_keys_after = BigMapKeys::get(storage.host, storage.context, &map_id);
+        assert_eq!(
+            big_map_keys_after.keys.len(),
+            2usize,
+            "{big_map_keys_after:?}"
+        );
+        assert_eq!(
+            big_map_keys_before.keys.first(),
+            big_map_keys_after.keys.first(),
+        );
+        assert_eq!(
+            big_map_keys_before.keys.get(2),
+            big_map_keys_after.keys.get(1),
+        );
 
         let expected_content = BTreeMap::from([
             (TypedValue::int(1), TypedValue::String("a".into())),
