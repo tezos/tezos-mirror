@@ -20,6 +20,8 @@ open Gitlab_ci.Util
 open Tezos_ci
 open Tezos_ci.Cache
 
+(** {2 Shared Helpers} *)
+
 module Helpers = struct
   let retry_default_config =
     Gitlab_ci.Types.
@@ -69,6 +71,8 @@ module Helpers = struct
     @ toggle install_js_deps ". ./scripts/install_build_deps.js.sh"
     @ before_script
 end
+
+(** {2 Shared build jobs} *)
 
 module Build = struct
   (* This version of the job builds both released and experimental executables.
@@ -237,8 +241,6 @@ module Build = struct
     (* Disable coverage for arm64 *)
     if arch = Amd64 then Coverage.enable_instrumentation job else job
 
-  (** {2 Shared jobs} *)
-
   let job_build_arm64_release ?rules () : tezos_job =
     job_build_released_binaries ?rules ~__POS__ ~arch:Arm64 ~storage:Ramfs ()
 
@@ -325,6 +327,8 @@ module Build = struct
       ]
     |> enable_cargo_cache |> enable_sccache
 end
+
+(** {2 Shared Docker jobs} *)
 
 module Docker = struct
   (** Type of Docker build jobs.
@@ -444,6 +448,8 @@ module Docker = struct
       ~tag:Gcp_not_interruptible
 end
 
+(** {2 Helpers for Debian/RPM packaging jobs} *)
+
 module Packaging = struct
   (* types for the repositories pipelines.
    - Release: we run all the release jobs, but no tests
@@ -451,8 +457,6 @@ module Packaging = struct
    - Full: we run the complete test matrix
 *)
   type repository_pipeline = Full | Partial | Release
-
-  (** {2 Child repositories pipelines} *)
 
   (** Return a tuple (ARCHITECTURES, <archs>) based on the type
     of repository pipeline. *)
