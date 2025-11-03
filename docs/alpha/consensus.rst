@@ -317,6 +317,8 @@ In this way, staking more tez can reduce the number of cycles in which it can't 
 
 Also note that while forbidden, a baker might become deactivated from inactivity, and might need to reactivate manually.
 
+For an example of the periods when a slashed baker can be unable to bake after slashing (limited to an event when the Rio protocol was active), see :download:`Forbidden periods for slashed bakers <https://octez.tezos.com/archive/SlashingIncidentExplanation.pdf>`.
+
 Note that selfish baking is not an issue in Tenderbake: say we are at round
 ``r`` and the validator which is proposer at round ``r+1`` does not (pre)attest
 at round ``r`` in the hope that the block at round ``r`` is not agreed upon and
