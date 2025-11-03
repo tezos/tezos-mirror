@@ -374,7 +374,7 @@ module Event = struct
       ~section
       ~name:"ws_reconnection"
       ~msg:"Disconnected from websocket, reconnecting in {delay}s."
-      ~level:Error
+      ~level:Warning
       ("delay", Data_encoding.float)
 
   let monitor_heads_timeout =
@@ -382,10 +382,19 @@ module Event = struct
       ~section
       ~name:"monitor_heads_timeout"
       ~msg:
-        "Timeout after {timeout}s while waiting for a new head. Disconnecting  \
+        "Timeout after {timeout}s while waiting for a new head. Disconnecting \
          from websocket."
       ~level:Warning
       ("timeout", Data_encoding.float)
+
+  let monitor_error =
+    declare_1
+      ~section
+      ~name:"monitor_error"
+      ~msg:"Error in monitoring: {error}"
+      ~level:Error
+      ("error", trace_encoding)
+      ~pp1:pp_print_top_error_of_trace
 end
 
 type error +=
@@ -885,6 +894,21 @@ let init_db_pointers db ws_client timeout ~first_block =
 
 let reconnection_delay = 10.
 
+let is_connection_exception = function
+  | Unix.(Unix_error (ECONNREFUSED, _, _))
+  | Websocket_client.Connection_closed | Lwt_io.Channel_closed _ ->
+      true
+  | _ -> false
+
+let is_connection_error trace =
+  List.exists
+    (function
+      | Exn e -> is_connection_exception e
+      | RPC_client_errors.(Request_failed {error = Connection_failed _; _}) ->
+          true
+      | _ -> false)
+    trace
+
 let get_chain_id ?timeout ws_client =
   Websocket_client.send_jsonrpc
     ?timeout
@@ -942,6 +966,7 @@ let start db ~config ~notify_ws_change ~first_block =
   let tx_queue_endpoint =
     ref (Services_backend_sig.Rpc (rpc_uri evm_node_endpoint))
   in
+  let connected_once = ref false in
   let run () =
     let ws_client =
       Websocket_client.create
@@ -953,6 +978,7 @@ let start db ~config ~notify_ws_change ~first_block =
         (ws_uri evm_node_endpoint)
     in
     let* () = Websocket_client.connect ws_client in
+    connected_once := true ;
     tx_queue_endpoint := Services_backend_sig.Websocket ws_client ;
     notify_ws_change ws_client ;
     let* () = init_db_pointers db ws_client config.rpc_timeout ~first_block in
@@ -978,11 +1004,15 @@ let start db ~config ~notify_ws_change ~first_block =
     in
     monitor_heads ctx
   in
-  let rec loop ?(first = false) () =
+  let rec loop () =
+    let*! stopped = protect run in
     let* () =
-      Lwt.catch run (function
-        | Unix.(Unix_error (ECONNREFUSED, _, _)) when not first -> return_unit
-        | e -> Lwt.reraise e)
+      match stopped with
+      | Error e ->
+          let*! () = Event.(emit monitor_error) e in
+          if is_connection_error e && !connected_once then return_unit
+          else fail e
+      | Ok () -> return_unit
     in
     let*! () = Event.(emit ws_reconnection) reconnection_delay in
     let*! () = Lwt_unix.sleep reconnection_delay in
@@ -1021,4 +1051,4 @@ let start db ~config ~notify_ws_change ~first_block =
       ()
   in
   Lwt.dont_wait tx_queue_beacon ignore ;
-  loop ~first:true ()
+  loop ()

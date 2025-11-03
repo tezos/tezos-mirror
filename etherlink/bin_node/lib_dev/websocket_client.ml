@@ -426,9 +426,6 @@ let connect ?monitoring ?(on_close = Fun.id) media uri =
   Opentelemetry.Scope.add_attrs scope (fun () ->
       Octez_telemetry.HTTP_client.span_attributes [media] `GET uri
       @ network_attributes endp) ;
-  Format.eprintf
-    "Connected on %s@."
-    (Conduit.sexp_of_endp endp |> Sexplib0.Sexp.to_string_hum) ;
   let ctx = Lazy.force Conduit_lwt_unix.default_ctx in
   let* client = Conduit_lwt_unix.endp_to_client ~ctx endp in
   let accept_header = Tezos_rpc_http.Media_type.accept_header [media] in
