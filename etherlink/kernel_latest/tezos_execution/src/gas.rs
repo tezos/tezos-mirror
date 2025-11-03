@@ -33,7 +33,7 @@ pub struct Cost {
 }
 impl Cost {
     /// This corresponds to the defaults costs in gas.
-    /// Currently can be found in Tezos source code at: src/proto_alpha/lib_protocol/michelson_v1_gas.ml
+    /// Currently can be found in Tezos source code at: src/proto_023_PtSeouLo/lib_protocol/michelson_v1_gas.ml
     const GAS_COST_MANAGER_OPERATION: u32 = 100_000;
     const GAS_COST_TRANSACTION: u32 = 2_000_000;
 
@@ -50,7 +50,7 @@ impl Cost {
     }
 
     /// Calculates the gas cost for signature verification based on the public key type and message length.
-    /// Currently can be found in Tezos source code at: src/proto_alpha/lib_protocol/michelson_v1_gas.ml
+    /// Currently can be found in Tezos source code at: src/proto_023_PtSeouLo/lib_protocol/michelson_v1_gas.ml
     /// And also in MIR : contrib/mir/src/gas.rs
     /// TODO: !19851, call MIR instead of duplicating this function
     pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Self {
@@ -68,7 +68,7 @@ impl Cost {
 
 impl TezlinkOperationGas {
     /// This corresponds to the default value of the `hard_gas_limit_per_operation` parametric constant.
-    /// Currently can be found in Tezos source code at: src/proto_alpha/lib_parameters/default_parameter.ml
+    /// Currently can be found in Tezos source code at: src/proto_023_PtSeouLo/lib_parameters/default_parameter.ml
     pub const MAX_GAS_UNIT_AMOUNT: u32 = 1_040_000;
 
     pub fn start(
