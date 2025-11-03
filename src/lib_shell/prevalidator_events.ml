@@ -65,6 +65,17 @@ let unparsable_operation =
     ~pp1:Operation_hash.pp
     ("oph", Operation_hash.encoding)
 
+let unknown_operation_branch =
+  declare_2
+    ~section
+    ~name:"unknown_operation_branch"
+    ~msg:"unknown operation branch {branch} for {oph}"
+    ~level:Debug
+    ~pp1:Block_hash.pp
+    ("branch", Block_hash.encoding)
+    ~pp2:Operation_hash.pp
+    ("oph", Operation_hash.encoding)
+
 let processing_operations =
   declare_0
     ~section
