@@ -384,16 +384,36 @@ let umami_patch ~rpc_url ~tzkt_api_url =
      different paths (block, contract, etc.), so it doesn't plug well into Umami
      for now. *)
   sf
-    {|diff --git a/packages/tezos/src/Network.ts b/packages/tezos/src/Network.ts
-index 1d28850f..5c3058c4 100644
+    {|diff --git a/packages/state/src/slices/networks.ts b/packages/state/src/slices/networks.ts
+index 3453eabc..1967b769 100644
+--- a/packages/state/src/slices/networks.ts
++++ b/packages/state/src/slices/networks.ts
+@@ -1,5 +1,5 @@
+ import { createSlice } from "@reduxjs/toolkit";
+-import { DefaultNetworks, MAINNET, type Network, isDefault } from "@umami/tezos";
++import { DefaultNetworks, TEZLINK, type Network, isDefault } from "@umami/tezos";
+ import { remove } from "lodash";
+ 
+ type State = {
+@@ -9,7 +9,7 @@ type State = {
+ 
+ const initialState: State = {
+   available: DefaultNetworks,
+-  current: MAINNET,
++  current: TEZLINK,
+ };
+ 
+ export const networksSlice = createSlice({
+diff --git a/packages/tezos/src/Network.ts b/packages/tezos/src/Network.ts
+index 1d28850f..fbd54ed7 100644
 --- a/packages/tezos/src/Network.ts
 +++ b/packages/tezos/src/Network.ts
 @@ -16,6 +16,14 @@ export const GHOSTNET: Network = {
    buyTezUrl: "https://faucet.ghostnet.teztnets.com/",
  };
-
+ 
 +export const TEZLINK: Network = {
-+  name: "Tezlink",
++  name: "custom",
 +  rpcUrl: "%s",
 +  tzktApiUrl: "%s",
 +  tzktExplorerUrl: "",
@@ -401,9 +421,9 @@ index 1d28850f..5c3058c4 100644
 +};
 +
  export const isDefault = (network: Network) => !!DefaultNetworks.find(n => n.name === network.name);
-
+ 
 -export const DefaultNetworks: Network[] = [MAINNET, GHOSTNET];
-+export const DefaultNetworks: Network[] = [TEZLINK];
++export const DefaultNetworks: Network[] = [MAINNET, GHOSTNET, TEZLINK];
 |}
     rpc_url
     tzkt_api_url
