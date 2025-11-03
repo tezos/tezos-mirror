@@ -118,6 +118,8 @@ let () = Documentation_ci.register ()
 
 let () = Etherlink_ci.register ()
 
+let () = Client_libs_ci.register ()
+
 let () = Tezos_ci_jobs.Tezt.register ()
 
 (** {3 General pipelines} *)

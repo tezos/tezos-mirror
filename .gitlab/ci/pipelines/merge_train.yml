@@ -1422,82 +1422,6 @@ trigger:homebrew_auto:
     include: .gitlab/ci/pipelines/homebrew_auto.yml
     strategy: depend
 
-kaitai_checks:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: manual
-    allow_failure: true
-  needs:
-  - oc.docker:ci:amd64
-  - trigger
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings
-    and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files`
-    and commit the resulting diff.' ; false)
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-  artifacts:
-    expire_in: 1 hour
-    paths:
-    - _build/default/client-libs/bin_codec_kaitai/codec.exe
-    when: on_success
-
-kaitai_e2e_checks:
-  image: ${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: manual
-    allow_failure: true
-  needs:
-  - oc.docker:client-libs-dependencies
-  - kaitai_checks
-  dependencies:
-  - oc.docker:client-libs-dependencies
-  - kaitai_checks
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - . ./scripts/install_build_deps.js.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files
-    2>/dev/null
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
@@ -3479,6 +3403,93 @@ documentation.docgen:
     - docs/user/default-acl.json
     - docs/api/errors.rst
     - docs/shell/p2p_api.rst
+
+client-libs.kaitai_checks:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - client-libs/*kaitai*/**/*
+    - images/client-libs-dependencies/**/*
+    - src/**/*
+    when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings
+    and Kaitai files seem to be out of sync. You might need to run `make check-kaitai-struct-files`
+    and commit the resulting diff.' ; false)
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+  artifacts:
+    expire_in: 1 hour
+    paths:
+    - _build/default/client-libs/bin_codec_kaitai/codec.exe
+    when: on_success
+
+client-libs.kaitai_e2e_checks:
+  image: ${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - client-libs/*kaitai*/**/*
+    - images/client-libs-dependencies/**/*
+    - src/**/*
+    when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:client-libs-dependencies
+  - trigger
+  - client-libs.kaitai_checks
+  dependencies:
+  - oc.docker:client-libs-dependencies
+  - client-libs.kaitai_checks
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - . ./scripts/install_build_deps.js.sh
+  - ./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files
+    2>/dev/null
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 grafazos.build:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}

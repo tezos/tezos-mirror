@@ -617,54 +617,6 @@ let jobs pipeline_type =
         Homebrew.child_pipeline_full_auto
     in
 
-    (* check that ksy files are still up-to-date with octez *)
-    let job_kaitai_checks =
-      job
-        ~__POS__
-        ~name:"kaitai_checks"
-        ~image:Images.CI.build
-        ~stage:Stages.test
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~manual:Yes ())
-        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-        [
-          "make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez \
-           encodings and Kaitai files seem to be out of sync. You might need \
-           to run `make check-kaitai-struct-files` and commit the resulting \
-           diff.' ; false)";
-        ]
-        ~artifacts:
-          (artifacts
-             ~expire_in:(Duration (Hours 1))
-             ~when_:On_success
-             ["_build/default/client-libs/bin_codec_kaitai/codec.exe"])
-      |> enable_cargo_cache |> enable_sccache
-    in
-    let job_kaitai_e2e_checks =
-      job
-        ~__POS__
-        ~name:"kaitai_e2e_checks"
-        ~image:Images.client_libs_dependencies
-        ~stage:Stages.test
-        ~dependencies:(Dependent [Artifacts job_kaitai_checks])
-        ~rules:(make_rules ~manual:Yes ())
-        ~before_script:
-          (before_script
-             ~source_version:true
-               (* TODO: https://gitlab.com/tezos/tezos/-/issues/5026
-                  As observed for the `unit:js_components` running `npm i`
-                  every time we run a job is inefficient.
-
-                  The benefit of this approach is that we specify node version
-                  and npm dependencies (package.json) in one place, and that the local
-                  environment is then the same as CI environment. *)
-             ~install_js_deps:true
-             [])
-        [
-          "./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh \
-           client-libs/kaitai-struct-files/files 2>/dev/null";
-        ]
-    in
     let job_oc_check_lift_limits_patch =
       job
         ~__POS__
@@ -1255,8 +1207,6 @@ let jobs pipeline_type =
     in
     let jobs_misc =
       [
-        job_kaitai_checks;
-        job_kaitai_e2e_checks;
         job_oc_check_lift_limits_patch;
         job_oc_python_check;
         job_oc_integration_compiler_rejections;
