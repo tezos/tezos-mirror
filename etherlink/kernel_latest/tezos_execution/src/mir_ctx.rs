@@ -28,7 +28,7 @@ use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup::types::{Contract, Timestamp};
-use tezos_storage::{read_nom_value, store_bin};
+use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::{BlockNumber, ScriptExprHash};
 use tezos_tezlink::lazy_storage_diff::{
     Alloc, BigMapDiff, Copy, LazyStorageDiff, LazyStorageDiffList, StorageDiff, Update,
@@ -336,7 +336,7 @@ impl BigMapKeys {
     #[cfg(test)]
     fn get(host: &mut impl Runtime, context: &Context, id: &BigMapId) -> Self {
         let path = keys_of_big_map(context, id).unwrap();
-        read_nom_value(host, &path).unwrap()
+        read_nom_value(host, &path).unwrap_or(BigMapKeys { keys: vec![] })
     }
 
     fn add_key(
@@ -364,6 +364,68 @@ impl BigMapKeys {
         big_map_keys.keys.retain(|elt| elt != &key);
         store_bin(&big_map_keys, host, &path)
             .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+        Ok(())
+    }
+
+    fn remove_keys_in_storage(
+        host: &mut impl Runtime,
+        context: &Context,
+        id: &BigMapId,
+    ) -> Result<(), LazyStorageError> {
+        let path = keys_of_big_map(context, id)?;
+        let big_map_keys_opt: Option<Self> = read_optional_nom_value(host, &path)
+            .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
+        let big_map_keys = match big_map_keys_opt {
+            Some(big_map_keys) => big_map_keys,
+            None => {
+                // If the big_map keys doesn't exist, no need to remove
+                // anything
+                return Ok(());
+            }
+        };
+        for key in big_map_keys.keys {
+            let value_path = value_path(context, id, key.0.as_bytes())?;
+            host.store_delete(&value_path)?;
+        }
+
+        // Remove keys for the big_map
+        host.store_delete(&path)?;
+
+        Ok(())
+    }
+
+    fn copy_keys_in_storage(
+        host: &mut impl Runtime,
+        context: &Context,
+        source: &BigMapId,
+        dest: &BigMapId,
+    ) -> Result<(), LazyStorageError> {
+        let source_path = keys_of_big_map(context, source)?;
+        let big_map_keys_opt: Option<Self> = read_optional_nom_value(host, &source_path)
+            .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
+        let big_map_keys = match big_map_keys_opt {
+            Some(big_map_keys) => big_map_keys,
+            None => {
+                // If the big_map keys doesn't exist, no need to try
+                // the copy we can just return instantly
+                return Ok(());
+            }
+        };
+
+        for key in &big_map_keys.keys {
+            let key_hashed = key.0.as_bytes();
+            let source_value_path = value_path(context, source, key_hashed)?;
+            let dest_value_path = value_path(context, dest, key_hashed)?;
+
+            // Copy the value at from source path to dest path
+            let value = host.store_read_all(&source_value_path)?;
+            host.store_write_all(&dest_value_path, &value)?;
+        }
+
+        let dest_path = keys_of_big_map(context, dest)?;
+        store_bin(&big_map_keys, host, &dest_path)
+            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+
         Ok(())
     }
 }
@@ -467,12 +529,30 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
     }
 
     fn big_map_copy(&mut self, id: &BigMapId) -> Result<BigMapId, LazyStorageError> {
-        let src_path = big_map_path(self.context, id)?;
         let next_id_path = next_id_path(self.context)?;
         let dest_id: BigMapId = read_nom_value(self.host, &next_id_path)
             .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
-        let dest_path = big_map_path(self.context, &dest_id)?;
-        self.host.store_copy(&src_path, &dest_path)?;
+
+        // Retrieve the path of the key_type
+        let src_key_type_path = key_type_path(self.context, id)?;
+        let dest_key_type_path = key_type_path(self.context, &dest_id)?;
+
+        // Copy the key type to the destination
+        let key_type = self.host.store_read_all(&src_key_type_path)?;
+        self.host.store_write_all(&dest_key_type_path, &key_type)?;
+
+        // Retrieve the path of the value_type
+        let src_value_type_path = value_type_path(self.context, id)?;
+        let dest_value_type_path = value_type_path(self.context, &dest_id)?;
+
+        // Copy the value type to the destination
+        let value_type = self.host.store_read_all(&src_value_type_path)?;
+        self.host
+            .store_write_all(&dest_value_type_path, &value_type)?;
+
+        // Copy the content of the big_map
+        BigMapKeys::copy_keys_in_storage(self.host, self.context, id, &dest_id)?;
+
         store_bin(&dest_id.succ(), self.host, &next_id_path)
             .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
 
@@ -482,8 +562,16 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
     }
 
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
-        let big_map_path = big_map_path(self.context, id)?;
-        self.host.store_delete(&big_map_path)?;
+        // Remove the key type of the big_map
+        let key_type_path = key_type_path(self.context, id)?;
+        self.host.store_delete(&key_type_path)?;
+
+        // Remove the value type of the big_map
+        let value_type_path = value_type_path(self.context, id)?;
+        self.host.store_delete(&value_type_path)?;
+
+        // Removing the content of the big_map
+        BigMapKeys::remove_keys_in_storage(self.host, self.context, id)?;
 
         // Write in the diff that there was a remove
         self.big_map_diff_remove(id.value.clone());
