@@ -39,16 +39,22 @@ let tag_arm64 = Runner.Tag.show Gcp_arm64
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
 let debian_package_release_matrix ?(ramfs = false) = function
-  | Partial -> [[("RELEASE", ["bookworm"]); ("TAGS", [tag_amd64 ~ramfs])]]
+  | Partial ->
+      [[("RELEASE", ["bookworm"; "trixie"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full ->
       [
         [
-          ("RELEASE", ["unstable"; "bookworm"]);
+          ("RELEASE", ["unstable"; "bookworm"; "trixie"]);
           ("TAGS", [tag_amd64 ~ramfs; tag_arm64]);
         ];
       ]
   | Release ->
-      [[("RELEASE", ["bookworm"]); ("TAGS", [tag_amd64 ~ramfs; tag_arm64])]]
+      [
+        [
+          ("RELEASE", ["bookworm"; "trixie"]);
+          ("TAGS", [tag_amd64 ~ramfs; tag_arm64]);
+        ];
+      ]
 
 (** These are the set of Ubuntu release-architecture combinations for
     which we build deb packages in the job
@@ -228,9 +234,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       ~stage:Stages.build
       ~variables:
         (variables
-           [
-             ("DISTRIBUTION", "debian"); ("RELEASE", "bookworm"); ("TAGS", "gcp");
-           ])
+           [("DISTRIBUTION", "debian"); ("RELEASE", "trixie"); ("TAGS", "gcp")])
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~tag:Dynamic
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
@@ -276,8 +280,8 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
            ])
       ~variables:(archs_variables pipeline_type)
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-      ~image:Images.Base_images.debian_bookworm
-      ["./scripts/ci/create_debian_repo.sh debian bookworm"]
+      ~image:Images.Base_images.debian_trixie
+      ["./scripts/ci/create_debian_repo.sh debian bookworm trixie"]
   in
   let job_apt_repo_ubuntu =
     make_job_apt_repo
