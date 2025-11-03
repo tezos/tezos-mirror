@@ -45,6 +45,12 @@ Errors
 Protocol parameters
 -------------------
 
+Feature flags
+^^^^^^^^^^^^^
+
+- Added ``native_contracts_enable``, that enables enshrined contracts in the
+  protocol. The flag is disabled by default on the mainnet. (MR :gl:`!19709`)
+
 
 
 Bug Fixes
@@ -55,5 +61,3 @@ Minor Changes
 
 Internal
 --------
-
-
