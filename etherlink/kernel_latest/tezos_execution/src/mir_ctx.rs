@@ -641,6 +641,38 @@ mod tests {
         }
     }
 
+    fn assert_big_map_removed<'a, Host: Runtime>(
+        ctx: &TcCtx<'a, Host>,
+        id: &BigMapId,
+        removed_keys: &BigMapKeys,
+    ) {
+        let key_type_path = key_type_path(ctx.context, id).unwrap();
+        assert!(
+            ctx.host.store_has(&key_type_path).unwrap().is_none(),
+            "Key type should have been removed",
+        );
+
+        let value_type_path = value_type_path(ctx.context, id).unwrap();
+        assert!(
+            ctx.host.store_has(&value_type_path).unwrap().is_none(),
+            "Value type should have been removed",
+        );
+
+        let keys_path = keys_of_big_map(ctx.context, id).unwrap();
+        assert!(
+            ctx.host.store_has(&keys_path).unwrap().is_none(),
+            "List of keys of the big_map should have been removed",
+        );
+
+        for key in &removed_keys.keys {
+            let value_path = value_path(ctx.context, id, key.0.as_bytes()).unwrap();
+            assert!(
+                ctx.host.store_has(&value_path).unwrap().is_none(),
+                "{key:?} should have been removed from the storage"
+            );
+        }
+    }
+
     #[test]
     fn test_map_from_memory() {
         let mut host = MockKernelHost::default();
@@ -780,13 +812,34 @@ mod tests {
 
     #[test]
     fn test_remove_big_map() {
+        // Setup the context and big_map for the test
         let mut host = MockKernelHost::default();
         make_default_ctx!(storage, &mut host, &Context::init_context());
-        let map_id = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let key_type = Type::Int;
+        let value_type = Type::Int;
+        let map_id = storage.big_map_new(&key_type, &value_type).unwrap();
+        let key = TypedValue::int(0);
+        let value = TypedValue::int(0);
         storage
-            .big_map_update(&map_id, TypedValue::int(0), Some(TypedValue::int(0)))
+            .big_map_update(&map_id, key.clone(), Some(value.clone()))
             .unwrap();
+
+        // Ensure that the big_map is existing
+        let mut content = BTreeMap::new();
+        content.insert(key.clone(), value);
+        let arena = Arena::new();
+        assert_big_map_eq(&mut storage, &arena, &map_id, key_type, value_type, content);
+
+        // Remove the big_map
         storage.big_map_remove(&map_id).unwrap();
+
+        // Ensure that the big_map has been removed
+        let removed_keys = BigMapKeys {
+            keys: vec![ScriptExprHash(H256::from_slice(&hash_key(key)))],
+        };
+        assert_big_map_removed(&storage, &map_id, &removed_keys);
+
+        // Verify that the big_map_mem function returns the expected result
         assert!(!storage.big_map_mem(&map_id, &TypedValue::int(0)).unwrap());
     }
 
