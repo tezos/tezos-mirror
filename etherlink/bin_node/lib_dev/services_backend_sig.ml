@@ -205,6 +205,7 @@ module type Tx_container = sig
       available based on the pending transaction of the tx_container.
       [next_nonce] is the next expected nonce found in the backend. *)
   val add :
+    ?wait_confirmation:bool ->
     next_nonce:Ethereum_types.quantity ->
     transaction_object ->
     raw_tx:Ethereum_types.hex ->

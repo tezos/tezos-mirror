@@ -10,6 +10,9 @@
 
 ### RPCs changes
 
+- Add new `eth_sendRawTransactionSync` endpoint to our JSON-RPC.
+  Defined in [EIP-7966](https://eips.ethereum.org/EIPS/eip-7966).
+
 ### Monitoring changes
 
 ### Command-line interface changes
@@ -53,6 +56,11 @@ This release will not apply any migration to the node's store (version
   hashes. (!19737)
 - Websocket connections on an EVM node in RPC mode can now receive events
   with `eth_subscribe`. (!19743)
+
+- Add new RPC endpoint eth_sendRawTransactionSync that
+  wait for transaction's execution before returning the
+  receipt (!19797). If you run an EVM node and
+  an RPC node you need to update both in the same time.
 
 ### Monitoring changes
 

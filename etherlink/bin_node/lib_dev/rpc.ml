@@ -90,6 +90,7 @@ module Forward_container
         base:Uri.t ->
         tx_object:Tx.t ->
         raw_tx:string ->
+        wait_confirmation:bool ->
         (Ethereum_types.hash, string) result tzresult Lwt.t
 
       val get_transaction_by_hash :
@@ -153,7 +154,8 @@ module Forward_container
         (*we return the known next_nonce instead of failing *)
         return next_nonce
 
-  let add ~next_nonce:_ (tx_object : Tx.t) ~raw_tx =
+  let add ?(wait_confirmation = false) ~next_nonce:_ (tx_object : Tx.t) ~raw_tx
+      =
     let open Lwt_syntax in
     let* () =
       Internal_event.Simple.emit
@@ -161,6 +163,7 @@ module Forward_container
         (Tx.hash_of_tx_object tx_object)
     in
     Injector.inject_transaction
+      ~wait_confirmation
       ~keep_alive:C.keep_alive
       ~timeout:C.timeout
       ~base:C.private_endpoint
@@ -256,7 +259,7 @@ let container_forward_request (type f) ~(chain_family : f L2_types.chain_family)
                          case (using counter RPC)"
 
                     let inject_transaction ~keep_alive ~timeout ~base ~tx_object
-                        ~raw_tx =
+                        ~raw_tx ~wait_confirmation:_ =
                       Injector.inject_tezlink_operation
                         ~keep_alive
                         ~timeout

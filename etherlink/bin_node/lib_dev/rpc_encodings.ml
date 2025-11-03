@@ -649,6 +649,26 @@ module Send_raw_transaction = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Send_raw_transaction_sync = struct
+  open Ethereum_types
+
+  type input = hex * int64
+
+  type output = Transaction_receipt.t
+
+  let input_encoding =
+    Helpers.encoding_with_optional_last_param
+      hex_encoding
+      Data_encoding.int64
+      0L
+
+  let output_encoding = Transaction_receipt.encoding
+
+  let method_ = "eth_sendRawTransactionSync"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Eth_call = struct
   open Ethereum_types
 
@@ -822,11 +842,12 @@ end
 module Inject_transaction = struct
   open Ethereum_types
 
-  type input = Transaction_object.t * string
+  type input = Transaction_object.t * string * bool
 
   type output = hash
 
-  let input_encoding = Data_encoding.(tup2 Transaction_object.encoding string)
+  let input_encoding =
+    Data_encoding.(tup3 Transaction_object.encoding string bool)
 
   let output_encoding = hash_encoding
 
@@ -1111,6 +1132,7 @@ let evm_supported_methods : (module METHOD) list =
     (module Get_uncle_by_block_hash_and_index);
     (module Get_uncle_by_block_number_and_index);
     (module Send_raw_transaction);
+    (module Send_raw_transaction_sync);
     (module Eth_call);
     (module Get_estimate_gas);
     (module Txpool_content);
@@ -1184,6 +1206,7 @@ let multichain_sequencer_supported_methods : (module METHOD) list =
   [
     (module Generic_block_number);
     (module Send_raw_transaction);
+    (module Send_raw_transaction_sync);
     (* Private RPCs *)
     (module Produce_block);
     (module Inject_transaction);

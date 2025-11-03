@@ -260,6 +260,11 @@ module Send_raw_transaction :
     with type input = Ethereum_types.hex
      and type output = Ethereum_types.hash
 
+module Send_raw_transaction_sync :
+  METHOD
+    with type input = Ethereum_types.hex * int64
+     and type output = Transaction_receipt.t
+
 module Eth_call :
   METHOD
     with type input =
@@ -307,7 +312,7 @@ module Produce_proposal :
 
 module Inject_transaction :
   METHOD
-    with type input = Transaction_object.t * string
+    with type input = Transaction_object.t * string * bool
      and type output = Ethereum_types.hash
 
 module Inject_tezlink_operation :

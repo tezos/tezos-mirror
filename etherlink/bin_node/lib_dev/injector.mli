@@ -22,6 +22,7 @@ val inject_transaction :
   base:Uri.t ->
   tx_object:Transaction_object.t ->
   raw_tx:string ->
+  wait_confirmation:bool ->
   (Ethereum_types.hash, string) result tzresult Lwt.t
 
 val inject_tezlink_operation :
