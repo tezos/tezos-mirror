@@ -60,6 +60,9 @@ let dune_cache ?key ?path ?cache_size ?copy_mode ?policy () =
    ANY file in [changed] changed, or if the merge request has ANY of the [label]s. *)
 type condition = {changed : Tezos_ci.Changeset.t; label : String_set.t}
 
+let empty_condition =
+  {changed = Tezos_ci.Changeset.make []; label = String_set.empty}
+
 let merge_conditions {changed = changed1; label = label1}
     {changed = changed2; label = label2} =
   {
@@ -143,10 +146,14 @@ module UID_map = Map.Make (Int)
    Those successive transformations are driven by the [convert_jobs] function,
    which is used by all functions that take Cacio jobs and register them as CIAO jobs. *)
 
+(* [rev_deps]: UIDs of jobs that directly depend on [job].
+   [explicit]: whether the job was explicitly requested
+   or automatically added to satisfy dependencies. *)
 type job_graph_node = {
   job : job;
   trigger : trigger option;
-  rev_deps : UID_set.t; (* UIDs of jobs that directly depend on [job]. *)
+  rev_deps : UID_set.t;
+  explicit : bool;
 }
 
 type job_graph = job_graph_node UID_map.t
@@ -174,11 +181,14 @@ let make_graph (jobs : (trigger * job) list) : job_graph =
      [trigger] is the trigger to use for [job]; it can be:
      - [Some _] if the trigger was specified by the user, from the [jobs] list;
      - [None] if the job was added automatically as a dependency.*)
-  let rec add_job ~trigger ~rev_deps acc job =
+  let rec add_job ~explicit ~trigger ~rev_deps acc job =
     (* Add dependencies of [job], with at least [job] as reverse dependency. *)
     let acc : job_graph_node UID_map.t =
       List.fold_left
-        (add_job ~trigger:None ~rev_deps:(UID_set.singleton job.uid))
+        (add_job
+           ~explicit:false
+           ~trigger:None
+           ~rev_deps:(UID_set.singleton job.uid))
         acc
         (List.map snd job.needs)
     in
@@ -186,8 +196,14 @@ let make_graph (jobs : (trigger * job) list) : job_graph =
     let update = function
       | None ->
           (* [job] is not in the graph yet, just add it. *)
-          Some {job; trigger; rev_deps}
-      | Some {job; trigger = old_trigger; rev_deps = old_rev_deps} ->
+          Some {job; trigger; rev_deps; explicit}
+      | Some
+          {
+            job;
+            trigger = old_trigger;
+            rev_deps = old_rev_deps;
+            explicit = old_explicit;
+          } ->
           (* [job] is already in the graph, update it. *)
           (* Make sure the triggers are compatible. *)
           let trigger =
@@ -217,18 +233,28 @@ let make_graph (jobs : (trigger * job) list) : job_graph =
              of multiple reverse dependencies.
              Make sure all those reverse dependencies are stored. *)
           let rev_deps = UID_set.union rev_deps old_rev_deps in
-          Some {job; trigger; rev_deps}
+          Some {job; trigger; rev_deps; explicit = explicit || old_explicit}
     in
     UID_map.update job.uid update acc
   in
   (* Start from the empty graph and use [add_jobs] to add all [jobs]. *)
   List.fold_left
     (fun acc (trigger, job) ->
-      add_job ~trigger:(Some trigger) ~rev_deps:UID_set.empty acc job)
+      add_job
+        ~explicit:true
+        ~trigger:(Some trigger)
+        ~rev_deps:UID_set.empty
+        acc
+        job)
     UID_map.empty
     jobs
 
-type fixed_job_graph_node = {job : job; trigger : trigger; only_if : condition}
+type fixed_job_graph_node = {
+  job : job;
+  trigger : trigger;
+  only_if : condition;
+  explicit : bool;
+}
 
 type fixed_job_graph = fixed_job_graph_node UID_map.t
 
@@ -255,7 +281,7 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
           | None ->
               (* Not supposed to happen. *)
               assert false
-          | Some {job; trigger; rev_deps} ->
+          | Some {job; trigger; rev_deps; explicit} ->
               (* Fix and add reverse dependencies recursively. *)
               let rev_deps = rev_deps |> UID_set.elements |> List.map fix_uid in
               (* Fix [trigger]. *)
@@ -283,14 +309,23 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
                 |> List.map (fun node -> node.trigger)
                 |> List.fold_left merge_triggers initial_trigger
               in
-              (* Fix the changeset, i.e. add the union of the changesets
-                 of reverse dependencies. *)
+              (* Fix the job's conditions so that it becomes the disjunction
+                 of the conditions of its transitive dependencies (including itself)
+                 that were explicitly added. *)
               let only_if =
+                let initial_only_if =
+                  if explicit then job.only_if
+                  else
+                    (* This job is only present because it is a dependency of another job.
+                       So its trigger conditions are irrelevant: we only want this job
+                       to be present if one of its reverse dependencies is present. *)
+                    empty_condition
+                in
                 rev_deps
                 |> List.map (fun node -> node.only_if)
-                |> List.fold_left merge_conditions job.only_if
+                |> List.fold_left merge_conditions initial_only_if
               in
-              {job; trigger; only_if}
+              {job; trigger; only_if; explicit}
         in
         result := UID_map.add uid result_node !result ;
         result_node
@@ -383,6 +418,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                   };
                 trigger;
                 only_if;
+                explicit = _;
               } ->
               (* Convert dependencies recursively. *)
               let dependencies =
