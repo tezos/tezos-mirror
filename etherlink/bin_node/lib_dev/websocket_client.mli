@@ -19,6 +19,8 @@ type error +=
   | Cannot_destruct of
       Ethereum_types.Subscription.kind * Ethereum_types.Subscription.id * string
 
+exception Connection_closed
+
 (** Subscriptions returned by [subscribe]. *)
 type 'a subscription = {
   stream : 'a Lwt_stream.t;  (** The stream of events. *)
