@@ -44,8 +44,6 @@ pub enum ValidityError {
     UnrevealedManagerKey(PublicKeyHash),
     #[error("Cannot pay {0:?} in fees.")]
     CantPayFees(Narith),
-    #[error("Fees are below the minimum expected ({0:?}).")]
-    FeesTooLow(Narith),
     #[error("Empty implicit contract.")]
     EmptyImplicitContract,
     #[error("Gas limit is too high.")]
