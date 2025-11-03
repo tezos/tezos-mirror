@@ -31,10 +31,8 @@ RUN opam install --yes \
         # We must tell Opam to assume external dependencies are installed because it is not able to
         # correctly detect and/or install Cargo and Rust compiler packages using the system package
         # manager.
-        --assume-depexts \ 
+        --assume-depexts \
         $(opam list --all --short | grep -v ocaml-option-) \
-    # Pin Tezt to a commit that has the memory measurement features we need.
-    && opam pin --yes tezt https://gitlab.com/nomadic-labs/tezt.git#30bc094a1a7afa82d4026e4397e0f4daa106e71f \
     && opam clean
 
 # ENTRYPOINT and CMD already set in prebuild
