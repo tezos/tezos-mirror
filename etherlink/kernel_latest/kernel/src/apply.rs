@@ -596,15 +596,15 @@ impl From<&FaDeposit> for SolFaDepositWithoutProxy {
     }
 }
 
-fn apply_fa_deposit<Host: Runtime>(
+pub fn pure_fa_deposit<Host: Runtime>(
     host: &mut Host,
     fa_deposit: &FaDeposit,
     block_constants: &BlockConstants,
     transaction_hash: [u8; TRANSACTION_HASH_SIZE],
-    tracer_input: Option<TracerInput>,
+    maximum_gas_limit: u64,
     spec_id: &SpecId,
-    limits: &EvmLimits,
-) -> Result<ExecutionResult<TransactionResult>, Error> {
+    tracer_input: Option<TracerInput>,
+) -> Result<ExecutionOutcome, Error> {
     // Fees are set to zero, this is an internal call from the system address to the FA bridge solidity contract.
     // We do not require the system address to pay for the execution cost.
     let block_constants = BlockConstants {
@@ -629,7 +629,7 @@ fn apply_fa_deposit<Host: Runtime>(
         .abi_encode(),
     };
     let effective_gas_price = block_constants.base_fee_per_gas();
-    let execution_outcome = match revm_run_transaction(
+    match revm_run_transaction(
         host,
         &block_constants,
         Some(transaction_hash),
@@ -639,25 +639,45 @@ fn apply_fa_deposit<Host: Runtime>(
         call_data,
         gas_limit,
         effective_gas_price,
-        limits.maximum_gas_limit,
+        maximum_gas_limit,
         Vec::new(),
         None,
         spec_id,
         tracer_input,
         false,
     ) {
-        Ok(outcome) => outcome,
-        Err(err) => {
-            return Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
-                err.to_string(),
-            )));
-        }
-    };
+        Ok(outcome) => Ok(outcome),
+        Err(err) => Err(Error::InvalidRunTransaction(revm_etherlink::Error::Custom(
+            err.to_string(),
+        ))),
+    }
+}
+
+fn apply_fa_deposit<Host: Runtime>(
+    host: &mut Host,
+    fa_deposit: &FaDeposit,
+    block_constants: &BlockConstants,
+    transaction_hash: [u8; TRANSACTION_HASH_SIZE],
+    tracer_input: Option<TracerInput>,
+    spec_id: &SpecId,
+    limits: &EvmLimits,
+) -> Result<ExecutionResult<TransactionResult>, Error> {
+    let execution_outcome = pure_fa_deposit(
+        host,
+        fa_deposit,
+        block_constants,
+        transaction_hash,
+        limits.maximum_gas_limit,
+        spec_id,
+        tracer_input,
+    )?;
 
     let gas_used = execution_outcome.result.gas_used().into();
 
     let transaction_result = TransactionResult {
-        caller,
+        // A specific address is allocated for queue call
+        // System address can only be used as caller for simulations
+        caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
         execution_outcome,
         gas_used,
         estimated_ticks_used: 0,

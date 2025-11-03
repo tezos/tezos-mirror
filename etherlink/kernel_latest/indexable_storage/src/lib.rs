@@ -157,7 +157,6 @@ impl IndexableStorage {
 
     /// Returns the value a the given index. Fails if the index is greater or
     /// equal to the length.
-    #[cfg(debug_assertions)]
     pub fn get_value<Host: Runtime>(
         &self,
         host: &Host,

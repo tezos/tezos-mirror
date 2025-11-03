@@ -69,6 +69,7 @@ mod sequencer_blueprint;
 mod simulation;
 mod stage_one;
 mod storage;
+mod sub_block;
 mod tick_model;
 mod transaction;
 mod upgrade;

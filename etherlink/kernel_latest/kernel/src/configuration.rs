@@ -5,7 +5,7 @@
 
 use crate::{
     blueprint_storage::DEFAULT_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS,
-    chains::{ChainConfig, ChainFamily, EvmLimits},
+    chains::{ChainConfig, ChainFamily, EvmChainConfig, EvmLimits},
     delayed_inbox::DelayedInbox,
     retrieve_minimum_base_fee_per_gas,
     storage::{
@@ -194,6 +194,15 @@ fn fetch_evm_chain_configuration<Host: Runtime>(
     let evm_limits = fetch_evm_limits(host);
     let spec_id = read_evm_version(host).into();
     ChainConfig::new_evm_config(chain_id, evm_limits, spec_id)
+}
+
+pub fn fetch_pure_evm_config<Host: Runtime>(
+    host: &mut Host,
+    chain_id: U256,
+) -> EvmChainConfig {
+    let limits = fetch_evm_limits(host);
+    let spec_id = read_evm_version(host).into();
+    EvmChainConfig::create_config(chain_id, limits, spec_id)
 }
 
 fn fetch_michelson_chain_configuration<Host: Runtime>(

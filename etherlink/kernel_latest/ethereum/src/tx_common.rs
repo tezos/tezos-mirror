@@ -170,7 +170,7 @@ pub struct EthereumTransactionCommon {
     ///
     /// *NB* this is inclusive of any additional fees that are paid, prior to execution:
     /// - data availability fee
-    gas_limit: u64,
+    pub gas_limit: u64,
     /// The 160-bit address of the message call’s recipient
     /// or, for a contract creation transaction
     pub to: Option<H160>,
