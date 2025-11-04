@@ -20,6 +20,8 @@
   that allow you to get a stream of transactions that have been chosen
   to be included in the next block (!19810).
   (only available with experimental feature preconfirmation_stream_enabled)
+- Add new `eth_subscribe` subscription name `tez_newPreconfirmedReceipts`
+  that allow you to get a stream of transaction preconfirmed receipts (!19837)
 
 ### Monitoring changes
 

@@ -292,6 +292,7 @@ module Request = struct
     | NewPendingTransactions
     | Syncing
     | NewIncludedTransactions
+    | NewPreconfirmedReceipts
 
   let param_of_sub_kind = function
     | NewHeads -> `A [`String "newHeads"]
@@ -304,6 +305,7 @@ module Request = struct
     | NewPendingTransactions -> `A [`String "newPendingTransactions"]
     | Syncing -> `A [`String "syncing"]
     | NewIncludedTransactions -> `A [`String "tez_newIncludedTransactions"]
+    | NewPreconfirmedReceipts -> `A [`String "tez_newPreconfirmedReceipts"]
 
   let eth_subscribe ~kind =
     {method_ = "eth_subscribe"; parameters = param_of_sub_kind kind}

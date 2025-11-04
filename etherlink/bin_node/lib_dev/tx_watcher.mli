@@ -11,7 +11,10 @@
 
 val create_stream :
   unit ->
-  Transaction_object.t Ethereum_types.Subscription.output Lwt_stream.t
+  ( Transaction_object.t,
+    Transaction_receipt.t )
+  Ethereum_types.Subscription.output
+  Lwt_stream.t
   * Lwt_watcher.stopper
 
 val notify : Ethereum_types.hash -> unit

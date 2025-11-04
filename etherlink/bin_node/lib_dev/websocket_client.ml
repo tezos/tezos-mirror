@@ -806,7 +806,9 @@ let subscribe' client ?timeout ~output_encoding
 let subscribe =
   subscribe'
     ~output_encoding:
-      (Ethereum_types.Subscription.output_encoding Transaction_object.encoding)
+      (Ethereum_types.Subscription.output_encoding
+         Transaction_object.encoding
+         Transaction_receipt.encoding)
 
 let subscribe_filter client ?timeout kind filter =
   let open Lwt_result_syntax in

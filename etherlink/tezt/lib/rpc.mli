@@ -80,6 +80,7 @@ module Request : sig
     | NewPendingTransactions
     | Syncing
     | NewIncludedTransactions
+    | NewPreconfirmedReceipts
 
   val eth_subscribe : kind:subscription_kind -> Evm_node.request
 
