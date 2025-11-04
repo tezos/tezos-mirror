@@ -534,7 +534,7 @@ let init_umami agent ~tezlink_proxy_endpoint ~external_tzkt_api_endpoint =
      be careful if we ever update it.*)
   run_cmd agent (sf "cd /tmp/umami-v2 && git apply %s" patch_dst)
 
-let init_tezlink_sequencer (cloud : Cloud.t) (name : string) ~(rpc_port : int)
+let init_tezlink_sequencer (cloud : Cloud.t) (name : string) ~(sequencer_proxy : proxy_info)
     (verbose : bool) (time_between_blocks : Evm_node.time_between_blocks) agent
     =
   let chain_id = 1 in
@@ -583,6 +583,7 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string) ~(rpc_port : int)
       }
   in
   let () = toplog "Launching the sandbox L2 node" in
+  let rpc_port = proxy_internal_port sequencer_proxy in
   let* evm_node =
     Tezos.Evm_node.Agent.init
       ~patch_config:(fun json ->
@@ -748,7 +749,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         init_tezlink_sequencer
           cloud
           name
-          ~rpc_port:(proxy_internal_port sequencer_proxy)
+          ~sequencer_proxy
           Cli.verbose
           Cli.time_between_blocks
           tezlink_sequencer_agent
