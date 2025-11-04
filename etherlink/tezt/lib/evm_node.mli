@@ -437,11 +437,6 @@ val wait_for_missing_blueprint : t -> (int * string) Lwt.t
     missing blueprint level. *)
 val wait_for_rollup_node_ahead : t -> int Lwt.t
 
-(** [wait_for_tx_pool_add_transaction ?timeout evm_node] waits for the event
-    [tx_pool_add_transaction.v0] using {!wait_for} and returns the transaction
-    hash. *)
-val wait_for_tx_pool_add_transaction : ?timeout:float -> t -> string Lwt.t
-
 (** [wait_for_tx_queue_add_transaction ?timeout evm_node] waits for the event
     [tx_queue_add_transaction.v0] using {!wait_for} and returns the transaction
     hash. *)

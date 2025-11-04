@@ -614,10 +614,6 @@ let wait_for_rollup_node_ahead evm_node =
   let level = json |> as_int in
   Some level
 
-let wait_for_tx_pool_add_transaction ?timeout evm_node =
-  wait_for_event ?timeout evm_node ~event:"tx_pool_add_transaction.v0"
-  @@ JSON.as_string_opt
-
 let wait_for_tx_queue_add_transaction ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_queue_add_transaction.v0"
   @@ fun json -> JSON.(json |> as_string |> Option.some)
