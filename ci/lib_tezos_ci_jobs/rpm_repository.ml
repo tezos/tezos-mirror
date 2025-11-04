@@ -12,7 +12,8 @@
 
 open Gitlab_ci.Types
 open Tezos_ci
-open Common
+open Common.Helpers
+open Common.Packaging
 
 (* This is a dynamic image declaration that is going to be instantiated using
    the values set in the parallel/matrix contruct *)

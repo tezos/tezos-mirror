@@ -36,7 +36,9 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 open Tezos_ci.Cache
-open Common
+open Common.Docker
+open Common.Build
+open Common.Helpers
 open Changesets
 
 (** Variants of the code verification pipeline.

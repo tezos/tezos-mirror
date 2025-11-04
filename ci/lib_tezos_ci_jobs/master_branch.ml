@@ -15,7 +15,8 @@
    - static binaries, and
    - documentation. *)
 
-open Common
+open Common.Build
+open Common.Docker
 open Gitlab_ci
 open Gitlab_ci.Util
 open Tezos_ci
@@ -119,7 +120,7 @@ let jobs =
       ~allow_failure:Yes
       ~before_script:
         ((* sets COVERAGE_OUTPUT *)
-         before_script
+         Common.Helpers.before_script
            ~source_version:true
            ~eval_opam:true
            [])

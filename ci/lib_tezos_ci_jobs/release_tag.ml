@@ -17,7 +17,8 @@
 
 open Tezos_ci
 open Tezos_ci.Cache
-open Common
+open Common.Build
+open Common.Docker
 
 (** Type of release tag pipelines.
 
@@ -293,7 +294,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~tag:Gcp_not_interruptible
   in
   let job_promote_to_latest_test =
-    Common.job_docker_promote_to_latest
+    job_docker_promote_to_latest
       ~ci_docker_hub:false
       ~dependencies:(Dependent [Job job_docker_merge])
       ()
