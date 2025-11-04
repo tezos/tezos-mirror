@@ -39,13 +39,17 @@ val notify_finalized_levels :
   end_l2_level:Ethereum_types.quantity ->
   unit
 
+(** Preconfirmed transaction can either be internal to Etherlink or coming from the delayed inbox  *)
+type transaction =
+  | Common of Transaction_object.t
+  | Delayed of Evm_events.Delayed_transaction.t
+
 (** Represents a message related to preconfirmed transactions *)
 type preconfirmation_message =
   | Block_timestamp of Time.Protocol.t
       (** Timestamp of the next created block *)
-  | Preconfirmed_transaction of Transaction_object.t
-      (** Indicates that the transaction
-      has been validated and is ready for pre-execution *)
+  | Preconfirmed_transaction of transaction
+      (** Indicates that the transaction will be included in the next block and is ready for pre-execution *)
 
 val preconfirmation_message_encoding : preconfirmation_message Data_encoding.t
 
@@ -57,4 +61,4 @@ val create_preconfirmation_stream :
 
 val notify_new_block_timestamp : Time.Protocol.t -> unit
 
-val notify_preconfirmation : Transaction_object.t -> unit
+val notify_preconfirmation : transaction -> unit

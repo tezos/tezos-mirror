@@ -73,9 +73,35 @@ let notify_finalized_levels ~l1_level ~start_l2_level ~end_l2_level =
   let message = Finalized_levels {l1_level; start_l2_level; end_l2_level} in
   Lwt_watcher.notify message_watcher message
 
+type transaction =
+  | Common of Transaction_object.t
+  | Delayed of Evm_events.Delayed_transaction.t
+
+let transaction_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"Preconfirmed_transaction"
+        (Tag 0)
+        (obj2
+           (req "kind" (constant "preconfirmed_transaction"))
+           (req "transaction" Transaction_object.encoding))
+        (function Common txn -> Some ((), txn) | _ -> None)
+        (fun ((), txn) -> Common txn);
+      case
+        ~title:"Preconfirmed_delayed_transaction"
+        (Tag 1)
+        (obj2
+           (req "kind" (constant "preconfirmed_delayed_transaction"))
+           (req "delayed_transaction" Evm_events.Delayed_transaction.encoding))
+        (function Delayed txn -> Some ((), txn) | _ -> None)
+        (fun ((), txn) -> Delayed txn);
+    ]
+
 type preconfirmation_message =
   | Block_timestamp of Time.Protocol.t
-  | Preconfirmed_transaction of Transaction_object.t
+  | Preconfirmed_transaction of transaction
 
 let preconfirmation_message_encoding =
   let open Data_encoding in
@@ -90,11 +116,11 @@ let preconfirmation_message_encoding =
         (function Block_timestamp ts -> Some ((), ts) | _ -> None)
         (fun ((), ts) -> Block_timestamp ts);
       case
-        ~title:"Preconfirmed transaction"
+        ~title:"Preconfirmed_transaction"
         (Tag 1)
         (obj2
            (req "kind" (constant "preconfirmed_transaction"))
-           (req "transaction" Transaction_object.encoding))
+           (req "transaction" transaction_encoding))
         (function Preconfirmed_transaction txn -> Some ((), txn) | _ -> None)
         (fun ((), txn) -> Preconfirmed_transaction txn);
     ]
