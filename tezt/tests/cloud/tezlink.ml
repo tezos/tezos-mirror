@@ -204,8 +204,7 @@ let git_clone agent ?branch repo_url directory =
     @ (match branch with None -> [] | Some branch -> ["-b"; branch])
     @ [repo_url; directory])
 
-let init_tzkt ~tzkt_proxy ~agent ~sequencer_proxy
-    ~time_between_blocks =
+let init_tzkt ~tzkt_proxy ~agent ~sequencer_proxy ~time_between_blocks =
   (* Set of functions helpful for Tzkt setup *)
   let run = run agent in
   let tezlink_sandbox_endpoint = proxy_internal_endpoint sequencer_proxy in
@@ -520,7 +519,9 @@ index 1d28850f..fbd54ed7 100644
 let init_umami agent ~sequencer_proxy ~tzkt_proxy =
   let runner = Agent.runner agent in
   let external_tzkt_api_endpoint = proxy_external_endpoint ~runner tzkt_proxy in
-  let tezlink_proxy_endpoint = proxy_external_endpoint ~runner sequencer_proxy in
+  let tezlink_proxy_endpoint =
+    proxy_external_endpoint ~runner sequencer_proxy
+  in
   let rpc_url = Client.string_of_endpoint tezlink_proxy_endpoint in
   let tzkt_api_url = Client.string_of_endpoint external_tzkt_api_endpoint in
   let patch = umami_patch ~rpc_url ~tzkt_api_url in
@@ -539,9 +540,9 @@ let init_umami agent ~sequencer_proxy ~tzkt_proxy =
      be careful if we ever update it.*)
   run_cmd agent (sf "cd /tmp/umami-v2 && git apply %s" patch_dst)
 
-let init_tezlink_sequencer (cloud : Cloud.t) (name : string) ~(sequencer_proxy : proxy_info)
-    (verbose : bool) (time_between_blocks : Evm_node.time_between_blocks) agent
-    =
+let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
+    ~(sequencer_proxy : proxy_info) (verbose : bool)
+    (time_between_blocks : Evm_node.time_between_blocks) agent =
   let chain_id = 1 in
   let () = toplog "Initializing the tezlink scenario" in
   let tezlink_config = Temp.file "l2-tezlink-config.yaml" in
@@ -689,9 +690,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       in
       (* The proxy endpoint is the https endpoint we want to provide
          to the external world, it has no /tezlink path. *)
-      let tezlink_sandbox_endpoint =
-        proxy_internal_endpoint sequencer_proxy
-      in
+      let tezlink_sandbox_endpoint = proxy_internal_endpoint sequencer_proxy in
       let tezlink_proxy_endpoint =
         proxy_external_endpoint ~runner sequencer_proxy
       in
@@ -770,10 +769,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~sequencer_proxy
                 ~time_between_blocks:Cli.time_between_blocks
             and* () =
-              init_umami
-                tezlink_sequencer_agent
-                ~sequencer_proxy
-                ~tzkt_proxy
+              init_umami tezlink_sequencer_agent ~sequencer_proxy ~tzkt_proxy
             and* () =
               if Cli.faucet then
                 let () = toplog "Starting faucet" in
