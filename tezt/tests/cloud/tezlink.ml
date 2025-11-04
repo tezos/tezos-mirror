@@ -558,6 +558,7 @@ type proxy_info =
       dns_domain : string;
       external_port : int;
       internal_info : proxy_internal_info;
+      activate_ssl : bool;
     }
 
 let proxy_internal_info = function
@@ -571,9 +572,9 @@ let proxy_internal_endpoint proxy_info =
   let {path; port} = proxy_internal_info proxy_info in
   Client.Foreign_endpoint (Endpoint.make ?path ~host ~scheme ~port ())
 
-let proxy_external_endpoint ~runner ~dns_domain ~activate_ssl = function
-  | No_proxy {port; path} -> build_endpoint ?path ~runner ~dns_domain port
-  | Proxy {dns_domain; external_port; internal_info = _} ->
+let proxy_external_endpoint ~runner = function
+  | No_proxy {port; path} -> build_endpoint ?path ~runner ~dns_domain:None port
+  | Proxy {dns_domain; external_port; activate_ssl; internal_info = _} ->
       let scheme = if activate_ssl then "https" else "http" in
       Client.Foreign_endpoint
         (Endpoint.make ~host:dns_domain ~scheme ~port:external_port ())
@@ -581,7 +582,7 @@ let proxy_external_endpoint ~runner ~dns_domain ~activate_ssl = function
 let nginx_reverse_proxy_config ~(ssl : Ssl.t option) ~proxy =
   match proxy with
   | No_proxy _ -> None
-  | Proxy {dns_domain; external_port; internal_info = _} -> (
+  | Proxy {dns_domain; external_port; activate_ssl = _; internal_info = _} -> (
       let internal_endpoint = proxy_internal_endpoint proxy in
       let proxy_pass =
         (* The trailing / is mandatory, otherwise the reverse proxy
@@ -614,6 +615,25 @@ let nginx_reverse_proxy_config ~(ssl : Ssl.t option) ~proxy =
           in
           Some config)
 
+let make_proxy agent ~path ~dns_domain public_port activate_ssl =
+  let public_port = port_of_option agent public_port in
+  match dns_domain with
+  | None ->
+      (* No DNS so no proxy, so we must use the public port. *)
+      No_proxy {port = public_port; path}
+  | Some dns_domain ->
+      (* We let the system choose a fresh internal node port.
+         Note that it will be publicy exposed, it's just that we don't need to
+         share this one. *)
+      let internal_port = Agent.next_available_port agent in
+      Proxy
+        {
+          internal_info = {port = internal_port; path};
+          dns_domain;
+          external_port = public_port;
+          activate_ssl;
+        }
+
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
   let name = "tezlink-sequencer" in
@@ -638,9 +658,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | Some agent -> agent
       in
       let runner = Agent.runner tezlink_sequencer_agent in
-      let public_rpc_port =
-        port_of_option tezlink_sequencer_agent Cli.public_rpc_port
-      in
       let dns_domain =
         match Tezt_cloud.Tezt_cloud_cli.dns_domains with
         | [] -> None
@@ -655,21 +672,14 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                  command line."
             else Some dns_domain
       in
+      let activate_ssl = Cli.activate_ssl in
       let sequencer_proxy_info =
-        let path = Some "/tezlink" in
-        match dns_domain with
-        | None -> No_proxy {port = public_rpc_port; path}
-        | Some dns_domain ->
-            let internal_port =
-              Agent.next_available_port tezlink_sequencer_agent
-            in
-            let external_port = public_rpc_port in
-            Proxy
-              {
-                internal_info = {port = internal_port; path};
-                external_port;
-                dns_domain;
-              }
+        make_proxy
+          tezlink_sequencer_agent
+          ~path:(Some "/tezlink")
+          ~dns_domain
+          Cli.public_rpc_port
+          activate_ssl
       in
       (* The proxy endpoint is the https endpoint we want to provide
          to the external world, it has no /tezlink path. *)
@@ -677,11 +687,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         proxy_internal_endpoint sequencer_proxy_info
       in
       let tezlink_proxy_endpoint =
-        proxy_external_endpoint
-          ~runner
-          ~dns_domain
-          ~activate_ssl:Cli.activate_ssl
-          sequencer_proxy_info
+        proxy_external_endpoint ~runner sequencer_proxy_info
       in
       let* () =
         add_service
@@ -699,39 +705,15 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       let* tzkt_proxy =
         if Cli.tzkt then
           let tzkt_proxy =
-            let path = None in
-            match dns_domain with
-            | None ->
-                (* No DNS so no proxy, so we must use the public API port. *)
-                No_proxy
-                  {
-                    port =
-                      port_of_option tezlink_sequencer_agent Cli.tzkt_api_port;
-                    path;
-                  }
-            | Some dns_domain ->
-                (* We let the system choose a fresh internal API node port.
-                   Note that it will be publicy exposed, it's just that we don't
-                   need to share this one. *)
-                let internal_port =
-                  Agent.next_available_port tezlink_sequencer_agent
-                in
-                let external_port =
-                  port_of_option tezlink_sequencer_agent Cli.tzkt_api_port
-                in
-                Proxy
-                  {
-                    internal_info = {port = internal_port; path};
-                    dns_domain;
-                    external_port;
-                  }
+            make_proxy
+              tezlink_sequencer_agent
+              ~path:None
+              ~dns_domain
+              Cli.tzkt_api_port
+              activate_ssl
           in
           let external_tzkt_api_endpoint =
-            proxy_external_endpoint
-              ~runner
-              ~dns_domain
-              ~activate_ssl:Cli.activate_ssl
-              tzkt_proxy
+            proxy_external_endpoint ~runner tzkt_proxy
           in
           let* () =
             add_service
@@ -784,11 +766,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~time_between_blocks:Cli.time_between_blocks
             and* () =
               let external_tzkt_api_endpoint =
-                proxy_external_endpoint
-                  ~runner
-                  ~dns_domain
-                  ~activate_ssl:Cli.activate_ssl
-                  tzkt_proxy
+                proxy_external_endpoint ~runner tzkt_proxy
               in
               init_umami
                 tezlink_sequencer_agent
@@ -824,11 +802,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                     ~url:(sf "%s/info" (Client.string_of_endpoint faucet_api))
                 in
                 let external_tzkt_api_endpoint =
-                  proxy_external_endpoint
-                    ~runner
-                    ~dns_domain
-                    ~activate_ssl:Cli.activate_ssl
-                    tzkt_proxy
+                  proxy_external_endpoint ~runner tzkt_proxy
                 in
                 let* faucet_frontend =
                   init_faucet_frontend
