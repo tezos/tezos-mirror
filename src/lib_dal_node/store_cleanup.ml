@@ -127,7 +127,7 @@ let clean_up_store_and_catch_up_for_refutation_support ctxt cctxt
   in
   let start_level = Int32.succ last_processed_level in
   let end_level = target_level head_level in
-  let levels_to_clean_up = Int32.(succ @@ sub end_level last_processed_level) in
+  let levels_to_clean_up = Int32.(succ @@ sub end_level start_level) in
   if levels_to_clean_up > 0l then
     let*! () =
       Event.emit_start_catchup ~start_level ~end_level ~levels_to_clean_up
