@@ -323,7 +323,11 @@ module Profile_handlers = struct
             in
             match res with
             | Error `Not_found ->
-                (* that is, it was not published *)
+                let* () =
+                  Event.emit_slot_header_status_not_found
+                    ~published_level
+                    ~slot_index
+                in
                 Lwt.return_none
             | Error (`Other error) ->
                 let* () =
