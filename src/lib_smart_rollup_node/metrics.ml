@@ -187,6 +187,9 @@ end
 module Info = struct
   open Tezos_version
 
+  let set_genesis_level =
+    set_gauge "Rollup genesis level" "genesis_level" Int32.to_float
+
   let node_general_info =
     v_labels_counter
       ~help:"General information on the node"
@@ -219,6 +222,7 @@ module Info = struct
         configuration.sc_rollup_address
     in
     let mode = Configuration.string_of_mode configuration.mode in
+    let () = set_genesis_level genesis_level in
     let genesis_level = Int32.to_string genesis_level in
     let genesis_hash = Commitment.Hash.to_b58check genesis_hash in
     let history_mode = Configuration.string_of_history_mode history_mode in
