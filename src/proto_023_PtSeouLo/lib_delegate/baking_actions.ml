@@ -575,7 +575,7 @@ let may_get_dal_content state consensus_vote =
            wait for a bit for the DAL node to provide an answer. *)
         Lwt.pick
           [
-            (let*! () = Lwt_unix.sleep 0.5 in
+            (let*! () = Lwt_unix.sleep 0.75 in
              Lwt.return `RPC_timeout);
             (let*! tz_res = promise in
              Lwt.return (`RPC_result tz_res));
