@@ -507,7 +507,7 @@ let process_dal_rpc_result state delegate level round =
   function
   | `RPC_timeout ->
       let*! () =
-        Events.(emit failed_to_get_dal_attestations_in_time delegate)
+        Events.(emit failed_to_get_dal_attestations_in_time (delegate, level))
       in
       return_none
   | `RPC_result (Error errs) ->
