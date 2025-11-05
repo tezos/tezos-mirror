@@ -518,6 +518,17 @@ let event_preconfirmation =
     ~level:Notice
     ("txn_hash", Ethereum_types.hash_encoding)
 
+let patched_sequencer_key =
+  Internal_event.Simple.declare_2
+    ~section
+    ~name:"patched_sequencer_key"
+    ~msg:"patched state with sequencer key {pk} ({pkh})"
+    ~level:Warning
+    ~pp1:Signature.Public_key.pp
+    ~pp2:Signature.Public_key_hash.pp
+    ("pk", Signature.Public_key.encoding)
+    ("pkh", Signature.Public_key_hash.encoding)
+
 let received_upgrade payload = emit received_upgrade payload
 
 let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
@@ -649,3 +660,6 @@ let replicate_operation_dropped hash reason =
 let preconfirmation_timestamp t = emit event_preconfirmation_timestamp t
 
 let preconfirmation t = emit event_preconfirmation t
+
+let patched_sequencer_key pk =
+  emit patched_sequencer_key (pk, Signature.Public_key.hash pk)

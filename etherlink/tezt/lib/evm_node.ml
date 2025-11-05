@@ -71,7 +71,7 @@ type mode =
       initial_kernel : string;
       preimages_dir : string option;
       private_rpc_port : int option;
-      rollup_node_endpoint : string;
+      rollup_node_endpoint : string option;
       tx_queue_max_lifespan : int option;
       tx_queue_max_size : int option;
       tx_queue_tx_per_addr_limit : int option;
@@ -106,6 +106,7 @@ type mode =
       tx_queue_max_lifespan : int option;
       tx_queue_max_size : int option;
       tx_queue_tx_per_addr_limit : int option;
+      sequencer_keys : string list;
     }
   | Tezlink_sandbox of {
       initial_kernel : string;
@@ -794,6 +795,7 @@ let mode_with_new_private_rpc (mode : mode) =
         tx_queue_max_lifespan;
         tx_queue_max_size;
         tx_queue_tx_per_addr_limit;
+        sequencer_keys;
       } ->
       Sandbox
         {
@@ -807,6 +809,7 @@ let mode_with_new_private_rpc (mode : mode) =
           tx_queue_max_lifespan;
           tx_queue_max_size;
           tx_queue_tx_per_addr_limit;
+          sequencer_keys;
         }
   | _ -> mode
 
@@ -893,8 +896,14 @@ let run_args evm_node =
               Client.time_of_timestamp timestamp |> Client.Time.to_notation)
             genesis_timestamp
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-    | Sandbox {initial_kernel; genesis_timestamp; wallet_dir; _} ->
+    | Sandbox {initial_kernel; genesis_timestamp; wallet_dir; sequencer_keys; _}
+      ->
+        let sequencer_keys =
+          List.map (fun s -> ["--sequencer-key"; s]) sequencer_keys
+          |> List.flatten
+        in
         ["run"; "sandbox"; "--kernel"; initial_kernel]
+        @ sequencer_keys
         @ Cli_arg.optional_arg
             "genesis-timestamp"
             (fun timestamp ->
@@ -1153,15 +1162,19 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           tx_queue_max_lifespan;
           tx_queue_max_size;
           tx_queue_tx_per_addr_limit;
+          sequencer_keys;
         } ->
-        [
-          (* These two fields are not necessary for the sandbox mode, however,
-             the init configuration needs them. *)
-          "--sequencer-key";
-          "unencrypted:edsk3tNH5Ye6QaaRQev3eZNcXgcN6sjCJRXChYFz42L6nKfRVwuL1n";
-          "--rollup-node-endpoint";
-          evm_node.persistent_state.endpoint;
-        ]
+        let sequencer_keys =
+          List.map (fun s -> ["--sequencer-key"; s]) sequencer_keys
+          |> List.flatten
+        in
+        sequencer_keys
+        @ [
+            (* This argument is not necessary for the sandbox mode, however,
+             the init configuration needs it. *)
+            "--rollup-node-endpoint";
+            evm_node.persistent_state.endpoint;
+          ]
         @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
         @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
         @ Cli_arg.optional_arg
@@ -1236,12 +1249,10 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           tx_queue_max_size;
           tx_queue_tx_per_addr_limit;
         } ->
-        [
-          "--evm-node-endpoint";
-          evm_node.persistent_state.endpoint;
-          "--rollup-node-endpoint";
-          rollup_node_endpoint;
-        ]
+        ["--evm-node-endpoint"; evm_node.persistent_state.endpoint]
+        @ (match rollup_node_endpoint with
+          | Some endpoint -> ["--rollup-node-endpoint"; endpoint]
+          | None -> ["--dont-track-rollup-node"])
         @ Cli_arg.optional_arg "preimages-dir" Fun.id preimages_dir
         @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
         @ Cli_arg.optional_arg
@@ -1984,7 +1995,8 @@ let switch_sequencer_to_observer ~(old_sequencer : t) ~(new_sequencer : t) =
               initial_kernel;
               preimages_dir;
               private_rpc_port;
-              rollup_node_endpoint = old_sequencer.persistent_state.endpoint;
+              rollup_node_endpoint =
+                Some old_sequencer.persistent_state.endpoint;
               tx_queue_max_lifespan;
               tx_queue_max_size;
               tx_queue_tx_per_addr_limit;
