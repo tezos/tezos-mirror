@@ -446,6 +446,29 @@ let raw_originate c ~prepaid_bootstrap_storage
   in
   Storage.Contract.Used_storage_space.init c contract total_size
 
+let native_originate ctxt contract ~script =
+  let open Lwt_result_syntax in
+  let contract = Contract_repr.Originated contract in
+  let* ctxt =
+    Storage.Contract.Spendable_balance.init ctxt contract Tez_repr.zero
+  in
+  let {Script_native_repr.kind; storage}, lazy_storage_diff = script in
+  let* ctxt, kind_size = Storage.Contract.Native.init ctxt contract kind in
+  let* ctxt, storage_size =
+    Storage.Contract.Storage.init ctxt contract storage
+  in
+  let* ctxt, lazy_storage_size =
+    update_script_lazy_storage ctxt lazy_storage_diff
+  in
+  let total_size =
+    Z.add (Z.add (Z.of_int kind_size) (Z.of_int storage_size)) lazy_storage_size
+  in
+  assert (Compare.Z.(total_size >= Z.zero)) ;
+  let* ctxt =
+    Storage.Contract.Paid_storage_space.init ctxt contract total_size
+  in
+  Storage.Contract.Used_storage_space.init ctxt contract total_size
+
 let create_implicit c manager ~balance =
   let open Lwt_result_syntax in
   let contract = Contract_repr.Implicit manager in
@@ -558,8 +581,16 @@ let get_script c contract_hash =
   let* c, storage = Storage.Contract.Storage.find c contract in
   match (code, storage) with
   | None, None -> return (c, None)
-  | Some code, Some storage -> return (c, Some {Script_repr.code; storage})
-  | None, Some _ | Some _, None -> failwith "get_script"
+  | Some code, Some storage ->
+      return (c, Some (Contract_repr.Script {Script_repr.code; storage}))
+  | None, Some storage -> (
+      let* c, native_kind = Storage.Contract.Native.find c contract in
+      match native_kind with
+      | None -> return (c, None)
+      | Some native_kind ->
+          return (c, Some (Contract_repr.Native {kind = native_kind; storage})))
+  (* A contract without storage is an illformed contract. *)
+  | Some _, None -> failwith "get_script"
 
 let get_storage ctxt contract_hash =
   let open Lwt_result_syntax in

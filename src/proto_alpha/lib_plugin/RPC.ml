@@ -1302,7 +1302,7 @@ module Scripts = struct
             unparsing_mode
             step_constants
             ~cached_script:None
-            ~script:{storage; code}
+            ~script:(Script.Script {storage; code})
             ~entrypoint
             ~parameter
             ~internal:true
@@ -1373,7 +1373,7 @@ module Scripts = struct
           Interp.execute
             ctxt
             step_constants
-            ~script:{storage; code}
+            ~script:(Script.Script {storage; code})
             ~entrypoint
             ~parameter
         in
@@ -1412,6 +1412,15 @@ module Scripts = struct
                  View_helpers.Viewed_contract_has_no_script)
             script_opt
         in
+        (* The native case will be handled in a later MR (!19583). *)
+        let script =
+          match script with
+          | Script.Script s -> s
+          | Native _ ->
+              Stdlib.failwith
+                "Tzip4 views are not implemented yet for native contracts"
+        in
+        (* let*? script = Environment.Error_monad.Result_syntax wrap_tzresult script in *)
         let*? decoded_script = Script_repr.(force_decode script.code) in
         let* view_ty = script_entrypoint_type ctxt decoded_script entrypoint in
         let*? ty = View_helpers.extract_view_output_type entrypoint view_ty in
@@ -1462,7 +1471,7 @@ module Scripts = struct
             ctxt
             unparsing_mode
             step_constants
-            ~script
+            ~script:(Script.Script script)
             ~cached_script:None
             ~entrypoint
             ~parameter
@@ -1501,6 +1510,14 @@ module Scripts = struct
             ~some:Result_syntax.return
             ~none:(Error_monad.error View_helpers.Viewed_contract_has_no_script)
             script_opt
+        in
+        (* The native case will be handled in a later MR (!19583). *)
+        let script =
+          match script with
+          | Script.Script s -> s
+          | Script.Native _ ->
+              Stdlib.failwith
+                "Views are not implemented yet for native contracts"
         in
         let*? decoded_script = Script_repr.(force_decode script.code) in
         let contract = Contract.Originated contract_hash in
@@ -1561,7 +1578,7 @@ module Scripts = struct
             ctxt
             unparsing_mode
             step_constants
-            ~script:viewer_script
+            ~script:(Script viewer_script)
             ~cached_script:None
             ~entrypoint:Entrypoint.default
             ~parameter
@@ -1596,7 +1613,7 @@ module Scripts = struct
         let* ( Ex_code
                  (Code
                     {
-                      code;
+                      implementation;
                       arg_type;
                       storage_type;
                       views;
@@ -1619,7 +1636,7 @@ module Scripts = struct
           Script_ir_translator.Ex_script
             (Script
                {
-                 code;
+                 implementation;
                  arg_type;
                  storage_type;
                  views;
@@ -2116,7 +2133,7 @@ module Contract = struct
              (req "unparsing_mode" unparsing_mode_encoding)
              (dft "normalize_types" bool false))
         ~query:RPC_query.empty
-        ~output:(option Script.encoding)
+        ~output:(option Script.michelson_with_storage_encoding)
         RPC_path.(path /: Contract.rpc_arg / "script" / "normalized")
 
     let get_used_storage_space =
@@ -2196,11 +2213,12 @@ module Contract = struct
         get_contract contract @@ fun contract ->
         let* ctxt, script = Contract.get_script ctxt contract in
         match script with
-        | None -> return_none
-        | Some script ->
+        | None | Some (Script.Native _) -> return_none
+        | Some (Script.Script script) ->
             let ctxt = Gas.set_unlimited ctxt in
             let+ script, _ctxt =
-              Script_ir_translator.parse_and_unparse_script_unaccounted
+              Script_ir_translator
+              .parse_and_unparse_michelson_script_unaccounted
                 ctxt
                 ~legacy:true
                 ~allow_forged_tickets_in_storage:true

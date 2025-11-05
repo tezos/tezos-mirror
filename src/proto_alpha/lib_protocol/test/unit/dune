@@ -78,7 +78,8 @@
   test_slashing_percentage
   test_staking_operations
   test_consecutive_round_zero
-  test_address_registry))
+  test_address_registry
+  test_native_contracts))
 
 (executable
  (name main)

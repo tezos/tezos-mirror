@@ -73,6 +73,7 @@
   Script_repr_costs_generated
   Script_repr_costs
   Script_repr
+  Script_native_repr
   Cache_memory_helpers
   Seed_repr
   Sampler
@@ -242,6 +243,7 @@
   Script_ir_annot
   Dependent_bool
   Script_list
+  Script_native_types
   Script_typed_ir
   Script_comparable
   Gas_comparable_input_size
@@ -251,6 +253,7 @@
   Script_typed_ir_size
   Script_typed_ir_size_costs_generated
   Script_typed_ir_size_costs
+  Script_native
   Michelson_v1_gas
   Operation_costs
   Script_tc_context
@@ -368,6 +371,7 @@
   script_repr_costs_generated.ml
   script_repr_costs.ml
   script_repr.ml script_repr.mli
+  script_native_repr.ml script_native_repr.mli
   cache_memory_helpers.ml
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -541,6 +545,7 @@
   script_ir_annot.ml script_ir_annot.mli
   dependent_bool.ml dependent_bool.mli
   script_list.ml script_list.mli
+  script_native_types.ml
   script_typed_ir.ml script_typed_ir.mli
   script_comparable.ml script_comparable.mli
   gas_comparable_input_size.ml gas_comparable_input_size.mli
@@ -550,6 +555,7 @@
   script_typed_ir_size.ml script_typed_ir_size.mli
   script_typed_ir_size_costs_generated.ml
   script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  script_native.ml script_native.mli
   michelson_v1_gas.ml michelson_v1_gas.mli
   operation_costs.ml operation_costs.mli
   script_tc_context.ml script_tc_context.mli
@@ -668,6 +674,7 @@
   script_repr_costs_generated.ml
   script_repr_costs.ml
   script_repr.ml script_repr.mli
+  script_native_repr.ml script_native_repr.mli
   cache_memory_helpers.ml
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -841,6 +848,7 @@
   script_ir_annot.ml script_ir_annot.mli
   dependent_bool.ml dependent_bool.mli
   script_list.ml script_list.mli
+  script_native_types.ml
   script_typed_ir.ml script_typed_ir.mli
   script_comparable.ml script_comparable.mli
   gas_comparable_input_size.ml gas_comparable_input_size.mli
@@ -850,6 +858,7 @@
   script_typed_ir_size.ml script_typed_ir_size.mli
   script_typed_ir_size_costs_generated.ml
   script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  script_native.ml script_native.mli
   michelson_v1_gas.ml michelson_v1_gas.mli
   operation_costs.ml operation_costs.mli
   script_tc_context.ml script_tc_context.mli
@@ -952,6 +961,7 @@
   script_repr_costs_generated.ml
   script_repr_costs.ml
   script_repr.ml script_repr.mli
+  script_native_repr.ml script_native_repr.mli
   cache_memory_helpers.ml
   seed_repr.ml seed_repr.mli
   sampler.ml sampler.mli
@@ -1125,6 +1135,7 @@
   script_ir_annot.ml script_ir_annot.mli
   dependent_bool.ml dependent_bool.mli
   script_list.ml script_list.mli
+  script_native_types.ml
   script_typed_ir.ml script_typed_ir.mli
   script_comparable.ml script_comparable.mli
   gas_comparable_input_size.ml gas_comparable_input_size.mli
@@ -1134,6 +1145,7 @@
   script_typed_ir_size.ml script_typed_ir_size.mli
   script_typed_ir_size_costs_generated.ml
   script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  script_native.ml script_native.mli
   michelson_v1_gas.ml michelson_v1_gas.mli
   operation_costs.ml operation_costs.mli
   script_tc_context.ml script_tc_context.mli

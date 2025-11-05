@@ -1123,10 +1123,21 @@ type toplevel = {
   views : view_map;
 }
 
-type ('arg, 'storage) code =
-  | Code : {
+type ('arg, 'storage) implementation =
+      ('arg, 'storage) Script_typed_ir.implementation =
+  | Lambda : {
       code :
         (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
+    }
+      -> ('arg, 'storage) implementation
+  | Native : {
+      kind : ('arg, 'storage) Script_native_types.kind;
+    }
+      -> ('arg, 'storage) implementation
+
+type ('arg, 'storage) code =
+  | Code : {
+      implementation : ('arg, 'storage) implementation;
       arg_type : ('arg, _) ty;
       storage_type : ('storage, _) ty;
       views : view_map;
@@ -5099,6 +5110,28 @@ let code_size ctxt code views =
   let+ ctxt = Gas.consume ctxt (Script_typed_ir_size_costs.nodes_cost ~nodes) in
   (code_size, ctxt)
 
+let get_typed_native_code :
+    context -> kind:Script.native_kind -> (ex_code * context) tzresult Lwt.t =
+ fun ctxt ~kind ->
+  let open Lwt_result_syntax in
+  let*? (Script_native.Ex_kind_and_types
+           (kind, {arg_type; storage_type; entrypoints})) =
+    Script_native.get_typed_kind_and_types kind
+  in
+  let implementation = Native {kind} in
+  return
+    ( Ex_code
+        (Code
+           {
+             implementation;
+             arg_type;
+             storage_type;
+             entrypoints;
+             views = Script_map.empty string_t;
+             code_size = Saturation_repr.zero;
+           }),
+      ctxt )
+
 let parse_code :
     unparse_code_rec:Script_ir_unparser.unparse_code_rec ->
     elab_conf:elab_conf ->
@@ -5157,7 +5190,15 @@ let parse_code :
     let*? code_size, ctxt = code_size ctxt code views in
     return
       ( Ex_code
-          (Code {code; arg_type; storage_type; views; entrypoints; code_size}),
+          (Code
+             {
+               implementation = Lambda {code};
+               arg_type;
+               storage_type;
+               views;
+               entrypoints;
+               code_size;
+             }),
         ctxt )
 
 let parse_storage :
@@ -5212,12 +5253,27 @@ let parse_script :
       ctxt
       ~allow_forged_tickets_in_storage
       ~allow_forged_lazy_storage_id_in_storage
-      {code; storage}
+      script
     ->
-    let* ( Ex_code
-             (Code {code; arg_type; storage_type; views; entrypoints; code_size}),
-           ctxt ) =
-      parse_code ~unparse_code_rec ~elab_conf ctxt ~code
+    let* ( ( Ex_code
+               (Code
+                  {
+                    implementation;
+                    arg_type;
+                    storage_type;
+                    views;
+                    entrypoints;
+                    code_size;
+                  }),
+             ctxt ),
+           storage ) =
+      match script with
+      | Script {code; storage} ->
+          let* ex_code = parse_code ~unparse_code_rec ~elab_conf ctxt ~code in
+          return (ex_code, storage)
+      | Native {kind; storage} ->
+          let* ex_code = get_typed_native_code ctxt ~kind in
+          return (ex_code, storage)
     in
     let+ storage, ctxt =
       parse_storage
@@ -5233,7 +5289,7 @@ let parse_script :
         (Script
            {
              code_size;
-             code;
+             implementation;
              arg_type;
              storage;
              storage_type;
@@ -5386,7 +5442,7 @@ let unparse_code_rec : unparse_code_rec =
     let* code, ctxt = unparse_code ctxt ~stack_depth mode node in
     return (Micheline.root code, ctxt)
 
-let parse_and_unparse_script_unaccounted ctxt ~legacy
+let parse_and_unparse_michelson_script_unaccounted ctxt ~legacy
     ~allow_forged_tickets_in_storage ~allow_forged_lazy_storage_id_in_storage
     mode ~normalize_types {code; storage} =
   let open Lwt_result_syntax in
@@ -6078,7 +6134,7 @@ let script_size
        (Script
           {
             code_size;
-            code = _;
+            implementation = _;
             arg_type = _;
             storage;
             storage_type;

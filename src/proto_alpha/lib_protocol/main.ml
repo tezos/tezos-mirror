@@ -356,7 +356,7 @@ let init chain_id ctxt block_header =
   let timestamp = block_header.timestamp in
   let predecessor = block_header.predecessor in
   let typecheck_smart_contract (ctxt : Alpha_context.context)
-      (script : Alpha_context.Script.t) =
+      (script : Alpha_context.Script.michelson_with_storage) =
     let allow_forged_tickets_in_storage, allow_forged_lazy_storage_id_in_storage
         =
       (false, false)
@@ -368,7 +368,7 @@ let init chain_id ctxt block_header =
         ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
         ~allow_forged_tickets_in_storage
         ~allow_forged_lazy_storage_id_in_storage
-        script
+        (Alpha_context.Script.Script script)
     in
     let* storage, lazy_storage_diff, ctxt =
       Script_ir_translator.extract_lazy_storage_diff

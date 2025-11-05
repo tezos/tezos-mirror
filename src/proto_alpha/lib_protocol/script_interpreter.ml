@@ -1830,7 +1830,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
            (Script
               {
                 code_size;
-                code;
+                implementation;
                 arg_type;
                 storage = old_storage;
                 storage_type;
@@ -1873,9 +1873,15 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
     Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
   in
   let* (ops, new_storage), ctxt =
-    trace
-      (Runtime_contract_error step_constants.self)
-      (interp logger (ctxt, step_constants) code (arg, old_storage))
+    match implementation with
+    | Lambda {code} ->
+        trace
+          (Runtime_contract_error step_constants.self)
+          (interp logger (ctxt, step_constants) code (arg, old_storage))
+    | Native {kind} ->
+        trace
+          (Runtime_contract_error step_constants.self)
+          (Script_native.execute (ctxt, step_constants) kind arg old_storage)
   in
   let* storage, lazy_storage_diff, ctxt =
     Script_ir_translator.extract_lazy_storage_diff
@@ -1905,7 +1911,15 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
   let script =
     Ex_script
       (Script
-         {code_size; code; arg_type; storage; storage_type; entrypoints; views})
+         {
+           code_size;
+           implementation;
+           arg_type;
+           storage;
+           storage_type;
+           entrypoints;
+           views;
+         })
   in
   let*? arg_type_has_tickets, ctxt =
     Ticket_scanner.type_has_tickets ctxt arg_type

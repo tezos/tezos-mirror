@@ -564,8 +564,8 @@ let apply_transaction_to_implicit_with_ticket ~sender ~destination ~ty ~ticket
       [] )
 
 let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
-    ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter ~script
-    ~script_ir ~cache_key ?(paid_storage_diff_acc = Z.zero)
+    ~entrypoint ~before_operation ~payer ~chain_id ~internal ~parameter
+    ~(script : Script.t) ~script_ir ~cache_key ?(paid_storage_diff_acc = Z.zero)
     ?(ticket_receipt_acc = []) () =
   let open Lwt_result_syntax in
   let contract = Contract.Originated contract_hash in
@@ -637,11 +637,18 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
   let* originated_contracts =
     Contract.originated_from_current_nonce ~since:before_operation ~until:ctxt
   in
+  let updated_script =
+    match script with
+    | Script.Script script ->
+        Script.Script {script with storage = Script.lazy_expr storage}
+    | Script.Native native ->
+        Native {native with storage = Script.lazy_expr storage}
+  in
   let*? ctxt =
     Script_cache.update
       ctxt
       cache_key
-      ({script with storage = Script.lazy_expr storage}, updated_cached_script)
+      (updated_script, updated_cached_script)
       updated_size
   in
   let result =
@@ -1339,7 +1346,7 @@ let apply_manager_operation : type kind.
             ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())
             ~allow_forged_tickets_in_storage:false
             ~allow_forged_lazy_storage_id_in_storage:false
-            script
+            (Script script)
         in
         let (Script {storage_type; views; storage; _}) = parsed_script in
         let views_result =
@@ -2918,12 +2925,19 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
                 let consumed_gas =
                   Gas.consumed ~since:backtracking_ctxt ~until:ctxt
                 in
+                let updated_script =
+                  match script with
+                  | Script.Script script ->
+                      Script.Script
+                        {script with storage = Script.lazy_expr storage}
+                  | Script.Native native ->
+                      Native {native with storage = Script.lazy_expr storage}
+                in
                 let*? ctxt =
                   Script_cache.update
                     ctxt
                     cache_key
-                    ( {script with storage = Script.lazy_expr storage},
-                      updated_cached_script )
+                    (updated_script, updated_cached_script)
                     updated_size
                 in
                 let result =

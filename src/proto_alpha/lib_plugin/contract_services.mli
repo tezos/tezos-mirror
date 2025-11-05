@@ -122,13 +122,13 @@ val script :
   'a #RPC_context.simple ->
   'a ->
   Contract_hash.t ->
-  Script.t shell_tzresult Lwt.t
+  Script.michelson_with_storage shell_tzresult Lwt.t
 
 val script_opt :
   'a #RPC_context.simple ->
   'a ->
   Contract_hash.t ->
-  Script.t option shell_tzresult Lwt.t
+  Script.michelson_with_storage option shell_tzresult Lwt.t
 
 val storage :
   'a #RPC_context.simple ->
@@ -336,7 +336,7 @@ module S : sig
       RPC_context.t * Contract.t,
       unit,
       unit,
-      Script.t )
+      Script.michelson_with_storage )
     RPC_service.service
 
   val storage :

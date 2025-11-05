@@ -130,6 +130,29 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
 
 (* End of code to remove at next automatic protocol snapshot *)
 
+let initialize_accumulator_native_contract ctxt =
+  let open Lwt_result_syntax in
+  (* Please note that this is the same mecanism for originating the Liquidity
+     Baking contract. *)
+  let operation_hash =
+    Operation_hash.hash_string ["This is the accumulator contract origination"]
+  in
+  let ctxt = Raw_context.init_origination_nonce ctxt operation_hash in
+  let*? ctxt, contract_hash =
+    Contract_storage.fresh_contract_from_current_nonce ctxt
+  in
+  let* ctxt =
+    Contract_storage.native_originate
+      ctxt
+      contract_hash
+      ~script:
+        (Script_native_repr.Accumulator_contract.with_initial_storage, None)
+  in
+  let* ctxt =
+    Storage.Contract.Native_contracts.Accumulator.init ctxt contract_hash
+  in
+  return (Raw_context.unset_origination_nonce ctxt)
+
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
   let open Lwt_result_syntax in
@@ -223,6 +246,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         in
         let* ctxt = Sc_rollup_inbox_storage.init_inbox ~predecessor ctxt in
         let* ctxt = Address_registry_storage.init ctxt in
+        let* ctxt = initialize_accumulator_native_contract ctxt in
         return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
         (* Start of Alpha stitching. Comment used for automatic snapshot *)
     | Alpha ->
