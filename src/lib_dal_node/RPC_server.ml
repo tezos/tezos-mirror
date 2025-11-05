@@ -361,11 +361,13 @@ module Profile_handlers = struct
     let* () =
       if List.is_empty ok then Lwt.return_unit
       else
-        let ok =
-          List.filter_map (function `Ok v -> Some v | `Not_ok _ -> None) ok
+        let slots_indices =
+          List.filter_map
+            (function
+              | `Ok (slot_index, _num_stored) -> Some slot_index
+              | `Not_ok _ -> None)
+            ok
         in
-        (* TODO: improve (do not go twice through the list)  *)
-        let slots_indices, _ = List.split ok in
         Event.emit_get_attestable_slots_ok_notice
           ~attester
           ~published_level
