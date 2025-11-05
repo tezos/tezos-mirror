@@ -6443,6 +6443,8 @@ end = struct
             ("test_storage_functions", true);
             ("test_storage", true);
             ("test_token", true);
+            ( "test_native_contracts",
+              N.(number >= 025 && name_dash <> "024-PsD5wVTJ") );
           ]
           |> conditional_list
         in

@@ -283,6 +283,9 @@ let all_bakers_attest_first_level c =
 
 let round_durations ctxt = Raw_context.round_durations ctxt
 
+let native_contracts_enable c =
+  (Raw_context.constants c).native_contracts_enable
+
 let all ctxt = Constants_repr.all_of_parametric (parametric ctxt)
 
 (* Derived pseudo-constants *)

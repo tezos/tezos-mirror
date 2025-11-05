@@ -982,6 +982,7 @@ module Constants : sig
       aggregate_attestation : bool;
       allow_tz4_delegate_enable : bool;
       all_bakers_attest_activation_threshold : Ratio.t;
+      native_contracts_enable : bool;
     }
 
     val encoding : t Data_encoding.t
