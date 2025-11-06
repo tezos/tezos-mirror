@@ -47,7 +47,7 @@ index cdbeea9ee4..b4df332c44 100644
 +       let+ ctxt = Bootstrap.cycle_end ctxt last_cycle in
 +       (ctxt, balance_updates, deactivated))
 +      [@profiler.record_s {verbosity = Notice} "delegate end cycle"]
- 
+
  let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
    let open Lwt_result_syntax in
 diff --git a/src/proto_alpha/lib_protocol/baking.ml b/src/proto_alpha/lib_protocol/baking.ml
@@ -69,7 +69,7 @@ index 7cf362b259..a45d1eda4a 100644
    in
 -  return (ctxt, map)
 +  return (ctxt, map)) [@profiler.record_s {verbosity = Notice} "attesting_rights"]
- 
+
  let incr_slot att_rights =
    let one = Attesting_power.make ~slots:1 ~stake:0L in
 diff --git a/src/proto_alpha/lib_protocol/delegate_cycles.ml b/src/proto_alpha/lib_protocol/delegate_cycles.ml
@@ -197,20 +197,21 @@ index f1a9e3bf62..bce1980044 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index 02788e854b..0598dc7a0e 100644
+index 84795cc0c52..df298fe7dcc 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
-@@ -236,22 +236,38 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+@@ -252,10 +252,20 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+         return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
          (* Start of Alpha stitching. Comment used for automatic snapshot *)
      | Alpha ->
-         let* ctxt =
--          Storage.Tenderbake.First_level_of_protocol.update ctxt level
-+          (Storage.Tenderbake.First_level_of_protocol.update
+-        let* ctxt = Storage.Protocol_activation_level.update ctxt level in
++        let* ctxt =
++          (Storage.Protocol_activation_level.update
 +             ctxt
 +             level
 +           [@profiler.record_s
-+             {verbosity = Notice} "Tenderbake.First_level_of_protocol.update"])
-         in
++             {verbosity = Notice} "Protocol_activation_level.update"])
++        in
          (* Migration of refutation games needs to be kept for each protocol. *)
          let* ctxt =
 -          Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
@@ -222,15 +223,16 @@ index 02788e854b..0598dc7a0e 100644
          in
          return (ctxt, [])
          (* End of Alpha stitching. Comment used for automatic snapshot *)
-         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
+@@ -263,11 +273,19 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
      | T024 ->
          let* ctxt =
--          Storage.Tenderbake.First_level_of_protocol.update ctxt level
-+          (Storage.Tenderbake.First_level_of_protocol.update
+           let*! ctxt = Storage.Tenderbake.First_level_of_protocol.remove ctxt in
+-          Storage.Protocol_activation_level.init ctxt level
++          (Storage.Protocol_activation_level.init
 +             ctxt
 +             level
 +           [@profiler.record_s
-+             {verbosity = Notice} "Tenderbake.First_level_of_protocol.update"])
++             {verbosity = Notice} "Protocol_Activation_level.init"])
          in
          (* Migration of refutation games needs to be kept for each protocol. *)
          let* ctxt =
@@ -241,8 +243,8 @@ index 02788e854b..0598dc7a0e 100644
 +             {verbosity = Notice}
 +               "Sc_rollup_refutation_storage.migrate_clean_refutation_games"])
          in
-         let* ctxt =
-           match previous_proto_constants with
+         return (ctxt, [])
+     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
 diff --git a/src/proto_alpha/lib_protocol/raw_context.ml b/src/proto_alpha/lib_protocol/raw_context.ml
 index c501d7fc16..00e5338465 100644
 --- a/src/proto_alpha/lib_protocol/raw_context.ml
@@ -261,7 +263,7 @@ index c501d7fc16..00e5338465 100644
 +      ~all_bakers_attest_first_level:None [@profiler.record_s {verbosity = Notice} "Prepare"])
    in
    (previous_proto, previous_proto_constants, ctxt)
- 
+
 diff --git a/src/proto_alpha/lib_protocol/script_cache.ml b/src/proto_alpha/lib_protocol/script_cache.ml
 index 35cc6b5178..5c679ad606 100644
 --- a/src/proto_alpha/lib_protocol/script_cache.ml
@@ -289,7 +291,7 @@ index 35cc6b5178..5c679ad606 100644
 +           in
 +           return (ctxt, identifier, Some (unparsed_script, script_ir)))
 +      [@profiler.record_s {verbosity = Notice} "cache_miss"])
- 
+
  let update ctxt identifier updated_script approx_size =
    Cache.update ctxt identifier (Some (updated_script, approx_size))
 diff --git a/src/proto_alpha/lib_protocol/script_interpreter.ml b/src/proto_alpha/lib_protocol/script_interpreter.ml
@@ -312,7 +314,7 @@ index 182af698fa..23620cd13c 100644
 @@ -1959,6 +1961,19 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
        },
        ctxt )
- 
+
 +let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
 +    unparsed_script cached_script arg =
 +  execute_any_arg
@@ -376,9 +378,8 @@ index 05e30ca6ee..b618445e78 100644
      ty
 -    t
 +    t [@profiler.record_s {verbosity = Notice} "parse_data"]
- 
+
  let parse_view ~elab_conf ctxt ty view =
    parse_view ~unparse_code_rec ~elab_conf ctxt ty view
--- 
+--
 2.51.1.dirty
-

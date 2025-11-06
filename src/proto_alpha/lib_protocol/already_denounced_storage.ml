@@ -27,7 +27,7 @@ let already_denounced ctxt delegate {Misbehaviour_repr.level; round; kind} =
   let* answer = already_denounced_aux ctxt delegate level round kind in
   if answer || Round_repr.(round = zero) then return answer
   else
-    let* first_level = Storage.Tenderbake.First_level_of_protocol.get ctxt in
+    let* first_level = Storage.Protocol_activation_level.get ctxt in
     if Raw_level_repr.(level.level >= first_level) then return answer
     else
       (* Exception related to the migration from Oxford to P: because

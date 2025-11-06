@@ -4039,7 +4039,7 @@ let check_attesting_power vi bs =
        block at the next level does not need to contain attestations.
        (Note that the migration block itself is validated by the
        previous protocol, so the returned value for it does not matter.) *)
-    let* first_level_of_protocol = First_level_of_protocol.get vi.ctxt in
+    let* first_level_of_protocol = Protocol_activation_level.get vi.ctxt in
     let level_position_in_protocol =
       Raw_level.diff vi.current_level.level first_level_of_protocol
     in

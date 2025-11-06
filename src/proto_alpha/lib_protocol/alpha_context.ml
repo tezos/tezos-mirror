@@ -244,8 +244,8 @@ module Block_payload = struct
   include Block_payload_repr
 end
 
-module First_level_of_protocol = struct
-  let get = Storage.Tenderbake.First_level_of_protocol.get
+module Protocol_activation_level = struct
+  let get = Storage.Protocol_activation_level.get
 end
 
 module Consecutive_round_zero = struct

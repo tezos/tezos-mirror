@@ -872,11 +872,18 @@ module Ticket_balance : sig
     Single_data_storage with type t := Raw_context.t and type value = Z.t
 end
 
+(** [Protocol_activation_level] stores the level of the first block whose
+    application results in a context of this protocol. *)
+module Protocol_activation_level :
+  Single_data_storage
+    with type t := Raw_context.t
+     and type value = Raw_level_repr.t
+
 (** Tenderbake *)
 
 module Tenderbake : sig
-  (** [First_level_of_protocol] stores the level of the first block of
-      this protocol. *)
+  (* TODO: #8065: delete in V
+     Use {!Protocol_activation_level} instead. *)
   module First_level_of_protocol :
     Single_data_storage
       with type t := Raw_context.t
