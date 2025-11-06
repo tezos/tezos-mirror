@@ -47,11 +47,9 @@ val may_notify_not_in_committee :
   Node_context.t -> Committee_cache.committee -> attestation_level:int32 -> unit
 
 (** [subscribe ctxt ~pkh] opens a [Resto_directory.Answer] stream that yields
-    [Types.Attestable_slots_watcher_table.Attestable_event.t] values. The stream
+    [Types.Attestable_event.t] values. The stream
     only emits items produced after subscription. *)
 val subscribe :
   Node_context.t ->
   pkh:Signature.public_key_hash ->
-  Types.Attestable_slots_watcher_table.Attestable_event.t
-  Resto_directory.Answer.stream
-  Lwt.t
+  Types.Attestable_event.t Resto_directory.Answer.stream Lwt.t

@@ -228,7 +228,7 @@ val get_attestable_slots :
 val monitor_attestable_slots :
   < meth : [`GET]
   ; input : unit
-  ; output : Types.Attestable_slots_watcher_table.Attestable_event.t
+  ; output : Types.Attestable_event.t
   ; prefix : unit
   ; params : unit * Signature.public_key_hash
   ; query : unit >

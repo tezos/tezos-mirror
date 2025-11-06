@@ -124,7 +124,7 @@ let is_attestable_slot_or_trap ctxt ~pkh ~(slot_id : Types.slot_id) =
 
 let may_notify_attestable_slot_or_trap ctxt ~(slot_id : Types.slot_id) =
   let open Lwt_result_syntax in
-  let module T = Types.Attestable_slots_watcher_table in
+  let module T = Attestable_slots_watcher_table in
   let attestable_slots_watcher_table =
     Node_context.get_attestable_slots_watcher_table ctxt
   in
@@ -157,7 +157,7 @@ let is_not_in_committee committee ~pkh =
   List.is_empty assigned_shard_indices
 
 let may_notify_not_in_committee ctxt committee ~attestation_level =
-  let module T = Types.Attestable_slots_watcher_table in
+  let module T = Attestable_slots_watcher_table in
   let attestable_slots_watcher_table =
     Node_context.get_attestable_slots_watcher_table ctxt
   in
@@ -184,14 +184,14 @@ let may_notify_not_in_committee ctxt committee ~attestation_level =
       - `start = max (1, L - attestation_lag + 1)`, as this is the oldest level where
       slots can be published and attested in the near future;
       - `stop = L`, as this is the newest level where we did not have time to obtain
-      the information about the published slots. 
-    
+      the information about the published slots.
+
     For each level in [start .. stop] (inclusively), we accumulate the attestation status
     information about each slot id. *)
 let get_backfill_payload ctxt ~pkh =
   let open Lwt_result_syntax in
   let open Node_context in
-  let module E = Types.Attestable_slots_watcher_table.Attestable_event in
+  let module E = Types.Attestable_event in
   let last_finalized_level = get_last_finalized_level ctxt in
   let*? attestation_lag =
     get_attestation_lag ctxt ~level:last_finalized_level
@@ -246,7 +246,7 @@ let get_backfill_payload ctxt ~pkh =
 let subscribe ctxt ~pkh =
   let open Lwt_syntax in
   let open Node_context in
-  let module T = Types.Attestable_slots_watcher_table in
+  let module T = Attestable_slots_watcher_table in
   let proto_params =
     Result.to_option
     @@ get_proto_parameters ctxt ~level:(`Level (get_last_finalized_level ctxt))
