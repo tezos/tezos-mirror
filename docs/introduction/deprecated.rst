@@ -29,7 +29,7 @@ Octez is now distributed as the following set of Opam packages:
   - :package-api:`octez-libs <octez-libs/index.html>`: Contains the base libraries for Octez (cryptography primitives, error management helpers, etc.).
   - :package-api:`octez-shell <octez-shell-libs/index.html>`: Contains the libraries related to the Octez shell.
   - :package-api:`octez-proto-libs <octez-proto-libs/index.html>`: Contains the libraries for the Tezos protocol.
-  - :package-api:`octez-l2-libs <octez-l2-libs/index.html>`: Contains the libraries related to layer 2.
+  - :package-api:`octez-l2-libs <octez-l2-libs/index.html>`: Contains the libraries related to Layer 2.
   - For each protocol ``P``:
     - :package-api:`octez-protocol-P-libs <octez-protocol-alpha-libs/index.html>`: The protocol ``P`` dependent libraries.
     - ``tezos-protocol-P``: The Tezos protocol ``P`` itself.

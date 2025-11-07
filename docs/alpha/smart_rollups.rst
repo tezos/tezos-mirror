@@ -387,7 +387,7 @@ The whitelist is optionally defined at origination. The rollup is
 considered public if no white-list is defined, private otherwise. The
 whitelist can be updated with a specific outbox message. This message
 contains an optional list, the new list completely replaces the stored
-whitelist in layer 1. If the message contains no list, then the
+whitelist in Layer 1. If the message contains no list, then the
 rollup becomes public. In turn, it is forbidden to make a public
 rollup private by sending an outbox message with a non-empty
 whitelist.

@@ -207,7 +207,7 @@ For its operation, the baker daemon needs to communicate with an Octez node usin
 Therefore, you must indicate a node endpoint whose RPC interface is available.
 The most common way is to :ref:`run a node locally <quickstart_node>`, ensuring its RPC port is open for local calls (e.g. ``--rpc-addr 127.0.0.1``).
 
-Bakers are also supposed to run a DAL node before running the baker daemon, to expand the amount of data that Tezos can distribute without causing congestion on layer 1.
+Bakers are also supposed to run a DAL node before running the baker daemon, to expand the amount of data that Tezos can distribute without causing congestion on Layer 1.
 Therefore, first :doc:`start a DAL node <../shell/dal_run>`.
 
 Typically, you run an attester DAL node as follows::
