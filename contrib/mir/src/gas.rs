@@ -281,11 +281,12 @@ pub mod interpret_cost {
     use checked::Checked;
     use num_bigint::{BigInt, BigUint};
     use num_traits::Zero;
+    use tezos_crypto_rs::public_key::PublicKey;
     use tezos_crypto_rs::CryptoError;
     use thiserror::Error;
 
     use super::{AsGasCost, BigIntByteSize, Log2i, OutOfGas};
-    use crate::ast::{Key, Micheline, Or, Ticket, TypedValue};
+    use crate::ast::{Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
@@ -840,16 +841,23 @@ pub mod interpret_cost {
         Crypto(#[from] CryptoError),
     }
 
-    pub fn check_signature(k: &Key, msg: &[u8]) -> Result<u32, OutOfGas> {
+    pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Result<u32, SigCostError> {
         let len = Checked::from(msg.len());
-        match k {
-            Key::Ed25519(..) => 65800 + ((len >> 3) + len),
-            Key::Secp256k1(..) => 51600 + ((len >> 3) + len),
-            Key::P256(..) => 341000 + ((len >> 3) + len),
+        let checked_cost = match k {
+            PublicKey::Ed25519(..) => 65_800 + ((len >> 3) + len),
+            PublicKey::Secp256k1(..) => 51_600 + ((len >> 3) + len),
+            PublicKey::P256(..) => 341_000 + ((len >> 3) + len),
             #[cfg(feature = "bls")]
-            Key::Bls(..) => 1570000 + (len * 3),
-        }
-        .as_gas_cost()
+            PublicKey::Bls(..) => 1_570_000 + (len * 3),
+            #[cfg(not(feature = "bls"))]
+            PublicKey::Bls(..) => {
+                return Err(SigCostError::Crypto(CryptoError::Unsupported(
+                    "bls feature disabled, tz4 signature verification not supported",
+                )))
+            }
+        };
+
+        checked_cost.as_gas_cost().map_err(SigCostError::from)
     }
 
     pub fn slice(length: usize) -> Result<u32, OutOfGas> {

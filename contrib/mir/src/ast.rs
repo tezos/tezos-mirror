@@ -29,6 +29,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     rc::Rc,
 };
+use tezos_crypto_rs::public_key::PublicKey;
 /// Reexported from [tezos_crypto_rs::hash]. Typechecked values of the Michelson
 /// type `chain_id`.
 pub use tezos_crypto_rs::{hash::ChainId, public_key_hash::PublicKeyHash};
@@ -45,14 +46,13 @@ pub use big_map::BigMap;
 pub use byte_repr_trait::{ByteReprError, ByteReprTrait};
 pub use micheline::IntoMicheline;
 pub use michelson_address::*;
-pub use michelson_key::Key;
 pub use michelson_lambda::{Closure, Lambda};
 pub use michelson_list::MichelsonList;
 pub use michelson_operation::{
     CreateContract, Emit, Operation, OperationInfo, SetDelegate, TransferTokens,
 };
-pub use michelson_signature::Signature;
 pub use or::Or;
+pub use tezos_crypto_rs::signature::Signature;
 
 use self::entrypoint::Direction;
 
@@ -333,7 +333,7 @@ pub enum TypedValue<'a> {
     ChainId(ChainId),
     Contract(Address),
     Bytes(Vec<u8>),
-    Key(Key),
+    Key(PublicKey),
     Signature(Signature),
     Lambda(Closure<'a>),
     KeyHash(PublicKeyHash),
@@ -407,8 +407,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             TV::Address(x) => V::Bytes(x.to_bytes_vec()),
             TV::ChainId(x) => V::Bytes(x.into()),
             TV::Bytes(x) => V::Bytes(x),
-            TV::Key(k) => V::Bytes(k.to_bytes_vec()),
-            TV::Signature(s) => V::Bytes(s.to_bytes_vec()),
+            TV::Key(k) => V::Bytes(k.to_bytes().unwrap()),
+            TV::Signature(s) => V::Bytes(s.into()),
             TV::Lambda(lam) => lam.into_micheline_optimized_legacy(arena),
             TV::KeyHash(s) => V::Bytes(s.to_bytes().unwrap()),
             TV::Timestamp(s) => V::Int(s),
@@ -913,28 +913,28 @@ pub mod test_strategies {
             .boxed(),
             T::Key => prop_oneof![
                 Just(V::Key(
-                    Key::from_base58_check("edpkupxHveP7SFVnBq4X9Dkad5smzLcSxpRx9tpR7US8DPN5bLPFwu").unwrap()
+                    PublicKey::from_b58check("edpkupxHveP7SFVnBq4X9Dkad5smzLcSxpRx9tpR7US8DPN5bLPFwu").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("edpkupH22qrz1sNQt5HSvWfRJFfyJ9dhNbZLptE6GR4JbMoBcACZZH").unwrap()
+                    PublicKey::from_b58check("edpkupH22qrz1sNQt5HSvWfRJFfyJ9dhNbZLptE6GR4JbMoBcACZZH").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("edpkuwTWKgQNnhR5v17H2DYHbfcxYepARyrPGbf1tbMoGQAj8Ljr3V").unwrap()
+                    PublicKey::from_b58check("edpkuwTWKgQNnhR5v17H2DYHbfcxYepARyrPGbf1tbMoGQAj8Ljr3V").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("sppk7cdA7Afj8MvuBFrP6KsTLfbM5DtH9GwYaRZwCf5tBVCz6UKGQFR").unwrap()
+                    PublicKey::from_b58check("sppk7cdA7Afj8MvuBFrP6KsTLfbM5DtH9GwYaRZwCf5tBVCz6UKGQFR").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD").unwrap()
+                    PublicKey::from_b58check("sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("p2pk67K1dwkDFPB63RZU5H3SoMCvmJdKZDZszc7U4FiGKN2YypKdDCB").unwrap()
+                    PublicKey::from_b58check("p2pk67K1dwkDFPB63RZU5H3SoMCvmJdKZDZszc7U4FiGKN2YypKdDCB").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("p2pk68C6tJr7pNLvgBH63K3hBVoztCPCA36zcWhXFUGywQJTjYBfpxk").unwrap()
+                    PublicKey::from_b58check("p2pk68C6tJr7pNLvgBH63K3hBVoztCPCA36zcWhXFUGywQJTjYBfpxk").unwrap()
                 )),
                 Just(V::Key(
-                    Key::from_base58_check("BLpk1yoPpFtFF3jGUSn2GrGzgHVcj1cm5o6HTMwiqSjiTNFSJskXFady9nrdhoZzrG6ybXiTSK5G").unwrap()
+                    PublicKey::from_b58check("BLpk1yoPpFtFF3jGUSn2GrGzgHVcj1cm5o6HTMwiqSjiTNFSJskXFady9nrdhoZzrG6ybXiTSK5G").unwrap()
                 )),
             ]
                 .boxed(),

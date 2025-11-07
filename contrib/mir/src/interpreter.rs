@@ -19,7 +19,7 @@ use std::rc::Rc;
 use tezos_crypto_rs::{
     blake2b::digest as blake2bdigest,
     hash::{ContractKt1Hash, HashTrait},
-    CryptoError,
+    CryptoError, PublicKeySignatureVerifier, PublicKeyWithHash,
 };
 use typed_arena::Arena;
 
@@ -1473,7 +1473,7 @@ fn interpret_one<'a>(
             let msg = pop!(V::Bytes);
             ctx.gas()
                 .consume(interpret_cost::check_signature(&key, &msg)?)?;
-            stack.push(V::Bool(sig.check(&key, &msg)));
+            stack.push(V::Bool(key.verify_signature(&sig, &msg).unwrap_or(false)));
         }
         I::TransferTokens => {
             let param = pop!();
@@ -1613,7 +1613,7 @@ fn interpret_one<'a>(
         I::HashKey => {
             ctx.gas().consume(interpret_cost::HASH_KEY)?;
             let key = pop!(V::Key);
-            stack.push(TypedValue::KeyHash(key.hash()))
+            stack.push(TypedValue::KeyHash(key.pk_hash()))
         }
         I::Ticket(content_type) => {
             let content = pop!();
@@ -1890,6 +1890,8 @@ mod interpreter_tests {
     use chrono::DateTime;
     use entrypoint::DEFAULT_EP_NAME;
     use num_bigint::BigUint;
+    use tezos_crypto_rs::public_key::PublicKey;
+    use tezos_data_encoding::nom::NomReader;
     use Instruction::*;
     use Option::None;
     use TypedValue as V;
@@ -4752,9 +4754,101 @@ mod interpreter_tests {
         );
     }
 
+    // tuples of (key, message, signature, is_valid).
+    // signatures are produced via `octez-client sign bytes <msg> for <key>`
+    fn signature_fixtures() -> Vec<(PublicKey, &'static [u8], Signature, bool)> {
+        vec!
+          [ ( PublicKey::from_b58check("BLpk1wfC8yTMJKYT3Q9YfGtjGiw3qpjbkoPhjoGVys7PjHSochLNxnMW7s4EUs37gvcTPZKDSoWi").unwrap()
+            , b"\0"
+            , Signature::from_base58_check("BLsigAmLKnuw12tethjMmotFPaQ6u4XCKrVk6c15dkRXKkjDDjHywbhS3nd4rBT31yrCvvQrS2HntWhDRu7sX8Vvek53zBUwQHqfcHRiVKVj1ehq8CBYs1Z7XW2rkL2XkVNHua4cnvxY7F").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("BLpk1wfC8yTMJKYT3Q9YfGtjGiw3qpjbkoPhjoGVys7PjHSochLNxnMW7s4EUs37gvcTPZKDSoWi").unwrap()
+            , b"\0\0"
+            , Signature::from_base58_check("BLsigBR1jcWq3w6yAFyDn2X6fxBGjB1E7YoywyUhpvHfisPpCgeMQfJHXoj2YW1BZoujsuZRXdU1BTQjWwqT3xAZRGVcsXovVAgEXbMuuaKLSYYbbMQM92gDDT1UCCRZ1RFvutdavYoumy").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("BLpk1wfC8yTMJKYT3Q9YfGtjGiw3qpjbkoPhjoGVys7PjHSochLNxnMW7s4EUs37gvcTPZKDSoWi").unwrap()
+            , b"kot"
+            , Signature::from_base58_check("BLsigBR1jcWq3w6yAFyDn2X6fxBGjB1E7YoywyUhpvHfisPpCgeMQfJHXoj2YW1BZoujsuZRXdU1BTQjWwqT3xAZRGVcsXovVAgEXbMuuaKLSYYbbMQM92gDDT1UCCRZ1RFvutdavYoumy").unwrap()
+            , false
+            )
+          , ( PublicKey::from_b58check("edpkuwTWKgQNnhR5v17H2DYHbfcxYepARyrPGbf1tbMoGQAj8Ljr3V").unwrap()
+            , b"\0"
+            , Signature::from_base58_check("edsigtrs8bK7vNfiR4Kd9dWasVa1bAWaQSu2ipnmLGZuwQa8ktCEMYVKqbWsbJ7zTS8dgYT9tiSUKorWCPFHosL5zPsiDwBQ6vb").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("edpkupH22qrz1sNQt5HSvWfRJFfyJ9dhNbZLptE6GR4JbMoBcACZZH").unwrap()
+            , b"\0\0"
+            , Signature::from_base58_check("edsigtj8LhbJ2B3qhZvqzA49raG65dydFcWZW9b9L7ntF3bb29zxaBFFL8SM1jeBUY66hG122znyVA4wpzLdwxcNZwSK3Szu7iD").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("edpkupH22qrz1sNQt5HSvWfRJFfyJ9dhNbZLptE6GR4JbMoBcACZZH").unwrap()
+            , b"kot"
+            , Signature::from_base58_check("edsigtrs8bK7vNfiR4Kd9dWasVa1bAWaQSu2ipnmLGZuwQa8ktCEMYVKqbWsbJ7zTS8dgYT9tiSUKorWCPFHosL5zPsiDwBQ6vb").unwrap()
+            , false
+            )
+          , ( PublicKey::from_b58check("sppk7cdA7Afj8MvuBFrP6KsTLfbM5DtH9GwYaRZwCf5tBVCz6UKGQFR").unwrap()
+            , b"\0"
+            , Signature::from_base58_check("spsig1Ng2bs4PXCbjaFGuojk9K5Pt3CkfbUZyHLLrBxHSmTqrUUxQggi4yJBit3Ljqnqr61UpdTewTLiu4schSCfZvaRwu412oZ").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD").unwrap()
+            , b"\0\0"
+            , Signature::from_base58_check("spsig1aP7D9oheiraNuM1NgziMPSPKS1F9kSWyFqkE8WigaeU5Uzb3LwY34F7Y7RsF6sY5ZfUda1NWdrC5V4KEfm9jeU1eniHmy").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("sppk7Ze7NMs6EHF2uB8qq8GrEgJvE9PWYkUijN3LcesafzQuGyniHBD").unwrap()
+            , b"kot"
+            , Signature::from_base58_check("spsig1PJ9LG9ovbpVJ3CucFWL7iBaQZjqEWMvppgLjYiiSwzcxpuUqHr2BUVZDUwkmZKzMNDWJdgtyhYiicz197TbhS4LPpnxDY").unwrap()
+            , false
+            )
+          , ( PublicKey::from_b58check("p2pk66qfVMXhFJWhtFDCT6F3JUM3M1iQpfWe4nPZKWcsqsKQtXXHFkQ").unwrap()
+            , b"\0"
+            , Signature::from_base58_check("p2sigv6HrN6xB5gQDnmKLC2P3ynwiPn4zfUj7CcZD1cepfFzX7xBDWFQu9uoKWbEzVgxCQxrE1J5X6FGYwF2dpoYcjpdPCBhuD").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("p2pk64bybDUtSjSQnsexpzhedhBo4vkoRX4tWfQQbBxKbA58wJqKkT2").unwrap()
+            , b"\x0A"
+            , Signature::from_base58_check("p2siggzjojhabur7zZvmNnhkhnU3nYA1ZUR9JSas57RVhNdAmQk6y3hns3F2zPBGsC964PFAE2HC3fbPkcqpVFbjoQQq9dFiZg").unwrap()
+            , true
+            )
+          , ( PublicKey::from_b58check("p2pk64bybDUtSjSQnsexpzhedhBo4vkoRX4tWfQQbBxKbA58wJqKkT2").unwrap()
+            , b"kot"
+            , Signature::from_base58_check("p2siggzjojhabur7zZvmNnhkhnU3nYA1ZUR9JSas57RVhNdAmQk6y3hns3F2zPBGsC964PFAE2HC3fbPkcqpVFbjoQQq9dFiZg").unwrap()
+            , false
+            )
+            // binary representation
+            // edpk
+          , ( PublicKey::nom_read_exact(&hex::decode("00aad3f16293766169f7db278c5e0e9db4fb82ffe1cbcc35258059617dc0fec082").unwrap()).unwrap()
+            , b"\0"
+            , Signature::try_from(hex::decode("91ac1e7fd668854fc7a40feec4034e42c06c068cce10622c607fda232db34c8cf5d8da83098dd891cd4cb4299b3fa0352ae323ad99b24541e54b91888fdc8201").unwrap()).unwrap()
+            , true
+            )
+            // sppk
+          , ( PublicKey::nom_read_exact(&hex::decode("0103b524d0184276467c848ac13557fb0ff8bec5907960f72683f22af430503edfc1").unwrap()).unwrap()
+            , b"\0"
+            , Signature::try_from(hex::decode("80e4e72ffecf72953789625b1125e9f45f432c14e53a01ec68a1e1b77d60cfe96a97443733ba0f7f42db3a56d7a433df2b4fc0035c05ab92d062f33c5bab0244").unwrap()).unwrap()
+            , true
+            )
+            // p2pk
+          , ( PublicKey::nom_read_exact(&hex::decode("0202041e5cb7fb3d7bc6fb7b9e94790919a9e76ccc372e6cc9cae925027c08ff95f3").unwrap()).unwrap()
+            , b"\x0A"
+            , Signature::try_from(hex::decode("12d25210bb02998516bf6a776e1cd55a06c5fbe3c21afbeef29b99d96305e43263c75a4449906e0f2d79ecc973fff9ce7f8c43fee40b04d07c191f00ee176175").unwrap()).unwrap()
+            , true
+            )
+            // BLpk
+          , ( PublicKey::nom_read_exact(&hex::decode("03ade3c5ec9e1be3dd08eb355f6e23b8e162b90f563fa5cf0b0299fb9f3aa29218483ead20efa8b350559be88bd99cea6c").unwrap()).unwrap()
+            , b"\0"
+            , Signature::try_from(hex::decode("a065340a9c902829a4d77312c3327b558d310a37305049fc144021ea837325f994e270537a03acfdf9ef276530366b7c1629cb4d71a2b5967b582bfcfd280becb8c918463eb0e5dd0165702a2494b8856baee31e0e7b9f9e5ae5b4af980e88ee").unwrap()).unwrap()
+            , true
+            )
+          ]
+    }
+
     #[test]
     fn check_signature() {
-        for (key, msg, sig, res) in michelson_signature::tests::signature_fixtures() {
+        for (key, msg, sig, res) in signature_fixtures() {
             let mut stack = stk![V::Bytes(msg.to_vec()), V::Signature(sig), V::Key(key)];
             assert_eq!(
                 interpret_one(&CheckSignature, &mut Ctx::default(), &mut stack),
