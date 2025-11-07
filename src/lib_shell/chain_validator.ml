@@ -489,7 +489,10 @@ let[@warning "-32"] reset_profilers =
   let reset_sections =
     let to_string b = Block_hash.to_b58check (Store.Block.hash b) in
     List.map
-      (Tezos_profiler.Profiler.section_maker Store.Block.equal to_string)
+      (Tezos_profiler.Profiler.section_maker
+         ~cpu:None
+         Store.Block.equal
+         to_string)
       profilers
   in
   fun block ->

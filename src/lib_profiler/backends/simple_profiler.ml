@@ -26,13 +26,23 @@
 
 open Profiler
 
-let time () = {wall = Unix.gettimeofday (); cpu = Sys.time ()}
+let time ~cpu () =
+  {
+    wall = Unix.gettimeofday ();
+    cpu = (if compute_cpu ~cpu then Some (Sys.time ()) else None);
+  }
 
-type stack_item = {id : id; time : time; report : report; verbosity : verbosity}
+type stack_item = {
+  id : id;
+  time : time;
+  report : report;
+  verbosity : verbosity;
+  cpu : bool option;
+}
 
 type stack = Toplevel of report | Cons of stack_item * stack
 
-type scope = {id : id; verbosity : verbosity; time : time}
+type scope = {id : id; verbosity : verbosity; time : time; cpu : bool option}
 
 type state = {stack : stack; scopes : scope list; max_verbosity : verbosity}
 
@@ -43,19 +53,23 @@ let empty max_verbosity =
     max_verbosity;
   }
 
-let aggregate state verbosity id =
-  {state with scopes = {id; verbosity; time = time ()} :: state.scopes}
+let aggregate ~cpu state verbosity id =
+  {
+    state with
+    scopes = {id; verbosity; time = time ~cpu (); cpu} :: state.scopes;
+  }
 
-let record state verbosity id =
-  if state.scopes <> [] then aggregate state verbosity id
+let record ~cpu state verbosity id =
+  if state.scopes <> [] then aggregate ~cpu state verbosity id
   else
     let stack =
       Cons
         ( {
             id;
-            time = time ();
+            time = time ~cpu ();
             report = {recorded = []; aggregated = IdMap.empty};
             verbosity;
+            cpu;
           },
           state.stack )
     in
@@ -143,7 +157,8 @@ let inc state report =
   in
   {state with stack}
 
-let span state verbosity d ((ids, metadata) : string list * metadata) =
+let span ~cpu state verbosity d ((ids, metadata) : string list * metadata) =
+  let zero_time = zero_time ~cpu in
   let tids =
     List.rev_append
       (List.map (fun {id; _} -> (id, zero_time)) state.scopes)
@@ -163,9 +178,10 @@ let span state verbosity d ((ids, metadata) : string list * metadata) =
       in
       inc state {recorded = []; aggregated = build_node tids}
 
-let mark state verbosity ids = span state verbosity zero_time ids
+let mark state verbosity ids =
+  span ~cpu:None state verbosity (zero_time ~cpu:None) ids
 
-let stop_aggregate state verbosity d id scopes =
+let stop_aggregate state verbosity d id scopes cpu =
   let tids =
     let s_scopes = List.map (fun {id; _} -> (id, d)) scopes in
     List.rev ((id, d) :: s_scopes)
@@ -174,21 +190,22 @@ let stop_aggregate state verbosity d id scopes =
     | [] -> IdMap.empty
     | (id, d) :: tids ->
         let children = build_node tids in
-        let count, total = if tids = [] then (1, d) else (0, zero_time) in
+        let count, total = if tids = [] then (1, d) else (0, zero_time ~cpu) in
         IdMap.singleton id {count; total; children; node_verbosity = verbosity}
   in
   inc state {recorded = []; aggregated = build_node tids}
 
-let stop state =
+let stop : state -> state =
+ fun state ->
   match state.scopes with
-  | {id; verbosity; time = t0} :: scopes ->
-      let d = Span (time () -* t0) in
+  | {id; verbosity; time = t0; cpu} :: scopes ->
+      let d = Span (time ~cpu () -* t0) in
       let state = {state with scopes} in
-      stop_aggregate state verbosity d id scopes
+      stop_aggregate state verbosity d id scopes cpu
   | [] ->
-      let stop_report id start contents report item_verbosity =
+      let stop_report id start contents report item_verbosity cpu =
         let contents = {contents with recorded = List.rev contents.recorded} in
-        let duration = Span (time () -* start) in
+        let duration = Span (time ~cpu () -* start) in
         let recorded =
           (id, {start; duration; contents; item_verbosity}) :: report.recorded
         in
@@ -197,27 +214,34 @@ let stop state =
       let stack =
         match state.stack with
         | Cons
-            ( {id; time = start; report = contents; verbosity},
+            ( {id; time = start; report = contents; verbosity; cpu},
               Cons
-                ({id = pid; time = pt0; report; verbosity = p_verbosity}, rest)
-            ) ->
+                ( {
+                    id = pid;
+                    time = pt0;
+                    report;
+                    verbosity = p_verbosity;
+                    cpu = _;
+                  },
+                  rest ) ) ->
             Cons
               ( {
                   id = pid;
                   time = pt0;
-                  report = stop_report id start contents report verbosity;
+                  report = stop_report id start contents report verbosity cpu;
                   verbosity = p_verbosity;
+                  cpu;
                 },
                 rest )
         | Cons
-            ({id; time = start; report = contents; verbosity}, Toplevel report)
-          ->
-            Toplevel (stop_report id start contents report verbosity)
+            ( {id; time = start; report = contents; verbosity; cpu},
+              Toplevel report ) ->
+            Toplevel (stop_report id start contents report verbosity cpu)
         | Toplevel _ -> (* Shhh, everything will be alright. *) state.stack
       in
       {state with stack}
 
-let stamp state verbosity id = stop (record state verbosity id)
+let stamp ~cpu state verbosity id = stop (record ~cpu state verbosity id)
 
 let pp_line ?toplevel_timestamp nindent ppf (id, metadata) n t =
   let id =
@@ -256,12 +280,13 @@ let pp_line ?toplevel_timestamp nindent ppf (id, metadata) n t =
   in
   Format.fprintf ppf "%s %-7i " (String.sub indentsym 0 80) n ;
   if t.wall = 0. then Format.fprintf ppf "                 "
-  else
+  else if Option.is_some t.cpu then
     Format.fprintf
       ppf
       "% 10.3fms %3d%%"
       (t.wall *. 1000.)
-      (int_of_float (ceil (100. *. (t.cpu /. t.wall)))) ;
+      (int_of_float (ceil (100. *. (Option.value ~default:0. t.cpu /. t.wall))))
+  else Format.fprintf ppf "% 10.3fms" (t.wall *. 1000.) ;
   Format.fprintf ppf "@,"
 
 let rec pp_report ?(toplevel_call = true) t0 nident ppf {aggregated; recorded} =
@@ -289,7 +314,7 @@ let pp_report ?t0 ppf report =
     | None -> (
         match report.recorded with
         | (_, {start; _}) :: _ -> start
-        | [] -> {wall = 0.; cpu = 0.})
+        | [] -> {wall = 0.; cpu = Some 0.})
   in
   Format.fprintf ppf "@[<v 0>%a@]" (pp_report t0 0) report
 
@@ -303,15 +328,15 @@ module Base (P : sig
   val output_report : (t -> report -> unit) option
 end) =
 struct
-  let time _ = time ()
+  let time ~cpu _ = time ~cpu ()
 
-  let record t verbosity id =
-    P.set_state t @@ record (P.get_state t) verbosity id
+  let record ~cpu t verbosity id =
+    P.set_state t @@ record ~cpu (P.get_state t) verbosity id
 
-  let aggregate t verbosity id =
-    P.set_state t @@ aggregate (P.get_state t) verbosity id
+  let aggregate ~cpu t verbosity id =
+    P.set_state t @@ aggregate ~cpu (P.get_state t) verbosity id
 
-  let report t =
+  let report ~cpu:_ t =
     match (P.get_state t).stack with
     | Toplevel {aggregated; recorded}
       when IdMap.cardinal aggregated > 0 || recorded <> [] ->
@@ -322,11 +347,11 @@ struct
 
   let may_output =
     match P.output_report with
-    | Some fn -> fun t -> Option.iter (fun r -> fn t r) (report t)
+    | Some fn -> fun t -> Option.iter (fun r -> fn t r) (report ~cpu:None t)
     | None -> fun _ -> ()
 
-  let stamp t verbosity id =
-    P.set_state t @@ stamp (P.get_state t) verbosity id ;
+  let stamp ~cpu t verbosity id =
+    P.set_state t @@ stamp ~cpu (P.get_state t) verbosity id ;
     may_output t
 
   let inc t report =
@@ -337,8 +362,8 @@ struct
     P.set_state t @@ mark (P.get_state t) verbosity id ;
     may_output t
 
-  let span t verbosity d id =
-    P.set_state t @@ span (P.get_state t) verbosity d id ;
+  let span ~cpu t verbosity d id =
+    P.set_state t @@ span ~cpu (P.get_state t) verbosity d id ;
     may_output t
 
   let stop t =
@@ -424,7 +449,7 @@ let make_driver ~file_format =
     let create (file_name, verbosity) =
       {
         profiler_state = empty verbosity;
-        time = time ();
+        time = time ~cpu:None ();
         output = Closed file_name;
       }
 

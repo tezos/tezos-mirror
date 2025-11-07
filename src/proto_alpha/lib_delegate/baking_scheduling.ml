@@ -31,13 +31,14 @@ open Baking_state_types
 module Profiler = struct
   include (val Profiler.wrap Baking_profiler.baker_profiler)
 
-  let[@warning "-32"] reset_block_section =
+  let[@warning "-32"] reset_block_section ~cpu =
     (* The section_maker must be created here and not inside the pattern
        matching because it instantiates a reference that needs to live the
        whole lifetime of the profiler and will be used to test if the
        section should be closed and re-opened or not. *)
     let section =
       Tezos_profiler.Profiler.section_maker
+        ~cpu
         ~verbosity:Notice
         ( = )
         Block_hash.to_b58check

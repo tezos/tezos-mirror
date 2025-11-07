@@ -218,12 +218,14 @@ module Internal_validator_process = struct
 
   let[@warning "-32"] headless_reports validator =
     let report =
-      Tezos_profiler.Profiler.report validator.environment_headless
+      Tezos_profiler.Profiler.report ~cpu:None validator.environment_headless
     in
     (match report with
     | None -> ()
     | Some report -> ( try Profiler.inc report with _ -> ())) ;
-    let report = Tezos_profiler.Profiler.report validator.context_headless in
+    let report =
+      Tezos_profiler.Profiler.report ~cpu:None validator.context_headless
+    in
     match report with
     | None -> ()
     | Some report -> ( try Profiler.inc report with _ -> ())

@@ -218,5 +218,6 @@ module Profiler : sig
 
   val init : (name:string -> instance option) -> unit
 
-  val create_reset_block_section : profiler -> Block_hash.t * metadata -> unit
+  val create_reset_block_section :
+    cpu:bool option -> profiler -> Block_hash.t * metadata -> unit
 end

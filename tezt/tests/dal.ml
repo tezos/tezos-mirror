@@ -8369,7 +8369,8 @@ let dal_crypto_benchmark () =
         page_size
     in
     let* () =
-      Profiler.record_f Profiler.main Debug ("SRS", []) @@ fun () ->
+      Profiler.record_f ~cpu:(Some true) Profiler.main Debug ("SRS", [])
+      @@ fun () ->
       Log.info "Loading SRS..." ;
       let* result =
         init_prover_dal
@@ -8390,65 +8391,106 @@ let dal_crypto_benchmark () =
       in
       unit
     in
-    Profiler.record_f Profiler.main Debug (message, []) @@ fun () ->
+    Profiler.record_f ~cpu:(Some true) Profiler.main Debug (message, [])
+    @@ fun () ->
     match make parameters with
     | Error (`Fail msg) ->
         let message = Format.asprintf "Fail: %s" msg in
-        Profiler.record_f Profiler.main Debug (message, []) @@ fun () ->
-        Lwt.return_unit
+        Profiler.record_f ~cpu:(Some true) Profiler.main Debug (message, [])
+        @@ fun () -> Lwt.return_unit
     | Ok _ ->
         let*? dal =
-          Profiler.record_f Profiler.main Debug ("make", []) @@ fun () ->
-          make parameters
+          Profiler.record_f ~cpu:(Some true) Profiler.main Debug ("make", [])
+          @@ fun () -> make parameters
         in
         let*? precomputation =
-          Profiler.record_f Profiler.main Debug ("shard precomputation", [])
+          Profiler.record_f
+            ~cpu:(Some true)
+            Profiler.main
+            Debug
+            ("shard precomputation", [])
           @@ fun () -> precompute_shards_proofs dal
         in
         let slot =
-          Profiler.record_f Profiler.main Debug ("slot generation", [])
+          Profiler.record_f
+            ~cpu:(Some true)
+            Profiler.main
+            Debug
+            ("slot generation", [])
           @@ fun () -> Cryptobox.Internal_for_tests.generate_slot ~slot_size
         in
         let*? polynomial =
-          Profiler.record_f Profiler.main Debug ("polynomial from slot", [])
+          Profiler.record_f
+            ~cpu:(Some true)
+            Profiler.main
+            Debug
+            ("polynomial from slot", [])
           @@ fun () -> polynomial_from_slot dal slot
         in
         let _slot =
-          Profiler.record_f Profiler.main Debug ("polynomial to slot", [])
+          Profiler.record_f
+            ~cpu:(Some true)
+            Profiler.main
+            Debug
+            ("polynomial to slot", [])
           @@ fun () -> polynomial_to_slot dal polynomial
         in
         let*? commitment =
-          Profiler.record_f Profiler.main Debug ("commit", []) @@ fun () ->
-          commit dal polynomial
+          Profiler.record_f ~cpu:(Some true) Profiler.main Debug ("commit", [])
+          @@ fun () -> commit dal polynomial
         in
         let*? commitment_proof =
-          Profiler.record_f Profiler.main Debug ("prove commitment", [])
+          Profiler.record_f
+            ~cpu:(Some true)
+            Profiler.main
+            Debug
+            ("prove commitment", [])
           @@ fun () -> prove_commitment dal polynomial
         in
         let shards =
-          Profiler.record_f Profiler.main Debug ("shards from polynomial", [])
+          Profiler.record_f
+            ~cpu:(Some true)
+            Profiler.main
+            Debug
+            ("shards from polynomial", [])
           @@ fun () -> shards_from_polynomial dal polynomial
         in
         let shard_proofs =
-          Profiler.record_f Profiler.main Debug ("prove shards", [])
+          Profiler.record_f
+            ~cpu:(Some true)
+            Profiler.main
+            Debug
+            ("prove shards", [])
           @@ fun () ->
           prove_shards dal ~precomputation ~polynomial |> Array.to_seq
         in
         let _polynomial =
-          Profiler.record_f Profiler.main Debug ("reconstruct polynomial", [])
+          Profiler.record_f
+            ~cpu:(Some true)
+            Profiler.main
+            Debug
+            ("reconstruct polynomial", [])
           @@ fun () -> polynomial_from_shards dal shards
         in
         let nb_pages = slot_size / page_size in
         let page_proofs =
           Seq.ints 0 |> Seq.take 1
           |> Seq.map (fun i ->
-                 Profiler.record_f Profiler.main Debug ("prove page", [])
+                 Profiler.record_f
+                   ~cpu:(Some true)
+                   Profiler.main
+                   Debug
+                   ("prove page", [])
                  @@ fun () ->
                  let*? page_proof = prove_page dal polynomial i in
                  page_proof)
         in
         let is_valid =
-          Profiler.record_f Profiler.main Debug ("verify commitment", [])
+          Profiler.record_f
+            ~cpu:(Some true)
+            Profiler.main
+            Debug
+            ("verify commitment", [])
           @@ fun () -> verify_commitment dal commitment commitment_proof
         in
         assert is_valid ;
@@ -8464,7 +8506,11 @@ let dal_crypto_benchmark () =
                            share_encoding
                            shard.share))
                  in
-                 Profiler.record_f Profiler.main Debug (message, [])
+                 Profiler.record_f
+                   ~cpu:(Some true)
+                   Profiler.main
+                   Debug
+                   (message, [])
                  @@ fun () ->
                  let*? () = verify_shard dal commitment shard shard_proof in
                  ())
@@ -8481,7 +8527,8 @@ let dal_crypto_benchmark () =
                     (List.hd shard_list).share))
               (List.length shard_list)
           in
-          Profiler.record_f Profiler.main Debug (message, []) @@ fun () ->
+          Profiler.record_f ~cpu:(Some true) Profiler.main Debug (message, [])
+          @@ fun () ->
           let*? () =
             verify_shard_multi dal commitment shard_list shard_proof_list
           in
@@ -8500,7 +8547,11 @@ let dal_crypto_benchmark () =
           Seq.zip (Seq.ints 0 |> Seq.take nb_pages) (Seq.zip pages page_proofs)
           |> Seq.take 1
           |> Seq.iter (fun (page_index, (page, page_proof)) ->
-                 Profiler.record_f Profiler.main Debug ("verify page", [])
+                 Profiler.record_f
+                   ~cpu:(Some true)
+                   Profiler.main
+                   Debug
+                   ("verify page", [])
                  @@ fun () ->
                  let*? () =
                    verify_page dal commitment ~page_index page page_proof
@@ -8511,7 +8562,8 @@ let dal_crypto_benchmark () =
           let message =
             sf "share_is_trap (number_of_shards:%d)" (Seq.length shards)
           in
-          Profiler.record_f Profiler.main Debug (message, []) @@ fun () ->
+          Profiler.record_f ~cpu:(Some true) Profiler.main Debug (message, [])
+          @@ fun () ->
           shards
           |> Seq.iter (fun {share; index = _} ->
                  let res =
