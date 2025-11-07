@@ -69,8 +69,8 @@ _`Metadata`
 
 _`Node`
     A peer in a Tezos P2P network.
-    The term "node" can refer to a few different kinds of nodes, including Tezos layer 1 nodes, `DAL node`_\ s, and `Smart Rollup`_ nodes.
-    The context should help to disambiguate between these, but in most cases, the term "node" refers to a layer 1 node.
+    The term "node" can refer to a few different kinds of nodes, including Tezos Layer 1 nodes, `DAL node`_\ s, and `Smart Rollup`_ nodes.
+    The context should help to disambiguate between these, but in most cases, the term "node" refers to a Layer 1 node.
     Layer 1 nodes maintain a local state and propagates block_\ s and operation_\ s.
 
 _`Operation`
@@ -276,7 +276,7 @@ _`Layer 1`
 
 _`Layer 2`
     Layer 2 (L2) includes sidechains, rollups, payment channels, etc. that batch their transactions and
-    write to the `Layer 1`_ chain. By processing transactions on layer 2 networks,
+    write to the `Layer 1`_ chain. By processing transactions on Layer 2 networks,
     greater scalability in speed and throughput can be achieved by the ecosystem overall, since the number of transactions
     the Layer 1 can process directly is limited. By cementing transactions from a L2 to L1,
     the security of the L1 chain backs those operations. Currently, Layer 2 solutions on Tezos are built as `smart rollup`_\ s.
@@ -306,7 +306,7 @@ _`Origination`
     is, to deploy -- a `smart contract`_ on the Tezos blockchain.
 
 _`Page`
-    A portion of the raw (unexpanded) data in a `DAL slot`_ of a fixed size that is small enough to fit in a layer 1 operation.
+    A portion of the raw (unexpanded) data in a `DAL slot`_ of a fixed size that is small enough to fit in a Layer 1 operation.
     The DAL splits the raw data in each slot into pages that can be requested individually so that for example refutation games can run properly.
 
 _`PVM`

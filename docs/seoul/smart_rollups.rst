@@ -266,6 +266,7 @@ cemented with a dedicated operation injected in Layer 1, and the
 outbox messages can be executed by the Layer 1 by an explicit Layer 1
 operation (see :doc:`../shell/smart_rollup_node`), typically
 to transfer assets from the rollup to the Layer 1.
+Note that such withdrawals are possible during a limited time after cementation, given by the protocol constant ``smart_rollup_max_active_outbox_levels``, which currently corresponds to about two weeks.
 
 The outbox messages can follow three different formats. Firstly, the
 Layer 1 operations contained in the outbox messages can be left
@@ -382,7 +383,7 @@ The whitelist is optionally defined at origination. The rollup is
 considered public if no white-list is defined, private otherwise. The
 whitelist can be updated with a specific outbox message. This message
 contains an optional list, the new list completely replaces the stored
-whitelist in layer 1. If the message contains no list, then the
+whitelist in Layer 1. If the message contains no list, then the
 rollup becomes public. In turn, it is forbidden to make a public
 rollup private by sending an outbox message with a non-empty
 whitelist.

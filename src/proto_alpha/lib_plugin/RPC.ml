@@ -4285,7 +4285,9 @@ module S = struct
 
   let stake_info =
     RPC_service.get_service
-      ~description:"Returns the stake info."
+      ~description:
+        "Returns the baking power distribution for all the active delegates at \
+         the current cycle"
       ~query:RPC_query.empty
       ~output:
         Data_encoding.(tup2 int64 (list (tup2 Consensus_key.encoding int64)))

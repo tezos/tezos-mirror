@@ -24,7 +24,7 @@ Non-bootstrap DAL nodes distinguish themselves only in the topics they subscribe
 
 Bootstrap nodes are DAL network entry points that are used for network discovery.
 A bootstrap node remains connected to a large number of peers and is subscribed to all topics.
-When a DAL node starts, it gets the URLs of the bootstrap nodes from its layer 1 node and uses these bootstrap nodes to connect to peers.
+When a DAL node starts, it gets the URLs of the bootstrap nodes from its Layer 1 node and uses these bootstrap nodes to connect to peers.
 When a DAL node does not have the necessary connections to the P2P network, bootstrap nodes provide connection points with the relevant topics.
 
 Modes

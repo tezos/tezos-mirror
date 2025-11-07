@@ -88,6 +88,9 @@ For instance:
 Update Instructions
 -------------------
 
+This section contains update instructions specialized for the current release, handling only a few installation types that are most common or that require special handling for this version.
+For full instructions on updating your Octez suite for any types of installation, refer to :doc:`../introduction/howtoget`.
+
 Ubuntu and Debian packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 

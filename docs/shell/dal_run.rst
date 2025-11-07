@@ -3,7 +3,7 @@ Running a DAL attester node
 
 To attest the data published on the :doc:`DAL<./dal_overview>`, you need an active baker and node.
 While you can run a DAL node without an active baker, when you do so, your account is not assigned DAL attestation rights and therefore your node can distribute data among other DAL nodes but cannot attest that it is available.
-Adding a DAL node to a baker's setup improves the Tezos ecosystem because the DAL greatly expands the amount of data that Tezos can distribute without causing congestion on layer 1.
+Adding a DAL node to a baker's setup improves the Tezos ecosystem because the DAL greatly expands the amount of data that Tezos can distribute without causing congestion on Layer 1.
 
 Therefore, we assume here you have installed Octez, see :doc:`../introduction/howtoget`.
 Make also sure that you have an instance of the ``octez-node`` binary running, as explained in :doc:`../user/setup-node`.
@@ -23,7 +23,7 @@ Running the DAL node
 
 Before anything else, make sure your machine satisfies the hardware requirements at :doc:`dal_node`.
 
-Follow these steps to run a DAL node along with a layer 1 node and a baker.
+Follow these steps to run a DAL node along with a Layer 1 node and a baker.
 
 #. **If** you plan to run the DAL node in **operator or observer** :ref:`profiles <dal_profiles>`, install the DAL trusted setup as described in section :ref:`setup_dal_crypto_params` (**NB:** just that section, not the rest of the page such as compiling sources, etc.).
 
@@ -77,7 +77,7 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
       octez-baker run with local node "$HOME/.tezos-node" bob --liquidity-baking-toggle-vote pass --dal-node http://127.0.0.1:10732
 
-   The baker daemon connects to the DAL node and attests to the availability of DAL data as well as its usual layer 1 baking function.
+   The baker daemon connects to the DAL node and attests to the availability of DAL data as well as its usual Layer 1 baking function.
 
 #. In a new terminal window, verify that your baking daemon has attestation rights allocated for the current cycle, by running:
 

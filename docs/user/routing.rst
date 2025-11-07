@@ -1,7 +1,7 @@
 Routing
 =======
 
-Octez nodes (including the layer 1 node itself, the DAL node, the EVM node, and the Smart Rollup node) must be able to initiate connections outside their local network and accept connections from outside their local network.
+Octez nodes (including the Layer 1 node itself, the DAL node, the EVM node, and the Smart Rollup node) must be able to initiate connections outside their local network and accept connections from outside their local network.
 This table shows the default ports that nodes accept connections and RPC requests from and the arguments that they support for routing configuration:
 
 .. list-table::
