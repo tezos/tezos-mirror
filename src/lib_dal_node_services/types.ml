@@ -788,157 +788,71 @@ module SlotIdSet =
       let hash = Slot_id.hash
     end)
 
-module Attestable_slots_watcher_table = struct
-  module Attestable_event = struct
-    type backfill_payload = {
-      slot_ids : slot_id list;
-      no_shards_attestation_levels : level list;
-    }
-
-    type t =
-      | Attestable_slot of {slot_id : slot_id}
-      | No_shards_assigned of {attestation_level : level}
-      | Slot_has_trap of {slot_id : slot_id}
-      | Backfill of {backfill_payload : backfill_payload}
-
-    let backfill_payload_encoding =
-      let open Data_encoding in
-      conv
-        (fun {slot_ids; no_shards_attestation_levels} ->
-          (slot_ids, no_shards_attestation_levels))
-        (fun (slot_ids, no_shards_attestation_levels) ->
-          {slot_ids; no_shards_attestation_levels})
-        (obj2
-           (req "slot_ids" (list slot_id_encoding))
-           (req "no_shards_attestation_levels" (list int32)))
-
-    let encoding =
-      let open Data_encoding in
-      union
-        [
-          case
-            ~title:"attestable_slot"
-            (Tag 0)
-            (obj2
-               (req "kind" (constant "attestable_slot"))
-               (req "slot_id" slot_id_encoding))
-            (function
-              | Attestable_slot {slot_id} -> Some ((), slot_id) | _ -> None)
-            (fun ((), slot_id) -> Attestable_slot {slot_id});
-          case
-            ~title:"no_shards_assigned"
-            (Tag 1)
-            (obj2
-               (req "kind" (constant "no_shards_assigned"))
-               (req "attestation_level" int32))
-            (function
-              | No_shards_assigned {attestation_level} ->
-                  Some ((), attestation_level)
-              | _ -> None)
-            (fun ((), attestation_level) ->
-              No_shards_assigned {attestation_level});
-          case
-            ~title:"slot_has_trap"
-            (Tag 2)
-            (obj2
-               (req "kind" (constant "slot_has_trap"))
-               (req "slot_id" slot_id_encoding))
-            (function
-              | Slot_has_trap {slot_id} -> Some ((), slot_id) | _ -> None)
-            (fun ((), slot_id) -> Slot_has_trap {slot_id});
-          case
-            ~title:"backfill"
-            (Tag 3)
-            (obj2
-               (req "kind" (constant "backfill"))
-               (req "backfill_payload" backfill_payload_encoding))
-            (function
-              | Backfill {backfill_payload} -> Some ((), backfill_payload)
-              | _ -> None)
-            (fun ((), backfill_payload) -> Backfill {backfill_payload});
-        ]
-  end
-
-  (** A watcher used to stream newly-attestable slots for a given delegate (pkh).
-      - [stream] is the push endpoint used by the DAL node to notify consumers
-        (RPC layer / baker) with [attestable_event] information.
-      - [num_subscribers] is the number of active consumers currently subscribed to
-        this pkh’s stream.
-      - [notified_slots] is an LRU set of slot ids already notified, so that we avoid
-        sending duplicates in the stream. *)
-  type watcher = {
-    stream : Attestable_event.t Lwt_watcher.input;
-    mutable num_subscribers : int;
-    notified_slots : SlotIdSet.t;
+module Attestable_event = struct
+  type backfill_payload = {
+    slot_ids : slot_id list;
+    no_shards_attestation_levels : level list;
   }
 
-  let get_stream watcher = watcher.stream
+  type t =
+    | Attestable_slot of {slot_id : slot_id}
+    | No_shards_assigned of {attestation_level : level}
+    | Slot_has_trap of {slot_id : slot_id}
+    | Backfill of {backfill_payload : backfill_payload}
 
-  let get_num_subscribers watcher = watcher.num_subscribers
+  let backfill_payload_encoding =
+    let open Data_encoding in
+    conv
+      (fun {slot_ids; no_shards_attestation_levels} ->
+        (slot_ids, no_shards_attestation_levels))
+      (fun (slot_ids, no_shards_attestation_levels) ->
+        {slot_ids; no_shards_attestation_levels})
+      (obj2
+         (req "slot_ids" (list slot_id_encoding))
+         (req "no_shards_attestation_levels" (list int32)))
 
-  let set_num_subscribers watcher value = watcher.num_subscribers <- value
-
-  type t = watcher Signature.Public_key_hash.Table.t
-
-  let create ~initial_size = Signature.Public_key_hash.Table.create initial_size
-
-  let get_or_init t pkh proto_params =
-    match Signature.Public_key_hash.Table.find t pkh with
-    | Some watcher ->
-        watcher.num_subscribers <- watcher.num_subscribers + 1 ;
-        watcher
-    | None ->
-        (* We only need to remember slot ids from their publication level until the
-           attestation window closes ([attestation_lag] levels later). There can be
-           at most [number_of_slots] distinct slot ids per level across that window.
-           We allow a small (2 levels) additional window for safety. *)
-        let capacity =
-          match proto_params with
-          | Some {number_of_slots; attestation_lag; _} ->
-              number_of_slots * (attestation_lag + 2)
-          | None -> 320 (* 32 * (8 + 2) - hardcoded values as of protocol T *)
-        in
-        let watcher =
-          {
-            stream = Lwt_watcher.create_input ();
-            num_subscribers = 1;
-            notified_slots = SlotIdSet.create capacity;
-          }
-        in
-        Signature.Public_key_hash.Table.add t pkh watcher ;
-        watcher
-
-  let notify_attestable_slot t pkh ~slot_id =
-    match Signature.Public_key_hash.Table.find t pkh with
-    | None -> ()
-    | Some watcher ->
-        if not @@ SlotIdSet.mem watcher.notified_slots slot_id then (
-          SlotIdSet.add watcher.notified_slots slot_id ;
-          Lwt_watcher.notify watcher.stream (Attestable_slot {slot_id}))
-
-  let notify_no_shards_assigned t pkh ~attestation_level =
-    match Signature.Public_key_hash.Table.find t pkh with
-    | None -> ()
-    | Some watcher ->
-        Lwt_watcher.notify
-          watcher.stream
-          (No_shards_assigned {attestation_level})
-
-  let notify_slot_has_trap t pkh ~slot_id =
-    match Signature.Public_key_hash.Table.find t pkh with
-    | None -> ()
-    | Some watcher ->
-        if not @@ SlotIdSet.mem watcher.notified_slots slot_id then (
-          SlotIdSet.add watcher.notified_slots slot_id ;
-          Lwt_watcher.notify watcher.stream (Slot_has_trap {slot_id}))
-
-  let notify_backfill_payload t pkh ~backfill_payload =
-    match Signature.Public_key_hash.Table.find t pkh with
-    | None -> ()
-    | Some watcher ->
-        Lwt_watcher.notify watcher.stream (Backfill {backfill_payload})
-
-  let remove = Signature.Public_key_hash.Table.remove
-
-  let elements = Signature.Public_key_hash.Table.to_seq_keys
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"attestable_slot"
+          (Tag 0)
+          (obj2
+             (req "kind" (constant "attestable_slot"))
+             (req "slot_id" slot_id_encoding))
+          (function
+            | Attestable_slot {slot_id} -> Some ((), slot_id) | _ -> None)
+          (fun ((), slot_id) -> Attestable_slot {slot_id});
+        case
+          ~title:"no_shards_assigned"
+          (Tag 1)
+          (obj2
+             (req "kind" (constant "no_shards_assigned"))
+             (req "attestation_level" int32))
+          (function
+            | No_shards_assigned {attestation_level} ->
+                Some ((), attestation_level)
+            | _ -> None)
+          (fun ((), attestation_level) ->
+            No_shards_assigned {attestation_level});
+        case
+          ~title:"slot_has_trap"
+          (Tag 2)
+          (obj2
+             (req "kind" (constant "slot_has_trap"))
+             (req "slot_id" slot_id_encoding))
+          (function Slot_has_trap {slot_id} -> Some ((), slot_id) | _ -> None)
+          (fun ((), slot_id) -> Slot_has_trap {slot_id});
+        case
+          ~title:"backfill"
+          (Tag 3)
+          (obj2
+             (req "kind" (constant "backfill"))
+             (req "backfill_payload" backfill_payload_encoding))
+          (function
+            | Backfill {backfill_payload} -> Some ((), backfill_payload)
+            | _ -> None)
+          (fun ((), backfill_payload) -> Backfill {backfill_payload});
+      ]
 end

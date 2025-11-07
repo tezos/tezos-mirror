@@ -47,8 +47,7 @@ type t = {
   disable_shard_validation : bool;
   ignore_pkhs : Signature.Public_key_hash.Set.t;
   mutable last_migration_level : int32;
-  mutable attestable_slots_watcher_table :
-    Types.Attestable_slots_watcher_table.t;
+  mutable attestable_slots_watcher_table : Attestable_slots_watcher_table.t;
 }
 
 let init config ~network_name profile_ctxt cryptobox
@@ -77,7 +76,7 @@ let init config ~network_name profile_ctxt cryptobox
     ignore_pkhs;
     last_migration_level = 0l;
     attestable_slots_watcher_table =
-      Types.Attestable_slots_watcher_table.create ~initial_size:5;
+      Attestable_slots_watcher_table.create ~initial_size:5;
   }
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
