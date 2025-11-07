@@ -115,102 +115,19 @@ let download_confirmed_slot_pages {Node_context.dal_cctxt; _} ~published_level
     dal_cctxt
     {slot_level = Raw_level.to_int32 published_level; slot_index = index}
 
-module Slots_statuses_cache =
-  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
-    (struct
-      type t = Dal.Slot.Header.id
-
-      let equal = Dal.Slot.Header.slot_id_equal
-
-      let hash id = Hashtbl.hash id
-    end)
-
-let download_skip_list_cells_of_level node_ctxt ~attested_level =
-  Plugin.RPC.Dal.skip_list_cells_of_level
-    (new Protocol_client_context.wrap_full node_ctxt.Node_context.cctxt)
-    (`Main, `Level attested_level)
-    ()
-
-(* We have currently 32 slots per level. We retain the information for 32 levels
-   (assuming no reorgs with different payload occur). *)
-let skip_list_cells_content_cache =
-  (* Attestation lag * number of slots * 32 retention levels, assuming no
-     reorgs. *)
-  let attestation_lag = 8 in
-  let number_of_slots = 32 in
-  let retention_levels = 32 in
-  Slots_statuses_cache.create
-    (attestation_lag * number_of_slots * retention_levels)
-
-let dal_skip_list_cell_content_of_slot_id node_ctxt
-    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants) slot_id
-    =
-  let open Lwt_result_syntax in
-  let attested_level =
-    Int32.add
-      (Raw_level.to_int32 slot_id.Dal.Slot.Header.published_level)
-      (Int32.of_int dal_constants.attestation_lag)
+(* Adaptive DAL is not supported anymore *)
+let get_slot_header_attestation_info {Node_context.dal_cctxt; _}
+    ~published_level ~index =
+  (* TODO: add a cache for this Query, but not for the Not_indexed case. *)
+  let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
+  let slot_id =
+    Slot_id.
+      {
+        slot_level = Raw_level.to_int32 published_level;
+        slot_index = Dal.Slot_index.to_int index;
+      }
   in
-  let* attested_level_hash =
-    Node_context.hash_of_level node_ctxt attested_level
-  in
-  match Slots_statuses_cache.find_opt skip_list_cells_content_cache slot_id with
-  | Some (cell_content, block_hash)
-    when Block_hash.equal attested_level_hash block_hash ->
-      return cell_content
-  | None | Some _ -> (
-      let* hash_with_cells =
-        download_skip_list_cells_of_level node_ctxt ~attested_level
-      in
-      List.iter
-        (fun (_hash, cell) ->
-          let content = Dal.Slots_history.content cell in
-          Slots_statuses_cache.replace
-            skip_list_cells_content_cache
-            (Dal.Slots_history.content_id content).header_id
-            (content, attested_level_hash))
-        hash_with_cells ;
-      (* The [find] below validates the fact that we fetched the info of
-         commitments published at level [slot_id.published_level]. *)
-      match
-        Slots_statuses_cache.find_opt skip_list_cells_content_cache slot_id
-      with
-      | Some (cell_content, block_hash)
-        when Block_hash.equal attested_level_hash block_hash ->
-          return cell_content
-      | None ->
-          Stdlib.failwith
-            (Format.asprintf
-               "Unreachable: We expect to find some data for slot %a, but got \
-                none"
-               Dal.Slot.Header.pp_id
-               slot_id)
-      | Some (_, got_hash) ->
-          Stdlib.failwith
-            (Format.asprintf
-               "Unreachable: We expect to find some data for slot %a \
-                associated to block hash %a, but got data associated to block \
-                hash %a"
-               Dal.Slot.Header.pp_id
-               slot_id
-               Block_hash.pp_short
-               attested_level_hash
-               Block_hash.pp_short
-               got_hash))
-
-let slot_attestation_status ?attestation_threshold_percent
-    ?restricted_commitments_publishers node_ctxt dal_constants slot_id =
-  let open Lwt_result_syntax in
-  let* cell_content =
-    dal_skip_list_cell_content_of_slot_id node_ctxt dal_constants slot_id
-  in
-  let commitment_res =
-    Dal.Slots_history.is_commitment_attested
-      ~attestation_threshold_percent
-      ~restricted_commitments_publishers
-      cell_content
-  in
-  return @@ if Option.is_some commitment_res then `Attested else `Unattested
+  Dal_node_client.get_slot_status dal_cctxt slot_id
 
 let get_page node_ctxt ~inbox_level page_id =
   let open Environment.Error_monad.Lwt_result_syntax in
@@ -310,26 +227,29 @@ let slot_pages
          slot_id
   then return_none
   else
-    let* status = slot_attestation_status node_ctxt dal_constants slot_id in
+    let* status =
+      get_slot_header_attestation_info node_ctxt ~published_level ~index
+    in
     match status with
-    | `Attested ->
+    | `Attested _attestation_lag ->
         let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
         let* pages =
           download_confirmed_slot_pages node_ctxt ~published_level ~index
         in
         return (Some pages)
-    | `Unattested -> return_none
+    | `Unattested | `Waiting_attestation | `Unpublished -> return_none
 
 let page_content
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
-    ~dal_activation_level ~inbox_level node_ctxt ~attestation_threshold_percent
-    ~restricted_commitments_publishers page_id ~dal_attested_slots_validity_lag
-    =
+    ~dal_activation_level ~inbox_level node_ctxt
+    ~attestation_threshold_percent:_ ~restricted_commitments_publishers:_
+    page_id ~dal_attested_slots_validity_lag =
   let open Lwt_result_syntax in
   let Node_context.{genesis_info = {level = origination_level; _}; l1_ctxt; _} =
     node_ctxt
   in
   let* chain_id = Layer1.get_chain_id l1_ctxt in
+  let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
   if
     not
     @@ page_id_is_valid
@@ -343,13 +263,8 @@ let page_content
   then return_none
   else
     let* status =
-      slot_attestation_status
-        ?attestation_threshold_percent
-        ?restricted_commitments_publishers
-        node_ctxt
-        dal_constants
-        page_id.Dal.Page.slot_id
+      get_slot_header_attestation_info node_ctxt ~published_level ~index
     in
     match status with
-    | `Attested -> get_page node_ctxt ~inbox_level page_id
-    | `Unattested -> return_none
+    | `Attested _attestation_lag -> get_page node_ctxt ~inbox_level page_id
+    | `Unattested | `Waiting_attestation | `Unpublished -> return_none
