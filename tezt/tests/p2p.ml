@@ -325,7 +325,7 @@ module Maintenance = struct
     Test.register
       ~__FILE__
       ~title:"p2p-maintenance-init-expected_connections"
-      ~tags:[team; "p2p"; "node"; "maintenance"]
+      ~tags:[team; "p2p"; "node"; "maintenance"; Tag.memory_hungry]
     @@ fun () ->
     (* Connections values evaluated from --connections option. *)
     let min_connections = expected_connections / 2 in
