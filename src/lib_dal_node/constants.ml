@@ -101,8 +101,8 @@ let crawler_re_processing_delay = 5.
 (* Sleep delay between refreshing the ips associated to bootstrap dns names *)
 let bootstrap_dns_refresh_delay = 300.
 
-(* This size is being used for the node store's traps cache. We set to 2 times
-   the maximum expected size when all slots are used. *)
+(* The size of the node store's traps cache. We set it to 2 times the maximum
+   expected size when all slots are used. *)
 let traps_cache_size =
   let open Q in
   mul (of_int 2)
@@ -111,3 +111,8 @@ let traps_cache_size =
   @@ mul (of_int attestation_lag)
   @@ traps_fraction
   |> to_int
+
+(* The expected time, in seconds, sufficient to subscribe and connect to new
+   peers on a (new) topic. This was not measured and the value is meant to be a
+   gross over-approximation. *)
+let time_to_join_new_topics = 5

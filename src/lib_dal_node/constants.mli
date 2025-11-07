@@ -51,9 +51,9 @@ val statuses_cache_size : int
     verification. *)
 val shards_verification_sampling_frequency : int
 
-(** During amplification, if the forked process takes more time than
-   this timeout to send the proved shards, then amplification attempt
-   is aborted to avoid keeping a pending promise forever. *)
+(** During amplification, if the forked process takes more time than this
+    timeout to send the proved shards, then amplification attempt is aborted to
+    avoid keeping a pending promise forever. *)
 val amplification_timeout : float
 
 (** Initial reconnection delay to L1 node from the DAL crawler in seconds. *)
@@ -68,17 +68,16 @@ val crawler_l1_blocks_cache_size : int
 val crawler_retries_on_disconnection : int
 
 (** Sleep delay before retrying processing a block in the L1 crawler in case a
-   disconnection error is encountered while retrieving data from L1 outside the
-   {!Layer1.iter_heads} callback. *)
+    disconnection error is encountered while retrieving data from L1 outside the
+    {!Layer1.iter_heads} callback. *)
 val crawler_re_processing_delay : float
 
-(* Sleep delay between refreshing the ips associated to bootstrap dns names *)
+(** Sleep delay between refreshing the ips associated to bootstrap dns names *)
 val bootstrap_dns_refresh_delay : float
 
-(** This size is being used for the store's traps cache. While
-    [proto_parameters.Dal_plugin.attestation_lag] should define the
-    minimum number of levels for which traps must be retained, we
-    maintain a larger cache capacity of 50 levels. This extended size
-    is acceptable since the cache is sparsely populated due to
-    [proto_parameters.traps_fraction]. *)
+(** The size of the node store's traps cache. *)
 val traps_cache_size : int
+
+(** The expected time, in seconds, sufficient to subscribe and connect to new
+    peers on a (new) topic. *)
+val time_to_join_new_topics : int
