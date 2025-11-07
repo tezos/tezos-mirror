@@ -68,7 +68,7 @@ let default_l2_setup ~l2_chain_id =
 
 type mode =
   | Observer of {
-      initial_kernel : string;
+      initial_kernel : string option;
       preimages_dir : string option;
       private_rpc_port : int option;
       rollup_node_endpoint : string option;
@@ -96,7 +96,8 @@ type mode =
       sequencer_sunset_sec : int option;
     }
   | Sandbox of {
-      initial_kernel : string;
+      initial_kernel : string option;
+      network : string option;
       funded_addresses : string list;
       preimage_dir : string option;
       private_rpc_port : int option;
@@ -179,11 +180,10 @@ let is_observer t =
 
 let initial_kernel t =
   let rec from_mode = function
-    | Sandbox {initial_kernel; _}
-    | Tezlink_sandbox {initial_kernel; _}
-    | Sequencer {initial_kernel; _}
-    | Observer {initial_kernel; _} ->
+    | Sandbox {initial_kernel; _} | Observer {initial_kernel; _} ->
         initial_kernel
+    | Tezlink_sandbox {initial_kernel; _} | Sequencer {initial_kernel; _} ->
+        Some initial_kernel
     | Rpc mode -> from_mode mode
     | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
   in
@@ -787,6 +787,7 @@ let mode_with_new_private_rpc (mode : mode) =
   | Sandbox
       {
         initial_kernel;
+        network;
         preimage_dir;
         private_rpc_port = Some _;
         time_between_blocks;
@@ -802,6 +803,7 @@ let mode_with_new_private_rpc (mode : mode) =
       Sandbox
         {
           initial_kernel;
+          network;
           preimage_dir;
           private_rpc_port = Some (Port.fresh ());
           time_between_blocks;
@@ -906,13 +908,22 @@ let run_args evm_node =
             genesis_timestamp
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
     | Sandbox
-        {initial_kernel; funded_addresses; genesis_timestamp; wallet_dir; sequencer_keys; _}
-      ->
+        {
+          initial_kernel;
+          network;
+          funded_addresses;
+          genesis_timestamp;
+          wallet_dir;
+          sequencer_keys;
+          _;
+        } ->
         let sequencer_keys =
           List.map (fun s -> ["--sequencer-key"; s]) sequencer_keys
           |> List.flatten
         in
-        ["run"; "sandbox"; "--kernel"; initial_kernel]
+        ["run"; "sandbox"]
+        @ Cli_arg.optional_arg "kernel" Fun.id initial_kernel
+        @ Cli_arg.optional_arg "network" Fun.id network
         @ sequencer_keys
         @ Cli_arg.optional_arg
             "genesis-timestamp"
@@ -940,7 +951,8 @@ let run_args evm_node =
         @ fund_args funded_addresses
         @ Cli_arg.optional_switch "verbose" verbose
     | Observer {initial_kernel; _} ->
-        ["run"; "observer"; "--initial-kernel"; initial_kernel]
+        ["run"; "observer"]
+        @ Cli_arg.optional_arg "initial-kernel" Fun.id initial_kernel
     | Rpc _ -> ["experimental"; "run"; "rpc"]
   in
   mode_args @ shared_args
@@ -1161,6 +1173,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
     | Sandbox
         {
           initial_kernel = _;
+          network = _;
           preimage_dir;
           private_rpc_port;
           time_between_blocks;
@@ -2025,7 +2038,7 @@ let switch_sequencer_to_observer ~(old_sequencer : t) ~(new_sequencer : t) =
         mode =
           Observer
             {
-              initial_kernel;
+              initial_kernel = Some initial_kernel;
               preimages_dir;
               private_rpc_port;
               rollup_node_endpoint =

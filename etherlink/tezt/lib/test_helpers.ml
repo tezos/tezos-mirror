@@ -544,7 +544,8 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
   let sequencer_mode =
     Evm_node.Sandbox
       {
-        initial_kernel = output;
+        initial_kernel = Some output;
+        network = None;
         preimage_dir = Some preimages_dir;
         private_rpc_port = Some (Port.fresh ());
         time_between_blocks = Some Nothing;
