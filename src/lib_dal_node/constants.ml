@@ -55,7 +55,7 @@ let committee_cache_size = 50
    finalize it) but a few more levels may be needed if the commitment
    is not published immediately so we consider a cache large enough to
    keep the shards for 5 levels. *)
-let cache_size =
+let not_yet_published_cache_size =
   let number_of_levels_to_keep = 5 in
   let number_of_slots = 5 in
   number_of_levels_to_keep * number_of_slots

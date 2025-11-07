@@ -24,8 +24,7 @@
 (*****************************************************************************)
 
 (** [shards_store_lru_size] is the maximum shards store LRU size. See
-    {!Key_value_store.init} and {!Store.Shards.init}.
-*)
+    {!Key_value_store.init} and {!Store.Shards.init}. *)
 val shards_store_lru_size : int
 
 val slots_store_lru_size : int
@@ -35,9 +34,9 @@ val status_store_lru_size : int
 (** [committee_cache_size] is the size of the DAL committee cache. *)
 val committee_cache_size : int
 
-(** [cache_size] is the size (in number of slots) of the cache of
-    not-yet-published slots, shards, and shard proofs. *)
-val cache_size : int
+(** [not_yet_published_cache_size] is the size (in number of slots) of the cache
+    of not-yet-published slots, shards, and shard proofs. *)
+val not_yet_published_cache_size : int
 
 (** [slot_id_cache_size] is the size (in number of levels) of the cache to
     associate commitments with slot ids at a given level. *)
