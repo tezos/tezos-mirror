@@ -7,7 +7,7 @@
 
 open Lwt_result_syntax
 
-type preconfirmation_handler = Transaction_object.t -> unit tzresult Lwt.t
+type preconfirmation_handler = Broadcast.transaction -> unit tzresult Lwt.t
 
 type timestamp_handler = Time.Protocol.t -> unit tzresult Lwt.t
 

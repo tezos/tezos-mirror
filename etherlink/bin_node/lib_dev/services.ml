@@ -335,7 +335,7 @@ let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
         let stream =
           Lwt_stream.filter_map
             (function
-              | Broadcast.Preconfirmed_transaction tx ->
+              | Broadcast.Preconfirmed_transaction (Broadcast.Common tx) ->
                   Some (Ethereum_types.Subscription.NewIncludedTransactions tx)
               | _ -> None)
             stream

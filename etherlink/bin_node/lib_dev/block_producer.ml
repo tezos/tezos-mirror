@@ -68,6 +68,7 @@ module Types = struct
     sequencer_sunset_sec : int64;
     mutable sunset : bool;
     preconfirmation_stream_enabled : bool;
+    mutable selected_delayed_txns : Evm_events.Delayed_transaction.t list;
     mutable validated_txns :
       (string * Tx_queue_types.transaction_object_t) list;
     mutable validation_state : int * Prevalidator.validation_state;
@@ -478,6 +479,7 @@ let init_validation_state ~(tx_container : Services_backend_sig.ex_tx_container)
 let clear_preconfirmation_data ~(state : Types.state) =
   let open Lwt_result_syntax in
   state.validated_txns <- [] ;
+  state.selected_delayed_txns <- [] ;
   let* validation_state =
     init_validation_state ~tx_container:state.tx_container
   in
@@ -595,11 +597,42 @@ let produce_block (state : Types.state) ~force ~(timestamp : Time.Protocol.t)
               return result
           | `No_block -> return result)
 
+let preconfirm_delayed_transactions ~(state : Types.state) =
+  let open Lwt_result_syntax in
+  let*! head_info = Evm_context.head_info () in
+  let* delayed_hashes, remaining_cumulative_size =
+    head_info_and_delayed_transactions
+      ~with_delayed_transactions:true
+      head_info.evm_state
+      state.maximum_number_of_chunks
+  in
+  let* txns =
+    List.map_es
+      (fun delayed_hash ->
+        let* tx =
+          Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash
+        in
+        Broadcast.notify_preconfirmation (Delayed tx) ;
+        return tx)
+      delayed_hashes
+  in
+  state.selected_delayed_txns <- txns ;
+  return remaining_cumulative_size
+
 let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
   let open Lwt_result_syntax in
   let maximum_cumulative_size =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
       state.maximum_number_of_chunks
+  in
+  let size, input_validation_state = state.validation_state in
+  let* current_size =
+    (* Accumulator empty and at least one transaction = start next future block *)
+    if state.validated_txns = [] && transactions <> [] then (
+      Broadcast.notify_new_block_timestamp (Time.System.to_protocol timestamp) ;
+      let* remaining_cumulative_size = preconfirm_delayed_transactions ~state in
+      return (Int.sub maximum_cumulative_size remaining_cumulative_size))
+    else return size
   in
   let validate (validation_state, rev_txns) ((raw, tx_object) as entry) =
     match tx_object with
@@ -610,10 +643,7 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
         match res with
         | `Drop -> (validation_state, rev_txns)
         | `Keep latest_validation_state ->
-            if Int.equal (List.length state.validated_txns) 0 then
-              Broadcast.notify_new_block_timestamp
-                (Time.System.to_protocol timestamp) ;
-            Broadcast.notify_preconfirmation tx_object ;
+            Broadcast.notify_preconfirmation (Common tx_object) ;
             (latest_validation_state, entry :: rev_txns)
         | `Stop -> (validation_state, rev_txns))
     | Tx_queue_types.Michelson _ ->
@@ -621,7 +651,10 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
         return (validation_state, rev_txns)
   in
   let* validation_state, rev_validated_txns =
-    List.fold_left_es validate (state.validation_state, []) transactions
+    List.fold_left_es
+      validate
+      ((current_size, input_validation_state), [])
+      transactions
   in
   state.validated_txns <- state.validated_txns @ List.rev rev_validated_txns ;
   state.validation_state <- validation_state ;
@@ -671,6 +704,7 @@ module Handlers = struct
           sequencer_sunset_sec;
           preconfirmation_stream_enabled;
           validation_state;
+          selected_delayed_txns = [];
           validated_txns = [];
           next_block_timestamp = None;
         }

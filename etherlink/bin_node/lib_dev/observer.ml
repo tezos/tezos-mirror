@@ -110,11 +110,15 @@ let on_timestamp ts =
   let*! () = Events.preconfirmation_timestamp ts in
   return ()
 
-let on_preconfirmation txn =
-  let open Lwt_result_syntax in
+let on_preconfirmation (txn : Broadcast.transaction) =
+  let open Lwt_syntax in
   Broadcast.notify_preconfirmation txn ;
-  let*! () = Events.preconfirmation (Transaction_object.hash txn) in
-  return ()
+  let* () =
+    match txn with
+    | Common txn -> Events.preconfirmation (Transaction_object.hash txn)
+    | Delayed _txn -> return_unit
+  in
+  Lwt_result_syntax.return_unit
 
 let install_finalizer_observer ~rollup_node_tracking
     ~(tx_container : _ Services_backend_sig.tx_container)
