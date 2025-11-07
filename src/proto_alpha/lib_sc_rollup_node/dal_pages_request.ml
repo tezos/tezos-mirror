@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+module Slot_id = Tezos_dal_node_services.Types.Slot_id
 
 (** If a slot, published at some level L, is expected to be confirmed at level
     L+D then, once the confirmation level is over, the rollup node is supposed to:
@@ -83,37 +84,23 @@ module Event = struct
       ~pp5:pp_content_elipsis
 end
 
-module Slot_id = struct
-  include Tezos_dal_node_services.Types.Slot_id
+module Slot_id_cache =
+  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong) (Slot_id)
 
-  let equal id1 id2 = Comparable.compare id1 id2 = 0
-
-  let hash id = Hashtbl.hash id
-end
-
-(* The cache allows to not fetch pages on the DAL node more than necessary. *)
-module Pages_cache =
-  Aches_lwt.Lache.Make (Aches.Rache.Transfer (Aches.Rache.LRU) (Slot_id))
-
-let get_slot_pages =
-  let pages_cache =
-    Pages_cache.create 16
-    (* 130MB *)
-  in
-  fun dal_cctxt slot_id ->
-    Pages_cache.bind_or_put
-      pages_cache
-      slot_id
-      (Dal_node_client.get_slot_pages dal_cctxt)
-      Lwt.return
-
-let download_confirmed_slot_pages {Node_context.dal_cctxt; _} ~published_level
-    ~index =
-  let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ dal_cctxt in
-  (* DAL must be configured for this point to be reached *)
-  get_slot_pages
-    dal_cctxt
-    {slot_level = Raw_level.to_int32 published_level; slot_index = index}
+let download_confirmed_slot_pages =
+  let open Lwt_result_syntax in
+  let cache = Slot_id_cache.create 32 in
+  fun dal_cctxt ~published_level ~index ->
+    let slot_id =
+      Slot_id.
+        {slot_level = Raw_level.to_int32 published_level; slot_index = index}
+    in
+    match Slot_id_cache.find_opt cache slot_id with
+    | Some pages -> return pages
+    | None ->
+        let+ res = Dal_node_client.get_slot_pages dal_cctxt slot_id in
+        Slot_id_cache.replace cache slot_id res ;
+        res
 
 (* Adaptive DAL is not supported anymore *)
 let get_slot_header_attestation_info {Node_context.dal_cctxt; _}
@@ -207,6 +194,8 @@ let slot_pages
     node_ctxt
   in
   let* chain_id = Layer1.get_chain_id l1_ctxt in
+  (* DAL must be configured for this point to be reached *)
+  let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ node_ctxt.dal_cctxt in
   let Dal.Slot.Header.{published_level; index} = slot_id in
   let* status =
     get_slot_header_attestation_info node_ctxt ~published_level ~index
@@ -228,7 +217,7 @@ let slot_pages
       else
         let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
         let* pages =
-          download_confirmed_slot_pages node_ctxt ~published_level ~index
+          download_confirmed_slot_pages dal_cctxt ~published_level ~index
         in
         return (Some pages)
   | `Unattested | `Waiting_attestation | `Unpublished -> return_none
@@ -243,6 +232,8 @@ let page_content
     node_ctxt
   in
   let* chain_id = Layer1.get_chain_id l1_ctxt in
+  (* DAL must be configured for this point to be reached *)
+  let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ node_ctxt.dal_cctxt in
   let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
   let* status =
     get_slot_header_attestation_info node_ctxt ~published_level ~index
@@ -263,5 +254,5 @@ let page_content
              ~dal_attested_slots_validity_lag
              page_id
       then return_none
-      else get_page node_ctxt ~inbox_level page_id
+      else get_page dal_cctxt ~inbox_level page_id
   | `Unattested | `Waiting_attestation | `Unpublished -> return_none
