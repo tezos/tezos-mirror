@@ -29,7 +29,10 @@ Subsidy
 At every block in the chain, a small amount of tez is minted and credited to the
 CPMM contract, and the CPMM's ``%default`` entrypoint is called to update the
 ``xtz_pool`` balance in its storage. The amount that is minted and sent to the
-CPMM contract for each block is a protocol constant (``LIQUIDITY_BAKING_SUBSIDY``), defining a fixed target rate of 5 tez/minute.
+CPMM contract for each block is derived from the protocol constant
+``LIQUIDITY_BAKING_SUBSIDY``, that specifies the amount to be be
+minted per minute (set to 5 tez/minute since the :doc:`Paris
+protocol<../protocols/020_paris>`.)
 One can easily compute the value of the per block subsidy by taking into account the minimal block time, under the assumption that all blocks are produced at round 0.
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
