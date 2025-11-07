@@ -593,14 +593,33 @@ let maybe_register_trap traps_store ~traps_fraction message_id message =
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment slot polynomial =
   let open Lwt_result_syntax in
-  let shards = Cryptobox.shards_from_polynomial cryptobox polynomial in
+  let shards =
+    (Cryptobox.shards_from_polynomial
+       cryptobox
+       polynomial
+     [@profiler.wrap_f
+       {driver_ids = [Opentelemetry]}
+         (Opentelemetry_helpers.trace_slot_no_commitment
+            ~attrs:[]
+            ~slot:(Bytes.to_string slot)
+            ~name:"shards_from_polynomial")])
+  in
   let*? precomputation =
     match shards_proofs_precomputation with
     | None -> Error (`Other [No_prover_SRS])
     | Some precomputation -> Ok precomputation
   in
   let shard_proofs =
-    Cryptobox.prove_shards cryptobox ~polynomial ~precomputation
+    (Cryptobox.prove_shards
+       cryptobox
+       ~polynomial
+       ~precomputation
+     [@profiler.wrap_f
+       {driver_ids = [Opentelemetry]}
+         (Opentelemetry_helpers.trace_slot_no_commitment
+            ~attrs:[]
+            ~slot:(Bytes.to_string slot)
+            ~name:"prove_shards")])
   in
   let shares =
     Array.of_seq @@ Seq.map (fun Cryptobox.{index = _; share} -> share) shards
