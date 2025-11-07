@@ -398,6 +398,7 @@ module Subscription : sig
     | Logs of logs
     | NewPendingTransactions
     | Syncing
+    | NewIncludedTransactions
     | Etherlink of etherlink_extension
 
   val kind_encoding : kind Data_encoding.t
@@ -431,6 +432,7 @@ module Subscription : sig
     | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
+    | NewIncludedTransactions of 'transaction_object
     | Etherlink of etherlink_extension_output
 
   val output_encoding :

@@ -290,6 +290,7 @@ module Request = struct
     | Logs of logs_input_param option
     | NewPendingTransactions
     | Syncing
+    | NewIncludedTransactions
 
   let param_of_sub_kind = function
     | NewHeads -> `A [`String "newHeads"]
@@ -301,6 +302,7 @@ module Request = struct
     | Logs None -> `A [`String "logs"]
     | NewPendingTransactions -> `A [`String "newPendingTransactions"]
     | Syncing -> `A [`String "syncing"]
+    | NewIncludedTransactions -> `A [`String "tez_newIncludedTransactions"]
 
   let eth_subscribe ~kind =
     {method_ = "eth_subscribe"; parameters = param_of_sub_kind kind}

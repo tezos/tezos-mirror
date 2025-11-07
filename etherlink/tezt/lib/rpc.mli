@@ -79,6 +79,7 @@ module Request : sig
     | Logs of logs_input_param option
     | NewPendingTransactions
     | Syncing
+    | NewIncludedTransactions
 
   val eth_subscribe : kind:subscription_kind -> Evm_node.request
 

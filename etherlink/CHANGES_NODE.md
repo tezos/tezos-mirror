@@ -12,6 +12,10 @@
 
 - Add new `eth_sendRawTransactionSync` endpoint to our JSON-RPC.
   Defined in [EIP-7966](https://eips.ethereum.org/EIPS/eip-7966).
+- Add new `eth_subscribe` subscription named `tez_newIncludedTransactions`
+  that allow you to get a stream of transactions that have been chosen
+  to be included in the next block (!19810).
+  (only available with experimental feature preconfirmation_stream_enabled)
 
 ### Monitoring changes
 

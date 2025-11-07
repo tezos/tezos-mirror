@@ -112,6 +112,7 @@ let on_timestamp ts =
 
 let on_preconfirmation txn =
   let open Lwt_result_syntax in
+  Broadcast.notify_preconfirmation txn ;
   let*! () = Events.preconfirmation (Transaction_object.hash txn) in
   return ()
 

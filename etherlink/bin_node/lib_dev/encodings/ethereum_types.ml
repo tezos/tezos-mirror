@@ -1369,6 +1369,7 @@ module Subscription = struct
     | Logs of logs
     | NewPendingTransactions
     | Syncing
+    | NewIncludedTransactions
     | Etherlink of etherlink_extension
 
   let etherlink_extension_encoding =
@@ -1435,6 +1436,12 @@ module Subscription = struct
           (tup1 (constant "syncing"))
           (function Syncing -> Some () | _ -> None)
           (fun () -> Syncing);
+        case
+          ~title:"tez_newIncludedTransactions"
+          (Tag 0xfe)
+          (tup1 (constant "tez_newIncludedTransactions"))
+          (function NewIncludedTransactions -> Some () | _ -> None)
+          (fun () -> NewIncludedTransactions);
         case
           ~title:"etherlink_extension"
           (Tag 0xff)
@@ -1518,6 +1525,7 @@ module Subscription = struct
     | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
+    | NewIncludedTransactions of 'transaction_object
     | Etherlink of etherlink_extension_output
 
   let output_encoding transaction_object_encoding =
@@ -1554,5 +1562,11 @@ module Subscription = struct
           l1_l2_levels_output_encoding
           (function Etherlink (L1_l2_levels l) -> Some l | _ -> None)
           (fun l -> Etherlink (L1_l2_levels l));
+        case
+          ~title:"tez_newIncludedTransactions"
+          (Tag 5)
+          transaction_object_encoding
+          (function NewIncludedTransactions tx -> Some tx | _ -> None)
+          (fun tx -> NewIncludedTransactions tx);
       ]
 end
