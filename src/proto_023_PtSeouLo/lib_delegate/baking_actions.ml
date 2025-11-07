@@ -515,7 +515,7 @@ let process_dal_rpc_result state delegate level round =
   function
   | `RPC_timeout ->
       let*! () =
-        Events.(emit failed_to_get_dal_attestations_in_time delegate)
+        Events.(emit failed_to_get_dal_attestations_in_time (delegate, level))
       in
       return_none
   | `RPC_result (Error errs) ->
@@ -575,7 +575,7 @@ let may_get_dal_content state consensus_vote =
            wait for a bit for the DAL node to provide an answer. *)
         Lwt.pick
           [
-            (let*! () = Lwt_unix.sleep 0.5 in
+            (let*! () = Lwt_unix.sleep 0.75 in
              Lwt.return `RPC_timeout);
             (let*! tz_res = promise in
              Lwt.return (`RPC_result tz_res));

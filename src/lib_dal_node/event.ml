@@ -396,6 +396,18 @@ open struct
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
 
+  let slot_header_status_not_found =
+    declare_2
+      ~section
+      ~prefix_name_with_section:true
+      ~name:"slot_header_status_not_found"
+      ~msg:
+        "Slot header status not found for level {published_level}, slot index \
+         {slot_index}."
+      ~level:Warning
+      ("published_level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+
   let slot_header_status_storage_error =
     declare_3
       ~section
@@ -1400,6 +1412,9 @@ let emit_removed_slot_shards ~published_level ~slot_index =
 
 let emit_removed_slot ~published_level ~slot_index =
   emit removed_slot (published_level, slot_index)
+
+let emit_slot_header_status_not_found ~published_level ~slot_index =
+  emit slot_header_status_not_found (published_level, slot_index)
 
 let emit_slot_header_status_storage_error ~published_level ~slot_index ~error =
   emit slot_header_status_storage_error (published_level, slot_index, error)

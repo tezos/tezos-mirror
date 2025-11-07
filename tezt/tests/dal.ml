@@ -5845,9 +5845,6 @@ module Skip_list_rpcs = struct
       last_confirmed_published_level
       last_attested_level
       max_level ;
-    let wait_for_dal_node =
-      wait_for_layer1_final_block dal_node last_attested_level
-    in
 
     let* second_level_new_proto = Client.level client in
     assert (second_level_new_proto = migration_level) ;
@@ -5869,7 +5866,14 @@ module Skip_list_rpcs = struct
       let* current_level = Node.get_level node in
       let count = max_level - current_level in
       Log.info "Current level is %d. Bake %d more blocks." current_level count ;
-      bake_for ~count client
+      let wait_for_level = ref (current_level - 1) in
+      repeat count (fun () ->
+          let wait_for_dal_node =
+            wait_for_layer1_final_block dal_node !wait_for_level
+          in
+          incr wait_for_level ;
+          let* () = bake_for client in
+          wait_for_dal_node)
     in
 
     let module SeenIndexes = Set.Make (struct
@@ -6002,7 +6006,6 @@ module Skip_list_rpcs = struct
         let* () = check_cell cell ~check_level:(Some level) in
         check_history (level + 1)
     in
-    let* () = wait_for_dal_node in
     Log.info "Check skip-list using commitments_history RPCs" ;
     let* () = check_history 1 in
 
