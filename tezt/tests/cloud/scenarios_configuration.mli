@@ -22,6 +22,8 @@ module DAL : sig
     producers_delay : int option;
     producer_machine_type : string option;
     observer_slot_indices : int list;
+    observers_multi_slot_indices : int list list;
+    archivers_slot_indices : int list list;
     observer_pkhs : string list;
     protocol : Protocol.t option;
     data_dir : string option;
@@ -42,6 +44,7 @@ module DAL : sig
     with_dal : bool option;
     proxy_localhost : bool option;
     disable_shard_validation : bool option;
+    disable_amplification : bool option;
     ignore_pkhs : string list;
     ppx_profiling_verbosity : string option;
     ppx_profiling_backends : string list;

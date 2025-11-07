@@ -10,7 +10,8 @@ type t =
   | Bootstrap
   | Baker of int
   | Producer of int
-  | Observer of [`Index of int | `Pkh of string]
+  | Observer of [`Indexes of int list | `Pkh of string]
+  | Archiver of [`Indexes of int list]
   | Reverse_proxy
   | Etherlink_operator
   | Etherlink_dal_operator
@@ -26,9 +27,11 @@ let rex_baker_index = rex "baker-(\\d+)"
 
 let rex_producer_index = rex "dal-producer-(\\d+)"
 
-let rex_observer_index = rex "dal-observer-(\\d+)"
+let rex_observer_indexes = rex "dal-observer-([0-9-]+)"
 
 let rex_observer_pkh = rex "dal-observer-([a-zA-Z0-9]+)"
+
+let rex_archiver_indexes = rex "dal-archiver-([0-9-]+)"
 
 let rex_reverse_proxy = rex "dal-reverse-proxy"
 
@@ -57,13 +60,29 @@ let rex_replace_index =
   let index = rex "\\(\\\\d\\+\\)" in
   fun r i -> replace_string index ~by:(string_of_int i) (show_rex r)
 
+let rex_replace_indexes =
+  let indexes = rex "\\(\\[0-9-\\]\\+\\)" in
+  fun r l ->
+    replace_string
+      indexes
+      ~by:
+        Format.(
+          asprintf
+            "%a"
+            (pp_print_list
+               ~pp_sep:(fun ppf () -> pp_print_string ppf "-")
+               pp_print_int)
+            l)
+      (show_rex r)
+
 let name_of = function
   | Bootstrap -> rex_constant rex_bootstrap
   | Baker i -> rex_replace_index rex_baker_index i
   | Producer i -> rex_replace_index rex_producer_index i
-  | Observer (`Index i) -> rex_replace_index rex_observer_index i
+  | Observer (`Indexes l) -> rex_replace_indexes rex_observer_indexes l
   | Observer (`Pkh pkh) ->
       rex_replace_string rex_observer_pkh (String.sub pkh 0 8)
+  | Archiver (`Indexes l) -> rex_replace_indexes rex_archiver_indexes l
   | Reverse_proxy -> rex_constant rex_reverse_proxy
   | Etherlink_operator -> rex_constant rex_etherlink_operator
   | Etherlink_dal_operator -> rex_constant rex_etherlink_dal_operator
@@ -82,6 +101,8 @@ type daemon =
   | Producer_dal_node of int
   | Observer_l1_node of int
   | Observer_dal_node of int
+  | Archiver_l1_node of int
+  | Archiver_dal_node of int
   | Echo_rollup_node of string
   | Etherlink_sc_rollup_node of string
   | Etherlink_evm_node of string
@@ -94,6 +115,8 @@ let name_of_daemon = function
   | Producer_dal_node i -> Format.asprintf "producer-dal-node-%i" i
   | Observer_l1_node i -> Format.asprintf "observer-node-%i" i
   | Observer_dal_node i -> Format.asprintf "observer-dal-node-%i" i
+  | Archiver_l1_node i -> Format.asprintf "archiver-node-%i" i
+  | Archiver_dal_node i -> Format.asprintf "archiver-dal-node-%i" i
   | Echo_rollup_node name -> Format.asprintf "%s-rollup-node" name
   | Etherlink_sc_rollup_node name ->
       Format.asprintf "etherlink-%s-rollup-node" name

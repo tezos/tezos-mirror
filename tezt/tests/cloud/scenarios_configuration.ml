@@ -22,6 +22,8 @@ module DAL = struct
     producers_delay : int option;
     producer_machine_type : string option;
     observer_slot_indices : int list;
+    observers_multi_slot_indices : int list list;
+    archivers_slot_indices : int list list;
     observer_pkhs : string list;
     protocol : Protocol.t option;
     data_dir : string option;
@@ -42,6 +44,7 @@ module DAL = struct
     with_dal : bool option;
     proxy_localhost : bool option;
     disable_shard_validation : bool option;
+    disable_amplification : bool option;
     ignore_pkhs : string list;
     ppx_profiling_verbosity : string option;
     ppx_profiling_backends : string list;
@@ -78,6 +81,8 @@ module DAL = struct
              producers_delay;
              producer_machine_type;
              observer_slot_indices;
+             observers_multi_slot_indices;
+             archivers_slot_indices;
              observer_pkhs;
              protocol;
              data_dir;
@@ -98,6 +103,7 @@ module DAL = struct
              with_dal;
              proxy_localhost;
              disable_shard_validation;
+             disable_amplification;
              ignore_pkhs;
              ppx_profiling_verbosity;
              ppx_profiling_backends;
@@ -119,16 +125,15 @@ module DAL = struct
                 stake,
                 bakers,
                 stake_machine_type ),
-              ( dal_producers_slot_indices,
-                producers,
-                producers_delay,
-                producer_machine_type,
-                observer_slot_indices,
-                observer_pkhs,
-                protocol,
-                data_dir,
-                etherlink,
-                etherlink_sequencer ) ),
+              ( ( dal_producers_slot_indices,
+                  producers,
+                  producers_delay,
+                  producer_machine_type,
+                  observer_slot_indices,
+                  observers_multi_slot_indices,
+                  archivers_slot_indices,
+                  observer_pkhs ),
+                (protocol, data_dir, etherlink, etherlink_sequencer) ) ),
             ( ( etherlink_producers,
                 etherlink_chain_id,
                 echo_rollups,
@@ -139,15 +144,16 @@ module DAL = struct
                 memtrace,
                 bootstrap_node_identity_file,
                 bootstrap_dal_node_identity_file ),
-              ( refresh_binaries,
-                node_external_rpc_server,
-                with_dal,
-                proxy_localhost,
-                disable_shard_validation,
-                ignore_pkhs,
-                ppx_profiling_verbosity,
-                ppx_profiling_backends,
-                enable_network_health_monitoring,
+              ( ( refresh_binaries,
+                  node_external_rpc_server,
+                  with_dal,
+                  proxy_localhost,
+                  disable_shard_validation,
+                  disable_amplification,
+                  ignore_pkhs,
+                  ppx_profiling_verbosity,
+                  ppx_profiling_backends,
+                  enable_network_health_monitoring ),
                 tezlink ) ) ),
           (slot_size, number_of_slots, attestation_lag, traps_fraction) ))
       (fun ( ( ( ( blocks_history,
@@ -160,16 +166,15 @@ module DAL = struct
                    stake,
                    bakers,
                    stake_machine_type ),
-                 ( dal_producers_slot_indices,
-                   producers,
-                   producers_delay,
-                   producer_machine_type,
-                   observer_slot_indices,
-                   observer_pkhs,
-                   protocol,
-                   data_dir,
-                   etherlink,
-                   etherlink_sequencer ) ),
+                 ( ( dal_producers_slot_indices,
+                     producers,
+                     producers_delay,
+                     producer_machine_type,
+                     observer_slot_indices,
+                     observers_multi_slot_indices,
+                     archivers_slot_indices,
+                     observer_pkhs ),
+                   (protocol, data_dir, etherlink, etherlink_sequencer) ) ),
                ( ( etherlink_producers,
                    etherlink_chain_id,
                    echo_rollups,
@@ -180,15 +185,16 @@ module DAL = struct
                    memtrace,
                    bootstrap_node_identity_file,
                    bootstrap_dal_node_identity_file ),
-                 ( refresh_binaries,
-                   node_external_rpc_server,
-                   with_dal,
-                   proxy_localhost,
-                   disable_shard_validation,
-                   ignore_pkhs,
-                   ppx_profiling_verbosity,
-                   ppx_profiling_backends,
-                   enable_network_health_monitoring,
+                 ( ( refresh_binaries,
+                     node_external_rpc_server,
+                     with_dal,
+                     proxy_localhost,
+                     disable_shard_validation,
+                     disable_amplification,
+                     ignore_pkhs,
+                     ppx_profiling_verbosity,
+                     ppx_profiling_backends,
+                     enable_network_health_monitoring ),
                    tezlink ) ) ),
              (slot_size, number_of_slots, attestation_lag, traps_fraction) )
          ->
@@ -208,6 +214,8 @@ module DAL = struct
           producers_delay;
           producer_machine_type;
           observer_slot_indices;
+          observers_multi_slot_indices;
+          archivers_slot_indices;
           observer_pkhs;
           protocol;
           data_dir;
@@ -228,6 +236,7 @@ module DAL = struct
           with_dal;
           proxy_localhost;
           disable_shard_validation;
+          disable_amplification;
           ignore_pkhs;
           ppx_profiling_verbosity;
           ppx_profiling_backends;
@@ -252,17 +261,21 @@ module DAL = struct
                   (opt "stake" Stake_repartition.Dal.encoding)
                   (dft "bakers" (list string) [])
                   (dft "stake_machine_type" (list string) []))
-               (obj10
-                  (dft "dal_producers_slot_indices" (list int31) [])
-                  (opt "producers" int31)
-                  (opt "producers_delay" int31)
-                  (opt "producer_machine_type" string)
-                  (dft "observer_slot_indices" (list int31) [])
-                  (dft "observer_pkhs" (list string) [])
-                  (opt "protocol" Protocol.encoding)
-                  (opt "data_dir" string)
-                  (opt "etherlink" bool)
-                  (opt "etherlink_sequencer" bool)))
+               (merge_objs
+                  (obj8
+                     (dft "dal_producers_slot_indices" (list int31) [])
+                     (opt "producers" int31)
+                     (opt "producers_delay" int31)
+                     (opt "producer_machine_type" string)
+                     (dft "observer_slot_indices" (list int31) [])
+                     (dft "observers_multi_slot_indices" (list (list int31)) [])
+                     (dft "archivers_slot_indices" (list (list int31)) [])
+                     (dft "observer_pkhs" (list string) []))
+                  (obj4
+                     (opt "protocol" Protocol.encoding)
+                     (opt "data_dir" string)
+                     (opt "etherlink" bool)
+                     (opt "etherlink_sequencer" bool))))
             (merge_objs
                (obj10
                   (opt "etherlink_producers" int31)
@@ -275,17 +288,19 @@ module DAL = struct
                   (opt "memtrace" bool)
                   (opt "bootstrap_node_identity_file" string)
                   (opt "bootstrap_dal_node_identity_file" string))
-               (obj10
-                  (opt "refresh_binaries" bool)
-                  (opt "node_external_rpc_server" bool)
-                  (opt "with_dal" bool)
-                  (opt "proxy_localhost" bool)
-                  (opt "disable_shard_validation" bool)
-                  (dft "ignore_pkhs" (list string) [])
-                  (opt "ppx_profiling_verbosity" string)
-                  (dft "ppx_profiling_backends" (list string) [])
-                  (opt "enable_network_health_monitoring" bool)
-                  (opt "tezlink" bool))))
+               (merge_objs
+                  (obj10
+                     (opt "refresh_binaries" bool)
+                     (opt "node_external_rpc_server" bool)
+                     (opt "with_dal" bool)
+                     (opt "proxy_localhost" bool)
+                     (opt "disable_shard_validation" bool)
+                     (opt "disable_amplification" bool)
+                     (dft "ignore_pkhs" (list string) [])
+                     (opt "ppx_profiling_verbosity" string)
+                     (dft "ppx_profiling_backends" (list string) [])
+                     (opt "enable_network_health_monitoring" bool))
+                  (obj1 (opt "tezlink" bool)))))
          (obj4
             (opt "slot_size" int31)
             (opt "number_of_slots" int31)

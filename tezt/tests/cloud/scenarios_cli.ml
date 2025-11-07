@@ -9,15 +9,43 @@
 module Clap = struct
   include Clap
 
+  let parse_list ~sep parse str =
+    try str |> String.split_on_char sep |> List.map parse |> Option.some
+    with _ -> None
+
+  let show_list ~sep show l =
+    l |> List.map show |> String.concat (String.make 1 sep)
+
   let list ?(sep = ',') ?(dummy = []) ~name parse show =
-    let parse str =
-      try str |> String.split_on_char sep |> List.map parse |> Option.some
-      with _ -> None
-    in
-    let show l = l |> List.map show |> String.concat (String.make 1 sep) in
+    let parse str = parse_list ~sep parse str in
+    let show = show_list ~sep show in
     Clap.typ ~name ~dummy ~parse ~show
 
   let list_of_int ?dummy name = list ~name ?dummy int_of_string string_of_int
+
+  let list_of_list ?(sep_out = ',') ?(sep_in = ';') ?(dummy = []) ~name
+      parse_elm show_elm =
+    let parse_inner str =
+      let trimmed =
+        let str = String.trim str in
+        let len = String.length str in
+        if String.get str 0 = '[' && String.get str (len - 1) = ']' then
+          String.sub str 1 (len - 2)
+        else str
+      in
+      match parse_list ~sep:sep_in parse_elm trimmed with
+      | Some l -> l
+      | None -> raise (Invalid_argument str)
+    in
+    let show_inner = function
+      | [] -> "[]"
+      | [e] -> show_elm e
+      | l -> "[" ^ show_list ~sep:sep_in show_elm l
+    in
+    list ~sep:sep_out ~dummy ~name parse_inner show_inner
+
+  let list_of_list_of_int ?dummy name =
+    list_of_list ~name ?dummy int_of_string string_of_int
 end
 
 let network_typ : Network.t Clap.typ =
@@ -69,6 +97,10 @@ module type Dal = sig
 
   val observer_slot_indices : int list
 
+  val observers_multi_slot_indices : int list list
+
+  val archivers_slot_indices : int list list
+
   val observer_pkhs : string list
 
   val protocol : Protocol.t
@@ -108,6 +140,8 @@ module type Dal = sig
   val proxy_localhost : bool
 
   val disable_shard_validation : bool
+
+  val disable_amplification : bool
 
   val ignore_pkhs : string list
 
@@ -364,6 +398,28 @@ module Dal () : Dal = struct
         (Clap.list_of_int "observer_slot_indices")
         []
 
+  let observers_multi_slot_indices =
+    config.observers_multi_slot_indices
+    @ Clap.default
+        ~section
+        ~long:"observers-multi-slot-indices"
+        ~placeholder:"[<slot_index>;..],[<slot_index>;...],..."
+        ~description:
+          "For each list of slots, an observer will be created to observe them."
+        (Clap.list_of_list_of_int "observer_multi_slot_indices")
+        []
+
+  let archivers_slot_indices =
+    config.archivers_slot_indices
+    @ Clap.default
+        ~section
+        ~long:"archivers-slot-indices"
+        ~placeholder:"[<slot_index>;..],[<slot_index>;...],..."
+        ~description:
+          "For each list of slots, an operator will be created to observe them."
+        (Clap.list_of_list_of_int "archivers_slot_indices")
+        []
+
   let observer_pkhs =
     config.observer_pkhs
     @ Clap.list_string
@@ -586,6 +642,15 @@ module Dal () : Dal = struct
       ~set_long:"disable-shard-validation"
       ~description:"All DAL nodes will bypass the shard validation stage."
       (Option.value ~default:false config.disable_shard_validation)
+
+  let disable_amplification =
+    Clap.flag
+      ~section
+      ~set_long:"disable-amplification"
+      ~description:
+        "DAL nodes will not do the missing-shards reconstruction and \
+         propagation."
+      (Option.value ~default:false config.disable_amplification)
 
   let ignore_pkhs =
     config.ignore_pkhs

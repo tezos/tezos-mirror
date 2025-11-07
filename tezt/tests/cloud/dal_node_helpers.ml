@@ -15,7 +15,7 @@ open Yes_crypto
 type observer = {
   node : Node.t;
   dal_node : Dal_node.t;
-  topic : [`Slot_index of int | `Pkh of string];
+  topic : [`Slot_indexes of int list | `Pkh of string];
 }
 
 type producer = {
@@ -25,6 +25,12 @@ type producer = {
   account : Account.key;
   is_ready : unit Lwt.t;
   slot_index : int;
+}
+
+type archiver = {
+  node : Node.t;
+  dal_node : Dal_node.t;
+  topic : [`Slot_indexes of int list];
 }
 
 let may_copy_dal_node_identity_file agent node = function
@@ -113,8 +119,9 @@ let init_producer_accounts ~client ~producer_key ~dal_node_producers =
 
 let init_producer cloud ~data_dir ~simulate_network ~external_rpc ~network
     ~snapshot ~memtrace ~ppx_profiling_verbosity ~ppx_profiling_backends
-    ~ignore_pkhs ~disable_shard_validation ~node_p2p_endpoint
-    ~dal_node_p2p_endpoint teztale account i slot_index agent =
+    ~ignore_pkhs ~disable_shard_validation ~disable_amplification
+    ~node_p2p_endpoint ~dal_node_p2p_endpoint teztale account i slot_index agent
+    =
   let name = name_of_daemon (Producer_l1_node i) in
   let () = toplog "Initializing the DAL producer %s" name in
   let data_dir = data_dir |> Option.map (fun data_dir -> data_dir // name) in
@@ -156,6 +163,7 @@ let init_producer cloud ~data_dir ~simulate_network ~external_rpc ~network
       ~name:(name_of_daemon (Producer_dal_node i))
       ~node
       ~disable_shard_validation
+      ~disable_amplification
       ?ignore_pkhs
       cloud
       agent
@@ -368,8 +376,8 @@ let producers_not_ready ~producers =
 
 let init_observer cloud ~data_dir ~simulate_network ~external_rpc ~network
     ~snapshot ~memtrace ~ppx_profiling_verbosity ~ppx_profiling_backends
-    ~disable_shard_validation ~node_p2p_endpoint ~dal_node_p2p_endpoint teztale
-    ~topic i agent =
+    ~disable_shard_validation ~disable_amplification ~node_p2p_endpoint
+    ~dal_node_p2p_endpoint teztale ~topic i agent : observer Lwt.t =
   let name = name_of_daemon (Observer_l1_node i) in
   let data_dir = data_dir |> Option.map (fun data_dir -> data_dir // name) in
   let env, with_yes_crypto = may_set_yes_crypto_env simulate_network in
@@ -393,15 +401,16 @@ let init_observer cloud ~data_dir ~simulate_network ~external_rpc ~network
       ~name:(name_of_daemon (Observer_dal_node i))
       ~node
       ~disable_shard_validation
+      ~disable_amplification
       cloud
       agent
   in
   let* () =
     match topic with
-    | `Slot_index slot_index ->
+    | `Slot_indexes slot_indexes ->
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow network)
-          ~observer_profiles:[slot_index]
+          ~observer_profiles:slot_indexes
           ~peers:(Option.to_list dal_node_p2p_endpoint)
           dal_node
     | `Pkh pkh ->
@@ -442,4 +451,81 @@ let init_observer cloud ~data_dir ~simulate_network ~external_rpc ~network
           ~node_name:(Node.name node)
           ~node_port:(Node.rpc_port node)
   in
-  Lwt.return {node; dal_node; topic}
+  Lwt.return ({node; dal_node; topic} : observer)
+
+let init_archiver cloud ~data_dir ~simulate_network ~external_rpc ~network
+    ~snapshot ~memtrace ~ppx_profiling_verbosity ~ppx_profiling_backends
+    ~disable_shard_validation ~disable_amplification ~node_p2p_endpoint
+    ~dal_node_p2p_endpoint teztale ~topic i agent : archiver Lwt.t =
+  let name = name_of_daemon (Archiver_l1_node i) in
+  let () = toplog "Initializing the DAL archiver %s" name in
+  let data_dir = data_dir |> Option.map (fun data_dir -> data_dir // name) in
+  let () = toplog "Init archiver %s: init L1 node" name in
+  let env, with_yes_crypto = may_set_yes_crypto_env simulate_network in
+  let* node =
+    Node_helpers.init
+      ?env
+      ?data_dir
+      ~name
+      ~arguments:Node.[Peer node_p2p_endpoint]
+      ~rpc_external:external_rpc
+      network
+      ~with_yes_crypto
+      ~snapshot
+      ~ppx_profiling_verbosity
+      ~ppx_profiling_backends
+      cloud
+      agent
+  in
+  let* dal_node =
+    Dal_node.Agent.create
+      ~name:(name_of_daemon (Archiver_dal_node i))
+      ~node
+      ~disable_shard_validation
+      ~disable_amplification
+      cloud
+      agent
+  in
+  let () = toplog "Init archiver %s: init DAL node config" name in
+  let* () =
+    match topic with
+    | `Slot_indexes slot_indexes ->
+        Dal_node.init_config
+          ~expected_pow:(Network.expected_pow network)
+          ~operator_profiles:slot_indexes
+          ~peers:(Option.to_list dal_node_p2p_endpoint)
+          dal_node
+  in
+  let () = toplog "Init archiver %s: add DAL node metrics" name in
+  let* () =
+    add_prometheus_source
+      ~node
+      ~dal_node
+      cloud
+      agent
+      (Format.asprintf "archiver-%d" i)
+  in
+  let otel = Cloud.open_telemetry_endpoint cloud in
+  let* () =
+    Dal_node.Agent.run
+      ~prometheus:Tezt_cloud_cli.prometheus
+      ?otel
+      ~memtrace
+      ~event_level:`Notice
+      ~disable_shard_validation
+      ~ppx_profiling_verbosity
+      ~ppx_profiling_backends
+      dal_node
+  in
+  let* () =
+    match teztale with
+    | None -> Lwt.return_unit
+    | Some teztale ->
+        Teztale.add_archiver
+          teztale
+          cloud
+          agent
+          ~node_name:(Node.name node)
+          ~node_port:(Node.rpc_port node)
+  in
+  Lwt.return ({node; dal_node; topic} : archiver)

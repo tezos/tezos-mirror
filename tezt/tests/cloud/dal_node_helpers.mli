@@ -17,7 +17,13 @@
 type observer = {
   node : Node.t;
   dal_node : Dal_node.t;
-  topic : [`Pkh of string | `Slot_index of int];
+  topic : [`Pkh of string | `Slot_indexes of int list];
+}
+
+type archiver = {
+  node : Node.t;
+  dal_node : Dal_node.t;
+  topic : [`Slot_indexes of int list];
 }
 
 type producer = {
@@ -64,6 +70,7 @@ val init_producer :
   ppx_profiling_backends:string list ->
   ignore_pkhs:string list ->
   disable_shard_validation:bool ->
+  disable_amplification:bool ->
   node_p2p_endpoint:string ->
   dal_node_p2p_endpoint:string option ->
   Tezos.Teztale.t option ->
@@ -106,10 +113,32 @@ val init_observer :
   ppx_profiling_verbosity:string option ->
   ppx_profiling_backends:string list ->
   disable_shard_validation:bool ->
+  disable_amplification:bool ->
   node_p2p_endpoint:string ->
   dal_node_p2p_endpoint:string option ->
   Tezos.Teztale.t option ->
-  topic:[`Pkh of string | `Slot_index of int] ->
+  topic:[`Pkh of string | `Slot_indexes of int list] ->
   int ->
   Agent.t ->
   observer Lwt.t
+
+(** Initialize a DAL archiver node and DAL node. *)
+val init_archiver :
+  Cloud.t ->
+  data_dir:string option ->
+  simulate_network:Network_simulation.t ->
+  external_rpc:bool ->
+  network:Network.t ->
+  snapshot:Snapshot_helpers.t ->
+  memtrace:bool ->
+  ppx_profiling_verbosity:string option ->
+  ppx_profiling_backends:string list ->
+  disable_shard_validation:bool ->
+  disable_amplification:bool ->
+  node_p2p_endpoint:string ->
+  dal_node_p2p_endpoint:string option ->
+  Tezos.Teztale.t option ->
+  topic:[`Slot_indexes of int list] ->
+  int ->
+  Agent.t ->
+  archiver Lwt.t
