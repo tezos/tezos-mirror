@@ -851,7 +851,8 @@ module Actions = struct
       ~name:"failed_to_get_attestations_in_time"
       ~level:Error
       ~msg:
-        "unable to get DAL attestation for {delegate} in time for level {level}"
+        "unable to get DAL attestation for {delegate} in time for attestation \
+         level {level}"
       ("delegate", Delegate_id.encoding)
       ("level", Data_encoding.int32)
 
