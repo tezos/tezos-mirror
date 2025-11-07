@@ -28,9 +28,7 @@ pub enum GasLimitError {
     CannotConvertToU32(num_bigint::TryFromBigIntError<num_bigint::BigUint>),
 }
 
-pub struct Cost {
-    value: u32,
-}
+pub struct Cost(u32);
 impl Cost {
     /// This corresponds to the defaults costs in gas.
     /// Currently can be found in Tezos source code at: src/proto_023_PtSeouLo/lib_protocol/michelson_v1_gas.ml
@@ -38,15 +36,11 @@ impl Cost {
     const GAS_COST_TRANSACTION: u32 = 2_000_000;
 
     pub fn manager_operation() -> Self {
-        Cost {
-            value: Self::GAS_COST_MANAGER_OPERATION,
-        }
+        Cost(Self::GAS_COST_MANAGER_OPERATION)
     }
 
     pub fn transaction() -> Self {
-        Cost {
-            value: Self::GAS_COST_TRANSACTION,
-        }
+        Cost(Self::GAS_COST_TRANSACTION)
     }
 
     /// Calculates the gas cost for signature verification based on the public key type and message length.
@@ -62,7 +56,7 @@ impl Cost {
             PublicKey::P256(..) => 341_000 + ((len >> 3) + len),
             PublicKey::Bls(..) => 1_570_000 + (3 * len),
         };
-        Cost { value }
+        Cost(value)
     }
 }
 
@@ -133,7 +127,7 @@ impl TezlinkOperationGas {
     }
 
     pub fn consume(&mut self, cost: Cost) -> Result<(), gas::OutOfGas> {
-        self.current_gas.consume(cost.value)
+        self.current_gas.consume(cost.0)
     }
 }
 
