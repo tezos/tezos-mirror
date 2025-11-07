@@ -15,6 +15,9 @@ module CI = Cacio.Make (struct
   let paths = ["src/**/*"]
 end)
 
+let octez_smart_rollup_node_release_tag_re =
+  "/^octez-smart-rollup-node-v\\d+(\\.\\d+)?(?:\\-(rc|beta)\\d+)?$/"
+
 (** Creates a Docker build job of the given [arch]. *)
 let job_docker_build =
   Cacio.parameterize @@ fun arch ->
@@ -167,6 +170,7 @@ let job_gitlab_release =
 
 let register () =
   CI.register_dedicated_test_release_pipeline
+    ~tag_rex:octez_smart_rollup_node_release_tag_re
     [
       (Auto, job_build_static_binaries Arm64);
       (Auto, job_build_static_binaries Amd64);
@@ -175,6 +179,7 @@ let register () =
       (Manual, job_release_page `test);
     ] ;
   CI.register_dedicated_release_pipeline
+    ~tag_rex:octez_smart_rollup_node_release_tag_re
     [
       (Auto, job_build_static_binaries Arm64);
       (Auto, job_build_static_binaries Amd64);

@@ -681,9 +681,11 @@ module type COMPONENT_API = sig
   val register_global_test_publish_release_page_jobs :
     (trigger * job) list -> unit
 
-  val register_dedicated_release_pipeline : (trigger * job) list -> unit
+  val register_dedicated_release_pipeline :
+    ?tag_rex:string -> (trigger * job) list -> unit
 
-  val register_dedicated_test_release_pipeline : (trigger * job) list -> unit
+  val register_dedicated_test_release_pipeline :
+    ?tag_rex:string -> (trigger * job) list -> unit
 end
 
 (* Some jobs are to be added to shared pipelines.
@@ -1227,11 +1229,13 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       already_called := true ;
       f x
 
-  let register_dedicated_release_pipeline =
+  let register_dedicated_release_pipeline ?tag_rex =
     only_once "register_dedicated_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
-    let release_tag_rex = get_release_tag_rex component_name in
+    let release_tag_rex =
+      Option.value ~default:(get_release_tag_rex component_name) tag_rex
+    in
     register_pipeline
       "release"
       ~description:(sf "Release %s." component_name)
@@ -1240,11 +1244,13 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         Gitlab_ci.If.(
           on_tezos_namespace && push && has_tag_match release_tag_rex))
 
-  let register_dedicated_test_release_pipeline =
+  let register_dedicated_test_release_pipeline ?tag_rex =
     only_once "register_dedicated_test_release_pipeline" @@ fun jobs ->
     component_must_not_be_shared "register_dedicated_release_pipeline"
     @@ fun component_name ->
-    let release_tag_rex = get_release_tag_rex component_name in
+    let release_tag_rex =
+      Option.value ~default:(get_release_tag_rex component_name) tag_rex
+    in
     register_pipeline
       "test_release"
       ~description:(sf "Release %s (test)." component_name)

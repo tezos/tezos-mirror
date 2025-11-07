@@ -421,8 +421,11 @@ module type COMPONENT_API = sig
 
       This function must be called only once per component.
 
+      [tag_rex] allows to specify a custom tag regular expression.
+
       Not implemented for the [Shared] component. *)
-  val register_dedicated_release_pipeline : (trigger * job) list -> unit
+  val register_dedicated_release_pipeline :
+    ?tag_rex:string -> (trigger * job) list -> unit
 
   (** Register jobs to be included in the test release pipeline of the current component.
 
@@ -431,8 +434,11 @@ module type COMPONENT_API = sig
 
       This function must be called only once per component.
 
+      [tag_rex] allows to specify a custom tag regular expression.
+
       Not implemented for the [Shared] component. *)
-  val register_dedicated_test_release_pipeline : (trigger * job) list -> unit
+  val register_dedicated_test_release_pipeline :
+    ?tag_rex:string -> (trigger * job) list -> unit
 end
 
 (** The main functor of Cacio. *)
