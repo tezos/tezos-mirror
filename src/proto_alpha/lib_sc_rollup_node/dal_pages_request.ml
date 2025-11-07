@@ -35,6 +35,7 @@ module Slot_id = Tezos_dal_node_services.Types.Slot_id
       is not confirmed. *)
 
 type Environment.Error_monad.error +=
+  | No_dal_node_provided
   | Dal_invalid_page_for_slot of Dal.Page.t
   | Dal_attestation_status_not_final of {
       published_level : int32;
@@ -82,6 +83,19 @@ let () =
       | _ -> None)
     (fun (published_level, slot_index) ->
       Dal_attestation_status_not_final {published_level; slot_index})
+
+let () =
+  let open Environment.Error_monad in
+  register_error_kind
+    `Permanent
+    ~id:"dal_pages_request.no_dal_node_provided"
+    ~title:"No DAL node provided"
+    ~description:"No DAL node was provided"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "No DAL node provided to fetch slot pages.")
+    Data_encoding.unit
+    (function No_dal_node_provided -> Some () | _ -> None)
+    (fun () -> No_dal_node_provided)
 
 module Event = struct
   include Internal_event.Simple
@@ -263,6 +277,14 @@ let attestation_status_not_final published_level slot_index =
   in
   Environment.wrap_tzresult res |> Lwt.return
 
+let get_dal_node cctxt_opt =
+  let open Environment.Error_monad.Lwt_result_syntax in
+  match cctxt_opt with
+  | Some res -> return res
+  | None ->
+      let*! err = tzfail No_dal_node_provided in
+      Environment.wrap_tzresult err |> Lwt.return
+
 let slot_pages_int
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
     ~dal_activation_level ~inbox_level node_ctxt slot_id
@@ -272,8 +294,7 @@ let slot_pages_int
     node_ctxt
   in
   let* chain_id = Layer1.get_chain_id l1_ctxt in
-  (* DAL must be configured for this point to be reached *)
-  let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ node_ctxt.dal_cctxt in
+  let* dal_cctxt = get_dal_node node_ctxt.dal_cctxt in
   let Dal.Slot.Header.{published_level; index} = slot_id in
   let* status =
     get_slot_header_attestation_info dal_cctxt ~published_level ~index
@@ -310,8 +331,7 @@ let page_content_int
     node_ctxt
   in
   let* chain_id = Layer1.get_chain_id l1_ctxt in
-  (* DAL must be configured for this point to be reached *)
-  let dal_cctxt = WithExceptions.Option.get ~loc:__LOC__ node_ctxt.dal_cctxt in
+  let* dal_cctxt = get_dal_node node_ctxt.dal_cctxt in
   let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
   let* status =
     get_slot_header_attestation_info dal_cctxt ~published_level ~index
