@@ -19,6 +19,7 @@ use std::rc::Rc;
 use tezos_crypto_rs::{
     blake2b::digest as blake2bdigest,
     hash::{ContractKt1Hash, HashTrait},
+    CryptoError,
 };
 use typed_arena::Arena;
 
@@ -29,6 +30,7 @@ use crate::ast::*;
 use crate::bls;
 use crate::context::{CtxTrait, TypecheckingCtx};
 use crate::gas::{interpret_cost, OutOfGas};
+use crate::interpreter::interpret_cost::SigCostError;
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
 use crate::stack::*;
@@ -40,6 +42,9 @@ pub enum InterpretError<'a> {
     /// Interpreter ran out of gas.
     #[error(transparent)]
     OutOfGas(#[from] OutOfGas),
+    /// Cryptographic error.
+    #[error(transparent)]
+    CryptoError(#[from] CryptoError),
     /// When performing mutez arithmetic, an overflow occurred.
     #[error("mutez overflow")]
     MutezOverflow,
@@ -55,6 +60,15 @@ pub enum InterpretError<'a> {
     /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0}")]
     LazyStorageError(#[from] LazyStorageError),
+}
+
+impl<'a> From<SigCostError> for InterpretError<'a> {
+    fn from(e: SigCostError) -> Self {
+        match e {
+            SigCostError::Crypto(err) => err.into(),
+            SigCostError::OutOfGas(err) => err.into(),
+        }
+    }
 }
 
 /// Errors possible when interpreting a full contract script.

@@ -281,6 +281,8 @@ pub mod interpret_cost {
     use checked::Checked;
     use num_bigint::{BigInt, BigUint};
     use num_traits::Zero;
+    use tezos_crypto_rs::CryptoError;
+    use thiserror::Error;
 
     use super::{AsGasCost, BigIntByteSize, Log2i, OutOfGas};
     use crate::ast::{Key, Micheline, Or, Ticket, TypedValue};
@@ -828,6 +830,14 @@ pub mod interpret_cost {
                 }
             }
         }
+    }
+
+    #[derive(Debug, Error)]
+    pub enum SigCostError {
+        #[error(transparent)]
+        OutOfGas(#[from] OutOfGas),
+        #[error(transparent)]
+        Crypto(#[from] CryptoError),
     }
 
     pub fn check_signature(k: &Key, msg: &[u8]) -> Result<u32, OutOfGas> {
