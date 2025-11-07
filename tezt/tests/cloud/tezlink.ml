@@ -51,7 +51,7 @@ let proxy_external_endpoint ~runner = function
 
 let nginx_reverse_proxy_config ~agent ~proxy =
   match proxy with
-  | No_proxy _ -> none
+  | No_proxy _ -> Lwt.return_nil
   | Proxy {dns_domain; external_port; activate_ssl; internal_info = _} ->
       let internal_endpoint = proxy_internal_endpoint proxy in
       let proxy_pass =
@@ -65,7 +65,7 @@ let nginx_reverse_proxy_config ~agent ~proxy =
             Test.fail "Please add --dns-domain %s" dns_domain
         in
         let* ssl = Ssl.generate agent dns_domain in
-        let config =
+        return @@
           Nginx_reverse_proxy.simple_ssl_node
             ~server_name:dns_domain
             ~port:external_port
@@ -73,17 +73,13 @@ let nginx_reverse_proxy_config ~agent ~proxy =
             ~proxy_pass
             ~certificate:ssl.certificate
             ~certificate_key:ssl.key
-        in
-        some config
       else
-        let config =
+        return @@
           Nginx_reverse_proxy.make_simple_config
             ~server_name:dns_domain
             ~port:external_port
             ~location:"/"
             ~proxy_pass
-        in
-        some config
 
 let port_of_option agent = function
   | None -> Agent.next_available_port agent
@@ -867,21 +863,21 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             ~agent:tezlink_sequencer_agent
             ~proxy:sequencer_proxy
         in
-        match rpc_nginx_config with
-        | Some rpc_nginx_config ->
             let* tzkt_nginx_config =
               match tzkt_proxy_opt with
-              | None -> none
+              | None -> return []
               | Some proxy ->
                   nginx_reverse_proxy_config
                     ~agent:tezlink_sequencer_agent
                     ~proxy
-            in
+        in
+        match rpc_nginx_config @ tzkt_nginx_config with
+        | [] -> unit
+        | nginx_configs ->
             Nginx_reverse_proxy.init
               ~agent:tezlink_sequencer_agent
               ~site:"tezlink"
-              (rpc_nginx_config @ Option.value ~default:[] tzkt_nginx_config)
-        | None -> unit
+              nginx_configs
       in
       let () = toplog "Starting main loop" in
       loop 0)
