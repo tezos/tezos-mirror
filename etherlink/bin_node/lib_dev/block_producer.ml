@@ -583,9 +583,9 @@ let produce_block (state : Types.state) ~force ~(timestamp : Time.Protocol.t)
               return result
           | `No_block -> return result)
 
-let preconfirm_delayed_transactions ~(state : Types.state) =
+let preconfirm_delayed_transactions ~(state : Types.state)
+    ~(head_info : Evm_context.head) =
   let open Lwt_result_syntax in
-  let*! head_info = Evm_context.head_info () in
   let* delayed_hashes, remaining_cumulative_size =
     head_info_and_delayed_transactions
       ~with_delayed_transactions:true
@@ -611,11 +611,16 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
       state.maximum_number_of_chunks
   in
+  let*! head_info = Evm_context.head_info () in
   let* current_size =
     (* Accumulator empty and at least one transaction = start next future block *)
     if state.validated_txns = [] && transactions <> [] then (
-      Broadcast.notify_next_block_timestamp (Time.System.to_protocol timestamp) ;
-      let* remaining_cumulative_size = preconfirm_delayed_transactions ~state in
+      Broadcast.notify_next_block_info
+        (Time.System.to_protocol timestamp)
+        head_info.next_blueprint_number ;
+      let* remaining_cumulative_size =
+        preconfirm_delayed_transactions ~state ~head_info
+      in
       return (Int.sub maximum_cumulative_size remaining_cumulative_size))
     else return state.validation_state.current_size
   in

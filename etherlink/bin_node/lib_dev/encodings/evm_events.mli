@@ -25,7 +25,7 @@ module Delayed_transaction : sig
     Rlp.item ->
     t option
 
-  val to_rlp : t -> bytes
+  val to_rlp : t -> Rlp.item
 end
 
 module Upgrade : sig

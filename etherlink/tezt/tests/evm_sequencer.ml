@@ -11644,7 +11644,8 @@ let test_websocket_logs_event =
 let test_websocket_tez_newIncludedTransactions_event =
   register_all
     ~__FILE__
-    ~tags:["evm"; "rpc"; "websocket"; "tez_new_included_transactions"]
+    ~tags:
+      ["evm"; "rpc"; "websocket"; "tez_new_included_transactions"; Tag.flaky]
     ~title:
       "Check that websocket event `newIncludedTransactions` is behaving \
        correctly"

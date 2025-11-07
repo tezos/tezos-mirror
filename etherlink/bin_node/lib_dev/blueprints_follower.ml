@@ -18,14 +18,15 @@ type finalized_levels_handler =
   end_l2_level:Ethereum_types.quantity ->
   unit tzresult Lwt.t
 
-type next_block_timestamp_handler = Time.Protocol.t -> unit tzresult Lwt.t
+type next_block_info_handler =
+  Time.Protocol.t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 
 type inclusion_handler = Broadcast.transaction -> unit tzresult Lwt.t
 
 type parameters = {
   on_new_blueprint : new_blueprint_handler;
   on_finalized_levels : finalized_levels_handler;
-  on_next_block_timestamp : next_block_timestamp_handler;
+  on_next_block_info : next_block_info_handler;
   on_inclusion : inclusion_handler;
   time_between_blocks : Configuration.time_between_blocks;
   evm_node_endpoint : Uri.t;
@@ -310,8 +311,8 @@ and stream_loop ~multichain (Qty next_blueprint_number) params monitor =
                  no need to wait. *)
               true
             params)
-  | Ok (Some (Next_block_timestamp timestamp)) ->
-      let* () = params.on_next_block_timestamp timestamp in
+  | Ok (Some (Next_block_info {timestamp; number})) ->
+      let* () = params.on_next_block_info timestamp number in
       (stream_loop [@tailcall])
         ~multichain
         (Qty next_blueprint_number)
@@ -337,7 +338,7 @@ and stream_loop ~multichain (Qty next_blueprint_number) params monitor =
 
 let start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
     ~next_blueprint_number ~on_new_blueprint ~on_finalized_levels
-    ~on_next_block_timestamp ~on_inclusion () =
+    ~on_next_block_info ~on_inclusion () =
   let open Lwt_result_syntax in
   let*! res =
     catchup
@@ -350,7 +351,7 @@ let start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
         rpc_timeout;
         on_new_blueprint;
         on_finalized_levels;
-        on_next_block_timestamp;
+        on_next_block_info;
         on_inclusion;
       }
   in

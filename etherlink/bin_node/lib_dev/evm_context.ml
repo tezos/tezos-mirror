@@ -31,6 +31,12 @@ type parameters = {
   tx_container : Services_backend_sig.ex_tx_container;
 }
 
+type future_block_state = {
+  evm_state : Evm_state.t;
+  timestamp : Time.Protocol.t;
+  next_tx_index : int32;
+}
+
 type session_state = {
   mutable context : Pvm.Context.rw;
   mutable finalized_number : Ethereum_types.quantity;
@@ -46,6 +52,12 @@ type session_state = {
       (** A function to be run by the worker at the end of the current
           {!Transaction.run} call. This can be used to delay some computation
           only once the commits in Irmin and SQlite have been confirmed. *)
+  mutable future_block_state : future_block_state option;
+      (** This value starts at None to prevent inclusion confirmation
+          handling on an incomplete stream after startup. 
+          In the case where we find a divergence between the next_blueprint_number
+          and the one received by Next_block_info, we lock single transaction executions
+          by setting this to None again. *)
 }
 
 type t = {
@@ -196,6 +208,7 @@ module State = struct
           evm_state;
           last_split_block;
           post_transaction_run_hook;
+          future_block_state;
         } =
       {
         context;
@@ -207,6 +220,7 @@ module State = struct
         evm_state;
         last_split_block;
         post_transaction_run_hook;
+        future_block_state;
       }
 
     (* [apply session session'] modifies [session] in-place to match the content of [session']. *)
@@ -221,6 +235,7 @@ module State = struct
           evm_state;
           last_split_block;
           post_transaction_run_hook;
+          future_block_state;
         } =
       session.context <- context ;
       session.finalized_number <- finalized_number ;
@@ -230,7 +245,8 @@ module State = struct
       session.pending_sequencer_upgrade <- pending_sequencer_upgrade ;
       session.evm_state <- evm_state ;
       session.last_split_block <- last_split_block ;
-      session.post_transaction_run_hook <- post_transaction_run_hook
+      session.post_transaction_run_hook <- post_transaction_run_hook ;
+      session.future_block_state <- future_block_state
 
     let session_to_head_info session =
       {
@@ -453,9 +469,9 @@ module State = struct
         evm_state
         (`Inbox
            [
-             "\254"
-             ^ Bytes.to_string
-                 (Evm_events.Delayed_transaction.to_rlp delayed_transaction);
+             "\254" ^ Bytes.to_string
+             @@ Rlp.encode
+                  (Evm_events.Delayed_transaction.to_rlp delayed_transaction);
            ])
     else
       let*! evm_state =
@@ -463,7 +479,8 @@ module State = struct
           ~key:"/__delayed_input"
           ~value:
             (Bytes.to_string
-               (Evm_events.Delayed_transaction.to_rlp delayed_transaction))
+            @@ Rlp.encode
+                 (Evm_events.Delayed_transaction.to_rlp delayed_transaction))
           evm_state
       in
       Evm_state.execute
@@ -869,6 +886,77 @@ module State = struct
       {l1_level; start_l2_level; end_l2_level} ;
     return_unit
 
+  let next_block_info ctxt (timestamp : Time.Protocol.t)
+      (number : Ethereum_types.quantity) =
+    if Ethereum_types.Qty.(number = ctxt.session.next_blueprint_number) then
+      ctxt.session.future_block_state <-
+        Some {evm_state = ctxt.session.evm_state; timestamp; next_tx_index = 0l}
+    else ctxt.session.future_block_state <- None
+
+  let execute_single_transaction ctxt (tx : Broadcast.transaction) =
+    let open Lwt_result_syntax in
+    match ctxt.session.future_block_state with
+    | Some {evm_state; timestamp; next_tx_index} ->
+        let* tx =
+          match tx with
+          | Broadcast.Common (Evm tx) ->
+              let hash =
+                Ethereum_types.(hash_raw_tx tx |> hash_to_bytes)
+                |> String.to_bytes
+              in
+              let tx_bytes = String.to_bytes tx in
+              let tag = Bytes.of_string "\x01" in
+              let rlp =
+                Rlp.(List [Value hash; List [Value tag; Value tx_bytes]])
+              in
+              return rlp
+          | Broadcast.Common (Michelson _op) ->
+              failwith "Michelson operations can not be executed individually"
+          | Broadcast.Delayed tx ->
+              return (Evm_events.Delayed_transaction.to_rlp tx)
+        in
+        let rlp =
+          Rlp.List
+            [
+              tx;
+              Value (Ethereum_types.timestamp_to_bytes timestamp);
+              Value
+                (Ethereum_types.encode_u256_le
+                   ctxt.session.next_blueprint_number);
+            ]
+        in
+        let*! evm_state =
+          Evm_state.modify
+            ~key:Durable_storage_path.Single_tx.input_tx
+            ~value:(Rlp.encode rlp |> Bytes.to_string)
+            evm_state
+        in
+        let*! data_dir, config = execution_config in
+        let* evm_state =
+          Evm_state.execute
+            ~pool:ctxt.execution_pool
+            ~native_execution:
+              (ctxt.configuration.kernel_execution.native_execution_policy
+             = Configuration.Never)
+            ~data_dir
+            ~config
+            ~wasm_entrypoint:"single_tx_execution"
+            evm_state
+            (`Inbox [])
+        in
+        let read = read_from_state evm_state in
+        let* receipt =
+          Durable_storage.inspect_durable_and_decode
+            read
+            (Durable_storage_path.Single_tx.output_receipt next_tx_index)
+            (Transaction_receipt.of_rlp_bytes
+               Ethereum_types.(Block_hash (Hex (String.make 64 '0'))))
+        in
+        ctxt.session.future_block_state <-
+          Some {evm_state; timestamp; next_tx_index = Int32.succ next_tx_index} ;
+        return_some receipt
+    | None -> return_none
+
   (** [apply_blueprint_store_unsafe ctxt conn timestamp chunks payload
       delayed_transactions] applies the blueprint [chunks] on the head of
       [ctxt], and commit the resulting state and the blueprint signed [payload]
@@ -1261,6 +1349,7 @@ module State = struct
               {number = ctxt.session.next_blueprint_number; timestamp; payload};
           }
       in
+      ctxt.session.future_block_state <- None ;
       return (current_block, execution_gas)
     in
     current_block
@@ -1820,6 +1909,7 @@ module State = struct
             evm_state;
             last_split_block;
             post_transaction_run_hook = None;
+            future_block_state = None;
           };
         store;
         signer;
@@ -2197,6 +2287,13 @@ module Handlers = struct
           ~l1_level
           ~start_l2_level
           ~end_l2_level
+    | Next_block_info {timestamp; number} ->
+        let ctxt = Worker.state self in
+        State.next_block_info ctxt timestamp number ;
+        return_unit
+    | Execute_single_transaction tx ->
+        let ctxt = Worker.state self in
+        State.execute_single_transaction ctxt tx
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -2217,6 +2314,8 @@ module Handlers = struct
       | Wasm_pvm_version -> Eq
       | Potential_observer_reorg _ -> Eq
       | Finalized_levels _ -> Eq
+      | Next_block_info _ -> Eq
+      | Execute_single_transaction _ -> Eq
   end
 
   let on_error (type a b) _self _st (req : (a, b) Request.t) (errs : b) :
@@ -2664,6 +2763,12 @@ let patch_state ?block_number ~key ~value () =
 let potential_observer_reorg evm_node_endpoint blueprint_with_events =
   worker_wait_for_request
     (Potential_observer_reorg {evm_node_endpoint; blueprint_with_events})
+
+let next_block_info timestamp number =
+  worker_wait_for_request (Next_block_info {timestamp; number})
+
+let execute_single_transaction tx =
+  worker_wait_for_request (Execute_single_transaction tx)
 
 let shutdown () =
   let open Lwt_result_syntax in

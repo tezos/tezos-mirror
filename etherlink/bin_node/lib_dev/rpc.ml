@@ -443,7 +443,7 @@ let main ~evm_node_endpoint ?evm_node_private_endpoint
           ~start_l2_level
           ~end_l2_level ;
         return_unit)
-      ~on_next_block_timestamp:(fun _ -> return_unit)
+      ~on_next_block_info:(fun _ _ -> return_unit)
       ~on_inclusion:(fun _ -> return_unit)
       ()
   in

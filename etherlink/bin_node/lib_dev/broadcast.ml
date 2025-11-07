@@ -65,7 +65,10 @@ type message =
       start_l2_level : Ethereum_types.quantity;
       end_l2_level : Ethereum_types.quantity;
     }
-  | Next_block_timestamp of Time.Protocol.t
+  | Next_block_info of {
+      timestamp : Time.Protocol.t;
+      number : Ethereum_types.quantity;
+    }
   | Included_transaction of transaction
 
 let message_encoding =
@@ -106,13 +109,16 @@ let message_encoding =
         (fun ((), l1_level, start_l2_level, end_l2_level) ->
           Finalized_levels {l1_level; start_l2_level; end_l2_level});
       case
-        ~title:"Block_timestamp"
+        ~title:"Next_block_info"
         (Tag 3)
-        (obj2
+        (obj3
            (req "kind" (constant "block_timestamp"))
-           (req "next_block_timestamp" Time.Protocol.encoding))
-        (function Next_block_timestamp ts -> Some ((), ts) | _ -> None)
-        (fun ((), ts) -> Next_block_timestamp ts);
+           (req "timestamp" Time.Protocol.encoding)
+           (req "number" Ethereum_types.quantity_encoding))
+        (function
+          | Next_block_info {timestamp; number} -> Some ((), timestamp, number)
+          | _ -> None)
+        (fun ((), timestamp, number) -> Next_block_info {timestamp; number});
       case
         ~title:"Included_transaction"
         (Tag 4)
@@ -137,8 +143,17 @@ let notify_finalized_levels ~l1_level ~start_l2_level ~end_l2_level =
   let message = Finalized_levels {l1_level; start_l2_level; end_l2_level} in
   Lwt_watcher.notify message_watcher message
 
-let notify_next_block_timestamp timestamp =
-  Lwt_watcher.notify message_watcher (Next_block_timestamp timestamp)
+let notify_next_block_info timestamp number =
+  Lwt_watcher.notify message_watcher (Next_block_info {timestamp; number})
 
 let notify_inclusion txn =
   Lwt_watcher.notify message_watcher (Included_transaction txn)
+
+(** Stream on which only pre-confirmed receipts are streamed  *)
+let receipt_watcher : Transaction_receipt.t Lwt_watcher.input =
+  Lwt_watcher.create_input ()
+
+let create_receipt_stream () = Lwt_watcher.create_stream receipt_watcher
+
+let notify_preconfirmed_receipt receipt =
+  Lwt_watcher.notify receipt_watcher receipt
