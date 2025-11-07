@@ -69,26 +69,26 @@ and 'kind contents_result =
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
-      consensus_power : Attesting_power.t;
+      consensus_power : Attesting_power.result;
     }
       -> Kind.preattestation contents_result
   | Attestation_result : {
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
-      consensus_power : Attesting_power.t;
+      consensus_power : Attesting_power.result;
     }
       -> Kind.attestation contents_result
   | Preattestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
-      committee : (Consensus_key.t * Attesting_power.t) list;
-      total_consensus_power : Attesting_power.t;
+      committee : (Consensus_key.t * Attesting_power.result) list;
+      total_consensus_power : Attesting_power.result;
     }
       -> Kind.preattestations_aggregate contents_result
   | Attestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
-      committee : (Consensus_key.t * Attesting_power.t) list;
-      total_consensus_power : Attesting_power.t;
+      committee : (Consensus_key.t * Attesting_power.result) list;
+      total_consensus_power : Attesting_power.result;
     }
       -> Kind.attestations_aggregate contents_result
   | Seed_nonce_revelation_result :
