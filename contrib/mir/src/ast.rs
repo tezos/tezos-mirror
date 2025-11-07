@@ -14,11 +14,9 @@ pub mod byte_repr_trait;
 mod comparable;
 pub mod micheline;
 pub mod michelson_address;
-pub mod michelson_key;
 pub mod michelson_lambda;
 pub mod michelson_list;
 pub mod michelson_operation;
-pub mod michelson_signature;
 pub mod or;
 pub mod overloads;
 
