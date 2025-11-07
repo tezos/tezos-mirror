@@ -153,8 +153,7 @@ let get_page node_ctxt ~inbox_level page_id =
   in
   Lwt.return @@ Environment.wrap_tzresult res
 
-let slot_id_is_valid chain_id
-    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
+let slot_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
     ~dal_activation_level ~origination_level ~inbox_level slot_id
     ~dal_attested_slots_validity_lag =
   let open Alpha_context in
@@ -170,9 +169,7 @@ let slot_id_is_valid chain_id
     else dal_activation_level
   in
   Result.is_ok
-    (Dal.Slot_index.check_is_in_range
-       ~number_of_slots:dal_constants.number_of_slots
-       slot_id.Dal.index)
+    (Dal.Slot_index.check_is_in_range ~number_of_slots slot_id.Dal.index)
   &&
   let origination_level_res = Raw_level.of_int32 origination_level in
   let commit_inbox_level_res = Raw_level.of_int32 inbox_level in
@@ -180,25 +177,21 @@ let slot_id_is_valid chain_id
   | Ok origination_level, Ok commit_inbox_level ->
       Alpha_context.Sc_rollup.Proof.Dal_helpers.import_level_is_valid
         ~dal_activation_level
-        ~dal_attestation_lag:dal_constants.attestation_lag
+        ~dal_attestation_lag
         ~origination_level
         ~commit_inbox_level
         ~dal_attested_slots_validity_lag
         ~published_level:slot_id.published_level
   | _ -> false
 
-let page_id_is_valid chain_id
-    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
-    ~dal_activation_level ~origination_level ~inbox_level
+let page_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
+    ~number_of_pages ~dal_activation_level ~origination_level ~inbox_level
     Dal.Page.{slot_id; page_index} ~dal_attested_slots_validity_lag =
-  Result.is_ok
-    (Dal.Page.Index.check_is_in_range
-       ~number_of_pages:
-         (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
-       page_index)
+  Result.is_ok (Dal.Page.Index.check_is_in_range ~number_of_pages page_index)
   && slot_id_is_valid
        chain_id
-       dal_constants
+       ~dal_attestation_lag
+       ~number_of_slots
        ~dal_activation_level
        ~origination_level
        ~inbox_level
@@ -219,7 +212,8 @@ let slot_pages
     not
     @@ slot_id_is_valid
          chain_id
-         dal_constants
+         ~dal_attestation_lag:dal_constants.attestation_lag
+         ~number_of_slots:dal_constants.number_of_slots
          ~dal_activation_level
          ~origination_level
          ~inbox_level
@@ -254,7 +248,10 @@ let page_content
     not
     @@ page_id_is_valid
          chain_id
-         dal_constants
+         ~dal_attestation_lag:dal_constants.attestation_lag
+         ~number_of_slots:dal_constants.number_of_slots
+         ~number_of_pages:
+           (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
          ~dal_activation_level
          ~origination_level
          ~inbox_level
