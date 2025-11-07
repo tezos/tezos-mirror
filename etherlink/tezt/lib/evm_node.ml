@@ -97,6 +97,7 @@ type mode =
     }
   | Sandbox of {
       initial_kernel : string;
+      funded_addresses : string list;
       preimage_dir : string option;
       private_rpc_port : int option;
       time_between_blocks : time_between_blocks option;
@@ -792,6 +793,7 @@ let mode_with_new_private_rpc (mode : mode) =
         genesis_timestamp;
         max_number_of_chunks;
         wallet_dir;
+        funded_addresses;
         tx_queue_max_lifespan;
         tx_queue_max_size;
         tx_queue_tx_per_addr_limit;
@@ -806,6 +808,7 @@ let mode_with_new_private_rpc (mode : mode) =
           genesis_timestamp;
           max_number_of_chunks;
           wallet_dir;
+          funded_addresses;
           tx_queue_max_lifespan;
           tx_queue_max_size;
           tx_queue_tx_per_addr_limit;
@@ -878,6 +881,12 @@ let config_file_arg evm_node =
     Fun.id
     evm_node.persistent_state.config_file
 
+let fund_args funded_addresses =
+  List.fold_left
+    (fun acc pk -> Cli_arg.optional_arg "fund" Fun.id (Some pk) @ acc)
+    []
+    funded_addresses
+
 (* assume a valid config for the given command and uses new latest run
    command format. *)
 let run_args evm_node =
@@ -896,7 +905,8 @@ let run_args evm_node =
               Client.time_of_timestamp timestamp |> Client.Time.to_notation)
             genesis_timestamp
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-    | Sandbox {initial_kernel; genesis_timestamp; wallet_dir; sequencer_keys; _}
+    | Sandbox
+        {initial_kernel; funded_addresses; genesis_timestamp; wallet_dir; sequencer_keys; _}
       ->
         let sequencer_keys =
           List.map (fun s -> ["--sequencer-key"; s]) sequencer_keys
@@ -910,6 +920,7 @@ let run_args evm_node =
               Client.time_of_timestamp timestamp |> Client.Time.to_notation)
             genesis_timestamp
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+        @ fund_args funded_addresses
     | Tezlink_sandbox
         {
           initial_kernel;
@@ -926,10 +937,7 @@ let run_args evm_node =
               Client.time_of_timestamp timestamp |> Client.Time.to_notation)
             genesis_timestamp
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-        @ List.fold_left
-            (fun acc pk -> Cli_arg.optional_arg "fund" Fun.id (Some pk) @ acc)
-            []
-            funded_addresses
+        @ fund_args funded_addresses
         @ Cli_arg.optional_switch "verbose" verbose
     | Observer {initial_kernel; _} ->
         ["run"; "observer"; "--initial-kernel"; initial_kernel]
@@ -1159,6 +1167,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           genesis_timestamp = _;
           max_number_of_chunks;
           wallet_dir;
+          funded_addresses = _;
           tx_queue_max_lifespan;
           tx_queue_max_size;
           tx_queue_tx_per_addr_limit;
