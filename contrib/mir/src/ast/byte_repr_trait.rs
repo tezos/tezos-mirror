@@ -22,6 +22,9 @@ pub enum ByteReprError {
     /// the contained string.
     #[error("wrong format: {0}")]
     WrongFormat(String),
+    /// Error decoding
+    #[error("Decode error: {0}")]
+    DecodeError(String),
 }
 
 impl From<FromBase58CheckError> for ByteReprError {
@@ -33,6 +36,12 @@ impl From<FromBase58CheckError> for ByteReprError {
 impl From<FromBytesError> for ByteReprError {
     fn from(value: FromBytesError) -> Self {
         Self::WrongFormat(value.to_string())
+    }
+}
+
+impl From<tezos_data_encoding::nom::error::DecodeError<&[u8]>> for ByteReprError {
+    fn from(value: tezos_data_encoding::nom::error::DecodeError<&[u8]>) -> Self {
+        Self::DecodeError(format!("{value:?}"))
     }
 }
 
