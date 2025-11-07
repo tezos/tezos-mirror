@@ -116,6 +116,17 @@ Blocks and block receipts
   /chains/<chain>/blocks/<block>/context/adaptive_issuance_launch_cycle``. (MR
   :gl:`!19215`)
 
+- Added fields related to consensus in block metadata:
+  ``attestations`` and ``preattestations``. They can be ``null`` when the corresponding
+  consensus operations are not required in the block. Otherwise, they contain three fields:
+  the ``total_committee_power`` and ``threshold``, as described in
+  :ref:`the consensus documentation<tb_validator_t024>`, and the
+  ``recorded_power``, summing the power of all (pre)attestations
+  of the block. (MR :gl:`!19835`)
+
+- Added ``all_bakers_attest_activation_level`` field in block metadata,
+  which returns the activation level of the "All Bakers Attest" feature if
+  the feature is set to activate. The field remains ``null`` otherwise. (MR :gl:`!19835`)
 
 Operation receipts
 ------------------
@@ -127,9 +138,10 @@ Operation receipts
 - **Breaking change** Updated attestation and preattestation receipts metadata.
   The ``consensus_power`` field is now divided in two parts: an integer field ``slots``,
   which corresponds to the number of slots attributed to the delegate, and represents
-  its consensus power until "All Bakers Attest" activates, and a string field
-  ``stake`` parsed as an int64, which is the staking power of the delegate, and represents its consensus power
-  once "All Bakers Attest" activates. (MR :gl:`!18915`)
+  its consensus power until "All Bakers Attest" activates, and an optional string field
+  ``baking_power`` parsed as an int64, which is the baking power of the delegate, and represents its consensus power
+  once "All Bakers Attest" activates. This last field is not in the receipt until
+  "All Bakers Attest" activates. (MRs :gl:`!18915`, :gl:`!19835`)
 
 
 Errors

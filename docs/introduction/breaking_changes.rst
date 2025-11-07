@@ -48,7 +48,7 @@ period of withdrawal has decreased from ~14 days in protocol Seoul to
 Consensus changes
 ^^^^^^^^^^^^^^^^^
 
-With the All Bakers Attest feature implemented in protocol T024 comes changes to
+With the All Bakers Attest feature implemented in protocol T024 come changes to
 the consensus. Most of these changes will take effect only when the feature activates,
 but in some cases, the format of operations or RPCs have been updated to include
 more information.
@@ -56,10 +56,23 @@ more information.
 In particular, the attestation and preattestation receipts metadata have been updated.
 The ``consensus_power`` field is now divided in two parts: an integer field ``slots``,
 which corresponds to the number of slots attributed to the delegate, and represents
-its consensus power until "All Bakers Attest" activates, and a string field
-``stake`` parsed as an int64, which is the staking power of the delegate, and represents its consensus power
-once All Bakers Attest activates.
+its consensus power until "All Bakers Attest" activates, and an optional string field
+``baking_power`` parsed as an int64, which is the baking power of the delegate, and represents its consensus power
+once "All Bakers Attest" activates. This last field is not in the receipt until
+"All Bakers Attest" activates.
 
+To track the activation status of the "All Bakers Attest" feature, the field
+``all_bakers_attest_activation_level`` has been added in the block metadata.
+It returns the activation level of the feature if it is set to activate.
+The field remains ``null`` otherwise.
+
+Additionally, fields related to the consensus were added in the block metadata:
+``attestations`` and ``preattestations``. They can be ``null`` when the corresponding
+consensus operations are not required in the block. Otherwise, they contain three fields:
+the ``total_committee_power`` and ``threshold``, as described in
+:ref:`the consensus documentation<tb_validator_t024>`, and the
+``recorded_power``, summing the power of all (pre)attestations
+of the block.
 
 Breaking changes to RPCs
 ^^^^^^^^^^^^^^^^^^^^^^^^
