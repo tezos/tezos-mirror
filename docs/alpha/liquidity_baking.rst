@@ -67,7 +67,9 @@ For indicative purposes, if among the non-abstaining blocks a fraction
 reached after roughly ``2*(log(1-1/(2f)) / log(0.999))``
 non-abstaining blocks, about 1386 blocks if everyone signals, 1963
 blocks if 80% do, 3583 blocks if 60% do etc. Recall for comparison
-that assuming six blocks per minute there are 8640 blocks per day.
+that since :ref:`MINIMAL_BLOCK_DELAY<cs_constants_alpha>` is 6
+seconds, there are 14400 blocks per day (assuming all blocks are
+produced at round zero.)
 
 When producing blocks using Octez baking daemon ``octez-baker``, there
 are two command-line options affecting toggle vote. The
