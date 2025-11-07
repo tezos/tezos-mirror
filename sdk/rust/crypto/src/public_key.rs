@@ -16,7 +16,7 @@ use tezos_data_encoding::encoding::HasEncoding;
 use tezos_data_encoding::nom::NomReader;
 
 /// Public Key of Layer1.
-#[derive(Debug, Clone, PartialEq, Eq, HasEncoding, BinWriter, NomReader)]
+#[derive(PartialOrd, Debug, Clone, PartialEq, Eq, HasEncoding, BinWriter, NomReader)]
 pub enum PublicKey {
     /// Tz1 - public key
     Ed25519(PublicKeyEd25519),
