@@ -4,12 +4,14 @@
 (executable
  (name main)
  (libraries
+  octez-evm-node-libs.evm_node_rust_deps
   bls12-381.archive
   octez-libs.test-helpers
   octez-libs.tezt-wrapper
   tezt-tezos
   tezt-cloud
   tezt_etherlink
+  etherlink_benchmark_lib
   octez-libs.stdlib-unix)
  (link_flags
   (:standard)
