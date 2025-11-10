@@ -196,7 +196,7 @@ type batch_validation_context = {
   first_counter : Manager_counter.t;
   length : int;
   fee : Tez.t;
-  gas_limit : Z.t;
+  gas_limit_sum : Z.t;
   signature_check_cost : Gas.cost;
 }
 
@@ -323,7 +323,7 @@ let validate_variable_gas_cost ~ctxt remaining_gas (Manager operation) =
 let validate_gas_limit ~ctxt gas_limit operation =
   let open Lwt_result_syntax in
   let gas_limit_z = Tezos_types.Operation.gas_limit_to_z gas_limit in
-  let overall_gas_limit = Z.(ctxt.gas_limit + gas_limit_z) in
+  let overall_gas_limit = Z.(ctxt.gas_limit_sum + gas_limit_z) in
   (* We have two limits to check:
      - the operation can't have a gas limit higher than
      hard_gas_limit_per_operation,
@@ -377,7 +377,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       let** () = validate_supported_operation ~ctxt operation in
       let** () = validate_source ~ctxt source in
       let** () = validate_counter ~ctxt counter in
-      let** gas_limit =
+      let** gas_limit_sum =
         validate_gas_limit ~ctxt gas_limit (Manager operation)
       in
       let*? () = validate_storage_limit storage_limit in
@@ -389,7 +389,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
              previous_counter = Some ctxt.next_counter;
              next_counter = Manager_counter.succ ctxt.next_counter;
              length = ctxt.length + 1;
-             gas_limit;
+             gas_limit_sum;
            })
   | _ -> tzfail @@ Not_a_manager_operation ctxt.error_clue
 
@@ -521,7 +521,7 @@ let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
       first_counter;
       length = 0;
       fee = Tez.zero;
-      gas_limit = Z.zero;
+      gas_limit_sum = Z.zero;
       signature_check_cost;
     }
   in
@@ -544,7 +544,7 @@ let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
         op;
         first_counter;
         fee = ctxt.fee;
-        gas_limit = ctxt.gas_limit;
+        gas_limit = ctxt.gas_limit_sum;
       }
   in
   return (Ok operation)

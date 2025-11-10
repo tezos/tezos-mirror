@@ -87,9 +87,9 @@ val parse_and_validate_for_queue :
   string ->
   (Tezos_types.Operation.t, string) result tzresult Lwt.t
 
-(** [could_fit state operation] returns [true] if the operationb, fits into the
-    blueprint being created. Can lead to a new blueprint. *)
-val could_fit :
+(** [gas_limit_could_fit state operation] returns [true] if the operationb,
+    fits into the blueprint being created. Can lead to a new blueprint. *)
+val gas_limit_could_fit :
   Validation_types.validation_state -> Tezos_types.Operation.t -> bool
 
 (** [init_blueprint_validation read ()] creates a empty validation state, from
