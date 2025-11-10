@@ -49,6 +49,67 @@ let env_var_ignore_topics = "TEZOS_IGNORE_TOPICS_I_KNOW_WHAT_I_AM_DOING"
 
 let env_ignore_topics = env_value_starts_with_yes ~env_var:env_var_ignore_topics
 
+let merge_experimental_features _ _configuration = ()
+
+let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
+    ?endpoint ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
+    ?metrics_addr ?profile ?(peers = []) ?history_mode ?service_name
+    ?service_namespace ?experimental_features ?fetch_trusted_setup
+    ?(verbose = false) ?(ignore_l1_config_peers = false)
+    ?(disable_amplification = false) ?batching_configuration configuration =
+  let profile =
+    match profile with
+    | None -> configuration.Configuration_file.profile
+    | Some from_cli ->
+        (* Note that the profile from the CLI is prioritized over
+           the profile provided in the config file. *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6110
+           Improve profile configuration UX for when we have conflicting CLI and config file. *)
+        Profile_manager.merge_profiles
+          ~lower_prio:configuration.profile
+          ~higher_prio:from_cli
+  in
+  let slots_backup_uris = slots_backup_uris @ configuration.slots_backup_uris in
+  let trust_slots_backup_uris =
+    trust_slots_backup_uris || configuration.trust_slots_backup_uris
+  in
+  {
+    configuration with
+    data_dir = Option.value ~default:configuration.data_dir data_dir;
+    rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
+    listen_addr = Option.value ~default:configuration.listen_addr listen_addr;
+    public_addr = Option.value ~default:configuration.public_addr public_addr;
+    expected_pow = Option.value ~default:configuration.expected_pow expected_pow;
+    endpoint = Option.value ~default:configuration.endpoint endpoint;
+    slots_backup_uris;
+    trust_slots_backup_uris;
+    profile;
+    (* metrics are disabled unless a metrics_addr option is specified *)
+    metrics_addr;
+    peers = peers @ configuration.peers;
+    history_mode = Option.value ~default:configuration.history_mode history_mode;
+    service_name = Option.value ~default:configuration.service_name service_name;
+    service_namespace =
+      Option.value ~default:configuration.service_namespace service_namespace;
+    fetch_trusted_setup =
+      Option.value
+        ~default:configuration.fetch_trusted_setup
+        fetch_trusted_setup;
+    experimental_features =
+      merge_experimental_features
+        experimental_features
+        configuration.experimental_features;
+    verbose = configuration.verbose || verbose;
+    ignore_l1_config_peers =
+      configuration.ignore_l1_config_peers || ignore_l1_config_peers;
+    disable_amplification =
+      configuration.disable_amplification || disable_amplification;
+    batching_configuration =
+      Option.value
+        ~default:configuration.batching_configuration
+        batching_configuration;
+  }
+
 module Term = struct
   type env = {docs : string; doc : string; name : string}
 
@@ -785,8 +846,6 @@ let cli_options_to_options ?data_dir ?config_file ?rpc_addr ?expected_pow
       batching_configuration;
     }
 
-let merge_experimental_features _ _configuration = ()
-
 let merge
     {
       data_dir;
@@ -813,58 +872,28 @@ let merge
       ignore_topics = _;
       batching_configuration;
     } configuration =
-  let profile =
-    match profile with
-    | None -> configuration.Configuration_file.profile
-    | Some from_cli ->
-        (* Note that the profile from the CLI is prioritized over
-           the profile provided in the config file. *)
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6110
-           Improve profile configuration UX for when we have conflicting CLI and config file. *)
-        Profile_manager.merge_profiles
-          ~lower_prio:configuration.profile
-          ~higher_prio:from_cli
-  in
-  let slots_backup_uris = slots_backup_uris @ configuration.slots_backup_uris in
-  let trust_slots_backup_uris =
-    trust_slots_backup_uris || configuration.trust_slots_backup_uris
-  in
-  {
-    configuration with
-    data_dir = Option.value ~default:configuration.data_dir data_dir;
-    rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr;
-    listen_addr = Option.value ~default:configuration.listen_addr listen_addr;
-    public_addr = Option.value ~default:configuration.public_addr public_addr;
-    expected_pow = Option.value ~default:configuration.expected_pow expected_pow;
-    endpoint = Option.value ~default:configuration.endpoint endpoint;
-    slots_backup_uris;
-    trust_slots_backup_uris;
-    profile;
-    (* metrics are disabled unless a metrics_addr option is specified *)
-    metrics_addr;
-    peers = peers @ configuration.peers;
-    history_mode = Option.value ~default:configuration.history_mode history_mode;
-    service_name = Option.value ~default:configuration.service_name service_name;
-    service_namespace =
-      Option.value ~default:configuration.service_namespace service_namespace;
-    fetch_trusted_setup =
-      Option.value
-        ~default:configuration.fetch_trusted_setup
-        fetch_trusted_setup;
-    experimental_features =
-      merge_experimental_features
-        experimental_features
-        configuration.experimental_features;
-    verbose = configuration.verbose || verbose;
-    ignore_l1_config_peers =
-      configuration.ignore_l1_config_peers || ignore_l1_config_peers;
-    disable_amplification =
-      configuration.disable_amplification || disable_amplification;
-    batching_configuration =
-      Option.value
-        ~default:configuration.batching_configuration
-        batching_configuration;
-  }
+  override_conf
+    ?data_dir
+    ?rpc_addr
+    ?expected_pow
+    ?listen_addr
+    ?public_addr
+    ?endpoint
+    ~slots_backup_uris
+    ~trust_slots_backup_uris
+    ?metrics_addr
+    ?profile
+    ~peers
+    ?history_mode
+    ?service_name
+    ?service_namespace
+    ~experimental_features:(Some experimental_features)
+    ?fetch_trusted_setup
+    ~verbose
+    ~ignore_l1_config_peers
+    ~disable_amplification
+    ?batching_configuration
+    configuration
 
 let wrap_with_error main_promise =
   let open Lwt_syntax in
