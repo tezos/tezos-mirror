@@ -5303,16 +5303,16 @@ let test_restart_dal_node _protocol dal_parameters _cryptobox node client
     C. Retrieval and validation checks:
        C.1 - Fetch valid slots via memory cache
        C.2 - Fetch valid slots after restarting the DAL node (sqlite skip list)
-       C.3 - Fetch valid slots after removing sqlite DB (L1 skip list)
        C.4 - Fetch slot from trusted archive (no validation)
        C.5 - Attempt to fetch from a missing archive (expected 404)
        C.6 - Tamper slot content to trigger commitment mismatch (expected 404)
        C.7 - Tamper slot size to trigger size mismatch (expected 404)
        C.8 - Use invalid archive URI (expected 500 with resolution errors)
        C.9 - Try to fetch slot with no commitment on L1 (expected 500)
-       C.10 - Use unregistered plugin for old level (expected 500)
+       C.10 - Try to fetch an unpublished slot for an old level (expected 500)
        C.11 - Try future level (expected 404)
        C.12 - Try out-of-bounds slot index (expected 404)
+       C.3 - Fetch valid slots after removing sqlite DB (L1 skip list)
 *)
 let dal_slots_retrievability =
   (* Helper to run the RPC that fetches a slot from a given DAL node *)
@@ -5442,7 +5442,20 @@ let dal_slots_retrievability =
           unit)
         [dal_pub1; dal_pub2; dal_pub3]
     in
-    let* () = bake_for ~count:(attestation_lag + 2) client in
+    let attested_level = published_level + attestation_lag in
+    let wait_for_dal_nodes =
+      Lwt.join
+      @@ List.map
+           (fun dal_node -> wait_for_layer1_final_block dal_node attested_level)
+           [
+             valid_dal_fetcher_1_2;
+             valid_dal_fetcher_3_trusted;
+             invalid_dal_fetcher_bad_uri;
+             invalid_dal_fetcher_bad_uri_trusted;
+           ]
+    in
+    let* () = bake_for ~count:(attestation_lag + 3) client in
+    let* () = wait_for_dal_nodes in
 
     (* C. RETRIEVAL & VALIDATION *)
     let check_valid_dal_fetcher_1_2 ~__LOC__ =
@@ -5462,19 +5475,6 @@ let dal_slots_retrievability =
     (* C.2 Restart and fetch via SQLite skip list *)
     let* () =
       Log.info "C.2: sqlite skip list" ;
-      let* () = Dal_node.terminate valid_dal_fetcher_1_2 in
-      let* () = Dal_node.run valid_dal_fetcher_1_2 in
-      check_valid_dal_fetcher_1_2 ~__LOC__
-    in
-
-    (* C.3 Remove sqlite DB and fetch via L1 skip list *)
-    let* () =
-      Log.info "C.3: L1 skip list" ;
-      let skip_db =
-        Format.sprintf "%s/store/skip_list_store"
-        @@ Dal_node.data_dir valid_dal_fetcher_1_2
-      in
-      let () = Sys.command ("rm -rf " ^ skip_db) |> ignore in
       let* () = Dal_node.terminate valid_dal_fetcher_1_2 in
       let* () = Dal_node.run valid_dal_fetcher_1_2 in
       check_valid_dal_fetcher_1_2 ~__LOC__
@@ -5564,11 +5564,13 @@ let dal_slots_retrievability =
            ~expected_error:"No_commitment_published_on_l1_for_slot_id"
     in
 
-    (* C.10 No DAL plugin for level 0: expect 500 *)
+    (* C.10 No slot published at level 0: expect 500 *)
     let* () =
-      Log.info "C.10: no DAL plugin" ;
+      Log.info "C.10: no slot published at level 0" ;
       get_slot_rpc valid_dal_fetcher_1_2 ~published_level:0 ~slot_index:1
-      |> fetch_500_expected ~__LOC__ ~expected_error:"no_plugin_for_given_level"
+      |> fetch_500_expected
+           ~__LOC__
+           ~expected_error:"No_commitment_published_on_l1_for_slot_id"
     in
 
     (* C.11 Future level: expect 404 *)
@@ -5589,6 +5591,22 @@ let dal_slots_retrievability =
         ~published_level
         ~slot_index:number_of_slots
       |> fetch_404_expected ~__LOC__
+    in
+
+    (* C.3 Remove sqlite DB and fetch via L1 skip list *)
+    let* () =
+      Log.info "C.3: L1 skip list" ;
+      let skip_db =
+        Format.sprintf "%s/store/skip_list_store"
+        @@ Dal_node.data_dir valid_dal_fetcher_1_2
+      in
+      let () = Sys.command ("rm -rf " ^ skip_db) |> ignore in
+      let* () = Dal_node.terminate valid_dal_fetcher_1_2 in
+      let* () = Dal_node.run valid_dal_fetcher_1_2 in
+      get_slot_rpc valid_dal_fetcher_1_2 ~published_level ~slot_index:3
+      |> fetch_500_expected
+           ~__LOC__
+           ~expected_error:"No_commitment_published_on_l1_for_slot_id"
     in
 
     unit

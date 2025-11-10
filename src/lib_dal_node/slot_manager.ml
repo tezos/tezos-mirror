@@ -387,10 +387,21 @@ let try_get_slot_header_from_indexed_skip_list ctxt slot_id =
    - Retrieve the skip list cells for [attested_level] using the plugin from L1.
    - Locate the one matching the [slot_index] of [slot_id].
    - Extract and return the slot header via the plugin. *)
-let _try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
-    ~dal_constants ~attested_level slot_id =
+let _try_get_slot_header_from_L1_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let Types.Slot_id.{slot_level; slot_index} = slot_id in
+  let*? (module Plugin : Dal_plugin.T), dal_constants =
+    Node_context.get_plugin_and_parameters_for_level ctxt ~level:slot_level
+  in
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8075
+     The attested level is wrong around migration!
+     Example: If [M] is the migration level, for [slot_level = M-2],
+     [attested_lag = 8] in P1, and [attested_lag = 5] in P2, we get
+     [attested_level = M+6], but at this level skip-list cells for
+     [slot_level = M+1] are found in the L1 context.  *)
+  let attested_level =
+    Int32.(add slot_level (of_int dal_constants.Types.attestation_lag))
+  in
   let* cells_of_level =
     let pred_published_level = Int32.pred slot_level in
     Plugin.Skip_list.cells_of_level
@@ -435,25 +446,7 @@ let _try_get_slot_header_from_L1_skip_list (module Plugin : Dal_plugin.T) ctxt
 let try_get_commitment_of_slot_id_from_skip_list ctxt slot_id =
   let open Lwt_result_syntax in
   let*! published_slot_header_opt =
-    let*! from_sqlite =
-      try_get_slot_header_from_indexed_skip_list ctxt slot_id
-    in
-    match from_sqlite with
-    | Ok (Some _header as res) -> return res
-    | _ ->
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8075
-         The attested level is wrong around migration!
-         Example: If [M] is the migration level, for [published_level = M-2],
-         [attested_lag = 8] in P1, and [attested_lag = 5] in P2, we get
-         [attested_level = M+6], but at this level skip-list cells for
-         [published_level = M+1] are found in the L1 context.  *)
-        (* try_get_slot_header_from_L1_skip_list *)
-        (*   dal_plugin *)
-        (*   ctxt *)
-        (*   ~dal_constants *)
-        (*   ~attested_level *)
-        (*   slot_id *)
-        failwith "Failed to retrieve slot id from skip-list store"
+    try_get_slot_header_from_indexed_skip_list ctxt slot_id
   in
   match published_slot_header_opt with
   | Ok (Some Dal_plugin.{published_level; slot_index; commitment}) ->
@@ -464,6 +457,11 @@ let try_get_commitment_of_slot_id_from_skip_list ctxt slot_id =
   | Ok None ->
       (* The function(s) above succeeded, but nothing was found as "published". *)
       return_none
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/8075
+     If the header was not found, or there was an error, then normally we would
+     try to get it from the L1 context, using
+     [_try_get_slot_header_from_L1_skip_list ctxt slot_id]. See the FIXME there
+     to see why we don't use it. *)
   | Error error -> tzfail error
 
 (* This function attempts to retrieve the commitment associated to a (published)

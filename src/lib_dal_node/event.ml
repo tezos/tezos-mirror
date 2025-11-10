@@ -1116,8 +1116,8 @@ open struct
       ~prefix_name_with_section:true
       ~name:"start_catchup"
       ~msg:
-        "catching up to level {end_level}, from last processed level \
-         {start_level} (that is, {levels_to_clean_up} levels to process)"
+        "catching up to level {end_level}, from level {start_level} (that is, \
+         {levels_to_clean_up} levels to process)"
       ~level:Notice
       ("start_level", Data_encoding.int32)
       ("end_level", Data_encoding.int32)
