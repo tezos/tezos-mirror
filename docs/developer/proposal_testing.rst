@@ -16,7 +16,7 @@ To run the protocol tests you must work in a clone of the Octez repository, in w
 You can run the tests for any protocol whose sources are in a subdirectory of the form ``src/proto*/``.
 For example, you can perform the protocol tests on protocol Alpha as follows::
 
-	dune run tezt src/proto_alpha/lib_protocol/test
+	dune runtest src/proto_alpha/lib_protocol/test
 
 You can execute only tests located in a particular subfolder, for example consensus-related tests::
 
