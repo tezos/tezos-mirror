@@ -623,7 +623,7 @@ module Term = struct
       $ disable_amplification $ ignore_topics $ batching_configuration)
 end
 
-type t = Run | Config_init | Config_update | Debug_print_store_schemas
+type t = Run | Config_init | Config_update
 
 (** [wrap_with_error main_promise] wraps a promise that returns a tzresult
     and converts it into an exit code. Returns exit code 0 on success, or
@@ -750,10 +750,20 @@ module Debug = struct
           let version = Tezos_version_value.Bin_version.octez_version_string in
           Cmdliner.Cmd.info ~doc:"Print SQL statements" ~man ~version "schemas"
 
-        let cmd run = Cmdliner.Cmd.v info (Term.term run)
+        let action () =
+          Lwt_utils_unix.with_tempdir "store" @@ fun data_dir ->
+          let open Lwt_result_syntax in
+          let* schemas = Store.Skip_list_cells.schemas data_dir in
+          let output = String.concat ";\n\n" schemas in
+          Format.printf "%s\n" output ;
+          return_unit
+
+        let term = Cmdliner.Term.(map wrap_action (const action $ const ()))
+
+        let cmd = Cmdliner.Cmd.v info term
       end
 
-      let cmd run =
+      let cmd =
         let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
         let info =
           let version = Tezos_version_value.Bin_version.octez_version_string in
@@ -763,25 +773,25 @@ module Debug = struct
             ~version
             "store"
         in
-        Cmdliner.Cmd.group ~default info [Schemas.cmd run]
+        Cmdliner.Cmd.group ~default info [Schemas.cmd]
     end
 
-    let cmd run =
+    let cmd =
       let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
       let info =
         let version = Tezos_version_value.Bin_version.octez_version_string in
         Cmdliner.Cmd.info ~doc:"Print debug information" ~man ~version "print"
       in
-      Cmdliner.Cmd.group ~default info [Store.cmd run]
+      Cmdliner.Cmd.group ~default info [Store.cmd]
   end
 
-  let cmd run =
+  let cmd =
     let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info ~doc:"Debug commands" ~man ~version "debug"
     in
-    Cmdliner.Cmd.group ~default info [Print.cmd (run Debug_print_store_schemas)]
+    Cmdliner.Cmd.group ~default info [Print.cmd]
 end
 
 type experimental_features = unit
@@ -987,12 +997,10 @@ let run subcommand cli_options =
       in
       let* configuration = Configuration_file.load ~config_file in
       Configuration_file.save ~config_file (merge cli_options configuration)
-  | Debug_print_store_schemas ->
-      Lwt_utils_unix.with_tempdir "store" @@ fun data_dir ->
-      let* schemas = Store.Skip_list_cells.schemas data_dir in
-      let output = String.concat ";\n\n" schemas in
-      Format.printf "%s\n" output ;
-      return_unit
+
+module Action = struct
+  let debug_print_store_schemas = Debug.Print.Store.Schemas.action
+end
 
 let commands =
   let run subcommand data_dir config_file rpc_addr expected_pow listen_addr
@@ -1038,4 +1046,4 @@ let commands =
     let version = Tezos_version_value.Bin_version.octez_version_string in
     Cmdliner.Cmd.info ~doc:"The Octez DAL node" ~version "octez-dal-node"
   in
-  Cmdliner.Cmd.group ~default info [Run.cmd run; Config.cmd run; Debug.cmd run]
+  Cmdliner.Cmd.group ~default info [Run.cmd run; Config.cmd run; Debug.cmd]

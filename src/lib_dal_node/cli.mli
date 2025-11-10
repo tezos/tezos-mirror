@@ -120,7 +120,7 @@ end
 (** {2 Command-line subcommands and internal types} *)
 
 (** Subcommands that can be used by the DAL node. *)
-type t = Run | Config_init | Config_update | Debug_print_store_schemas
+type t = Run | Config_init | Config_update
 
 (** Internal options type - opaque to external users *)
 type options
@@ -153,6 +153,10 @@ val cli_options_to_options :
   ?batching_configuration:Configuration_file.batching_configuration ->
   unit ->
   (options, bool * string) result
+
+module Action : sig
+  val debug_print_store_schemas : unit -> (unit, tztrace) result Lwt.t
+end
 
 val run : t -> options -> unit tzresult Lwt.t
 

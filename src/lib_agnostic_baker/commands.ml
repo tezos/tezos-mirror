@@ -120,6 +120,16 @@ module Dal = struct
   let commands =
     let open Tezos_clic in
     let group = {name = "dal"; title = "Commands related to the DAL daemon."} in
+    let debug_print_store_schemas =
+      let open Tezos_clic in
+      let args = Tezos_clic.no_options in
+      command
+        ~group
+        ~desc:"Print SQL statements describing the tables created in the store."
+        args
+        (prefixes ["debug"; "dal"; "print"; "store"; "schemas"] @@ stop)
+        (fun () _cctxt -> Cli.Action.debug_print_store_schemas ())
+    in
     let make_command ~desc params cmd =
       command
         ~group
@@ -210,10 +220,7 @@ module Dal = struct
            already, the command will fail."
         (prefixes ["config"; "dal"; "update"] @@ stop)
         Cli.Config_update;
-      make_command
-        ~desc:"Print SQL statements describing the tables created in the store."
-        (prefixes ["debug"; "dal"; "print"; "store"; "schemas"] @@ stop)
-        Cli.Debug_print_store_schemas;
+      debug_print_store_schemas;
     ]
 end
 
