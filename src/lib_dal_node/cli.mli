@@ -42,24 +42,37 @@ module Term : sig
 
   type switch = {long : string; extra_long : string list; doc : string}
 
+  (** Directory containing files related to the DAL node. *)
   val data_dir_arg : string arg
 
+  (** Configuration file of the DAL node. *)
   val config_file_arg : string arg
 
+  (** The endpoint on which the DAL node can be contacted for RPCs. *)
   val rpc_addr_arg : P2p_point.Id.t arg
 
+  (** The expected proof of work for the P2P identity. *)
   val expected_pow_arg : float arg
 
+  (** The TCP address and port bound by the DAL node. *)
   val net_addr_arg : P2p_point.Id.t arg
 
+  (** The endpoint on which the DAL node can be contacted by other DAL nodes. *)
   val public_addr_arg : P2p_point.Id.t arg
 
+  (** The endpoint on which to contact the L1 node. *)
   val endpoint_arg : Uri.t arg
 
+  (** (Optional) URIs to use as backup sources for slot data retrieval, in
+      case the slot is missing locally and reconstruction from shards is not
+      possible. Supported URI schemes include [http], [https], and
+      [file]. *)
   val slots_backup_uris_arg : Uri.t list arg
 
+  (** Whether to trust the data downloaded from the provided slots backup URIs. *)
   val trust_slots_backup_uris_switch : switch
 
+  (** Ignore the boot(strap) peers provided by L1. *)
   val ignore_l1_config_peers_switch : switch
 
   val attester_profile_arg : Signature.public_key_hash list arg
@@ -70,89 +83,47 @@ module Term : sig
 
   val bootstrap_profile_switch : switch
 
+  (** DAL nodes to connect to. *)
   val peers_arg : string list arg
 
+  (** Metrics server endpoint. *)
   val metrics_addr_arg : P2p_point.Id.t arg
 
   val history_mode_arg : Configuration_file.history_mode arg
 
+  (** Name of the service provided by this node. *)
   val service_name_arg : string arg
 
+  (** Namespace for the service. *)
   val service_namespace_arg : string arg
 
+  (** Should the trusted setup be installed if required and invalid? *)
   val fetch_trusted_setup_arg : bool arg
 
+  (** Should the crypto shard verification against commitment hashes be bypassed. *)
   val disable_shard_validation_switch : switch
 
+  (** Disable amplification. Default value is false. *)
   val disable_amplification_switch : switch
 
+  (** Emit events related to connections. Default value is false. *)
   val verbose_switch : switch
 
+  (** Do not distribute shards of these pkhs. *)
   val ignore_topics_arg : Signature.public_key_hash list arg
 
+  (** The configuration used for batching verification of received shards
+      via GossipSub to save cryptographic computation. *)
   val batching_configuration_arg : Configuration_file.batching_configuration arg
 end
 
-(** {2 Command-line options} *)
+(** {2 Command-line subcommands and internal types} *)
 
-(** This module declares the main commands of the DAL node. For each
-    command, a set of options is recognized. The function [commands]
-    can be used to register a function when the user invokes the
-    command. *)
-
-type experimental_features = unit
-
-type options = {
-  data_dir : string option;
-      (** Directory containing files related to the DAL node. *)
-  config_file : string option;  (** Configuration file of the DAL node. *)
-  rpc_addr : P2p_point.Id.t option;
-      (** The endpoint on which the DAL node can be contacted for RPCs. *)
-  expected_pow : float option;
-      (** The expected proof of work for the P2P identity. *)
-  listen_addr : P2p_point.Id.t option;
-      (** The TCP address and port bound by the DAL node. *)
-  public_addr : P2p_point.Id.t option;
-      (** The endpoint on which the DAL node can be contacted by other DAL nodes. *)
-  endpoint : Uri.t option;  (** The endpoint on which to contact the L1 node. *)
-  slots_backup_uris : Uri.t list;
-      (** (Optional) URIs to use as backup sources for slot data retrieval, in
-          case the slot is missing locally and reconstruction from shards is not
-          possible. Supported URI schemes include [http], [https], and
-          [file]. *)
-  trust_slots_backup_uris : bool;
-      (** Whether to trust the data downlaoded from the provided slots backup URIs. *)
-  profile : Profile_manager.unresolved_profile option;
-      (** Profiles of the DAL node used for tracking shards. *)
-  metrics_addr : P2p_point.Id.t option;  (** Metrics server endpoint. *)
-  peers : string list;  (** DAL nodes to connect to. *)
-  history_mode : Configuration_file.history_mode option;
-  service_name : string option;
-      (** Name of the service provided by this node. *)
-  service_namespace : string option;  (** Namespace for the service. *)
-  experimental_features : experimental_features;  (** Experimental features. *)
-  fetch_trusted_setup : bool option;
-      (** Should the trusted setup be installed if required and invalid?
-      In case of [None] at init it is considered as yes. *)
-  disable_shard_validation : bool;
-      (** Should the crypto shard verification against commitment hashes be bypassed. *)
-  verbose : bool;
-      (** Emit events related to connections. Default value is false. *)
-  ignore_l1_config_peers : bool;
-      (** Ignore the boot(strap) peers provided by L1. *)
-  disable_amplification : bool;
-      (** Disable amplification. Default value is false. *)
-  ignore_topics : Signature.public_key_hash list;
-      (** Do not distribute shards of these pkhs. *)
-  batching_configuration : Configuration_file.batching_configuration option;
-      (** The configuration used for batching verification of received shards
-          via GossipSub to save cryptographic computation. *)
-}
-
-(** Subcommands that can be used by the DAL node. In the future this type
-    could be generalized if a command recgonizes a different set of
-    options. *)
+(** Subcommands that can be used by the DAL node. *)
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
+
+(** Internal options type - opaque to external users *)
+type options
 
 val cli_options_to_options :
   ?data_dir:string ->
