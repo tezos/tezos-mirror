@@ -110,6 +110,26 @@ let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
         batching_configuration;
   }
 
+let profile ?attesters ?operators ?observers ?(bootstrap = false) () =
+  let open Result_syntax in
+  let profile = Controller_profiles.make ?attesters ?operators ?observers () in
+  match (bootstrap, observers, profile) with
+  | false, None, profiles when Controller_profiles.is_empty profiles ->
+      return_none
+  | false, Some _, profiles when Controller_profiles.is_empty profiles ->
+      (* The user only mentioned '--observer' without any slot and
+           without any other profile. It will be assigned to random
+           slots. *)
+      return_some Profile_manager.random_observer
+  | false, _, _ -> return_some (Profile_manager.controller profile)
+  | true, None, profiles when Controller_profiles.is_empty profiles ->
+      return_some Profile_manager.bootstrap
+  | true, _, _ ->
+      Error_monad.error_with
+        "a bootstrap node (option '--bootstrap') cannot be an attester (option \
+         '--attester'), an operator (option '--operator') nor an observer \
+         (option '--observer')"
+
 module Term = struct
   type env = {docs : string; doc : string; name : string}
 
@@ -623,7 +643,7 @@ module Term = struct
       $ disable_amplification $ ignore_topics $ batching_configuration)
 end
 
-type t = Run | Config_init | Config_update
+type t = Run
 
 (** [wrap_with_error main_promise] wraps a promise that returns a tzresult
     and converts it into an exit code. Returns exit code 0 on success, or
@@ -672,6 +692,77 @@ module Config = struct
 
   let man = description
 
+  let mk_action action =
+   fun data_dir
+       config_file
+       rpc_addr
+       expected_pow
+       listen_addr
+       public_addr
+       endpoint
+       slots_backup_uris
+       trust_slots_backup_uris
+       metrics_addr
+       attesters
+       operators
+       observers
+       bootstrap
+       peers
+       history_mode
+       service_name
+       service_namespace
+       fetch_trusted_setup
+       verbose
+       ignore_l1_config_peers
+       disable_amplification
+       batching_configuration ->
+    let open Lwt_result_syntax in
+    let data_dir =
+      Option.value ~default:Configuration_file.default.data_dir data_dir
+    in
+    let config_file =
+      Option.value
+        ~default:(Configuration_file.default_config_file data_dir)
+        config_file
+    in
+    let*? profile = profile ?attesters ?operators ?observers ~bootstrap () in
+    let configuration_override =
+      override_conf
+        ~data_dir
+        ?rpc_addr
+        ?expected_pow
+        ?listen_addr
+        ?public_addr
+        ?endpoint
+        ?slots_backup_uris
+        ~trust_slots_backup_uris
+        ?metrics_addr
+        ?profile
+        ?peers
+        ?history_mode
+        ?service_name
+        ?service_namespace
+        ?fetch_trusted_setup
+        ~verbose
+        ~ignore_l1_config_peers
+        ~disable_amplification
+        ?batching_configuration
+    in
+    action ~config_file ~configuration_override
+
+  let mk_term action =
+    let open Term in
+    Cmdliner.Term.(
+      map
+        wrap_action
+        (const action $ data_dir $ config_file $ rpc_addr $ expected_pow
+       $ net_addr $ public_addr $ endpoint $ slots_backup_uris
+       $ trust_slots_backup_uris $ metrics_addr $ attester_profile
+       $ operator_profile $ observer_profile $ bootstrap_profile $ peers
+       $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
+       $ verbose $ ignore_l1_config_peers $ disable_amplification
+       $ batching_configuration))
+
   module Init = struct
     let man =
       [
@@ -689,7 +780,15 @@ module Config = struct
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info ~doc:"Configuration initialisation" ~man ~version "init"
 
-    let cmd run = Cmdliner.Cmd.v info (Term.term (run Config_init))
+    let action =
+      mk_action @@ fun ~config_file ~configuration_override ->
+      Configuration_file.save
+        ~config_file
+        (configuration_override Configuration_file.default)
+
+    let term = mk_term action
+
+    let cmd = Cmdliner.Cmd.v info term
   end
 
   module Update = struct
@@ -706,10 +805,20 @@ module Config = struct
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info ~doc:"Configuration update" ~man ~version "update"
 
-    let cmd run = Cmdliner.Cmd.v info (Term.term (run Config_update))
+    let action =
+      mk_action @@ fun ~config_file ~configuration_override ->
+      let open Lwt_result_syntax in
+      let* configuration = Configuration_file.load ~config_file in
+      Configuration_file.save
+        ~config_file
+        (configuration_override configuration)
+
+    let term = mk_term action
+
+    let cmd = Cmdliner.Cmd.v info term
   end
 
-  let cmd run =
+  let cmd =
     let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
@@ -719,7 +828,7 @@ module Config = struct
         ~version
         "config"
     in
-    Cmdliner.Cmd.group ~default info [Init.cmd run; Update.cmd run]
+    Cmdliner.Cmd.group ~default info [Init.cmd; Update.cmd]
 end
 
 module Debug = struct
@@ -979,26 +1088,64 @@ let run subcommand cli_options =
         ~config_file
         ~configuration_override:(merge cli_options)
         ()
-  | Config_init ->
-      Configuration_file.save
-        ~config_file
-        (merge cli_options Configuration_file.default)
-  | Config_update ->
-      let config_file =
-        Option.value
-          cli_options.config_file
-          ~default:
-            (let data_dir =
-               Option.value
-                 ~default:Configuration_file.default.data_dir
-                 cli_options.data_dir
-             in
-             Filename.concat data_dir "config.json")
-      in
-      let* configuration = Configuration_file.load ~config_file in
-      Configuration_file.save ~config_file (merge cli_options configuration)
 
 module Action = struct
+  (** Optional boolean values are defined as switch, which means that default value is [false]. *)
+
+  let mk_config_action action =
+   fun ?data_dir
+       ?config_file
+       ?rpc_addr
+       ?expected_pow
+       ?listen_addr
+       ?public_addr
+       ?endpoint
+       ?slots_backup_uris
+       ?(trust_slots_backup_uris = false)
+       ?metrics_addr
+       ?attesters
+       ?operators
+       ?observers
+       ?(bootstrap = false)
+       ?peers
+       ?history_mode
+       ?service_name
+       ?service_namespace
+       ?fetch_trusted_setup
+       ?(verbose = false)
+       ?(ignore_l1_config_peers = false)
+       ?(disable_amplification = false)
+       ?batching_configuration
+       () ->
+    action
+      data_dir
+      config_file
+      rpc_addr
+      expected_pow
+      listen_addr
+      public_addr
+      endpoint
+      slots_backup_uris
+      trust_slots_backup_uris
+      metrics_addr
+      attesters
+      operators
+      observers
+      bootstrap
+      peers
+      history_mode
+      service_name
+      service_namespace
+      fetch_trusted_setup
+      verbose
+      ignore_l1_config_peers
+      disable_amplification
+      batching_configuration
+
+  let config_init = mk_config_action Config.Init.action
+
+  let config_update = mk_config_action Config.Update.action
+
   let debug_print_store_schemas = Debug.Print.Store.Schemas.action
 end
 
@@ -1046,4 +1193,4 @@ let commands =
     let version = Tezos_version_value.Bin_version.octez_version_string in
     Cmdliner.Cmd.info ~doc:"The Octez DAL node" ~version "octez-dal-node"
   in
-  Cmdliner.Cmd.group ~default info [Run.cmd run; Config.cmd run; Debug.cmd]
+  Cmdliner.Cmd.group ~default info [Run.cmd run; Config.cmd; Debug.cmd]

@@ -197,13 +197,92 @@ module Dal = struct
           | Ok options -> Cli.run cmd options
           | Error (_, msg) -> failwith "%s" msg)
     in
-
-    [
-      make_command
-        ~desc:"Run the Octez DAL"
-        (prefixes ["run"; "dal"] @@ stop)
-        Cli.Run;
-      make_command
+    let mk_config_command ~prefix:p ~desc action =
+      let open Tezos_clic in
+      let args =
+        Tezos_clic.args23
+          data_dir
+          config_file
+          rpc_addr
+          expected_pow
+          net_addr
+          public_addr
+          endpoint
+          slots_backup_uris
+          trust_slots_backup_uris
+          metrics_addr
+          attester_profile
+          operator_profile
+          observer_profile
+          bootstrap_profile
+          peers
+          history_mode
+          service_name
+          service_namespace
+          fetch_trusted_setup
+          verbose
+          ignore_l1_config_peers
+          disable_amplification
+          batching_configuration
+      in
+      command
+        ~group
+        ~desc
+        args
+        (prefixes ["config"; "dal"; p] @@ stop)
+        (fun ( data_dir,
+               config_file,
+               rpc_addr,
+               expected_pow,
+               net_addr,
+               public_addr,
+               endpoint,
+               slots_backup_uris,
+               trust_slots_backup_uris,
+               metrics_addr,
+               attesters,
+               operators,
+               observers,
+               bootstrap,
+               peers,
+               history_mode,
+               service_name,
+               service_namespace,
+               fetch_trusted_setup,
+               verbose,
+               ignore_l1_config_peers,
+               disable_amplification,
+               batching_configuration )
+             _cctxt
+           ->
+          action
+            ?data_dir
+            ?config_file
+            ?rpc_addr
+            ?expected_pow
+            ?listen_addr:net_addr
+            ?public_addr
+            ?endpoint
+            ?slots_backup_uris
+            ?trust_slots_backup_uris:(Some trust_slots_backup_uris)
+            ?metrics_addr
+            ?attesters
+            ?operators
+            ?observers
+            ?bootstrap:(Some bootstrap)
+            ?peers
+            ?history_mode
+            ?service_name
+            ?service_namespace
+            ?fetch_trusted_setup
+            ?verbose:(Some verbose)
+            ?ignore_l1_config_peers:(Some ignore_l1_config_peers)
+            ?disable_amplification:(Some disable_amplification)
+            ?batching_configuration
+            ())
+    in
+    let config_init =
+      mk_config_command
         ~desc:
           "This command creates a configuration file with the parameters \
            provided on the command-line, if no configuration file exists \
@@ -211,15 +290,25 @@ module Dal = struct
            command-line parameters override the existing ones, and old \
            parameters are lost. This configuration is then used by the run \
            command."
-        (prefixes ["config"; "dal"; "init"] @@ stop)
-        Cli.Config_init;
-      make_command
+        ~prefix:"init"
+        Cli.Action.config_init
+    in
+    let config_update =
+      mk_config_command
         ~desc:
           "This command updates the configuration file with the parameters \
            provided on the command-line. If no configuration file exists \
            already, the command will fail."
-        (prefixes ["config"; "dal"; "update"] @@ stop)
-        Cli.Config_update;
+        ~prefix:"update"
+        Cli.Action.config_update
+    in
+    [
+      make_command
+        ~desc:"Run the Octez DAL"
+        (prefixes ["run"; "dal"] @@ stop)
+        Cli.Run;
+      config_init;
+      config_update;
       debug_print_store_schemas;
     ]
 end
