@@ -117,42 +117,7 @@ module Term : sig
   val batching_configuration_arg : Configuration_file.batching_configuration arg
 end
 
-(** {2 Command-line subcommands and internal types} *)
-
-(** Subcommands that can be used by the DAL node. *)
-type t
-
-(** Internal options type - opaque to external users *)
-type options
-
-val cli_options_to_options :
-  ?data_dir:string ->
-  ?config_file:string ->
-  ?rpc_addr:P2p_point.Id.t ->
-  ?expected_pow:float ->
-  ?listen_addr:P2p_point.Id.t ->
-  ?public_addr:P2p_point.Id.t ->
-  ?endpoint:Uri.t ->
-  ?slots_backup_uris:Uri.t list ->
-  ?trust_slots_backup_uris:bool ->
-  ?metrics_addr:P2p_point.Id.t ->
-  ?attesters:Signature.public_key_hash list ->
-  ?operators:int list ->
-  ?observers:int list ->
-  ?bootstrap:bool ->
-  ?peers:string list ->
-  ?history_mode:Configuration_file.history_mode ->
-  ?service_name:string ->
-  ?service_namespace:string ->
-  ?fetch_trusted_setup:bool ->
-  ?disable_shard_validation:bool ->
-  ?verbose:bool ->
-  ?ignore_l1_config_peers:bool ->
-  ?disable_amplification:bool ->
-  ?ignore_topics:Signature.public_key_hash list ->
-  ?batching_configuration:Configuration_file.batching_configuration ->
-  unit ->
-  (options, bool * string) result
+(** {2 Command-line subcommands} *)
 
 module Action : sig
   (** Optional boolean values have [false] as default value. *)

@@ -633,8 +633,6 @@ module Term = struct
   let batching_configuration = arg_to_cmdliner batching_configuration_arg
 end
 
-type t
-
 (** [wrap_with_error main_promise] wraps a promise that returns a tzresult
     and converts it into an exit code. Returns exit code 0 on success, or
     prints the error trace to stderr and returns exit code 1 on failure. *)
@@ -999,90 +997,6 @@ module Debug = struct
     in
     Cmdliner.Cmd.group ~default info [Print.cmd]
 end
-
-type experimental_features = unit
-
-type options = {
-  data_dir : string option;
-  config_file : string option;
-  rpc_addr : P2p_point.Id.t option;
-  expected_pow : float option;
-  listen_addr : P2p_point.Id.t option;
-  public_addr : P2p_point.Id.t option;
-  endpoint : Uri.t option;
-  slots_backup_uris : Uri.t list;
-  trust_slots_backup_uris : bool;
-  profile : Profile_manager.unresolved_profile option;
-  metrics_addr : P2p_point.Id.t option;
-  peers : string list;
-  history_mode : Configuration_file.history_mode option;
-  service_name : string option;
-  service_namespace : string option;
-  experimental_features : experimental_features;
-  fetch_trusted_setup : bool option;
-  disable_shard_validation : bool;
-  verbose : bool;
-  ignore_l1_config_peers : bool;
-  disable_amplification : bool;
-  ignore_topics : Signature.public_key_hash list;
-  batching_configuration : Configuration_file.batching_configuration option;
-}
-
-let cli_options_to_options ?data_dir ?config_file ?rpc_addr ?expected_pow
-    ?listen_addr ?public_addr ?endpoint ?(slots_backup_uris = [])
-    ?(trust_slots_backup_uris = false) ?metrics_addr ?attesters ?operators
-    ?observers ?(bootstrap = false) ?(peers = []) ?history_mode ?service_name
-    ?service_namespace ?fetch_trusted_setup ?(disable_shard_validation = false)
-    ?(verbose = false) ?(ignore_l1_config_peers = false)
-    ?(disable_amplification = false) ?(ignore_topics = [])
-    ?batching_configuration () =
-  let open Result_syntax in
-  let profile = Controller_profiles.make ?attesters ?operators ?observers () in
-  let* profile =
-    match (bootstrap, observers, profile) with
-    | false, None, profiles when Controller_profiles.is_empty profiles ->
-        return_none
-    | false, Some _, profiles when Controller_profiles.is_empty profiles ->
-        (* The user only mentioned '--observer' without any slot and
-           without any other profile. It will be assigned to random
-           slots. *)
-        return_some Profile_manager.random_observer
-    | false, _, _ -> return_some (Profile_manager.controller profile)
-    | true, None, profiles when Controller_profiles.is_empty profiles ->
-        return_some Profile_manager.bootstrap
-    | true, _, _ ->
-        fail
-          ( false,
-            "a bootstrap node (option '--bootstrap') cannot be an attester \
-             (option '--attester'), an operator (option '--operator') nor an \
-             observer (option '--observer')" )
-  in
-  return
-    {
-      data_dir;
-      config_file;
-      rpc_addr;
-      expected_pow;
-      listen_addr;
-      public_addr;
-      endpoint;
-      slots_backup_uris;
-      trust_slots_backup_uris;
-      profile;
-      metrics_addr;
-      peers;
-      history_mode;
-      service_name;
-      service_namespace;
-      experimental_features = ();
-      fetch_trusted_setup;
-      disable_shard_validation;
-      verbose;
-      ignore_l1_config_peers;
-      disable_amplification;
-      ignore_topics;
-      batching_configuration;
-    }
 
 module Action = struct
   (** Optional boolean values are defined as switch, which means that default value is [false]. *)
