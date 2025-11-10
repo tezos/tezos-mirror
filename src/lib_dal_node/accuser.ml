@@ -74,9 +74,11 @@ let inject_entrapment_evidences
   in
   when_ proto_parameters.incentives_enable (fun () ->
       let published_level =
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4612
-           Correctly compute [published_level] in case of protocol changes, in
-           particular a change of the value of [attestation_lag]. *)
+        (* In case a protocol changes the value of [attestation_lag], the
+           computed [published_level] is wrong just after the
+           migration. However, since no slots are considered protocol-attested
+           in this period, no entrapment would be injected ([Plugin.is_attested]
+           returns [false]). *)
         Int32.(sub attested_level (of_int proto_parameters.attestation_lag))
       in
       let store = Node_context.get_store node_ctxt in
@@ -94,9 +96,9 @@ let inject_entrapment_evidences
           let traps_to_inject =
             filter_injectable_traps attestation_map traps
             |>
-            (* We do not emit two denunciations for the same level, delegate
-                  and slot index, even if 2 shards assigned to this delegate
-                  were traps *)
+            (* We do not emit two denunciations for the same level, delegate and
+               slot index, even if 2 shards assigned to this delegate were
+               traps. *)
             List.sort_uniq
               (fun
                 (delegate1, slot_index1, _, _, _, _, _)
