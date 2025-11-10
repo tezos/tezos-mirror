@@ -10,24 +10,61 @@ open Test_helpers
 open Floodgate_lib
 
 type parameters = {
-  profiling : bool;
-  time_between_blocks : float;
-  iterations : int;
-  accounts : int option;
-  contracts : int option;
-  timeout : float;
-  spp : int;
-  width : int;
-  height : int;
-  swap_hops : int;
+  mutable profiling : bool;
+  mutable time_between_blocks : float;
+  mutable iterations : int;
+  mutable accounts : int option;
+  mutable contracts : int option;
+  mutable timeout : float;
+  mutable spp : int;
+  mutable width : int;
+  mutable height : int;
+  mutable swap_hops : int;
 }
 
 let parameters =
+  (* default values *)
+  {
+    profiling = false;
+    time_between_blocks = 0.5;
+    iterations = 5;
+    accounts = None;
+    contracts = None;
+    timeout = 2.0;
+    spp = 2;
+    width = 64;
+    height = 48;
+    swap_hops = 1;
+  }
+
+module type PARAMETERS = sig
+  val profiling : bool
+
+  val time_between_blocks : float
+
+  val iterations : int
+
+  val accounts : int option
+
+  val contracts : int option
+
+  val timeout : float
+
+  val spp : int
+
+  val width : int
+
+  val height : int
+
+  val swap_hops : int
+end
+
+module Parameters () : PARAMETERS = struct
   let section =
     Clap.section
       "EVM NODE BENCHMARK"
       ~description:"Parameters for running benchmarks on the EVM node"
-  in
+
   let profiling =
     Clap.flag
       ~section
@@ -36,7 +73,7 @@ let parameters =
       ~description:
         "Report profiling information (needs perf on linux and xctrace on \
          macos)"
-  in
+
   let time_between_blocks =
     Clap.default_float
       ~section
@@ -44,8 +81,8 @@ let parameters =
       ~short:'T'
       ~placeholder:"seconds"
       ~description:"Number of seconds between blocks"
-      0.5
-  in
+      parameters.time_between_blocks
+
   let iterations =
     Clap.default_int
       ~section
@@ -53,8 +90,8 @@ let parameters =
       ~short:'I'
       ~placeholder:"nb"
       ~description:"Number of iterations for the benchmark"
-      5
-  in
+      parameters.iterations
+
   let accounts =
     Clap.optional_int
       ~section
@@ -63,7 +100,7 @@ let parameters =
       ~placeholder:"nb"
       ~description:"Number of accounts that sign transactions for the benchmark"
       ()
-  in
+
   let contracts =
     Clap.optional_int
       ~section
@@ -72,7 +109,7 @@ let parameters =
       ~placeholder:"nb"
       ~description:"Number of ERC20 contracts for the benchmark"
       ()
-  in
+
   let timeout =
     Clap.default_float
       ~section
@@ -81,8 +118,8 @@ let parameters =
       ~description:
         "Number of seconds to wait for inclusion before considering operation \
          dropped"
-      2.0
-  in
+      parameters.timeout
+
   let spp =
     Clap.default_int
       ~section
@@ -91,8 +128,8 @@ let parameters =
       ~description:
         "Samples Per Pixel for SnailTracer benchmark. Higher values will use \
          more gas."
-      2
-  in
+      parameters.spp
+
   let width =
     Clap.default_int
       ~section
@@ -100,8 +137,8 @@ let parameters =
       ~placeholder:"pixels"
       ~description:
         "Width of image for SnailTracer. Higher values will use more gas."
-      64
-  in
+      parameters.width
+
   let height =
     Clap.default_int
       ~section
@@ -110,27 +147,31 @@ let parameters =
       ~description:
         "Height of image for SnailTracer. Higher values will use more gas."
       48
-  in
+
   let swap_hops =
     Clap.default_int
       ~section
       ~long:"swap-hops"
       ~placeholder:"nb"
       ~description:"Number of hops to do in swap path."
-      1
-  in
-  {
-    profiling;
-    time_between_blocks;
-    iterations;
-    accounts;
-    contracts;
-    timeout;
-    spp;
-    width;
-    height;
-    swap_hops;
-  }
+      parameters.swap_hops
+
+  let () =
+    parameters.profiling <- profiling ;
+    parameters.time_between_blocks <- time_between_blocks ;
+    parameters.iterations <- iterations ;
+    parameters.accounts <- accounts ;
+    parameters.contracts <- contracts ;
+    parameters.timeout <- timeout ;
+    parameters.spp <- spp ;
+    parameters.width <- width ;
+    parameters.height <- height ;
+    parameters.swap_hops <- swap_hops
+end
+
+let parse_cli () =
+  let module P = Parameters () in
+  ()
 
 let ( let+? ) x f =
   match x with

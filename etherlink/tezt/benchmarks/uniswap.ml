@@ -11,7 +11,7 @@ open Etherlink_benchmark_lib
 open Benchmark_utils
 open Uniswap
 
-let test_swaps =
+let test_swaps () =
   let nb_accounts = Option.value parameters.accounts ~default:100 in
   let nb_tokens = Option.value parameters.contracts ~default:1 in
   let nb_hops = parameters.swap_hops in
@@ -44,4 +44,4 @@ let test_swaps =
   let* () = shutdown () in
   stop_profile ()
 
-let register () = test_swaps [Protocol.Alpha]
+let register () = test_swaps () [Protocol.Alpha]
