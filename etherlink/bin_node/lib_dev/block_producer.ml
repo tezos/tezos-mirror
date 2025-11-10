@@ -288,7 +288,7 @@ let validate_tezlink_op ~maximum_cumulative_size
   let open Lwt_result_syntax in
   let new_size = state.current_size + String.length raw_op in
   if new_size > maximum_cumulative_size then return `Stop
-  else if not (Tezlink_prevalidation.could_fit state operation) then
+  else if not (Tezlink_prevalidation.gas_limit_could_fit state operation) then
     return `Stop
   else
     let* res = Tezlink_prevalidation.validate_for_blueprint state operation in

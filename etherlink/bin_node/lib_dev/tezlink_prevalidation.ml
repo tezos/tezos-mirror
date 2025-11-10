@@ -561,7 +561,7 @@ let maximum_gas_per_block =
   Tezos_types.Operation.gas_limit_to_z
     Tezlink_constants.all_constants.parametric.hard_gas_limit_per_block
 
-let could_fit state (operation : Tezos_types.Operation.t) =
+let gas_limit_could_fit state (operation : Tezos_types.Operation.t) =
   Z.(state.gas + operation.gas_limit <= maximum_gas_per_block)
 
 let add_ source cache =
