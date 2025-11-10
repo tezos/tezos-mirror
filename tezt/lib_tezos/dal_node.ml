@@ -575,8 +575,7 @@ module Proxy = struct
       [~published_level]. To do this, we need to add the missing slot indices for each level
       in the [Backfill] element that is always the first one sent in the monitoring stream.
       Note: this function heavily depends on the types of elements that are in the returned RPC
-      stream, information which can be found at
-      {!Tezos_dal_node_services.Types.Attestable_slots_watcher_table.Attestable_event.t}. *)
+      stream, information which can be found at {!Tezos_dal_node_services.Types.Attestable_event.t}. *)
   let rewrite_attestable_stream_line ~number_of_slots ~published_level line =
     let open Ezjsonm in
     let make_slot_id slot_level slot_index =
