@@ -35,43 +35,6 @@ module Dal = struct
            | Ok s -> return s
            | Error msg -> failwith "%s" msg))
 
-  let arg_list_to_clic
-      ({
-         default = _;
-         short;
-         long;
-         extra_long = _;
-         parse;
-         doc;
-         placeholder;
-         pp = _;
-         env;
-       } :
-        'a arg_list) =
-    let open Tezos_clic in
-    let parse_list s =
-      let l = String.split_on_char ',' s in
-      let rec traverse acc = function
-        | [] -> Ok (List.rev acc)
-        | x :: xs -> (
-            match parse x with
-            | Ok x -> traverse (x :: acc) xs
-            | Error msg -> Error msg)
-      in
-      traverse [] l
-    in
-    arg
-      ~doc
-      ?short
-      ~long
-      ~placeholder
-      ?env:(Option.map (fun (env : env) -> env.name) env)
-      (parameter (fun _ctxt s ->
-           let open Lwt_result_syntax in
-           match parse_list s with
-           | Ok s -> return s
-           | Error msg -> failwith "%s" msg))
-
   let switch_to_clic {long; extra_long = _; doc} =
     let open Tezos_clic in
     switch ~doc ~long ()
@@ -90,21 +53,21 @@ module Dal = struct
 
   let endpoint = arg_to_clic endpoint_arg
 
-  let slots_backup_uris = arg_list_to_clic slots_backup_uris_arg
+  let slots_backup_uris = arg_to_clic slots_backup_uris_arg
 
   let trust_slots_backup_uris = switch_to_clic trust_slots_backup_uris_switch
 
   let ignore_l1_config_peers = switch_to_clic ignore_l1_config_peers_switch
 
-  let attester_profile = arg_list_to_clic attester_profile_arg
+  let attester_profile = arg_to_clic attester_profile_arg
 
-  let operator_profile = arg_list_to_clic operator_profile_arg
+  let operator_profile = arg_to_clic operator_profile_arg
 
   let observer_profile = arg_to_clic observer_profile_arg
 
   let bootstrap_profile = switch_to_clic bootstrap_profile_switch
 
-  let peers = arg_list_to_clic peers_arg
+  let peers = arg_to_clic peers_arg
 
   let metrics_addr = arg_to_clic metrics_addr_arg
 
@@ -122,7 +85,7 @@ module Dal = struct
 
   let verbose = switch_to_clic verbose_switch
 
-  let ignore_topics = arg_list_to_clic ignore_topics_arg
+  let ignore_topics = arg_to_clic ignore_topics_arg
 
   let batching_configuration = arg_to_clic batching_configuration_arg
 
@@ -191,38 +154,34 @@ module Dal = struct
             batching_configuration )
           _cctxt
         ->
-          let attester_profile = Option.value ~default:[] attester_profile in
-          let operator_profile = Option.value ~default:[] operator_profile in
-          let http_backup_uris = Option.value ~default:[] http_backup_uris in
-          let peers = Option.value ~default:[] peers in
-          let ignore_topics = Option.value ~default:[] ignore_topics in
           let options =
             Cli.cli_options_to_options
-              data_dir
-              config_file
-              rpc_addr
-              expected_pow
-              net_addr
-              public_addr
-              endpoint
-              http_backup_uris
-              trust_http_backup_uris
-              metrics_addr
-              attester_profile
-              operator_profile
-              observer_profile
-              bootstrap_profile
-              peers
-              history_mode
-              service_name
-              service_namespace
-              fetch_trusted_setup
-              disable_shard_validation
-              verbose
-              ignore_l1_config_peers
-              disable_amplification
-              ignore_topics
-              batching_configuration
+              ?data_dir
+              ?config_file
+              ?rpc_addr
+              ?expected_pow
+              ?listen_addr:net_addr
+              ?public_addr
+              ?endpoint
+              ?slots_backup_uris:http_backup_uris
+              ~trust_slots_backup_uris:trust_http_backup_uris
+              ?metrics_addr
+              ?attesters:attester_profile
+              ?operators:operator_profile
+              ?observers:observer_profile
+              ~bootstrap:bootstrap_profile
+              ?peers
+              ?history_mode
+              ?service_name
+              ?service_namespace
+              ?fetch_trusted_setup
+              ~disable_shard_validation
+              ~verbose
+              ~ignore_l1_config_peers
+              ~disable_amplification
+              ?ignore_topics
+              ?batching_configuration
+              ()
           in
           match options with
           | Ok options -> Cli.run cmd options

@@ -40,18 +40,6 @@ module Term : sig
     env : env option;
   }
 
-  type 'a arg_list = {
-    default : 'a trace;
-    short : char option;
-    long : string;
-    extra_long : string list;
-    parse : string -> ('a, string) result;
-    doc : string;
-    placeholder : string;
-    pp : Format.formatter -> 'a -> unit;
-    env : env option;
-  }
-
   type switch = {long : string; extra_long : string list; doc : string}
 
   val data_dir_arg : string arg
@@ -68,21 +56,21 @@ module Term : sig
 
   val endpoint_arg : Uri.t arg
 
-  val slots_backup_uris_arg : Uri.t arg_list
+  val slots_backup_uris_arg : Uri.t list arg
 
   val trust_slots_backup_uris_switch : switch
 
   val ignore_l1_config_peers_switch : switch
 
-  val attester_profile_arg : Signature.public_key_hash arg_list
+  val attester_profile_arg : Signature.public_key_hash list arg
 
-  val operator_profile_arg : int arg_list
+  val operator_profile_arg : int list arg
 
   val observer_profile_arg : int trace arg
 
   val bootstrap_profile_switch : switch
 
-  val peers_arg : string arg_list
+  val peers_arg : string list arg
 
   val metrics_addr_arg : P2p_point.Id.t arg
 
@@ -100,7 +88,7 @@ module Term : sig
 
   val verbose_switch : switch
 
-  val ignore_topics_arg : Signature.public_key_hash arg_list
+  val ignore_topics_arg : Signature.public_key_hash list arg
 
   val batching_configuration_arg : Configuration_file.batching_configuration arg
 end
@@ -167,31 +155,32 @@ type options = {
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
 
 val cli_options_to_options :
-  string option ->
-  string option ->
-  P2p_point.Id.t option ->
-  float option ->
-  P2p_point.Id.t option ->
-  P2p_point.Id.t option ->
-  Uri.t option ->
-  Uri.t list ->
-  bool ->
-  P2p_point.Id.t option ->
-  Signature.public_key_hash list ->
-  int trace ->
-  int trace option ->
-  bool ->
-  string trace ->
-  Configuration_file.history_mode option ->
-  string option ->
-  string option ->
-  bool option ->
-  bool ->
-  bool ->
-  bool ->
-  bool ->
-  Signature.public_key_hash list ->
-  Configuration_file.batching_configuration option ->
+  ?data_dir:string ->
+  ?config_file:string ->
+  ?rpc_addr:P2p_point.Id.t ->
+  ?expected_pow:float ->
+  ?listen_addr:P2p_point.Id.t ->
+  ?public_addr:P2p_point.Id.t ->
+  ?endpoint:Uri.t ->
+  ?slots_backup_uris:Uri.t list ->
+  ?trust_slots_backup_uris:bool ->
+  ?metrics_addr:P2p_point.Id.t ->
+  ?attesters:Signature.public_key_hash list ->
+  ?operators:int list ->
+  ?observers:int list ->
+  ?bootstrap:bool ->
+  ?peers:string list ->
+  ?history_mode:Configuration_file.history_mode ->
+  ?service_name:string ->
+  ?service_namespace:string ->
+  ?fetch_trusted_setup:bool ->
+  ?disable_shard_validation:bool ->
+  ?verbose:bool ->
+  ?ignore_l1_config_peers:bool ->
+  ?disable_amplification:bool ->
+  ?ignore_topics:Signature.public_key_hash list ->
+  ?batching_configuration:Configuration_file.batching_configuration ->
+  unit ->
   (options, bool * string) result
 
 val run : t -> options -> unit tzresult Lwt.t

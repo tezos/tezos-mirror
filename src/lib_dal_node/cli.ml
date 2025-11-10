@@ -64,18 +64,6 @@ module Term = struct
     env : env option;
   }
 
-  type 'a arg_list = {
-    default : 'a list;
-    short : char option;
-    long : string;
-    extra_long : string list;
-    parse : string -> ('a, string) result;
-    doc : string;
-    placeholder : string;
-    pp : Format.formatter -> 'a -> unit;
-    env : env option;
-  }
-
   type switch = {long : string; extra_long : string list; doc : string}
 
   let make_env ~docs ~doc name = {docs; doc; name}
@@ -84,9 +72,26 @@ module Term = struct
       ?(extra_long = []) long : 'a arg =
     {default; short; long; extra_long; parse; doc; placeholder; pp; env}
 
-  let make_arg_list ?(default = []) ?short ~parse ~doc ?(placeholder = "VAL")
-      ~pp ?env ?(extra_long = []) long : 'a arg_list =
-    {default; short; long; extra_long; parse; doc; placeholder; pp; env}
+  let arg_list (parse, printer) =
+    let parse s =
+      let l = String.split_on_char ',' s in
+      let rec traverse acc = function
+        | [] -> Ok (List.rev acc)
+        | x :: xs -> (
+            match parse x with
+            | Ok x -> traverse (x :: acc) xs
+            | Error err -> Error err)
+      in
+      traverse [] l
+    in
+    ( parse,
+      Format.pp_print_list
+        ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",")
+        printer )
+
+  let make_arg_list ~format =
+    let parse, pp = arg_list format in
+    make_arg ~parse ~pp
 
   let make_switch ~doc ?(extra_long = []) long = {long; extra_long; doc}
 
@@ -119,49 +124,9 @@ module Term = struct
           ~docv:placeholder
           names)
 
-  let arg_list_to_cmdliner
-      ({default; short; long; extra_long; parse; doc; placeholder; pp; env} :
-        'a arg_list) =
-    let open Cmdliner in
-    let parser =
-      let parser s = match parse s with Ok x -> `Ok x | Error s -> `Error s in
-      (parser, pp)
-    in
-    let names =
-      match short with
-      | None -> long :: extra_long
-      | Some short -> String.make 1 short :: long :: extra_long
-    in
-    Arg.(
-      value
-      & opt (list parser) default
-      & info
-          ~doc
-          ~docs
-          ?env:(Option.map env_to_cmdliner env)
-          ~docv:placeholder
-          names)
-
   let switch_to_cmdliner {long; extra_long; doc} =
     let open Cmdliner in
     Arg.(value & flag & info ~docs ~doc (long :: extra_long))
-
-  let arg_list (parse, printer) =
-    let parse s =
-      let l = String.split_on_char ',' s in
-      let rec traverse acc = function
-        | [] -> Ok (List.rev acc)
-        | x :: xs -> (
-            match parse x with
-            | Ok x -> traverse (x :: acc) xs
-            | Error err -> Error err)
-      in
-      traverse [] l
-    in
-    ( parse,
-      Format.pp_print_list
-        ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",")
-        printer )
 
   let p2p_point_format ~default_port =
     let decoder str =
@@ -290,7 +255,6 @@ module Term = struct
   let endpoint = arg_to_cmdliner endpoint_arg
 
   let slots_backup_uris_arg =
-    let decoder, printer = uri_format in
     make_arg_list
       ~doc:
         "List of base URIs to fetch missing DAL slots if they are unavailable \
@@ -298,11 +262,10 @@ module Term = struct
          include 'http://', 'https://', and 'file://'. The option accepts a \
          list of fallback sources separated with commas."
       ~placeholder:"URI"
-      ~parse:decoder
-      ~pp:printer
+      ~format:uri_format
       "slots-backup-uri"
 
-  let slots_backup_uris = arg_list_to_cmdliner slots_backup_uris_arg
+  let slots_backup_uris = arg_to_cmdliner slots_backup_uris_arg
 
   let trust_slots_backup_uris_switch =
     make_switch
@@ -377,39 +340,33 @@ module Term = struct
     (decoder, producer_profile_printer)
 
   let attester_profile_arg =
-    let parse, pp = attester_profile_format in
     make_arg_list
       ~doc:"The Octez DAL node attester profiles for given public key hashes."
       ~placeholder:"PKH1,PKH2,..."
-      ~pp
-      ~parse
+      ~format:attester_profile_format
       ~extra_long:["attester"]
       "attester-profiles"
 
-  let attester_profile = arg_list_to_cmdliner attester_profile_arg
+  let attester_profile = arg_to_cmdliner attester_profile_arg
 
   let operator_profile_arg =
-    let parse, pp = producer_profile_format in
     make_arg_list
       ~doc:
         "The Octez DAL node operator profiles for given slot indexes. These \
          were previously known as producer profiles, however this name now \
          refers to both operator and observer profiles."
       ~placeholder:"INDEX1,INDEX2,..."
-      ~parse
-      ~pp
+      ~format:producer_profile_format
       ~extra_long:["producer-profiles"; "producer"; "operator"]
       "operator-profiles"
 
-  let operator_profile = arg_list_to_cmdliner operator_profile_arg
+  let operator_profile = arg_to_cmdliner operator_profile_arg
 
   let observer_profile_arg =
-    let parse, pp = arg_list observer_profile_format in
-    make_arg
+    make_arg_list
       ~doc:"The Octez DAL node observer profiles for given slot indexes."
       ~placeholder:"INDEX1,INDEX2,..."
-      ~parse
-      ~pp
+      ~format:observer_profile_format
       ~extra_long:["observer"]
       "observer-profiles"
 
@@ -434,12 +391,11 @@ module Term = struct
          and the one from the Octez node's configuration parameter \
          'dal_config.bootstrap_peers'."
       ~placeholder:"ADDR:PORT,..."
-      ~parse:Result.ok
-      ~pp:Format.pp_print_string
+      ~format:(Result.ok, Format.pp_print_string)
       ~default:default_list
       "peers"
 
-  let peers = arg_list_to_cmdliner peers_arg
+  let peers = arg_to_cmdliner peers_arg
 
   let metrics_addr_arg =
     let default_port = Configuration_file.default_metrics_port in
@@ -561,17 +517,15 @@ module Term = struct
   let disable_amplification = switch_to_cmdliner disable_amplification_switch
 
   let ignore_topics_arg =
-    let parse, pp = attester_profile_format in
     make_arg_list
       ~doc:
         "The producer Octez DAL node will not publish shards for the provided \
          pkhs. This argument is for testing purposes only."
       ~placeholder:"PKH1,PKH2,..."
-      ~pp
-      ~parse
+      ~format:attester_profile_format
       "ignore-topics"
 
-  let ignore_topics = arg_list_to_cmdliner ignore_topics_arg
+  let ignore_topics = arg_to_cmdliner ignore_topics_arg
 
   let batching_configuration_arg =
     let open Configuration_file in
@@ -775,16 +729,18 @@ type options = {
   batching_configuration : Configuration_file.batching_configuration option;
 }
 
-let cli_options_to_options data_dir config_file rpc_addr expected_pow
-    listen_addr public_addr endpoint slots_backup_uris trust_slots_backup_uris
-    metrics_addr attesters operators observers bootstrap_flag peers history_mode
-    service_name service_namespace fetch_trusted_setup disable_shard_validation
-    verbose ignore_l1_config_peers disable_amplification ignore_topics
-    batching_configuration =
+let cli_options_to_options ?data_dir ?config_file ?rpc_addr ?expected_pow
+    ?listen_addr ?public_addr ?endpoint ?(slots_backup_uris = [])
+    ?(trust_slots_backup_uris = false) ?metrics_addr ?attesters ?operators
+    ?observers ?(bootstrap = false) ?(peers = []) ?history_mode ?service_name
+    ?service_namespace ?fetch_trusted_setup ?(disable_shard_validation = false)
+    ?(verbose = false) ?(ignore_l1_config_peers = false)
+    ?(disable_amplification = false) ?(ignore_topics = [])
+    ?batching_configuration () =
   let open Result_syntax in
-  let profile = Controller_profiles.make ~attesters ~operators ?observers () in
+  let profile = Controller_profiles.make ?attesters ?operators ?observers () in
   let* profile =
-    match (bootstrap_flag, observers, profile) with
+    match (bootstrap, observers, profile) with
     | false, None, profiles when Controller_profiles.is_empty profiles ->
         return_none
     | false, Some _, profiles when Controller_profiles.is_empty profiles ->
@@ -1006,37 +962,38 @@ let main_run subcommand cli_options =
 let commands =
   let run subcommand data_dir config_file rpc_addr expected_pow listen_addr
       public_addr endpoint slots_backup_uris trust_slots_backup_uris
-      metrics_addr attesters operators observers bootstrap_flag peers
-      history_mode service_name service_namespace fetch_trusted_setup
+      metrics_addr attesters operators observers bootstrap peers history_mode
+      service_name service_namespace fetch_trusted_setup
       disable_shard_validation verbose ignore_l1_config_peers
-      disable_amplification ignore_pkhs batching_configuration =
+      disable_amplification ignore_topics batching_configuration =
     match
       cli_options_to_options
-        data_dir
-        config_file
-        rpc_addr
-        expected_pow
-        listen_addr
-        public_addr
-        endpoint
-        slots_backup_uris
-        trust_slots_backup_uris
-        metrics_addr
-        attesters
-        operators
-        observers
-        bootstrap_flag
-        peers
-        history_mode
-        service_name
-        service_namespace
-        fetch_trusted_setup
-        disable_shard_validation
-        verbose
-        ignore_l1_config_peers
-        disable_amplification
-        ignore_pkhs
-        batching_configuration
+        ?data_dir
+        ?config_file
+        ?rpc_addr
+        ?expected_pow
+        ?listen_addr
+        ?public_addr
+        ?endpoint
+        ?slots_backup_uris
+        ~trust_slots_backup_uris
+        ?metrics_addr
+        ?attesters
+        ?operators
+        ?observers
+        ~bootstrap
+        ?peers
+        ?history_mode
+        ?service_name
+        ?service_namespace
+        ?fetch_trusted_setup
+        ~disable_shard_validation
+        ~verbose
+        ~ignore_l1_config_peers
+        ~disable_amplification
+        ?ignore_topics
+        ?batching_configuration
+        ()
     with
     | Ok options -> main_run subcommand options
     | Error msg -> `Error msg
