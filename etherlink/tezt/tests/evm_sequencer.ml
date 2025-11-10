@@ -213,7 +213,7 @@ let send_fa_deposit_to_delayed_inbox ?(proxy = "") ~amount ~l1_contracts
 
 let register_sandbox ?tx_queue_tx_per_addr_limit ~title ?set_account_code
     ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
-    body =
+    ?sequencer_keys body =
   Test.register
     ~__FILE__
     ~title
@@ -236,9 +236,43 @@ let register_sandbox ?tx_queue_tx_per_addr_limit ~title ?set_account_code
       ?minimum_base_fee_per_gas
       ?patch_config
       ?websockets
+      ?sequencer_keys
       ()
   in
   body sequencer
+
+type sandbox_test = {sandbox : Evm_node.t; observer : Evm_node.t}
+
+let register_sandbox_with_observer ?tx_queue_tx_per_addr_limit ~title
+    ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags
+    ?patch_config ?websockets ?(sequencer_keys = [Constant.bootstrap1]) body =
+  Test.register
+    ~__FILE__
+    ~title
+    ~tags
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    ~uses:
+      [
+        Constant.octez_evm_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ]
+  @@ fun () ->
+  let* sandbox =
+    init_sequencer_sandbox
+      ?tx_queue_tx_per_addr_limit
+      ?set_account_code
+      ?da_fee_per_byte
+      ?minimum_base_fee_per_gas
+      ?patch_config
+      ?websockets
+      ~sequencer_keys
+      ()
+  in
+  let* observer = Setup.run_new_observer_node ~sc_rollup_node:None sandbox in
+  body {sandbox; observer}
 
 let register_upgrade_all ~title ~tags ~genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.all)
@@ -612,7 +646,8 @@ let test_observer_reset =
              initial_kernel = invalid_kernel;
              preimages_dir = Some preimages_dir;
              private_rpc_port = Some (Port.fresh ());
-             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             rollup_node_endpoint =
+               Some (Sc_rollup_node.endpoint sc_rollup_node);
              tx_queue_max_lifespan = None;
              tx_queue_max_size = None;
              tx_queue_tx_per_addr_limit = None;
@@ -629,7 +664,8 @@ let test_observer_reset =
              initial_kernel = invalid_kernel;
              preimages_dir = Some preimages_dir;
              private_rpc_port = Some (Port.fresh ());
-             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             rollup_node_endpoint =
+               Some (Sc_rollup_node.endpoint sc_rollup_node);
              tx_queue_max_lifespan = None;
              tx_queue_max_size = None;
              tx_queue_tx_per_addr_limit = None;
@@ -769,7 +805,6 @@ let test_remove_sequencer =
     ~error_msg:"Sequencer should be missing block %L" ;
   let*@ proxy_head = Rpc.block_number proxy in
   Check.((proxy_head > 0l) int32) ~error_msg:"Proxy should have advanced" ;
-
   unit
 
 let test_patch_state =
@@ -823,34 +858,58 @@ let test_patch_state =
 
   unit
 
-let test_persistent_state =
-  register_all
-    ~__FILE__
-    ~tags:["evm"; "sequencer"]
-    ~title:"Sequencer state is persistent across runs"
-    ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+let test_persistent_state () =
+  register_sandbox_with_observer
+    ~tags:["evm"; "sequencer"; "observer"]
+    ~title:"EVM node state is persistent across runs"
+  @@ fun {sandbox; observer} ->
   (* Force the sequencer to produce a block. *)
-  let*@ _ = produce_block sequencer in
+  let* () =
+    let*@ _ = produce_block sandbox in
+    Lwt.return_unit
+  and* () = Evm_node.wait_for_blueprint_applied observer 1 in
   (* Ask for the current block. *)
-  let*@ block_number = Rpc.block_number sequencer in
+  let*@ block_number = Rpc.block_number sandbox in
+  let*@ observer_block_number = Rpc.block_number observer in
   Check.is_true
     ~__LOC__
-    (block_number > 0l)
+    (block_number = 1l)
     ~error_msg:"The sequencer should have produced a block" ;
+  Check.is_true
+    ~__LOC__
+    (observer_block_number = 1l)
+    ~error_msg:"The observer should have received the block" ;
+
   (* Terminate the sequencer. *)
-  let* () = Evm_node.terminate sequencer in
+  let* () = Evm_node.terminate sandbox in
+
   (* Restart it. *)
-  let* () = Evm_node.run sequencer in
+  let* () = Evm_node.run sandbox in
   (* Assert the block number is at least [block_number]. Asserting
      that the block number is exactly the same as {!block_number} can
      be flaky if a block is produced between the restart and the
      RPC. *)
-  let*@ new_block_number = Rpc.block_number sequencer in
+  let*@ new_block_number = Rpc.block_number sandbox in
   Check.is_true
     ~__LOC__
-    (new_block_number >= block_number)
+    (new_block_number = block_number)
     ~error_msg:"The sequencer should have produced a block" ;
+
+  (* same with the observer *)
+  let* () = Evm_node.terminate observer in
+  (* Restart it. *)
+  let* () =
+    Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
+  in
+  (* Assert the block number is at least [block_number]. Asserting
+       that the block number is exactly the same as {!block_number} can
+       be flaky if a block is produced between the restart and the
+       RPC. *)
+  let*@ new_observer_block_number = Rpc.block_number observer in
+  Check.is_true
+    ~__LOC__
+    (new_observer_block_number = block_number)
+    ~error_msg:"The observer should have the same value" ;
   unit
 
 (* Helper to setup snapshot test. This function stops the observer and sequencer
@@ -2841,7 +2900,9 @@ let test_observer_applies_blueprint_from_rpc_node =
   let levels_to_wait = 3 in
 
   let* rpc_node = run_new_rpc_endpoint sequencer_node in
-  let* observer_node = run_new_observer_node ~sc_rollup_node rpc_node in
+  let* observer_node =
+    run_new_observer_node ~sc_rollup_node:(Some sc_rollup_node) rpc_node
+  in
 
   let* _ = Evm_node.wait_for_blueprint_applied observer_node levels_to_wait
   and* _ = Evm_node.wait_for_blueprint_applied sequencer_node levels_to_wait
@@ -2972,7 +3033,8 @@ let test_get_balance_block_param =
              initial_kernel = "evm_kernel.wasm";
              preimages_dir = Some "/tmp";
              private_rpc_port = None;
-             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             rollup_node_endpoint =
+               Some (Sc_rollup_node.endpoint sc_rollup_node);
              tx_queue_max_lifespan = None;
              tx_queue_tx_per_addr_limit = None;
              tx_queue_max_size = None;
@@ -3070,7 +3132,8 @@ let test_get_block_by_number_block_param =
              initial_kernel = "evm_kernel.wasm";
              preimages_dir = Some "/tmp";
              private_rpc_port = None;
-             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             rollup_node_endpoint =
+               Some (Sc_rollup_node.endpoint sc_rollup_node);
              tx_queue_max_lifespan = None;
              tx_queue_tx_per_addr_limit = None;
              tx_queue_max_size = None;
@@ -6235,13 +6298,12 @@ let test_sequencer_upgrade =
     match Evm_node.mode observer with
     | Observer mode ->
         Evm_node.init
-          ~extra_arguments:["--dont-track-rollup-node"]
           ~mode:
             (Observer
                {
                  mode with
                  private_rpc_port = Some (Port.fresh ());
-                 rollup_node_endpoint = "";
+                 rollup_node_endpoint = None;
                })
           (Evm_node.endpoint sequencer)
     | _ -> Test.fail "impossible, it's an observer"
@@ -6770,7 +6832,9 @@ let test_sequencer_diverge =
   let* () = Evm_node.run sequencer_bis in
 
   (* We start a new observer for the new sequencer and wait for it to catch-up *)
-  let* observer_bis = run_new_observer_node ~sc_rollup_node sequencer_bis in
+  let* observer_bis =
+    run_new_observer_node ~sc_rollup_node:(Some sc_rollup_node) sequencer_bis
+  in
   let* () = Evm_node.wait_for_blueprint_applied observer_bis 4 in
 
   (* When run in the CI the shutdown event are sometimes handled after the
@@ -10195,7 +10259,10 @@ let test_finalized_view =
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* finalized_observer =
-    run_new_observer_node ~finalized_view:true ~sc_rollup_node sequencer
+    run_new_observer_node
+      ~finalized_view:true
+      ~sc_rollup_node:(Some sc_rollup_node)
+      sequencer
   in
   let p = Evm_node.wait_for_blueprint_applied finalized_observer 4 in
   (* Produce a few EVM blocks *)
@@ -10288,7 +10355,10 @@ let test_finalized_view_forward_txn =
   @@ fun {sc_rollup_node; client; sequencer; _} _protocol ->
   (* Start a proxy node with --finalized-view enabled *)
   let* finalized_observer =
-    run_new_observer_node ~finalized_view:true ~sc_rollup_node sequencer
+    run_new_observer_node
+      ~finalized_view:true
+      ~sc_rollup_node:(Some sc_rollup_node)
+      sequencer
   in
   let* () = Evm_node.wait_for_blueprint_applied finalized_observer 0 in
 
@@ -10655,14 +10725,12 @@ let test_relay_restricted_rpcs =
   let*@? _ = Rpc.tez_kernelVersion sequencer in
   unit
 
-let test_eth_send_raw_transaction_sync_rpc =
-  register_all
-    ~__FILE__
-    ~time_between_blocks:Nothing
+let test_eth_send_raw_transaction_sync_rpc () =
+  register_sandbox_with_observer
     ~tags:["evm"; "delayed_transaction"]
     ~title:"eth_sendRawTransactionSync waits for receipt"
-  @@ fun {sequencer; observer; _} _protocol ->
-  let* gas_price = Rpc.get_gas_price sequencer in
+  @@ fun {sandbox; observer} ->
+  let* gas_price = Rpc.get_gas_price sandbox in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let receiver = Eth_account.bootstrap_accounts.(1) in
   let* raw_tx =
@@ -10683,7 +10751,7 @@ let test_eth_send_raw_transaction_sync_rpc =
   let* _ = Evm_node.wait_for_tx_queue_injecting_transaction observer in
   Check.((Lwt.is_sleeping receipt_promise = true) bool)
     ~error_msg:"eth_sendRawTransactionSync should wait for inclusion" ;
-  let*@ _ = produce_block sequencer in
+  let*@ _ = produce_block sandbox in
   let*@ receipt = receipt_promise in
   Check.(
     (receipt.status = true)
@@ -10691,14 +10759,12 @@ let test_eth_send_raw_transaction_sync_rpc =
       ~error_msg:"Transaction should have been included and successful") ;
   unit
 
-let test_eth_send_raw_transaction_sync_rpc_timeouts =
-  register_all
-    ~__FILE__
-    ~time_between_blocks:Nothing
+let test_eth_send_raw_transaction_sync_rpc_timeouts () =
+  register_sandbox_with_observer
     ~tags:["evm"; "delayed_transaction"]
     ~title:"eth_sendRawTransactionSync timeouts"
-  @@ fun {sequencer; observer; _} _protocol ->
-  let* gas_price = Rpc.get_gas_price sequencer in
+  @@ fun {sandbox; observer} ->
+  let* gas_price = Rpc.get_gas_price sandbox in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let receiver = Eth_account.bootstrap_accounts.(1) in
   let* raw_tx =
@@ -11401,7 +11467,7 @@ let test_websocket_newPendingTransactions_event =
   let* observer =
     run_new_observer_node
       ~finalized_view:false
-      ~sc_rollup_node
+      ~sc_rollup_node:(Some sc_rollup_node)
       ~websockets:true
       sequencer
   in
@@ -12811,7 +12877,8 @@ let test_observer_init_from_snapshot =
              initial_kernel = "evm_kernel.wasm";
              preimages_dir = Some "/tmp";
              private_rpc_port = None;
-             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             rollup_node_endpoint =
+               Some (Sc_rollup_node.endpoint sc_rollup_node);
              tx_queue_max_lifespan = None;
              tx_queue_max_size = None;
              tx_queue_tx_per_addr_limit = None;
@@ -14492,7 +14559,7 @@ let protocols = Protocol.all
 
 let () =
   test_remove_sequencer protocols ;
-  test_persistent_state protocols ;
+  test_persistent_state () ;
   test_snapshots ~desync:false protocols ;
   test_snapshots ~desync:true protocols ;
   test_patch_state [Protocol.Alpha] ;
@@ -14615,8 +14682,8 @@ let () =
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
   test_proxy_node_can_forward_to_evm_endpoint protocols ;
-  test_eth_send_raw_transaction_sync_rpc protocols ;
-  test_eth_send_raw_transaction_sync_rpc_timeouts protocols ;
+  test_eth_send_raw_transaction_sync_rpc () ;
+  test_eth_send_raw_transaction_sync_rpc_timeouts () ;
   test_tx_pool_pending_nonce () ;
   test_da_fees_after_execution protocols ;
   test_trace_transaction_calltracer_failed_create protocols ;

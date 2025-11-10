@@ -1420,6 +1420,28 @@ node_da_fees:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+patched_sequencer_key:
+  description: patched state with sequencer key {pk} ({pkh})
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* patched_sequencer_key version 0 */
+      "patched_sequencer_key.v0":
+        { "pk": $Signature.Public_key,
+          "pkh": $Signature.Public_key_hash } }
+    $Signature.Public_key:
+      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      $unistring
+    $Signature.Public_key_hash:
+      /* A Ed25519, Secp256k1, P256, or BLS public key hash
+         (Base58Check-encoded) */
+      $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 patched_state:
   description: key {key} successfully patched, starting from level {level}
   level: warning

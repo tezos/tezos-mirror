@@ -281,6 +281,7 @@ val init_sequencer_sandbox :
   ?kernel:Uses.t ->
   ?evm_version:Evm_version.t ->
   ?eth_bootstrap_accounts:string list ->
+  ?sequencer_keys:Account.key list ->
   unit ->
   Evm_node.t Lwt.t
 

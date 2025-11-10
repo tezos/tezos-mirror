@@ -507,7 +507,7 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
         private_rpc_port = None;
         initial_kernel = output;
         preimages_dir = Some preimages_dir;
-        rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+        rollup_node_endpoint = Some (Sc_rollup_node.endpoint sc_rollup_node);
         tx_queue_max_lifespan = None;
         tx_queue_max_size = None;
         tx_queue_tx_per_addr_limit = None;

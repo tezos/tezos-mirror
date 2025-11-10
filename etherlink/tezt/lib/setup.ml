@@ -229,7 +229,7 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
         initial_kernel;
         preimages_dir = Some preimages_dir;
         private_rpc_port = Some (Port.fresh ());
-        rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+        rollup_node_endpoint = Option.map Sc_rollup_node.endpoint sc_rollup_node;
         tx_queue_max_lifespan =
           Option.map (fun tx_queue -> tx_queue.max_lifespan) tx_queue;
         tx_queue_max_size =
@@ -693,7 +693,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       (fun _l2 ->
         run_new_observer_node
           ~patch_config:obs_patch_config
-          ~sc_rollup_node
+          ~sc_rollup_node:(Some sc_rollup_node)
           ?rpc_server
           ?websockets
           ?history_mode

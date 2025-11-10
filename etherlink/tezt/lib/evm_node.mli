@@ -65,7 +65,8 @@ type mode =
       initial_kernel : string;
       preimages_dir : string option;
       private_rpc_port : int option;  (** Port for private RPC server*)
-      rollup_node_endpoint : string;
+      rollup_node_endpoint : string option;
+          (*when None add `--dont-track-rollup-node` *)
       tx_queue_max_lifespan : int option;
       tx_queue_max_size : int option;
       tx_queue_tx_per_addr_limit : int option;
@@ -108,6 +109,7 @@ type mode =
       tx_queue_max_lifespan : int option;
       tx_queue_max_size : int option;
       tx_queue_tx_per_addr_limit : int option;
+      sequencer_keys : string list;
     }
   | Tezlink_sandbox of {
       initial_kernel : string;

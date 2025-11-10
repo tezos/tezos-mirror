@@ -493,11 +493,11 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     ?(eth_bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
-        (Array.to_list Eth_account.bootstrap_accounts)) () =
+        (Array.to_list Eth_account.bootstrap_accounts)) ?(sequencer_keys = [])
+    () =
   let wallet_dir = Temp.dir "wallet" in
   let output_config = Temp.file "config.yaml" in
   let preimages_dir = Temp.dir "wasm_2_0_0" in
-
   let*! () =
     Evm_node.make_kernel_installer_config
       ?maximum_gas_per_transaction
@@ -507,6 +507,9 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       ~output:output_config
       ~eth_bootstrap_accounts
       ?evm_version
+      ?sequencer:
+        (Option.map (fun k -> k.Account.public_key)
+        @@ List.nth_opt sequencer_keys 0)
       ()
   in
   let* {output; _} =
@@ -529,6 +532,10 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
         tx_queue_max_lifespan;
         tx_queue_max_size;
         tx_queue_tx_per_addr_limit;
+        sequencer_keys =
+          List.map
+            (fun k -> Account.uri_of_secret_key k.Account.secret_key)
+            sequencer_keys;
       }
   in
   Evm_node.init

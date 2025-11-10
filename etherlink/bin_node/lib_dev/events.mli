@@ -208,3 +208,7 @@ val replicate_operation_dropped : Operation_hash.t -> string -> unit Lwt.t
 val preconfirmation_timestamp : Time.Protocol.t -> unit Lwt.t
 
 val preconfirmation : Ethereum_types.hash -> unit Lwt.t
+
+(** [patched_sequencer_key pk] advertises that the sequencer key in
+    state was patched with [pk] . *)
+val patched_sequencer_key : Signature.Public_key.t -> unit Lwt.t

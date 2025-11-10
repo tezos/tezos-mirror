@@ -68,12 +68,12 @@ val setup_l1_contracts :
 (** [run_new_rpc_endpoint node] starts a new rpc node following the setup. *)
 val run_new_rpc_endpoint : Evm_node.t -> Evm_node.t Lwt.t
 
-(**[run_new_rpc_endpoint ~sc_rollup_node node] starts a new observer following
+(**[run_new_observer_node ~sc_rollup_node node] starts a new observer following
    the setup. *)
 val run_new_observer_node :
   ?finalized_view:bool ->
   ?patch_config:(Tezt_wrapper.JSON.t -> Tezt_wrapper.JSON.t) ->
-  sc_rollup_node:Sc_rollup_node.t ->
+  sc_rollup_node:Sc_rollup_node.t option ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
