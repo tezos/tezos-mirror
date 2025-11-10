@@ -152,7 +152,7 @@ module Events = struct
       ~prefix_name_with_section:true
       ~name:"ping"
       ~msg:"Process Ping from {peer}"
-      ~level:Info
+      ~level:Debug
       ~pp1:P2p_peer.Id.pp
       ("peer", P2p_peer.Id.encoding)
 
@@ -174,7 +174,7 @@ module Events = struct
       ~prefix_name_with_section:true
       ~name:"graft"
       ~msg:"Process Graft {peer} for {topic}"
-      ~level:Info
+      ~level:Debug
       ~pp1:P2p_peer.Id.pp
       ~pp2:GS.Topic.pp
       ("peer", P2p_peer.Id.encoding)
@@ -186,7 +186,7 @@ module Events = struct
       ~prefix_name_with_section:true
       ~name:"prune"
       ~msg:"Process Prune {peer} for {topic} with backoff {backoff} and px {px}"
-      ~level:Info
+      ~level:Debug
       ~pp1:P2p_peer.Id.pp
       ~pp2:GS.Topic.pp
       ~pp3:Types.Span.pp
@@ -203,7 +203,7 @@ module Events = struct
       ~name:"ihave"
       ~msg:
         "Process IHave from {peer} for {topic} with message_ids {message_ids}"
-      ~level:Info
+      ~level:Debug
       ~pp1:P2p_peer.Id.pp
       ~pp2:GS.Topic.pp
       ~pp3:(Format.pp_print_list ~pp_sep GS.Message_id.pp)
@@ -217,7 +217,7 @@ module Events = struct
       ~prefix_name_with_section:true
       ~name:"iwant"
       ~msg:"Process IWant from {peer} with message_ids {message_ids}"
-      ~level:Info
+      ~level:Debug
       ~pp1:P2p_peer.Id.pp
       ~pp2:(Format.pp_print_list ~pp_sep GS.Message_id.pp)
       ("peer", P2p_peer.Id.encoding)

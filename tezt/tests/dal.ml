@@ -5651,7 +5651,7 @@ let test_attestation_through_p2p ~batching_time_interval _protocol
       ~peers
       producer
   in
-  let* () = Dal_node.run ~wait_ready:true producer in
+  let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug producer in
   let* producer_peer_id = peer_id producer in
   let* () =
     check_profiles
@@ -6419,7 +6419,7 @@ module Amplification = struct
       Dal_node.wait_for_connections slot_producer (2 + List.length all_attesters)
     in
 
-    let* () = Dal_node.run ~wait_ready:true slot_producer in
+    let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug slot_producer in
     let observer = Dal_node.create ~name:"observer" ~node () in
     let* () =
       Dal_node.init_config ~observer_profiles:[slot_index] ~peers observer
@@ -6751,7 +6751,7 @@ module Amplification = struct
 
     let producer = Dal_node.create ~name:"producer" ~node () in
     let* () = Dal_node.init_config ~operator_profiles:[index] ~peers producer in
-    let* () = Dal_node.run ~wait_ready:true producer in
+    let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug producer in
     let* producer_peer_id = peer_id producer in
     let* () =
       check_profiles
@@ -6763,7 +6763,7 @@ module Amplification = struct
 
     let observer = Dal_node.create ~name:"observer" ~node () in
     let* () = Dal_node.init_config ~observer_profiles:[index] ~peers observer in
-    let* () = Dal_node.run ~wait_ready:true observer in
+    let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug observer in
     let* observer_peer_id = peer_id observer in
     let* () =
       check_profiles
@@ -6920,13 +6920,13 @@ module Amplification = struct
       let env =
         String_map.singleton Dal_node.ignore_topics_environment_variable "yes"
       in
-      Dal_node.run ~env ~wait_ready:true producer
+      Dal_node.run ~env ~wait_ready:true ~event_level:`Debug producer
     in
     let* producer_peer_id = peer_id producer in
 
     let observer = Dal_node.create ~name:"observer" ~node () in
     let* () = Dal_node.init_config ~observer_profiles:[index] ~peers observer in
-    let* () = Dal_node.run ~wait_ready:true observer in
+    let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug observer in
     let* observer_peer_id = peer_id observer in
 
     let all_pkhs =
@@ -6938,7 +6938,7 @@ module Amplification = struct
     let* () =
       Dal_node.init_config ~attester_profiles:all_pkhs ~peers attester
     in
-    let* () = Dal_node.run ~wait_ready:true attester in
+    let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug attester in
     let* attester_peer_id = peer_id attester in
 
     Log.info
@@ -8207,7 +8207,7 @@ let test_rpc_get_connections _protocol dal_parameters _cryptobox node client
 
   let producer = Dal_node.create ~name:"producer" ~node () in
   let* () = Dal_node.init_config ~operator_profiles:[index] ~peers producer in
-  let* () = Dal_node.run ~wait_ready:true producer in
+  let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug producer in
   let* producer_peer_id = peer_id producer in
   let* () =
     check_profiles
@@ -8219,7 +8219,7 @@ let test_rpc_get_connections _protocol dal_parameters _cryptobox node client
 
   let observer = Dal_node.create ~name:"observer" ~node () in
   let* () = Dal_node.init_config ~observer_profiles:[index] ~peers observer in
-  let* () = Dal_node.run ~wait_ready:true observer in
+  let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug observer in
   let* observer_peer_id = peer_id observer in
   let* () =
     check_profiles
@@ -9301,7 +9301,7 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
   let* () =
     Dal_node.init_config ~operator_profiles:[slot_index] ~peers producer
   in
-  let* () = Dal_node.run ~wait_ready:true producer in
+  let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug producer in
   let* () =
     check_profiles
       ~__LOC__
@@ -11821,7 +11821,7 @@ let test_dal_one_level_reorg protocol dal_parameters _cryptobox node1 client1
   let* () =
     Dal_node.init_config ~operator_profiles:[slot_index] ~peers producer
   in
-  let* () = Dal_node.run ~wait_ready:true producer in
+  let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug producer in
   let* () =
     check_profiles
       ~__LOC__

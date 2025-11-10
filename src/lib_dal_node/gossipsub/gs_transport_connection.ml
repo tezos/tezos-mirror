@@ -48,7 +48,7 @@ module Events = struct
       ~prefix_name_with_section:true
       ~name:"message_notified_to_app"
       ~msg:"Successfully notified message id {message_id} to the application"
-      ~level:Info
+      ~level:Debug
       ~pp1:Worker.GS.Message_id.pp
       ("message_id", Types.Message_id.encoding)
 
