@@ -262,7 +262,7 @@ let produce_block_with_transactions (type f)
         ~transactions_and_objects
         ~hash_of_tx_object:Tx_queue_types.Tezlink_operation.hash_of_tx_object
 
-let validate_tx ~maximum_cumulative_size
+let validate_etherlink_tx ~maximum_cumulative_size
     (validation_state : Validation_types.validation_state) raw_tx
     (tx_object : Transaction_object.t) =
   let open Lwt_result_syntax in
@@ -282,7 +282,7 @@ let validate_tx ~maximum_cumulative_size
         let*! () = Block_producer_events.transaction_rejected hash msg in
         return `Drop
 
-let validate_op ~maximum_cumulative_size
+let validate_tezlink_op ~maximum_cumulative_size
     (state : Validation_types.validation_state) raw_op
     (operation : Tezos_types.Operation.t) =
   let open Lwt_result_syntax in
@@ -316,7 +316,7 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
         let* l =
           Tx_container.pop_transactions
             ~maximum_cumulative_size
-            ~validate_tx:(validate_op ~maximum_cumulative_size)
+            ~validate_tx:(validate_tezlink_op ~maximum_cumulative_size)
             ~initial_validation_state
         in
         return (Michelson_tx_objects l)
@@ -358,7 +358,7 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
         let* l =
           Tx_container.pop_transactions
             ~maximum_cumulative_size
-            ~validate_tx:(validate_tx ~maximum_cumulative_size)
+            ~validate_tx:(validate_etherlink_tx ~maximum_cumulative_size)
             ~initial_validation_state
         in
         return (Evm_tx_objects l)
@@ -625,12 +625,20 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
       match tx_object with
       | Tx_queue_types.Evm tx_object ->
           let+ res =
-            validate_tx ~maximum_cumulative_size validation_state raw tx_object
+            validate_etherlink_tx
+              ~maximum_cumulative_size
+              validation_state
+              raw
+              tx_object
           in
           (res, Broadcast.Evm raw)
       | Tx_queue_types.Michelson operation ->
           let+ res =
-            validate_op ~maximum_cumulative_size validation_state raw operation
+            validate_tezlink_op
+              ~maximum_cumulative_size
+              validation_state
+              raw
+              operation
           in
           (res, Broadcast.Michelson raw)
     in
