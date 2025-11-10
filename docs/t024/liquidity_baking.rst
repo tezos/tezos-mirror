@@ -29,7 +29,10 @@ Subsidy
 At every block in the chain, a small amount of tez is minted and credited to the
 CPMM contract, and the CPMM's ``%default`` entrypoint is called to update the
 ``xtz_pool`` balance in its storage. The amount that is minted and sent to the
-CPMM contract for each block is a protocol constant (``LIQUIDITY_BAKING_SUBSIDY``), defining a fixed target rate of 5 tez/minute.
+CPMM contract for each block is derived from the protocol constant
+``LIQUIDITY_BAKING_SUBSIDY``, that specifies the amount to be be
+minted per minute (set to 5 tez/minute since the :doc:`Paris
+protocol<../protocols/020_paris>`.)
 One can easily compute the value of the per block subsidy by taking into account the minimal block time, under the assumption that all blocks are produced at round 0.
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
@@ -64,7 +67,9 @@ For indicative purposes, if among the non-abstaining blocks a fraction
 reached after roughly ``2*(log(1-1/(2f)) / log(0.999))``
 non-abstaining blocks, about 1386 blocks if everyone signals, 1963
 blocks if 80% do, 3583 blocks if 60% do etc. Recall for comparison
-that assuming six blocks per minute there are 8640 blocks per day.
+that since :ref:`MINIMAL_BLOCK_DELAY<cs_constants_t024>` is 6
+seconds, there are 14400 blocks per day (assuming all blocks are
+produced at round zero.)
 
 When producing blocks using Octez baking daemon ``octez-baker``, there
 are two command-line options affecting toggle vote. The
