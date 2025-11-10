@@ -170,8 +170,8 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
           @@ Imported_protocol.Contract_storage.Empty_implicit_contract source)
   | _ -> tzfail @@ Not_a_manager_operation error_clue
 
-(** Information required to validate an operation. Some will change while folding
-   on the batch. We'll need :
+(** Information required to validate a batch of operations. Some will change
+    while folding on the batch. We'll need :
        - the [source]
        - the [next_counter] to check the operation of each counter are in order.
          This value will increase by one for each operation.

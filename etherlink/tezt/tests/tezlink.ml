@@ -2276,7 +2276,6 @@ let test_tezlink_validation_gas_limit =
     ~title:"Test Tezlink validation of block gas limit"
     ~tags:["kernel"; "validation"; "gas_limit"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
-    ~time_between_blocks:Evm_node.Nothing
   @@ fun {sequencer; _} _protocol ->
   let endpoint =
     Client.(
@@ -2347,7 +2346,6 @@ let test_tezlink_validation_counter =
     ~title:"Test Tezlink validation of counters"
     ~tags:["kernel"; "validation"; "counter"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
-    ~time_between_blocks:Evm_node.Nothing
   @@ fun {sequencer; _} _protocol ->
   let endpoint =
     Client.(
@@ -2399,7 +2397,6 @@ let test_tezlink_validation_balance =
     ~title:"Test Tezlink validation of balance"
     ~tags:["kernel"; "validation"; "balance"]
     ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
-    ~time_between_blocks:Evm_node.Nothing
   @@ fun {sequencer; _} _protocol ->
   let endpoint =
     Client.(
