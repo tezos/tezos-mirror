@@ -288,9 +288,9 @@ val wait_for_blueprint_catchup : ?timeout:float -> t -> (int * int) Lwt.t
 val wait_for_blueprint_injection_failure :
   ?timeout:float -> ?level:int -> t -> unit Lwt.t
 
-val wait_for_preconfirmation_timestamp : ?timeout:float -> t -> string Lwt.t
+val wait_for_next_block_timestamp : ?timeout:float -> t -> string Lwt.t
 
-val wait_for_preconfirmation : ?timeout:float -> t -> string Lwt.t
+val wait_for_inclusion : ?timeout:float -> t -> string Lwt.t
 
 module Config_file : sig
   (** Node configuration files. *)

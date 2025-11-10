@@ -331,12 +331,17 @@ let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7642 *)
         Stdlib.failwith "The websocket event [syncing] is not implemented yet."
     | NewIncludedTransactions ->
-        let stream, stopper = Broadcast.create_preconfirmation_stream () in
+        let stream, stopper = Broadcast.create_broadcast_stream () in
         let stream =
           Lwt_stream.filter_map
             (function
-              | Broadcast.Preconfirmed_transaction (Broadcast.Common tx) ->
-                  Some (Ethereum_types.Subscription.NewIncludedTransactions tx)
+              | Broadcast.Included_transaction (Broadcast.Common (Evm raw)) -> (
+                  let res = Transaction_object.decode raw in
+                  match res with
+                  | Ok txn ->
+                      Some
+                        (Ethereum_types.Subscription.NewIncludedTransactions txn)
+                  | Error _ -> None)
               | _ -> None)
             stream
         in

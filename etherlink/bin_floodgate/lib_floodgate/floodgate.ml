@@ -378,6 +378,8 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
       return `Continue)
     ~on_finalized_levels:(fun ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ ->
       return_unit)
+    ~on_next_block_timestamp:(fun _ -> return_unit)
+    ~on_inclusion:(fun _ -> return_unit)
     ()
 
 let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint

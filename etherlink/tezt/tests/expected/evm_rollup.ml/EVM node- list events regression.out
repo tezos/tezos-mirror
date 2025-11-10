@@ -1205,6 +1205,19 @@ importing_snapshot:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+inclusion:
+  description: received inclusion confirmation for the transaction {txn_hash}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* inclusion version 0 */
+      "inclusion.v0": $unistring }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 invalidated_token:
   description: authentication token was invalidated before its expired date
   level: warning
@@ -1391,6 +1404,23 @@ new_access_token:
     { /* new_access_token version 0 */
       "new_access_token.v0": any }
   
+next_block_timestamp:
+  description: received timestamp of the next block {timestamp}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* next_block_timestamp version 0 */
+      "next_block_timestamp.v0": $timestamp.protocol }
+    $timestamp.protocol:
+      /* A timestamp as seen by the protocol: second-level precision, epoch
+         based. */
+      $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 no_l1_latest_level:
   description: no l1 level processed, no EVM events catch up will occur
   level: warning
@@ -1505,36 +1535,6 @@ performance_profile:
   json format:
     { /* performance_profile version 0 */
       "performance_profile.v0": "performance" | "default" }
-  
-preconfirmation:
-  description: received preconfirmation for the transaction {txn_hash}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* preconfirmation version 0 */
-      "preconfirmation.v0": $unistring }
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
-  
-preconfirmation_timestamp:
-  description: received timestamp of the next block {timestamp}
-  level: notice
-  section: evm_node.dev
-  json format:
-    { /* preconfirmation_timestamp version 0 */
-      "preconfirmation_timestamp.v0": $timestamp.protocol }
-    $timestamp.protocol:
-      /* A timestamp as seen by the protocol: second-level precision, epoch
-         based. */
-      $unistring
-    $unistring:
-      /* Universal string representation
-         Either a plain UTF8 string, or a sequence of bytes for strings that
-         contain invalid byte sequences. */
-      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
 predownload_kernel:
   description: kernel {version} successfully predownloaded

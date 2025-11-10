@@ -713,12 +713,12 @@ let wait_for_blueprint_injection_failure ?timeout ?level evm_node =
       if json |-> "level" |> as_int = expected_level then Some () else None
   | None -> Some ()
 
-let wait_for_preconfirmation_timestamp ?timeout evm_node =
-  wait_for_event ?timeout evm_node ~event:"preconfirmation_timestamp.v0"
+let wait_for_next_block_timestamp ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"next_block_timestamp.v0"
   @@ fun json -> Some (JSON.as_string json)
 
-let wait_for_preconfirmation ?timeout evm_node =
-  wait_for_event ?timeout evm_node ~event:"preconfirmation.v0" @@ fun json ->
+let wait_for_inclusion ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"inclusion.v0" @@ fun json ->
   Some (JSON.as_string json)
 
 let mode_with_new_private_rpc (mode : mode) =

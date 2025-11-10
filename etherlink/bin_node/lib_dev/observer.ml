@@ -105,20 +105,26 @@ let on_finalized_levels ~rollup_node_tracking ~l1_level ~start_l2_level
     Evm_context.apply_finalized_levels ~l1_level ~start_l2_level ~end_l2_level
   else return_unit
 
-let on_timestamp ts =
+let on_next_block_timestamp ts =
   let open Lwt_result_syntax in
-  let*! () = Events.preconfirmation_timestamp ts in
+  let*! () = Events.next_block_timestamp ts in
   return ()
 
-let on_preconfirmation (txn : Broadcast.transaction) =
-  let open Lwt_syntax in
-  Broadcast.notify_preconfirmation txn ;
+let on_inclusion (txn : Broadcast.transaction) =
+  let open Lwt_result_syntax in
+  Broadcast.notify_inclusion txn ;
   let* () =
     match txn with
-    | Common txn -> Events.preconfirmation (Transaction_object.hash txn)
-    | Delayed _txn -> return_unit
+    | Common (Evm txn) ->
+        let*? obj = Transaction_object.decode txn in
+        let*! () = Events.inclusion (Transaction_object.hash obj) in
+        return_unit
+    | Delayed {hash; _} ->
+        let*! () = Events.inclusion hash in
+        return_unit
+    | _ -> return_unit
   in
-  Lwt_result_syntax.return_unit
+  return_unit
 
 let install_finalizer_observer ~rollup_node_tracking
     ~(tx_container : _ Services_backend_sig.tx_container)
@@ -344,17 +350,9 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         ~next_blueprint_number
         ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
         ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
+        ~on_next_block_timestamp
+        ~on_inclusion
         ()
-    and* () =
-      when_ config.experimental_features.preconfirmation_stream_enabled
-      @@ fun () ->
-      Preconfirmation_follower.start
-        {
-          evm_node_endpoint;
-          evm_node_endpoint_timeout = config.rpc_timeout;
-          on_timestamp;
-          on_preconfirmation;
-        }
     and* () =
       Drift_monitor.run
         ~evm_node_endpoint
