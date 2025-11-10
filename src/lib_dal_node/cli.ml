@@ -614,17 +614,39 @@ module Term = struct
 
   let term process =
     Cmdliner.Term.(
-      ret
-        (const process $ data_dir $ config_file $ rpc_addr $ expected_pow
-       $ net_addr $ public_addr $ endpoint $ slots_backup_uris
-       $ trust_slots_backup_uris $ metrics_addr $ attester_profile
-       $ operator_profile $ observer_profile $ bootstrap_profile $ peers
-       $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
-       $ disable_shard_validation $ verbose $ ignore_l1_config_peers
-       $ disable_amplification $ ignore_topics $ batching_configuration))
+      const process $ data_dir $ config_file $ rpc_addr $ expected_pow
+      $ net_addr $ public_addr $ endpoint $ slots_backup_uris
+      $ trust_slots_backup_uris $ metrics_addr $ attester_profile
+      $ operator_profile $ observer_profile $ bootstrap_profile $ peers
+      $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
+      $ disable_shard_validation $ verbose $ ignore_l1_config_peers
+      $ disable_amplification $ ignore_topics $ batching_configuration)
 end
 
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
+
+(** [wrap_with_error main_promise] wraps a promise that returns a tzresult
+    and converts it into an exit code. Returns exit code 0 on success, or
+    prints the error trace to stderr and returns exit code 1 on failure. *)
+let wrap_with_error main_promise =
+  let open Lwt_syntax in
+  let* r = Lwt_exit.wrap_and_exit main_promise in
+  match r with
+  | Ok () -> Lwt_exit.exit_and_wait 0
+  | Error err ->
+      let* () = Lwt_io.eprint (Format.asprintf "%a" pp_print_trace err) in
+      Lwt_exit.exit_and_wait 1
+
+(** [wrap_action action] is the main entry point wrapper for DAL node commands.
+    It sets up the exception filter to handle all exceptions except runtime ones,
+    starts the event loop with EIO support, and wraps the action with error
+    handling via [wrap_with_error]. *)
+let wrap_action action =
+  Lwt.Exception_filter.(set handle_all_except_runtime) ;
+  Tezos_base_unix.Event_loop.main_run
+    ~eio:true
+    ~process_name:"dal node"
+    (fun () -> wrap_with_error action)
 
 module Run = struct
   let description =
@@ -895,17 +917,6 @@ let merge
     ?batching_configuration
     configuration
 
-let wrap_with_error main_promise =
-  let open Lwt_syntax in
-  let* r = Lwt_exit.wrap_and_exit main_promise in
-  match r with
-  | Ok () ->
-      let* _ = Lwt_exit.exit_and_wait 0 in
-      Lwt.return (`Ok ())
-  | Error err ->
-      let* _ = Lwt_exit.exit_and_wait 1 in
-      Lwt.return @@ `Error (false, Format.asprintf "%a" pp_print_trace err)
-
 let run subcommand cli_options =
   let open Lwt_result_syntax in
   let data_dir =
@@ -983,11 +994,6 @@ let run subcommand cli_options =
       Format.printf "%s\n" output ;
       return_unit
 
-let main_run subcommand cli_options =
-  Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Tezos_base_unix.Event_loop.main_run ~eio:true ~process_name:"dal node"
-  @@ fun () -> wrap_with_error @@ run subcommand cli_options
-
 let commands =
   let run subcommand data_dir config_file rpc_addr expected_pow listen_addr
       public_addr endpoint slots_backup_uris trust_slots_backup_uris
@@ -1024,8 +1030,8 @@ let commands =
         ?batching_configuration
         ()
     with
-    | Ok options -> main_run subcommand options
-    | Error msg -> `Error msg
+    | Ok options -> wrap_action (run subcommand options)
+    | Error (_, e) -> wrap_action (Error_monad.failwith "%s" e)
   in
   let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
   let info =

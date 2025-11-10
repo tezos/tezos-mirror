@@ -157,4 +157,4 @@ val cli_options_to_options :
 val run : t -> options -> unit tzresult Lwt.t
 
 (** Subcommands of the DAL node *)
-val commands : unit Cmdliner.Cmd.t
+val commands : int Cmdliner.Cmd.t
