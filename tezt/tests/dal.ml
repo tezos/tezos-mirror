@@ -5202,10 +5202,6 @@ let test_dal_node_crawler_reconnects_to_l1 _protocol _dal_parameters _cryptobox
    stores much more data. *)
 let test_restart_dal_node _protocol dal_parameters _cryptobox node client
     dal_node =
-  let all_pkhs =
-    Account.Bootstrap.keys |> Array.to_list
-    |> List.map (fun account -> account.Account.public_key_hash)
-  in
   let* history_mode = Node.RPC.call node @@ RPC.get_config_history_mode in
   let* proto_params =
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
@@ -5228,38 +5224,38 @@ let test_restart_dal_node _protocol dal_parameters _cryptobox node client
     else (* this is just a not too small value *)
       3 * blocks_per_cycle
   in
-  let* baker =
-    let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
-    Agnostic_baker.init
-      ~delegates:all_pkhs
-      ~liquidity_baking_toggle_vote:(Some On)
-      ~state_recorder:true
-      ~force_apply_from_round:0
-      ~dal_node_rpc_endpoint
-      node
-      client
-  in
   let stop_level = 10 in
   let restart_level = stop_level + offline_period in
-  Log.info
-    "We let the DAL node run for a few levels (till level %d), then we stop \
-     it, then we restart it at level %d"
-    stop_level
-    restart_level ;
-  let* _ = Node.wait_for_level node stop_level in
-  let* () = Dal_node.terminate dal_node in
-  let* _ = Node.wait_for_level node restart_level in
-  let* () = Dal_node.run dal_node in
-
   let last_finalized_level =
     restart_level + dal_parameters.Dal.Parameters.attestation_lag
   in
+
+  Log.info
+    "We let the DAL node run for a few levels (till level %d)."
+    stop_level ;
+
+  let* () =
+    let* level = Node.get_level node in
+    bake_for ~count:(stop_level - level) client
+  in
+
+  Log.info "We then stop it." ;
+  let* () = Dal_node.terminate dal_node in
+
+  let* () =
+    let* level = Node.get_level node in
+    bake_for ~count:(restart_level - level) client
+  in
+  Log.info "We then restart it at level %d." restart_level ;
+  let* () = Dal_node.run dal_node in
   let wait_for_dal_node =
     wait_for_layer1_final_block dal_node last_finalized_level
   in
-  let* _ = Node.wait_for_level node (last_finalized_level + 2) in
-  let* () = Agnostic_baker.terminate baker in
+  let* () =
+    bake_for ~count:(dal_parameters.Dal.Parameters.attestation_lag + 2) client
+  in
   let* () = wait_for_dal_node in
+
   if profile <> Dal_RPC.Bootstrap then
     let expected_levels =
       List.init
@@ -12405,18 +12401,14 @@ let register ~protocols =
     test_attesters_receive_dal_rewards
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
   scenario_with_layer1_and_dal_nodes
-    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~tags:["restart"]
-    ~activation_timestamp:Now
     ~operator_profiles:[0]
     ~l1_history_mode:(Custom (Rolling (Some 5)))
     "restart DAL node (producer)"
     test_restart_dal_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
     ~tags:["restart"]
-    ~activation_timestamp:Now
     ~bootstrap_profile:true
     "restart DAL node (bootstrap)"
     test_restart_dal_node
