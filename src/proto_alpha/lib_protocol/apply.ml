@@ -2975,7 +2975,7 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
 
 let are_attestations_required ctxt ~level =
   let open Lwt_result_syntax in
-  let+ first_level = First_level_of_protocol.get ctxt in
+  let+ first_level = Protocol_activation_level.get ctxt in
   (* NB: the first level is the level of the migration block. There
      are no attestations for this block. Therefore the block at the
      next level cannot contain attestations. *)

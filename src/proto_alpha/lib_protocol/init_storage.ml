@@ -190,9 +190,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     match previous_protocol with
     | Genesis param ->
         (* This is the genesis protocol: initialise the state *)
-        let* ctxt =
-          Storage.Tenderbake.First_level_of_protocol.init ctxt level
-        in
+        let* ctxt = Storage.Protocol_activation_level.init ctxt level in
         let* ctxt = Forbidden_delegates_storage.init_for_genesis ctxt in
         let*! ctxt = Storage.Contract.Total_supply.add ctxt Tez_repr.zero in
         let* ctxt = Storage.Block_round.init ctxt Round_repr.zero in
@@ -254,9 +252,7 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
         (* Start of Alpha stitching. Comment used for automatic snapshot *)
     | Alpha ->
-        let* ctxt =
-          Storage.Tenderbake.First_level_of_protocol.update ctxt level
-        in
+        let* ctxt = Storage.Protocol_activation_level.update ctxt level in
         (* Migration of refutation games needs to be kept for each protocol. *)
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
@@ -266,7 +262,8 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
     | T024 ->
         let* ctxt =
-          Storage.Tenderbake.First_level_of_protocol.update ctxt level
+          let*! ctxt = Storage.Tenderbake.First_level_of_protocol.remove ctxt in
+          Storage.Protocol_activation_level.init ctxt level
         in
         (* Migration of refutation games needs to be kept for each protocol. *)
         let* ctxt =

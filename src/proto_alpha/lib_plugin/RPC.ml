@@ -2429,7 +2429,7 @@ module Protocol = struct
 
   let register_first_level () =
     Registration.register0 ~chunked:false S.first_level (fun context () () ->
-        Alpha_context.First_level_of_protocol.get context)
+        Alpha_context.Protocol_activation_level.get context)
 
   let register () = register_first_level ()
 

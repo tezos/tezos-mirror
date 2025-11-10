@@ -119,6 +119,13 @@ module Consecutive_round_zero :
     end)
     (Encoding.Int32)
 
+module Protocol_activation_level =
+  Make_single_data_storage (Registered) (Raw_context)
+    (struct
+      let name = ["protocol_activation_level"]
+    end)
+    (Raw_level_repr)
+
 module Tenderbake = struct
   module First_level_of_protocol =
     Make_single_data_storage (Registered) (Raw_context)
