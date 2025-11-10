@@ -181,8 +181,8 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
        - the [source]
        - the [first_counter]
        - the [length] of the batch
-    To build the blueprint we'll need:
        - the total [fee]
+       - the total [gas_limit_sum]
 *)
 type batch_validation_context = {
   source : public_key_hash;
