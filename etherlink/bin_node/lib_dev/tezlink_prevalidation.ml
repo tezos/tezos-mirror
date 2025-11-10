@@ -181,8 +181,9 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
        - the [source]
        - the [first_counter]
        - the [length] of the batch
-       - the total [fee]
-       - the total [gas_limit_sum]
+       - the total [fee_sum] (to check the validity when inserting in a
+         blueprint, as the source balance might have changed)
+       - the total [gas_limit_sum] (to check if there is room in the blueprint)
 *)
 type batch_validation_context = {
   source : public_key_hash;
@@ -195,7 +196,7 @@ type batch_validation_context = {
   error_clue : clue;
   first_counter : Manager_counter.t;
   length : int;
-  fee : Tez.t;
+  fee_sum : Tez.t;
   gas_limit_sum : Z.t;
   signature_check_cost : Gas.cost;
 }
@@ -259,12 +260,12 @@ let validate_balance ~ctxt ~fee =
   | Some balance_left -> (
       (* The source can pay for the fees, we compute the total fee for the
          batch. *)
-      match Tez.(ctxt.fee +? fee) with
-      | Ok fee -> return (Ok {ctxt with balance_left; fee})
+      match Tez.(ctxt.fee_sum +? fee) with
+      | Ok fee_sum -> return (Ok {ctxt with balance_left; fee_sum})
       | Error _ ->
           tzfail_p
           @@ Imported_protocol.Tez_repr.Addition_overflow
-               (tezrep_of ctxt.fee, tezrep_of fee))
+               (tezrep_of ctxt.fee_sum, tezrep_of fee))
   | None ->
       (* The source can't pay for the fees. *)
       tzfail_p
@@ -520,7 +521,7 @@ let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
       error_clue;
       first_counter;
       length = 0;
-      fee = Tez.zero;
+      fee_sum = Tez.zero;
       gas_limit_sum = Z.zero;
       signature_check_cost;
     }
@@ -543,7 +544,7 @@ let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
         raw;
         op;
         first_counter;
-        fee = ctxt.fee;
+        fee = ctxt.fee_sum;
         gas_limit = ctxt.gas_limit_sum;
       }
   in
