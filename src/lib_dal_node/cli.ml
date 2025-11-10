@@ -38,7 +38,7 @@ let env_value_starts_with_yes ~env_var =
 let disable_shard_validation_environment_variable =
   "TEZOS_DISABLE_SHARD_VALIDATION_I_KNOW_WHAT_I_AM_DOING"
 
-let disable_shard_validation =
+let env_disable_shard_validation =
   env_value_starts_with_yes
     ~env_var:disable_shard_validation_environment_variable
 
@@ -631,19 +631,9 @@ module Term = struct
       "batching-time-interval"
 
   let batching_configuration = arg_to_cmdliner batching_configuration_arg
-
-  let term process =
-    Cmdliner.Term.(
-      const process $ data_dir $ config_file $ rpc_addr $ expected_pow
-      $ net_addr $ public_addr $ endpoint $ slots_backup_uris
-      $ trust_slots_backup_uris $ metrics_addr $ attester_profile
-      $ operator_profile $ observer_profile $ bootstrap_profile $ peers
-      $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
-      $ disable_shard_validation $ verbose $ ignore_l1_config_peers
-      $ disable_amplification $ ignore_topics $ batching_configuration)
 end
 
-type t = Run
+type t
 
 (** [wrap_with_error main_promise] wraps a promise that returns a tzresult
     and converts it into an exit code. Returns exit code 0 on success, or
@@ -678,7 +668,114 @@ module Run = struct
     let version = Tezos_version_value.Bin_version.octez_version_string in
     Cmdliner.Cmd.info ~doc:"Run the Octez DAL node" ~man ~version "run"
 
-  let cmd run = Cmdliner.Cmd.v info (Term.term (run Run))
+  let action =
+   fun data_dir
+       config_file
+       rpc_addr
+       expected_pow
+       listen_addr
+       public_addr
+       endpoint
+       slots_backup_uris
+       trust_slots_backup_uris
+       metrics_addr
+       attesters
+       operators
+       observers
+       bootstrap
+       peers
+       history_mode
+       service_name
+       service_namespace
+       fetch_trusted_setup
+       disable_shard_validation
+       verbose
+       ignore_l1_config_peers
+       disable_amplification
+       ignore_topics
+       batching_configuration ->
+    let open Lwt_result_syntax in
+    let data_dir =
+      Option.value ~default:Configuration_file.default.data_dir data_dir
+    in
+    let config_file =
+      Option.value
+        ~default:(Configuration_file.default_config_file data_dir)
+        config_file
+    in
+    let ignore_topics = Option.value ~default:[] ignore_topics in
+    let*? profile = profile ?attesters ?operators ?observers ~bootstrap () in
+    let configuration_override =
+      override_conf
+        ~data_dir
+        ?rpc_addr
+        ?expected_pow
+        ?listen_addr
+        ?public_addr
+        ?endpoint
+        ?slots_backup_uris
+        ~trust_slots_backup_uris
+        ?metrics_addr
+        ?profile
+        ?peers
+        ?history_mode
+        ?service_name
+        ?service_namespace
+        ?fetch_trusted_setup
+        ~verbose
+        ~ignore_l1_config_peers
+        ~disable_amplification
+        ?batching_configuration
+    in
+    let* () =
+      if env_disable_shard_validation && not disable_shard_validation then
+        failwith
+          "DAL shard validation is disabled but the option \
+           '--disable-shard-validation' was not provided."
+      else if (not env_disable_shard_validation) && disable_shard_validation
+      then
+        failwith
+          "DAL shard validation is enabled but the environment variable %s was \
+           not set."
+          disable_shard_validation_environment_variable
+      else return_unit
+    in
+    let* ignore_pkhs =
+      if env_ignore_topics && List.is_empty ignore_topics then
+        failwith
+          "The environment variable to ignore topics %s was set, but the \
+           option '--ignore-topics' was not provided."
+          env_var_ignore_topics
+      else if (not env_ignore_topics) && (not @@ List.is_empty ignore_topics)
+      then
+        failwith
+          "The option '--ignore-topics' was provided, but the environment \
+           variable to ignore topics %s was not set."
+          env_var_ignore_topics
+      else return ignore_topics
+    in
+    Daemon.run
+      ~disable_shard_validation
+      ~ignore_pkhs
+      ~data_dir
+      ~config_file
+      ~configuration_override
+      ()
+
+  let term =
+    let open Term in
+    Cmdliner.Term.(
+      map
+        wrap_action
+        (const action $ data_dir $ config_file $ rpc_addr $ expected_pow
+       $ net_addr $ public_addr $ endpoint $ slots_backup_uris
+       $ trust_slots_backup_uris $ metrics_addr $ attester_profile
+       $ operator_profile $ observer_profile $ bootstrap_profile $ peers
+       $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
+       $ disable_shard_validation $ verbose $ ignore_l1_config_peers
+       $ disable_amplification $ ignore_topics $ batching_configuration))
+
+  let cmd = Cmdliner.Cmd.v info term
 end
 
 module Config = struct
@@ -987,110 +1084,43 @@ let cli_options_to_options ?data_dir ?config_file ?rpc_addr ?expected_pow
       batching_configuration;
     }
 
-let merge
-    {
-      data_dir;
-      config_file = _;
-      rpc_addr;
-      expected_pow;
-      listen_addr;
-      public_addr;
-      endpoint;
-      slots_backup_uris;
-      trust_slots_backup_uris;
-      metrics_addr;
-      profile;
-      peers;
-      history_mode;
-      service_name;
-      service_namespace;
-      experimental_features;
-      fetch_trusted_setup;
-      disable_shard_validation = _;
-      verbose;
-      ignore_l1_config_peers;
-      disable_amplification;
-      ignore_topics = _;
-      batching_configuration;
-    } configuration =
-  override_conf
-    ?data_dir
-    ?rpc_addr
-    ?expected_pow
-    ?listen_addr
-    ?public_addr
-    ?endpoint
-    ~slots_backup_uris
-    ~trust_slots_backup_uris
-    ?metrics_addr
-    ?profile
-    ~peers
-    ?history_mode
-    ?service_name
-    ?service_namespace
-    ~experimental_features:(Some experimental_features)
-    ?fetch_trusted_setup
-    ~verbose
-    ~ignore_l1_config_peers
-    ~disable_amplification
-    ?batching_configuration
-    configuration
-
-let run subcommand cli_options =
-  let open Lwt_result_syntax in
-  let data_dir =
-    Option.value
-      ~default:Configuration_file.default.data_dir
-      cli_options.data_dir
-  in
-  let config_file =
-    Option.value
-      cli_options.config_file
-      ~default:(Configuration_file.default_config_file data_dir)
-  in
-  match subcommand with
-  | Run ->
-      let* () =
-        if disable_shard_validation && not cli_options.disable_shard_validation
-        then
-          failwith
-            "DAL shard validation is disabled but the option \
-             '--disable-shard-validation' was not provided."
-        else if
-          (not disable_shard_validation) && cli_options.disable_shard_validation
-        then
-          failwith
-            "DAL shard validation is enabled but the environment variable %s \
-             was not set."
-            disable_shard_validation_environment_variable
-        else return_unit
-      in
-      let* ignore_pkhs =
-        if env_ignore_topics && List.is_empty cli_options.ignore_topics then
-          failwith
-            "The environment variable to ignore topics %s was set, but the \
-             option '--ignore-topics' was not provided."
-            env_var_ignore_topics
-        else if
-          (not env_ignore_topics)
-          && (not @@ List.is_empty cli_options.ignore_topics)
-        then
-          failwith
-            "The option '--ignore-topics' was provided, but the environment \
-             variable to ignore topics %s was not set."
-            env_var_ignore_topics
-        else return cli_options.ignore_topics
-      in
-      Daemon.run
-        ~disable_shard_validation
-        ~ignore_pkhs
-        ~data_dir
-        ~config_file
-        ~configuration_override:(merge cli_options)
-        ()
-
 module Action = struct
   (** Optional boolean values are defined as switch, which means that default value is [false]. *)
+
+  let run ?data_dir ?config_file ?rpc_addr ?expected_pow ?listen_addr
+      ?public_addr ?endpoint ?slots_backup_uris
+      ?(trust_slots_backup_uris = false) ?metrics_addr ?attesters ?operators
+      ?observers ?(bootstrap = false) ?peers ?history_mode ?service_name
+      ?service_namespace ?fetch_trusted_setup
+      ?(disable_shard_validation = false) ?(verbose = false)
+      ?(ignore_l1_config_peers = false) ?(disable_amplification = false)
+      ?ignore_topics ?batching_configuration () =
+    Run.action
+      data_dir
+      config_file
+      rpc_addr
+      expected_pow
+      listen_addr
+      public_addr
+      endpoint
+      slots_backup_uris
+      trust_slots_backup_uris
+      metrics_addr
+      attesters
+      operators
+      observers
+      bootstrap
+      peers
+      history_mode
+      service_name
+      service_namespace
+      fetch_trusted_setup
+      disable_shard_validation
+      verbose
+      ignore_l1_config_peers
+      disable_amplification
+      ignore_topics
+      batching_configuration
 
   let mk_config_action action =
    fun ?data_dir
@@ -1150,47 +1180,9 @@ module Action = struct
 end
 
 let commands =
-  let run subcommand data_dir config_file rpc_addr expected_pow listen_addr
-      public_addr endpoint slots_backup_uris trust_slots_backup_uris
-      metrics_addr attesters operators observers bootstrap peers history_mode
-      service_name service_namespace fetch_trusted_setup
-      disable_shard_validation verbose ignore_l1_config_peers
-      disable_amplification ignore_topics batching_configuration =
-    match
-      cli_options_to_options
-        ?data_dir
-        ?config_file
-        ?rpc_addr
-        ?expected_pow
-        ?listen_addr
-        ?public_addr
-        ?endpoint
-        ?slots_backup_uris
-        ~trust_slots_backup_uris
-        ?metrics_addr
-        ?attesters
-        ?operators
-        ?observers
-        ~bootstrap
-        ?peers
-        ?history_mode
-        ?service_name
-        ?service_namespace
-        ?fetch_trusted_setup
-        ~disable_shard_validation
-        ~verbose
-        ~ignore_l1_config_peers
-        ~disable_amplification
-        ?ignore_topics
-        ?batching_configuration
-        ()
-    with
-    | Ok options -> wrap_action (run subcommand options)
-    | Error (_, e) -> wrap_action (Error_monad.failwith "%s" e)
-  in
   let default = Cmdliner.Term.(ret (const (`Help (`Pager, None)))) in
   let info =
     let version = Tezos_version_value.Bin_version.octez_version_string in
     Cmdliner.Cmd.info ~doc:"The Octez DAL node" ~version "octez-dal-node"
   in
-  Cmdliner.Cmd.group ~default info [Run.cmd run; Config.cmd; Debug.cmd]
+  Cmdliner.Cmd.group ~default info [Run.cmd; Config.cmd; Debug.cmd]

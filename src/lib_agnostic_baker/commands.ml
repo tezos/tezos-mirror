@@ -89,34 +89,6 @@ module Dal = struct
 
   let batching_configuration = arg_to_clic batching_configuration_arg
 
-  let args =
-    Tezos_clic.args25
-      data_dir
-      config_file
-      rpc_addr
-      expected_pow
-      net_addr
-      public_addr
-      endpoint
-      slots_backup_uris
-      trust_slots_backup_uris
-      metrics_addr
-      attester_profile
-      operator_profile
-      observer_profile
-      bootstrap_profile
-      peers
-      history_mode
-      service_name
-      service_namespace
-      fetch_trusted_setup
-      disable_shard_validation
-      verbose
-      ignore_l1_config_peers
-      disable_amplification
-      ignore_topics
-      batching_configuration
-
   let commands =
     let open Tezos_clic in
     let group = {name = "dal"; title = "Commands related to the DAL daemon."} in
@@ -130,72 +102,95 @@ module Dal = struct
         (prefixes ["debug"; "dal"; "print"; "store"; "schemas"] @@ stop)
         (fun () _cctxt -> Cli.Action.debug_print_store_schemas ())
     in
-    let make_command ~desc params cmd =
+    let run =
+      let open Tezos_clic in
+      let args =
+        Tezos_clic.args25
+          data_dir
+          config_file
+          rpc_addr
+          expected_pow
+          net_addr
+          public_addr
+          endpoint
+          slots_backup_uris
+          trust_slots_backup_uris
+          metrics_addr
+          attester_profile
+          operator_profile
+          observer_profile
+          bootstrap_profile
+          peers
+          history_mode
+          service_name
+          service_namespace
+          fetch_trusted_setup
+          disable_shard_validation
+          verbose
+          ignore_l1_config_peers
+          disable_amplification
+          ignore_topics
+          batching_configuration
+      in
       command
         ~group
-        ~desc
+        ~desc:"Run the Octez DAL"
         args
-        params
-        (fun
-          ( data_dir,
-            config_file,
-            rpc_addr,
-            expected_pow,
-            net_addr,
-            public_addr,
-            endpoint,
-            http_backup_uris,
-            trust_http_backup_uris,
-            metrics_addr,
-            attester_profile,
-            operator_profile,
-            observer_profile,
-            bootstrap_profile,
-            peers,
-            history_mode,
-            service_name,
-            service_namespace,
-            fetch_trusted_setup,
-            disable_shard_validation,
-            verbose,
-            ignore_l1_config_peers,
-            disable_amplification,
-            ignore_topics,
-            batching_configuration )
-          _cctxt
-        ->
-          let options =
-            Cli.cli_options_to_options
-              ?data_dir
-              ?config_file
-              ?rpc_addr
-              ?expected_pow
-              ?listen_addr:net_addr
-              ?public_addr
-              ?endpoint
-              ?slots_backup_uris:http_backup_uris
-              ~trust_slots_backup_uris:trust_http_backup_uris
-              ?metrics_addr
-              ?attesters:attester_profile
-              ?operators:operator_profile
-              ?observers:observer_profile
-              ~bootstrap:bootstrap_profile
-              ?peers
-              ?history_mode
-              ?service_name
-              ?service_namespace
-              ?fetch_trusted_setup
-              ~disable_shard_validation
-              ~verbose
-              ~ignore_l1_config_peers
-              ~disable_amplification
-              ?ignore_topics
-              ?batching_configuration
-              ()
-          in
-          match options with
-          | Ok options -> Cli.run cmd options
-          | Error (_, msg) -> failwith "%s" msg)
+        (prefixes ["run"; "dal"] @@ stop)
+        (fun ( data_dir,
+               config_file,
+               rpc_addr,
+               expected_pow,
+               net_addr,
+               public_addr,
+               endpoint,
+               slots_backup_uris,
+               trust_slots_backup_uris,
+               metrics_addr,
+               attesters,
+               operators,
+               observers,
+               bootstrap,
+               peers,
+               history_mode,
+               service_name,
+               service_namespace,
+               fetch_trusted_setup,
+               disable_shard_validation,
+               verbose,
+               ignore_l1_config_peers,
+               disable_amplification,
+               ignore_topics,
+               batching_configuration )
+             _cctxt
+           ->
+          Cli.Action.run
+            ?data_dir
+            ?config_file
+            ?rpc_addr
+            ?expected_pow
+            ?listen_addr:net_addr
+            ?public_addr
+            ?endpoint
+            ?slots_backup_uris
+            ~trust_slots_backup_uris
+            ?metrics_addr
+            ?attesters
+            ?operators
+            ?observers
+            ~bootstrap
+            ?peers
+            ?history_mode
+            ?service_name
+            ?service_namespace
+            ?fetch_trusted_setup
+            ~disable_shard_validation
+            ~verbose
+            ~ignore_l1_config_peers
+            ~disable_amplification
+            ?ignore_topics
+            ?batching_configuration
+            ())
     in
     let mk_config_command ~prefix:p ~desc action =
       let open Tezos_clic in
@@ -302,15 +297,7 @@ module Dal = struct
         ~prefix:"update"
         Cli.Action.config_update
     in
-    [
-      make_command
-        ~desc:"Run the Octez DAL"
-        (prefixes ["run"; "dal"] @@ stop)
-        Cli.Run;
-      config_init;
-      config_update;
-      debug_print_store_schemas;
-    ]
+    [run; config_init; config_update; debug_print_store_schemas]
 end
 
 module Baker = struct
