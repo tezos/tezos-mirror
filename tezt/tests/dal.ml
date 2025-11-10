@@ -8996,7 +8996,7 @@ module Refutations = struct
       ~smart_rollup_timeout_period_in_blocks:20
       ~l1_history_mode:Default_with_refutation
       ~disable_amplification:true
-      ~tags:[Tag.slow]
+      ~tags:[Tag.slow; Tag.memory_hungry]
       (scenario ~refute_operations_priority)
       protocols
 end
@@ -12313,7 +12313,7 @@ let register ~protocols =
     protocols ;
   Skip_list_rpcs.test_skip_list_rpcs protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["amplification"]
+    ~tags:["amplification"; Tag.memory_hungry]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~redundancy_factor:2
@@ -12342,7 +12342,7 @@ let register ~protocols =
     Amplification.test_amplification_without_lost_shards
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "simple"]
+    ~tags:["gc"; "simple"; Tag.memory_hungry]
     ~operator_profiles:[0]
     ~number_of_slots:1
     "garbage collection of shards for producer"
@@ -12443,6 +12443,7 @@ let register ~protocols =
     "test reveal_dal_page in fast exec wasm pvm"
     ~uses:(fun _protocol ->
       [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel])
+    ~tags:[Tag.memory_hungry]
     ~pvm_name:"wasm_2_0_0"
     ~number_of_shards:256
     ~slot_size:(1 lsl 15)
