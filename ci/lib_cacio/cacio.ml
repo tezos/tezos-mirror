@@ -750,6 +750,34 @@ let number_of_declared_jobs = ref 0
 
 let get_number_of_declared_jobs () = !number_of_declared_jobs
 
+(* Data to be written using [output_tezt_job_list]. *)
+type tezt_job_info = {
+  component : string option;
+  variant : string option;
+  parallel_jobs : int;
+  parallel_tests : int;
+}
+
+let tezt_jobs : tezt_job_info list ref = ref []
+
+let output_tezt_job_list path =
+  let ch = open_out path in
+  Fun.protect ~finally:(fun () -> close_out ch) @@ fun () ->
+  ( Fun.flip List.iter !tezt_jobs
+  @@ fun {component; variant; parallel_jobs; parallel_tests} ->
+    let component = Option.value component ~default:"" in
+    let variant = Option.value variant ~default:"" in
+    assert (not @@ String.exists (( = ) ',') component) ;
+    assert (not @@ String.exists (( = ) ',') variant) ;
+    Printf.fprintf
+      ch
+      "%s,%s,%d,%d\n"
+      component
+      variant
+      parallel_jobs
+      parallel_tests ) ;
+  flush ch
+
 (* We could avoid using a functor if we required the user of this module
    to pass the component's [name] and [paths] to the functions that need them,
    but in practice this would be less convenient since all functions need at least
@@ -1068,6 +1096,15 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       | Some pipeline_name ->
           (Artifacts, job_tezt_fetch_records pipeline_name) :: needs
     in
+    let tezt_job_info =
+      {
+        component = Component.name;
+        variant = (if variant = "" then None else Some variant);
+        parallel_jobs;
+        parallel_tests;
+      }
+    in
+    tezt_jobs := tezt_job_info :: !tezt_jobs ;
     job
       (if variant = "" then "tezt" else "tezt-" ^ variant)
       ~__POS__:source_location

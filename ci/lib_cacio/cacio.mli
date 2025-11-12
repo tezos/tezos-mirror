@@ -493,6 +493,13 @@ val get_release_tag_rexes : unit -> string list
 (** Get the number of times the [job] function was called. *)
 val get_number_of_declared_jobs : unit -> int
 
+(** {2 Other} *)
+
+(** Output the list of Tezt jobs, as well as some of their parameters, to a file.
+
+    The file can be read by [tezt/stats]. *)
+val output_tezt_job_list : string -> unit
+
 (** {2 Future work} *)
 
 (** One idea would be to have Cacio provide a dedicated function to create Tezt jobs.
