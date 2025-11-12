@@ -55,8 +55,33 @@ let () =
           in
           let paths = if paths = [] then ["tezt/records"] else [] in
           `stats (recursive, filter, paths) );
+        ( Clap.case
+            "balance"
+            ~description:
+              "Output how many jobs of each kind should lead to better \
+               balancing."
+        @@ fun () ->
+          let target =
+            Clap.default_float
+              ~long:"target"
+              ~short:'t'
+              ~placeholder:"MINUTES"
+              ~description:
+                "Recommend job counts such that each job runs for about \
+                 MINUTES."
+              5.
+          in
+          let verbose =
+            Clap.flag
+              ~set_long:"verbose"
+              ~set_short:'v'
+              ~description:"Output more information about each job."
+              false
+          in
+          `balance (target, verbose) );
       ]
   in
   Clap.close () ;
   match command with
   | `stats (recursive, filter, paths) -> Cmd_stats.run ~recursive ~filter ~paths
+  | `balance (target, verbose) -> Cmd_balance.run ~target ~verbose
