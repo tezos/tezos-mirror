@@ -29,11 +29,11 @@ touch /tmp/kiss.log
 chmod a+rw /tmp/kiss.log
 
 KISSFAIL=0
-
+CURL_RETRY="--retry 2 --retry-delay 5 --retry-max-time 60"
 # shellcheck disable=SC2086
-if curl --output /dev/null --silent --head --fail "$KISSCACHE"; then
+if curl $CURL_RETRY --output /dev/null --silent --head --fail "$KISSCACHE"; then
   # Use curl to fetch the mangled URL
-  curl -L $arguments $mangled_url
+  curl $CURL_RETRY -L $arguments $mangled_url
 
   # shellcheck disable=SC2181
   if [ $? = 0 ]; then
@@ -49,7 +49,7 @@ fi
 if [ $KISSFAIL = 1 ]; then
   # Use curl to fetch the original URL
   # shellcheck disable=SC2086
-  curl -L $arguments $original_url
+  curl $CURL_RETRY -L $arguments $original_url
 
   # shellcheck disable=SC2181
   if [ $? = 0 ]; then
