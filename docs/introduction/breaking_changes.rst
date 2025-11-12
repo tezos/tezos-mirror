@@ -6,16 +6,35 @@ between successive protocols or successive Octez versions. It
 complements the respective :ref:`protocol changelogs
 <protocol_changelogs>` and :doc:`Octez changelog <../CHANGES>` by
 gathering all breaking changes in one place and providing more context
-when appropriate.
+when appropriate. Deprecated features are also presented here.
 
-For each change, there may be subsections ``Deprecation`` and ``Breaking
-changes``. The former subsection will explain what changes can be made during a
-deprecation phase to adapt smoothly to the new changes. The latter subsection
-will present the changes that can not be done by the deprecation mechanism and
-that may be breaking.
+In the particular case of RPC changes, you may consult complementary
+information on :ref:`RPC versioning <rpc_versioning>`, covering how
+new versions are introduced, the deprecation policy, and a concrete
+calendar of RPCs planned to be removed.
 
-In the particular case of RPC changes, you may consult complementary information on :ref:`RPC versioning <rpc_versioning>`, covering how new versions are introduced, the deprecation policy, and a concrete calendar of RPCs planned to be removed.
+This page contains the breaking changes and deprecated features of
+current or recent protocols, protocol proposals, and Octez versions:
 
+- :ref:`tallinn_breaking_changes`
+- :ref:`seoul_breaking_changes`
+- :ref:`v24_breaking_changes`
+- :ref:`v23_breaking_changes`
+- :ref:`v22_breaking_changes`
+
+as well as a preview of future breaking changes and deprecated
+features in upcoming releases:
+
+- :ref:`alpha_breaking_changes`
+- :ref:`octez_dev_breaking_changes`
+
+For features deprecated or broken in older protocols and Octez
+versions, see :doc:`deprecated`.
+
+.. toctree::
+   :hidden:
+
+   deprecated
 
 .. _v24_breaking_changes:
 
@@ -296,6 +315,8 @@ This proof may be generated using the client command::
 	octez-client create bls proof for <alias>
 
 
+.. _v22_breaking_changes:
+
 Octez Version 22
 ----------------
 
@@ -311,30 +332,30 @@ Starting from Octez ``v22``, launching a baker daemon requires an explicit menti
 The recommended approach is to run a DAL node and start the baker using the ``--dal-node <uri>`` option.
 If you do not wish to use a DAL node, you can opt-out by using the ``--without-dal`` option.
 
-Older changes
--------------
 
-For features deprecated or broken in older Octez versions and protocols, see :doc:`deprecated`.
 
-.. toctree::
-   :hidden:
-
-   deprecated
-
-Upcoming changes
+Upcoming Changes
 ================
 
 .. warning::
 
    Changes described in this section concern code that has been merged into the master branch but **has not been released yet**!
    They are meant as a heads-up for developers wanting to known in advance how future releases and protocols may impact developers and users.
+   Note that they may also be modified or discarded before being released.
 
-Upcoming release
-----------------
+.. _octez_dev_breaking_changes:
+
+Upcoming Octez Release
+----------------------
 
 N/A
 
-Development protocol Alpha
+
+.. _alpha_breaking_changes:
+
+Development Protocol Alpha
 --------------------------
+
+:doc:`Full Protocol Alpha Changelog<../protocols/alpha>`
 
 N/A
