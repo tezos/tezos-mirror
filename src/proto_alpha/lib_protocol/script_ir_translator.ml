@@ -1124,7 +1124,7 @@ type toplevel = {
 }
 
 type ('arg, 'storage) implementation =
-      ('arg, 'storage) Script_typed_ir.implementation =
+      ('arg, 'storage) Script_typed.implementation =
   | Lambda : {
       code :
         (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
@@ -1146,7 +1146,7 @@ type ('arg, 'storage) code =
     }
       -> ('arg, 'storage) code
 
-type ex_script = Ex_script : ('a, 'c) Script_typed_ir.script -> ex_script
+type ex_script = Ex_script : ('a, 'c) Script_typed.script -> ex_script
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 

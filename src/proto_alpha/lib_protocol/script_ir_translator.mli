@@ -81,7 +81,7 @@ type ex_parameter_ty_and_entrypoints =
 type ex_stack_ty =
   | Ex_stack_ty : ('a, 's) Script_typed_ir.stack_ty -> ex_stack_ty
 
-type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
+type ex_script = Ex_script : ('a, 'b) Script_typed.script -> ex_script
 
 type toplevel = {
   code_field : Script.node;
@@ -91,7 +91,7 @@ type toplevel = {
 }
 
 type ('arg, 'storage) implementation =
-      ('arg, 'storage) Script_typed_ir.implementation =
+      ('arg, 'storage) Script_typed.implementation =
   | Lambda : {
       code :
         (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;

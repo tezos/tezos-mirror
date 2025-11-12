@@ -8,6 +8,7 @@
 open Alpha_context
 open Script_native_types
 open Script_typed_ir
+open Script_typed
 
 module Helpers = struct
   open Micheline

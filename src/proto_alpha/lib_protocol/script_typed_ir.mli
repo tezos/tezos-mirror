@@ -1680,38 +1680,13 @@ and operation = {
   lazy_storage_diff : Lazy_storage.diffs option;
 }
 
+type ex_ty = Ex_ty : ('a, _) ty -> ex_ty
+
 type ('arg, 'arg_dep, 'storage, 'storage_dep) types = {
   arg_type : ('arg, 'arg_dep) ty;
   storage_type : ('storage, 'storage_dep) ty;
   entrypoints : 'arg entrypoints;
 }
-
-type ex_ty = Ex_ty : ('a, _) ty -> ex_ty
-
-type native = Ex_kind : ('arg, 'storage) Script_native_types.kind -> native
-
-type ('arg, 'storage) implementation =
-  | Lambda : {
-      code :
-        (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
-    }
-      -> ('arg, 'storage) implementation
-  | Native : {
-      kind : ('arg, 'storage) Script_native_types.kind;
-    }
-      -> ('arg, 'storage) implementation
-
-type ('arg, 'storage) script =
-  | Script : {
-      implementation : ('arg, 'storage) implementation;
-      arg_type : ('arg, _) ty;
-      storage : 'storage;
-      storage_type : ('storage, _) ty;
-      views : view_map;
-      entrypoints : 'arg entrypoints;
-      code_size : Cache_memory_helpers.sint;
-    }
-      -> ('arg, 'storage) script
 
 val manager_kind : 'kind internal_operation_contents -> 'kind Kind.manager
 

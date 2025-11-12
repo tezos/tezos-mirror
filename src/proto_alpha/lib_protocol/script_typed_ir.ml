@@ -1522,36 +1522,6 @@ type ('arg, 'arg_dep, 'storage, 'storage_dep) types = {
   entrypoints : 'arg entrypoints;
 }
 
-type native = Ex_kind : ('arg, 'storage) Script_native_types.kind -> native
-
-type ('arg, 'storage) implementation =
-  | Lambda : {
-      code :
-        (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
-    }
-      -> ('arg, 'storage) implementation
-  | Native : {
-      kind : ('arg, 'storage) Script_native_types.kind;
-    }
-      -> ('arg, 'storage) implementation
-
-type ('arg, 'storage) script =
-  | Script : {
-      implementation : ('arg, 'storage) implementation;
-      arg_type : ('arg, _) ty;
-      storage : 'storage;
-      storage_type : ('storage, _) ty;
-      views : view_map;
-      entrypoints : 'arg entrypoints;
-      code_size : Cache_memory_helpers.sint;
-          (* This is an over-approximation of the value size in memory, in
-             bytes, of the contract's static part, that is its source
-             code. This includes the code of the contract as well as the code
-             of the views. The storage size is not taken into account by this
-             field as it has a dynamic size. *)
-    }
-      -> ('arg, 'storage) script
-
 let manager_kind : type kind.
     kind internal_operation_contents -> kind Kind.manager = function
   | Transaction_to_implicit _ -> Kind.Transaction_manager_kind
