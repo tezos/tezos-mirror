@@ -120,10 +120,6 @@ DAL node
   a 500 error if querying a level at which the DAL was not supported instead
   of a 404 error. (MR :gl:`!19471`)
 
-- **Breaking change** Enforced stricter validation for the JSON configuration
-  file. Previously, the parser would silently ignore any content that appeared
-  after the first valid JSON object. Now, any extraneous data will cause the
-  function to return an error. (MR :gl:`!18745`)
 
 Version 23.3
 ============
