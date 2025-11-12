@@ -29,12 +29,12 @@ features in upcoming releases:
 - :ref:`octez_dev_breaking_changes`
 
 For features deprecated or broken in older protocols and Octez
-versions, see :doc:`deprecated`.
+versions, see :doc:`past_breaking_changes`.
 
 .. toctree::
    :hidden:
 
-   deprecated
+   past_breaking_changes
 
 .. _v24_breaking_changes:
 
