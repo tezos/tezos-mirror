@@ -9013,24 +9013,19 @@ let rollup_node_injects_dal_slots _protocol parameters dal_node sc_node
     Sc_rollup_node.RPC.call sc_node
     @@ Sc_rollup_rpc.post_dal_slot_indices ~slot_indices:[0]
   in
+  let wait_injected =
+    Node.wait_for node "operation_injected.v0" (fun _ -> Some ())
+  in
   let* () =
     Sc_rollup_node.RPC.call sc_node
     @@ Sc_rollup_rpc.post_local_dal_batcher_injection
          ~messages:["Hello DAL from a Smart Rollup"]
   in
-  (* We need to bake once to get the commitment injected and once more to have it
-     included in a block. *)
+  let* () = wait_injected in
+  (* We need to bake once to have the commitment included in a block, and then
+     [attestation_lag] to have it attested. *)
   let* () =
-    repeat 2 (fun () ->
-        let* () = bake_for client in
-        let* level = Client.level client in
-        let* _level =
-          Sc_rollup_node.wait_for_level ~timeout:10. sc_node level
-        in
-        unit)
-  in
-  let* () =
-    repeat parameters.Dal.Parameters.attestation_lag (fun () ->
+    repeat (1 + parameters.Dal.Parameters.attestation_lag) (fun () ->
         let* () = bake_for client in
         let* level = Client.level client in
         let* _level =
