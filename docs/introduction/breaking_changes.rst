@@ -348,6 +348,22 @@ Upcoming Changes
 Upcoming Octez Release
 ----------------------
 
+.. This section gathers the breaking changes and deprecations listed
+   in the development changelog:
+   https://octez.tezos.com/docs/CHANGES-dev.html (file CHANGES.rst at
+   the root of the tezos repository) -- not to be confused with the
+   released changelog https://octez.tezos.com/docs/CHANGES.html (file
+   docs/CHANGES.rst)
+
+   When releasing the changes described here, don't forget to:
+   - move them to a new section "Octez Version X" at the top of this page
+   - add a link to the new "releases/version-X" page, cf other sections
+   - in the introduction of the current page, add a link to the new section
+   - update tense used to present/past if needed
+   - reset the content of the "Upcoming Octez Release" section to just
+     "N/A" (unless there are already changes planned for the version
+     after the newly released one, of course)
+
 N/A
 
 
