@@ -1,0 +1,781 @@
+[
+  {
+    "file": "etherlink/lib_wasm_runtime_callbacks/test/test_store.ml",
+    "title": "store_delete host function",
+    "tags": [
+      "mem_tree",
+      "store",
+      "store_delete"
+    ],
+    "successful_runs": {
+      "total_time": "73685",
+      "count": "1"
+    }
+  },
+  {
+    "file": "etherlink/tezt/tests/validate.ml",
+    "title": "Legacy: Validate gas limit (mainnet)",
+    "tags": [
+      "da_fee",
+      "evm_node",
+      "gas_limit",
+      "legacy",
+      "mainnet",
+      "mainnet_kernel",
+      "smart_rollup_installer"
+    ],
+    "successful_runs": {
+      "total_time": "9448637",
+      "count": "1"
+    },
+    "peak_memory_usage": 294273000
+  },
+  {
+    "file": "etherlink/tezt/tests/validate.ml",
+    "title": "Eip2930: Sender must not be a contract (latest)",
+    "tags": [
+      "eip2930",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "sender_contract",
+      "smart_rollup_installer"
+    ],
+    "successful_runs": {
+      "total_time": "9386084",
+      "count": "1"
+    },
+    "peak_memory_usage": 265464000
+  },
+  {
+    "file": "etherlink/tezt/tests/validate.ml",
+    "title": "Eip1559: Transactions with gas limit below the base gas cost (which includes inclusion fees) are rejected (mainnet)",
+    "tags": [
+      "base_gas_cost_minimum_limit",
+      "eip1559",
+      "evm_node",
+      "mainnet",
+      "mainnet_kernel",
+      "smart_rollup_installer"
+    ],
+    "successful_runs": {
+      "total_time": "9375237",
+      "count": "1"
+    },
+    "peak_memory_usage": 268641000
+  },
+  {
+    "file": "etherlink/tezt/tests/validate.ml",
+    "title": "Eip2930: Validate that gas limit validation covers calldata cost (mainnet)",
+    "tags": [
+      "calldata_cost",
+      "eip2930",
+      "evm_node",
+      "gas_limit",
+      "mainnet",
+      "mainnet_kernel",
+      "smart_rollup_installer"
+    ],
+    "successful_runs": {
+      "total_time": "9424421",
+      "count": "1"
+    },
+    "peak_memory_usage": 314478000
+  },
+  {
+    "file": "etherlink/tezt/tests/tezlink.ml",
+    "title": "Alpha: Test of the genesis block argument (latest, without dal, multichain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm_kernel",
+      "evm_node",
+      "genesis",
+      "latest",
+      "multichain_enabled",
+      "node",
+      "protocols",
+      "rpc",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "tezlink"
+    ],
+    "successful_runs": {
+      "total_time": "64315291",
+      "count": "1"
+    },
+    "peak_memory_usage": 2132498000
+  },
+  {
+    "file": "etherlink/tezt/tests/tezlink.ml",
+    "title": "Alpha: Internal receipts (latest, without dal, multichain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm_kernel",
+      "evm_node",
+      "internal",
+      "latest",
+      "multichain_enabled",
+      "node",
+      "operation",
+      "receipts",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "tezlink"
+    ],
+    "successful_runs": {
+      "total_time": "68103554",
+      "count": "1"
+    },
+    "peak_memory_usage": 2397240000
+  },
+  {
+    "file": "etherlink/tezt/tests/gc.ml",
+    "title": "Switch history mode with shorter retention period",
+    "tags": [
+      "evm_kernel",
+      "evm_node",
+      "history_mode",
+      "smart_rollup_installer"
+    ],
+    "successful_runs": {
+      "total_time": "18226591",
+      "count": "1"
+    },
+    "peak_memory_usage": 334899000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Import desync sequencer snapshot in empty data dir (latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "desync",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "snapshots"
+    ],
+    "successful_runs": {
+      "total_time": "74330415",
+      "count": "1"
+    },
+    "peak_memory_usage": 1969603000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Can restart an Observer node (latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "observer",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "64720248",
+      "count": "1"
+    },
+    "peak_memory_usage": 1985371000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Observer forwards transaction (mainnet, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_node",
+      "mainnet",
+      "mainnet_kernel",
+      "node",
+      "observer",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "transaction"
+    ],
+    "successful_runs": {
+      "total_time": "63667841",
+      "count": "1"
+    },
+    "peak_memory_usage": 2104842000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Delayed transaction timeout considers l1 level (latest, with dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "dal",
+      "dal_node",
+      "delayed_inbox",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "min_levels",
+      "node",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "timeout"
+    ],
+    "successful_runs": {
+      "total_time": "169568377",
+      "count": "1"
+    },
+    "peak_memory_usage": 2833110000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Timestamp from the future are refused (latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "block",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "timestamp"
+    ],
+    "successful_runs": {
+      "total_time": "67595250",
+      "count": "1"
+    },
+    "peak_memory_usage": 2184562000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Rollup-node sequencer upgrade is applied to the sequencer local state. (mainnet, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "auto",
+      "client",
+      "evm",
+      "evm_node",
+      "mainnet",
+      "mainnet_kernel",
+      "node",
+      "sequencer",
+      "sequencer_upgrade",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "sync"
+    ],
+    "successful_runs": {
+      "total_time": "121077902",
+      "count": "1"
+    },
+    "peak_memory_usage": 2702461000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Sequencer pool address is the block's miner (mainnet, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "coinbase",
+      "evm",
+      "evm_node",
+      "mainnet",
+      "mainnet_kernel",
+      "miner",
+      "node",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "66378557",
+      "count": "1"
+    },
+    "peak_memory_usage": 2133842000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: FA bridge feature is set in storage (mainnet, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm_node",
+      "fa_bridge",
+      "feature_flag",
+      "mainnet",
+      "mainnet_kernel",
+      "node",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "60433618",
+      "count": "1"
+    },
+    "peak_memory_usage": 1956912000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Sequencer can run debug_traceCall and return a valid log (mainnet, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "call",
+      "client",
+      "evm",
+      "evm_node",
+      "mainnet",
+      "mainnet_kernel",
+      "node",
+      "rpc",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "trace"
+    ],
+    "successful_runs": {
+      "total_time": "69898586",
+      "count": "1"
+    },
+    "peak_memory_usage": 2355578000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: debug_traceBlockByNumber succeeds on block with transactions using same caller (latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "block",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "trace"
+    ],
+    "successful_runs": {
+      "total_time": "63902831",
+      "count": "1"
+    },
+    "peak_memory_usage": 2135052000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Test batch size limit (mainnet, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "batch_limit",
+      "client",
+      "evm_node",
+      "mainnet",
+      "mainnet_kernel",
+      "node",
+      "rpc",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "67023885",
+      "count": "1"
+    },
+    "peak_memory_usage": 2002601000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: debug_traceTransaction with calltracer to see how propagated revert is handled (latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "call_trace",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "propagate",
+      "revert",
+      "rpc",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "trace"
+    ],
+    "successful_runs": {
+      "total_time": "62300721",
+      "count": "1"
+    },
+    "peak_memory_usage": 2150061000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Produce block with no delayed transactions (latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "delayed_transaction",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "62887439",
+      "count": "1"
+    },
+    "peak_memory_usage": 2212701000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Check that websocket event `newIncludedTransactions` is behaving correctly (latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "rpc",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "tez_new_included_transactions",
+      "websocket"
+    ],
+    "successful_runs": {
+      "total_time": "80986992",
+      "count": "1"
+    },
+    "peak_memory_usage": 2377201000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Calling a contract that fills the maximum amount of slots leads to OutOfGas not an out of memory error (latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "out_of_memory",
+      "slots",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "61739085",
+      "count": "1"
+    },
+    "peak_memory_usage": 2141703000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: RPC returns the correct transaction object for eip2930 transactions (latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "eip2930",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "transaction_object"
+    ],
+    "successful_runs": {
+      "total_time": "55461848",
+      "count": "1"
+    },
+    "peak_memory_usage": 1937588000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Submits transactions to an observer with a tx queue and make sure it can respond to getTransactionCount. (latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm_kernel",
+      "evm_node",
+      "latest",
+      "node",
+      "nonce",
+      "observer",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "tx_queue"
+    ],
+    "successful_runs": {
+      "total_time": "56439278",
+      "count": "1"
+    },
+    "peak_memory_usage": 1974995000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: tez_kernelRootHash is set after upgrade",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "kernel_root_hash",
+      "node",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "upgrade"
+    ],
+    "successful_runs": {
+      "total_time": "56177374",
+      "count": "1"
+    },
+    "peak_memory_usage": 1888094000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: EVM node server connection",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_node",
+      "node",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "9853902",
+      "count": "1"
+    },
+    "peak_memory_usage": 698138000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: RPC method eth_getBlockByHash (sequencer, latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "get_block_by_hash",
+      "latest",
+      "node",
+      "rpc",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "44601505",
+      "count": "1"
+    },
+    "peak_memory_usage": 1989368000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: RPC method eth_getTransactionCount in batch (sequencer, mainnet, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_node",
+      "get_transaction_count_as_batch",
+      "mainnet",
+      "mainnet_kernel",
+      "node",
+      "rpc",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "44499667",
+      "count": "1"
+    },
+    "peak_memory_usage": 1921589000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: Check L2 blocks progression (proxy, mainnet, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_node",
+      "l2_blocks_progression",
+      "mainnet",
+      "mainnet_kernel",
+      "node",
+      "proxy",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "38241410",
+      "count": "1"
+    },
+    "peak_memory_usage": 1855278000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: Check L2 transfers are applied (sequencer, latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "l2_transfer",
+      "latest",
+      "node",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "53197214",
+      "count": "1"
+    },
+    "peak_memory_usage": 2038018000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: Check `eth_getBlockByNumber` works correctly when asking for the `latest` (proxy, mainnet, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "blocks",
+      "client",
+      "evm",
+      "evm_node",
+      "latest",
+      "mainnet",
+      "mainnet_kernel",
+      "node",
+      "proxy",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "34566620",
+      "count": "1"
+    },
+    "peak_memory_usage": 1733843000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: Creates a kernel with an initialized administrator key (proxy, mainnet, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "administrator",
+      "alpha",
+      "client",
+      "config",
+      "evm",
+      "evm_node",
+      "mainnet",
+      "mainnet_kernel",
+      "node",
+      "proxy",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "37181385",
+      "count": "1"
+    },
+    "peak_memory_usage": 1564050000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: RPC methods eth_gasPrice (sequencer, latest, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_kernel",
+      "evm_node",
+      "gas_price",
+      "latest",
+      "node",
+      "rpc",
+      "sequencer",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "42292005",
+      "count": "1"
+    },
+    "peak_memory_usage": 2004634000
+  },
+  {
+    "file": "etherlink/tezt/tests/evm_rollup.ml",
+    "title": "Alpha: Check that an L2 call to a smart contract with an intermediate call that runs out of gas still succeeds. (sequencer, mainnet, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "call",
+      "client",
+      "evm",
+      "evm_node",
+      "mainnet",
+      "mainnet_kernel",
+      "node",
+      "out_of_gas",
+      "sequencer",
+      "simple_storage",
+      "smart_rollup_installer",
+      "smart_rollup_node"
+    ],
+    "successful_runs": {
+      "total_time": "48431582",
+      "count": "1"
+    },
+    "peak_memory_usage": 2278730000
+  }
+]

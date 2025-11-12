@@ -1,0 +1,25 @@
+[
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "T024-: Testing DAL node (fetching slots from backup sources)",
+    "tags": [
+      "admin_client",
+      "backup",
+      "client",
+      "dal",
+      "dal_node",
+      "extra",
+      "http",
+      "memory_hungry",
+      "node",
+      "retrievability",
+      "t024",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "49064243",
+      "count": "1"
+    },
+    "peak_memory_usage": 7458675000
+  }
+]

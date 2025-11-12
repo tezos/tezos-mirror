@@ -1,0 +1,27 @@
+[
+  {
+    "file": "etherlink/tezt/tests/evm_sequencer.ml",
+    "title": "Alpha: Outbox size limit resilience (slow) (mainnet, without dal, single chain)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "evm",
+      "evm_node",
+      "mainnet",
+      "mainnet_kernel",
+      "node",
+      "outbox",
+      "slow",
+      "smart_rollup_installer",
+      "smart_rollup_node",
+      "spam",
+      "withdraw"
+    ],
+    "successful_runs": {
+      "total_time": "236031371",
+      "count": "1"
+    },
+    "peak_memory_usage": 3106886000
+  }
+]
