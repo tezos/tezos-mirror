@@ -9,12 +9,12 @@ module SlotIdSet =
   Aches.Vache.Set (Aches.Vache.LRU_Sloppy) (Aches.Vache.Strong) (Types.Slot_id)
 
 (** A watcher used to stream newly-attestable slots for a given delegate (pkh).
-      - [stream] is the push endpoint used by the DAL node to notify consumers
-        (RPC layer / baker) with [attestable_event] information.
-      - [num_subscribers] is the number of active consumers currently subscribed to
-        this pkh’s stream.
-      - [notified_slots] is an LRU set of slot ids already notified, so that we avoid
-        sending duplicates in the stream. *)
+    - [stream] is the push endpoint used by the DAL node to notify consumers
+      (RPC layer / baker) with [attestable_event] information.
+    - [num_subscribers] is the number of active consumers currently subscribed to
+      this pkh’s stream.
+    - [notified_slots] is an LRU set of slot ids already notified, so that we avoid
+      sending duplicates in the stream. *)
 type watcher = {
   stream : Types.Attestable_event.t Lwt_watcher.input;
   mutable num_subscribers : int;
@@ -38,9 +38,9 @@ let get_or_init t pkh proto_params =
       watcher
   | None ->
       (* We only need to remember slot ids from their publication level until the
-           attestation window closes ([attestation_lag] levels later). There can be
-           at most [number_of_slots] distinct slot ids per level across that window.
-           We allow a small (2 levels) additional window for safety. *)
+         attestation window closes ([attestation_lag] levels later). There can be
+         at most [number_of_slots] distinct slot ids per level across that window.
+         We allow a small (2 levels) additional window for safety. *)
       let capacity =
         match proto_params with
         | Some Types.{number_of_slots; attestation_lag; _} ->
