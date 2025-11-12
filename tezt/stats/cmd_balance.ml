@@ -16,42 +16,66 @@ type tezt_job = {
   component : string option;
   variant : string option;
   directory : string;
-  tezt_job_count : int;
+  parallel_jobs : int;
+  parallel_tests : int;
 }
 
-let job ?component ?variant ~j () =
-  let name =
-    (match component with None -> "" | Some component -> component ^ ".")
-    ^ "tezt"
-    ^ match variant with None -> "" | Some variant -> "-" ^ variant
-  in
-  let directory =
-    let base = "tezt/records" in
-    let component_base =
-      match component with None -> base | Some component -> base // component
-    in
-    match variant with
-    | None -> component_base
-    | Some variant -> component_base // variant
-  in
-  {name; component; variant; directory; tezt_job_count = j}
+let parse_job_line line =
+  match String.split_on_char ',' line with
+  | [""] -> []
+  | [component; variant; parallel_jobs; parallel_tests] ->
+      let component = if component = "" then None else Some component in
+      let variant = if variant = "" then None else Some variant in
+      let name =
+        (match component with None -> "" | Some component -> component ^ ".")
+        ^ "tezt"
+        ^ match variant with None -> "" | Some variant -> "-" ^ variant
+      in
+      let directory =
+        let base = "tezt/records" in
+        let component_base =
+          match component with
+          | None -> base
+          | Some component -> base // component
+        in
+        match variant with
+        | None -> component_base
+        | Some variant -> component_base // variant
+      in
+      let parallel_jobs =
+        match int_of_string_opt parallel_jobs with
+        | Some n -> n
+        | None ->
+            failwith
+              "failed to parse the list of jobs: invalid integer for \
+               parallel_jobs"
+      in
+      let parallel_tests =
+        match int_of_string_opt parallel_tests with
+        | Some n -> n
+        | None ->
+            failwith
+              "failed to parse the list of jobs: invalid integer for \
+               parallel_tests"
+      in
+      let job =
+        {name; component; variant; directory; parallel_jobs; parallel_tests}
+      in
+      [job]
+  | _ ->
+      failwith
+        "failed to parse the list of jobs: unexpected number of column in CSV \
+         file"
 
-(* List of Tezt jobs to balance. *)
-(* TODO: Cacio could generate a file in script-inputs/ with this information. *)
-let jobs =
-  [
-    job ~j:6 ();
-    job ~variant:"extra" ~j:6 ();
-    job ~variant:"flaky" ~j:1 ();
-    job ~variant:"riscv-slow-sequential" ~j:1 ();
-    job ~variant:"slow" ~j:3 ();
-    job ~variant:"static-binaries" ~j:3 ();
-    job ~variant:"time-sensitive" ~j:1 ();
-    job ~component:"etherlink" ~j:6 ();
-    job ~component:"etherlink" ~variant:"extra" ~j:6 ();
-    job ~component:"etherlink" ~variant:"flaky" ~j:1 ();
-    job ~component:"etherlink" ~variant:"slow" ~j:3 ();
-  ]
+let jobs () =
+  let ch = open_in "script-inputs/cacio-tezt-jobs" in
+  Fun.protect ~finally:(fun () -> close_in ch) @@ fun () ->
+  let rec read acc =
+    match input_line ch with
+    | exception End_of_file -> List.rev acc
+    | line -> read (parse_job_line line @ acc)
+  in
+  read []
 
 let balance_job job ~target ~verbose =
   let tests =
@@ -68,7 +92,7 @@ let balance_job job ~target ~verbose =
   let effective_tezt_job_count =
     (* Cannot run [job.tezt_job_count] tests in parallel
        if there are less than [job.tezt_job_count] tests. *)
-    min stats.count job.tezt_job_count
+    min stats.count job.parallel_tests
   in
   let recommended_job_count =
     let ideal =
@@ -99,13 +123,13 @@ let balance_job job ~target ~verbose =
       "- recommended job count: %g (about %.2f minutes per job with -j %d)"
       recommended_job_count
       expected_minutes_per_job
-      job.tezt_job_count)
+      job.parallel_tests)
   else
     echo
       "%s: %g (~%.2f min/job with -j %d)"
       job.name
       recommended_job_count
       expected_minutes_per_job
-      job.tezt_job_count
+      job.parallel_tests
 
-let run ~target ~verbose = List.iter (balance_job ~target ~verbose) jobs
+let run ~target ~verbose = List.iter (balance_job ~target ~verbose) (jobs ())
