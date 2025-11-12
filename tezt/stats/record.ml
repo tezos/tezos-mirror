@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezt_core
+
 type summed_durations = {total_time : int64; count : int}
 
 let zero = {total_time = 0L; count = 0}
@@ -64,13 +66,13 @@ let input ~recursive paths : t =
     paths
   |> List.flatten
 
-let matches _tsl _test = failwith "disabled until Tezt 4.3.0 is released"
-(*   TSL.eval *)
-(*     { *)
-(*       file = test.file; *)
-(*       title = test.title; *)
-(*       tags = test.tags; *)
-(*       memory = test.peak_memory_usage |> Option.value ~default:0; *)
-(*       duration = Int64.to_float (duration_ns test) /. 1_000_000.; *)
-(*     } *)
-(*     tsl *)
+let matches tsl test =
+  TSL.eval
+    {
+      file = test.file;
+      title = test.title;
+      tags = test.tags;
+      memory = test.peak_memory_usage |> Option.value ~default:0;
+      duration = Int64.to_float (duration_ns test) /. 1_000_000.;
+    }
+    tsl
