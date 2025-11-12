@@ -1,6 +1,24 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2025 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
 let sf = Printf.sprintf
 
 let echo x = Printf.ksprintf print_endline x
+
+let top count tests ~by ~cmp ~get ~show =
+  echo "Top %i (by %s):" count by ;
+  let tests = List.sort (fun a b -> cmp (get b) (get a)) tests in
+  let rec list index = function
+    | [] -> ()
+    | (head : Record.test) :: tail ->
+        echo "%d) %s (%s)" index head.title (show (get head)) ;
+        if index < count then list (index + 1) tail
+  in
+  list 1 tests
 
 let run ~recursive ~filter ~paths =
   let tests = Record.input ~recursive paths in
@@ -9,43 +27,21 @@ let run ~recursive ~filter ~paths =
     | None -> tests
     | Some filter -> List.filter (Record.matches filter) tests
   in
-
-  let test_count = List.length tests in
-  let total_duration =
-    List.fold_left
-      (fun acc test -> Int64.add acc (Record.duration_ns test))
-      0L
-      tests
-  in
-  let seconds ns = Int64.to_float ns /. 1_000_000. in
-  let minutes ns = seconds ns /. 60. in
-  let hours ns = minutes ns /. 60. in
-
-  let top count ~by ~cmp ~get ~show =
-    echo "Top %i (by %s):" count by ;
-    let tests = List.sort (fun a b -> cmp (get b) (get a)) tests in
-    let rec list index = function
-      | [] -> ()
-      | (head : Record.test) :: tail ->
-          echo "%d) %s (%s)" index head.title (show (get head)) ;
-          if index < count then list (index + 1) tail
-    in
-    list 1 tests
-  in
-
-  echo "test_count = %d" test_count ;
+  let stats = Stats.make tests in
+  echo "test_count = %d" stats.count ;
   echo
     "total_duration = %.3f seconds = %.2f minutes = %.2f hours"
-    (seconds total_duration)
-    (minutes total_duration)
-    (hours total_duration) ;
+    (Stats.Duration.seconds stats.total_duration)
+    (Stats.Duration.minutes stats.total_duration)
+    (Stats.Duration.hours stats.total_duration) ;
   echo
     "average_duration = %.3f seconds"
-    (seconds total_duration /. float test_count) ;
+    (Stats.Duration.seconds stats.average_duration) ;
   echo "" ;
   top
     10
+    tests
     ~by:"duration"
-    ~cmp:Int64.compare
-    ~get:Record.duration_ns
-    ~show:(fun duration -> sf "%.2f minutes" (minutes duration))
+    ~cmp:Float.compare
+    ~get:Record.duration_minutes
+    ~show:(sf "%.2f minutes")

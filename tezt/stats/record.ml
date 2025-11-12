@@ -47,6 +47,8 @@ let duration_ns test =
       test.successful_runs.total_time
       (Int64.of_int test.successful_runs.count)
 
+let duration_minutes test = Int64.to_float (duration_ns test) /. 60_000_000.
+
 type t = test list
 
 let decode (json : JSON.t) : t = JSON.(json |> as_list |> List.map decode_test)

@@ -19,6 +19,9 @@ type test = {
 (** Get the average duration of successful runs, in nanoseconds. *)
 val duration_ns : test -> int64
 
+(** Get the average duration of successful runs, in minutes. *)
+val duration_minutes : test -> float
+
 type t = test list
 
 (** Input some record files.
