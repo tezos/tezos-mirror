@@ -185,8 +185,13 @@ let may_notify_not_in_committee ctxt committee ~attestation_level =
       slots can be published and attested in the near future;
       - `stop = L`, as this is the newest level where we did not have time to obtain
       the information about the published slots.
+    
+    We include [L+1] in backfill to cover possible races between updating the
+    last-finalized level and stream subscription. This keeps the
+    client's cache consistent even if the first slot was published before the stream
+    was fully established.
 
-    For each level in [start .. stop] (inclusively), we accumulate the attestation status
+    For each level in [start .. stop + 1] (inclusively), we accumulate the attestation status
     information about each slot id. *)
 let get_backfill_payload ctxt ~pkh =
   let open Lwt_result_syntax in
@@ -197,9 +202,11 @@ let get_backfill_payload ctxt ~pkh =
     get_attestation_lag ctxt ~level:last_finalized_level
   in
   let published_levels =
-    let count = Int32.(to_int @@ min last_finalized_level attestation_lag) in
+    let count =
+      Int32.(to_int @@ min last_finalized_level attestation_lag) + 1
+    in
     Stdlib.List.init count (fun i ->
-        Int32.(sub last_finalized_level (of_int i)))
+        Int32.(sub (succ last_finalized_level) (of_int i)))
     |> List.rev
   in
   List.fold_left_es
