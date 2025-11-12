@@ -131,7 +131,6 @@ fn burn_tez(
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
     let new_balance = match balance.0.checked_sub(amount) {
         None => {
-            log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
                 contract: account.contract(),
                 balance: balance.clone(),
@@ -301,8 +300,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
         log!(
             tc_ctx.host,
             Debug,
-            "Internal operation executed successfully: {:?}",
-            internal_receipt
+            "Internal operation executed successfully"
         );
         all_internal_receipts.push(internal_receipt);
     }
@@ -674,7 +672,6 @@ fn apply_balance_changes(
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
     let new_giver_balance = match giver_balance.0.checked_sub(amount) {
         None => {
-            log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
                 contract: giver_account.contract(),
                 balance: giver_balance,
@@ -780,8 +777,6 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         block_ctx,
     );
 
-    log!(safe_host, Debug, "Receipts: {receipts:#?}");
-
     if applied {
         log!(
             safe_host,
@@ -796,6 +791,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
             Debug,
             "Reverting the changes because some operation failed."
         );
+        log!(safe_host, Debug, "Receipts: {receipts:#?}");
         safe_host.revert()?;
     }
 
