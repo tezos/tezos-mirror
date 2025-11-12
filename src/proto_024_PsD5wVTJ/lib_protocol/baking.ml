@@ -217,7 +217,7 @@ let attesting_rights (ctxt : t) ~attested_level =
   return (ctxt, map)
 
 let incr_slot att_rights =
-  let one = Attesting_power.make ~slots:1 ~stake:0L in
+  let one = Attesting_power.make ~slots:1 ~baking_power:0L in
   Attesting_power.add one att_rights
 
 let attesting_rights_by_first_slot ctxt ~attested_level :
@@ -306,7 +306,7 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
                     {
                       Consensus_key.consensus_key;
                       attesting_power =
-                        Attesting_power.make ~slots:0 ~stake:weight;
+                        Attesting_power.make ~slots:0 ~baking_power:weight;
                       dal_power = 0;
                     }
                     acc,
@@ -321,7 +321,9 @@ let attesting_rights_by_first_slot ctxt ~attested_level :
                     v with
                     attesting_power =
                       Attesting_power.(
-                        add (make ~slots:0 ~stake:weight) v.attesting_power);
+                        add
+                          (make ~slots:0 ~baking_power:weight)
+                          v.attesting_power);
                   }
                 in
                 if all_bakers_attest_enabled then

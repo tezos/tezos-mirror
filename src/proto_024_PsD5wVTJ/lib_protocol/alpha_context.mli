@@ -2254,13 +2254,21 @@ end
 module Attesting_power : sig
   type t
 
+  type result
+
   val encoding : t Data_encoding.t
+
+  val op_result_encoding : result Data_encoding.t
+
+  val to_result : context -> attested_level:Raw_level.t -> t -> result
 
   val pp : Format.formatter -> t -> unit
 
+  val pp_result : Format.formatter -> result -> unit
+
   val zero : t
 
-  val make : slots:int -> stake:int64 -> t
+  val make : slots:int -> baking_power:int64 -> t
 
   val add : t -> t -> t
 
@@ -2270,6 +2278,8 @@ module Attesting_power : sig
   val get : context -> attested_level:Level.t -> t -> int64
 
   val get_slots : t -> int
+
+  val get_slots_from_result : result -> int
 
   val check_all_bakers_attest_at_level :
     context -> attested_level:Level.t -> bool
@@ -2284,6 +2294,10 @@ module Attesting_power : sig
   (** See {!Consensus_parameters_storage.consensus_committee}. *)
   val consensus_committee :
     context -> attested_level:Level.t -> (context * int64) tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    val get_from_result : result -> int64
+  end
 end
 
 (** This module re-exports definitions from {!Delegate_consensus_key}. *)

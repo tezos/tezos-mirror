@@ -2276,6 +2276,12 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
   in
   let mk_preattestation_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       consensus_power =
+    let consensus_power =
+      Attesting_power.to_result
+        ctxt
+        ~attested_level:content.level
+        consensus_power
+    in
     Single_result
       (Preattestation_result
          {
@@ -2333,6 +2339,12 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
   let open Lwt_result_syntax in
   let mk_attestation_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       consensus_power =
+    let consensus_power =
+      Attesting_power.to_result
+        ctxt
+        ~attested_level:consensus.level
+        consensus_power
+    in
     Single_result
       (Attestation_result
          {
@@ -2375,7 +2387,8 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
             consensus_key
             Attesting_power.zero (* Fake power. *) )
 
-let record_attestations_aggregate ctxt (mode : mode) committee :
+let record_attestations_aggregate ctxt (mode : mode)
+    (content : consensus_aggregate_content) committee :
     (context * Kind.attestations_aggregate contents_result_list) tzresult Lwt.t
     =
   let open Lwt_result_syntax in
@@ -2403,10 +2416,21 @@ let record_attestations_aggregate ctxt (mode : mode) committee :
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return
               ( ctxt,
-                (key, attesting_power) :: consensus_keys,
+                ( key,
+                  Attesting_power.to_result
+                    ctxt
+                    ~attested_level:content.level
+                    attesting_power )
+                :: consensus_keys,
                 Attesting_power.add attesting_power consensus_power ))
           (ctxt, [], Attesting_power.zero)
           committee
+      in
+      let total_consensus_power =
+        Attesting_power.to_result
+          ctxt
+          ~attested_level:content.level
+          total_consensus_power
       in
       let result =
         Attestations_aggregate_result
@@ -2461,10 +2485,21 @@ let record_preattestations_aggregate ctxt (mode : mode)
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return
               ( ctxt,
-                (key, attesting_power) :: consensus_keys,
+                ( key,
+                  Attesting_power.to_result
+                    ctxt
+                    ~attested_level:content.level
+                    attesting_power )
+                :: consensus_keys,
                 Attesting_power.add attesting_power consensus_power ))
           (ctxt, [], Attesting_power.zero)
           committee
+      in
+      let total_consensus_power =
+        Attesting_power.to_result
+          ctxt
+          ~attested_level:content.level
+          total_consensus_power
       in
       let result =
         Preattestations_aggregate_result
@@ -2612,13 +2647,13 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
           Validate_errors.Consensus.(Aggregate_disabled)
       in
       record_preattestations_aggregate ctxt mode consensus_content committee
-  | Single (Attestations_aggregate {committee; _}) ->
+  | Single (Attestations_aggregate {consensus_content; committee}) ->
       let*? () =
         error_unless
           (Constants.aggregate_attestation ctxt)
           Validate_errors.Consensus.(Aggregate_disabled)
       in
-      record_attestations_aggregate ctxt mode committee
+      record_attestations_aggregate ctxt mode consensus_content committee
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       let* ctxt = Nonce.reveal ctxt level nonce in

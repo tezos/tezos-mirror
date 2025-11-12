@@ -711,13 +711,18 @@ module Attesting_power = struct
   include Attesting_power_repr
   include Consensus_parameters_storage
 
-  let get ctxt ~attested_level {slots; stake} =
+  let get ctxt ~attested_level {slots; baking_power} =
     let all_bakers_attest_enabled =
       check_all_bakers_attest_at_level ctxt ~attested_level
     in
-    if all_bakers_attest_enabled then stake else Int64.of_int slots
+    if all_bakers_attest_enabled then baking_power else Int64.of_int slots
 
   let get_slots {slots; _} = slots
+
+  let to_result ctxt ~attested_level =
+    let attested_level = Level_storage.from_raw ctxt attested_level in
+    to_result
+      ~abaab_activated:(check_all_bakers_attest_at_level ctxt ~attested_level)
 end
 
 module Consensus = struct
