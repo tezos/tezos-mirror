@@ -927,7 +927,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         | Alpha -> []
         | _ ->
             (* There is no point in testing the multichain feature on non-alpha protocols *)
-            [(if enable_multichain then Tag.ci_disabled else Tag.extra)])
+            [Tag.ci_disabled])
       ~__FILE__
       ~uses:(fun protocol -> uses protocol @ additional_uses)
       body
@@ -1085,14 +1085,14 @@ type feature_test_registration =
 
 let default_dal_registration =
   Register_both
-    {additional_tags_with = [Tag.extra]; additional_tags_without = []}
+    {additional_tags_with = [Tag.ci_disabled]; additional_tags_without = []}
 
 let ci_enabled_dal_registration =
   Register_both {additional_tags_with = []; additional_tags_without = []}
 
 let default_multichain_registration =
   Register_both
-    {additional_tags_with = [Tag.extra]; additional_tags_without = []}
+    {additional_tags_with = [Tag.ci_disabled]; additional_tags_without = []}
 
 (* Register all variants of a test. *)
 let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
