@@ -5,21 +5,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Accumulator
+type t = CLST
 
 type with_storage = {kind : t; storage : Script_repr.lazy_expr}
 
-module Accumulator_contract = struct
+module CLST_contract = struct
   let initial_storage =
     Micheline.(
-      Prim
-        ( dummy_location,
-          Michelson_v1_primitives.D_Pair,
-          [Int (dummy_location, Z.zero); Int (dummy_location, Z.zero)],
-          [] ))
-    |> Micheline.strip_locations |> Script_repr.lazy_expr
+      Prim (dummy_location, Michelson_v1_primitives.D_Unit, [], [])
+      |> strip_locations |> Script_repr.lazy_expr)
 
-  let with_initial_storage = {kind = Accumulator; storage = initial_storage}
+  let with_initial_storage = {kind = CLST; storage = initial_storage}
 end
 
 let encoding : t Data_encoding.t =
@@ -28,10 +24,10 @@ let encoding : t Data_encoding.t =
     [
       case
         (Tag 0)
-        ~title:"Accumulator"
+        ~title:"CLST"
         unit
-        (function Accumulator -> Some ())
-        (fun () -> Accumulator);
+        (function CLST -> Some ())
+        (fun () -> CLST);
     ]
 
 let with_storage_encoding =
@@ -47,8 +43,8 @@ let rpc_arg =
   RPC_arg.make
     ~descr:"A native contract kind"
     ~name:"kind"
-    ~construct:(function Accumulator -> "Accumulator")
-    ~destruct:(fun _ -> Ok Accumulator)
+    ~construct:(function CLST -> "CLST")
+    ~destruct:(fun _ -> Ok CLST)
     ()
 
-let equal k1 k2 = match (k1, k2) with Accumulator, Accumulator -> true
+let equal k1 k2 = match (k1, k2) with CLST, CLST -> true

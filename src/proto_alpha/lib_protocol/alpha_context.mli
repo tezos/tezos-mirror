@@ -756,7 +756,7 @@ module Script : sig
 
   type michelson_with_storage = {code : lazy_expr; storage : lazy_expr}
 
-  type native_kind = Script_native_repr.t = Accumulator
+  type native_kind = Script_native_repr.t = CLST
 
   type native_with_storage = {kind : native_kind; storage : lazy_expr}
 
@@ -1927,7 +1927,7 @@ module Contract : sig
 
     val paid_storage_space : context -> t -> Z.t tzresult Lwt.t
 
-    val get_accumulator_contract_hash :
+    val get_clst_contract_hash :
       context -> (Contract_hash.t, error trace) result Lwt.t
   end
 

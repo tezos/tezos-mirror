@@ -23,6 +23,9 @@ module Helpers = struct
     let annot = match named with Some name -> name :: annot | None -> annot in
     Prim (loc, prim, args, annot)
 
+  let unit_ty ?loc () =
+    {untyped = prim ?loc Script.T_unit []; typed = Ty_ex_c unit_t}
+
   let int_ty ?loc () =
     {untyped = prim ?loc Script.T_int []; typed = Ty_ex_c int_t}
 
@@ -35,20 +38,20 @@ module Helpers = struct
     {untyped = prim ~loc Script.T_pair [unty1; unty2]; typed = pair_t}
 end
 
-module Accumulator_types = struct
+module CLST_types = struct
   open Helpers
 
-  type arg = z_n
+  type arg = unit
 
-  type storage = z_n * z_n
+  type storage = unit
 
-  let arg_type : arg ty_node = int_ty ()
+  let arg_type : arg ty_node = unit_ty ()
 
-  let storage_type : storage ty_node tzresult = pair_ty (int_ty ()) (int_ty ())
+  let storage_type : storage ty_node = unit_ty ()
 end
 
 type ('arg, 'storage) kind =
-  | Accumulator_kind : (Accumulator_types.arg, Accumulator_types.storage) kind
+  | CLST_kind : (CLST_types.arg, CLST_types.storage) kind
 
 type ex_kind_and_types =
   | Ex_kind_and_types :
@@ -58,9 +61,9 @@ type ex_kind_and_types =
 let get_typed_kind_and_types =
   let open Result_syntax in
   function
-  | Script_native_repr.Accumulator ->
-      let {typed = Ty_ex_c arg_type; untyped} = Accumulator_types.arg_type in
-      let+ {typed = Ty_ex_c storage_type; _} = Accumulator_types.storage_type in
+  | Script_native_repr.CLST ->
+      let {typed = Ty_ex_c arg_type; untyped} = CLST_types.arg_type in
+      let {typed = Ty_ex_c storage_type; _} = CLST_types.storage_type in
       (* The entrypoints will be introduced in a later MR (!19584). *)
       let entrypoints =
         {
@@ -68,12 +71,13 @@ let get_typed_kind_and_types =
           original_type_expr = untyped;
         }
       in
-      Ex_kind_and_types (Accumulator_kind, {arg_type; storage_type; entrypoints})
+      return
+        (Ex_kind_and_types (CLST_kind, {arg_type; storage_type; entrypoints}))
 
 module Internal_for_tests = struct
   let eq_native_kind (type arg arg' storage storage')
       (kind : (arg, storage) kind) (kind' : (arg', storage') kind) =
-    match (kind, kind') with Accumulator_kind, Accumulator_kind -> true
+    match (kind, kind') with CLST_kind, CLST_kind -> true
 
   type 'a ty_node = 'a Helpers.ty_node = {
     untyped : Script.node;
@@ -87,8 +91,8 @@ module Internal_for_tests = struct
   let types_of_kind =
     let open Result_syntax in
     function
-    | Script_native_repr.Accumulator ->
-        let arg_type = Accumulator_types.arg_type in
-        let* storage_type = Accumulator_types.storage_type in
+    | Script_native_repr.CLST ->
+        let arg_type = CLST_types.arg_type in
+        let storage_type = CLST_types.storage_type in
         return (Ex (arg_type, storage_type))
 end

@@ -9,12 +9,11 @@ open Alpha_context
 open Script_native_types
 open Script_typed_ir
 
-module Accumulator_contract = struct
-  open Script_native_types.Accumulator_types
+module CLST_contract = struct
+  open Script_native_types.CLST_types
 
-  let execute (ctxt, _) (value : arg) (acc, count) =
-    Lwt.return_ok
-      ((Script_list.empty, Script_int.(add value acc, add one count)), ctxt)
+  let execute (ctxt, _) (_value : arg) (storage : storage) =
+    Lwt_result_syntax.return ((Script_list.empty, storage), ctxt)
 end
 
 let execute (type arg storage) (ctxt, step_constants)
@@ -22,5 +21,4 @@ let execute (type arg storage) (ctxt, step_constants)
     ((operation Script_list.t, storage) pair * context, error trace) result
     Lwt.t =
   match kind with
-  | Accumulator_kind ->
-      Accumulator_contract.execute (ctxt, step_constants) arg storage
+  | CLST_kind -> CLST_contract.execute (ctxt, step_constants) arg storage

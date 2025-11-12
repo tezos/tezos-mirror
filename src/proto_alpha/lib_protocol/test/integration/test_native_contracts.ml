@@ -31,7 +31,7 @@ let test_feature_flag_enabled () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = test_context ~enable_feature:true () in
   let*! hash =
-    Alpha_context.Contract.Internal_for_tests.get_accumulator_contract_hash ctxt
+    Alpha_context.Contract.Internal_for_tests.get_clst_contract_hash ctxt
   in
   match hash with
   | Ok _ -> return_unit
@@ -44,7 +44,7 @@ let test_feature_flag_disabled () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = test_context ~enable_feature:false () in
   let*!@ hash =
-    Alpha_context.Contract.Internal_for_tests.get_accumulator_contract_hash ctxt
+    Alpha_context.Contract.Internal_for_tests.get_clst_contract_hash ctxt
   in
   Assert.proto_error ~loc:__LOC__ hash (function
     | Raw_context.Storage_error (Missing_key (_, Raw_context.Get)) -> true
@@ -54,7 +54,7 @@ let test_feature_flag_disabled_on_mainnet () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = test_mainnet_context () in
   let*!@ hash =
-    Alpha_context.Contract.Internal_for_tests.get_accumulator_contract_hash ctxt
+    Alpha_context.Contract.Internal_for_tests.get_clst_contract_hash ctxt
   in
   Assert.proto_error ~loc:__LOC__ hash (function
     | Raw_context.Storage_error (Missing_key (_, Raw_context.Get)) -> true

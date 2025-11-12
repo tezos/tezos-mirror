@@ -355,7 +355,7 @@ module Contract : sig
       originated during protocol stitching and their can cannot be easily
       retrieved. *)
   module Native_contracts : sig
-    module Accumulator :
+    module CLST :
       Single_data_storage
         with type value = Contract_hash.t
          and type t := Raw_context.t

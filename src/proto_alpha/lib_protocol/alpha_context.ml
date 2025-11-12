@@ -367,7 +367,7 @@ module Script = struct
 
   type michelson_with_storage = t = {code : lazy_expr; storage : lazy_expr}
 
-  type native_kind = Script_native_repr.t = Accumulator
+  type native_kind = Script_native_repr.t = CLST
 
   type native_with_storage = Script_native_repr.with_storage = {
     kind : native_kind;
@@ -484,8 +484,8 @@ module Contract = struct
     include Contract_repr
     include Contract_storage
 
-    let get_accumulator_contract_hash ctxt =
-      Storage.Contract.Native_contracts.Accumulator.get ctxt
+    let get_clst_contract_hash ctxt =
+      Storage.Contract.Native_contracts.CLST.get ctxt
   end
 end
 
