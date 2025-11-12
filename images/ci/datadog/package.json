@@ -10,6 +10,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@datadog/datadog-ci": "^2.44.0"
+    "@datadog/datadog-ci": "^4.1.0"
   }
 }
