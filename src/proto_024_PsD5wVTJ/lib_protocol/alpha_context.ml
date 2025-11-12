@@ -723,6 +723,9 @@ module Attesting_power = struct
     let attested_level = Level_storage.from_raw ctxt attested_level in
     to_result
       ~abaab_activated:(check_all_bakers_attest_at_level ctxt ~attested_level)
+
+  let all_bakers_attest_activation_level ctxt =
+    Constants_storage.all_bakers_attest_first_level ctxt
 end
 
 module Consensus = struct

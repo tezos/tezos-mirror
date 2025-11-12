@@ -3228,7 +3228,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         Nonce.record_hash ctxt {nonce_hash; delegate = block_producer.delegate}
   in
   let* ctxt, dal_attestation = Dal_apply.finalisation ctxt in
-  let* ctxt, reward_bonus =
+  let* ctxt, reward_bonus, attestation_result =
     let* required_attestations =
       are_attestations_required ctxt ~level:current_level.level
     in
@@ -3244,8 +3244,49 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
           let* ctxt, rewards_bonus =
             Baking.bonus_baking_reward ctxt ~attested_level ~attesting_power
           in
-          return (ctxt, Some rewards_bonus)
-    else return (ctxt, None)
+          let* ctxt, consensus_committee =
+            Attesting_power.consensus_committee ctxt ~attested_level
+          in
+          let* ctxt, consensus_threshold =
+            Attesting_power.consensus_threshold ctxt ~attested_level
+          in
+          let consensus_recorded_power =
+            Attesting_power.get ctxt ~attested_level attesting_power
+          in
+          return
+            ( ctxt,
+              Some rewards_bonus,
+              Some
+                {
+                  consensus_committee;
+                  consensus_threshold;
+                  consensus_recorded_power;
+                } )
+    else return (ctxt, None, None)
+  in
+  let* ctxt, preattestation_result =
+    let lre = Consensus.locked_round_evidence ctxt in
+    match lre with
+    | None -> return (ctxt, None)
+    | Some (_round, preattesting_power) ->
+        let attested_level = current_level in
+        let* ctxt, consensus_committee =
+          Attesting_power.consensus_committee ctxt ~attested_level
+        in
+        let* ctxt, consensus_threshold =
+          Attesting_power.consensus_threshold ctxt ~attested_level
+        in
+        let consensus_recorded_power =
+          Attesting_power.get ctxt ~attested_level preattesting_power
+        in
+        return
+          ( ctxt,
+            Some
+              {
+                consensus_committee;
+                consensus_threshold;
+                consensus_recorded_power;
+              } )
   in
   let*? baking_reward = Delegate.Rewards.baking_reward_fixed_portion ctxt in
   let* ctxt, baking_receipts =
@@ -3270,6 +3311,9 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
   in
   let+ voting_period_info = Voting_period.get_rpc_current_info ctxt in
+  let abaab_activation_level =
+    Attesting_power.all_bakers_attest_activation_level ctxt
+  in
   let receipt =
     Apply_results.
       {
@@ -3284,6 +3328,9 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         liquidity_baking_toggle_ema;
         implicit_operations_results;
         dal_attestation;
+        abaab_activation_level;
+        attestations = attestation_result;
+        preattestations = preattestation_result;
       }
   in
   (ctxt, receipt)
@@ -3403,6 +3450,9 @@ let finalize_block (application_state : application_state) shell_header_opt =
               liquidity_baking_toggle_ema;
               implicit_operations_results;
               dal_attestation = Dal.Attestation.empty;
+              abaab_activation_level = None;
+              attestations = None;
+              preattestations = None;
             } )
   | Application
       {

@@ -2281,6 +2281,8 @@ module Attesting_power : sig
 
   val get_slots_from_result : result -> int
 
+  val all_bakers_attest_activation_level : context -> Level.t option
+
   val check_all_bakers_attest_at_level :
     context -> attested_level:Level.t -> bool
 
