@@ -9013,24 +9013,19 @@ let rollup_node_injects_dal_slots _protocol parameters dal_node sc_node
     Sc_rollup_node.RPC.call sc_node
     @@ Sc_rollup_rpc.post_dal_slot_indices ~slot_indices:[0]
   in
+  let wait_injected =
+    Node.wait_for node "operation_injected.v0" (fun _ -> Some ())
+  in
   let* () =
     Sc_rollup_node.RPC.call sc_node
     @@ Sc_rollup_rpc.post_local_dal_batcher_injection
          ~messages:["Hello DAL from a Smart Rollup"]
   in
-  (* We need to bake once to get the commitment injected and once more to have it
-     included in a block. *)
+  let* () = wait_injected in
+  (* We need to bake once to have the commitment included in a block, and then
+     [attestation_lag] to have it attested. *)
   let* () =
-    repeat 2 (fun () ->
-        let* () = bake_for client in
-        let* level = Client.level client in
-        let* _level =
-          Sc_rollup_node.wait_for_level ~timeout:10. sc_node level
-        in
-        unit)
-  in
-  let* () =
-    repeat parameters.Dal.Parameters.attestation_lag (fun () ->
+    repeat (1 + parameters.Dal.Parameters.attestation_lag) (fun () ->
         let* () = bake_for client in
         let* level = Client.level client in
         let* _level =
@@ -9362,12 +9357,10 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
     "first_level_in_committee = %d; published_level = %d"
     first_level_in_committee
     published_level ;
-  Log.info "Bake blocks up to level %d" (published_level - 1) ;
-  let* () = bake_for ~count:(published_level - 1 - level) client in
 
-  let* id_attester = peer_id attester in
-  let* id_producer = peer_id producer in
   let check_graft_promises =
+    let* id_attester = peer_id attester in
+    let* id_producer = peer_id producer in
     Lwt.pick
     @@ check_grafts
          ~number_of_slots
@@ -9376,14 +9369,18 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
          (producer, id_producer)
          new_account.public_key_hash
   in
-  let* assigned_shard_indexes =
-    Dal_RPC.(
-      call attester
-      @@ get_assigned_shard_indices
-           ~level:first_level_in_committee
-           ~pkh:new_account.public_key_hash)
-  in
+
+  Log.info "Bake blocks up to level %d" (published_level - 1) ;
+  let* () = bake_for ~count:(published_level - 1 - level) client in
+
   let wait_for_shards_promises =
+    let* assigned_shard_indexes =
+      Dal_RPC.(
+        call attester
+        @@ get_assigned_shard_indices
+             ~level:first_level_in_committee
+             ~pkh:new_account.public_key_hash)
+    in
     wait_for_shards_promises
       ~dal_node:attester
       ~storage_profile:`Cache_only
@@ -12382,6 +12379,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
+    ~traps_fraction:Q.zero
     ~number_of_slots:1
     "new attester attests"
     test_new_attester_attests
