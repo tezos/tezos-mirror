@@ -315,6 +315,7 @@ module type COMPONENT_API = sig
 
       For other arguments, see the documentation of the [job] function above. *)
   val tezt_job :
+    __POS__:string * int * int * int ->
     pipeline:[`merge_request | `scheduled] ->
     description:string ->
     ?provider:Tezos_ci.Runner.Provider.t ->

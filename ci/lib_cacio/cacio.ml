@@ -631,6 +631,7 @@ module type COMPONENT_API = sig
   type tezt_timeout = No_timeout | Minutes of int
 
   val tezt_job :
+    __POS__:string * int * int * int ->
     pipeline:[`merge_request | `scheduled] ->
     description:string ->
     ?provider:Tezos_ci.Runner.Provider.t ->
@@ -887,7 +888,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   type tezt_timeout = No_timeout | Minutes of int
 
-  let tezt_job ~pipeline ~description ?provider ?arch
+  let tezt_job ~__POS__:source_location ~pipeline ~description ?provider ?arch
       ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?fetch_records_from
       ?only_if_changed ?(needs = []) ?needs_legacy ?test_coverage ?allow_failure
       ?tezt_exe ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
@@ -1064,7 +1065,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     in
     job
       (if variant = "" then "tezt" else "tezt-" ^ variant)
-      ~__POS__
+      ~__POS__:source_location
       ~stage:Test
       ~description
       ?provider

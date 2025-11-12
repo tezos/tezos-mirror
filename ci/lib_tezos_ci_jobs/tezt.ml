@@ -77,6 +77,7 @@ let job_tezt =
   Cacio.parameterize @@ fun pipeline ->
   tezt_job
     ""
+    ~__POS__
     ~pipeline
     ~description:"Run normal Tezt tests."
     ~test_coverage:true
@@ -89,6 +90,7 @@ let job_tezt_time_sensitive =
   Cacio.parameterize @@ fun pipeline ->
   tezt_job
     "time-sensitive"
+    ~__POS__
     ~pipeline
     ~description:"Run Tezt tests tagged as time_sensitive."
     ~test_coverage:true
@@ -99,6 +101,7 @@ let job_tezt_riscv_slow_sequential =
   Cacio.parameterize @@ fun pipeline ->
   tezt_job
     "riscv-slow-sequential"
+    ~__POS__
     ~pipeline
     ~description:"Run Tezt tests tagged as riscv_slow_sequential."
     ~test_selection:(Tezt_core.TSL_AST.Has_tag "riscv_slow_sequential")
@@ -109,6 +112,7 @@ let job_tezt_slow =
   Cacio.parameterize @@ fun pipeline ->
   tezt_job
     "slow"
+    ~__POS__
     ~pipeline
     ~description:"Run Tezt tests tagged as slow."
     ~test_selection:(tests_tag_selector ~slow:true [])
@@ -121,6 +125,7 @@ let job_tezt_extra =
   Cacio.parameterize @@ fun pipeline ->
   tezt_job
     "extra"
+    ~__POS__
     ~pipeline
     ~description:"Run Tezt tests tagged as extra and not flaky."
     ~test_selection:(tests_tag_selector ~extra:true [Not (Has_tag "flaky")])
@@ -132,6 +137,7 @@ let job_tezt_flaky =
   Cacio.parameterize @@ fun pipeline ->
   tezt_job
     "flaky"
+    ~__POS__
     ~pipeline
     ~description:"Run Tezt tests tagged as flaky."
     ~test_coverage:true
@@ -144,6 +150,7 @@ let job_tezt_static_binaries =
   Cacio.parameterize @@ fun pipeline ->
   tezt_job
     "static-binaries"
+    ~__POS__
     ~pipeline
     ~description:
       "Run Tezt tests tagged as cli and not flaky, using static executables."

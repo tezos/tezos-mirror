@@ -260,6 +260,7 @@ let job_tezt =
   Cacio.parameterize @@ fun pipeline ->
   tezt_job
     ""
+    ~__POS__
     ~pipeline
     ~description:"Run normal Etherlink Tezt tests."
     ~test_coverage:true
@@ -273,6 +274,7 @@ let job_tezt_slow =
   Cacio.parameterize @@ fun pipeline ->
   tezt_job
     "slow"
+    ~__POS__
     ~pipeline
     ~description:"Run Etherlink Tezt tests tagged as slow."
     ~test_selection:(Tezos_ci_jobs.Tezt.tests_tag_selector ~slow:true [])
@@ -285,6 +287,7 @@ let job_tezt_extra =
   Cacio.parameterize @@ fun pipeline ->
   tezt_job
     "extra"
+    ~__POS__
     ~pipeline
     ~description:"Run Etherlink Tezt tests tagged as extra and not flaky."
     ~test_selection:
@@ -299,6 +302,7 @@ let job_tezt_flaky =
   Cacio.parameterize @@ fun pipeline ->
   tezt_job
     "flaky"
+    ~__POS__
     ~pipeline
     ~description:"Run Etherlink Tezt tests tagged as flaky."
     ~test_coverage:true
