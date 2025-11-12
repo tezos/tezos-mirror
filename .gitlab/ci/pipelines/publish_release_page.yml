@@ -54,7 +54,7 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 publish:release-page:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${ci_image_name}/release-page:${ci_image_tag}
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -69,7 +69,6 @@ publish:release-page:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
-  - sudo apk add aws-cli pandoc
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
