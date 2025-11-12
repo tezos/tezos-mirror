@@ -93,6 +93,8 @@ tezt/lib_cloud/dockerfiles/*.Dockerfile.dockerignore
 !tezt/lib_cloud/dockerfiles/dal_with_snapshot.Dockerfile.dockerignore
 !tezt/lib_cloud/dockerfiles/octez.Dockerfile
 !tezt/lib_cloud/dockerfiles/octez.Dockerfile.dockerignore
+!tezt/lib_cloud/dockerfiles/etherlink.Dockerfile
+!tezt/lib_cloud/dockerfiles/etherlink.Dockerfile.dockerignore
 .merlin
 
 *~
