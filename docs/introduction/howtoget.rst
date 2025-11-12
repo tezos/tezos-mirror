@@ -408,7 +408,8 @@ environment variables:
 - ``NODE_HOST``: The name of the node container (defaults to ``node``).
 - ``NODE_RPC_PORT``: The RPC port **inside the container** the node listens to (defaults to ``8732``).
 - ``NODE_RPC_ADDR``: The RPC address **inside the container** the node binds to (defaults to ``[::]``).
-- ``PROTOCOL``: The protocol used.
+- ``PROTOCOL``: The protocol used (if the protocol is not provided,
+  ``octez-baker`` and ``octez-accuser`` will be used).
 
 These variables can be set in the docker-compose file, as demonstrated in :src:`scripts/docker/alpha.yml`::
 

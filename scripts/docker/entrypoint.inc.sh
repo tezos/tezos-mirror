@@ -5,7 +5,6 @@ node=${node:?}
 client=${client:?}
 admin_client=${admin_client:?}
 baker=${baker:?}
-endorser=${endorser:?}
 accuser=${accuser:?}
 signer=${signer:?}
 smart_rollup_node=${smart_rollup_node:?}
@@ -137,14 +136,6 @@ launch_node() {
     if [ "$i" = "--help" ]; then exit 0; fi
   done
 
-  # Generate a new identity if not present
-
-  if [ ! -f "$node_data_dir/identity.json" ]; then
-    echo "Generating a new node identity..."
-    "$node" identity generate "${IDENTITY_POW:-26}". \
-      --data-dir "$node_data_dir"
-  fi
-
   configure_client
 
   # Launching the node
@@ -186,24 +177,6 @@ launch_baker_test() {
     run with local node "$node_data_dir" "$@"
 }
 
-launch_endorser() {
-  configure_client
-  wait_for_the_node_to_be_bootstrapped
-  exec "$endorser" --chain main \
-    --base-dir "$client_dir" \
-    --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
-    run "$@"
-}
-
-launch_endorser_test() {
-  configure_client
-  wait_for_the_node_to_be_bootstrapped
-  exec "$endorser" --chain test \
-    --base-dir "$client_dir" \
-    --endpoint "http://$NODE_HOST:$NODE_RPC_PORT" \
-    run "$@"
-}
-
 launch_accuser() {
   configure_client
   wait_for_the_node_to_be_bootstrapped
@@ -225,7 +198,7 @@ launch_smart_rollup_node() {
   configure_client
 
   if [ ! -f "$smart_rollup_node_data_dir/config.json" ]; then
-    echo "Configuring the rollup node..."
+    echo "Configuring the smart rollup node..."
     "$smart_rollup_node" init observer config \
       for "$SOR_ALIAS_OR_ADDR" \
       with operators \
