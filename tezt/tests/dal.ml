@@ -9362,12 +9362,10 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
     "first_level_in_committee = %d; published_level = %d"
     first_level_in_committee
     published_level ;
-  Log.info "Bake blocks up to level %d" (published_level - 1) ;
-  let* () = bake_for ~count:(published_level - 1 - level) client in
 
-  let* id_attester = peer_id attester in
-  let* id_producer = peer_id producer in
   let check_graft_promises =
+    let* id_attester = peer_id attester in
+    let* id_producer = peer_id producer in
     Lwt.pick
     @@ check_grafts
          ~number_of_slots
@@ -9376,14 +9374,18 @@ let test_new_attester_attests protocol dal_parameters _cryptobox node client
          (producer, id_producer)
          new_account.public_key_hash
   in
-  let* assigned_shard_indexes =
-    Dal_RPC.(
-      call attester
-      @@ get_assigned_shard_indices
-           ~level:first_level_in_committee
-           ~pkh:new_account.public_key_hash)
-  in
+
+  Log.info "Bake blocks up to level %d" (published_level - 1) ;
+  let* () = bake_for ~count:(published_level - 1 - level) client in
+
   let wait_for_shards_promises =
+    let* assigned_shard_indexes =
+      Dal_RPC.(
+        call attester
+        @@ get_assigned_shard_indices
+             ~level:first_level_in_committee
+             ~pkh:new_account.public_key_hash)
+    in
     wait_for_shards_promises
       ~dal_node:attester
       ~storage_profile:`Cache_only
