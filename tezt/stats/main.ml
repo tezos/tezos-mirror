@@ -47,8 +47,10 @@ let () =
             Clap.list_string
               ~placeholder:"PATH"
               ~description:
-                "Path to a record file to read. If no PATH is specified, \
-                 defaults to 'tezt/records'."
+                "Path to a record file or directory to read. If no PATH is \
+                 specified, defaults to 'tezt/records'. If PATH is a \
+                 directory, read all JSON files from PATH (recursively if -r \
+                 is set, which is the default)."
               ()
           in
           let paths = if paths = [] then ["tezt/records"] else [] in

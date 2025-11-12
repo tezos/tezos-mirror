@@ -26,7 +26,9 @@ type t = test list
 
 (** Input some record files.
 
-    If [recursive] is [true], recurse into subdirectories. *)
+    If one of the requested files is actually a directory,
+    input all JSON files from it, and if [recursive] is [true],
+    recurse into its subdirectories. *)
 val input : recursive:bool -> string list -> t
 
 (** Test whether a test satisfies a TSL predicate. *)
