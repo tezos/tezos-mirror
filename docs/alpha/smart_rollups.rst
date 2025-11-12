@@ -252,6 +252,8 @@ There is no need to synchronize between operators: if two honest
 operators publish the same commitment for a given commitment period,
 the commitment will be published with two stakes on it.
 
+.. _withdrawal_period_alpha:
+
 A commitment is optimistically trusted but it can be refuted until it
 is said to be **cemented** (i.e., final, unchangeable). Indeed, right
 after a commitment is published, a two-week refutation period
