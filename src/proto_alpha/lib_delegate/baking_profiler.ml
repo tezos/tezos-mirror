@@ -11,6 +11,8 @@ let nonce_profiler = unplugged ()
 
 let operation_worker_profiler = unplugged ()
 
+let dal_attestable_slots_worker_profiler = unplugged ()
+
 let node_rpc_profiler = unplugged ()
 
 (* This is the main profiler for the baker *)
@@ -24,6 +26,7 @@ let all_profilers =
   [
     ("nonce", [nonce_profiler]);
     ("op_worker", [operation_worker_profiler]);
+    ("dal_slots_worker", [dal_attestable_slots_worker_profiler]);
     ("node_rpc", [node_rpc_profiler]);
     ("baker", [baker_profiler; environment_profiler]);
   ]

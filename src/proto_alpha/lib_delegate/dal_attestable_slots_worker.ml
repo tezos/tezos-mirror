@@ -8,6 +8,9 @@
 open Baking_state_types
 open Tezos_dal_node_services
 
+module Profiler =
+  (val Profiler.wrap Baking_profiler.dal_attestable_slots_worker_profiler)
+
 module Events = struct
   include Internal_event.Simple
 
@@ -157,7 +160,12 @@ let update_cache_backfill_payload state ~delegate_id ~backfill_payload =
   let E.{slot_ids; no_shards_attestation_levels} = backfill_payload in
   List.iter
     (fun slot_id ->
-      update_cache_with_attestable_slot state ~delegate_id ~slot_id)
+      (update_cache_with_attestable_slot
+         state
+         ~delegate_id
+         ~slot_id
+       [@profiler.record_f
+         {verbosity = Debug} "update_cache_with_attestable_slot"]))
     slot_ids ;
   List.iter
     (fun attestation_level ->
@@ -206,7 +214,12 @@ let rec consume_stream state stream_handle ~delegate_id =
       Delegate_id.Table.remove state.streams delegate_id ;
       return_unit
   | Some (E.Attestable_slot {slot_id}) ->
-      update_cache_with_attestable_slot state ~delegate_id ~slot_id ;
+      update_cache_with_attestable_slot
+        state
+        ~delegate_id
+        ~slot_id
+      [@profiler.aggregate_f
+        {verbosity = Debug} "update_cache_with_attestable_slot"] ;
       consume_stream state ~delegate_id stream_handle
   | Some (No_shards_assigned {attestation_level}) ->
       update_cache_no_shards_assigned state ~delegate_id ~attestation_level ;
@@ -235,7 +248,15 @@ let subscribe_to_new_streams state dal_node_rpc_ctxt ~delegate_ids_to_add =
     List.filter_map_p
       (fun delegate_id ->
         let* res =
-          Node_rpc.monitor_attestable_slots dal_node_rpc_ctxt ~delegate_id
+          (Node_rpc.monitor_attestable_slots
+             dal_node_rpc_ctxt
+             ~delegate_id
+           [@profiler.record_s
+             {verbosity = Info}
+               (Format.asprintf
+                  "monitor_attestable_slots : %a"
+                  Delegate_id.pp
+                  delegate_id)])
         in
         match res with
         | Ok (stream, stopper) -> return_some (delegate_id, {stream; stopper})
@@ -258,7 +279,18 @@ let subscribe_to_new_streams state dal_node_rpc_ctxt ~delegate_ids_to_add =
     (fun (delegate_id, stream_handle) ->
       Lwt.dont_wait
         (fun () ->
-          let* () = consume_backfill_stream state ~delegate_id stream_handle in
+          let* () =
+            (consume_backfill_stream
+               state
+               ~delegate_id
+               stream_handle
+             [@profiler.record_s
+               {verbosity = Info}
+                 (Format.asprintf
+                    "consume_backfill_stream : %a"
+                    Delegate_id.pp
+                    delegate_id)])
+          in
           consume_stream state ~delegate_id stream_handle)
         (fun exn ->
           Events.(
@@ -283,6 +315,11 @@ let update_streams_subscriptions state dal_node_rpc_ctxt ~delegate_ids =
 
 let get_dal_attestable_slots state ~delegate_id ~attestation_level =
   let open Lwt_syntax in
+  () [@profiler.stop] ;
+  ()
+  [@profiler.record
+    {verbosity = Notice}
+      (Format.sprintf "attestation_level : %ld" attestation_level)] ;
   match Level_map.find_opt state.cache attestation_level with
   | None ->
       let* () = Events.(emit no_attestable_slot_at_level attestation_level) in
