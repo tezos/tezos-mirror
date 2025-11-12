@@ -1728,6 +1728,9 @@ module Images = struct
     let e2etest =
       mk_ci_image ~image_path:"${ci_image_name}/e2etest:${ci_image_tag}"
 
+    let release_page =
+      mk_ci_image ~image_path:"${ci_image_name}/release-page:${ci_image_tag}"
+
     (* Corresponding CI images from the protected registry using the [master] tags. We only define those used in [sanity] jobs. *)
     let prebuild_master = mk_ci_image_master "prebuild"
 

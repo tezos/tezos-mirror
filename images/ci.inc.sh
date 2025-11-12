@@ -3,7 +3,7 @@
 ## Sourceable file with common variables and functions for scripts
 ## related to the CI images
 
-export valid_layer_targets='runtime monitoring prebuild build test e2etest'
+export valid_layer_targets='runtime monitoring prebuild build test e2etest release-page'
 
 # Gives the Docker tag for a images/ci image based on:
 #  Argument 1: target architecture
