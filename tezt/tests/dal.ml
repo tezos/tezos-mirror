@@ -12384,6 +12384,7 @@ let register ~protocols =
   scenario_with_layer1_and_dal_nodes
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
+    ~traps_fraction:Q.zero
     ~number_of_slots:1
     "new attester attests"
     test_new_attester_attests
