@@ -2596,6 +2596,26 @@ let operation_data_and_metadata_encoding =
              (Operation_data {contents; signature}, No_operation_metadata));
        ]
 
+type attestations_result = {
+  consensus_committee : int64;
+  consensus_threshold : int64;
+  consensus_recorded_power : int64;
+}
+
+let attestations_result_encoding =
+  def "block_header.alpha.attestations_result"
+  @@ conv
+       (fun {consensus_committee; consensus_threshold; consensus_recorded_power}
+          ->
+         (consensus_committee, consensus_threshold, consensus_recorded_power))
+       (fun (consensus_committee, consensus_threshold, consensus_recorded_power)
+          ->
+         {consensus_committee; consensus_threshold; consensus_recorded_power})
+       (obj3
+          (req "total_committee_power" int64)
+          (req "threshold" int64)
+          (req "recorded_power" int64))
+
 type block_metadata = {
   proposer : Consensus_key.t;
   baker : Consensus_key.t;
@@ -2608,6 +2628,9 @@ type block_metadata = {
   liquidity_baking_toggle_ema : Per_block_votes.Liquidity_baking_toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
   dal_attestation : Dal.Attestation.t;
+  abaab_activation_level : Level.t option;
+  attestations : attestations_result option;
+  preattestations : attestations_result option;
 }
 
 let block_metadata_encoding =
@@ -2627,6 +2650,9 @@ let block_metadata_encoding =
               liquidity_baking_toggle_ema;
               implicit_operations_results;
               dal_attestation;
+              abaab_activation_level;
+              attestations;
+              preattestations;
             }
           ->
          ( ( proposer,
@@ -2641,7 +2667,10 @@ let block_metadata_encoding =
              proposer_active_key,
              baker_active_key,
              consumed_gas,
-             dal_attestation ) ))
+             dal_attestation,
+             abaab_activation_level,
+             attestations,
+             preattestations ) ))
        (fun ( ( proposer,
                 baker,
                 level_info,
@@ -2654,7 +2683,10 @@ let block_metadata_encoding =
                 proposer_active_key,
                 baker_active_key,
                 consumed_gas,
-                dal_attestation ) )
+                dal_attestation,
+                abaab_activation_level,
+                attestations,
+                preattestations ) )
           ->
          {
            proposer = {delegate = proposer; consensus_pkh = proposer_active_key};
@@ -2668,6 +2700,9 @@ let block_metadata_encoding =
            liquidity_baking_toggle_ema;
            implicit_operations_results;
            dal_attestation;
+           abaab_activation_level;
+           attestations;
+           preattestations;
          })
        (merge_objs
           (obj8
@@ -2681,11 +2716,14 @@ let block_metadata_encoding =
              (req
                 "liquidity_baking_toggle_ema"
                 Per_block_votes.Liquidity_baking_toggle_EMA.encoding))
-          (obj5
+          (obj8
              (req
                 "implicit_operations_results"
                 (list successful_manager_operation_result_encoding))
              (req "proposer_consensus_key" Signature.Public_key_hash.encoding)
              (req "baker_consensus_key" Signature.Public_key_hash.encoding)
              (req "consumed_milligas" Gas.Arith.n_fp_encoding)
-             (req "dal_attestation" Dal.Attestation.encoding)))
+             (req "dal_attestation" Dal.Attestation.encoding)
+             (req "all_bakers_attest_activation_level" (option Level.encoding))
+             (req "attestations" (option attestations_result_encoding))
+             (req "preattestations" (option attestations_result_encoding))))
