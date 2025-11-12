@@ -56,6 +56,7 @@ RUN apt-get update && \
     jq \
     tzdata \
     pkg-config autoconf automake autotools-dev libtool xutils-dev clang cmake \
+    rustup \
     musl-tools \
     wabt binutils-gold binutils-riscv64-unknown-elf gcc-riscv64-linux-gnu && \
     ln -s /usr/bin/riscv64-linux-gnu-gcc /usr/bin/riscv64-unknown-linux-musl-gcc && \
@@ -63,14 +64,10 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# install toolchain
-RUN curl https://sh.rustup.rs --silent --show-error --fail | \
-    sh -s -- --default-toolchain stable -y
-
-ENV PATH=/root/.cargo/bin:$PATH
-
 # install rust toolchains and compilation targets
-RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 1.80.1 1.84.1 1.86.0 1.88.0 nightly-2025-01-30 nightly-2023-12-15 && \
+# nightly-2025-01-30 is installed separately as it's only used for formatting
+# set the default to the last stable toolchain installed.
+RUN rustup update 1.66.0 1.68.2 1.73.0 1.76.0 1.83.0 1.88.0 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
         rustup target add --toolchain="$tc" wasm32-unknown-unknown; \
         rustup target add --toolchain="$tc" riscv64gc-unknown-none-elf; \
@@ -78,5 +75,8 @@ RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 1.80.1 1.84.1 1.86.0 1.88.0 nightl
         rustup target add --toolchain="$tc" riscv64gc-unknown-linux-musl; \
         rustup target add --toolchain="$tc" x86_64-unknown-linux-musl; \
     done && \
+    rustup update nightly-2025-01-30 && \
     rustup component add --toolchain=nightly-2025-01-30 rustfmt miri rust-src && \
-    rustup component add --toolchain=nightly-2023-12-15 rust-src llvm-tools
+    rustup default 1.88.0
+
+ENV PATH=/root/.cargo/bin:$PATH
