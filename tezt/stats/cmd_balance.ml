@@ -119,16 +119,24 @@ let balance_job job ~target ~verbose =
     echo
       "- average test duration: %.2f seconds"
       (Stats.Duration.seconds stats.average_duration) ;
+    echo "- current job count: %d" job.parallel_jobs ;
     echo
       "- recommended job count: %g (about %.2f minutes per job with -j %d)"
       recommended_job_count
       expected_minutes_per_job
       job.parallel_tests)
   else
+    let emoji =
+      if abs_float (float job.parallel_jobs -. recommended_job_count) < 0.001
+      then "✅"
+      else "❌"
+    in
     echo
-      "%s: %g (~%.2f min/job with -j %d)"
+      "%s %s: %g (current: %d) (~%.2f min/job with -j %d)"
+      emoji
       job.name
       recommended_job_count
+      job.parallel_jobs
       expected_minutes_per_job
       job.parallel_tests
 
