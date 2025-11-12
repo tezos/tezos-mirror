@@ -245,10 +245,10 @@ Putting together all the above instructions, you may want to quickly start a nod
 
 .. code-block:: shell
 
-    # Download a snapshot for your target network, e.g. ghostnet:
-    wget https://snapshots.tzinit.org/ghostnet/rolling -O rolling
-    # Configure the node for running on your testnet, e.g. ghostnet:
-    octez-node config init --network ghostnet --rpc-addr 127.0.0.1
+    # Download a snapshot for your target network, e.g. shadownet:
+    wget https://snapshots.tzinit.org/shadownet/rolling -O rolling
+    # Configure the node for running on your testnet, e.g. shadownet:
+    octez-node config init --network shadownet --rpc-addr 127.0.0.1
     # Import the snapshot file into the node:
     octez-node snapshot import rolling
     # Run the node:
@@ -485,11 +485,11 @@ In Tezos there are two kinds of accounts: *user accounts* (also called implicit 
   secret key and they run Michelson code each time they receive a
   transaction.
 
-In the following, we originate our first contract. 
+In the following, we originate our first contract.
 For this, let us consider the following ``id.tz`` contract:
 
   .. code-block:: michelson
-    
+
     parameter string;
     storage string;
     code {CAR; NIL operation; PAIR};

@@ -301,13 +301,13 @@ To make sure you use the most recent version of Octez, run::
 
     docker pull tezos/tezos-bare:latest
 
-For instance, to run a node on the Ghostnet :doc:`test network <../user/multinetwork>`, starting :doc:`from a snapshot <../user/snapshots>`, in Rolling :doc:`history mode <../user/history_modes>`, start with a fresh directory and configure the node::
+For instance, to run a node on the Shadownet :doc:`test network <../user/multinetwork>`, starting :doc:`from a snapshot <../user/snapshots>`, in Rolling :doc:`history mode <../user/history_modes>`, start with a fresh directory and configure the node::
 
     mkdir $HOME/rolling-data-directory
     docker run -it --rm \
       --volume "$HOME/rolling-data-directory:/home/tezos/.tezos-node" \
       tezos/tezos-bare:latest \
-      octez-node config init --network ghostnet --rpc-addr 127.0.0.1 \
+      octez-node config init --network shadownet --rpc-addr 127.0.0.1 \
         --history-mode rolling
 
 (You may use another location than ``$HOME``, but note that option ``--volume`` requires absolute paths.)

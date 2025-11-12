@@ -161,7 +161,7 @@ Protocol parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Breaking change** Block time has been reduced from 8 seconds to 6
-seconds on mainnet (on ghostnet, it remains unchanged at 4
+seconds on mainnet and shadownet (on ghostnet, it remains unchanged at 4
 seconds). That is, a block can be produced with a delay of 6 seconds
 with respect to the previous block, if the latter is at round 0.
 

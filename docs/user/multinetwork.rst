@@ -49,11 +49,11 @@ Built-In Networks
 The simplest way to select the network to connect to is to use the ``--network``
 option for selecting a :ref:`test network<test_networks>` when you initialize your :doc:`node configuration <./node-configuration>`.
 
-For instance, to run on Ghostnet::
+For instance, to run on Shadowtnet::
 
-  octez-node config init --data-dir ~/tezos-ghostnet --network ghostnet
-  octez-node identity generate --data-dir ~/tezos-ghostnet
-  octez-node run --data-dir ~/tezos-ghostnet
+  octez-node config init --data-dir ~/tezos-shadownet --network shadownet
+  octez-node identity generate --data-dir ~/tezos-shadownet
+  octez-node run --data-dir ~/tezos-shadownet
 
 .. note::
    Once initialized, the node remembers its network settings on subsequent runs
@@ -71,17 +71,19 @@ the following built-in networks:
 
 - ``sandbox``
 
+- ``shadownet``
+
 - ``ghostnet``
 
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
 You can use the ``--network`` option with ``octez-node run`` to make sure
 your node runs on the expected network. For instance, to make sure that
-it runs on Ghostnet::
+it runs on Shadownet::
 
-  octez-node run --data-dir ~/tezos-ghostnet --network ghostnet
+  octez-node run --data-dir ~/tezos-shadownet --network shadownet
 
-This command will fail with an error if the configured network is not Ghostnet.
+This command will fail with an error if the configured network is not Shadownet.
 The node also displays the chain name (such as ``TEZOS_MAINNET``) when it starts.
 Also mind opening the :doc:`RPC interface <../developer/rpc>` as appropriate.
 
@@ -238,11 +240,11 @@ When connecting to existing networks, both options may apply, so here are some u
 
 If you use alias configuration, the configuration file stores
 the name of the network to connect to. For instance, if you configured it
-to connect to Ghostnet, it will contain something like::
+to connect to Shadownet, it will contain something like::
 
   {
     "p2p": {},
-    "network": "ghostnet"
+    "network": "shadownet"
   }
 
 For Mainnet, it would contain ``mainnet``, or nothing as this is actually the default.
@@ -254,7 +256,7 @@ overrides may be added. Because the configuration file only contains the name
 of the network and not its parameters, it will automatically use the updated values.
 
 However, if you use explicit configuration, the configuration file will
-no longer contain an alias such as ``mainnet`` or ``ghostnet``. Instead,
+no longer contain an alias such as ``mainnet`` or ``shadownet``. Instead,
 it will explicitly contain the list of bootstrap peers, user-activated upgrades
 and user-activated protocol overrides that you specify. This means that when
 you update your node, the updated values will not be used.
