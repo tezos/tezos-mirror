@@ -25,7 +25,11 @@
 
 let number_of_slots = 32
 
+let number_of_shards = 512
+
 let attestation_lag = 8
+
+let traps_fraction = Q.(1 // 2000)
 
 (* Each entry in the cache maintains two open file descriptors (one via
    regular file opening and one via mmap on the bitset region).
@@ -97,10 +101,13 @@ let crawler_re_processing_delay = 5.
 (* Sleep delay between refreshing the ips associated to bootstrap dns names *)
 let bootstrap_dns_refresh_delay = 300.
 
-(* This size is being used for the node store's traps cache. While
-   [proto_parameters.Dal_plugin.attestation_lag] defines the minimum
-   number of levels for which traps must be retained, we maintain a
-   larger cache capacity of 50 levels. This extended size is
-   acceptable since the cache is sparsely populated due to
-   [proto_parameters.traps_fraction]. *)
-let traps_cache_size = 50
+(* This size is being used for the node store's traps cache. We set to 2 times
+   the maximum expected size when all slots are used. *)
+let traps_cache_size =
+  let open Q in
+  mul (of_int 2)
+  @@ mul (of_int number_of_slots)
+  @@ mul (of_int number_of_shards)
+  @@ mul (of_int attestation_lag)
+  @@ traps_fraction
+  |> to_int
