@@ -165,9 +165,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
         log!(
             tc_ctx.host,
             Debug,
-            "Executing internal operation {:?} with counter {:?}",
-            operation,
-            counter
+            "Executing internal operation {operation:?} with counter {counter:?}"
         );
         let nonce = counter
             .try_into()
@@ -312,8 +310,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
         log!(
             tc_ctx.host,
             Debug,
-            "Internal operation execution failed at index {}",
-            index
+            "Internal operation execution failed at index {index}"
         );
         all_internal_receipts
             .iter_mut()
@@ -462,11 +459,8 @@ fn transfer_external<'a, Host: Runtime>(
     log!(
         tc_ctx.host,
         Debug,
-        "Applying an external transfer operation from {} to {:?} of {:?} mutez with parameters {:?}",
-        operation_ctx.source.pkh(),
-        dest,
-        amount,
-        parameter
+        "Applying an external transfer operation from {} to {dest:?} of {amount:?} mutez with parameters {parameter:?}",
+        operation_ctx.source.pkh()
     );
     let (entrypoint, value) = match parameter {
         Some(param) => (
@@ -704,8 +698,8 @@ fn apply_balance_changes(
     log!(
         host,
         Debug,
-        "Transfer: OK - the new balance of the giver is {:?} and the new balance of the receiver is {:?}",
-    new_giver_balance, new_receiver_balance);
+        "Transfer: OK - the new balance of the giver is {new_giver_balance:?} and the new balance of the receiver is {new_receiver_balance:?}"
+    );
 
     Ok(())
 }
@@ -786,7 +780,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         block_ctx,
     );
 
-    log!(safe_host, Debug, "Receipts: {:#?}", receipts);
+    log!(safe_host, Debug, "Receipts: {receipts:#?}");
 
     if applied {
         log!(
@@ -826,16 +820,14 @@ fn apply_batch<Host: Runtime>(
         log!(
             host,
             Debug,
-            "Applying operation #{} in the batch with counter {:?}.",
-            index,
+            "Applying operation #{index} in the batch with counter {:?}.",
             validated_operation.content.counter
         );
         let receipt = if first_failure.is_some() {
             log!(
                 host,
                 Debug,
-                "Skipping this operation because we already failed on {:?}.",
-                first_failure
+                "Skipping this operation because we already failed on {first_failure:?}."
             );
             produce_skipped_receipt(
                 &validated_operation.content,
