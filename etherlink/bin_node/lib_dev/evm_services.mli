@@ -75,14 +75,3 @@ val monitor_messages :
   timeout:float ->
   Ethereum_types.quantity ->
   Broadcast.message monitor tzresult Lwt.t
-
-(** [monitor_preconfirmations ~timeout evm_node_endpoint] connects to the given
-    [evm_node_endpoint] and starts monitoring the stream of incoming
-    {!Broadcast.preconfirmation_message}.  Target node must support
-    preconfirmation streaming, which only includes sequencers. Initial
-    connection to the node [evm_node_endpoint] has to be done within [timeout]
-    seconds. *)
-val monitor_preconfirmations :
-  timeout:float ->
-  Uri.t ->
-  Broadcast.preconfirmation_message monitor tzresult Lwt.t

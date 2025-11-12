@@ -7,20 +7,26 @@
 
 open Ethereum_types
 
-type on_new_blueprint_handler =
+type new_blueprint_handler =
   quantity ->
   Blueprint_types.with_events ->
   [`Restart_from of quantity | `Continue] tzresult Lwt.t
 
-type on_finalized_levels_handler =
+type finalized_levels_handler =
   l1_level:int32 ->
   start_l2_level:Ethereum_types.quantity ->
   end_l2_level:Ethereum_types.quantity ->
   unit tzresult Lwt.t
 
+type next_block_timestamp_handler = Time.Protocol.t -> unit tzresult Lwt.t
+
+type inclusion_handler = Broadcast.transaction -> unit tzresult Lwt.t
+
 type parameters = {
-  on_new_blueprint : on_new_blueprint_handler;
-  on_finalized_levels : on_finalized_levels_handler;
+  on_new_blueprint : new_blueprint_handler;
+  on_finalized_levels : finalized_levels_handler;
+  on_next_block_timestamp : next_block_timestamp_handler;
+  on_inclusion : inclusion_handler;
   time_between_blocks : Configuration.time_between_blocks;
   evm_node_endpoint : Uri.t;
   rpc_timeout : float;
@@ -304,6 +310,20 @@ and stream_loop ~multichain (Qty next_blueprint_number) params monitor =
                  no need to wait. *)
               true
             params)
+  | Ok (Some (Next_block_timestamp timestamp)) ->
+      let* () = params.on_next_block_timestamp timestamp in
+      (stream_loop [@tailcall])
+        ~multichain
+        (Qty next_blueprint_number)
+        params
+        monitor
+  | Ok (Some (Included_transaction tx)) ->
+      let* () = params.on_inclusion tx in
+      (stream_loop [@tailcall])
+        ~multichain
+        (Qty next_blueprint_number)
+        params
+        monitor
   | Ok None | Error [Timeout] ->
       Evm_services.close_monitor monitor ;
       (catchup [@tailcall])
@@ -316,7 +336,8 @@ and stream_loop ~multichain (Qty next_blueprint_number) params monitor =
       fail err
 
 let start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
-    ~next_blueprint_number ~on_new_blueprint ~on_finalized_levels () =
+    ~next_blueprint_number ~on_new_blueprint ~on_finalized_levels
+    ~on_next_block_timestamp ~on_inclusion () =
   let open Lwt_result_syntax in
   let*! res =
     catchup
@@ -329,6 +350,8 @@ let start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
         rpc_timeout;
         on_new_blueprint;
         on_finalized_levels;
+        on_next_block_timestamp;
+        on_inclusion;
       }
   in
   (* The blueprint follower should never fail. If it does, we better exit with

@@ -11,6 +11,13 @@
 val create_blueprint_stream :
   unit -> Blueprint_types.Legacy.with_events Lwt_stream.t * Lwt_watcher.stopper
 
+type common_transaction = Evm of string | Michelson of string
+
+(** Preconfirmed transaction can either be internal or coming from the delayed inbox *)
+type transaction =
+  | Common of common_transaction
+  | Delayed of Evm_events.Delayed_transaction.t
+
 (** Type of messages that are broadcasted to all evm nodes. *)
 type message =
   | Blueprint of Blueprint_types.with_events
@@ -19,6 +26,8 @@ type message =
       start_l2_level : Ethereum_types.quantity;
       end_l2_level : Ethereum_types.quantity;
     }
+  | Next_block_timestamp of Time.Protocol.t
+  | Included_transaction of transaction
 
 val message_encoding : message Data_encoding.t
 
@@ -39,26 +48,9 @@ val notify_finalized_levels :
   end_l2_level:Ethereum_types.quantity ->
   unit
 
-(** Preconfirmed transaction can either be internal to Etherlink or coming from the delayed inbox  *)
-type transaction =
-  | Common of Transaction_object.t
-  | Delayed of Evm_events.Delayed_transaction.t
+(** [notify_next_block_timestamp timestamp] advertizes the next block [timestamp] to the broadcast stream *)
+val notify_next_block_timestamp : Time.Protocol.t -> unit
 
-(** Represents a message related to preconfirmed transactions *)
-type preconfirmation_message =
-  | Block_timestamp of Time.Protocol.t
-      (** Timestamp of the next created block *)
-  | Preconfirmed_transaction of transaction
-      (** Indicates that the transaction will be included in the next block and is ready for pre-execution *)
-
-val preconfirmation_message_encoding : preconfirmation_message Data_encoding.t
-
-(** [create_preconfirmation_stream ()] returns a stream that emits every preconfirmation
-    message as soon as it is notified via [notify_new_block_timestamp] and [notify_preconfirmation].  
-    This allows subscribers to monitor the sequence and timing of preconfirmed transactions. *)
-val create_preconfirmation_stream :
-  unit -> preconfirmation_message Lwt_stream.t * Lwt_watcher.stopper
-
-val notify_new_block_timestamp : Time.Protocol.t -> unit
-
-val notify_preconfirmation : transaction -> unit
+(** [notify_inclusion tx] advertizes [tx] as the latest transaction to be included in the next block
+    to the broadcast stream *)
+val notify_inclusion : transaction -> unit

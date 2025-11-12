@@ -169,6 +169,8 @@ let start_blueprint_follower ~relay_endpoint =
       return `Continue)
     ~on_finalized_levels:(fun ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ ->
       return_unit)
+    ~on_next_block_timestamp:(fun _ -> return_unit)
+    ~on_inclusion:(fun _ -> return_unit)
     ()
 
 let withdraw_data receiver =

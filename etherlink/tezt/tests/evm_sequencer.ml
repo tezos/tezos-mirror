@@ -2815,8 +2815,8 @@ let test_observer_receives_preconfirmations =
   *)
   let* _res = produce_block sequencer in
   let add = Evm_node.wait_for_tx_queue_add_transaction sequencer in
-  let next_ts = Evm_node.wait_for_preconfirmation_timestamp observer in
-  let preconf = Evm_node.wait_for_preconfirmation observer in
+  let next_ts = Evm_node.wait_for_next_block_timestamp observer in
+  let preconf = Evm_node.wait_for_inclusion observer in
   let p =
     Eth_cli.transaction_send
       ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key

@@ -612,7 +612,7 @@ let preconfirm_delayed_transactions ~(state : Types.state) =
         let* tx =
           Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash
         in
-        Broadcast.notify_preconfirmation (Delayed tx) ;
+        Broadcast.notify_inclusion (Delayed tx) ;
         return tx)
       delayed_hashes
   in
@@ -629,7 +629,7 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
   let* current_size =
     (* Accumulator empty and at least one transaction = start next future block *)
     if state.validated_txns = [] && transactions <> [] then (
-      Broadcast.notify_new_block_timestamp (Time.System.to_protocol timestamp) ;
+      Broadcast.notify_next_block_timestamp (Time.System.to_protocol timestamp) ;
       let* remaining_cumulative_size = preconfirm_delayed_transactions ~state in
       return (Int.sub maximum_cumulative_size remaining_cumulative_size))
     else return size
@@ -643,7 +643,7 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
         match res with
         | `Drop -> (validation_state, rev_txns)
         | `Keep latest_validation_state ->
-            Broadcast.notify_preconfirmation (Common tx_object) ;
+            Broadcast.notify_inclusion (Common (Evm raw)) ;
             (latest_validation_state, entry :: rev_txns)
         | `Stop -> (validation_state, rev_txns))
     | Tx_queue_types.Michelson _ ->

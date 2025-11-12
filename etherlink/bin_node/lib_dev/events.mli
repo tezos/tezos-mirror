@@ -205,9 +205,9 @@ val replicate_transaction_dropped : Ethereum_types.hash -> string -> unit Lwt.t
     [hash] was dropped because it is now invalid in the sandbox. *)
 val replicate_operation_dropped : Operation_hash.t -> string -> unit Lwt.t
 
-val preconfirmation_timestamp : Time.Protocol.t -> unit Lwt.t
+val next_block_timestamp : Time.Protocol.t -> unit Lwt.t
 
-val preconfirmation : Ethereum_types.hash -> unit Lwt.t
+val inclusion : Ethereum_types.hash -> unit Lwt.t
 
 (** [patched_sequencer_key pk] advertises that the sequencer key in
     state was patched with [pk] . *)

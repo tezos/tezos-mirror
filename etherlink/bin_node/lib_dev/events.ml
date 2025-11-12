@@ -502,19 +502,19 @@ let multichain_node_singlechain_kernel =
        because the multichain feature is not yet enabled in the rollup"
     ()
 
-let event_preconfirmation_timestamp =
+let event_next_block_timestamp =
   Internal_event.Simple.declare_1
     ~section
-    ~name:"preconfirmation_timestamp"
+    ~name:"next_block_timestamp"
     ~msg:"received timestamp of the next block {timestamp}"
     ~level:Notice
     ("timestamp", Time.Protocol.encoding)
 
-let event_preconfirmation =
+let event_tx_inclusion =
   Internal_event.Simple.declare_1
     ~section
-    ~name:"preconfirmation"
-    ~msg:"received preconfirmation for the transaction {txn_hash}"
+    ~name:"inclusion"
+    ~msg:"received inclusion confirmation for the transaction {txn_hash}"
     ~level:Notice
     ("txn_hash", Ethereum_types.hash_encoding)
 
@@ -657,9 +657,9 @@ let replicate_transaction_dropped hash reason =
 let replicate_operation_dropped hash reason =
   emit replicate_operation_dropped (hash, reason)
 
-let preconfirmation_timestamp t = emit event_preconfirmation_timestamp t
+let next_block_timestamp t = emit event_next_block_timestamp t
 
-let preconfirmation t = emit event_preconfirmation t
+let inclusion t = emit event_tx_inclusion t
 
 let patched_sequencer_key pk =
   emit patched_sequencer_key (pk, Signature.Public_key.hash pk)
