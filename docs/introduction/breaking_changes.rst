@@ -17,6 +17,81 @@ that may be breaking.
 In the particular case of RPC changes, you may consult complementary information on :ref:`RPC versioning <rpc_versioning>`, covering how new versions are introduced, the deprecation policy, and a concrete calendar of RPCs planned to be removed.
 
 
+.. _v24_breaking_changes:
+
+Octez Version 24
+----------------
+
+:doc:`Full Octez Version 24 Changelog<../releases/version-24>`
+
+Deprecation of protocol-specific bakers and accusers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Octez v24 deprecates the ``octez-baker-<protocol>`` and
+``octez-accuser-<protocol>`` binaries. They will be removed in a
+future version. Please use the protocol-independent binaries
+``octez-baker`` and ``octez-accuser`` instead, which automatically
+handle protocol switches.
+
+
+Deprecation of Adaptive Issuance vote in the baker
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Octez v24 deprecates the optional argument ``--adaptive-issuance-vote
+<vote>`` of the baker. This argument will be removed in a future
+version. It was meant to decide the activation of the Adaptive
+Issuance feature, and has had no effects since the Paris protocol has
+been voted in, so it can already be removed without any impact on the
+baker.
+
+The ``adaptive_issuance_vote`` field of the per-block-vote
+configuration file is similarly deprecated.
+
+
+Node events
+^^^^^^^^^^^
+
+As of Octez v24, the following node events contain the short hash of
+blocks instead of the full hash:
+
+- from the block validator: events
+  ``validation_or_application_failed``, ``application_failed``,
+  ``application_failure_after_validation``, ``validation_failure``,
+  ``validation_canceled``, ``commit_block_failure``,
+  ``validated_block``, ``validation_and_application_success`` and
+  ``updated_to_checkpoint``,
+
+- from the prevalidator: event ``request_completed_info``,
+
+- and from the store: ``<block_hash> (level: <level>)`` has become
+  ``<short_block_hash> (level: <level>)``.
+
+The level of event ``validator.block.validating_block`` has changed
+from ``Debug`` to ``Info``, so it now appears in the daily logs by
+default. Moreover, this event now shows the long block hash, level,
+predecessor, fitness, and timestamp of the block.
+
+The level of event ``validator.chain.block_info`` has changed from
+``Info`` to ``Debug``, so it no longer appears in the daily logs by
+default.
+
+
+DAL node RPCs
+^^^^^^^^^^^^^
+
+As of Octez v24, the
+``/levels/<slot_level>/slots/<slot_index>/status`` RPC answers with
+``unpublished`` status for unpublished slots instead of a 404 empty
+response.
+
+Slots status are not stored in dedicated files on disk anymore, but
+found in a cache and the skip list. A consequence of this is that the
+``/levels/<slot_level>/slots/<slot_index>/status`` RPC now only works
+with nodes that store the skip list, and therefore not with observer
+nodes. Also, the RPC now answers with a 500 error if querying a level
+at which the DAL was not supported, instead of a 404 error.
+
+
 
 .. _tallinn_breaking_changes:
 
@@ -126,10 +201,6 @@ omitted in cache functions. As a result, gas costs for smart contract
 calls has increased by at most 2 units of gas each time the cache is
 accessed.
 
-.. _v24_breaking_changes:
-
-Octez Version 24
-----------------
 
 .. _v23_breaking_changes:
 
