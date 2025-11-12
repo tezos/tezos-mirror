@@ -41,11 +41,13 @@ Node
 Baker
 -----
 
-- **Deprecation** The ``adaptive-issuance-vote`` argument (placeholder
-  ``vote``) is now deprecated, and will be removed in the next major
-  version of Octez. It was meant to decide the activation of the
-  Adaptive Issuance feature, and has had no effects since the Paris
-  protocol has been voted in. (MR :gl:`!19215`)
+- **Deprecation** The optional baker argument
+  ``--adaptive-issuance-vote <vote>`` is now deprecated, and will be
+  removed in the next major version of Octez. It was meant to decide
+  the activation of the Adaptive Issuance feature, and has had no
+  effects since the Paris protocol has been voted in. The
+  ``adaptive_issuance_vote`` field of the per-block-vote configuration
+  file is similarly deprecated. (MR :gl:`!19215`)
 
 - **Deprecation** The ``octez-baker-<protocol>`` binaries are
    deprecated, and will be removed in the next major version of
