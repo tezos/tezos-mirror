@@ -223,6 +223,11 @@ fn execute_internal_operations<'a, Host: Runtime>(
                             Ok(success) => ContentResult::Applied(success.into()),
                             Err(err) => {
                                 failed = Some(index);
+                                log!(
+                                    tc_ctx.host,
+                                    Error,
+                                    "Internal transfer failed: {err:?}"
+                                );
                                 ContentResult::Failed(
                                     ApplyOperationError::from(err).into(),
                                 )
@@ -280,6 +285,11 @@ fn execute_internal_operations<'a, Host: Runtime>(
                             Ok(success) => ContentResult::Applied(success),
                             Err(err) => {
                                 failed = Some(index);
+                                log!(
+                                    tc_ctx.host,
+                                    Error,
+                                    "Internal origination failed: {err:?}"
+                                );
                                 ContentResult::Failed(
                                     ApplyOperationError::from(err).into(),
                                 )
@@ -877,6 +887,11 @@ fn apply_operation<Host: Runtime>(
     match &validated_operation.content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(&mut tc_ctx, source_account, pk);
+
+            if reveal_result.is_err() {
+                log!(host, Error, "Reveal failed because of: {reveal_result:?}");
+            }
+
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,
                 reveal_result.map_err(Into::into),
@@ -906,6 +921,15 @@ fn apply_operation<Host: Runtime>(
                 &mut internal_operations_receipts,
                 &parser,
             );
+
+            if transfer_result.is_err() {
+                log!(
+                    host,
+                    Error,
+                    "Transfer failed because of: {transfer_result:?}"
+                );
+            }
+
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,
                 transfer_result.map_err(Into::into),
@@ -933,6 +957,15 @@ fn apply_operation<Host: Runtime>(
                 ),
                 Err(err) => Err(err),
             };
+
+            if origination_result.is_err() {
+                log!(
+                    host,
+                    Error,
+                    "Origination failed because of: {origination_result:?}"
+                );
+            }
+
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,
                 origination_result.map_err(|e| e.into()),
