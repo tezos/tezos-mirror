@@ -95,7 +95,10 @@ let get_last_schedule_pipeline ?status ?matching ~project () =
           | Some name when name =~ pattern -> true
           | _ -> false
         in
-        Log.debug "%d of those match the pattern." (List.length pipelines) ;
+        Log.debug
+          "%d of those match the pattern %S."
+          (List.length pipelines)
+          (show_rex pattern) ;
         pipelines
   in
   match pipelines with

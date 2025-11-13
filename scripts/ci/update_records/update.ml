@@ -30,6 +30,14 @@ let project = Sys.getenv_opt "PROJECT" |> Option.value ~default:"tezos/tezos"
 let default_branch =
   Sys.getenv_opt "DEFAULT_BRANCH" |> Option.value ~default:"master"
 
+(* Same as [mkdir -p]. *)
+let rec mkdir_p path =
+  if not (Sys.file_exists path) then
+    let parent = Filename.dirname path in
+    if String.length parent < String.length path then (
+      mkdir_p parent ;
+      Sys.mkdir path 0o755)
+
 let fetch_record records_directory
     (uri, {Tezt_job_name.component; index; variant}) =
   let local_filename =
@@ -49,7 +57,7 @@ let fetch_record records_directory
     match variant with None -> dir | Some variant -> dir // variant
   in
   let local = local_dir // local_filename in
-  if not @@ Sys.file_exists local_dir then Sys.mkdir local_dir 0o755 ;
+  mkdir_p local_dir ;
   Lwt.catch
     (fun () ->
       let* () = Gitlab.get_output uri ~output_path:local in
