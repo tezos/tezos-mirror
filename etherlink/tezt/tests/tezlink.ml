@@ -2026,6 +2026,34 @@ let test_tezlink_prevalidation =
       op_wrong_gas_limit
       client_tezlink
   in
+  (* gas limit upper bound is higher for batches, but still needs to fit in a
+     block *)
+  let* batch_wrong_gas_limit =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~gas_limit:(hard_gas_limit_per_operation - 1)
+            ~counter:2
+            ~source:Constant.bootstrap1
+            (transfer ());
+          make
+            ~fee:1000
+            ~gas_limit:(hard_gas_limit_per_operation - 1)
+            ~counter:3
+            ~source:Constant.bootstrap1
+            (transfer ());
+        ]
+        client)
+  in
+  let* _ =
+    Operation.inject
+      ~error:gas_limit_too_high_rex
+      ~dont_wait:true
+      batch_wrong_gas_limit
+      client_tezlink
+  in
 
   (* case tz4 *)
   let* tz4 = Client.gen_and_show_keys ~sig_alg:"bls" client_tezlink in
