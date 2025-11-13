@@ -280,13 +280,3 @@ let changeset_riscv_kernels =
   Changeset.(
     changeset_riscv_kernels_code @ changeset_images_rust_toolchain
     (* Run if the [rust-toolchain] image is updated *))
-
-let changeset_mir =
-  Changeset.(
-    changeset_base @ changeset_images (* Run if the test image is updated *)
-    @ make ["contrib/mir/**/*"])
-
-let changeset_mir_tzt =
-  Changeset.(
-    changeset_base @ changeset_images (* Run if the test image is updated *)
-    @ make ["contrib/mir/**/*"; "tzt_reference_test_suite/**/*"])
