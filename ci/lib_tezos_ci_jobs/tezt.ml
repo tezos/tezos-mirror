@@ -129,7 +129,7 @@ let job_tezt_extra =
     ~pipeline
     ~description:"Run Tezt tests tagged as extra and not flaky."
     ~test_selection:(tests_tag_selector ~extra:true [Not (Has_tag "flaky")])
-    ~parallel_jobs:10
+    ~parallel_jobs:1
     ~parallel_tests:6
     ~retry_jobs:2
 
