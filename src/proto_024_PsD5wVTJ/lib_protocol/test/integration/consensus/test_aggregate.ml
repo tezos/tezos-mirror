@@ -75,7 +75,7 @@ type 'kind aggregate =
   | Attestation : Alpha_context.Kind.attestations_aggregate aggregate
 
 let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
-    ((block, (_, op_receipts)) : Block.block_with_metadata) =
+    ((_block, (_, op_receipts)) : Block.block_with_metadata) =
   let open Lwt_result_syntax in
   let (result
         : kind
@@ -83,15 +83,6 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
     match kind with
     | Preattestation -> find_preattestations_aggregate_result op_receipts
     | Attestation -> find_attestations_aggregate_result op_receipts
-  in
-  let* ctxt = Block.get_alpha_ctxt block in
-  let block_level = Alpha_context.Level.current ctxt in
-  let attested_level =
-    match kind with
-    | Preattestation -> block_level
-    | Attestation ->
-        Alpha_context.Level.pred ctxt block_level
-        |> WithExceptions.Option.get ~loc:__LOC__
   in
   match (kind, result) with
   | ( Preattestation,
@@ -124,9 +115,7 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
             attesters
         in
         let total_consensus_power =
-          Alpha_context.Attesting_power.get
-            ctxt
-            ~attested_level
+          Alpha_context.Attesting_power.Internal_for_tests.get_from_result
             total_consensus_power
         in
         if Int64.equal voting_power total_consensus_power then return_unit
@@ -153,7 +142,9 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
       let resulting_committee =
         List.map
           (fun (a, b) ->
-            (a, Alpha_context.Attesting_power.get ctxt ~attested_level b))
+            ( a,
+              Alpha_context.Attesting_power.Internal_for_tests.get_from_result b
+            ))
           resulting_committee
       in
       if

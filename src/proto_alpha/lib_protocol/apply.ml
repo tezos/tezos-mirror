@@ -2283,6 +2283,12 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
   in
   let mk_preattestation_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       consensus_power =
+    let consensus_power =
+      Attesting_power.to_result
+        ctxt
+        ~attested_level:content.level
+        consensus_power
+    in
     Single_result
       (Preattestation_result
          {
@@ -2340,6 +2346,12 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
   let open Lwt_result_syntax in
   let mk_attestation_result ({delegate; consensus_pkh; _} : Consensus_key.pk)
       consensus_power =
+    let consensus_power =
+      Attesting_power.to_result
+        ctxt
+        ~attested_level:consensus.level
+        consensus_power
+    in
     Single_result
       (Attestation_result
          {
@@ -2382,7 +2394,8 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
             consensus_key
             Attesting_power.zero (* Fake power. *) )
 
-let record_attestations_aggregate ctxt (mode : mode) committee :
+let record_attestations_aggregate ctxt (mode : mode)
+    (content : consensus_aggregate_content) committee :
     (context * Kind.attestations_aggregate contents_result_list) tzresult Lwt.t
     =
   let open Lwt_result_syntax in
@@ -2410,10 +2423,21 @@ let record_attestations_aggregate ctxt (mode : mode) committee :
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return
               ( ctxt,
-                (key, attesting_power) :: consensus_keys,
+                ( key,
+                  Attesting_power.to_result
+                    ctxt
+                    ~attested_level:content.level
+                    attesting_power )
+                :: consensus_keys,
                 Attesting_power.add attesting_power consensus_power ))
           (ctxt, [], Attesting_power.zero)
           committee
+      in
+      let total_consensus_power =
+        Attesting_power.to_result
+          ctxt
+          ~attested_level:content.level
+          total_consensus_power
       in
       let result =
         Attestations_aggregate_result
@@ -2468,10 +2492,21 @@ let record_preattestations_aggregate ctxt (mode : mode)
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return
               ( ctxt,
-                (key, attesting_power) :: consensus_keys,
+                ( key,
+                  Attesting_power.to_result
+                    ctxt
+                    ~attested_level:content.level
+                    attesting_power )
+                :: consensus_keys,
                 Attesting_power.add attesting_power consensus_power ))
           (ctxt, [], Attesting_power.zero)
           committee
+      in
+      let total_consensus_power =
+        Attesting_power.to_result
+          ctxt
+          ~attested_level:content.level
+          total_consensus_power
       in
       let result =
         Preattestations_aggregate_result
@@ -2619,13 +2654,13 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
           Validate_errors.Consensus.(Aggregate_disabled)
       in
       record_preattestations_aggregate ctxt mode consensus_content committee
-  | Single (Attestations_aggregate {committee; _}) ->
+  | Single (Attestations_aggregate {consensus_content; committee}) ->
       let*? () =
         error_unless
           (Constants.aggregate_attestation ctxt)
           Validate_errors.Consensus.(Aggregate_disabled)
       in
-      record_attestations_aggregate ctxt mode committee
+      record_attestations_aggregate ctxt mode consensus_content committee
   | Single (Seed_nonce_revelation {level; nonce}) ->
       let level = Level.from_raw ctxt level in
       let* ctxt = Nonce.reveal ctxt level nonce in
@@ -3207,7 +3242,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         Nonce.record_hash ctxt {nonce_hash; delegate = block_producer.delegate}
   in
   let* ctxt, dal_attestation = Dal_apply.finalisation ctxt in
-  let* ctxt, reward_bonus =
+  let* ctxt, reward_bonus, attestation_result =
     let* required_attestations =
       are_attestations_required ctxt ~level:current_level.level
     in
@@ -3223,8 +3258,49 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
           let* ctxt, rewards_bonus =
             Baking.bonus_baking_reward ctxt ~attested_level ~attesting_power
           in
-          return (ctxt, Some rewards_bonus)
-    else return (ctxt, None)
+          let* ctxt, consensus_committee =
+            Attesting_power.consensus_committee ctxt ~attested_level
+          in
+          let* ctxt, consensus_threshold =
+            Attesting_power.consensus_threshold ctxt ~attested_level
+          in
+          let consensus_recorded_power =
+            Attesting_power.get ctxt ~attested_level attesting_power
+          in
+          return
+            ( ctxt,
+              Some rewards_bonus,
+              Some
+                {
+                  consensus_committee;
+                  consensus_threshold;
+                  consensus_recorded_power;
+                } )
+    else return (ctxt, None, None)
+  in
+  let* ctxt, preattestation_result =
+    let lre = Consensus.locked_round_evidence ctxt in
+    match lre with
+    | None -> return (ctxt, None)
+    | Some (_round, preattesting_power) ->
+        let attested_level = current_level in
+        let* ctxt, consensus_committee =
+          Attesting_power.consensus_committee ctxt ~attested_level
+        in
+        let* ctxt, consensus_threshold =
+          Attesting_power.consensus_threshold ctxt ~attested_level
+        in
+        let consensus_recorded_power =
+          Attesting_power.get ctxt ~attested_level preattesting_power
+        in
+        return
+          ( ctxt,
+            Some
+              {
+                consensus_committee;
+                consensus_threshold;
+                consensus_recorded_power;
+              } )
   in
   let*? baking_reward = Delegate.Rewards.baking_reward_fixed_portion ctxt in
   let* ctxt, baking_receipts =
@@ -3249,6 +3325,9 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
   in
   let+ voting_period_info = Voting_period.get_rpc_current_info ctxt in
+  let abaab_activation_level =
+    Attesting_power.all_bakers_attest_activation_level ctxt
+  in
   let receipt =
     Apply_results.
       {
@@ -3263,6 +3342,9 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         liquidity_baking_toggle_ema;
         implicit_operations_results;
         dal_attestation;
+        abaab_activation_level;
+        attestations = attestation_result;
+        preattestations = preattestation_result;
       }
   in
   (ctxt, receipt)
@@ -3382,6 +3464,9 @@ let finalize_block (application_state : application_state) shell_header_opt =
               liquidity_baking_toggle_ema;
               implicit_operations_results;
               dal_attestation = Dal.Attestation.empty;
+              abaab_activation_level = None;
+              attestations = None;
+              preattestations = None;
             } )
   | Application
       {

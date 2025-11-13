@@ -241,7 +241,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                 kind;
               };
             delegate = Tezos_crypto.Signature.Of_V2.public_key_hash ck.delegate;
-            power = Protocol.Alpha_context.Attesting_power.get_slots power;
+            power =
+              Protocol.Alpha_context.Attesting_power.get_slots_from_result power;
           }
         :: acc)
       acc
@@ -278,7 +279,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                    delegate =
                      Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
                    power =
-                     Protocol.Alpha_context.Attesting_power.get_slots
+                     Protocol.Alpha_context.Attesting_power
+                     .get_slots_from_result
                        consensus_power;
                  }
                :: acc
@@ -302,7 +304,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                    delegate =
                      Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
                    power =
-                     Protocol.Alpha_context.Attesting_power.get_slots
+                     Protocol.Alpha_context.Attesting_power
+                     .get_slots_from_result
                        consensus_power;
                  }
                :: acc

@@ -69,26 +69,26 @@ and 'kind contents_result =
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
-      consensus_power : Attesting_power.t;
+      consensus_power : Attesting_power.result;
     }
       -> Kind.preattestation contents_result
   | Attestation_result : {
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
-      consensus_power : Attesting_power.t;
+      consensus_power : Attesting_power.result;
     }
       -> Kind.attestation contents_result
   | Preattestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
-      committee : (Consensus_key.t * Attesting_power.t) list;
-      total_consensus_power : Attesting_power.t;
+      committee : (Consensus_key.t * Attesting_power.result) list;
+      total_consensus_power : Attesting_power.result;
     }
       -> Kind.preattestations_aggregate contents_result
   | Attestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
-      committee : (Consensus_key.t * Attesting_power.t) list;
-      total_consensus_power : Attesting_power.t;
+      committee : (Consensus_key.t * Attesting_power.result) list;
+      total_consensus_power : Attesting_power.result;
     }
       -> Kind.attestations_aggregate contents_result
   | Seed_nonce_revelation_result :
@@ -327,6 +327,12 @@ val kind_equal_list :
   'kind2 contents_result_list ->
   ('kind, 'kind2) eq option
 
+type attestations_result = {
+  consensus_committee : int64;
+  consensus_threshold : int64;
+  consensus_recorded_power : int64;
+}
+
 type block_metadata = {
   proposer : Consensus_key.t;
   baker : Consensus_key.t;
@@ -339,6 +345,9 @@ type block_metadata = {
   liquidity_baking_toggle_ema : Per_block_votes.Liquidity_baking_toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
   dal_attestation : Dal.Attestation.t;
+  abaab_activation_level : Level.t option;
+  attestations : attestations_result option;
+  preattestations : attestations_result option;
 }
 
 val block_metadata_encoding : block_metadata Data_encoding.encoding
