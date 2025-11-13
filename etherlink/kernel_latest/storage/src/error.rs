@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use num_bigint::{BigUint, TryFromBigIntError};
 use rlp::DecoderError;
 use tezos_data_encoding::enc::BinError;
 use tezos_data_encoding::nom::error::DecodeError;
@@ -31,6 +32,14 @@ pub enum Error {
     OriginatedToImplicit,
     #[error("Typechecking error: {0}")]
     TcError(String),
+    #[error("BigInt conversion error: {0}")]
+    TryFromBigIntError(TryFromBigIntError<BigUint>),
+}
+
+impl From<TryFromBigIntError<BigUint>> for Error {
+    fn from(e: TryFromBigIntError<BigUint>) -> Self {
+        Error::TryFromBigIntError(e)
+    }
 }
 
 impl From<PathError> for Error {

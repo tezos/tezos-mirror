@@ -5,6 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 use core::str::Utf8Error;
+use num_bigint::{BigUint, TryFromBigIntError};
 use primitive_types::U256;
 use rlp::DecoderError;
 use tezos_data_encoding::enc::BinError;
@@ -131,6 +132,8 @@ pub enum Error {
     Overflow(String),
     #[error("Typechecking error: {0}")]
     TcError(String),
+    #[error("BigInt conversion error: {0}")]
+    TryFromBigIntError(TryFromBigIntError<BigUint>),
 }
 
 impl From<revm_etherlink::Error> for Error {
@@ -229,6 +232,9 @@ impl From<IndexableStorageError> for Error {
             IndexableStorageError::ImplicitToOriginated => Error::ImplicitToOriginated,
             IndexableStorageError::OriginatedToImplicit => Error::OriginatedToImplicit,
             IndexableStorageError::TcError(msg) => Error::TcError(msg),
+            IndexableStorageError::TryFromBigIntError(msg) => {
+                Error::TryFromBigIntError(msg)
+            }
         }
     }
 }
@@ -250,6 +256,7 @@ impl From<GenStorageError> for Error {
             GenStorageError::ImplicitToOriginated => Error::ImplicitToOriginated,
             GenStorageError::OriginatedToImplicit => Error::OriginatedToImplicit,
             GenStorageError::TcError(msg) => Error::TcError(msg),
+            GenStorageError::TryFromBigIntError(msg) => Error::TryFromBigIntError(msg),
         }
     }
 }
