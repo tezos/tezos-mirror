@@ -97,6 +97,27 @@ let transaction_dropped =
     ~level:Warning
     ("address", Ethereum_types.address_encoding)
 
+let transaction_retried_confirmed =
+  declare_3
+    ~section
+    ~name:"transaction_retried_confirmed"
+    ~msg:
+      "Transaction from {address} was retried {attempt} times before being \
+       confirmed in {time}."
+    ~level:Warning
+    ("address", Ethereum_types.address_encoding)
+    ("attempt", Data_encoding.int31)
+    ("time", Time.System.Span.encoding)
+
+let transaction_retried_failed =
+  declare_2
+    ~section
+    ~name:"transaction_retried_confirmed"
+    ~msg:"Transaction from {address} failed after {attempt} attempts."
+    ~level:Warning
+    ("address", Ethereum_types.address_encoding)
+    ("attempt", Data_encoding.int31)
+
 let setup_completed =
   declare_0
     ~alternative_color:Magenta
@@ -162,6 +183,12 @@ let transaction_confirmed account duration =
 
 let transaction_refused account =
   emit transaction_refused (Account.address_et account)
+
+let transaction_retried_confirmed account attempt times =
+  emit transaction_retried_confirmed (Account.address_et account, attempt, times)
+
+let transaction_retried_failed account attempt =
+  emit transaction_retried_failed (Account.address_et account, attempt)
 
 let transaction_dropped account =
   emit transaction_dropped (Account.address_et account)
