@@ -1147,7 +1147,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"test_kernels"
           ~changes:changeset_test_kernels
-          ~dependencies:(Dependent [Job job_build_kernels])
+          ~dependencies:(Dependent [])
           ["make -f kernels.mk check"; "make -f kernels.mk test"]
       in
       let job_audit_riscv_deps : tezos_job =
