@@ -7472,7 +7472,7 @@ module Garbage_collection = struct
     let wait_for_connections_of_producer_promise =
       Dal_node.wait_for_connections slot_producer 3
     in
-    let* () = Dal_node.run ~wait_ready:true slot_producer in
+    let* () = Dal_node.run ~wait_ready:true ~event_level:`Debug slot_producer in
 
     (* Create & configure observer *)
     let observer = Dal_node.create ~name:"observer" ~node () in
