@@ -211,6 +211,17 @@ let () =
     (obj1 (req "loc" location_encoding))
     (function Unexpected_operation loc -> Some loc | _ -> None)
     (fun loc -> Unexpected_operation loc) ;
+  (* Unpackable type *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.unpackable_type"
+    ~title:"Type cannot be packed (type error)"
+    ~description:
+      "When parsing script, a value was given to a primitive that expects a \
+       packable type."
+    (obj1 (req "loc" location_encoding))
+    (function Unpackable_type loc -> Some loc | _ -> None)
+    (fun loc -> Unpackable_type loc) ;
   (* No such entrypoint *)
   register_error_kind
     `Permanent
