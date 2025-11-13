@@ -1122,6 +1122,7 @@ module Replay = struct
         ~apply_unsafe_patches:false
         ~bail_on_disagree:false
         ~slow_vm_fallback:false
+        ~commit_on:None
         ~profiling
         ~force_etherlink:false
         ~l1_monitor_finalized:None

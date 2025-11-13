@@ -713,3 +713,17 @@ let l1_monitor_finalized_switch :
   |> Tezos_clic.map_arg ~f:(fun _ -> function
        | true -> Lwt_result_syntax.return_some true
        | false -> Lwt_result_syntax.return_none)
+
+let commit_on_arg :
+    ( Configuration.commit_on_strategy option,
+      Client_context.full )
+    Tezos_clic.arg =
+  Tezos_clic.arg
+    ~long:"commit-on"
+    ~placeholder:"block|commitment"
+    ~doc:
+      (Format.sprintf
+         "Choose when to commit context to disk. Default is %S."
+         Configuration.(string_of_commit_on_strategy default_commit_on_strategy))
+  @@ Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
+         Lwt.return (Configuration.commit_on_strategy_of_string s))

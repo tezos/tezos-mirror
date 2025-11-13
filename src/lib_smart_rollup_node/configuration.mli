@@ -106,6 +106,10 @@ type outbox_message_filter =
       (** Accept transactions which match the filter on their destination and
           entrypoint. *)
 
+type commit_on_strategy =
+  | Block  (** Commit to disk every block *)
+  | Commitment  (** Commit to disk every commitment *)
+
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   etherlink : bool;
@@ -154,6 +158,7 @@ type t = {
   history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
   bail_on_disagree : bool;
+  commit_on : commit_on_strategy;
   opentelemetry : Octez_telemetry.Opentelemetry_config.t;
 }
 
@@ -290,6 +295,14 @@ val default_index_buffer_size : int
 (** Default setting for monitoring finalized heads of L1 node. *)
 val default_l1_monitor_finalized : bool
 
+val default_commit_on_strategy : commit_on_strategy
+
+val string_of_commit_on_strategy : commit_on_strategy -> string
+
+val commit_on_strategy_of_string : string -> commit_on_strategy tzresult
+
+val commit_on_strategy_encoding : commit_on_strategy Data_encoding.t
+
 (** Encoding for configuration. *)
 val encoding : t Data_encoding.t
 
@@ -338,6 +351,7 @@ module Cli : sig
     unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
     slow_vm_fallback:bool ->
+    commit_on:commit_on_strategy option ->
     profiling:bool option ->
     force_etherlink:bool ->
     l1_monitor_finalized:bool option ->
@@ -377,6 +391,7 @@ module Cli : sig
     unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
     slow_vm_fallback:bool ->
+    commit_on:commit_on_strategy option ->
     profiling:bool option ->
     force_etherlink:bool ->
     l1_monitor_finalized:bool option ->
