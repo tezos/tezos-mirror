@@ -224,6 +224,18 @@ module Arg = struct
         "The number of transactions an EOA inject before waiting for their \
          confirmation."
       Parameter.int
+
+  let dummy_data_size =
+    Tezos_clic.arg
+      ~long:"dummy-data-size"
+      ~placeholder:"BYTES"
+      ~doc:
+        "Size in bytes of dummy data to include in native XTZ transaction \
+         payloads. This allows testing network capacity under load conditions \
+         with data-heavy transactions. Only applicable with the `xtz` \
+         scenario. If not set, no dummy data will be included in the \
+         transactions."
+      Parameter.int
 end
 
 let log_config ~verbose () =
@@ -242,7 +254,7 @@ let run_command =
   command
     ~desc:"Start Floodgate to spam an EVM-compatible network"
     Arg.(
-      args14
+      args15
         verbose
         relay_endpoint
         rpc_endpoint
@@ -256,7 +268,8 @@ let run_command =
         initial_balance
         scenario
         txs_salvo_eoa
-        elapsed_time_between_report)
+        elapsed_time_between_report
+        dummy_data_size)
     (prefixes ["run"] @@ stop)
     (fun ( verbose,
            relay_endpoint,
@@ -271,13 +284,21 @@ let run_command =
            initial_balance,
            scenario,
            txs_per_salvo,
-           elapsed_time_between_report )
+           elapsed_time_between_report,
+           dummy_data_size )
          ()
        ->
       let open Lwt_result_syntax in
       let*! () = log_config ~verbose () in
       let* controller =
         require ~error_msg:"Missing argument --controller" controller
+      in
+      let* () =
+        if Option.is_some dummy_data_size && scenario <> `XTZ then
+          failwith
+            "the --dummy-data-size argument is only applicable with the `xtz` \
+             scenario."
+        else return_unit
       in
       Floodgate.run
         ~relay_endpoint
@@ -292,7 +313,8 @@ let run_command =
         ~initial_balance
         ~txs_per_salvo
         ~elapsed_time_between_report
-        ~scenario)
+        ~scenario
+        ~dummy_data_size)
 
 let commands = [run_command]
 

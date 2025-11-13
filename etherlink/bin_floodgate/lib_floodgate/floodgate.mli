@@ -20,6 +20,7 @@ val run :
   initial_balance:Z.t ->
   txs_per_salvo:int ->
   elapsed_time_between_report:float ->
+  dummy_data_size:int option ->
   unit tzresult Lwt.t
 
 val deploy :
