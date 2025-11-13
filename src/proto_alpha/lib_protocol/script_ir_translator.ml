@@ -5114,9 +5114,9 @@ let get_typed_native_code :
     context -> kind:Script.native_kind -> (ex_code * context) tzresult Lwt.t =
  fun ctxt ~kind ->
   let open Lwt_result_syntax in
-  let*? (Script_native.Ex_kind_and_types
+  let*? (Script_native_types.Ex_kind_and_types
            (kind, {arg_type; storage_type; entrypoints})) =
-    Script_native.get_typed_kind_and_types kind
+    Script_native_types.get_typed_kind_and_types kind
   in
   let implementation = Native {kind} in
   return

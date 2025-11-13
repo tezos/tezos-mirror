@@ -254,7 +254,6 @@
   Script_typed_ir_size
   Script_typed_ir_size_costs_generated
   Script_typed_ir_size_costs
-  Script_native
   Michelson_v1_gas
   Operation_costs
   Script_tc_context
@@ -281,6 +280,7 @@
   Ticket_operations_diff
   Ticket_accounting
   Ticket_transfer
+  Script_native
   Script_interpreter_defs
   Script_interpreter
   Sc_rollup_management_protocol
@@ -557,7 +557,6 @@
   script_typed_ir_size.ml script_typed_ir_size.mli
   script_typed_ir_size_costs_generated.ml
   script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
-  script_native.ml script_native.mli
   michelson_v1_gas.ml michelson_v1_gas.mli
   operation_costs.ml operation_costs.mli
   script_tc_context.ml script_tc_context.mli
@@ -584,6 +583,7 @@
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
+  script_native.ml script_native.mli
   script_interpreter_defs.ml
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
@@ -861,7 +861,6 @@
   script_typed_ir_size.ml script_typed_ir_size.mli
   script_typed_ir_size_costs_generated.ml
   script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
-  script_native.ml script_native.mli
   michelson_v1_gas.ml michelson_v1_gas.mli
   operation_costs.ml operation_costs.mli
   script_tc_context.ml script_tc_context.mli
@@ -888,6 +887,7 @@
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
+  script_native.ml script_native.mli
   script_interpreter_defs.ml
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
@@ -1149,7 +1149,6 @@
   script_typed_ir_size.ml script_typed_ir_size.mli
   script_typed_ir_size_costs_generated.ml
   script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
-  script_native.ml script_native.mli
   michelson_v1_gas.ml michelson_v1_gas.mli
   operation_costs.ml operation_costs.mli
   script_tc_context.ml script_tc_context.mli
@@ -1176,6 +1175,7 @@
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
+  script_native.ml script_native.mli
   script_interpreter_defs.ml
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli

@@ -245,7 +245,6 @@
         "Script_typed_ir_size",
         "Script_typed_ir_size_costs_generated",
         "Script_typed_ir_size_costs",
-        "Script_native",
         "Michelson_v1_gas",
         "Operation_costs",
         "Script_tc_context",
@@ -275,6 +274,7 @@
         "Ticket_accounting",
         "Ticket_transfer",
 
+        "Script_native",
         "Script_interpreter_defs",
         "Script_interpreter",
         "Sc_rollup_management_protocol",

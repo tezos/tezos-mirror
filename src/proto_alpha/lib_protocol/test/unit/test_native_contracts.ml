@@ -88,7 +88,7 @@ let test_native_contract_types kind () =
                 untyped = untyped_storage_type;
                 typed = Script_typed_ir.Ty_ex_c storage_type;
               } )) =
-    Script_native.Internal_for_tests.types_of_kind kind
+    Script_native_types.Internal_for_tests.types_of_kind kind
   in
   let*?@ ctxt =
     test_unparse_ty "parameter" ctxt untyped_parameter_type parameter_type
