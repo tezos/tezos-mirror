@@ -370,8 +370,6 @@ module Term = struct
 
   let attester_profile_printer = Signature.Public_key_hash.pp
 
-  let producer_profile_printer = Format.pp_print_int
-
   let attester_profile_format =
     let decoder arg =
       let arg =
@@ -388,13 +386,13 @@ module Term = struct
     in
     (decoder, attester_profile_printer)
 
-  let producer_profile_format =
+  let positive_int_format name =
     let decoder string =
       let error () =
         Format.kasprintf
           (fun s -> Error s)
-          "Unrecognized profile for producer (expected non-negative integer, \
-           got %s)"
+          "Unrecognized profile for %s (expected non-negative integer, got %s)"
+          name
           string
       in
       match int_of_string_opt string with
@@ -402,23 +400,11 @@ module Term = struct
       | Some i when i < 0 -> error ()
       | Some slot_index -> Ok slot_index
     in
-    (decoder, producer_profile_printer)
+    (decoder, Format.pp_print_int)
 
-  let observer_profile_format =
-    let decoder string =
-      let error () =
-        Format.kasprintf
-          (fun s -> Error s)
-          "Unrecognized profile for observer (expected nonnegative integer, \
-           got %s)"
-          string
-      in
-      match int_of_string_opt string with
-      | None -> error ()
-      | Some i when i < 0 -> error ()
-      | Some slot_index -> Ok slot_index
-    in
-    (decoder, producer_profile_printer)
+  let producer_profile_format = positive_int_format "producer"
+
+  let observer_profile_format = positive_int_format "observer"
 
   let attester_profile_arg =
     make_arg_list
