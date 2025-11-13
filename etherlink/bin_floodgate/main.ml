@@ -236,6 +236,36 @@ module Arg = struct
          scenario. If not set, no dummy data will be included in the \
          transactions."
       Parameter.int
+
+  let retry_attempt =
+    let default = "never" in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"retry-attempt"
+      ~short:'a'
+      ~placeholder:"never|always|INT"
+      ~doc:
+        "The number of time a transaction is retried when it has been dropped."
+      (Tezos_clic.parameter
+         Floodgate.(
+           fun _ s ->
+             let open Lwt_result_syntax in
+             match s with
+             | "always" -> return Always
+             | "never" -> return Never
+             | s ->
+                 let*? n =
+                   Option.to_result
+                     ~none:
+                       [
+                         error_of_fmt
+                           "Expected an integer, \"always\" or \"never\", got \
+                            %s"
+                           s;
+                       ]
+                     (int_of_string_opt s)
+                 in
+                 return (Number n)))
 end
 
 let log_config ~verbose () =
@@ -254,7 +284,7 @@ let run_command =
   command
     ~desc:"Start Floodgate to spam an EVM-compatible network"
     Arg.(
-      args15
+      args16
         verbose
         relay_endpoint
         rpc_endpoint
@@ -269,7 +299,8 @@ let run_command =
         scenario
         txs_salvo_eoa
         elapsed_time_between_report
-        dummy_data_size)
+        dummy_data_size
+        retry_attempt)
     (prefixes ["run"] @@ stop)
     (fun ( verbose,
            relay_endpoint,
@@ -285,7 +316,8 @@ let run_command =
            scenario,
            txs_per_salvo,
            elapsed_time_between_report,
-           dummy_data_size )
+           dummy_data_size,
+           retry_attempt )
          ()
        ->
       let open Lwt_result_syntax in
@@ -314,7 +346,8 @@ let run_command =
         ~txs_per_salvo
         ~elapsed_time_between_report
         ~scenario
-        ~dummy_data_size)
+        ~dummy_data_size
+        ~retry_attempt)
 
 let commands = [run_command]
 
