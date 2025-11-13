@@ -219,7 +219,7 @@ let () =
   let release_description =
     "\n\n\
      For more information on Octez' release system, see: \
-     https://tezos.gitlab.io/releases/releases.html"
+     https://octez.tezos.com/docs/releases/releases.html"
   in
   (* TODO: rename 'octez_docker_latest_release' ?? *)
   register
@@ -249,21 +249,26 @@ let () =
        'nomadic-labs/tezos' project." ;
   (* TODO: simplify dry run pipelines by having them all be on tezos/tezos? *)
   register
-    "octez_release_tag"
-    If.(
-      on_tezos_namespace && push
-      && (has_tag_match octez_major_release_tag_re
-         || has_tag_match octez_minor_release_tag_re))
+    "octez_major_release_tag"
+    If.(on_tezos_namespace && push && has_tag_match octez_major_release_tag_re)
+    ~jobs:(Release_tag.octez_jobs ~major:true Release_tag)
+    ~variables:[("DOCKER_FORCE_BUILD", "true")]
+    ~description:
+      ("Release tag pipelines for major Octez release.\n\n\
+        This pipeline is created when the release manager pushes a tag in the \
+        format octez-vX.0(-rcN).\n\
+        Publishes release assets for all the components of Octez."
+     ^ release_description) ;
+  register
+    "octez_minor_release_tag"
+    If.(on_tezos_namespace && push && has_tag_match octez_minor_release_tag_re)
     ~jobs:(Release_tag.octez_jobs ~major:false Release_tag)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
-      ("Release tag pipelines for Octez.\n\n\
+      ("Release tag pipelines for minor Octez release.\n\n\
         This pipeline is created when the release manager pushes a tag in the \
-        format octez-vX.Y(-rcN). It creates and publishes release on GitLab \
-        with the associated artifacts (static binaries, Docker images, .deb \
-        packages, etc.). It also prepares for a new opam package release by \
-        updating https://github.com/tezos/opam-repository."
-     ^ release_description) ;
+        format octez-vX.Y.\n\
+        Publishes release assets for Octez L1 only." ^ release_description) ;
   register
     "octez_beta_release_tag"
     If.(on_tezos_namespace && push && has_tag_match octez_beta_release_tag_re)
