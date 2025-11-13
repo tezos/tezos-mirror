@@ -108,8 +108,8 @@ let job_release_page ~test ?dependencies () =
       (Gitlab_ci.Util.artifacts
          ~expire_in:(Duration (Days 1))
          ["./index.md"; "index.html"])
-    ~after_script:["cp /tmp/release_page*/index.md ./index.md"]
     ~before_script:["eval $(opam env)"]
+    ~after_script:["cp /tmp/release_page*/index.md ./index.md"]
     ?dependencies
     ~variables:
       (if test then

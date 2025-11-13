@@ -95,8 +95,8 @@ let _version_manager =
     ~opam:""
     ~path:"ci/bin_release_page"
     ~release_status:Unreleased
-    ~modules:["version_manager"; "rss"]
-    ~deps:[unix; clap; tezt_json_lib; _release_page_base_lib |> open_]
+    ~modules:["version_manager"]
+    ~deps:[unix; clap; tezt_json_lib; rss; _release_page_base_lib |> open_]
 
 let ci_grafazos =
   private_lib

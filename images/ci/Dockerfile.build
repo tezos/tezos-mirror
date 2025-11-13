@@ -33,6 +33,8 @@ RUN opam install --yes \
         # manager.
         --assume-depexts \
         $(opam list --all --short | grep -v ocaml-option-) \
+    && opam repo add ocaml https://opam.ocaml.org && opam update \
+    && opam install --yes rss.3.0 \
     && opam clean
 
 # ENTRYPOINT and CMD already set in prebuild

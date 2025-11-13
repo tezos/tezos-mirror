@@ -276,6 +276,8 @@ let repr = external_lib "repr" V.True
 
 let ringo = external_lib "ringo" V.(at_least "1.1.0")
 
+let rss = external_lib "rss" ~opam:"" V.True
+
 let rusage = external_lib "rusage" V.True
 
 let aches = external_lib "aches" V.(at_least "1.1.0")
