@@ -46,6 +46,9 @@ Michelson
   the address has already been indexed through ``INDEX_ADDRESS``; it
   returns ``None`` otherwise. (MR :gl:`!18866`)
 
+- Improved error message when using non packable values with ``PACK``,
+  ``FAILWITH`` and ``EMIT``, and in parameters of partially applied
+  ``LAMBDA``. (MR :gl:`!19889`)
 
 Gas improvements
 ----------------
