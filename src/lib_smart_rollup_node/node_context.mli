@@ -215,6 +215,13 @@ val processing_lockfile_path : data_dir:string -> string
 (** The path for the lockfile used in garbage collection. *)
 val gc_lockfile_path : data_dir:string -> string
 
+val commit_context :
+  _ rw_context ->
+  level:int32 ->
+  commitment:bool ->
+  Context.rw ->
+  Smart_rollup_context_hash.t option tzresult Lwt.t
+
 (** [checkout_context node_ctxt block_hash] returns the context at block
     [block_hash]. *)
 val checkout_context :

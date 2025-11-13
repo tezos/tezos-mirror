@@ -188,7 +188,6 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       (Layer1.head_of_header head)
       (inbox, messages)
   in
-  let*! context_hash = Context.commit ctxt in
   finish_block_evaluation state head ctxt ;
   let* commitment_hash =
     Publisher.process_head
@@ -196,6 +195,13 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       node_ctxt
       ~predecessor:predecessor.hash
       head
+      ctxt
+  in
+  let* context_hash =
+    Node_context.commit_context
+      node_ctxt
+      ~level:head.level
+      ~commitment:(Option.is_some commitment_hash)
       ctxt
   in
   let* () = maybe_split_context node_ctxt commitment_hash head.level in
@@ -216,7 +222,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
         predecessor = predecessor.hash;
         commitment_hash;
         previous_commitment_hash;
-        context = Some context_hash;
+        context_hash;
         inbox_witness;
         inbox_hash;
       }

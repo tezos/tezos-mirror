@@ -63,6 +63,23 @@ let create_sync_info () =
     sync_level_input = Lwt_watcher.create_input ();
   }
 
+let maybe_reset_to_last_committed_context ~data_dir =
+  let open Lwt_result_syntax in
+  let* store = Store.init Read_write ~data_dir in
+  Lwt.finalize
+    (fun () ->
+      let* head = Store.State.L2_head.get store in
+      let* last_committed =
+        Store.L2_blocks.find_last_committed_hash_level store
+      in
+      match (head, last_committed) with
+      | None, _ | _, None -> return_unit
+      | Some (head, _), Some (last_committed, _)
+        when Block_hash.equal last_committed head ->
+          return_unit
+      | Some _, Some _ -> Store.reset_to_last_committed store)
+    (fun () -> Store.close store)
+
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     ?last_whitelist_update ~(store_access : 'store Access_mode.t)
     ~(context_access : 'context Access_mode.t) l1_ctxt genesis_info ~(lcc : lcc)
@@ -85,6 +102,7 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     }
   in
   let* () = update_metadata metadata ~data_dir in
+  let* () = maybe_reset_to_last_committed_context ~data_dir in
   let* store = Node_context.Node_store.init store_access ~data_dir in
   let dal_cctxt =
     Option.map

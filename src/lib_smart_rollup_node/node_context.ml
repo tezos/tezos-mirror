@@ -169,6 +169,18 @@ let processing_lockfile_path ~data_dir =
 
 let gc_lockfile_path ~data_dir = Filename.concat data_dir "gc_lock"
 
+let commit_context node_ctxt ~level:_ ~commitment ctxt =
+  let open Lwt_result_syntax in
+  let do_commit =
+    match node_ctxt.config.commit_on with
+    | Block -> true
+    | Commitment -> commitment
+  in
+  if not do_commit then return_none
+  else
+    let*! hash = Context.commit ctxt in
+    return_some hash
+
 let checkout_context node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* context_hash = Store.L2_blocks.find_context node_ctxt.store block_hash in
