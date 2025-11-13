@@ -283,28 +283,26 @@ let deploy ?nonce ?gas_limit ~rpc_endpoint ~scenario infos controller =
   let*! () = Floodgate_events.deploy_erc20 contract in
   return contract
 
-let prepare_scenario ~rpc_endpoint ~scenario infos ~dummy_data_size
-    simple_gas_limit controller =
+let prepare_scenario ~rpc_endpoint ~scenario infos ~dummy_data_size controller =
   let open Lwt_result_syntax in
   match scenario with
-  | `XTZ -> (
-      match dummy_data_size with
-      | None -> return (`Native None, simple_gas_limit)
-      | Some size ->
-          let data =
+  | `XTZ ->
+      let data =
+        Option.map
+          (fun size ->
             let dummy_bytes = Bytes.create size in
-            Hex.show (Hex.of_bytes dummy_bytes)
-          in
-          let* gas_limit =
-            Network_info.get_gas_limit
-              ~rpc_endpoint
-              ~base_fee_per_gas:infos.Network_info.base_fee_per_gas
-              ~to_:(Account.address_et controller)
-              ~data:(Ethereum_types.hash_of_string data)
-              ~value:Z.zero
-              ()
-          in
-          return (`Native (Some data), gas_limit))
+            Hex.show (Hex.of_bytes dummy_bytes))
+          dummy_data_size
+      in
+      let* gas_limit =
+        Network_info.get_gas_limit
+          ~rpc_endpoint
+          ~base_fee_per_gas:infos.Network_info.base_fee_per_gas
+          ~to_:(Account.address_et controller)
+          ?data:(Option.map Ethereum_types.hash_of_string data)
+          ()
+      in
+      return (`Native data, gas_limit)
   | `ERC20 ->
       let* contract = deploy ~rpc_endpoint ~scenario:`ERC20 infos controller in
       let data =
@@ -414,14 +412,6 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
   in
   let* infos = Network_info.fetch ~rpc_endpoint ~base_fee_factor in
   let* () = Tx_queue.start ~relay_endpoint ~max_transaction_batch_length () in
-  let* simple_gas_limit =
-    Network_info.get_gas_limit
-      ~rpc_endpoint
-      ~base_fee_per_gas:infos.base_fee_per_gas
-      ~from:(Account.address_et controller)
-      ~to_:(Account.address_et controller)
-      ()
-  in
   let*! () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let* () =
     match ws_endpoint with
@@ -430,13 +420,14 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
   and* () = Tx_queue.beacon ~tick_interval
   and* () =
     let* token, gas_limit =
-      prepare_scenario
+      prepare_scenario ~rpc_endpoint ~scenario ~dummy_data_size infos controller
+    in
+    let* simple_gas_limit =
+      Network_info.get_gas_limit
         ~rpc_endpoint
-        ~scenario
-        ~dummy_data_size
-        infos
-        simple_gas_limit
-        controller
+        ~base_fee_per_gas:infos.Network_info.base_fee_per_gas
+        ~to_:(Account.address_et controller)
+        ()
     in
     let* () =
       Seq.ES.iter
