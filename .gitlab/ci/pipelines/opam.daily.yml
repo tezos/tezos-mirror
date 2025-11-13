@@ -102,11 +102,7 @@ opam:all_6:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -130,10 +126,13 @@ opam:all_6:
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -175,11 +174,7 @@ opam:exec_6:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -203,10 +198,13 @@ opam:exec_6:
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -235,11 +233,7 @@ opam:all_2:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -263,10 +257,13 @@ opam:all_2:
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -310,11 +307,7 @@ opam:all_1:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -338,10 +331,13 @@ opam:all_1:
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -374,11 +370,7 @@ opam:all_3:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -402,10 +394,13 @@ opam:all_3:
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -449,11 +444,7 @@ opam:exec_4:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -477,10 +468,13 @@ opam:exec_4:
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -508,11 +502,7 @@ opam:all_4:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -536,10 +526,13 @@ opam:all_4:
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -582,11 +575,7 @@ opam:exec_1:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -610,10 +599,13 @@ opam:exec_1:
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -651,11 +643,7 @@ opam:all_5:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -679,10 +667,13 @@ opam:all_5:
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week
@@ -726,11 +717,7 @@ opam:all_7:
   - opam:prepare
   timeout: 90 minutes
   cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -754,10 +741,13 @@ opam:all_7:
   - ./scripts/ci/sccache-stop.sh
   variables:
     RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
+    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
     CARGO_NET_OFFLINE: "false"
   artifacts:
     expire_in: 1 week

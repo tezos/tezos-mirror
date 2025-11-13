@@ -335,10 +335,6 @@ oc.build_arm64-released:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo_targets/_target
@@ -362,8 +358,12 @@ oc.build_arm64-released:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
     OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
@@ -388,13 +388,9 @@ oc.build_arm64-extra-dev:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -417,8 +413,12 @@ oc.build_arm64-extra-dev:
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -445,13 +445,9 @@ oc.build_arm64-exp:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -472,8 +468,12 @@ oc.build_arm64-exp:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/experimental-executables
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -504,10 +504,6 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo_targets/_target
@@ -531,8 +527,12 @@ oc.build:static-x86_64-linux-binaries:
     EXECUTABLE_FILES: script-inputs/octez-released-executables script-inputs/octez-experimental-executables
     DUNE_BUILD_JOBS: -j 12
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
     OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
@@ -557,10 +557,6 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo_targets/_target
@@ -584,8 +580,12 @@ oc.build:static-arm64-linux-binaries:
     EXECUTABLE_FILES: script-inputs/octez-released-executables script-inputs/octez-experimental-executables
     DUNE_BUILD_JOBS: -j 12
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
     OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
@@ -610,10 +610,6 @@ oc.build_x86_64-released:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo_targets/_target
@@ -637,8 +633,12 @@ oc.build_x86_64-released:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
     OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
@@ -668,10 +668,6 @@ oc.build_amd64-extra-dev:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -699,8 +695,12 @@ oc.build_amd64-extra-dev:
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
@@ -735,10 +735,6 @@ oc.build_amd64-exp:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -764,8 +760,12 @@ oc.build_amd64-exp:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/experimental-executables
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
@@ -796,11 +796,7 @@ oc.build_kernels:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
-  - key: kernels-sccache
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
@@ -820,8 +816,12 @@ oc.build_kernels:
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
     CARGO_NET_OFFLINE: "false"
   artifacts:
     name: build-kernels-$CI_COMMIT_REF_SLUG
@@ -848,13 +848,9 @@ build_octez_source:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -881,8 +877,12 @@ build_octez_source:
   variables:
     DUNE_BUILD_JOBS: -j 12
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
 
 build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -897,13 +897,9 @@ build-layer1-profiling:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -929,8 +925,12 @@ build-layer1-profiling:
   variables:
     PROFILE: static
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     expire_in: 1 day
     paths:
@@ -950,13 +950,9 @@ test_sdk_rust:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -973,8 +969,12 @@ test_sdk_rust:
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
 
 test_sdk_bindings:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
@@ -989,13 +989,9 @@ test_sdk_bindings:
   - oc.docker:rust-sdk-bindings:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -1013,8 +1009,12 @@ test_sdk_bindings:
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
 
 ocaml-check:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1074,10 +1074,6 @@ oc.unit:non-proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -1104,8 +1100,12 @@ oc.unit:non-proto-x86_64:
     MAKE_TARGETS: test-nonproto-unit
     DUNE_ARGS: -j 12
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -1142,10 +1142,6 @@ oc.unit:other-x86_64:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -1172,8 +1168,12 @@ oc.unit:other-x86_64:
     MAKE_TARGETS: test-other-unit
     DUNE_ARGS: -j 12
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -1210,10 +1210,6 @@ oc.unit:proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -1240,8 +1236,12 @@ oc.unit:proto-x86_64:
     MAKE_TARGETS: test-proto-unit
     DUNE_ARGS: -j 12
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -1274,13 +1274,9 @@ oc.unit:non-proto-arm64:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -1302,8 +1298,12 @@ oc.unit:non-proto-arm64:
     DUNE_ARGS: -j 12
     DISTRIBUTE_TESTS_TO_PARALLELS: "true"
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     name: $CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}
     expire_in: 1 day
@@ -1359,13 +1359,9 @@ oc.unit:protocol_compiles:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -1383,8 +1379,12 @@ oc.unit:protocol_compiles:
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
 
 de.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -1589,13 +1589,9 @@ oc.check_lift_limits_patch:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -1616,8 +1612,12 @@ oc.check_lift_limits_patch:
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.python_check:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -1654,13 +1654,9 @@ oc.integration:compiler-rejections:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -1678,8 +1674,12 @@ oc.integration:compiler-rejections:
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
 
 oc.script:test-gen-genesis:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1718,10 +1718,6 @@ oc.script:snapshot_alpha_and_link:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -1745,8 +1741,12 @@ oc.script:snapshot_alpha_and_link:
   - dune cache trim --size=5GB
   variables:
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
@@ -1861,13 +1861,9 @@ check_riscv_kernels:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -1886,8 +1882,12 @@ check_riscv_kernels:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
 
 audit_riscv_deps:
   image: ${rust_toolchain_image_name_protected}:master
@@ -1898,13 +1898,9 @@ audit_riscv_deps:
   dependencies: []
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -1922,8 +1918,12 @@ audit_riscv_deps:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
 
 test_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1936,13 +1936,9 @@ test_kernels:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   interruptible: false
   before_script:
@@ -1961,8 +1957,12 @@ test_kernels:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
     CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
 
 tezt-static-binaries:
   image: ${ci_image_name}/e2etest:${ci_image_tag}

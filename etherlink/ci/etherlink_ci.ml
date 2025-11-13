@@ -88,7 +88,7 @@ let job_build_evm_node_static =
          ["octez-binaries/$ARCH/*"])
     ~cargo_cache:true
     ~cargo_target_caches:true
-    ~sccache:(Cacio.sccache ~cache_size:"2G" ())
+    ~sccache:(Cacio.sccache ())
     ~variables:
       [
         ("ARCH", arch_string);
