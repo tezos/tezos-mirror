@@ -52,11 +52,11 @@ let predicate_from_args ?major ?minor ?rc () =
 let version_to_rss_item ~component version =
   let version_str = Version.to_string version in
   let title = sf "%s %s" (String.capitalize_ascii component.name) version_str in
-  let guid = sf "%s-%s" component.name version_str in
+  let guid = Rss.Guid_name (sf "%s-%s" component.name version_str) in
   (* TODO: Deduce from command line arguments. *)
-  let link = "https://octez.tezos.com/releases" in
-  let pubDate = version.publication_date |> Unix.gmtime in
-  let description =
+  let link = Uri.of_string "https://octez.tezos.com/releases" in
+  let pubdate = version.publication_date |> Ptime.of_float_s in
+  let desc =
     sf
       "%s version %d.%d%s"
       (String.capitalize_ascii component.name)
@@ -64,7 +64,7 @@ let version_to_rss_item ~component version =
       version.minor
       (match version.rc with Some rc -> sf "-rc%d" rc | None -> "")
   in
-  Rss.make_item ~title ~description ~guid ~link ~pubDate
+  Rss.item ~title ~desc ~guid ~link ?pubdate ()
 
 let () =
   Clap.description
@@ -219,7 +219,7 @@ let () =
       else (
         Format.printf "The following version(s) remain active:@." ;
         List.iter (fun v -> Format.printf "  - %s@." (to_string v)) still_active)
-  | `generate_rss ->
+  | `generate_rss -> (
       let component_name = "octez" in
       let url = Option.value base_url ~default:("https://" ^ s3_path) in
       let component =
@@ -232,18 +232,21 @@ let () =
         }
       in
       let title = String.capitalize_ascii component.name in
-      let description = sf "%s releases" component.name in
+      let desc = sf "%s releases" component.name in
       (* TODO: Deduce from command line arguments. *)
-      let link = "https://octez.tezos.com/releases" in
-      let lastBuildDate = Unix.time () |> Unix.gmtime in
+      let link = Uri.of_string "https://octez.tezos.com/releases" in
+      let last_build_date = Unix.time () |> Ptime.of_float_s in
       let versions = Base.Version.load_from_storage ~path:component.path in
       let items =
         List.map
           (fun version -> version_to_rss_item ~component version)
           versions
       in
-      let channel =
-        Rss.make_channel ~title ~description ~link ~lastBuildDate ~items
-      in
-      Rss.generate_rss channel ;
-      Format.printf "Generated RSS feed: feed.xml@."
+      let channel = Rss.channel ~title ~desc ~link ?last_build_date items in
+      let output_file = "feed.xml" in
+      Format.printf "Generating RSS feed...@." ;
+      try
+        Rss.print_file ~indent:2 ~encoding:"UTF-8" output_file channel ;
+        Printf.printf "RSS feed generated: %s\n%!" output_file
+      with Sys_error msg ->
+        failwith (sf "System error writing %s: %s" output_file msg))

@@ -23,5 +23,5 @@ WORKDIR /home/tezos
 
 RUN opam repo add ocaml https://opam.ocaml.org && opam update \
     && opam install --yes \
-       clap.0.3.0 tezt.4.3.0 \
+       clap.0.3.0 tezt.4.3.0 rss.3.0 \
     && opam clean
