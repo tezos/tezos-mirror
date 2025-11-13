@@ -295,7 +295,7 @@ end
 module Migration = Sqlite.Migration.Make (struct
   let table_name = "migrations"
 
-  let version = 1
+  let version = 2
 
   let all_migrations = Rollup_node_sqlite_migrations.all
 end)
