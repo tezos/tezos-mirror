@@ -14,7 +14,7 @@ use tezos_smart_rollup::{
     host::ValueType,
     types::{PublicKey, PublicKeyHash},
 };
-use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
+use tezos_smart_rollup_host::path::{concat, OwnedPath};
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 
 // This enum is inspired of `src/proto_alpha/lib_protocol/manager_repr.ml`
@@ -32,12 +32,6 @@ pub enum Manager {
     #[encoding(tag = 2)]
     Revealed(PublicKey),
 }
-
-const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
-
-const COUNTER_PATH: RefPath = RefPath::assert_from(b"/counter");
-
-const MANAGER_PATH: RefPath = RefPath::assert_from(b"/manager");
 
 fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::Error> {
     // uses the same encoding as in the octez node's representation of the context
@@ -60,7 +54,7 @@ pub trait TezlinkAccount {
         &self,
         host: &impl Runtime,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = concat(self.path(), &BALANCE_PATH)?;
+        let path = context::account::balance_path(self)?;
         Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
     }
 
@@ -70,7 +64,7 @@ pub trait TezlinkAccount {
         host: &mut impl Runtime,
         balance: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &BALANCE_PATH)?;
+        let path = context::account::balance_path(self)?;
         store_bin(balance, host, &path)
     }
 }
@@ -124,7 +118,7 @@ impl TezlinkImplicitAccount {
         &self,
         host: &impl Runtime,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = concat(self.path(), &COUNTER_PATH)?;
+        let path = context::account::counter_path(self)?;
         Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
     }
 
@@ -134,7 +128,7 @@ impl TezlinkImplicitAccount {
         host: &mut impl Runtime,
         counter: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &COUNTER_PATH)?;
+        let path = context::account::counter_path(self)?;
         store_bin(counter, host, &path)
     }
 
@@ -154,7 +148,7 @@ impl TezlinkImplicitAccount {
         &self,
         host: &impl Runtime,
     ) -> Result<Manager, tezos_storage::error::Error> {
-        let path = concat(self.path(), &MANAGER_PATH)?;
+        let path = context::account::manager_path(self)?;
         let manager: Manager = read_nom_value(host, &path)?;
         Ok(manager)
     }
@@ -174,7 +168,7 @@ impl TezlinkImplicitAccount {
         host: &mut impl Runtime,
         public_key_hash: &PublicKeyHash,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &MANAGER_PATH)?;
+        let path = context::account::manager_path(self)?;
         // The tag for public key hash is 0 (see the Manager enum above)
         let mut buffer = vec![0_u8];
         public_key_hash
@@ -203,7 +197,7 @@ impl TezlinkImplicitAccount {
         host: &mut impl Runtime,
         public_key: &PublicKey,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &MANAGER_PATH)?;
+        let path = context::account::manager_path(self)?;
         // The tag for public key is 2 (see the Manager enum above)
         let mut buffer = vec![2_u8];
         public_key
@@ -236,22 +230,10 @@ impl TezlinkImplicitAccount {
         &self,
         host: &impl Runtime,
     ) -> Result<bool, tezos_storage::error::Error> {
-        let path = concat(&self.path, &BALANCE_PATH)?;
+        let path = context::account::balance_path(self)?;
         Ok(Some(ValueType::Value) == host.store_has(&path)?)
     }
 }
-
-const CODE_PATH: RefPath = RefPath::assert_from(b"/data/code");
-
-const STORAGE_PATH: RefPath = RefPath::assert_from(b"/data/storage");
-
-const CODE_SIZE_PATH: RefPath = RefPath::assert_from(b"/len/code");
-
-const STORAGE_SIZE_PATH: RefPath = RefPath::assert_from(b"/len/storage");
-
-const PAID_BYTES: RefPath = RefPath::assert_from(b"/paid_bytes");
-
-const USED_BYTES: RefPath = RefPath::assert_from(b"/used_bytes");
 
 #[derive(Debug, PartialEq)]
 pub struct TezlinkOriginatedAccount {
@@ -300,7 +282,7 @@ impl TezlinkOriginatedAccount {
         &self,
         host: &impl Runtime,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
-        let path = concat(self.path(), &CODE_PATH)?;
+        let path = context::code::code_path(self)?;
         Ok(host.store_read_all(&path)?)
     }
 
@@ -309,7 +291,7 @@ impl TezlinkOriginatedAccount {
         host: &mut impl Runtime,
         len: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &CODE_SIZE_PATH)?;
+        let path = context::code::code_size_path(self)?;
         store_bin(len, host, &path)
     }
 
@@ -318,7 +300,7 @@ impl TezlinkOriginatedAccount {
         host: &mut impl Runtime,
         data: &[u8],
     ) -> Result<u64, tezos_storage::error::Error> {
-        let path = concat(self.path(), &CODE_PATH)?;
+        let path = context::code::code_path(self)?;
         host.store_write_all(&path, data)?;
         let code_size = data.len() as u64;
         self.set_code_size(host, &code_size.into())?;
@@ -329,7 +311,7 @@ impl TezlinkOriginatedAccount {
         &self,
         host: &impl Runtime,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
-        let path = concat(self.path(), &STORAGE_PATH)?;
+        let path = context::code::storage_path(self)?;
         Ok(host.store_read_all(&path)?)
     }
 
@@ -338,7 +320,7 @@ impl TezlinkOriginatedAccount {
         host: &mut impl Runtime,
         len: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &STORAGE_SIZE_PATH)?;
+        let path = context::code::storage_size_path(self)?;
         store_bin(len, host, &path)
     }
 
@@ -347,7 +329,7 @@ impl TezlinkOriginatedAccount {
         host: &mut impl Runtime,
         data: &[u8],
     ) -> Result<u64, tezos_storage::error::Error> {
-        let path = concat(self.path(), &STORAGE_PATH)?;
+        let path = context::code::storage_path(self)?;
         host.store_write_all(&path, data)?;
         let storage_size = data.len() as u64;
         self.set_storage_size(host, &storage_size.into())?;
@@ -359,7 +341,7 @@ impl TezlinkOriginatedAccount {
         host: &mut impl Runtime,
         paid: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &PAID_BYTES)?;
+        let path = context::code::paid_bytes_path(self)?;
         store_bin(paid, host, &path)
     }
 
@@ -368,7 +350,7 @@ impl TezlinkOriginatedAccount {
         host: &mut impl Runtime,
         used: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(self.path(), &USED_BYTES)?;
+        let path = context::code::used_bytes_path(self)?;
         store_bin(used, host, &path)
     }
 
@@ -404,6 +386,7 @@ mod test {
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup::host::Runtime;
     use tezos_smart_rollup_host::path::Path;
+    use tezos_smart_rollup_host::path::RefPath;
 
     /// obtained by `octez-client show address bootstrap1` in mockup mode
     const BOOTSTRAP1_PKH: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";

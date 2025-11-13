@@ -117,3 +117,85 @@ pub mod big_maps {
         )
     }
 }
+
+pub mod code {
+    use crate::account_storage::{TezlinkAccount, TezlinkOriginatedAccount};
+
+    use super::*;
+
+    const CODE_PATH: RefPath = RefPath::assert_from(b"/data/code");
+
+    const STORAGE_PATH: RefPath = RefPath::assert_from(b"/data/storage");
+
+    const CODE_SIZE_PATH: RefPath = RefPath::assert_from(b"/len/code");
+
+    const STORAGE_SIZE_PATH: RefPath = RefPath::assert_from(b"/len/storage");
+
+    const PAID_BYTES_PATH: RefPath = RefPath::assert_from(b"/paid_bytes");
+
+    const USED_BYTES_PATH: RefPath = RefPath::assert_from(b"/used_bytes");
+
+    pub fn code_path(account: &TezlinkOriginatedAccount) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &CODE_PATH)
+    }
+
+    pub fn storage_path(
+        account: &TezlinkOriginatedAccount,
+    ) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &STORAGE_PATH)
+    }
+
+    pub fn code_size_path(
+        account: &TezlinkOriginatedAccount,
+    ) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &CODE_SIZE_PATH)
+    }
+
+    pub fn storage_size_path(
+        account: &TezlinkOriginatedAccount,
+    ) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &STORAGE_SIZE_PATH)
+    }
+
+    pub fn paid_bytes_path(
+        account: &TezlinkOriginatedAccount,
+    ) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &PAID_BYTES_PATH)
+    }
+
+    pub fn used_bytes_path(
+        account: &TezlinkOriginatedAccount,
+    ) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &USED_BYTES_PATH)
+    }
+}
+
+pub mod account {
+    use crate::account_storage::TezlinkAccount;
+
+    use super::*;
+
+    const BALANCE_PATH: RefPath = RefPath::assert_from(b"/balance");
+
+    const COUNTER_PATH: RefPath = RefPath::assert_from(b"/counter");
+
+    const MANAGER_PATH: RefPath = RefPath::assert_from(b"/manager");
+
+    pub fn balance_path<A: TezlinkAccount + ?Sized>(
+        account: &A,
+    ) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &BALANCE_PATH)
+    }
+
+    pub fn counter_path<A: TezlinkAccount + ?Sized>(
+        account: &A,
+    ) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &COUNTER_PATH)
+    }
+
+    pub fn manager_path<A: TezlinkAccount + ?Sized>(
+        account: &A,
+    ) -> Result<OwnedPath, PathError> {
+        concat(account.path(), &MANAGER_PATH)
+    }
+}
