@@ -52,15 +52,7 @@ type sccache_config
 (** Make an sccache configuration.
 
     See {!Tezos_ci.Cache.enable_sccache}. *)
-val sccache :
-  ?key:string ->
-  ?error_log:string ->
-  ?idle_timeout:string ->
-  ?log:string ->
-  ?path:string ->
-  ?cache_size:string ->
-  unit ->
-  sccache_config
+val sccache : ?error_log:string -> ?log:string -> unit -> sccache_config
 
 (** Configuration of Dune's cache. *)
 type dune_cache_config

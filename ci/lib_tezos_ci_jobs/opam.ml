@@ -120,11 +120,7 @@ let job_opam_packages ?dependencies group batch_index packages : tezos_job =
   (* We store caches in [_build] for two reasons: (1) the [_build]
           folder is excluded from opam's rsync. (2) gitlab ci cache
           requires that cached files are in a sub-folder of the checkout. *)
-  enable_sccache
-    ~key:"opam-sccache"
-    ~error_log:"$CI_PROJECT_DIR/opam_logs/sccache.log"
-    ~idle_timeout:"0"
-    ~path:"$CI_PROJECT_DIR/_build/_sccache"
+  enable_sccache ~error_log:"$CI_PROJECT_DIR/opam_logs/sccache.log"
   |> enable_cargo_cache
 
 let jobs_opam_packages ?dependencies () : tezos_job list =
