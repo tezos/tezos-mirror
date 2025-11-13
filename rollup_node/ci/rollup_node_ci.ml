@@ -66,7 +66,7 @@ let job_build_static_binaries =
         ("VERSION_EXECUTABLE", "octez-smart-rollup-node");
       ]
     ~cargo_cache:true
-    ~sccache:(Cacio.sccache ~cache_size:"2G" ())
+    ~sccache:(Cacio.sccache ())
     ~cargo_target_caches:true
     ~artifacts:
       ((* Extend the lifespan to prevent failure for external tools using artifacts. *)

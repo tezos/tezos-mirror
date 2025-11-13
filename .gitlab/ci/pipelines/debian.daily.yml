@@ -149,11 +149,6 @@ oc.build-debian:
   - oc.docker-build-debian-dependencies
   dependencies: []
   timeout: 60 minutes
-  cache:
-    key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -173,8 +168,11 @@ oc.build-debian:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
     DUNE_BUILD_JOBS: -j 12
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:
@@ -298,11 +296,6 @@ oc.build-ubuntu:
   - oc.docker-build-ubuntu-dependencies
   dependencies: []
   timeout: 60 minutes
-  cache:
-    key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -322,8 +315,11 @@ oc.build-ubuntu:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
     DUNE_BUILD_JOBS: -j 12
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_WRITE
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
   artifacts:
     paths:

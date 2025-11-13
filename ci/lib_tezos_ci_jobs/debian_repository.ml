@@ -220,7 +220,7 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
         "export CARGO_NET_OFFLINE=false";
         script;
       ]
-    |> enable_sccache ~idle_timeout:"0"
+    |> enable_sccache
   in
 
   (* data packages. we build them once *)

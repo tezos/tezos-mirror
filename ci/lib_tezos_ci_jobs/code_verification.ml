@@ -182,7 +182,6 @@ let job_build_x86_64_release =
     ~storage:Ramfs
     ~dependencies:(dependencies_needs_start pipeline_type)
     ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
-    ~sccache_size:"2G"
     ()
 
 (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
@@ -517,8 +516,7 @@ let jobs pipeline_type =
           "eval $(opam env)";
           "make octez";
         ]
-      |> enable_cargo_cache
-      |> enable_sccache ~cache_size:"2G"
+      |> enable_cargo_cache |> enable_sccache
     in
     [
       job_build_arm64_release;
