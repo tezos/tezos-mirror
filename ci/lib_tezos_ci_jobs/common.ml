@@ -482,7 +482,6 @@ module Packaging = struct
       ~parallel:(Matrix matrix)
       ~dependencies
       ~tag:Dynamic
-      ~retry:Gitlab_ci.Types.{max = 1; when_ = [Stuck_or_timeout_failure]}
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
       [
         (* This is a hack to enable Cargo networking for jobs in child pipelines.
