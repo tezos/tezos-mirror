@@ -1475,7 +1475,12 @@ type baker_with_power = {delegate : string; baking_power : int}
 val get_stake_distribution :
   ?chain:string -> ?block:string -> cycle:int -> unit -> baker_with_power list t
 
-val get_stake_info : ?chain:string -> ?block:string -> unit -> JSON.t t
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/baking_power_distribution_for_current_cycle]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_baking_power_distribution_for_current_cycle :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/tz4_baker_number_ratio?cycle=<cycle>]
 

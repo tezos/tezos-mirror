@@ -225,7 +225,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... +ꜩ38000.025906
 
 
-./octez-client rpc get /chains/main/blocks/head/helpers/stake_info
+./octez-client rpc get /chains/main/blocks/head/helpers/baking_power_distribution_for_current_cycle
 [ "7333333553913",
   [ [ { "delegate": "[PUBLIC_KEY_HASH]",
         "consensus_pkh": "[PUBLIC_KEY_HASH]" },
