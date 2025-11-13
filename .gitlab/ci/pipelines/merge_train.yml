@@ -32,6 +32,7 @@ oc.docker:ci:amd64:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
     ARCH: amd64
+    GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
       dotenv: ci_image_tag.env
@@ -161,6 +162,7 @@ oc.docker:ci:arm64:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
     ARCH: arm64
+    GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
       dotenv: ci_image_tag.env
@@ -1406,8 +1408,8 @@ trigger:homebrew_auto:
   rules:
   - changes:
     - .gitlab/ci/pipelines/homebrew_auto.yml
+    - images/scripts/install-gsutil-apt.sh
     - manifest/**/*.ml*
-    - scripts/ci/install-gsutil.sh
     - scripts/packaging/homebrew_install.sh
     - scripts/packaging/homebrew_release.sh
     - scripts/packaging/octez/homebrew/Formula/*

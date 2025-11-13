@@ -29,6 +29,7 @@ oc.docker:ci:amd64:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
     ARCH: amd64
+    GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
       dotenv: ci_image_tag.env
@@ -55,6 +56,7 @@ oc.docker:ci:arm64:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
     ARCH: arm64
+    GCLOUD_VERSION: 543.0.0
   artifacts:
     reports:
       dotenv: ci_image_tag.env
@@ -257,7 +259,7 @@ oc.create-homebrew-formula:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/ci/install-gsutil.sh
+  - images/scripts/install-gsutil-apt.sh
   - ./scripts/packaging/homebrew_release.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -469,7 +471,7 @@ apt_repo_debian:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
-  - ./scripts/ci/install-gsutil.sh
+  - images/scripts/install-gsutil-apt.sh
   - apt install -y apt-utils debsigs jq
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
@@ -584,7 +586,7 @@ apt_repo_ubuntu:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
-  - ./scripts/ci/install-gsutil.sh
+  - images/scripts/install-gsutil-apt.sh
   - apt install -y apt-utils debsigs jq
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:

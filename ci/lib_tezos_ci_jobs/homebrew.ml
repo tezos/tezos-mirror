@@ -24,7 +24,8 @@ let job_create_homebrew_formula : tezos_job =
     ~image
     ~stage
     [
-      "./scripts/ci/install-gsutil.sh"; "./scripts/packaging/homebrew_release.sh";
+      "images/scripts/install-gsutil-apt.sh";
+      "./scripts/packaging/homebrew_release.sh";
     ]
 
 (* this job tests if the formula created by job_create_homebrew_formula
