@@ -40,6 +40,10 @@ val gc : rw -> level:int32 -> unit tzresult Lwt.t
     they refer to levels after [level]. *)
 val reset_to_level : rw -> level:int32 -> unit tzresult Lwt.t
 
+(** [reset_to_last_committed store] reset the store at the last committed level
+    on disk. *)
+val reset_to_last_committed : rw -> unit tzresult Lwt.t
+
 (** [export_store ~data_dir ~output_db_file ?at_level ()] exports the store
     database with data from the [data_dir] into the [output_db_file]. This
     function also removes data that is specific to the operator. If [at_level]
@@ -352,6 +356,14 @@ module L2_blocks : sig
   (** Retrieve the current head of the L2 chain. *)
   val find_head :
     ?conn:Sqlite.conn -> _ t -> Sc_rollup_block.t option tzresult Lwt.t
+
+  (** Retrieve the last block whose context is committed on disk. *)
+  val find_last_committed :
+    ?conn:Sqlite.conn -> _ t -> Sc_rollup_block.t option tzresult Lwt.t
+
+  (** Same as {!find_last_committed} but just returns hash and level. *)
+  val find_last_committed_hash_level :
+    ?conn:Sqlite.conn -> _ t -> (Block_hash.t * int32) option tzresult Lwt.t
 
   (** Retrieve the currently last finalized block of the L2 chain. *)
   val find_finalized :

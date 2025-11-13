@@ -57,6 +57,17 @@ module Events = struct
       ~msg:"Garbage collection finished for store"
       ~level:Info
       ()
+
+  let reset_to_last_committed =
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_store_reset_to_last_committed"
+      ~msg:
+        "Reset store to last block ({block_hash} at level {level}) whose \
+         context is committed to disk"
+      ~level:Warning
+      ("block_hash", Block_hash.encoding)
+      ("level", Data_encoding.int32)
 end
 
 let with_connection store conn =
@@ -1106,6 +1117,32 @@ module L2_blocks = struct
       ON s.name = "l2_head" AND s.value = b.block_hash
       |sql}
 
+    let select_last_committed =
+      (unit ->? l2_block) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level, b.predecessor, b.commitment_hash,
+       b.previous_commitment_hash, b.context, b.inbox_witness,
+       b.inbox_hash, b.initial_tick, b.num_ticks, b.state_hash, b.pvm_status
+      FROM l2_blocks as b
+      INNER JOIN l2_levels as l
+      ON l.block_hash = b.block_hash
+      AND b.context IS NOT NULL
+      ORDER BY l.level DESC LIMIT 1
+      |sql}
+
+    let select_last_committed_hash_level =
+      (unit ->? t2 block_hash level) ~name:__FUNCTION__ ~table
+      @@ {sql|
+      SELECT
+       b.block_hash, b.level
+      FROM l2_blocks as b
+      INNER JOIN l2_levels as l
+      ON l.block_hash = b.block_hash
+      AND b.context IS NOT NULL
+      ORDER BY l.level DESC LIMIT 1
+      |sql}
+
     let select_finalized =
       (unit ->? l2_block) ~name:__FUNCTION__ ~table
       @@ {sql|
@@ -1190,6 +1227,14 @@ module L2_blocks = struct
   let find_head ?conn store =
     with_connection store conn @@ fun conn ->
     Sqlite.Db.find_opt conn Q.select_head ()
+
+  let find_last_committed ?conn store =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_last_committed ()
+
+  let find_last_committed_hash_level ?conn store =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.select_last_committed_hash_level ()
 
   let find_finalized ?conn store =
     with_connection store conn @@ fun conn ->
@@ -1559,3 +1604,12 @@ let export_store ~data_dir ~output_db_file ?at_level () =
   let* () = Sqlite.use store @@ fun conn -> Sqlite.vacuum_self ~conn in
   let*! () = close store in
   return_unit
+
+let reset_to_last_committed store =
+  let open Lwt_result_syntax in
+  let* last_committed = L2_blocks.find_last_committed_hash_level store in
+  match last_committed with
+  | None -> return_unit
+  | Some (block, level) ->
+      let*! () = Events.(emit reset_to_last_committed) (block, level) in
+      reset_to_level store ~level
