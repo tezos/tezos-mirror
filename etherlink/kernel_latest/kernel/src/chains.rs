@@ -73,8 +73,8 @@ impl From<String> for ChainFamily {
 #[derive(Debug)]
 pub struct EvmChainConfig {
     chain_id: U256,
-    limits: EvmLimits,
-    spec_id: SpecId,
+    pub limits: EvmLimits,
+    pub spec_id: SpecId,
 }
 
 #[derive(Debug)]

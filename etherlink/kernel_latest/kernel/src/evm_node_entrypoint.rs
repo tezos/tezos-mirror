@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -8,8 +9,9 @@
 //! only. It allows to call specific functions of the kernel without
 //! using the inbox and a specific message.
 
-use crate::{delayed_inbox::DelayedInbox, transaction::Transaction};
+use crate::{delayed_inbox::DelayedInbox, sub_block, transaction::Transaction};
 use tezos_ethereum::rlp_helpers::FromRlpBytes;
+use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{
     internal_runtime::{InternalRuntime, WasmInternalHost},
     runtime::KernelHost,
@@ -38,4 +40,50 @@ where
     delayed_inbox
         .save_transaction(&mut host, transaction, 0.into(), 0u32)
         .unwrap();
+}
+
+#[allow(dead_code)]
+#[no_mangle]
+pub extern "C" fn single_tx_execution() {
+    let mut sdk_host = unsafe { RollupHost::new() };
+    single_tx_execution_fn(&mut sdk_host, WasmInternalHost());
+}
+
+pub fn single_tx_execution_fn<Host, I>(host: &mut Host, internal: I)
+where
+    Host: tezos_smart_rollup_host::runtime::Runtime,
+    I: InternalRuntime,
+{
+    let mut host: KernelHost<Host, &mut Host, I> = KernelHost::init(host, internal);
+    let tx_input = match sub_block::read_single_tx_execution_input(&mut host) {
+        Ok(Some(input)) => input,
+        Ok(None) => {
+            log!(
+                host,
+                Error,
+                "No single transaction execution input found in storage"
+            );
+            return;
+        }
+        Err(err) => {
+            log!(
+                host,
+                Error,
+                "Error while reading single transaction execution input: {:?}",
+                err
+            );
+            return;
+        }
+    };
+    match sub_block::handle_run_transaction(&mut host, tx_input) {
+        Ok(()) => (),
+        Err(err) => {
+            log!(
+                host,
+                Error,
+                "Error during single transaction execution: {:?}",
+                err
+            );
+        }
+    }
 }
