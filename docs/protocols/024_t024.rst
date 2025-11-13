@@ -82,9 +82,10 @@ RPC Changes
   slots per block). (MR :gl:`!18959`)
 
 - Added a new RPC ``GET
-  /chains/<chain_id>/blocks/<block_id>/helpers/stake_info``. It
-  returns the baking power distribution for all the active delegates
-  at the current cycle. (MR :gl:`!18019`)
+  /chains/<chain_id>/blocks/<block_id>/helpers/baking_power_distribution_for_current_cycle``. It
+  returns the total baking power and baking power distribution for all
+  the active delegates, that are used to determine consensus rights
+  for the current cycle. (MRs :gl:`!18019`, :gl:`!19898`)
 
 - Added a new RPC ``GET
   /chains/<chain_id>/blocks/<block_id>/helpers/tz4_baker_number_ratio?cycle=<cycle>``.

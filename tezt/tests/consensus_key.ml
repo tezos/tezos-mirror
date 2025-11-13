@@ -857,7 +857,9 @@ let test_drain_delegate_1 ?(baker = Constant.bootstrap1.alias)
   in
   let* _ =
     if Protocol.number protocol >= 024 then
-      Lwt.map ignore @@ Client.RPC.call ~hooks client @@ RPC.get_stake_info ()
+      Lwt.map ignore
+      @@ Client.RPC.call ~hooks client
+      @@ RPC.get_baking_power_distribution_for_current_cycle ()
     else return ()
   in
   let* _ =

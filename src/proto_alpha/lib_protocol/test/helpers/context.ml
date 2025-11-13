@@ -663,9 +663,11 @@ module Delegate = struct
     in
     return {frozen; weighted_delegated}
 
-  let stake_info ctxt ~manager_pkh =
+  let baking_power_distribution_for_current_cycle ctxt ~manager_pkh =
     let open Lwt_result_wrap_syntax in
-    let* total_stake, stakes = Plugin.RPC.stake_info rpc_ctxt ctxt in
+    let* total_stake, stakes =
+      Plugin.RPC.baking_power_distribution_for_current_cycle rpc_ctxt ctxt
+    in
     let stakes =
       List.map (fun (ck, stake) -> (ck.Consensus_key.delegate, stake)) stakes
     in
