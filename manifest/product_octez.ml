@@ -6812,9 +6812,10 @@ module Protocol = Protocol
                       S "run";
                       S "%{bin:octez-protocol-compiler}";
                       (if
-                         String_set.mem
-                           tezos_protocol.Tezos_protocol.hash
-                           final_protocol_versions
+                         (match number with Dev -> false | _ -> true)
+                         && String_set.mem
+                              tezos_protocol.Tezos_protocol.hash
+                              final_protocol_versions
                        then E
                        else S "-no-hash-check");
                       (match disable_warnings with
