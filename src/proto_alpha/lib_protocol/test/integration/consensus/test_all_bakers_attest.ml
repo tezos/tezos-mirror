@@ -84,7 +84,11 @@ let check_all_bakers_attested ~kind =
       let get_active_bakers block =
         (* gets the stake info of the block's cycle. It includes all active
            bakers with a stake. *)
-        let* _, bakers = Plugin.RPC.stake_info Block.rpc_ctxt block in
+        let* _, bakers =
+          Plugin.RPC.baking_power_distribution_for_current_cycle
+            Block.rpc_ctxt
+            block
+        in
         return (List.map fst bakers)
       in
       let* active_bakers =

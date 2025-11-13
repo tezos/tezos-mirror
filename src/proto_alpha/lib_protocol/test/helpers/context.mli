@@ -354,7 +354,7 @@ module Delegate : sig
 
   val stake_for_cycle : t -> Cycle.t -> public_key_hash -> stake tzresult Lwt.t
 
-  val stake_info :
+  val baking_power_distribution_for_current_cycle :
     t -> manager_pkh:public_key_hash -> (int64 * int64 option) tzresult Lwt.t
 end
 
