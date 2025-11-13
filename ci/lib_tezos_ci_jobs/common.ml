@@ -23,13 +23,13 @@ open Tezos_ci.Cache
 (** {2 Shared Helpers} *)
 
 module Helpers = struct
-  let retry_default_config =
-    Gitlab_ci.Types.
-      {
-        image = None;
-        interruptible = Some true;
-        retry = Some {max = 2; when_ = [Script_failure; Runner_system_failure]};
-      }
+  (* Sets up the [default:] top-level configuration element. *)
+  let retry_default =
+    Gitlab_ci.Util.default
+      ~interruptible:true
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
+      ()
 
   (** The default [before_script:] section.
 

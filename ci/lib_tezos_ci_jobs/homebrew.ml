@@ -79,7 +79,7 @@ let child_pipeline_full =
     ~description:
       "A child pipeline of 'before_merging' building and testing the homebrew \
        packaging. Manually triggered."
-    ~default:Common.Helpers.retry_default_config
+    ~default:Common.Helpers.retry_default
     ~jobs:(jobs Full)
 
 let child_pipeline_full_auto =
@@ -89,5 +89,5 @@ let child_pipeline_full_auto =
       "A child pipeline of 'before_merging' (and thus 'merge_train') building \
        and testing the homebrew packaging. Starts automatically on certain \
        conditions."
-    ~default:Common.Helpers.retry_default_config
+    ~default:Common.Helpers.retry_default
     ~jobs:(jobs Full)
