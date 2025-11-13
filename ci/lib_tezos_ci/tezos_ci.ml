@@ -1444,22 +1444,30 @@ module Cache = struct
     |> append_after_script
          ["eval $(opam env)"; "dune cache trim --size=" ^ cache_size]
 
-  let enable_sccache ?key ?error_log ?idle_timeout ?log
-      ?(path = "$CI_PROJECT_DIR/_sccache") ?(cache_size = "5G") job =
-    let key =
-      Option.value
-        ~default:("sccache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-        key
-    in
+  let enable_sccache ?error_log ?idle_timeout ?log job =
     job
     |> append_variables
-         ([("SCCACHE_DIR", path); ("SCCACHE_CACHE_SIZE", cache_size)]
+         ([
+            (* force incremental build in cargo
+
+              see https://github.com/mozilla/sccache?tab=readme-ov-file#known-caveats *)
+            ("CARGO_INCREMENTAL", "0");
+            (* we use GCP backend in r/w mode *)
+            ("SCCACHE_GCS_BUCKET", "$GCP_SCCACHE_BUCKET");
+            ("SCCACHE_GCS_RW_MODE", "READ_WRITE");
+            ("SCCACHE_GCS_KEY_PREFIX", "sccache");
+            (* recovering if the backend is not avalable *)
+            ("SCCACHE_IGNORE_SERVER_IO_ERROR", "1");
+          ]
          @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
          @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
          @ opt_var "SCCACHE_LOG" Fun.id log)
-    |> append_cache (cache ~key [path])
     (* Starts sccache and sets [RUSTC_WRAPPER] *)
-    |> append_before_script [". ./scripts/ci/sccache-start.sh"]
+    |> append_before_script
+         [
+           ". ./scripts/ci/sccache-start.sh";
+           "sccache --show-stats | grep \"Cache location\" ";
+         ]
     |> append_after_script ["./scripts/ci/sccache-stop.sh"]
 
   let cargo_home =

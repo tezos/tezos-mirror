@@ -128,12 +128,10 @@ module Build = struct
         @ version_executable)
       ~artifacts
       ["./scripts/ci/build_static_binaries.sh"]
-    |> enable_cargo_cache
-    |> enable_sccache ~cache_size:"2G"
-    |> enable_cargo_target_caches
+    |> enable_cargo_cache |> enable_sccache |> enable_cargo_target_caches
 
   let job_build_released_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
-      ?dependencies ?(sccache_size = "5G") () =
+      ?dependencies () =
     let arch_string = Runner.Arch.show_easy_to_distinguish arch in
     let name = sf "oc.build_%s-released" arch_string in
     let executable_files = "script-inputs/released-executables" in
@@ -168,15 +166,13 @@ module Build = struct
         ~variables
         ~artifacts
         ["./scripts/ci/build_full_unreleased.sh"]
-      |> enable_cargo_cache
-      |> enable_sccache ~cache_size:sccache_size
-      |> enable_cargo_target_caches
+      |> enable_cargo_cache |> enable_sccache |> enable_cargo_target_caches
     in
     (* Disable coverage for arm64 *)
     if arch = Amd64 then Coverage.enable_instrumentation job else job
 
   let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
-      ?dependencies ?(sccache_size = "5G") ~name executable_files =
+      ?dependencies ~name executable_files =
     let arch_string = Runner.Arch.show_easy_to_distinguish arch in
     let build_extra =
       match arch with
@@ -234,9 +230,7 @@ module Build = struct
         ~variables
         ~artifacts
         ["./scripts/ci/build_full_unreleased.sh"]
-      |> enable_cargo_cache
-      |> enable_sccache ~cache_size:sccache_size
-      |> enable_cargo_target_caches
+      |> enable_cargo_cache |> enable_sccache |> enable_cargo_target_caches
     in
     (* Disable coverage for arm64 *)
     if arch = Amd64 then Coverage.enable_instrumentation job else job
@@ -251,7 +245,6 @@ module Build = struct
       ~__POS__
       ~arch:Arm64
       ~storage:Ramfs
-      ~sccache_size:"2G"
       "script-inputs/dev-executables"
 
   let job_build_arm64_extra_exp ?rules () : tezos_job =
@@ -261,7 +254,6 @@ module Build = struct
       ~__POS__
       ~arch:Arm64
       ~storage:Ramfs
-      ~sccache_size:"2G"
       "script-inputs/experimental-executables"
 
   let job_build_kernels ?rules () : tezos_job =
@@ -285,9 +277,7 @@ module Build = struct
              "tx_kernel_dal.wasm";
              "dal_echo_kernel.wasm";
            ])
-    |> enable_kernels
-    |> enable_sccache ~key:"kernels-sccache" ~path:"$CI_PROJECT_DIR/_sccache"
-    |> enable_cargo_cache
+    |> enable_kernels |> enable_sccache |> enable_cargo_cache
 
   let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
     job

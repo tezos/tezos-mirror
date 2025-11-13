@@ -80,7 +80,7 @@ let job_build_evm_node_static =
          ["octez-evm-*"; "etherlink-*"])
     ~cargo_cache:true
     ~cargo_target_caches:true
-    ~sccache:(Cacio.sccache ~cache_size:"2G" ())
+    ~sccache:(Cacio.sccache ())
     [
       "./scripts/ci/take_ownership.sh";
       ". ./scripts/version.sh";
