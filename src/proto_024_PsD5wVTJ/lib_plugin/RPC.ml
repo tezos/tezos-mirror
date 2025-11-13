@@ -3979,6 +3979,7 @@ module Validators = struct
     level : Raw_level.t;
     consensus_threshold : int64;
     consensus_committee : int64;
+    abaab_activation_flag : bool;
     delegates : delegate list;
   }
 
@@ -4026,14 +4027,37 @@ module Validators = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {level; consensus_threshold; consensus_committee; delegates} ->
-        (level, consensus_threshold, consensus_committee, delegates))
-      (fun (level, consensus_threshold, consensus_committee, delegates) ->
-        {level; consensus_threshold; consensus_committee; delegates})
-      (obj4
+      (fun {
+             level;
+             consensus_threshold;
+             consensus_committee;
+             abaab_activation_flag;
+             delegates;
+           }
+         ->
+        ( level,
+          consensus_threshold,
+          consensus_committee,
+          abaab_activation_flag,
+          delegates ))
+      (fun ( level,
+             consensus_threshold,
+             consensus_committee,
+             abaab_activation_flag,
+             delegates )
+         ->
+        {
+          level;
+          consensus_threshold;
+          consensus_committee;
+          abaab_activation_flag;
+          delegates;
+        })
+      (obj5
          (req "level" Raw_level.encoding)
          (req "consensus_threshold" int64)
          (req "consensus_committee" int64)
+         (req "all_bakers_attest_activated" bool)
          (req "delegates" (list delegate_encoding)))
 
   module S = struct
@@ -4120,6 +4144,11 @@ module Validators = struct
         let+ _ctxt, rights =
           List.fold_left_es
             (fun (ctxt, acc) attested_level ->
+              let abaab_activation_flag =
+                Attesting_power.check_all_bakers_attest_at_level
+                  ctxt
+                  ~attested_level
+              in
               let* ctxt, consensus_threshold =
                 Attesting_power.consensus_threshold ctxt ~attested_level
               in
@@ -4135,6 +4164,7 @@ module Validators = struct
                       level = attested_level.level;
                       consensus_threshold;
                       consensus_committee;
+                      abaab_activation_flag;
                       delegates = [];
                     },
                     delegates )

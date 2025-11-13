@@ -951,6 +951,7 @@ let delegate_infos attesting_rights delegates =
      Plugin.RPC.Validators.level = _;
      consensus_threshold;
      consensus_committee;
+     abaab_activation_flag = _;
      delegates = attesting_rights;
    };
   ] ->
