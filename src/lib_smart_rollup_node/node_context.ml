@@ -295,18 +295,15 @@ let get_l2_block node_ctxt block_hash =
       failwith "Could not retrieve L2 block for %a" Block_hash.pp block_hash
   | Some block -> return block
 
+let find_l2_block_by_level {store; _} level =
+  Store.L2_blocks.find_by_level store level
+
 let get_l2_block_by_level node_ctxt level =
   let open Lwt_result_syntax in
-  Error.trace_lwt_result_with "Could not retrieve L2 block at level %ld" level
-  @@ let* block_hash = hash_of_level node_ctxt level in
-     get_l2_block node_ctxt block_hash
-
-let find_l2_block_by_level node_ctxt level =
-  let open Lwt_result_syntax in
-  let* block_hash = hash_of_level_opt node_ctxt level in
-  match block_hash with
-  | None -> return_none
-  | Some block_hash -> find_l2_block node_ctxt block_hash
+  let* block = find_l2_block_by_level node_ctxt level in
+  match block with
+  | None -> failwith "Could not retrieve L2 block for level %ld" level
+  | Some block -> return block
 
 let set_finalized node_ctxt hash level =
   let open Lwt_result_syntax in

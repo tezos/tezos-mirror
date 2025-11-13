@@ -1006,7 +1006,7 @@ module L2_blocks = struct
   module Q = struct
     open Types
 
-    let table = "l2_levels" (* For opentelemetry *)
+    let table = "l2_blocks" (* For opentelemetry *)
 
     let l2_block =
       let open Sc_rollup_block in
@@ -1082,12 +1082,14 @@ module L2_blocks = struct
       (level ->? l2_block) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT
-       block_hash, level, predecessor, commitment_hash,
+       b.block_hash, b.level, predecessor, commitment_hash,
        previous_commitment_hash, context, inbox_witness,
        inbox_hash, initial_tick, num_ticks, state_hash, pvm_status
-      FROM l2_blocks
-      WHERE level = ?
-      |sql}
+      FROM l2_blocks as b
+      INNER JOIN l2_levels as l
+      ON l.block_hash = b.block_hash
+      AND l.level = ?
+|sql}
 
     let select_level =
       (block_hash ->? level) ~name:__FUNCTION__ ~table
