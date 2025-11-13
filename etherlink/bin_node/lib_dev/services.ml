@@ -342,6 +342,11 @@ let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
                       Some
                         (Ethereum_types.Subscription.NewIncludedTransactions txn)
                   | Error _ -> None)
+              | Broadcast.Included_transaction
+                  (Broadcast.Common (Michelson _raw)) ->
+                  (* TODO: L2-586
+                     include tezlink transaction in preconfirmation stream *)
+                  None
               | _ -> None)
             stream
         in

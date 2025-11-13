@@ -7,6 +7,7 @@
 (*****************************************************************************)
 
 open Ethereum_types
+open Validation_types
 
 type error +=
   | Gas_limit_too_low of {gas_limit : Z.t; minimum_gas_limit_required : Z.t}
@@ -874,22 +875,6 @@ let prevalidate_raw_transaction_tezlink raw_transaction =
   worker_wait_for_request
     (Request.Prevalidate_raw_transaction_tezlink {raw_transaction})
 
-type validation_config = {
-  minimum_base_fee_per_gas : Ethereum_types.quantity;
-  base_fee_per_gas : Ethereum_types.quantity;
-  maximum_gas_limit : Ethereum_types.quantity;
-  da_fee_per_byte : Ethereum_types.quantity;
-  next_nonce :
-    Ethereum_types.address -> Ethereum_types.quantity option tzresult Lwt.t;
-  balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t;
-}
-
-type validation_state = {
-  config : validation_config;
-  addr_balance : Z.t String.Map.t;
-  addr_nonce : Z.t String.Map.t;
-}
-
 let validate_balance_gas_nonce_with_validation_state validation_state
     (transaction : Transaction_object.t) :
     (validation_state, string) result tzresult Lwt.t =
@@ -901,7 +886,7 @@ let validate_balance_gas_nonce_with_validation_state validation_state
     match nonce with
     | Some nonce -> return nonce
     | None -> (
-        let* nonce = validation_state.config.next_nonce caller in
+        let* nonce = validation_state.evm_config.next_nonce caller in
         match nonce with
         | Some (Qty nonce) -> return nonce
         | None -> return Z.zero)
@@ -918,12 +903,12 @@ let validate_balance_gas_nonce_with_validation_state validation_state
     match from_balance with
     | Some balance -> return balance
     | None ->
-        let* (Qty balance) = validation_state.config.balance caller in
+        let* (Qty balance) = validation_state.evm_config.balance caller in
         return balance
   in
   let** total_cost =
     validate_balance_and_max_fee_per_gas
-      ~base_fee_per_gas:validation_state.config.base_fee_per_gas
+      ~base_fee_per_gas:validation_state.evm_config.base_fee_per_gas
       ~transaction
       ~from_balance:(Qty from_balance)
   in
@@ -938,7 +923,7 @@ let validate_balance_gas_nonce_with_validation_state validation_state
           | Some balance -> return balance
           | None ->
               let* (Qty balance) =
-                validation_state.config.balance (Address (Hex to_))
+                validation_state.evm_config.balance (Address (Hex to_))
               in
               return balance
         in
