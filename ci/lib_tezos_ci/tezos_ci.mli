@@ -667,6 +667,8 @@ module Images : sig
     val test_master : Image.t
 
     val e2etest : Image.t
+
+    val release_page : Image.t
   end
 
   module Base_images : sig

@@ -95,7 +95,7 @@ let monitoring_child_pipeline =
 let job_release_page ~test ?dependencies () =
   job
     ~__POS__
-    ~image:Images.CI.build
+    ~image:Images.CI.release_page
     ~stage:Stages.publish
     ~description:
       "A job to update the Octez release page. If running in a test pipleine, \
@@ -108,13 +108,8 @@ let job_release_page ~test ?dependencies () =
       (Gitlab_ci.Util.artifacts
          ~expire_in:(Duration (Days 1))
          ["./index.md"; "index.html"])
-    ~before_script:
-      [
-        (* Required for creating the release page.*)
-        "sudo apk add aws-cli pandoc";
-        "eval $(opam env)";
-      ]
     ~after_script:["cp /tmp/release_page*/index.md ./index.md"]
+    ~before_script:["eval $(opam env)"]
     ?dependencies
     ~variables:
       (if test then
