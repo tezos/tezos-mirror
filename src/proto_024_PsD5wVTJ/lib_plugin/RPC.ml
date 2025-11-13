@@ -4250,15 +4250,18 @@ module S = struct
       ~output:Data_encoding.int64
       RPC_path.(path / "total_baking_power")
 
-  let stake_info =
+  let baking_power_distribution_for_current_cycle =
     RPC_service.get_service
       ~description:
-        "Returns the baking power distribution for all the active delegates at \
-         the current cycle"
+        "Returns the total baking power and the list of active delegates with \
+         their respective baking power, used to determine consensus rights for \
+         the current cycle. Note that these baking powers correspond to the \
+         staked and delegated balances that were held by bakers at the end of \
+         (current_cycle - CONSENSUS_RIGHTS_DELAY - 1)."
       ~query:RPC_query.empty
       ~output:
         Data_encoding.(tup2 int64 (list (tup2 Consensus_key.encoding int64)))
-      RPC_path.(path / "stake_info")
+      RPC_path.(path / "baking_power_distribution_for_current_cycle")
 
   let cycle_query : Cycle.t option RPC_query.t =
     let open RPC_query in
@@ -4342,8 +4345,11 @@ let register () =
       Stake_distribution.For_RPC.total_baking_power
         ctxt
         (Level.current ctxt).cycle) ;
-  Registration.register0 ~chunked:false S.stake_info (fun ctxt () () ->
-      let* _, total_stake, stake_info_list =
+  Registration.register0
+    ~chunked:false
+    S.baking_power_distribution_for_current_cycle
+    (fun ctxt () () ->
+      let* (_ctxt : t), total_stake, stake_info_list =
         Stake_distribution.stake_info ctxt (Level.current ctxt)
       in
       let stake_info_list =
@@ -4389,7 +4395,13 @@ let levels_in_current_cycle ctxt ?(offset = 0l) block =
 let consecutive_round_zero ctxt block =
   RPC_context.make_call0 S.consecutive_round_zero ctxt block () ()
 
-let stake_info ctxt block = RPC_context.make_call0 S.stake_info ctxt block () ()
+let baking_power_distribution_for_current_cycle ctxt block =
+  RPC_context.make_call0
+    S.baking_power_distribution_for_current_cycle
+    ctxt
+    block
+    ()
+    ()
 
 let tz4_baker_number_ratio ctxt ?cycle block =
   RPC_context.make_call0 S.tz4_baker_number_ratio ctxt block cycle ()
