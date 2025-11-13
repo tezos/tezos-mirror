@@ -2000,6 +2000,7 @@ let test_tezlink_prevalidation =
   in
 
   let hard_gas_limit_per_operation = 1_040_000 in
+  let hard_gas_limit_per_block = 1_386_666 in
 
   (* case wrong gas limit *)
   let gas_limit_too_high_rex =
@@ -2025,6 +2026,34 @@ let test_tezlink_prevalidation =
       op_wrong_gas_limit
       client_tezlink
   in
+  (* gas limit upper bound is higher for batches, but still needs to fit in a
+     block *)
+  let* batch_wrong_gas_limit =
+    Operation.Manager.(
+      operation
+        [
+          make
+            ~fee:1000
+            ~gas_limit:(hard_gas_limit_per_operation - 1)
+            ~counter:2
+            ~source:Constant.bootstrap1
+            (transfer ());
+          make
+            ~fee:1000
+            ~gas_limit:(hard_gas_limit_per_operation - 1)
+            ~counter:3
+            ~source:Constant.bootstrap1
+            (transfer ());
+        ]
+        client)
+  in
+  let* _ =
+    Operation.inject
+      ~error:gas_limit_too_high_rex
+      ~dont_wait:true
+      batch_wrong_gas_limit
+      client_tezlink
+  in
 
   (* case tz4 *)
   let* tz4 = Client.gen_and_show_keys ~sig_alg:"bls" client_tezlink in
@@ -2044,7 +2073,7 @@ let test_tezlink_prevalidation =
   in
 
   (* case gas limit of batch too high*)
-  let not_quite_too_high = hard_gas_limit_per_operation - 1000 in
+  let not_quite_too_high = hard_gas_limit_per_block - 1000 in
   let* op_wrong_gas_limit2 =
     Operation.Manager.(
       operation
@@ -2070,6 +2099,163 @@ let test_tezlink_prevalidation =
       ~dont_wait:true
       op_wrong_gas_limit2
       client_tezlink
+  in
+  unit
+
+let test_tezlink_prevalidation_gas_limit_lower_bound =
+  register_tezlink_test
+    ~title:"Test Tezlink prevalidation of operation gas limit lower bound"
+    ~tags:["kernel"; "prevalidation"; "gas_limit"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let new_test () =
+    (* Print a banner to delimitate a test. Usefull here because the error
+       messages can't be customized to easily find which test fails.*)
+    Tezt.Log.(
+      info
+        ~color:Color.(bold ++ FG.green)
+        "******************************************************************") ;
+    Tezt.Log.(info ~color:Color.(bold ++ FG.green) ~prefix:"NEW TEST")
+  in
+
+  let* client_tezlink = Client.init ~endpoint () in
+  let build_and_inject ?error operations =
+    let* op = Operation.Manager.operation operations client in
+    Operation.inject ~dont_wait:true ?error op client_tezlink
+  in
+
+  (* make sure there are no transactions in the queue *)
+  let* () = produce_block_and_wait_for ~sequencer 1 in
+  let* () = produce_block_and_wait_for ~sequencer 2 in
+
+  (* **** hardcoded cost values, from protocol **** *)
+  (* base cost for manager operations*)
+  let manager_cost = 100 in
+  (* A transfer adds the cost of decoding empty micheline. That cost 10 milligas, but we can't be that precise so we round up.  *)
+  let minimum_transfer_cost = manager_cost + 1 in
+
+  new_test () "Test 1: 0 gas is not high enough for anything" ;
+  let* _ =
+    build_and_inject
+      ~error:(rex "gas_exhausted.operation")
+      Operation.Manager.
+        [make ~gas_limit:0 ~source:Constant.bootstrap1 (transfer ())]
+  in
+
+  new_test () "Test 2: manager cost is not enough for a single operation" ;
+  (* minimum cost, without any gas for signature verification should be rejected. *)
+  let* _ =
+    build_and_inject
+      ~error:(rex "gas_exhausted.operation")
+      Operation.Manager.
+        [
+          make
+            ~gas_limit:minimum_transfer_cost
+            ~source:Constant.bootstrap1
+            (transfer ());
+        ]
+  in
+
+  (* We want to avoid hardcoding signature cost, which depends on the size of
+     the encoded transaction and protocol constant. We take advantage of the
+     batch strategy: the cost of signature verification is the responsability
+     of the first operation in the batch. So as long as we send a batch with a
+     valid first transaction, we can ignore the signature cost for the other
+     operations.
+
+     Note that it doesn't work for testing reveal costs, because the reveal
+     _must_ be the first operation. We don't have any specific logic for reveal
+     though: because we don't have tz4 the only cost of a reveal is manager
+     cost. So we don't write a specific test.
+  *)
+  new_test
+    ()
+    "Sanity check: minimum cost is enough if signature cost is already \
+     accounted for" ;
+  (* Sanity check for transfer cost: we check that the hardcoded minimum is
+     correct. *)
+  let* (`OpHash op_just_enough_hash) =
+    build_and_inject
+      Operation.Manager.
+        [
+          make
+            ~counter:1
+            ~gas_limit:2000
+            ~source:Constant.bootstrap1
+            (transfer ());
+          make
+            ~counter:2
+            ~gas_limit:minimum_transfer_cost
+            ~source:Constant.bootstrap1
+            (transfer ());
+        ]
+  in
+  let* () = produce_block_and_wait_for ~sequencer 3 in
+  let* () =
+    check_operations
+      ~client:client_tezlink
+      ~block:"3"
+      ~expected:[op_just_enough_hash]
+  in
+  let* _ =
+    Client.get_receipt_for ~operation:op_just_enough_hash client_tezlink
+  in
+
+  let not_enough_gas_for_deserializing =
+    rex
+      "Command failed: Gas limit was not high enough to deserialize the \
+       transaction parameters or origination script code or initial storage \
+       etc., making the operation impossible to parse within the provided gas \
+       bounds."
+  in
+  new_test () "Test 3: transfers need to set up gas for decoding parameters" ;
+  (* Check that a transfer with just manager cost is rejected when checking the
+     cost of the parameter. *)
+  let* _ =
+    build_and_inject
+      ~error:not_enough_gas_for_deserializing
+      Operation.Manager.
+        [
+          make
+            ~counter:3
+            ~gas_limit:2000
+            ~source:Constant.bootstrap1
+            (transfer ());
+          make
+            ~counter:4
+            ~gas_limit:manager_cost
+            ~source:Constant.bootstrap1
+            (transfer ());
+        ]
+  in
+
+  new_test
+    ()
+    "Test 4: originations need to set up gas for decoding code and storage" ;
+  (* Check that an origination with just manager cost is rejected when checking
+     cost of code and storage. *)
+  let* _ =
+    build_and_inject
+      ~error:not_enough_gas_for_deserializing
+      Operation.Manager.
+        [
+          make
+            ~counter:3
+            ~gas_limit:2000
+            ~source:Constant.bootstrap1
+            (transfer ());
+          make
+            ~counter:4
+            ~gas_limit:manager_cost
+            ~source:Constant.bootstrap1
+            (origination ~code:(`A []) ~init_storage:(`A []) ());
+        ]
   in
 
   unit
@@ -2345,6 +2531,7 @@ let () =
   test_tezlink_internal_operation [Alpha] ;
   test_tezlink_internal_receipts [Alpha] ;
   test_tezlink_prevalidation [Alpha] ;
+  test_tezlink_prevalidation_gas_limit_lower_bound [Alpha] ;
   test_tezlink_validation_gas_limit [Alpha] ;
   test_tezlink_validation_counter [Alpha] ;
   test_tezlink_validation_balance [Alpha] ;

@@ -5,6 +5,10 @@
 (* SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>              *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(** Configuration of a validation. Depends on the context in which the
+    validation is done, e.g. contains functions to read the balance and counter
+    of a contract in that context (i.e. the last block). *)
 type michelson_validation_config = {
   get_balance : Tezos_types.Contract.t -> Z.t tzresult Lwt.t;
   get_counter : Tezos_types.Contract.t -> Z.t tzresult Lwt.t;
@@ -20,6 +24,9 @@ type evm_validation_config = {
   balance : Ethereum_types.address -> Ethereum_types.quantity tzresult Lwt.t;
 }
 
+(** Current state of a blueprint validation. Maintains a cache of balances and
+    counter, created from the context (i.e. the last block) and updated with
+    the operations/transactions already included in the blueprint. *)
 type validation_state = {
   michelson_config : michelson_validation_config;
   evm_config : evm_validation_config;
