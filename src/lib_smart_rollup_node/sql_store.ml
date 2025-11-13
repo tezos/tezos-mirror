@@ -1017,7 +1017,7 @@ module L2_blocks = struct
           predecessor
           commitment_hash
           previous_commitment_hash
-          context
+          context_hash
           inbox_witness
           inbox_hash
           initial_tick
@@ -1033,7 +1033,7 @@ module L2_blocks = struct
                 predecessor;
                 commitment_hash;
                 previous_commitment_hash;
-                context;
+                context_hash;
                 inbox_witness;
                 inbox_hash;
               };
@@ -1048,7 +1048,7 @@ module L2_blocks = struct
       @@ proj block_hash (fun b -> b.header.predecessor)
       @@ proj (option commitment_hash) (fun b -> b.header.commitment_hash)
       @@ proj commitment_hash (fun b -> b.header.previous_commitment_hash)
-      @@ proj context_hash (fun b -> b.header.context)
+      @@ proj (option context_hash) (fun b -> b.header.context_hash)
       @@ proj payload_hashes_hash (fun b -> b.header.inbox_witness)
       @@ proj inbox_hash (fun b -> b.header.inbox_hash)
       @@ proj z (fun b -> b.initial_tick)
@@ -1098,7 +1098,7 @@ module L2_blocks = struct
       |sql}
 
     let select_context =
-      (block_hash ->? context_hash) ~name:__FUNCTION__ ~table
+      (block_hash ->? option context_hash) ~name:__FUNCTION__ ~table
       @@ {sql|
       SELECT context
       FROM l2_blocks
@@ -1222,7 +1222,9 @@ module L2_blocks = struct
 
   let find_context ?conn store block_hash =
     with_connection store conn @@ fun conn ->
-    Sqlite.Db.find_opt conn Q.select_context block_hash
+    let open Lwt_result_syntax in
+    let+ context = Sqlite.Db.find_opt conn Q.select_context block_hash in
+    Option.join context
 
   let find_head ?conn store =
     with_connection store conn @@ fun conn ->

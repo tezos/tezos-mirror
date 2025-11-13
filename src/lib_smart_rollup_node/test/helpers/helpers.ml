@@ -181,7 +181,7 @@ let add_l2_genesis_block ?boot_sector (node_ctxt : _ Node_context.t) =
         predecessor = predecessor.hash;
         commitment_hash = Some commitment_hash;
         previous_commitment_hash;
-        context = context_hash;
+        context_hash = Some context_hash;
         inbox_witness;
         inbox_hash;
       }

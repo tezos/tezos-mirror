@@ -39,7 +39,7 @@ type header = {
       (** Previous commitment hash in the chain. If there is a commitment for this
           block, this field contains the commitment that was previously
           computed. *)
-  context : Smart_rollup_context_hash.t;
+  context_hash : Smart_rollup_context_hash.t option;
       (** Hash of the layer 2 context for this block. *)
   inbox_witness :
     Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash.t;
@@ -91,8 +91,6 @@ type full = (header, content) block
 (** {2 Encodings} *)
 
 val header_encoding : header Data_encoding.t
-
-val header_size : int
 
 val content_encoding : content Data_encoding.t
 

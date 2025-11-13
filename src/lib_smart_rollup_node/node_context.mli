@@ -303,6 +303,15 @@ val set_l2_head : _ rw_store -> Sc_rollup_block.t -> unit tzresult Lwt.t
     exists. *)
 val last_processed_head_opt : _ t -> Sc_rollup_block.t option tzresult Lwt.t
 
+(** [last_committed_block store] returns the last block whose context is
+    committed on disk. *)
+val last_committed_block : _ t -> Sc_rollup_block.t option tzresult Lwt.t
+
+(** [find_previous_committed_block store level] returns the most recent block
+    with a committed context strictly before [level], if any. *)
+val find_previous_committed_block :
+  _ t -> int32 -> Sc_rollup_block.t option tzresult Lwt.t
+
 (** [mark_finalized_head store hash level] remembers that the block with [hash]
     at [level] is finalized. By construction, every block whose level is smaller
     than [level] is also finalized. *)

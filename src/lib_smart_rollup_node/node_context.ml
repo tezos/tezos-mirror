@@ -280,6 +280,11 @@ let is_processed {store; _} head =
 
 let last_processed_head_opt {store; _} = Store.L2_blocks.find_head store
 
+let last_committed_block {store; _} = Store.L2_blocks.find_last_committed store
+
+let find_previous_committed_block {store; _} level =
+  Store.L2_blocks.find_previous_committed store level
+
 let find_l2_block {store; _} block_hash = Store.L2_blocks.find store block_hash
 
 let get_l2_block node_ctxt block_hash =

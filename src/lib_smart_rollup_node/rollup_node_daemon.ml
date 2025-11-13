@@ -216,7 +216,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
         predecessor = predecessor.hash;
         commitment_hash;
         previous_commitment_hash;
-        context = context_hash;
+        context = Some context_hash;
         inbox_witness;
         inbox_hash;
       }
@@ -871,7 +871,7 @@ module Internal_for_tests = struct
           predecessor = predecessor.hash;
           commitment_hash;
           previous_commitment_hash;
-          context = context_hash;
+          context_hash = Some context_hash;
           inbox_witness;
           inbox_hash;
         }
@@ -1034,21 +1034,32 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
   run state
 
 module Replay = struct
-  let preload_wasmer node_ctxt l2_block =
+  let preload_wasmer node_ctxt (l2_block : Sc_rollup_block.full) =
     let open Lwt_result_syntax in
     match node_ctxt.Node_context.kind with
     | Example_arith | Riscv -> return_unit
     | Wasm_2_0_0 ->
+        let* l2_block_header =
+          match l2_block.header.context_hash with
+          | Some _ -> return l2_block.header
+          | None -> (
+              (* Fallback to use last committed block for preloading. *)
+              let+ last_committed =
+                Node_context.last_committed_block node_ctxt
+              in
+              match last_committed with
+              | None -> l2_block.header
+              | Some b -> b.header)
+        in
         Format.eprintf
           "Preloading \
            kernel............................................................. \
            %!" ;
-        let* () =
-          Wasm_2_0_0_utilities.preload_kernel
-            node_ctxt
-            l2_block.Sc_rollup_block.header
+        let* preloaded =
+          Wasm_2_0_0_utilities.preload_kernel node_ctxt l2_block_header
         in
-        Format.eprintf "[\x1B[1;32mOK\x1B[0m]@." ;
+        if preloaded then Format.eprintf "[\x1B[1;32mOK\x1B[0m]@."
+        else Format.eprintf "[\x1B[1;31mKO\x1B[0m]@." ;
         return_unit
 
   let mk_node_ctxt ~data_dir ~profiling cctxt block =

@@ -29,7 +29,7 @@ type header = {
   predecessor : Block_hash.t;
   commitment_hash : Commitment.Hash.t option;
   previous_commitment_hash : Commitment.Hash.t;
-  context : Smart_rollup_context_hash.t;
+  context_hash : Smart_rollup_context_hash.t option;
   inbox_witness :
     Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash.t;
   inbox_hash : Inbox.Hash.t;
@@ -75,7 +75,7 @@ let header_encoding =
            predecessor;
            commitment_hash;
            previous_commitment_hash;
-           context;
+           context_hash;
            inbox_witness;
            inbox_hash;
          }
@@ -85,7 +85,7 @@ let header_encoding =
         predecessor,
         commitment_hash,
         previous_commitment_hash,
-        context,
+        context_hash,
         inbox_witness,
         inbox_hash ))
     (fun ( block_hash,
@@ -93,7 +93,7 @@ let header_encoding =
            predecessor,
            commitment_hash,
            previous_commitment_hash,
-           context,
+           context_hash,
            inbox_witness,
            inbox_hash )
        ->
@@ -103,7 +103,7 @@ let header_encoding =
         predecessor;
         commitment_hash;
         previous_commitment_hash;
-        context;
+        context_hash;
         inbox_witness;
         inbox_hash;
       })
@@ -130,7 +130,7 @@ let header_encoding =
             "Previous commitment hash in the chain. If there is a commitment \
              for this block, this field contains the commitment that was \
              previously computed.")
-       (req
+       (opt
           "context"
           Smart_rollup_context_hash.encoding
           ~description:"Hash of the layer 2 context for this block.")
@@ -145,10 +145,6 @@ let header_encoding =
           "inbox_hash"
           Inbox.Hash.encoding
           ~description:"Hash of the inbox for this block.")
-
-let header_size =
-  WithExceptions.Option.get ~loc:__LOC__
-  @@ Data_encoding.Binary.fixed_length header_encoding
 
 let content_encoding =
   let open Data_encoding in
