@@ -12,7 +12,8 @@
   rollup_node_ci
   sdk_bindings_ci
   etherlink_ci
-  documentation_ci)
+  documentation_ci
+  client_libs_ci)
  (flags
   (:standard)
   -open Gitlab_ci.Base

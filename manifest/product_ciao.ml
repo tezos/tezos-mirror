@@ -157,6 +157,16 @@ let ci_documentation =
       ]
     ~release_status:Unreleased
 
+let ci_client_libs =
+  private_lib
+    "client_libs_ci"
+    ~opam:""
+    ~path:"client-libs/ci"
+    ~bisect_ppx:No
+    ~deps:
+      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
+    ~release_status:Unreleased
+
 let _ci_bin_main =
   private_exe
     "main"
@@ -174,6 +184,7 @@ let _ci_bin_main =
         ci_sdk_bindings;
         ci_etherlink;
         ci_documentation;
+        ci_client_libs;
       ]
     ~release_status:Unreleased
 

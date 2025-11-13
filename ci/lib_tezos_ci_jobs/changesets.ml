@@ -11,16 +11,16 @@ open Tezos_ci
 
 (** Modifying these files will unconditionally execute all conditional jobs.
 
-        If the CI configuration of [before_merging] or [merge_train]
-        pipelines change, we execute all jobs of these merge request
-        pipelines. (We cannot currently have a finer grain and run only
-        the jobs that are modified.)
+    If the CI configuration of [before_merging] or [merge_train]
+    pipelines change, we execute all jobs of these merge request
+    pipelines. (We cannot currently have a finer grain and run only
+    the jobs that are modified.)
 
-        As Changesets should only be present in merge request pipelines,
-        other pipelines' files need not be in the changeset.
+    As Changesets should only be present in merge request pipelines,
+    other pipelines' files need not be in the changeset.
 
-        [changeset_base] should be included in all Changesets below, any
-        exceptions should be explained. *)
+    [changeset_base] should be included in all Changesets below, any
+    exceptions should be explained. *)
 let changeset_base =
   Changeset.make
     [
@@ -48,12 +48,6 @@ let changeset_images_rust_sdk_bindings =
     ]
 
 let changeset_images = Changeset.make ["images/**/*"]
-
-let changeset_images_clientlibs =
-  Changeset.make ["images/client-libs-dependencies/**/*"]
-
-let changeset_base_images =
-  Changeset.make ["images/base-images/**/*"; "scripts/ci/build-base-images.sh"]
 
 (** Only if octez source code has changed *)
 let changeset_octez =
@@ -112,36 +106,13 @@ let changeset_octez_docs =
           "grafazos/doc/**/*";
         ])
 
-(** Only if reStructured Text files have changed *)
-let changeset_octez_docs_rst = Changeset.(changeset_base @ make ["**/*.rst"])
-
 (* Job [documentation:manuals] requires the build jobs, because it needs
-       to run Octez executables to generate the man pages.
-       So the build jobs need to be included if the documentation changes. *)
+   to run Octez executables to generate the man pages.
+   So the build jobs need to be included if the documentation changes. *)
 let changeset_octez_or_doc = Changeset.(changeset_octez @ changeset_octez_docs)
 
 let changeset_octez_or_kernels_or_doc =
   Changeset.(changeset_octez_or_kernels @ changeset_octez_docs)
-
-let changeset_octez_docker_changes_or_master =
-  Changeset.(
-    changeset_base
-    @ make
-        [
-          "scripts/**/*";
-          "script-inputs/**/*";
-          "src/**/*";
-          "tezt/**/*";
-          "vendors/**/*";
-          "dune";
-          "dune-project";
-          "dune-workspace";
-          "opam";
-          "Makefile";
-          "kernels.mk";
-          "build.Dockerfile";
-          "Dockerfile";
-        ])
 
 let changeset_docker_files = Changeset.make ["build.Dockerfile"; "Dockerfile"]
 
@@ -195,45 +166,6 @@ let changeset_homebrew =
         "manifest/**/*.ml*";
       ])
 
-(** The set of [changes:] that select opam jobs.
-
-        Note: unlike all other Changesets, this one does not include {!changeset_base}.
-        This is to avoid running these costly jobs too often. *)
-let changeset_opam_jobs =
-  Changeset.(
-    make
-      [
-        "**/dune";
-        "**/dune.inc";
-        "**/*.dune.inc";
-        "**/dune-project";
-        "**/dune-workspace";
-        "**/*.opam";
-        ".gitlab/ci/jobs/packaging/opam:prepare.yml";
-        ".gitlab/ci/jobs/packaging/opam_package.yml";
-        "manifest/**/*.ml*";
-        "scripts/opam-prepare-repo.sh";
-        "scripts/version.sh";
-      ])
-
-let changeset_kaitai_e2e_files, changeset_kaitai_checks_files =
-  (* this is an over approximation considering all scripts used
-         in both Changesets, that mainly differ because of the image
-         use to run the jobs *)
-  let changeset_kaitai =
-    Changeset.make
-      [
-        "scripts/install_build_deps.js.sh";
-        "scripts/version.sh";
-        "src/**/*";
-        "client-libs/*kaitai*/**/*";
-        "scripts/ci/datadog_send_job_info.sh";
-        "scripts/slim-mode.sh";
-      ]
-  in
-  ( Changeset.(changeset_base @ changeset_images_clientlibs @ changeset_kaitai),
-    Changeset.(changeset_base @ changeset_images @ changeset_kaitai) )
-
 (** Set of OCaml files for type checking ([dune build @check]). *)
 let changeset_ocaml_check_files =
   Changeset.(
@@ -250,7 +182,7 @@ let changeset_lift_limits_patch =
         ])
 
 (* The linting job runs over the set of [source_directories]
-       defined in [scripts/lint.sh] that must be included here: *)
+   defined in [scripts/lint.sh] that must be included here: *)
 let changeset_lint_files =
   Changeset.(
     changeset_base
@@ -286,7 +218,7 @@ let changeset_semgrep_files =
 let changeset_jsonnet_fmt_files = Changeset.(make ["**/*.jsonnet"])
 
 (* We only need to run the [oc.script:snapshot_alpha_and_link] job if
-       protocol Alpha or if the scripts changed. *)
+   protocol Alpha or if the scripts changed. *)
 let changeset_script_snapshot_alpha_and_link =
   Changeset.(
     changeset_base
