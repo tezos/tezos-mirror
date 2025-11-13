@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type attempt = Always | Never | Number of int
+
 let one_xtz = Z.(of_int 1_000_000_000 * of_int 1_000_000_000)
 
 let xtz_of_int x = Z.(of_int x * one_xtz)
@@ -71,7 +73,8 @@ let rec report_tps ~elapsed_time =
   in
   report_tps ~elapsed_time
 
-let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account =
+let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
+    ~retry_attempt =
   let data, to_ =
     match token with
     | `Native data ->
@@ -88,25 +91,32 @@ let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account =
   let rec salvo ~start ~nonce_limit ~nonce =
     let is_last_nonce = Compare.Z.(Z.succ nonce = nonce_limit) in
     let open Lwt_syntax in
-    let callback reason =
-      match reason with
-      | `Accepted _ -> return_unit
-      | `Refused ->
-          let* () = Floodgate_events.transaction_refused account in
-          return_unit
-      | `Confirmed ->
-          let end_ = Time.System.now () in
-          let* () =
-            Floodgate_events.transaction_confirmed
-              account
-              Ptime.(diff end_ start)
-          in
-          if is_last_nonce then loop () else return_unit
-      | `Dropped ->
-          let* () = Floodgate_events.transaction_dropped account in
-          if is_last_nonce then loop () else return_unit
-    in
-    let* () =
+    let rec retry_transfer attempt =
+      let maybe_retry () =
+        match retry_attempt with
+        | Always -> retry_transfer (attempt + 1)
+        | Never -> return_unit
+        | Number max_attempt when attempt >= max_attempt -> return_unit
+        | Number _ -> retry_transfer (attempt + 1)
+      in
+      let callback reason =
+        match reason with
+        | `Accepted _ -> return_unit
+        | `Refused ->
+            let* () = Floodgate_events.transaction_refused account in
+            maybe_retry ()
+        | `Confirmed ->
+            let end_ = Time.System.now () in
+            let* () =
+              Floodgate_events.transaction_confirmed
+                account
+                Ptime.(diff end_ start)
+            in
+            if is_last_nonce then loop () else return_unit
+        | `Dropped ->
+            let* () = Floodgate_events.transaction_dropped account in
+            maybe_retry ()
+      in
       Tx_queue.transfer
         ~nonce
         ~infos
@@ -117,6 +127,7 @@ let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account =
         ?data
         ()
     in
+    let* () = retry_transfer 0 in
     if not is_last_nonce then salvo ~start ~nonce_limit ~nonce:(Z.succ nonce)
     else return_unit
   and loop () =
@@ -402,7 +413,8 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
 let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
     ~ws_endpoint ~controller ~max_active_eoa ~max_transaction_batch_length
     ~spawn_interval ~tick_interval ~base_fee_factor ~initial_balance
-    ~txs_per_salvo ~elapsed_time_between_report ~dummy_data_size =
+    ~txs_per_salvo ~elapsed_time_between_report ~dummy_data_size ~retry_attempt
+    =
   let open Lwt_result_syntax in
   let* controller =
     controller_from_signer
@@ -446,7 +458,13 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
               Floodgate_events.spam_started (Account.address_et node)
             in
             Lwt_result.ok
-              (spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit node)
+              (spam_with_account
+                 ~txs_per_salvo
+                 ~token
+                 ~infos
+                 ~gas_limit
+                 node
+                 ~retry_attempt)
           in
           return_unit)
         (Seq.ints 0 |> Stdlib.Seq.take max_active_eoa)

@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type attempt = Always | Never | Number of int
+
 val run :
   scenario:[< `ERC20 | `XTZ] ->
   relay_endpoint:Uri.t ->
@@ -21,6 +23,7 @@ val run :
   txs_per_salvo:int ->
   elapsed_time_between_report:float ->
   dummy_data_size:int option ->
+  retry_attempt:attempt ->
   unit tzresult Lwt.t
 
 val deploy :
