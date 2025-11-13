@@ -1828,79 +1828,6 @@ oc:scripts:release_script_values:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-mir_unit:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - contrib/mir/**/*
-    - images/**/*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - trigger
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - cargo test --manifest-path contrib/mir/Cargo.toml
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    CARGO_NET_OFFLINE: "false"
-
-mir_tzt:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - contrib/mir/**/*
-    - images/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - trigger
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - cargo run --manifest-path contrib/mir/Cargo.toml --bin tzt_runner tzt_reference_test_suite/*.tzt
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    CARGO_NET_OFFLINE: "false"
-
 test_sdk_rust:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
@@ -3225,6 +3152,73 @@ etherlink.unit_tests:
       junit: test_results/*.xml
     when: always
   retry: 2
+
+etherlink.mir_unit:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - contrib/mir/**/*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - cargo test --manifest-path contrib/mir/Cargo.toml
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    CARGO_NET_OFFLINE: "false"
+
+etherlink.mir_tzt:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - contrib/mir/**/*
+    - tzt_reference_test_suite/**/*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - cargo run --manifest-path contrib/mir/Cargo.toml --bin tzt_runner tzt_reference_test_suite/*.tzt
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    CARGO_NET_OFFLINE: "false"
 
 etherlink.build_tezt:
   image: ${ci_image_name}/build:${ci_image_tag}
