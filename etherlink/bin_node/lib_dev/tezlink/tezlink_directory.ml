@@ -458,6 +458,29 @@ let build_block_static_directory ~l2_chain_id
              anonymous_operation_hashes;
              manager_operation_hashes;
            ])
+  |> register
+       ~service:Tezos_services.operations
+       ~impl:(fun {chain; block} o () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+         let* block = Backend.block chain block in
+         let consensus_operations = [] in
+         let voting_operations = [] in
+         let anonymous_operations = [] in
+         let*? manager_operations =
+           Tezos_services.Current_block_services.deserialize_operations
+             ~chain_id
+             block.operations
+         in
+         return
+           ( o#version,
+             [
+               consensus_operations;
+               voting_operations;
+               anonymous_operations;
+               manager_operations;
+             ] ))
   |> opt_register
        ~service:Tezos_services.operation
        ~impl:(fun (({chain; block}, operation_pass), operation_index) o () ->

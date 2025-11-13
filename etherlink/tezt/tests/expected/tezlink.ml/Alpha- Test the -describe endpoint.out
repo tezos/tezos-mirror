@@ -203,6 +203,8 @@ Available services:
           using some heuristics. 
     - GET /chains/main/blocks/head/operation_hashes
         The hashes of all the operations included in the block. 
+    - GET /chains/main/blocks/head/operations
+        All the operations included in the block. 
     - GET /chains/main/blocks/head/operations/<list_offset>/<operation_offset>
         The `m-th` operation in the `n-th` validation pass of the block. 
     - GET /chains/main/blocks/head/protocols
