@@ -426,6 +426,14 @@ let report_errors ~details ~show_source
           loc ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
+    | Environment.Ecoproto_error (Unpackable_type loc) :: rest ->
+        Format.fprintf
+          ppf
+          "%aValue has a type that cannot be packed"
+          print_loc
+          loc ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
     | Environment.Ecoproto_error (Runtime_contract_error contract) :: rest ->
         Format.fprintf
           ppf

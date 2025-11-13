@@ -1114,7 +1114,7 @@ let check_packable ~allow_contract loc root =
     | Chest_key_t -> return_unit
     | Chest_t -> return_unit
   in
-  check root
+  record_trace (Unpackable_type loc) (check root)
 
 type toplevel = {
   code_field : Script.node;
