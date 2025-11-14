@@ -340,10 +340,12 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
         (Int32.succ predecessor.shell.level, round, delegate, force_apply))
   in
   let* injection_level =
-    Plugin.RPC.current_level
+    Node_rpc.current_level
       cctxt
       ~offset:1l
-      (`Hash global_state.chain_id, `Hash (predecessor.hash, 0))
+      ~chain:(`Hash global_state.chain_id)
+      ~block:(`Hash (predecessor.hash, 0))
+      ()
   in
   let* seed_nonce_opt =
     (generate_seed_nonce_hash
