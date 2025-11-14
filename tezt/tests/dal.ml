@@ -4238,8 +4238,8 @@ let test_dal_node_gs_invalid_messages_exchange ?batching_time_interval _protocol
    * the baker does not crash when there's a DAL node specified, but it is not
    running
    * the baker register profiles when the DAL node restarts. *)
-let test_baker_registers_profiles _protocol _parameters _cryptobox l1_node
-    client dal_node =
+let test_baker_registers_profiles protocol _parameters _cryptobox l1_node client
+    dal_node =
   let delegates =
     List.to_seq Constant.all_secret_keys |> Seq.take 3 |> List.of_seq
   in
@@ -4257,8 +4257,11 @@ let test_baker_registers_profiles _protocol _parameters _cryptobox l1_node
     Agnostic_baker.create ~dal_node_rpc_endpoint l1_node client ~delegates
   in
   let wait_for_attestation_event =
-    Agnostic_baker.wait_for baker "failed_to_get_attestations.v0" (fun _json ->
-        Some ())
+    let attestation_event =
+      if Protocol.number protocol >= 025 then "no_attestable_slot_at_level.v0"
+      else "failed_to_get_attestations.v0"
+    in
+    Agnostic_baker.wait_for baker attestation_event (fun _json -> Some ())
   in
   let* () = Agnostic_baker.run baker in
   let* () = wait_for_attestation_event in
