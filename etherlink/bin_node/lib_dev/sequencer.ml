@@ -18,6 +18,7 @@ type sandbox_config = {
   parent_chain : Uri.t option;
   disable_da_fees : bool;
   kernel_verbosity : Events.kernel_log_level option;
+  with_runtimes : Tezosx.runtime list;
   tezlink : tezlink_sandbox option;
 }
 
@@ -262,7 +263,15 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
   let* () =
     match sandbox_config with
-    | Some {funded_addresses; disable_da_fees; kernel_verbosity; tezlink; _} ->
+    | Some
+        {
+          funded_addresses;
+          disable_da_fees;
+          kernel_verbosity;
+          with_runtimes;
+          tezlink;
+          _;
+        } ->
         let*? pk, _ = Signer.first_lexicographic_signer signer in
         let* () = Evm_context.patch_sequencer_key pk in
         let*! () = Events.patched_sequencer_key pk in
@@ -273,6 +282,15 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
           List.iter_es
             (fun address -> Evm_context.provision_balance address new_balance)
             funded_addresses
+        in
+        let* () =
+          List.iter_es
+            (fun runtime ->
+              Evm_context.patch_state
+                ~key:(Tezosx.feature_flag runtime)
+                ~value:""
+                ())
+            with_runtimes
         in
         let* () =
           Option.iter_es

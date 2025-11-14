@@ -130,6 +130,9 @@ const EVM_CHAIN_ID: RefPath = RefPath::assert_from(b"/evm/chain_id");
 pub const ENABLE_MULTICHAIN: RefPath =
     RefPath::assert_from(b"/evm/feature_flags/enable_multichain");
 
+pub const ENABLE_TEZOS_RUNTIME: RefPath =
+    RefPath::assert_from(b"/evm/feature_flags/enable_tezos_runtime");
+
 // Root for chain configurations. Informations about a chain are available by appending its chain ID.
 pub const CHAIN_CONFIGURATIONS: RefPath =
     RefPath::assert_from(b"/evm/chain_configurations");
@@ -733,6 +736,10 @@ pub fn enable_dal<Host: Runtime>(host: &Host) -> anyhow::Result<bool> {
     } else {
         Ok(false)
     }
+}
+
+pub fn enable_tezos_runtime<Host: Runtime>(host: &Host) -> bool {
+    Some(ValueType::Value) == host.store_has(&ENABLE_TEZOS_RUNTIME).unwrap_or(None)
 }
 
 pub fn tweak_dal_activation<Host: Runtime>(
