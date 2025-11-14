@@ -904,7 +904,9 @@ module Mockup_for_baker = struct
 
   let routes ~attestation_lag ~attesters ~attestable_slots =
     [
-      monitor_route ~published_levels:20;
+      (* Mirrors the DAL node’s backfill window on subscribe, where (attestation_lag + 1)
+         published levels are included. *)
+      monitor_route ~published_levels:(attestation_lag + 1);
       (let path_pattern =
          Format.sprintf
            "/profiles/(tz[1234][a-zA-Z0-9]+)/attested_levels/([1-9][0-9]*)/attestable_slots"
