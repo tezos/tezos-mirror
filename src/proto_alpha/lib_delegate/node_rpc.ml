@@ -429,6 +429,17 @@ let forge_vdf_revelation cctxt ~chain ~block ~branch ~solution =
 let levels_in_current_cycle cctxt ~offset ~chain ~block =
   Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block)
 
+let forge_double_consensus_operation_evidence cctxt ~chain ~block ~branch ~slot
+    ~op1 ~op2 =
+  Plugin.RPC.Forge.double_consensus_operation_evidence
+    cctxt
+    (chain, block)
+    ~branch
+    ~slot
+    ~op1
+    ~op2
+    ()
+
 let await_protocol_activation cctxt ~chain () =
   let open Lwt_result_syntax in
   let* block_stream, stop =
