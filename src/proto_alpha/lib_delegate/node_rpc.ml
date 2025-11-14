@@ -26,10 +26,9 @@
 open Protocol
 open Alpha_context
 open Baking_cache
-open Baking_state
 open Baking_state_types
 module Block_services = Block_services.Make (Protocol) (Protocol)
-module Events = Baking_events.Node_rpc
+module Events = Node_rpc_events
 
 module Profiler = struct
   include (val Profiler.wrap Baking_profiler.node_rpc_profiler)

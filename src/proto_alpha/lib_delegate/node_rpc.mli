@@ -64,17 +64,17 @@ val preapply_block :
 val monitor_valid_proposals :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
-  ?cache:Baking_state.block_info Baking_cache.Block_cache.t ->
+  ?cache:Baking_state_types.block_info Baking_cache.Block_cache.t ->
   unit ->
-  (Baking_state.proposal Lwt_stream.t * (unit -> unit)) tzresult Lwt.t
+  (Baking_state_types.proposal Lwt_stream.t * (unit -> unit)) tzresult Lwt.t
 
 (** Monitor heads from the node. *)
 val monitor_heads :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
-  ?cache:Baking_state.block_info Baking_cache.Block_cache.t ->
+  ?cache:Baking_state_types.block_info Baking_cache.Block_cache.t ->
   unit ->
-  (Baking_state.proposal Lwt_stream.t * (unit -> unit)) tzresult Lwt.t
+  (Baking_state_types.proposal Lwt_stream.t * (unit -> unit)) tzresult Lwt.t
 
 (** Await the current protocol to be activated. *)
 val await_protocol_activation :
@@ -93,8 +93,8 @@ val fetch_dal_config :
 val dal_attestable_slots :
   Tezos_rpc.Context.generic ->
   attestation_level:int32 ->
-  Baking_state.delegate_info list ->
-  Baking_state.dal_attestable_slots
+  Baking_state_types.delegate_info list ->
+  Baking_state_types.dal_attestable_slots
 
 (** [get_dal_profiles ctxt delegates] calls the DAL node RPC GET
     /profiles/ to retrieve the DAL node's profiles. *)
