@@ -84,9 +84,11 @@ T024, the following are potentially breaking:
   /chains/<chain_id>/blocks/<block_id>/helpers/validators`` to group
   delegates by level. The returned list contains one element for each
   queried level (by default, only the current level), and contains
-  four fields: the ``level`` itself, the ``consensus_threshold``
+  five fields: the ``level`` itself, the ``consensus_threshold``
   required for the current level, the ``consensus_committee`` of the
-  current level, and ``delegates`` which is the list of validators for
+  current level, the ``all_bakers_attest_activated`` which indicates the
+  activation status of the "All Bakers Attest" feature, and
+  ``delegates`` which is the list of validators for
   that level. Each element of this last list contains the fields
   present in the previous version of this RPC: ``delegate``, "slots"
   which have been renamed to ``rounds``, ``consensus_key``, and
