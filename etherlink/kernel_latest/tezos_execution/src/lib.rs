@@ -131,7 +131,6 @@ fn burn_tez(
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
     let new_balance = match balance.0.checked_sub(amount) {
         None => {
-            log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
                 contract: account.contract(),
                 balance: balance.clone(),
@@ -165,9 +164,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
         log!(
             tc_ctx.host,
             Debug,
-            "Executing internal operation {:?} with counter {:?}",
-            operation,
-            counter
+            "Executing internal operation {operation:?} with counter {counter:?}"
         );
         let nonce = counter
             .try_into()
@@ -226,6 +223,11 @@ fn execute_internal_operations<'a, Host: Runtime>(
                             Ok(success) => ContentResult::Applied(success.into()),
                             Err(err) => {
                                 failed = Some(index);
+                                log!(
+                                    tc_ctx.host,
+                                    Error,
+                                    "Internal transfer failed: {err:?}"
+                                );
                                 ContentResult::Failed(
                                     ApplyOperationError::from(err).into(),
                                 )
@@ -283,6 +285,11 @@ fn execute_internal_operations<'a, Host: Runtime>(
                             Ok(success) => ContentResult::Applied(success),
                             Err(err) => {
                                 failed = Some(index);
+                                log!(
+                                    tc_ctx.host,
+                                    Error,
+                                    "Internal origination failed: {err:?}"
+                                );
                                 ContentResult::Failed(
                                     ApplyOperationError::from(err).into(),
                                 )
@@ -303,8 +310,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
         log!(
             tc_ctx.host,
             Debug,
-            "Internal operation executed successfully: {:?}",
-            internal_receipt
+            "Internal operation executed successfully"
         );
         all_internal_receipts.push(internal_receipt);
     }
@@ -312,8 +318,7 @@ fn execute_internal_operations<'a, Host: Runtime>(
         log!(
             tc_ctx.host,
             Debug,
-            "Internal operation execution failed at index {}",
-            index
+            "Internal operation execution failed at index {index}"
         );
         all_internal_receipts
             .iter_mut()
@@ -462,11 +467,8 @@ fn transfer_external<'a, Host: Runtime>(
     log!(
         tc_ctx.host,
         Debug,
-        "Applying an external transfer operation from {} to {:?} of {:?} mutez with parameters {:?}",
-        operation_ctx.source.pkh(),
-        dest,
-        amount,
-        parameter
+        "Applying an external transfer operation from {} to {dest:?} of {amount:?} mutez with parameters {parameter:?}",
+        operation_ctx.source.pkh()
     );
     let (entrypoint, value) = match parameter {
         Some(param) => (
@@ -680,7 +682,6 @@ fn apply_balance_changes(
         .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
     let new_giver_balance = match giver_balance.0.checked_sub(amount) {
         None => {
-            log!(host, Debug, "Balance is too low");
             return Err(TransferError::BalanceTooLow(BalanceTooLow {
                 contract: giver_account.contract(),
                 balance: giver_balance,
@@ -704,8 +705,8 @@ fn apply_balance_changes(
     log!(
         host,
         Debug,
-        "Transfer: OK - the new balance of the giver is {:?} and the new balance of the receiver is {:?}",
-    new_giver_balance, new_receiver_balance);
+        "Transfer: OK - the new balance of the giver is {new_giver_balance:?} and the new balance of the receiver is {new_receiver_balance:?}"
+    );
 
     Ok(())
 }
@@ -786,8 +787,6 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         block_ctx,
     );
 
-    log!(safe_host, Debug, "Receipts: {:#?}", receipts);
-
     if applied {
         log!(
             safe_host,
@@ -802,6 +801,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
             Debug,
             "Reverting the changes because some operation failed."
         );
+        log!(safe_host, Debug, "Receipts: {receipts:#?}");
         safe_host.revert()?;
     }
 
@@ -826,16 +826,14 @@ fn apply_batch<Host: Runtime>(
         log!(
             host,
             Debug,
-            "Applying operation #{} in the batch with counter {:?}.",
-            index,
+            "Applying operation #{index} in the batch with counter {:?}.",
             validated_operation.content.counter
         );
         let receipt = if first_failure.is_some() {
             log!(
                 host,
                 Debug,
-                "Skipping this operation because we already failed on {:?}.",
-                first_failure
+                "Skipping this operation because we already failed on {first_failure:?}."
             );
             produce_skipped_receipt(
                 &validated_operation.content,
@@ -889,6 +887,11 @@ fn apply_operation<Host: Runtime>(
     match &validated_operation.content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(&mut tc_ctx, source_account, pk);
+
+            if reveal_result.is_err() {
+                log!(host, Error, "Reveal failed because of: {reveal_result:?}");
+            }
+
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,
                 reveal_result.map_err(Into::into),
@@ -918,6 +921,15 @@ fn apply_operation<Host: Runtime>(
                 &mut internal_operations_receipts,
                 &parser,
             );
+
+            if transfer_result.is_err() {
+                log!(
+                    host,
+                    Error,
+                    "Transfer failed because of: {transfer_result:?}"
+                );
+            }
+
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,
                 transfer_result.map_err(Into::into),
@@ -945,6 +957,15 @@ fn apply_operation<Host: Runtime>(
                 ),
                 Err(err) => Err(err),
             };
+
+            if origination_result.is_err() {
+                log!(
+                    host,
+                    Error,
+                    "Origination failed because of: {origination_result:?}"
+                );
+            }
+
             let manager_result = produce_operation_result(
                 validated_operation.balance_updates,
                 origination_result.map_err(|e| e.into()),
