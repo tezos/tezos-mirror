@@ -250,6 +250,25 @@ let get_backfill_payload ctxt ~pkh =
     {slot_ids = []; no_shards_attestation_levels = []}
     published_levels
 
+(** [create_new_stream_with_backfill stream backfill_payload_opt] builds a new
+    event stream that delivers at most one [Backfill] event before any live items,
+    then transparently forwards all events from the provided live [stream]. *)
+let create_new_stream_with_backfill stream backfill_payload_opt =
+  let open Lwt_syntax in
+  let* backfill_stream =
+    match backfill_payload_opt with
+    | Ok backfill_payload ->
+        let stream, push = Lwt_stream.create () in
+        (* Start with a [Backfill] event *)
+        push (Some (Types.Attestable_event.Backfill {backfill_payload})) ;
+        push None ;
+        return stream
+    | Error error ->
+        let* () = Event.emit_backfill_error ~error in
+        return (Lwt_stream.of_list [])
+  in
+  return @@ Lwt_stream.append backfill_stream stream
+
 let subscribe ctxt ~pkh =
   let open Lwt_syntax in
   let open Node_context in
@@ -263,18 +282,11 @@ let subscribe ctxt ~pkh =
   in
   let watcher = T.get_or_init attestable_slots_watcher_table pkh proto_params in
   let stream, stopper = Lwt_watcher.create_stream (T.get_stream watcher) in
-  let* () =
-    let* backfill_payload = get_backfill_payload ctxt ~pkh in
-    match backfill_payload with
-    | Ok backfill_payload ->
-        T.notify_backfill_payload
-          attestable_slots_watcher_table
-          pkh
-          ~backfill_payload ;
-        return_unit
-    | Error error -> Event.emit_backfill_error ~error
+  let* backfill_stream =
+    let* backfill_payload_opt = get_backfill_payload ctxt ~pkh in
+    create_new_stream_with_backfill stream backfill_payload_opt
   in
-  let next () = Lwt_stream.get stream in
+  let next () = Lwt_stream.get backfill_stream in
   let shutdown () =
     (* stop this stream, then possibly remove the whole watcher if last subscriber *)
     Lwt_watcher.shutdown stopper ;
