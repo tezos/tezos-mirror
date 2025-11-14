@@ -924,10 +924,12 @@ let try_resolve_consensus_keys cctxt key =
           return pkh
         else
           let* attesting_rights =
-            Plugin.RPC.Validators.get
+            Node_rpc.get_validators
               cctxt
-              (`Main, `Head head_offset)
+              ~chain:`Main
+              ~block:(`Head head_offset)
               ~consensus_keys:[pkh]
+              ()
           in
           match attesting_rights with
           | Error _ | Ok [Plugin.RPC.Validators.{delegates = []; _}] ->

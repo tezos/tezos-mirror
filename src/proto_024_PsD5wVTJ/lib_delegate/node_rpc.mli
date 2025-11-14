@@ -83,6 +83,17 @@ val await_protocol_activation :
   unit ->
   unit tzresult Lwt.t
 
+(** Get the validators information for the given list of keys. *)
+val get_validators :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?block:Shell_services.block ->
+  ?levels:int32 list ->
+  ?delegates:public_key_hash list ->
+  ?consensus_keys:public_key_hash list ->
+  unit ->
+  RPC.Validators.t list tzresult Lwt.t
+
 val fetch_dal_config :
   #Protocol_client_context.rpc_context -> Cryptobox.Config.t tzresult Lwt.t
 
