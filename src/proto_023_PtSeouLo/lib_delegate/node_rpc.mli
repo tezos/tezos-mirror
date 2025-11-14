@@ -130,6 +130,16 @@ val levels_in_current_cycle :
 val fetch_dal_config :
   #Protocol_client_context.rpc_context -> Cryptobox.Config.t tzresult Lwt.t
 
+val forge_double_consensus_operation_evidence :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  branch:Block_hash.t ->
+  slot:Slot.t ->
+  op1:'k Kind.consensus Alpha_context.operation ->
+  op2:'l Kind.consensus Alpha_context.operation ->
+  bytes tzresult Lwt.t
+
 (** [dal_attestable_slots ctxt ~attestation_level delegates_slots] calls the DAL
     node RPC GET /profiles/<pkh>/attested_levels/<level>/attestable_slots/<pkh>
     for each of the delegates in [delegate_slots] and returns the corresponding

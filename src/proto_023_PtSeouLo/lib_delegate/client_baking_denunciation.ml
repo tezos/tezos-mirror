@@ -301,14 +301,14 @@ let process_consensus_op state cctxt chain_id slot (type a)
                 Alpha_block_services.hash cctxt ~chain ~block ()
               in
               let forge op1 op2 =
-                Plugin.RPC.Forge.double_consensus_operation_evidence
+                Node_rpc.forge_double_consensus_operation_evidence
                   cctxt
-                  (`Hash chain_id, block)
+                  ~chain:(`Hash chain_id)
+                  ~block
                   ~branch:block_hash
                   ~slot
                   ~op1
                   ~op2
-                  ()
               in
               let* bytes =
                 if Operation_hash.(new_op_hash < existing_op_hash) then
