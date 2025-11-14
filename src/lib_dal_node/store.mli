@@ -11,6 +11,15 @@
 
 open Cryptobox
 
+(** Store directory names within the DAL node's data directory. *)
+module Stores_dirs : sig
+  val shard : string
+
+  val slot : string
+
+  val skip_list_cells : string
+end
+
 module Shards : sig
   (** A shard of some slot id consist of a shard index (a number
       between 0 and the number_of_shards protocol parameter) and a
