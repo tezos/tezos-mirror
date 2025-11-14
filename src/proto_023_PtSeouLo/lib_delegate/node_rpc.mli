@@ -140,6 +140,15 @@ val forge_double_consensus_operation_evidence :
   op2:'l Kind.consensus Alpha_context.operation ->
   bytes tzresult Lwt.t
 
+val forge_double_baking_evidence :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  branch:Block_hash.t ->
+  bh1:block_header ->
+  bh2:block_header ->
+  (bytes, Error_monad.tztrace) result Lwt.t
+
 (** [dal_attestable_slots ctxt ~attestation_level delegates_slots] calls the DAL
     node RPC GET /profiles/<pkh>/attested_levels/<level>/attestable_slots/<pkh>
     for each of the delegates in [delegate_slots] and returns the corresponding

@@ -451,6 +451,15 @@ let forge_double_consensus_operation_evidence cctxt ~chain ~block ~branch ~slot
     ~op2
     ()
 
+let forge_double_baking_evidence cctxt ~chain ~block ~branch ~bh1 ~bh2 =
+  Plugin.RPC.Forge.double_baking_evidence
+    cctxt
+    (chain, block)
+    ~branch
+    ~bh1
+    ~bh2
+    ()
+
 let await_protocol_activation cctxt ~chain () =
   let open Lwt_result_syntax in
   let* block_stream, stop =
