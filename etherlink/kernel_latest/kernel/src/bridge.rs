@@ -133,7 +133,7 @@ pub struct Deposit {
     /// Deposit amount in wei
     pub amount: U256,
     /// Deposit receiver on L2
-    pub receiver: H160,
+    pub receiver: DepositReceiver,
     /// Inbox level containing the original deposit message
     pub inbox_level: u32,
     /// Inbox message id
@@ -196,7 +196,7 @@ impl Deposit {
         Ok((
             Self {
                 amount,
-                receiver: info.receiver.to_h160(),
+                receiver: info.receiver,
                 inbox_level,
                 inbox_msg_id,
             },
@@ -212,7 +212,7 @@ impl Deposit {
     /// Signature: Deposit(uint256,address,uint256,uint256)
     pub fn event_log(&self) -> Log {
         let event_data = SolBridgeDepositEvent {
-            receiver: h160_to_alloy(&self.receiver),
+            receiver: h160_to_alloy(&self.receiver.to_h160()),
             amount: u256_to_alloy(&self.amount),
             inbox_level: u256_to_alloy(&U256::from(self.inbox_level)),
             inbox_msg_id: u256_to_alloy(&U256::from(self.inbox_msg_id)),
@@ -263,7 +263,7 @@ impl Decodable for Deposit {
                 let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
                 Ok(Self {
                     amount,
-                    receiver,
+                    receiver: DepositReceiver::Ethereum(receiver),
                     inbox_level: 0,
                     inbox_msg_id: 0,
                 })
@@ -271,7 +271,9 @@ impl Decodable for Deposit {
             4 => {
                 let mut it = decoder.iter();
                 let amount: U256 = decode_field(&next(&mut it)?, "amount")?;
-                let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
+                let receiver_decoder = next(&mut it)?;
+                let receiver: DepositReceiver =
+                    decode_field(&receiver_decoder, "receiver")?;
                 let inbox_level: u32 = decode_field(&next(&mut it)?, "inbox_level")?;
                 let inbox_msg_id: u32 = decode_field(&next(&mut it)?, "inbox_msg_id")?;
                 Ok(Self {
@@ -297,7 +299,8 @@ pub fn execute_deposit<Host: Runtime>(
 ) -> Result<DepositResult, revm_etherlink::Error> {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
-    let mut to_account = StorageAccount::from_address(&h160_to_alloy(&deposit.receiver))?;
+    let receiver = deposit.receiver.to_h160();
+    let mut to_account = StorageAccount::from_address(&h160_to_alloy(&receiver))?;
 
     let result = match to_account.add_balance(host, u256_to_alloy(&deposit.amount)) {
         Ok(()) => ExecutionResult::Success {
@@ -362,7 +365,7 @@ mod tests {
     fn dummy_deposit() -> Deposit {
         Deposit {
             amount: U256::from(1u64),
-            receiver: H160::from([2u8; 20]),
+            receiver: DepositReceiver::Ethereum(H160::from([2u8; 20])),
             inbox_level: 3,
             inbox_msg_id: 4,
         }
@@ -399,7 +402,7 @@ mod tests {
             deposit,
             Deposit {
                 amount: tezos_ethereum::wei::eth_from_mutez(2),
-                receiver: H160([1u8; 20]),
+                receiver: DepositReceiver::Ethereum(H160([1u8; 20])),
                 inbox_level: 0,
                 inbox_msg_id: 0,
             }
@@ -422,7 +425,7 @@ mod tests {
             deposit,
             Deposit {
                 amount: tezos_ethereum::wei::eth_from_mutez(2),
-                receiver: H160::from([1u8; 20]),
+                receiver: DepositReceiver::Ethereum(H160::from([1u8; 20])),
                 inbox_level: 0,
                 inbox_msg_id: 0,
             }
@@ -534,7 +537,7 @@ mod tests {
             res,
             Deposit {
                 amount: U256::one(),
-                receiver: H160::from([1u8; 20]),
+                receiver: DepositReceiver::Ethereum(H160::from([1u8; 20])),
                 inbox_level: 0,
                 inbox_msg_id: 0,
             }

@@ -404,7 +404,7 @@ pub fn handle_run_transaction<Host: Runtime>(
                 result: outcome.result,
                 caller: H160::from(SYSTEM_SOL_ADDR.into_array()),
                 receipt_data: ReceiptData {
-                    to: Some(deposit.receiver),
+                    to: Some(deposit.receiver.to_h160()),
                     type_: TransactionType::Legacy,
                 },
             }

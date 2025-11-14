@@ -627,7 +627,7 @@ mod tests {
     fn dummy_tx_deposit(i: u8) -> Transaction {
         let deposit = Deposit {
             amount: i.into(),
-            receiver: H160([i; 20]),
+            receiver: crate::bridge::DepositReceiver::Ethereum(H160([i; 20])),
             inbox_level: 1,
             inbox_msg_id: 0,
         };
