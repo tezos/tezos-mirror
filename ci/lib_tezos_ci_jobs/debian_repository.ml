@@ -93,10 +93,7 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ~before_script:
       (before_script
          ~source_version:true
-         [
-           "images/scripts/install-gsutil-apt.sh";
-           "apt install -y apt-utils debsigs jq";
-         ])
+         ["apt-get install -y --update apt-utils debsigs"])
     ~variables
     script
 

@@ -23,10 +23,7 @@ let job_create_homebrew_formula : tezos_job =
     ~arch:Amd64
     ~image
     ~stage
-    [
-      "images/scripts/install-gsutil-apt.sh";
-      "./scripts/packaging/homebrew_release.sh";
-    ]
+    ["./scripts/packaging/homebrew_release.sh"]
 
 (* this job tests if the formula created by job_create_homebrew_formula
      can be compiled and installed *)
