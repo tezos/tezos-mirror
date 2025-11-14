@@ -18,60 +18,6 @@ open Rpc.Syntax
 open Test_helpers
 open Setup
 
-let test_describe_endpoint =
-  Protocol.register_regression_test
-    ~__FILE__
-    ~tags:["evm"; "rpc"; "describe"]
-    ~title:"Test the /describe endpoint"
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_evm_node;
-        Constant.octez_client;
-        Constant.WASM.evm_kernel;
-        Constant.octez_smart_rollup_node;
-        Constant.smart_rollup_installer;
-      ])
-  @@ fun protocol ->
-  let l2_chains =
-    [
-      {
-        (Evm_node.default_l2_setup ~l2_chain_id:12) with
-        l2_chain_family = "Michelson";
-      };
-    ]
-  in
-  let* {sequencer; client; _} =
-    Setup.setup_sequencer
-      ~mainnet_compat:false
-      ~enable_dal:false
-      ~enable_multichain:true
-      ~l2_chains
-      ~rpc_server:Evm_node.Resto
-      ~spawn_rpc:(Port.fresh ())
-      ~time_between_blocks:Nothing
-      protocol
-  in
-  let hooks = Tezos_regression.hooks in
-  let sequencer_endpoint = Evm_node.rpc_endpoint_record sequencer in
-  (* List all the endpoint of the sequencer *)
-  let root_endpoint = Client.(Foreign_endpoint sequencer_endpoint) in
-  let* (_ : string) = Client.rpc_list ~hooks ~endpoint:root_endpoint client in
-  (* List the endpoints of the /tezlink directory *)
-  let tezlink_endpoint =
-    Client.(Foreign_endpoint {sequencer_endpoint with path = "/tezlink"})
-  in
-  let* (_ : string) =
-    Client.rpc_list ~hooks ~endpoint:tezlink_endpoint client
-  in
-  let* (_ : string) =
-    Client.rpc_list
-      ~hooks
-      ~endpoint:tezlink_endpoint
-      ~url:"chains/main/blocks/head"
-      client
-  in
-  unit
-
 let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
     ?(time_between_blocks = Evm_node.Nothing) ?additional_uses scenario
     protocols =
@@ -95,6 +41,70 @@ let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
     ?additional_uses
     scenario
     protocols
+
+let register_tezlink_regression_test ~title ~tags ?bootstrap_accounts
+    ?bootstrap_contracts ?(time_between_blocks = Evm_node.Nothing) scenario =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~tags:("tezlink" :: tags)
+    ~title
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_client;
+        Constant.WASM.evm_kernel;
+        Constant.octez_smart_rollup_node;
+        Constant.smart_rollup_installer;
+      ])
+  @@ fun protocol ->
+  let l2_chains =
+    [
+      {
+        (Evm_node.default_l2_setup ~l2_chain_id:12) with
+        l2_chain_family = "Michelson";
+        tez_bootstrap_accounts = bootstrap_accounts;
+        tez_bootstrap_contracts = bootstrap_contracts;
+      };
+    ]
+  in
+  let* setup =
+    Setup.setup_sequencer
+      ~mainnet_compat:false
+      ~enable_dal:false
+      ~enable_multichain:true
+      ~l2_chains
+      ~rpc_server:Evm_node.Resto
+      ~spawn_rpc:(Port.fresh ())
+      ~time_between_blocks
+      protocol
+  in
+  scenario setup protocol
+
+let test_describe_endpoint =
+  register_tezlink_regression_test
+    ~tags:["evm"; "rpc"; "describe"]
+    ~title:"Test the /describe endpoint"
+  @@ fun {sequencer; client; _} _ ->
+  let hooks = Tezos_regression.hooks in
+  let sequencer_endpoint = Evm_node.rpc_endpoint_record sequencer in
+  (* List all the endpoint of the sequencer *)
+  let root_endpoint = Client.(Foreign_endpoint sequencer_endpoint) in
+  let* (_ : string) = Client.rpc_list ~hooks ~endpoint:root_endpoint client in
+  (* List the endpoints of the /tezlink directory *)
+  let tezlink_endpoint =
+    Client.(Foreign_endpoint {sequencer_endpoint with path = "/tezlink"})
+  in
+  let* (_ : string) =
+    Client.rpc_list ~hooks ~endpoint:tezlink_endpoint client
+  in
+  let* (_ : string) =
+    Client.rpc_list
+      ~hooks
+      ~endpoint:tezlink_endpoint
+      ~url:"chains/main/blocks/head"
+      client
+  in
+  unit
 
 let test_observer_starts =
   register_tezlink_test
@@ -1722,6 +1732,7 @@ let test_tezlink_prevalidation =
       ~source:Constant.bootstrap1
       ~dest:unrevealed
       ~fee:2000
+      ~gas_limit:5000
       client_tezlink
   in
 
@@ -2411,6 +2422,7 @@ let test_tezlink_validation_balance =
       ~source:Constant.bootstrap1
       ~dest:new_account
       ~amount
+      ~gas_limit:5000
       client_tezlink
   in
   let* () = produce_block_and_wait_for ~sequencer 3 in
@@ -2492,6 +2504,63 @@ let test_tezlink_validation_balance =
   let* () = check_operations ~client:client_tezlink ~block:"7" ~expected:[] in
   unit
 
+let test_tezlink_gas_vs_l1 =
+  register_tezlink_regression_test
+    ~title:"Test Tezlink gas vs L1 operations"
+    ~tags:["kernel"; "gas"; "l1"]
+    ~bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
+  @@ fun {sequencer; client; _} _ ->
+  let tezlink_endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+
+  let* client_tezlink = Client.init ~endpoint:tezlink_endpoint () in
+
+  let get_consumed_gas operations =
+    JSON.(
+      operations |> geti 3 |> geti 0 |> get "contents" |> geti 0
+      |> get "metadata" |> get "operation_result" |> get "consumed_milligas"
+      |> as_int)
+  in
+  let transfer client =
+    Client.transfer
+      ~fee:Tez.one
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      client
+  in
+
+  (* Inject transfer via L1 *)
+  let* () = transfer client in
+  let* _ = Client.bake_for_and_wait client in
+
+  let* gas_used_l1 =
+    let* operations =
+      Client.RPC.call client @@ RPC.get_chain_block_operations ()
+    in
+    Lwt.return @@ get_consumed_gas operations
+  in
+
+  (* Inject transfer via Tezlink *)
+  let* () = transfer client_tezlink in
+  let* _ = produce_block sequencer in
+  let* gas_used_tezlink =
+    let* operations =
+      Client.RPC.call client_tezlink @@ RPC.get_chain_block_operations ()
+    in
+    Lwt.return @@ get_consumed_gas operations
+  in
+
+  Regression.capture @@ sf "Gas used L1: %d\n" gas_used_l1 ;
+  Regression.capture @@ sf "Gas used Tezlink: %d\n" gas_used_tezlink ;
+
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -2536,4 +2605,5 @@ let () =
   test_tezlink_validation_counter [Alpha] ;
   test_tezlink_validation_balance [Alpha] ;
   test_tezlink_origination [Alpha] ;
-  test_tezlink_forge_operations [Alpha]
+  test_tezlink_forge_operations [Alpha] ;
+  test_tezlink_gas_vs_l1 [Alpha]

@@ -40,6 +40,7 @@ use tezos_tezlink::{
 };
 
 use crate::address::OriginationNonce;
+use crate::gas::Cost;
 use crate::mir_ctx::{convert_big_map_diff, BlockCtx, Ctx, ExecCtx, OperationCtx, TcCtx};
 
 extern crate alloc;
@@ -157,6 +158,10 @@ fn execute_internal_operations<'a, Host: Runtime>(
     for (index, OperationInfo { operation, counter }) in
         internal_operations.into_iter().enumerate()
     {
+        tc_ctx
+            .gas
+            .consume(Cost::manager_operation())
+            .map_err(|_| TransferError::OutOfGas)?;
         log!(
             tc_ctx.host,
             Debug,
@@ -333,6 +338,11 @@ fn transfer<'a, Host: Runtime>(
 ) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
+            tc_ctx
+                .gas
+                .consume(Cost::transaction())
+                .map_err(|_| TransferError::OutOfGas)?;
+
             if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Err(TransferError::NonSmartContractExecutionCall);
             }
@@ -1334,7 +1344,7 @@ mod tests {
 
         let src_account = init_account(&mut host, &other.pkh, 50);
 
-        let operation = make_reveal_operation(15, 1, 4, 5, source);
+        let operation = make_reveal_operation(15, 1, 1000, 5, source);
 
         let result = validate_and_apply_operation(
             &mut host,
@@ -1366,7 +1376,7 @@ mod tests {
         let src_account = init_account(&mut host, &source.pkh, 50);
 
         // Fees are too high for source's balance
-        let operation = make_reveal_operation(100, 1, 4, 5, source);
+        let operation = make_reveal_operation(100, 1, 1000, 5, source);
 
         let result = validate_and_apply_operation(
             &mut host,
@@ -1398,7 +1408,7 @@ mod tests {
         let src_account = init_account(&mut host, &source.pkh, 50);
 
         // Counter is incoherent for source's counter
-        let operation = make_reveal_operation(15, 15, 4, 5, source);
+        let operation = make_reveal_operation(15, 15, 1000, 5, source);
 
         let result = validate_and_apply_operation(
             &mut host,
@@ -1445,7 +1455,7 @@ mod tests {
             .expect("Setting manager field should have succeed");
 
         // Applying the operation
-        let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
+        let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
         let receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
@@ -1505,7 +1515,7 @@ mod tests {
             .force_set_manager_public_key_hash(&mut host, &inconsistent_pkh)
             .expect("Setting manager field should have succeed");
 
-        let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
+        let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
 
         let receipt = validate_and_apply_operation(
             &mut host,
@@ -1561,7 +1571,7 @@ mod tests {
         // Even if we don't use it we need to init the account
         let account = init_account(&mut host, &source.pkh, 50);
 
-        let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
+        let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
 
         let result = validate_and_apply_operation(
             &mut host,
@@ -1602,7 +1612,7 @@ mod tests {
         )
         .expect("Public key creation should have succeed");
 
-        let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
+        let operation = make_reveal_operation(15, 1, 1000, 5, source.clone());
 
         let receipt = validate_and_apply_operation(
             &mut host,
@@ -1629,7 +1639,7 @@ mod tests {
                 },
             ],
             result: ContentResult::Applied(RevealSuccess {
-                consumed_milligas: 0_u64.into(),
+                consumed_milligas: 165905_u64.into(),
             }),
             internal_operation_results: vec![],
         })];
@@ -1667,7 +1677,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            4,
+            21040,
             5,
             source.clone(),
             100_u64.into(),
@@ -1742,7 +1752,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            4,
+            21040,
             5,
             src.clone(),
             30_u64.into(),
@@ -1791,7 +1801,7 @@ mod tests {
                 ],
                 ticket_receipt: vec![],
                 originated_contracts: vec![],
-                consumed_milligas: 0_u64.into(),
+                consumed_milligas: 2165895_u64.into(),
                 storage_size: 0_u64.into(),
                 paid_storage_size_diff: 0_u64.into(),
                 allocated_destination_contract: false,
@@ -1828,7 +1838,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            4,
+            21000,
             5,
             src.clone(),
             30_u64.into(),
@@ -1877,7 +1887,7 @@ mod tests {
                 ],
                 ticket_receipt: vec![],
                 originated_contracts: vec![],
-                consumed_milligas: 0_u64.into(),
+                consumed_milligas: 2165895_u64.into(),
                 storage_size: 0_u64.into(),
                 paid_storage_size_diff: 0_u64.into(),
                 allocated_destination_contract: false,
@@ -1936,7 +1946,7 @@ mod tests {
         let operation = make_transfer_operation(
             fees,
             1,
-            8,
+            22080,
             5,
             src.clone(),
             0.into(),
@@ -1978,7 +1988,7 @@ mod tests {
                         balance_updates: vec![],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 7015_u64.into(),
+                        consumed_milligas: 172925_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: false,
@@ -2019,7 +2029,7 @@ mod tests {
                                 ],
                                 ticket_receipt: vec![],
                                 originated_contracts: vec![],
-                                consumed_milligas: 0_u64.into(),
+                                consumed_milligas: 2_100_000_u64.into(),
                                 storage_size: 0_u64.into(),
                                 paid_storage_size_diff: 0_u64.into(),
                                 allocated_destination_contract: false,
@@ -2065,7 +2075,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            4,
+            1040,
             5,
             src.clone(),
             30_u64.into(),
@@ -2121,7 +2131,7 @@ mod tests {
                 ],
                 ticket_receipt: vec![],
                 originated_contracts: vec![],
-                consumed_milligas: 2645_u64.into(),
+                consumed_milligas: 168563_u64.into(),
                 storage_size: 0_u64.into(),
                 paid_storage_size_diff: 0_u64.into(),
                 allocated_destination_contract: false,
@@ -2174,7 +2184,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            4,
+            1040,
             5,
             src.clone(),
             30_u64.into(),
@@ -2252,7 +2262,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            4,
+            21040,
             5,
             src.clone(),
             30_u64.into(),
@@ -2313,7 +2323,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            4,
+            21000,
             5,
             src.clone(),
             30_u64.into(),
@@ -2398,7 +2408,7 @@ mod tests {
         let batch = make_operation(
             5,
             1,
-            0,
+            21000,
             0,
             src.clone(),
             vec![reveal_content, transfer_content_1, transfer_content_2],
@@ -2428,7 +2438,7 @@ mod tests {
                     },
                 ],
                 result: ContentResult::Applied(RevealSuccess {
-                    consumed_milligas: 0_u64.into(),
+                    consumed_milligas: 166023_u64.into(),
                 }),
                 internal_operation_results: vec![],
             }),
@@ -2467,7 +2477,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 0_u64.into(),
+                        consumed_milligas: 2100000_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: false,
@@ -2506,7 +2516,7 @@ mod tests {
                         ],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
-                        consumed_milligas: 0_u64.into(),
+                        consumed_milligas: 2100000_u64.into(),
                         storage_size: 0_u64.into(),
                         paid_storage_size_diff: 0_u64.into(),
                         allocated_destination_contract: false,
@@ -2566,7 +2576,7 @@ mod tests {
         let batch = make_operation(
             100,
             1,
-            0,
+            22000,
             0,
             src.clone(),
             vec![reveal_content, transfer_content],
@@ -2659,7 +2669,7 @@ mod tests {
         let batch = make_operation(
             10_u64,
             1,
-            10,
+            21010,
             0,
             src.clone(),
             vec![reveal_content, succ_transfer, fail_transfer],
@@ -2765,7 +2775,7 @@ mod tests {
         let operation = make_origination_operation(
             fee,
             1,
-            4,
+            1040,
             5,
             src.clone(),
             smart_contract_balance,
@@ -2844,7 +2854,7 @@ mod tests {
                 originated_contracts: vec![Originated {
                     contract: expected_kt1.clone(),
                 }],
-                consumed_milligas: 2400u64.into(),
+                consumed_milligas: 168321u64.into(),
                 storage_size: 38u64.into(),
                 paid_storage_size_diff: 38u64.into(),
                 lazy_storage_diff: None,
@@ -2972,7 +2982,7 @@ mod tests {
         let operation = make_operation(
             10,
             1,
-            15,
+            21150,
             0,
             src.clone(),
             vec![
@@ -3142,7 +3152,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            4,
+            21040,
             5,
             src.clone(),
             transfer_amount.into(),
@@ -3204,7 +3214,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            4,
+            21040,
             5,
             src.clone(),
             transfer_amount.into(),
@@ -3270,7 +3280,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            4,
+            21040,
             5,
             src.clone(),
             30_u64.into(),
@@ -3346,7 +3356,7 @@ mod tests {
         let operation = make_operation(
             10,
             1,
-            10,
+            22100,
             0,
             src.clone(),
             vec![OperationContent::Transfer(TransferContent {
@@ -3449,7 +3459,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address.clone(),
                     }],
-                    consumed_milligas: 0_u64.into(),
+                    consumed_milligas: 100000_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
@@ -3545,7 +3555,7 @@ mod tests {
         let operation = make_operation(
             10,
             1,
-            30,
+            22300,
             0,
             src.clone(),
             vec![OperationContent::Transfer(TransferContent {
@@ -3639,7 +3649,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address_3,
                     },],
-                    consumed_milligas: 0_u64.into(),
+                    consumed_milligas: 100000_u64.into(),
                     storage_size: 33_u64.into(),
                     paid_storage_size_diff: 33_u64.into(),
                     lazy_storage_diff: None,
@@ -3692,7 +3702,7 @@ mod tests {
                     originated_contracts: vec![Originated {
                         contract: expected_address_2,
                     }],
-                    consumed_milligas: 0_u64.into(),
+                    consumed_milligas: 100000_u64.into(),
                     storage_size: 30_u64.into(),
                     paid_storage_size_diff: 30_u64.into(),
                     lazy_storage_diff: None,
@@ -3770,7 +3780,7 @@ mod tests {
         let batch = make_operation(
             5,
             1,
-            4,
+            21040,
             0,
             src.clone(),
             vec![
@@ -3809,7 +3819,7 @@ mod tests {
                     },
                 ],
                 result: ContentResult::BackTracked(backtrack_result(RevealSuccess {
-                    consumed_milligas: 0_u64.into(),
+                    consumed_milligas: 166197_u64.into(),
                 })),
                 internal_operation_results: vec![],
             }),
@@ -3871,7 +3881,7 @@ mod tests {
                         originated_contracts: vec![Originated {
                             contract: expected_kt1_1.clone(),
                         }],
-                        consumed_milligas: 2400_u64.into(),
+                        consumed_milligas: 102400_u64.into(),
                         storage_size: 30.into(),
                         paid_storage_size_diff: 30.into(),
                         lazy_storage_diff: None,
@@ -3937,7 +3947,7 @@ mod tests {
                         originated_contracts: vec![Originated {
                             contract: expected_kt1_2.clone(),
                         }],
-                        consumed_milligas: 2400u64.into(),
+                        consumed_milligas: 102400u64.into(),
                         storage_size: 30.into(),
                         paid_storage_size_diff: 30.into(),
                         lazy_storage_diff: None,
@@ -4033,7 +4043,7 @@ mod tests {
             .expect("Should have succeeded to parse the script")
             .encode();
         let storage = Micheline::from(42).encode();
-        let orination_content = OriginationContent {
+        let origination_content = OriginationContent {
             balance,
             delegate: None,
             script: Script { code, storage },
@@ -4041,10 +4051,10 @@ mod tests {
         let operation = make_operation(
             10,
             1,
-            0,
+            1000,
             0,
             src.clone(),
-            vec![OperationContent::Origination(orination_content)],
+            vec![OperationContent::Origination(origination_content)],
         );
         let receipts = validate_and_apply_operation(
             &mut host,
@@ -4113,7 +4123,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             1,
-            4,
+            21000,
             5,
             src.clone(),
             0.into(),
@@ -4149,7 +4159,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             2,
-            11,
+            1110,
             5,
             src.clone(),
             0.into(),
@@ -4190,7 +4200,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             3,
-            100,
+            23000,
             5,
             src.clone(),
             0.into(),
@@ -4239,7 +4249,7 @@ mod tests {
         let operation = make_transfer_operation(
             15,
             4,
-            100,
+            3000,
             5,
             src,
             0.into(),

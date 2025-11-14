@@ -698,6 +698,19 @@ let operation :
     Tezos_rpc.Service.t =
   Tezos_rpc.Service.subst2 Current_block_services.S.Operations.operation
 
+let operations :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context,
+      < force_metadata : bool
+      ; metadata : [`Always | `Never] option
+      ; version : Tezlink_protocols.Shell_impl.version >,
+      unit,
+      Tezos_shell_services.Block_services.version
+      * Current_block_services.operation list list )
+    Tezos_rpc.Service.t =
+  import_service Current_block_services.S.Operations.operations
+
 let bootstrapped :
     ( [`GET],
       unit,

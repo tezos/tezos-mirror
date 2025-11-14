@@ -5,7 +5,7 @@
 use num_bigint::{BigInt, Sign, TryFromBigIntError};
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::PublicKeySignatureVerifier;
-use tezos_data_encoding::{enc::BinError, types::Narith};
+use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
@@ -120,18 +120,6 @@ fn get_revealed_key<Host: Runtime>(
     }
 }
 
-// Inspired from `check_gas_limit` in `src/proto_alpha/lib_protocol/gas_limit_repr.ml`
-fn check_gas_limit(
-    hard_gas_limit_per_operation: &Narith,
-    gas_limit: &Narith,
-) -> Result<(), ValidityError> {
-    if gas_limit.0 <= hard_gas_limit_per_operation.0 {
-        Ok(())
-    } else {
-        Err(ValidityError::GasLimitTooHigh)
-    }
-}
-
 // Inspired from `check_storage_limit` in `src/proto_alpha/lib_protocol/validate.ml`
 fn check_storage_limit(
     hard_storage_limit_per_operation: &Narith,
@@ -179,20 +167,10 @@ fn validate_individual_operation<Host: Runtime>(
     account_pkh: &PublicKeyHash,
     account_balance: &mut Narith,
     account_counter: &mut Narith,
-    gas: TezlinkOperationGas,
+    mut gas: TezlinkOperationGas,
 ) -> Result<ValidatedOperation, ValidityError> {
+    gas.consume(crate::gas::Cost::manager_operation())?;
     check_and_increment_counter(host, account_counter, &content.counter)?;
-    // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
-    let hard_gas_limit = 1040000_u64;
-    check_gas_limit(&hard_gas_limit.into(), &content.gas_limit)?;
-    log!(
-        host,
-        Debug,
-        "Validation: OK - the gas_limit {:?} does not exceed the {:?} threshold.",
-        &content.gas_limit,
-        hard_gas_limit
-    );
-
     // TODO: hard storage limit per operation is a Tezos constant, for now we took the one from ghostnet
     let hard_storage_limit = 60000_u64;
     check_storage_limit(&hard_storage_limit.into(), &content.storage_limit)?;
@@ -247,10 +225,15 @@ pub struct ValidatedBatch {
 pub fn verify_signature(
     operation: Operation,
     pk: &PublicKey,
-    _validation_gas: &mut TezlinkOperationGas,
-) -> Result<bool, BinError> {
+    validation_gas: &mut TezlinkOperationGas,
+) -> Result<bool, ValidityError> {
     let serialized_unsigned_operation =
-        serialize_unsigned_operation(&operation.branch, &operation.content)?;
+        serialize_unsigned_operation(&operation.branch, &operation.content)
+            .map_err(|_| ValidityError::InvalidSignature)?;
+    validation_gas.consume(crate::gas::Cost::check_signature(
+        pk,
+        &serialized_unsigned_operation,
+    ))?;
     let signature = &operation.signature.into();
     // The verify_signature function never returns false. If the verification
     // is incorrect the function will return an Error and it's up to us to
