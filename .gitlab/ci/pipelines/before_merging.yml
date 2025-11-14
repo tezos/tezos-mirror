@@ -1381,7 +1381,7 @@ trigger:homebrew_auto:
   rules:
   - changes:
     - .gitlab/ci/pipelines/homebrew_auto.yml
-    - images/scripts/install-gsutil-apt.sh
+    - images/scripts/install-gcloud-apt.sh
     - manifest/**/*.ml*
     - scripts/packaging/homebrew_install.sh
     - scripts/packaging/homebrew_release.sh
