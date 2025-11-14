@@ -117,7 +117,7 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   module Etherlink = struct
     include Etherlink_durable_storage.Make (Backend.Reader)
     include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
-    include Simulator.Make (Backend.SimulatorBackend)
+    include Simulator.MakeEtherlink (Backend.SimulatorBackend)
 
     let replay number =
       let open Lwt_result_syntax in

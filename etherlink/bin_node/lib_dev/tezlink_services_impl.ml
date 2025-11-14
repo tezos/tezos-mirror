@@ -14,7 +14,7 @@ end
 
 module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
   Tezlink_backend_sig.S = struct
-  include Simulator.MakeTezlinkSimulator (Backend)
+  include Simulator.MakeTezlink (Backend)
 
   type block_param =
     [ `Head of int32

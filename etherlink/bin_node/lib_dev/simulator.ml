@@ -18,7 +18,7 @@ module type SimulationBackend = sig
     bytes tzresult Lwt.t
 end
 
-module Make (SimulationBackend : SimulationBackend) = struct
+module MakeEtherlink (SimulationBackend : SimulationBackend) = struct
   let call_simulation ?(state_override = Ethereum_types.state_override_empty)
       ~log_file ~input_encoder ~input simulation_state =
     let open Lwt_result_syntax in
@@ -291,7 +291,7 @@ let () =
     (function Operation_serialization_error e -> Some e | _ -> None)
     (fun e -> Operation_serialization_error e)
 
-module MakeTezlinkSimulator (SimulationBackend : SimulationBackend) = struct
+module MakeTezlink (SimulationBackend : SimulationBackend) = struct
   open Tezlink_imports
   open Imported_protocol
 
