@@ -156,7 +156,9 @@ module Slots_handlers = struct
       end)
 
   let post_slot =
-    let slots_cache = Injected_slots_cache.create Constants.cache_size in
+    let slots_cache =
+      Injected_slots_cache.create Constants.not_yet_published_cache_size
+    in
     fun ctxt query slot ->
       call_handler1 (fun () ->
           let open Lwt_result_syntax in
@@ -165,7 +167,7 @@ module Slots_handlers = struct
           | Some (commitment, commitment_proof)
             when Option.is_some
                    (Store.Commitment_indexed_cache.find_opt
-                      (Store.cache store)
+                      (Store.not_yet_published_cache store)
                       commitment) ->
               return (commitment, commitment_proof)
           | _ ->

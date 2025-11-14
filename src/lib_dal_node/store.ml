@@ -795,10 +795,11 @@ type t = {
   shards : Shards.t;
   slots : Slots.t;
   traps : Traps.t;
-  cache :
+  not_yet_published_cache :
     (Cryptobox.slot * Cryptobox.share array * Cryptobox.shard_proof array)
     Commitment_indexed_cache.t;
-      (* The length of the array is the number of shards per slot *)
+      (* Cache of not-yet-published slots, shards, and shard proofs. The length
+         of the array is the number of shards per slot *)
   chain_id : Chain_id.t;
   finalized_commitments : Slot_id_cache.t;
   last_processed_level : Last_processed_level.t;
@@ -806,7 +807,8 @@ type t = {
   skip_list_cells_store : Dal_store_sqlite3.Skip_list_cells.t;
 }
 
-let cache {cache; _} = cache
+let not_yet_published_cache {not_yet_published_cache; _} =
+  not_yet_published_cache
 
 let chain_id {chain_id; _} = chain_id
 
@@ -881,9 +883,10 @@ module Skip_list_cells = struct
     Dal_store_sqlite3.Skip_list_cells.schemas store
 end
 
-let cache_entry node_store commitment slot shares shard_proofs =
+let cache_not_yet_published_entry node_store commitment slot shares shard_proofs
+    =
   Commitment_indexed_cache.replace
-    node_store.cache
+    node_store.not_yet_published_cache
     commitment
     (slot, shares, shard_proofs)
 
@@ -967,7 +970,8 @@ let init config profile_ctxt proto_parameters =
       slots;
       traps;
       statuses_cache;
-      cache = Commitment_indexed_cache.create Constants.cache_size;
+      not_yet_published_cache =
+        Commitment_indexed_cache.create Constants.not_yet_published_cache_size;
       finalized_commitments =
         Slot_id_cache.create ~capacity:Constants.slot_id_cache_size;
       chain_id;

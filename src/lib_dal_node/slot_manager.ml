@@ -605,7 +605,12 @@ let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
   let shares =
     Array.of_seq @@ Seq.map (fun Cryptobox.{index = _; share} -> share) shards
   in
-  Store.cache_entry node_store commitment slot shares shard_proofs ;
+  Store.cache_not_yet_published_entry
+    node_store
+    commitment
+    slot
+    shares
+    shard_proofs ;
   return_unit
 
 let get_opt array i =
@@ -719,7 +724,7 @@ let publish_slot_data ctxt ~level_committee ~slot_size gs_worker
     proto_parameters commitment slot_id =
   let open Lwt_result_syntax in
   let node_store = Node_context.get_store ctxt in
-  let cache = Store.cache node_store in
+  let cache = Store.not_yet_published_cache node_store in
   match Store.Commitment_indexed_cache.find_opt cache commitment with
   | None ->
       (* The commitment was likely published by a different node. It would be

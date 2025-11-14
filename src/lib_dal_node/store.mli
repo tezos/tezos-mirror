@@ -151,8 +151,9 @@ end
 (** The DAL node store. *)
 type t
 
-(** [cache t] returns the cache associated with the store [t]. *)
-val cache :
+(** [not_yet_published_cache t] returns the cache for not-yet-published data
+    associated with the store [t]. *)
+val not_yet_published_cache :
   t -> (slot * share array * shard_proof array) Commitment_indexed_cache.t
 
 (** [first_seen_level t] returns the first seen level store associated
@@ -193,8 +194,8 @@ val slots : t -> Slots.t
 val traps : t -> Traps.t
 
 (** [cache_entry store commitment entry] adds or replace an entry to
-    the cache with key [commitment]. *)
-val cache_entry :
+    the not-yet-published cache with key [commitment]. *)
+val cache_not_yet_published_entry :
   t ->
   commitment ->
   Cryptobox.slot ->

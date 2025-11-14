@@ -192,17 +192,24 @@ let may_update_topics ctxt proto_parameters ~block_level =
      get new peers for these (possibly new) topics, this must be done in
      advance.
 
-     We do it [attestation_lag + 1] levels in advance. This means the node has the
-     current "block time" (so 5-10 seconds) to prepare. This should be
-     sufficient.
+     We do it [additional_levels] levels in advance, where [additional_levels]
+     is computed based on an estimation on the actual time needed.
+
+     Note that we have [block_level = n - 1].
 
      Note that this does not affect processing messages for levels before [n +
      attestation_lag - 1], because the node does not unsubscribe, and message
      validation does not depend on the subscribed topics. *)
+  let additional_levels =
+    1
+    + Constants.time_to_join_new_topics
+      / Int64.to_int proto_parameters.Types.minimal_block_delay
+  in
   let+ committee =
     let level =
       Int32.(
-        succ @@ add block_level (of_int proto_parameters.Types.attestation_lag))
+        add (of_int additional_levels)
+        @@ add block_level (of_int proto_parameters.Types.attestation_lag))
     in
     Node_context.fetch_committees ctxt ~level
   in
@@ -719,13 +726,13 @@ let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
         Int32.(
           pred @@ add level (of_int proto_parameters.Types.attestation_lag))
       in
-      let* (committee : (int trace * int) Signature.Public_key_hash.Map.t) =
-        Node_context.fetch_committees ctxt ~level:attestation_level
-      in
       (* Note that, when the baker and DAL node are synchronized, then if
          the baker is at level L, then in this function `block_level = L - 2`.
          We therefore need the committee at `block_level + 2`. So, as long as
          `attestation_lag > 2`, there should be no issue. *)
+      let* (committee : (int trace * int) Signature.Public_key_hash.Map.t) =
+        Node_context.fetch_committees ctxt ~level:attestation_level
+      in
       Attestable_slots.may_notify_not_in_committee
         ctxt
         committee
