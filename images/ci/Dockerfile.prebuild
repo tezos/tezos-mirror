@@ -98,12 +98,13 @@ WORKDIR /home/tezos
 
 # Create an opam-repository directory that is a clone of the public opam repository
 # filtered to only keep packages which we actually need.
-COPY --chown=tezos:tezos scripts/create_opam_repo.sh scripts/version.sh octez-deps.opam.locked dream-httpaf.opam.locked dream.opam.locked cohttp.opam.locked cohttp-lwt.opam.locked cohttp-lwt-unix.opam.locked ./
+COPY --chown=tezos:tezos scripts/create_opam_repo.sh scripts/version.sh octez-deps.opam.locked release-tools-deps.opam.locked dream-httpaf.opam.locked dream.opam.locked cohttp.opam.locked cohttp-lwt.opam.locked cohttp-lwt-unix.opam.locked ./
 
 # Run the script, then clean up; we only need the result of the script (the opam repository).
 RUN ./create_opam_repo.sh \
   && rm create_opam_repo.sh \
   && rm octez-deps.opam.locked \
+  && rm release-tools-deps.opam.locked \
   && rm dream-httpaf.opam.locked \
   && rm dream.opam.locked \
   && rm cohttp.opam.locked \
