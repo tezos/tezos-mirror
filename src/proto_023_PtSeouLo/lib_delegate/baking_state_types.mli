@@ -117,7 +117,7 @@ module Delegate : sig
   val pp_without_companion_key : Format.formatter -> t -> unit
 
   (** Builds a {!t} from an element of the output of
-      {!Plugin.RPC.Validators.get}, if the consensus key is present in
+      {!Node_rpc.get_validators}, if the consensus key is present in
       [known_keys]; otherwise, returns [None].
 
       If the consensus key is a known BLS key and the validator

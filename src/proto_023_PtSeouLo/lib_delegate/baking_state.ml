@@ -943,13 +943,8 @@ let delegate_slots attesting_rights delegates =
 let compute_delegate_slots (cctxt : Protocol_client_context.full)
     ?(block = `Head 0) ~level ~chain delegates =
   let open Lwt_result_syntax in
-  let*? level = Environment.wrap_tzresult (Raw_level.of_int32 level) in
   let* attesting_rights =
-    (Plugin.RPC.Validators.get
-       cctxt
-       (chain, block)
-       ~levels:[level]
-     [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
+    Node_rpc.get_validators cctxt ~chain ~block ~levels:[level] ()
   in
   let*! delegate_slots =
     (delegate_slots

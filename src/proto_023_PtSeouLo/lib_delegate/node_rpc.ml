@@ -405,6 +405,22 @@ let monitor_heads cctxt ~chain ?cache () =
   in
   return (stream, stopper)
 
+let get_validators cctxt ~chain ?(block = `Head 0) ?(levels = []) ?delegates
+    ?consensus_keys () =
+  let open Lwt_result_syntax in
+  let*? levels =
+    List.map_e
+      (fun level -> Environment.wrap_tzresult (Raw_level.of_int32 level))
+      levels
+  in
+  (Plugin.RPC.Validators.get
+     cctxt
+     (chain, block)
+     ~levels
+     ?delegates
+     ?consensus_keys
+   [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
+
 let await_protocol_activation cctxt ~chain () =
   let open Lwt_result_syntax in
   let* block_stream, stop =
