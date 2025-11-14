@@ -112,6 +112,14 @@ val forge_seed_nonce_revelation :
   unit ->
   bytes tzresult Lwt.t
 
+val forge_vdf_revelation :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  branch:Block_hash.t ->
+  solution:Environment.Vdf.result * Environment.Vdf.proof ->
+  bytes tzresult Lwt.t
+
 val fetch_dal_config :
   #Protocol_client_context.rpc_context -> Cryptobox.Config.t tzresult Lwt.t
 
