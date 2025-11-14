@@ -138,10 +138,6 @@ oc.build-rockylinux:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
-  retry:
-    max: 1
-    when:
-    - stuck_or_timeout_failure
   parallel:
     matrix:
     - RELEASE:
@@ -188,10 +184,6 @@ oc.build-rockylinux-data:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
-  retry:
-    max: 1
-    when:
-    - stuck_or_timeout_failure
   parallel:
     matrix:
     - RELEASE:
@@ -343,10 +335,6 @@ oc.build-fedora:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
-  retry:
-    max: 1
-    when:
-    - stuck_or_timeout_failure
   parallel:
     matrix:
     - RELEASE:
@@ -394,10 +382,6 @@ oc.build-fedora-data:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
-  retry:
-    max: 1
-    when:
-    - stuck_or_timeout_failure
   parallel:
     matrix:
     - RELEASE:

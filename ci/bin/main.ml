@@ -12,18 +12,10 @@
 
 open Gitlab_ci
 open Gitlab_ci.Types
-open Gitlab_ci.Util
 open Tezos_ci
 open Tezos_ci.Cache
 
 let () = Tezos_ci.Cli.init ()
-
-(* Sets up the [default:] top-level configuration element. *)
-let default =
-  default
-    ~interruptible:true
-    ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
-    ()
 
 (* Top-level [variables:] *)
 let variables : variables =
@@ -545,7 +537,11 @@ let () =
      If argument --inline-source, then print generation info in yml files. *)
   match Cli.config.action with
   | Write ->
-      Pipeline.write ~default ~variables ~filename:".gitlab-ci.yml" () ;
+      Pipeline.write
+        ~default:Common.Helpers.retry_default
+        ~variables
+        ~filename:".gitlab-ci.yml"
+        () ;
       Tezos_ci.check_files ~remove_extra_files:Cli.config.remove_extra_files ()
   | List_pipelines -> Pipeline.list_pipelines ()
   | Overview_pipelines -> Pipeline.overview_pipelines ()

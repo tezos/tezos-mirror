@@ -6,7 +6,7 @@ default:
   retry:
     max: 2
     when:
-    - script_failure
+    - stuck_or_timeout_failure
     - runner_system_failure
 
 workflow:
@@ -145,10 +145,6 @@ oc.build-rockylinux:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
-  retry:
-    max: 1
-    when:
-    - stuck_or_timeout_failure
   parallel:
     matrix:
     - RELEASE:
@@ -193,10 +189,6 @@ oc.build-rockylinux-data:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
-  retry:
-    max: 1
-    when:
-    - stuck_or_timeout_failure
   parallel:
     matrix:
     - RELEASE:
