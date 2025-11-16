@@ -30,7 +30,9 @@ module Profiler = struct
   include (val Profiler.wrap Shell_profiling.store_profiler)
 
   let[@warning "-32"] reset_block_section =
-    Shell_profiling.create_reset_block_section Shell_profiling.store_profiler
+    Shell_profiling.create_reset_block_section
+      ~cpu:None
+      Shell_profiling.store_profiler
 end
 
 module Shared = struct
@@ -510,7 +512,7 @@ module Block = struct
     let open Lwt_result_syntax in
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
-    () [@profiler.reset_block_section {verbosity = Notice} hash] ;
+    () [@profiler.overwrite Profiler.reset_block_section (hash, [])] ;
     (let {
        Block_validation.validation_store =
          {
