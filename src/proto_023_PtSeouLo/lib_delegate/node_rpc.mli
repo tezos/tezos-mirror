@@ -177,3 +177,11 @@ val register_dal_profiles :
 val get_dal_health :
   Tezos_rpc.Context.generic ->
   Tezos_dal_node_services.Types.Health.t tzresult Lwt.t
+
+val get_nonce :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?block:Shell_services.block ->
+  level:Raw_level.t ->
+  unit ->
+  Alpha_services.Nonce.info tzresult Lwt.t
