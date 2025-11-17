@@ -80,8 +80,8 @@ let convert_operation (op : packed_operation) : Tezos_base.Operation.t =
    [fitness] is computed from the [round] and [locked_round]
    arguments. *)
 let finalize_block_header ~shell_header ~validation_result ~operations_hash
-    ~(pred_info : Baking_state.block_info) ~pred_resulting_context_hash ~round
-    ~locked_round =
+    ~(pred_info : Baking_state_types.block_info) ~pred_resulting_context_hash
+    ~round ~locked_round =
   let open Lwt_result_syntax in
   let* fitness =
     match validation_result with
@@ -162,7 +162,7 @@ let check_protocol_changed ~user_activated_upgrades ~level
    [shell_header], the list of operations that have been applied in the block
    and the [payload_hash] corresponding to these operations. *)
 let filter_via_node ~chain_id ~fees_config ~hard_gas_limit_per_block
-    ~faked_protocol_data ~timestamp ~(pred_info : Baking_state.block_info)
+    ~faked_protocol_data ~timestamp ~(pred_info : Baking_state_types.block_info)
     ~payload_round ~operation_pool cctxt =
   let open Lwt_result_syntax in
   let chain = `Hash chain_id in
@@ -210,7 +210,7 @@ let filter_via_node ~chain_id ~fees_config ~hard_gas_limit_per_block
    [filter_via_node] is called to return these values. *)
 let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
     ~faked_protocol_data ~user_activated_upgrades ~timestamp
-    ~(pred_info : Baking_state.block_info) ~pred_resulting_context_hash
+    ~(pred_info : Baking_state_types.block_info) ~pred_resulting_context_hash
     ~force_apply ~round ~context_index ~payload_round ~operation_pool cctxt =
   let open Lwt_result_syntax in
   let* incremental =
@@ -283,7 +283,8 @@ let filter_with_context ~chain_id ~fees_config ~hard_gas_limit_per_block
    via {!Node_rpc.preapply_block}. A [shell_header] is recovered from this call
    and returned alongside of the list of operations and the payload_hash. *)
 let apply_via_node ~chain_id ~faked_protocol_data ~timestamp
-    ~(pred_info : Baking_state.block_info) ~ordered_pool ~payload_hash cctxt =
+    ~(pred_info : Baking_state_types.block_info) ~ordered_pool ~payload_hash
+    cctxt =
   let open Lwt_result_syntax in
   let chain = `Hash chain_id in
   let operations = Operation_pool.ordered_to_list_list ordered_pool in
@@ -308,7 +309,7 @@ let apply_via_node ~chain_id ~faked_protocol_data ~timestamp
    consensus operations only from an [ordered_pool] via
    {!Operation_selection.filter_consensus_operations_only}. *)
 let apply_with_context ~chain_id ~faked_protocol_data ~user_activated_upgrades
-    ~timestamp ~(pred_info : Baking_state.block_info)
+    ~timestamp ~(pred_info : Baking_state_types.block_info)
     ~pred_resulting_context_hash ~force_apply ~round ~ordered_pool
     ~context_index ~payload_hash cctxt =
   let open Lwt_result_syntax in
@@ -798,7 +799,7 @@ let aggregate_consensus_operations_on_reproposal consensus_operations =
 (* [forge] a new [unsigned_block] in accordance with [simulation_kind] and
    [simulation_mode] *)
 let forge (cctxt : #Protocol_client_context.full) ~chain_id
-    ~(pred_info : Baking_state.block_info) ~pred_resulting_context_hash
+    ~(pred_info : Baking_state_types.block_info) ~pred_resulting_context_hash
     ~pred_live_blocks ~timestamp ~round ~liquidity_baking_toggle_vote
     ~user_activated_upgrades fees_config ~force_apply ~seed_nonce_hash
     ~payload_round simulation_mode simulation_kind constants =

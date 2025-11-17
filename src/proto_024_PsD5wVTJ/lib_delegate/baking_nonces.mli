@@ -76,5 +76,5 @@ val start_revelation_worker :
   Baking_configuration.nonce_config ->
   Chain_id.t ->
   Constants.t ->
-  Baking_state.proposal Lwt_stream.t ->
+  Baking_state_types.proposal Lwt_stream.t ->
   Lwt_canceler.t Lwt.t
