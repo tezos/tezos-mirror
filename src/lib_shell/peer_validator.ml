@@ -270,13 +270,6 @@ let may_validate_new_head w hash (header : Block_header.t) =
   let pv = Worker.state w in
   let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
   let*! valid_block = Store.Block.is_known_valid chain_store hash in
-  let*! invalid_block = Store.Block.is_known_invalid chain_store hash in
-  let*! valid_predecessor =
-    Store.Block.is_known_valid chain_store header.shell.predecessor
-  in
-  let*! invalid_predecessor =
-    Store.Block.is_known_invalid chain_store header.shell.predecessor
-  in
   let block_received = (pv.peer_id, hash) in
   if valid_block then (
     let*! () =
@@ -286,40 +279,54 @@ let may_validate_new_head w hash (header : Block_header.t) =
     [@profiler.mark
       {verbosity = Info} (profiling_new_head_prefix hash ["valid block"])] ;
     return_unit)
-  else if invalid_block then (
-    let*! () = Events.(emit ignoring_invalid_block) block_received in
-    ()
-    [@profiler.mark
-      {verbosity = Info} (profiling_new_head_prefix hash ["invalid block"])] ;
-    tzfail Validation_errors.Known_invalid)
-  else if invalid_predecessor then
-    let*! () = Events.(emit ignoring_invalid_block) block_received in
-    let* () =
-      (Distributed_db.commit_invalid_block
-         pv.parameters.chain_db
-         hash
-         header
-         [Validation_errors.Known_invalid]
-       [@profiler.span_s
-         {verbosity = Info}
-           (profiling_new_head_prefix hash ["commit invalid block"])])
-    in
-    tzfail Validation_errors.Known_invalid
-  else if not valid_predecessor then (
-    let*! () = Events.(emit missing_new_head_predecessor) block_received in
-    ()
-    [@profiler.mark
-      {verbosity = Info}
-        (profiling_new_head_prefix hash ["missing new head predecessor"])] ;
-
-    Distributed_db.Request.current_branch pv.parameters.chain_db pv.peer_id ;
-    return_unit)
   else
-    only_if_fitness_increases w header hash @@ function
-    | `Known_valid | `Lower_fitness -> return_unit
-    | `Ok ->
-        let* () = assert_acceptable_head w hash header in
-        validate_new_head w hash header
+    let*! invalid_block = Store.Block.is_known_invalid chain_store hash in
+    if invalid_block then (
+      let*! () = Events.(emit ignoring_invalid_block) block_received in
+      ()
+      [@profiler.mark
+        {verbosity = Info} (profiling_new_head_prefix hash ["invalid block"])] ;
+      tzfail Validation_errors.Known_invalid)
+    else
+      let*! invalid_predecessor =
+        Store.Block.is_known_invalid chain_store header.shell.predecessor
+      in
+      if invalid_predecessor then
+        let*! () = Events.(emit ignoring_invalid_block) block_received in
+        let* () =
+          (Distributed_db.commit_invalid_block
+             pv.parameters.chain_db
+             hash
+             header
+             [Validation_errors.Known_invalid]
+           [@profiler.span_s
+             {verbosity = Info}
+               (profiling_new_head_prefix hash ["commit invalid block"])])
+        in
+        tzfail Validation_errors.Known_invalid
+      else
+        let*! valid_predecessor =
+          Store.Block.is_known_valid chain_store header.shell.predecessor
+        in
+        if not valid_predecessor then (
+          let*! () =
+            Events.(emit missing_new_head_predecessor) block_received
+          in
+          ()
+          [@profiler.mark
+            {verbosity = Info}
+              (profiling_new_head_prefix hash ["missing new head predecessor"])] ;
+
+          Distributed_db.Request.current_branch
+            pv.parameters.chain_db
+            pv.peer_id ;
+          return_unit)
+        else
+          only_if_fitness_increases w header hash @@ function
+          | `Known_valid | `Lower_fitness -> return_unit
+          | `Ok ->
+              let* () = assert_acceptable_head w hash header in
+              validate_new_head w hash header
 
 let may_validate_new_branch w locator =
   let open Lwt_result_syntax in
