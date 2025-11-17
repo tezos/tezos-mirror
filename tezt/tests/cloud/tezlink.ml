@@ -414,7 +414,9 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_proxy ~faucet_pkh
     ~tzkt_proxy ~faucet_frontend_proxy =
   let runner = Agent.runner agent in
   let faucet_api = proxy_external_endpoint ~runner faucet_api_proxy in
-  let tezlink_sandbox_endpoint = proxy_internal_endpoint sequencer_proxy in
+  let tezlink_sandbox_endpoint =
+    proxy_external_endpoint ~runner sequencer_proxy
+  in
   let faucet_frontend_port = proxy_internal_port faucet_frontend_proxy in
   let tzkt_api = proxy_external_endpoint ~runner tzkt_proxy in
   let faucet_frontend_dir = "faucet-frontend" in
@@ -870,7 +872,24 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         let* tzkt_nginx_config =
           nginx_config_of_proxy_opt tezlink_sequencer_agent tzkt_proxy_opt
         in
-        match rpc_nginx_config @ tzkt_nginx_config with
+        let* faucet_api_nginx_config =
+          let faucet_api_proxy =
+            Option.map (fun proxys -> proxys.faucet_api_proxy) faucet_proxys_opt
+          in
+          nginx_config_of_proxy_opt tezlink_sequencer_agent faucet_api_proxy
+        in
+        let* faucet_nginx_config =
+          let faucet_proxy =
+            Option.map
+              (fun proxys -> proxys.faucet_frontend_proxy)
+              faucet_proxys_opt
+          in
+          nginx_config_of_proxy_opt tezlink_sequencer_agent faucet_proxy
+        in
+        match
+          rpc_nginx_config @ tzkt_nginx_config @ faucet_api_nginx_config
+          @ faucet_nginx_config
+        with
         | [] -> unit
         | nginx_configs ->
             Nginx_reverse_proxy.init
