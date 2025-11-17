@@ -415,10 +415,10 @@ fi
 
 # if snapshot_command is used, protocol_target should be of the form [a-z]+_[0-9][0-9][0-9]
 if [[ ${command} == "snapshot" ]]; then
-  if ! [[ ${protocol_source} =~ ^[a-z]+[0-9]*$ ]]; then
-    error "To ${red}snapshot${reset}, protocol_source should be of the form [a-z]+[0-9]+" 1>&2
-    print_and_exit 1 "${LINENO}"
-  fi
+  # if ! [[ ${protocol_source} =~ ^[a-z]+[0-9]*$ ]]; then
+  #   error "To ${red}snapshot${reset}, protocol_source should be of the form [a-z]+[0-9]+" 1>&2
+  #   print_and_exit 1 "${LINENO}"
+  # fi
   if ! [[ ${protocol_target} =~ ^[a-z]+_[0-9][0-9][0-9]$ ]]; then
     error "To ${red}snapshot${reset}, protocol_target should be of the form [a-z]+_[0-9][0-9][0-9]" 1>&2
     clean_and_exit 1 "${LINENO}"
