@@ -166,7 +166,9 @@ module Build = struct
         ~variables
         ~artifacts
         ["./scripts/ci/build_full_unreleased.sh"]
-      |> enable_cargo_cache |> enable_sccache |> enable_cargo_target_caches
+      |> enable_cargo_cache
+      |> enable_sccache ~policy:Pull_push
+      |> enable_cargo_target_caches
     in
     (* Disable coverage for arm64 *)
     if arch = Amd64 then Coverage.enable_instrumentation job else job
@@ -230,7 +232,9 @@ module Build = struct
         ~variables
         ~artifacts
         ["./scripts/ci/build_full_unreleased.sh"]
-      |> enable_cargo_cache |> enable_sccache |> enable_cargo_target_caches
+      |> enable_cargo_cache
+      |> enable_sccache ~policy:Pull_push
+      |> enable_cargo_target_caches
     in
     (* Disable coverage for arm64 *)
     if arch = Amd64 then Coverage.enable_instrumentation job else job
