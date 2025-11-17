@@ -14,7 +14,6 @@ type action =
   | Record
   | Record_f
   | Record_s
-  | Reset_block_section
   | Span
   | Span_f
   | Span_s
@@ -60,11 +59,6 @@ let record_f key location =
 let record_s key location =
   match Key.content key with
   | Key.Apply _ | Key.Ident _ | Key.String _ -> Record_s
-  | _ -> Error.error location (Error.Invalid_record key)
-
-let reset_block_section key location =
-  match Key.content key with
-  | Key.Apply _ | Key.Ident _ | Key.String _ -> Reset_block_section
   | _ -> Error.error location (Error.Invalid_record key)
 
 let span key location =
@@ -114,7 +108,6 @@ let to_constant {action; _} =
   | Record -> Constants.record_constant
   | Record_f -> Constants.record_f_constant
   | Record_s -> Constants.record_s_constant
-  | Reset_block_section -> Constants.record_s_constant
   | Span -> Constants.span_constant
   | Span_f -> Constants.span_f_constant
   | Span_s -> Constants.span_s_constant
@@ -138,7 +131,6 @@ let association_constant_action_maker =
     (Constants.record_constant, record);
     (Constants.record_f_constant, record_f);
     (Constants.record_s_constant, record_s);
-    (Constants.reset_block_section_constant, reset_block_section);
     (Constants.span_constant, span);
     (Constants.span_f_constant, span_f);
     (Constants.span_s_constant, span_s);
@@ -177,7 +169,6 @@ let to_fully_qualified_lident_expr t loc =
         | Record -> "record"
         | Record_f -> "record_f"
         | Record_s -> "record_s"
-        | Reset_block_section -> "reset_block_section"
         | Span -> "span"
         | Span_f -> "span_f"
         | Span_s -> "span_s"

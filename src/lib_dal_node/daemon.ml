@@ -93,11 +93,11 @@ let on_new_finalized_head ctxt cctxt crawler =
     | None -> Lwt.fail_with "L1 crawler lib shut down"
     | Some (finalized_block_hash, finalized_shell_header) ->
         ()
-        [@profiler.reset_block_section
-          {profiler_module = Profiler} finalized_block_hash] ;
+        [@profiler.overwrite
+          Profiler.reset_block_section (finalized_block_hash, [])] ;
         ()
-        [@profiler.reset_block_section
-          {profiler_module = Gossipsub_profiler} finalized_block_hash] ;
+        [@profiler.overwrite
+          Gossipsub_profiler.reset_block_section (finalized_block_hash, [])] ;
         let* () =
           (Block_handler.new_finalized_head
              ctxt

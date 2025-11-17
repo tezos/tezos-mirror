@@ -785,7 +785,7 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
         Baking_state.may_record_new_state ~previous_state:state ~new_state
     | Baking_configuration.Memory -> return_unit
   in
-  () [@profiler.reset_block_section event] ;
+  () [@profiler.overwrite Profiler.reset_block_section (event, [])] ;
   (let*! state', action =
      (State_transitions.step
         state
@@ -1083,7 +1083,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
   (* profiler_section is defined here because ocamlformat and ppx mix badly here *)
   let[@warning "-26"] profiler_section = New_valid_proposal current_proposal in
   () [@profiler.stop] ;
-  () [@profiler.reset_block_section profiler_section] ;
+  () [@profiler.overwrite Profiler.reset_block_section (profiler_section, [])] ;
   protect
     ~on_error:(fun err ->
       let*! _ = Option.iter_es Lwt_canceler.cancel canceler in

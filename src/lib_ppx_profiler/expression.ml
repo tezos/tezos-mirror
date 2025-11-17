@@ -150,14 +150,6 @@ let rewrite rewriters t =
             (Rewriter.to_fully_qualified_lident_expr rewriter loc)
             loc
             rewriter.key
-      (* Functions that don't have a ~verbosity parameter *)
-      | Rewriter.Reset_block_section ->
-          add_unit_function_cpu
-            ~verbosity:false
-            expr
-            (Rewriter.to_fully_qualified_lident_expr rewriter loc)
-            loc
-            rewriter.key
       (* Functions that don't have a ~verbosity nor ~metadata parameter *)
       | Rewriter.Stop ->
           add_unit_function_no_cpu
