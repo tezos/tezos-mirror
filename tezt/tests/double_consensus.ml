@@ -806,8 +806,72 @@ let double_aggregation_wrong_payload_hash =
 let accuser_processed_block accuser =
   Accuser.wait_for accuser "accuser_processed_block.v0" (fun _json -> Some ())
 
-let daemon_stop accuser =
-  Accuser.wait_for accuser "daemon_stop.v0" (fun _json -> Some ())
+let stopping_agent accuser =
+  Accuser.wait_for accuser "stopping_agent.v0" (fun json ->
+      Some JSON.(json |-> "proto" |> as_string))
+
+let accusers_migration_test ~migrate_from ~migrate_to =
+  let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
+  (* Migration level is set arbitrarily *)
+  let migration_level = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  Test.register
+    ~__FILE__
+    ~title:
+      (Format.asprintf
+         "accuser works correctly under migration from %s to %s"
+         (Protocol.tag migrate_from)
+         (Protocol.tag migrate_to))
+    ~tags:
+      [team; "migration"; Protocol.tag migrate_from; Protocol.tag migrate_to]
+    ~uses:[Constant.octez_accuser]
+  @@ fun () ->
+  let* client, node =
+    Protocol_migration.user_migratable_node_init ~migration_level ~migrate_to ()
+  in
+  let* () = Client.activate_protocol ~protocol:migrate_from client in
+
+  Log.info "Initialise accuser" ;
+  let* accuser = Accuser.init ~event_level:`Debug node in
+  let accuser_processed_block = accuser_processed_block accuser in
+  let accuser_stop = stopping_agent accuser in
+
+  Log.info "Bake %d levels" (migration_level - 1) ;
+  let* () =
+    repeat (migration_level - 1) (fun () ->
+        let* () = Client.bake_for_and_wait client in
+        accuser_processed_block)
+  in
+
+  Log.info
+    "Bake one more level to migrate from %s to %s"
+    (Protocol.tag migrate_from)
+    (Protocol.tag migrate_to) ;
+  (* The accuser for the old protocol is killed 3 levels after the migration. *)
+  let* () = repeat 3 (fun _ -> Client.bake_for_and_wait client)
+  and* () =
+    let* proto = accuser_stop in
+    Check.((proto = Protocol.hash migrate_from) string)
+      ~error_msg:"Expected to have stopped the agent of proto %R, but got %L" ;
+    unit
+  in
+
+  Log.info "After migration, old protocol accuser should have stopped" ;
+
+  Log.info "Bake a few more levels into the new protocol" ;
+  let* () =
+    repeat 5 (fun () ->
+        let* () =
+          Client.attest_for
+            ~protocol:migrate_to
+            ~force:true
+            ~key:[Constant.bootstrap1.alias]
+            client
+        in
+        let* () = Client.bake_for_and_wait client in
+        accuser_processed_block)
+  in
+  let* () = Accuser.terminate accuser in
+  unit
 
 let fetch_round ?block client =
   Client.RPC.call client @@ RPC.get_chain_block_helper_round ?block ()
@@ -1153,6 +1217,9 @@ let double_preattestation_aggregation_wrong_payload_hash =
       client1
   in
   unit
+
+let register_migration ~migrate_from ~migrate_to =
+  accusers_migration_test ~migrate_from ~migrate_to
 
 let register ~protocols =
   double_attestation_wrong_block_payload_hash protocols ;
