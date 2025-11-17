@@ -571,10 +571,8 @@ let on_notify_head w peer_id (block_hash, header) mempool =
        when the received block is actually the current head or it's
        predecessor. *)
     if
-      not
-        Block_hash.(
-          Store.Block.hash current_head = block_hash
-          || Store.Block.predecessor current_head = block_hash)
+      Store.Block.hash current_head <> block_hash
+      && Store.Block.predecessor current_head <> block_hash
     then (
       Lwt_watcher.notify nv.received_block_input block_hash ;
       with_activated_peer_validator w peer_id (fun pv ->
