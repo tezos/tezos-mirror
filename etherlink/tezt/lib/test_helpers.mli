@@ -321,8 +321,8 @@ val deposit :
   Client.t ->
   unit Lwt.t
 
-(** [check_operations ~client ~block ~expected] compute the list of hashes of
-    the operations manager of [block] and check it's equal to [expected]. *)
+(** [check_operations ~client ~block ~expected] fetches the list of hashes of
+    the manager operations of [block] and check it's equal to [expected]. *)
 val check_operations :
   client:Client.t -> block:string -> expected:string list -> unit Lwt.t
 

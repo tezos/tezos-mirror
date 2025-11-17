@@ -170,8 +170,8 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
           @@ Imported_protocol.Contract_storage.Empty_implicit_contract source)
   | _ -> tzfail @@ Not_a_manager_operation error_clue
 
-(** Information required to validate an operation. Some will change while folding
-   on the batch. We'll need :
+(** Information required to validate a batch of operations. Some will change
+    while folding on the batch. We'll need :
        - the [source]
        - the [next_counter] to check the operation of each counter are in order.
          This value will increase by one for each operation.
@@ -181,8 +181,9 @@ let validate_manager_info ~read ~error_clue (Contents op : packed_contents) =
        - the [source]
        - the [first_counter]
        - the [length] of the batch
-    To build the blueprint we'll need:
-       - the total [fee]
+       - the total [fee_sum] (to check the validity when inserting in a
+         blueprint, as the source balance might have changed)
+       - the total [gas_limit_sum] (to check if there is room in the blueprint)
 *)
 type batch_validation_context = {
   source : public_key_hash;
@@ -195,8 +196,8 @@ type batch_validation_context = {
   error_clue : clue;
   first_counter : Manager_counter.t;
   length : int;
-  fee : Tez.t;
-  gas_limit : Z.t;
+  fee_sum : Tez.t;
+  gas_limit_sum : Z.t;
   signature_check_cost : Gas.cost;
 }
 
@@ -259,12 +260,12 @@ let validate_balance ~ctxt ~fee =
   | Some balance_left -> (
       (* The source can pay for the fees, we compute the total fee for the
          batch. *)
-      match Tez.(ctxt.fee +? fee) with
-      | Ok fee -> return (Ok {ctxt with balance_left; fee})
+      match Tez.(ctxt.fee_sum +? fee) with
+      | Ok fee_sum -> return (Ok {ctxt with balance_left; fee_sum})
       | Error _ ->
           tzfail_p
           @@ Imported_protocol.Tez_repr.Addition_overflow
-               (tezrep_of ctxt.fee, tezrep_of fee))
+               (tezrep_of ctxt.fee_sum, tezrep_of fee))
   | None ->
       (* The source can't pay for the fees. *)
       tzfail_p
@@ -323,7 +324,7 @@ let validate_variable_gas_cost ~ctxt remaining_gas (Manager operation) =
 let validate_gas_limit ~ctxt gas_limit operation =
   let open Lwt_result_syntax in
   let gas_limit_z = Tezos_types.Operation.gas_limit_to_z gas_limit in
-  let overall_gas_limit = Z.(ctxt.gas_limit + gas_limit_z) in
+  let overall_gas_limit = Z.(ctxt.gas_limit_sum + gas_limit_z) in
   (* We have two limits to check:
      - the operation can't have a gas limit higher than
      hard_gas_limit_per_operation,
@@ -377,7 +378,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
       let** () = validate_supported_operation ~ctxt operation in
       let** () = validate_source ~ctxt source in
       let** () = validate_counter ~ctxt counter in
-      let** gas_limit =
+      let** gas_limit_sum =
         validate_gas_limit ~ctxt gas_limit (Manager operation)
       in
       let*? () = validate_storage_limit storage_limit in
@@ -389,7 +390,7 @@ let validate_operation_in_batch ~(ctxt : batch_validation_context)
              previous_counter = Some ctxt.next_counter;
              next_counter = Manager_counter.succ ctxt.next_counter;
              length = ctxt.length + 1;
-             gas_limit;
+             gas_limit_sum;
            })
   | _ -> tzfail @@ Not_a_manager_operation ctxt.error_clue
 
@@ -520,8 +521,8 @@ let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
       error_clue;
       first_counter;
       length = 0;
-      fee = Tez.zero;
-      gas_limit = Z.zero;
+      fee_sum = Tez.zero;
+      gas_limit_sum = Z.zero;
       signature_check_cost;
     }
   in
@@ -543,8 +544,8 @@ let parse_and_validate_for_queue ?(check_signature = true) ~read raw =
         raw;
         op;
         first_counter;
-        fee = ctxt.fee;
-        gas_limit = ctxt.gas_limit;
+        fee = ctxt.fee_sum;
+        gas_limit = ctxt.gas_limit_sum;
       }
   in
   return (Ok operation)
@@ -561,7 +562,7 @@ let maximum_gas_per_block =
   Tezos_types.Operation.gas_limit_to_z
     Tezlink_constants.all_constants.parametric.hard_gas_limit_per_block
 
-let could_fit state (operation : Tezos_types.Operation.t) =
+let gas_limit_could_fit state (operation : Tezos_types.Operation.t) =
   Z.(state.gas + operation.gas_limit <= maximum_gas_per_block)
 
 let add_ source cache =
