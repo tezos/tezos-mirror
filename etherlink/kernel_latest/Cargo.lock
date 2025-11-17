@@ -3220,6 +3220,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-protocol"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "nom",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "tezos-smart-rollup"
 version = "0.2.2"
 dependencies = [
@@ -3276,6 +3287,7 @@ dependencies = [
  "num-traits",
  "paste",
  "regex",
+ "tezos-protocol",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-host",
  "tezos_crypto_rs",

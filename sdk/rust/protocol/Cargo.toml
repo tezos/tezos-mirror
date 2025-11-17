@@ -9,3 +9,7 @@ tezos_crypto_rs.workspace = true
 nom.workspace = true
 thiserror = "1.0"
 hex = "0.4"
+proptest = { version = "1.0", optional = true }
+
+[features]
+testing = ["proptest"]
