@@ -94,6 +94,14 @@ val get_validators :
   unit ->
   RPC.Validators.t list tzresult Lwt.t
 
+val current_level :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?block:Shell_services.block ->
+  ?offset:int32 ->
+  unit ->
+  Level.t tzresult Lwt.t
+
 val fetch_dal_config :
   #Protocol_client_context.rpc_context -> Cryptobox.Config.t tzresult Lwt.t
 

@@ -410,6 +410,9 @@ let get_validators cctxt ~chain ?(block = `Head 0) ?(levels = []) ?delegates
      ?consensus_keys
    [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
 
+let current_level cctxt ~chain ?(block = `Head 0) ?offset () =
+  Plugin.RPC.current_level cctxt ?offset (chain, block)
+
 let await_protocol_activation cctxt ~chain () =
   let open Lwt_result_syntax in
   let* block_stream, stop =

@@ -212,7 +212,7 @@ let try_migrate_legacy_nonces state =
     let new_location = Baking_files.filename stateful_location in
     let* nonces = cctxt#load new_location ~default:empty encoding in
     let* {cycle = current_cycle; _} =
-      Plugin.RPC.current_level cctxt (chain, `Head 0)
+      Node_rpc.current_level cctxt ~chain ~block:(`Head 0) ()
     in
     let*! nonces, failed_migration =
       Block_hash.Map.fold_s
@@ -223,7 +223,11 @@ let try_migrate_legacy_nonces state =
               return existing_nonces
             else
               let* {cycle = nonce_cycle; level = nonce_level; _} =
-                Plugin.RPC.current_level cctxt (chain, `Hash (block_hash, 0))
+                Node_rpc.current_level
+                  cctxt
+                  ~chain
+                  ~block:(`Hash (block_hash, 0))
+                  ()
               in
               match is_outdated constants nonce_cycle current_cycle with
               | true ->
@@ -550,7 +554,9 @@ let reveal_potential_nonces state (new_proposal : Baking_state_types.proposal) =
         let*! () = Events.(emit cannot_read_nonces err) in
         return_unit
     | Ok nonces -> (
-        let* current_level = Plugin.RPC.current_level cctxt (chain, `Head 0) in
+        let* current_level =
+          Node_rpc.current_level cctxt ~chain ~block:(`Head 0) ()
+        in
         let*! partitioned_nonces =
           (partition_unrevealed_nonces
              state
