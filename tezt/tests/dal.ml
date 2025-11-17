@@ -12342,7 +12342,7 @@ let register ~protocols =
     Amplification.test_amplification
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["amplification"; "simple"]
+    ~tags:["amplification"; "simple"; Tag.memory_hungry]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
       (* In this test, receiving all shards should happen before amplification
@@ -12371,7 +12371,7 @@ let register ~protocols =
     Garbage_collection.test_gc_producer_and_attester
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "multi"; Tag.slow]
+    ~tags:["gc"; "multi"; Tag.slow; Tag.memory_hungry]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1
