@@ -158,7 +158,9 @@ module Build = struct
         ~variables
         ~artifacts
         ["./scripts/ci/build_full_unreleased.sh"]
-      |> enable_cargo_cache |> enable_sccache |> enable_cargo_target_caches
+      |> enable_cargo_cache
+      |> enable_sccache ~policy:Pull_push
+      |> enable_cargo_target_caches
     in
     (* Disable coverage for arm64 *)
     if arch = Amd64 then Coverage.enable_instrumentation job else job
@@ -222,7 +224,8 @@ module Build = struct
         ~variables
         ~artifacts
         ["./scripts/ci/build_full_unreleased.sh"]
-      |> enable_cargo_cache |> enable_sccache
+      |> enable_cargo_cache
+      |> enable_sccache ~policy:Pull_push
     in
     (* Disable coverage for arm64 *)
     if arch = Amd64 then Coverage.enable_instrumentation job else job
@@ -270,7 +273,9 @@ module Build = struct
              "tx_kernel_dal.wasm";
              "dal_echo_kernel.wasm";
            ])
-    |> enable_kernels |> enable_sccache |> enable_cargo_cache
+    |> enable_kernels
+    |> enable_sccache ~policy:Pull_push
+    |> enable_cargo_cache
 
   let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
     job
