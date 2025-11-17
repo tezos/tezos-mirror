@@ -49,57 +49,63 @@ let proxy_external_endpoint ~runner = function
       Client.Foreign_endpoint
         (Endpoint.make ~host:dns_domain ~scheme ~port:external_port ())
 
-let nginx_reverse_proxy_config ~(ssl : Ssl.t option) ~proxy =
+let nginx_reverse_proxy_config ~agent ~proxy =
   match proxy with
-  | No_proxy _ -> None
-  | Proxy {dns_domain; external_port; activate_ssl = _; internal_info = _} -> (
+  | No_proxy _ -> none
+  | Proxy {dns_domain; external_port; activate_ssl; internal_info = _} ->
       let internal_endpoint = proxy_internal_endpoint proxy in
       let proxy_pass =
         (* The trailing / is mandatory, otherwise the reverse proxy
            won't be able to serve services with a path. *)
         Client.string_of_endpoint internal_endpoint ^ "/"
       in
-      match ssl with
-      | Some ssl ->
-          let () =
-            if not (List.mem dns_domain Tezt_cloud_cli.dns_domains) then
-              Test.fail "Please add --dns-domain %s" dns_domain
-          in
-          let config =
-            Nginx_reverse_proxy.simple_ssl_node
-              ~server_name:dns_domain
-              ~port:external_port
-              ~location:"/"
-              ~proxy_pass
-              ~certificate:ssl.certificate
-              ~certificate_key:ssl.key
-          in
-          Some config
-      | None ->
-          let config =
-            Nginx_reverse_proxy.make_simple_config
-              ~server_name:dns_domain
-              ~port:external_port
-              ~location:"/"
-              ~proxy_pass
-          in
-          Some config)
+      if activate_ssl then
+        let () =
+          if not (List.mem dns_domain Tezt_cloud_cli.dns_domains) then
+            Test.fail "Please add --dns-domain %s" dns_domain
+        in
+        let* ssl = Ssl.generate agent dns_domain in
+        let config =
+          Nginx_reverse_proxy.simple_ssl_node
+            ~server_name:dns_domain
+            ~port:external_port
+            ~location:"/"
+            ~proxy_pass
+            ~certificate:ssl.certificate
+            ~certificate_key:ssl.key
+        in
+        some config
+      else
+        let config =
+          Nginx_reverse_proxy.make_simple_config
+            ~server_name:dns_domain
+            ~port:external_port
+            ~location:"/"
+            ~proxy_pass
+        in
+        some config
 
 let port_of_option agent = function
   | None -> Agent.next_available_port agent
   | Some port -> port
 
 let make_proxy agent ~path ~dns_domain public_port activate_ssl =
-  let public_port = port_of_option agent public_port in
   match dns_domain with
   | None ->
       (* No DNS so no proxy, so we must use the public port. *)
+      let public_port = port_of_option agent public_port in
       No_proxy {port = public_port; path}
+  | Some dns_domain when Option.is_some public_port ->
+      Test.fail
+        "Setting a public port is only allowed for non-proxy localhost mode, \
+         but was specified for %s."
+        dns_domain
   | Some dns_domain ->
       (* We let the system choose a fresh internal node port.
          Note that it will be publicy exposed, it's just that we don't need to
          share this one. *)
       let internal_port = Agent.next_available_port agent in
+      let public_port = if activate_ssl then 443 else 80 in
       Proxy
         {
           internal_info = {port = internal_port; path};
@@ -691,6 +697,13 @@ let add_services cloud runner ~sequencer_proxy ~tzkt_proxy_opt
   in
   unit
 
+type dns_domains = {
+  sequencer_domain : string;
+  tzkt_api_domain : string;
+  faucet_domain : string;
+  faucet_api_domain : string;
+}
+
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
   let name = "tezlink-sequencer" in
@@ -715,26 +728,32 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | Some agent -> agent
       in
       let runner = Agent.runner tezlink_sequencer_agent in
-      let dns_domain =
-        match Tezt_cloud.Tezt_cloud_cli.dns_domains with
-        | [] -> None
-        | _ :: _ :: _ ->
-            Test.fail
-              "Multiple DNS domains are not yet supported in this scenario"
-        | [dns_domain] ->
-            if Tezt_cloud.Tezt_cloud_cli.((not proxy) && localhost) then
-              Test.fail
-                "Setting a DNS domain in non-proxy localhost mode is \
-                 unexpected, please remove the `--dns-domain` option from the \
-                 command line."
-            else Some dns_domain
+      if
+        Tezt_cloud.Tezt_cloud_cli.(
+          (not proxy) && localhost && not (List.is_empty dns_domains))
+      then
+        Test.fail
+          "Setting DNS domains in non-proxy localhost mode is unexpected, \
+           please remove the `--dns-domain` option from the command line." ;
+      let dns_domains =
+        Option.map
+          (fun parent_domain ->
+            let make_domain domain = sf "%s.%s" domain parent_domain in
+            {
+              sequencer_domain = make_domain "node";
+              tzkt_api_domain = make_domain "api.tzkt";
+              faucet_domain = make_domain "faucet";
+              faucet_api_domain = make_domain "faucet.api";
+            })
+          Cli.parent_dns_domain
       in
       let activate_ssl = Cli.activate_ssl in
       let sequencer_proxy =
         make_proxy
           tezlink_sequencer_agent
           ~path:(Some "/tezlink")
-          ~dns_domain
+          ~dns_domain:
+            (Option.map (fun doms -> doms.sequencer_domain) dns_domains)
           Cli.public_rpc_port
           activate_ssl
       in
@@ -744,7 +763,8 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             make_proxy
               tezlink_sequencer_agent
               ~path:None
-              ~dns_domain
+              ~dns_domain:
+                (Option.map (fun doms -> doms.tzkt_api_domain) dns_domains)
               Cli.tzkt_api_port
               activate_ssl
           in
@@ -758,7 +778,8 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               make_proxy
                 tezlink_sequencer_agent
                 ~path:None
-                ~dns_domain
+                ~dns_domain:
+                  (Option.map (fun doms -> doms.faucet_api_domain) dns_domains)
                 None
                 activate_ssl
             in
@@ -766,7 +787,8 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               make_proxy
                 tezlink_sequencer_agent
                 ~path:None
-                ~dns_domain
+                ~dns_domain:
+                  (Option.map (fun doms -> doms.faucet_domain) dns_domains)
                 None
                 activate_ssl
             in
@@ -840,32 +862,25 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             unit
       in
       let* () =
-        match dns_domain with
-        | Some full_name ->
-            let* ssl =
-              if Cli.activate_ssl then
-                let* ssl = Ssl.generate tezlink_sequencer_agent full_name in
-                some ssl
-              else none
-            in
-            let* () =
-              let rpc_nginx_node =
-                nginx_reverse_proxy_config ~ssl ~proxy:sequencer_proxy
-              in
-              match rpc_nginx_node with
-              | None -> unit
-              | Some rpc_nginx_node ->
-                  let tzkt_nginx_config =
-                    match tzkt_proxy_opt with
-                    | None -> None
-                    | Some proxy -> nginx_reverse_proxy_config ~ssl ~proxy
-                  in
-                  Nginx_reverse_proxy.init
+        let* rpc_nginx_node =
+          nginx_reverse_proxy_config
+            ~agent:tezlink_sequencer_agent
+            ~proxy:sequencer_proxy
+        in
+        match rpc_nginx_node with
+        | Some rpc_nginx_node ->
+            let* tzkt_nginx_config =
+              match tzkt_proxy_opt with
+              | None -> none
+              | Some proxy ->
+                  nginx_reverse_proxy_config
                     ~agent:tezlink_sequencer_agent
-                    ~site:"tezlink"
-                    (rpc_nginx_node @ Option.value ~default:[] tzkt_nginx_config)
+                    ~proxy
             in
-            unit
+            Nginx_reverse_proxy.init
+              ~agent:tezlink_sequencer_agent
+              ~site:"tezlink"
+              (rpc_nginx_node @ Option.value ~default:[] tzkt_nginx_config)
         | None -> unit
       in
       let () = toplog "Starting main loop" in
