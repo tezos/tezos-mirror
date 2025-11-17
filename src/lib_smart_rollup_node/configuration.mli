@@ -136,6 +136,10 @@ type t = {
   loop_retry_delay : float;
       (** Delay in seconds to retry the main loop and the refutation loop after
           an error. *)
+  dal_slot_status_max_fetch_attempts : int;
+      (** Maximum number of attempts to fetch a finalized DAL slot status
+          (i.e. not [Unknown] or awaiting attestation) before giving up.
+          Attempts are spaced by 1 second each. Default value is 15. *)
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
@@ -220,6 +224,9 @@ val default_history_mode : history_mode
 
 (** Default filter for executing outbox messages is only whitelist updates.  *)
 val default_execute_outbox_filter : outbox_message_filter list
+
+(** Default maximum number of attempts to fetch a finalized DAL slot status. *)
+val default_dal_slot_status_max_fetch_attempts : int
 
 val history_mode_encoding : history_mode Data_encoding.t
 

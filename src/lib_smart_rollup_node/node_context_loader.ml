@@ -258,6 +258,8 @@ module For_snapshots = struct
           pre_images_endpoint = None;
           bail_on_disagree = false;
           opentelemetry = Octez_telemetry.Opentelemetry_config.default;
+          dal_slot_status_max_fetch_attempts =
+            Configuration.default_dal_slot_status_max_fetch_attempts;
         }
     in
     let*? l1_ctxt =
@@ -376,6 +378,8 @@ module Internal_for_tests = struct
           cors = Resto_cohttp.Cors.default;
           bail_on_disagree = false;
           opentelemetry = Octez_telemetry.Opentelemetry_config.default;
+          dal_slot_status_max_fetch_attempts =
+            Configuration.default_dal_slot_status_max_fetch_attempts;
         }
     in
     let* lockfile = lock ~data_dir in
