@@ -285,43 +285,6 @@ let get_dal_node cctxt_opt =
       let*! err = tzfail No_dal_node_provided in
       Environment.wrap_tzresult err |> Lwt.return
 
-let slot_pages_int
-    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
-    ~dal_activation_level ~inbox_level node_ctxt slot_id
-    ~dal_attested_slots_validity_lag =
-  let open Lwt_result_syntax in
-  let Node_context.{genesis_info = {level = origination_level; _}; l1_ctxt; _} =
-    node_ctxt
-  in
-  let* chain_id = Layer1.get_chain_id l1_ctxt in
-  let* dal_cctxt = get_dal_node node_ctxt.dal_cctxt in
-  let Dal.Slot.Header.{published_level; index} = slot_id in
-  let* status =
-    get_slot_header_attestation_info dal_cctxt ~published_level ~index
-  in
-  match status with
-  | `Attested attestation_lag ->
-      if
-        not
-        @@ slot_id_is_valid
-             chain_id
-             ~dal_attestation_lag:attestation_lag
-             ~number_of_slots:dal_constants.number_of_slots
-             ~dal_activation_level
-             ~origination_level
-             ~inbox_level
-             ~dal_attested_slots_validity_lag
-             slot_id
-      then return_none
-      else
-        let index = Sc_rollup_proto_types.Dal.Slot_index.to_octez index in
-        let* pages =
-          download_confirmed_slot_pages dal_cctxt ~published_level ~index
-        in
-        return (Some pages)
-  | `Unattested | `Unpublished -> return_none
-  | `Waiting_attestation -> attestation_status_not_final published_level index
-
 let page_content_int
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
     ~dal_activation_level ~inbox_level node_ctxt page_id
@@ -382,17 +345,4 @@ let page_content
        ~inbox_level
        node_ctxt
        page_id
-       ~dal_attested_slots_validity_lag
-
-let slot_pages
-    (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
-    ~dal_activation_level ~inbox_level node_ctxt slot_id
-    ~dal_attested_slots_validity_lag =
-  with_errors_logging ~inbox_level slot_id
-  @@ slot_pages_int
-       dal_constants
-       ~dal_activation_level
-       ~inbox_level
-       node_ctxt
-       slot_id
        ~dal_attested_slots_validity_lag
