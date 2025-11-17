@@ -26,46 +26,34 @@
 open Protocol
 open Alpha_context
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/7070
+(** Access DAL page contents for a rollup.
 
-   Rework the interface of dal_pages_request.mli (see the issue for details). *)
-
-(** Access DAL slots and page contents.
-
-    This module exposes helpers to retrieve DAL slot/page data for a rollup,
+    This module exposes helpers to retrieve DAL page data for a rollup, while
     validating import conditions against the DAL attestation lag and the
-    rollup's context. It queries a DAL node to obtain the slot status and, when
-    appropriate, to download page contents. *)
+    rollup's context. It queries a DAL node to obtain the status of the page's
+    slot and, when appropriate, to download the page content. *)
 
-(** Retrieve the pages of the given slot.
+(** Retrieve the content of a single DAL page.
 
-    The function queries the DAL node for the slot's attestation status:
+    The function queries the DAL node for the attestation status of the page's
+    slot:
+
     - If the slot is [Attested lag], the function checks that importing the slot
       at [inbox_level] is valid given:
         - the DAL activation level,
         - the rollup origination level,
         - the attested slots validity lag, and
         - index bounds (number of slots).
-      If valid, it downloads and returns [Some pages]; otherwise returns [None].
+      If valid, it downloads and returns [Some content]; otherwise returns
+      [None].
+
     - If the slot is [Unattested] or [Unpublished], returns [None].
+
     - If the status is [Waiting_attestation], the function returns an error
       ([Dal_attestation_status_not_final]).
 
-    The returned pages, when present, satisfy:
-    - pages are ordered by increasing page index within the slot,
-    - the list length equals the expected number of pages for the slot. *)
-val slot_pages :
-  Octez_smart_rollup.Rollup_constants.dal_constants ->
-  dal_activation_level:Raw_level.t option ->
-  inbox_level:int32 ->
-  _ Node_context.t ->
-  Dal.slot_id ->
-  dal_attested_slots_validity_lag:int ->
-  Dal.Page.content list option tzresult Lwt.t
-
-(** Retrieve the content of a single page.
-
-   Same as {!slot_pages}, but for a single page. *)
+    When present, the returned content corresponds to the page index carried by
+    the given [Dal.Page.t]. *)
 val page_content :
   Octez_smart_rollup.Rollup_constants.dal_constants ->
   dal_activation_level:Raw_level.t option ->

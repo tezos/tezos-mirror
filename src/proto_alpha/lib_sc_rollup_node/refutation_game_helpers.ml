@@ -38,7 +38,7 @@ open Alpha_context
       slot are not saved to the store, the function returns a failure
       in the error monad. *)
 let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
-    ~inbox_level (dal_params : Dal.parameters) start_state =
+    ~inbox_level start_state =
   let open Lwt_result_syntax in
   let is_reveal_enabled =
     match constants.Rollup_constants.sc_rollup.reveal_activation_level with
@@ -73,46 +73,32 @@ let page_info_from_pvm_state constants (node_ctxt : _ Node_context.t)
   match input_request with
   | Sc_rollup.(Needs_reveal (Request_dal_page page_id)) -> (
       let Dal.Page.{slot_id; page_index} = page_id in
-      let* pages =
-        Dal_pages_request.slot_pages
+      let* page_content_opt =
+        Dal_pages_request.page_content
           constants.Rollup_constants.dal
           ~dal_activation_level
           ~dal_attested_slots_validity_lag
           ~inbox_level
           node_ctxt
-          slot_id
+          page_id
       in
-      match pages with
+      match page_content_opt with
       | None -> return_none (* The slot is not confirmed. *)
-      | Some pages -> (
-          let pages_per_slot = dal_params.slot_size / dal_params.page_size in
-          (* check invariant that pages' length is correct. *)
-          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4031
-             It's better to do the check when the slots are saved into disk. *)
-          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
-             This check is not resilient to dal parameters change. *)
-          match List.nth_opt pages page_index with
-          | Some content ->
-              let* page_proof =
-                let dal_cctxt =
-                  WithExceptions.Option.get ~loc:__LOC__ node_ctxt.dal_cctxt
-                in
-                let Dal.Slot.Header.{published_level; index} = slot_id in
-                Dal_node_client.get_slot_page_proof
-                  dal_cctxt
-                  {
-                    slot_level = published_level |> Raw_level.to_int32;
-                    slot_index = index |> Alpha_context.Dal.Slot_index.to_int;
-                  }
-                  page_index
-              in
-              return_some (content, page_proof)
-          | None ->
-              failwith
-                "Page index %d too big or negative.\n\
-                 Number of pages in a slot is %d."
-                page_index
-                pages_per_slot))
+      | Some content ->
+          let* page_proof =
+            let dal_cctxt =
+              WithExceptions.Option.get ~loc:__LOC__ node_ctxt.dal_cctxt
+            in
+            let Dal.Slot.Header.{published_level; index} = slot_id in
+            Dal_node_client.get_slot_page_proof
+              dal_cctxt
+              {
+                slot_level = published_level |> Raw_level.to_int32;
+                slot_index = index |> Alpha_context.Dal.Slot_index.to_int;
+              }
+              page_index
+          in
+          return_some (content, page_proof))
   | _ -> return_none
 
 let metadata (node_ctxt : _ Node_context.t) =
@@ -179,7 +165,6 @@ let generate_proof (node_ctxt : _ Node_context.t)
       constants
       ~inbox_level:game.inbox_level
       node_ctxt
-      dal_parameters
       start_state
   in
   let module P = struct
