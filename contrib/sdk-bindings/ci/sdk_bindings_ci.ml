@@ -22,7 +22,8 @@ let job_test ?dependencies ?rules () =
     ~before_script:[". $HOME/.venv/bin/activate"]
     ?rules
     ["make -C contrib/sdk-bindings check"; "make -C contrib/sdk-bindings test"]
-  |> enable_cargo_cache |> enable_sccache
+  |> enable_cargo_cache
+  |> enable_sccache ~policy:Pull_push
 
 module Release = struct
   (** Jobs and pipelines to release SDK bindings for each supported language *)
