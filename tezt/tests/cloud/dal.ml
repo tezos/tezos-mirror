@@ -1417,6 +1417,9 @@ let register (module Cli : Scenarios_cli.Dal) =
              (fun index -> Observer (`Indexes [index]))
              configuration.observer_slot_indices;
            List.map
+             (fun indexes -> Observer (`Indexes indexes))
+             configuration.observers_multi_slot_indices;
+           List.map
              (fun indexes -> Archiver (`Indexes indexes))
              configuration.archivers_slot_indices;
            List.map (fun pkh -> Observer (`Pkh pkh)) configuration.observer_pkhs;
