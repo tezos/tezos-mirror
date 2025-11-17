@@ -24,7 +24,9 @@ printf '%s' "$json" | jq 'if . == null then {} else .stats end | {
     "sccache.cache_read_hit_duration_secs": (.cache_read_hit_duration.secs // 0),
     "sccache.compilations": (.compilations // 0),
     "sccache.compiler_write_duration_secs": (.compiler_write_duration.secs // 0),
-    "sccache.compile_fails": (.compile_fails // 0)
+    "sccache.compile_fails": (.compile_fails // 0),
+    "sccache.max_cache_size": (.max_cache_size // 0),
+    "sccache.cache_size": (.cache_size // 0)
 }' > sccache_metrics.json
 
 export DATADOG_SITE=datadoghq.eu
