@@ -25,7 +25,6 @@ fi
 
 CARGO_CACHE_DIR=$CI_PROJECT_DIR/.cargo/registry/cache
 DUNE_CACHE_ROOT=$CI_PROJECT_DIR/_dune_cache
-SCCACHE_DIR=$CI_PROJECT_DIR/_sccache
 RUST_DEPS_TARGET_DIR=$CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
 RUSTZCASH_DEPS_TARGET_DIR=$CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
 ETHERLINK_WASM_RUNTIME_TARGET_DIR=$CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
@@ -62,10 +61,15 @@ get_cache_size() {
 # Get cache sizes and set environment variables
 get_cache_size "$DUNE_CACHE_ROOT" "CACHE_DUNE"
 get_cache_size "$CARGO_CACHE_DIR" "CACHE_CARGO"
-get_cache_size "$SCCACHE_DIR" "CACHE_SCCACHE"
 get_cache_size "$RUST_DEPS_TARGET_DIR" "CACHE_RUST_DEPS"
 get_cache_size "$RUSTZCASH_DEPS_TARGET_DIR" "CACHE_RUSTZCASH_DEPS"
 get_cache_size "$ETHERLINK_WASM_RUNTIME_TARGET_DIR" "CACHE_ETHERLINK_WASM_RUNTIME"
+
+if command -v sccache > /dev/null 2>&1 &&
+  [ "$SECTION" = "before" ]; then
+  # small debug notice to make sure we're using GCS as backend
+  sccache --show-stats | grep "Cache location"
+fi
 
 # Send info to Datadog
 if command -v datadog-ci > /dev/null 2>&1; then
@@ -73,14 +77,22 @@ if command -v datadog-ci > /dev/null 2>&1; then
   echo "CACHE_MEASURES=$CACHE_MEASURES"
   # FIXME LATER use "datadog-ci measure --level job --measures-file my_measures.json"
   eval "DATADOG_SITE=datadoghq.eu datadog-ci measure --level job ${CACHE_MEASURES}"
-  if command -v sccache > /dev/null 2>&1 &&
-    sccache --show-stats > /dev/null 2>&1; then
 
-    # send sccache metrics to datadog
-    ./scripts/ci/datadog_sccache_metrics.sh
+  if [ "$SECTION" = "after" ]; then
+    # check that [sccache] daemon is running
+    if command -v sccache > /dev/null 2>&1 &&
+      # check that [sccache] daemon is running
+      sccache --show-stats > /dev/null 2>&1; then
 
-  else
-    echo "sccache not running: no sscache metric sent to Datadog"
+      # print stats on the job console
+      sccache --show-stats
+
+      # send sccache metrics to datadog
+      ./scripts/ci/datadog_sccache_metrics.sh
+
+    else
+      echo "sccache not installed or not running: no sccache metric sent to Datadog"
+    fi
   fi
 else
   echo "'datadog-ci' not installed. no job info sent to Datadog"
