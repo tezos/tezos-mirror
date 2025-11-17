@@ -335,6 +335,8 @@ where
                         gas: Gas::new_spent(result.gas_used),
                     },
                     memory_offset,
+                    was_precompile_called: true,
+                    precompile_call_logs: vec![],
                 },
                 Err(_) => CallOutcome {
                     result: InterpreterResult {
@@ -344,6 +346,8 @@ where
                         gas: Gas::new_spent(inputs.gas_limit),
                     },
                     memory_offset,
+                    was_precompile_called: true,
+                    precompile_call_logs: vec![],
                 },
             };
 
