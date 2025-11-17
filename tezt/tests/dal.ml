@@ -2689,6 +2689,12 @@ let test_reveal_dal_page_in_fast_exec_wasm_pvm protocol parameters dal_node
   Check.((Some [|true|] = dal_attestation) (option (array bool)))
     ~error_msg:"Unexpected DAL attestations: expected %L, got %R" ;
   Log.info "Wait for the rollup node to catch up to the latest level." ;
+
+  (* Before importing a slot, we wait 2 blocks for finality + 1 block for DAL
+       node processing *)
+  let* () = bake_for ~count:3 client in
+  let* _level = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node level in
   Log.info "Read and assert against value written in durable storage." ;
   let key = "/output/slot-0" in
@@ -7999,6 +8005,12 @@ module Tx_kernel_e2e = struct
         ~attestation_lag:parameters.attestation_lag
         ~number_of_slots:parameters.number_of_slots
     in
+    (* Before importing a slot, we wait 2 blocks for finality + 1 block for DAL
+       node processing. *)
+    let* () = bake_for client in
+    let* () = bake_for client in
+    let* () = bake_for client in
+
     Log.info "Wait for the rollup node to catch up." ;
     let* current_level = Node.get_level node in
     let* _level =
@@ -8069,9 +8081,14 @@ module Tx_kernel_e2e = struct
         ~attestation_lag:parameters.attestation_lag
         ~number_of_slots:parameters.number_of_slots
     in
-    Log.info "Wait for the rollup node to catch up." ;
+
+    (* Before importing a slot, we wait 2 blocks for finality + 1 block for DAL
+       node processing *)
+    let* () = repeat 3 (fun () -> bake_for client) in
+    let* _level = Sc_rollup_node.wait_sync ~timeout:10. sc_rollup_node in
+    Log.info "Wait for the rollup node to catch up at level %d." target_level ;
     let* _level =
-      Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node target_level
+      Sc_rollup_node.wait_for_level ~timeout:60. sc_rollup_node target_level
     in
     let key = "/output/slot-0" in
     let* value_written =

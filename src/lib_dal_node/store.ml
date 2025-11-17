@@ -28,13 +28,7 @@ module Profiler = (val Profiler.wrap Dal_profiler.dal_profiler)
 (** FIFO-keyed map with slot_id as keys. *)
 module Slot_map =
   Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
-    (struct
-      type t = Types.Slot_id.t
-
-      let equal = Types.Slot_id.equal
-
-      let hash = Types.Slot_id.hash
-    end)
+    (Types.Slot_id)
 
 module Version = struct
   type t = int
