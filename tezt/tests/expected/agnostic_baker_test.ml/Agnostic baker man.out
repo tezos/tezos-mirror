@@ -215,7 +215,7 @@ Commands related to the DAL daemon.:
     on the command-line. If no configuration file exists already, the command
     will fail.
   
-  debug dal print store schemas 
+  debug dal print store schemas
     Print SQL statements describing the tables created in the store.
 
 Miscellaneous commands:

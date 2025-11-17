@@ -30,4 +30,4 @@ let _ =
      whose value is the file collecting the trace. The trace can then
      be observed with [memtrace-viewer]. *)
   Memtrace.trace_if_requested () ;
-  exit @@ Cmdliner.Cmd.eval Cli.commands
+  exit @@ Cmdliner.Cmd.eval' Cli.commands
