@@ -30,9 +30,7 @@ module Profiler = struct
   include (val Profiler.wrap Shell_profiling.store_profiler)
 
   let[@warning "-32"] reset_block_section =
-    Shell_profiling.create_reset_block_section
-      ~cpu:None
-      Shell_profiling.store_profiler
+    Shell_profiling.create_reset_block_section Shell_profiling.store_profiler
 end
 
 module Shared = struct

@@ -465,7 +465,7 @@ let wrap profiler =
 
 type 'a section_maker = 'a * metadata -> unit
 
-let section_maker ?(verbosity = Notice) ~cpu equal to_string profiler :
+let section_maker ?(verbosity = Notice) ?cpu equal to_string profiler :
     'a section_maker =
   let last = ref None in
   let () = at_exit (fun () -> Option.iter (fun _ -> stop profiler) !last) in
