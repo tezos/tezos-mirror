@@ -26,10 +26,9 @@
 open Protocol
 open Alpha_context
 open Baking_cache
-open Baking_state
 open Baking_state_types
 module Block_services = Block_services.Make (Protocol) (Protocol)
-module Events = Baking_events.Node_rpc
+module Events = Node_rpc_events
 
 module Profiler = struct
   include (val Profiler.wrap Baking_profiler.node_rpc_profiler)
@@ -394,6 +393,22 @@ let monitor_heads cctxt ~chain ?cache () =
     Lwt_stream.filter_map_s map block_stream
   in
   return (stream, stopper)
+
+let get_validators cctxt ~chain ?(block = `Head 0) ?(levels = []) ?delegates
+    ?consensus_keys () =
+  let open Lwt_result_syntax in
+  let*? levels =
+    List.map_e
+      (fun level -> Environment.wrap_tzresult (Raw_level.of_int32 level))
+      levels
+  in
+  (Plugin.RPC.Validators.get
+     cctxt
+     (chain, block)
+     ~levels
+     ?delegates
+     ?consensus_keys
+   [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
 
 let await_protocol_activation cctxt ~chain () =
   let open Lwt_result_syntax in

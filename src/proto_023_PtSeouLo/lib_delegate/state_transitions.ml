@@ -26,6 +26,7 @@
 open Protocol
 open Alpha_context
 open Baking_state
+open Baking_state_types
 open Baking_actions
 module Events = Baking_events.State_transitions
 
@@ -36,7 +37,7 @@ let do_nothing state = Lwt.return (state, Do_nothing)
 type proposal_acceptance = Invalid | Outdated_proposal | Valid_proposal
 
 let is_acceptable_proposal_for_current_level state
-    (proposal : Baking_state.proposal) =
+    (proposal : Baking_state_types.proposal) =
   let open Lwt_syntax in
   let current_round = state.round_state.current_round in
   if Round.(current_round < proposal.block.round) then

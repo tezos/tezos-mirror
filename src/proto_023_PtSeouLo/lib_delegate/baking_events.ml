@@ -28,7 +28,7 @@ open Alpha_context
 open Baking_state_types
 open Baking_state
 
-let section = [Protocol.name; "baker"]
+let section = Baking_events_section.section
 
 let pp_int32 fmt n = Format.fprintf fmt "%ld" n
 
@@ -559,38 +559,6 @@ module State_transitions = struct
       ("candidate", Block_hash.encoding)
       ~pp2:pp_phase
       ("phase", phase_encoding)
-end
-
-module Node_rpc = struct
-  include Internal_event.Simple
-
-  let section = section @ ["rpc"]
-
-  let error_while_monitoring_heads =
-    declare_1
-      ~section
-      ~name:"error_while_monitoring_heads"
-      ~level:Error
-      ~msg:"error while monitoring heads {trace}"
-      ~pp1:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
-
-  let error_while_monitoring_valid_proposals =
-    declare_1
-      ~section
-      ~name:"error_while_monitoring_valid_proposals"
-      ~level:Error
-      ~msg:"error while monitoring valid proposals {trace}"
-      ~pp1:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
-
-  let chain_id =
-    declare_1
-      ~section
-      ~name:"node_chain_id"
-      ~level:Info
-      ~msg:"Running baker with chain id: {chain_id}"
-      ("chain_id", Chain_id.encoding)
 end
 
 module Launch = struct

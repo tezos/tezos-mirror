@@ -26,6 +26,7 @@
 open Protocol
 open Alpha_context
 open Baking_state
+open Baking_state_types
 module Events = Baking_events.Lib
 
 let sleep_until_block_timestamp prepared_block =
@@ -785,7 +786,7 @@ let rec baking_minimal_timestamp ~count state
         (fun proposal ->
           Lwt.return
             Compare.Int32.(
-              proposal.Baking_state.block.shell.level <> attestation_level))
+              proposal.Baking_state_types.block.shell.level <> attestation_level))
         block_stream
     in
     let*! next_level_proposal =

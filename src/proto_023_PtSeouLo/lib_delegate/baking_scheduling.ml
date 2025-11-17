@@ -52,8 +52,8 @@ module Profiler = struct
 end
 
 type loop_state = {
-  heads_stream : Baking_state.proposal Lwt_stream.t;
-  get_valid_blocks_stream : Baking_state.proposal Lwt_stream.t Lwt.t;
+  heads_stream : proposal Lwt_stream.t;
+  get_valid_blocks_stream : proposal Lwt_stream.t Lwt.t;
   qc_stream : Operation_worker.event Lwt_stream.t;
   forge_event_stream : forge_event Lwt_stream.t;
   future_block_stream :
@@ -619,8 +619,8 @@ let create_round_durations constants =
     (Round.Durations.create ~first_round_duration ~delay_increment_per_round)
 
 let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
-    config operation_worker round_durations
-    ~(current_proposal : Baking_state.proposal) ?constants delegates =
+    config operation_worker round_durations ~(current_proposal : proposal)
+    ?constants delegates =
   let open Lwt_result_syntax in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
      consider saved attestable value *)
@@ -926,10 +926,12 @@ let try_resolve_consensus_keys cctxt key =
           return pkh
         else
           let* attesting_rights =
-            Plugin.RPC.Validators.get
+            Node_rpc.get_validators
               cctxt
-              (`Main, `Head head_offset)
+              ~chain:`Main
+              ~block:(`Head head_offset)
               ~consensus_keys:[pkh]
+              ()
           in
           match attesting_rights with
           | Error _ | Ok [] -> try_find_delegate_key (head_offset - 1)
@@ -989,7 +991,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Launch.keys_used delegates) in
   let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
-  let*! () = Events.emit Baking_events.Node_rpc.chain_id chain_id in
+  let*! () = Events.emit Node_rpc_events.chain_id chain_id in
   let* constants =
     match constants with
     | Some c -> return c

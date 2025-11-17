@@ -274,7 +274,7 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
     delegates
 
 let compute_current_round_duration round_durations
-    ~(predecessor : Baking_state.block_info) round =
+    ~(predecessor : Baking_state_types.block_info) round =
   let open Result_syntax in
   let* start =
     Round.timestamp_of_round
@@ -297,7 +297,7 @@ let compute_current_round_duration round_durations
 let one_minute = Ptime.Span.of_int_s 60
 
 let wait_next_block block_stream current_proposal =
-  let open Baking_state in
+  let open Baking_state_types in
   let open Lwt_syntax in
   Lwt.catch
     (fun () ->

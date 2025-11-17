@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Baking_state
+open Baking_state_types
 open Protocol.Alpha_context
 
 (** {2 Scheduler state type}  *)

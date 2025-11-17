@@ -5,6 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Alpha_context
+
 (** Unique identifier for a key. *)
 module Key_id : sig
   type t
@@ -114,7 +117,7 @@ module Delegate : sig
   val pp_without_companion_key : Format.formatter -> t -> unit
 
   (** Builds a {!t} from an element of the output of
-      {!Plugin.RPC.Validators.get}, if the consensus key is present in
+      {!Node_rpc.get_validators}, if the consensus key is present in
       [known_keys]; otherwise, returns [None].
 
       If the consensus key is a known BLS key and the validator
@@ -125,3 +128,43 @@ module Delegate : sig
   val of_validator :
     known_keys:Key.Set.t -> RPC.Validators.delegate -> t option Lwt.t
 end
+
+(** A prequorum consists of a level, a round, a block_payload_hash and the list
+    of preattestations that has a total voting power higher than the protocol
+    threshold. *)
+type prequorum = {
+  level : int32;
+  round : Round.t;
+  block_payload_hash : Block_payload_hash.t;
+  preattestations : packed_operation list;
+}
+
+type block_info = {
+  hash : Block_hash.t;
+  shell : Block_header.shell_header;
+  payload_hash : Block_payload_hash.t;
+  payload_round : Round.t;
+  round : Round.t;
+  prequorum : prequorum option;
+  quorum : packed_operation list;
+  payload : Operation_pool.payload;
+  grandparent : Block_hash.t;
+}
+
+type proposal = {block : block_info; predecessor : block_info}
+
+(** A delegate slot consists of the delegate's consensus key, its public key
+    hash, its first slot, and its attesting power at some level. *)
+type delegate_info = {
+  delegate : Delegate.t;
+  attestation_slot : Slot.t;
+  attesting_power : int64;
+}
+
+(** An association list between delegates and promises for their DAL
+    attestations at some level (as obtained through the [get_attestable_slots]
+    RPC). See usage in {!level_state}. *)
+type dal_attestable_slots =
+  (Delegate_id.t
+  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
+  list

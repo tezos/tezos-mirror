@@ -5,6 +5,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Alpha_context
+
 module Key_id = struct
   type t = Signature.Public_key_hash.t
 
@@ -213,3 +216,41 @@ module Delegate = struct
         in
         return_some {manager_key; consensus_key; companion_key}
 end
+
+type prequorum = {
+  level : int32;
+  round : Round.t;
+  block_payload_hash : Block_payload_hash.t;
+  preattestations : packed_operation list;
+}
+
+type block_info = {
+  hash : Block_hash.t;
+  shell : Block_header.shell_header;
+  payload_hash : Block_payload_hash.t;
+  payload_round : Round.t;
+  round : Round.t;
+  prequorum : prequorum option;
+  quorum : packed_operation list;
+  payload : Operation_pool.payload;
+  grandparent : Block_hash.t;
+}
+
+type proposal = {block : block_info; predecessor : block_info}
+
+type delegate_info = {
+  delegate : Delegate.t;
+  attestation_slot : Slot.t;
+  attesting_power : int64;
+}
+
+type dal_attestable_slots =
+  (Delegate_id.t
+  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
+  list
+
+type delegate_slot = {
+  delegate : Delegate.t;
+  first_slot : Slot.t;
+  attesting_power : int;
+}

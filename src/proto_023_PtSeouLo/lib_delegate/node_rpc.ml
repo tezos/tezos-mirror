@@ -26,10 +26,9 @@
 open Protocol
 open Alpha_context
 open Baking_cache
-open Baking_state
 open Baking_state_types
 module Block_services = Block_services.Make (Protocol) (Protocol)
-module Events = Baking_events.Node_rpc
+module Events = Node_rpc_events
 
 module Profiler = struct
   include (val Profiler.wrap Baking_profiler.node_rpc_profiler)
@@ -406,6 +405,22 @@ let monitor_heads cctxt ~chain ?cache () =
   in
   return (stream, stopper)
 
+let get_validators cctxt ~chain ?(block = `Head 0) ?(levels = []) ?delegates
+    ?consensus_keys () =
+  let open Lwt_result_syntax in
+  let*? levels =
+    List.map_e
+      (fun level -> Environment.wrap_tzresult (Raw_level.of_int32 level))
+      levels
+  in
+  (Plugin.RPC.Validators.get
+     cctxt
+     (chain, block)
+     ~levels
+     ?delegates
+     ?consensus_keys
+   [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
+
 let await_protocol_activation cctxt ~chain () =
   let open Lwt_result_syntax in
   let* block_stream, stop =
@@ -435,7 +450,7 @@ let dal_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
     ~attestation_level delegate_slots =
   let attested_level = Int32.succ attestation_level in
   List.map
-    (fun (delegate_slot : delegate_slot) ->
+    (fun (delegate_slot : Baking_state_types.delegate_slot) ->
       let delegate_id =
         Baking_state_types.Delegate.delegate_id delegate_slot.delegate
       in

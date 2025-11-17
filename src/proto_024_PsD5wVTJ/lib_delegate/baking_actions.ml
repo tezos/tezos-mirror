@@ -1057,7 +1057,7 @@ let start_waiting_for_attestation_quorum state =
 
 let compute_round (proposal : proposal) round_durations =
   let open Protocol in
-  let open Baking_state in
+  let open Baking_state_types in
   let timestamp = Time.System.now () |> Time.System.to_protocol in
   let predecessor_block = proposal.predecessor in
   Environment.wrap_tzresult

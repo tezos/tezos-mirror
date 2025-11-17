@@ -32,25 +32,6 @@ module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
 
 type validation_mode = Node | Local of Abstract_context_index.t
 
-type prequorum = {
-  level : int32;
-  round : Round.t;
-  block_payload_hash : Block_payload_hash.t;
-  preattestations : packed_operation list;
-}
-
-type block_info = {
-  hash : Block_hash.t;
-  shell : Block_header.shell_header;
-  payload_hash : Block_payload_hash.t;
-  payload_round : Round.t;
-  round : Round.t;
-  prequorum : prequorum option;
-  quorum : packed_operation list;
-  payload : Operation_pool.payload;
-  grandparent : Block_hash.t;
-}
-
 type cache = {
   known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
 }
@@ -128,12 +109,6 @@ module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 
 module RoundMap : Map.S with type key = Round.t = Map.Make (Round)
 
-type delegate_info = {
-  delegate : Delegate.t;
-  attestation_slot : Slot.t;
-  attesting_power : int64;
-}
-
 module Delegate_infos = struct
   type t = {
     own_delegates : delegate_info list;
@@ -179,13 +154,6 @@ module Delegate_infos = struct
 end
 
 type delegate_infos = Delegate_infos.t
-
-type dal_attestable_slots =
-  (Delegate_id.t
-  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
-  list
-
-type proposal = {block : block_info; predecessor : block_info}
 
 let proposal_encoding =
   let open Data_encoding in
@@ -1003,13 +971,8 @@ let delegate_infos attesting_rights delegates =
 let compute_delegate_infos (cctxt : Protocol_client_context.full)
     ?(block = `Head 0) ~level ~chain delegates =
   let open Lwt_result_syntax in
-  let*? level = Environment.wrap_tzresult (Raw_level.of_int32 level) in
   let* attesting_rights =
-    (Plugin.RPC.Validators.get
-       cctxt
-       (chain, block)
-       ~levels:[level]
-     [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
+    Node_rpc.get_validators cctxt ~chain ~block ~levels:[level] ()
   in
   let*! delegate_infos =
     (delegate_infos

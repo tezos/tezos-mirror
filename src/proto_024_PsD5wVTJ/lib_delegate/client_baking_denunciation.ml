@@ -189,7 +189,12 @@ let get_validator_rights state cctxt level =
   match Validators_cache.find_opt state.validators_rights level with
   | None -> (
       let* validators =
-        Plugin.RPC.Validators.get cctxt (cctxt#chain, `Head 0) ~levels:[level]
+        Node_rpc.get_validators
+          cctxt
+          ~chain:cctxt#chain
+          ~block:(`Head 0)
+          ~levels:[Raw_level.to_int32 level]
+          ()
       in
       match validators with
       | [{delegates = validators; _}] ->
@@ -244,7 +249,7 @@ let process_consensus_op state cctxt chain_id slot (type a)
     in
     return_unit
   else if diff < -2l then
-    (* We do not handle operations too far in the future *)
+    (* We do not handle operations too far in the futurqe *)
     let*! () =
       Events.(emit consensus_operation_too_far_in_future)
         (Operation.hash new_op)

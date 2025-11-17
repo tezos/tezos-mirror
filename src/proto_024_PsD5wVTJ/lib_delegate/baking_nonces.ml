@@ -514,7 +514,7 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
 (** [reveal_potential_nonces state new_proposal] updates the internal [state]
     of the worker each time a proposal with a new predecessor is received; this means
     revealing the necessary nonces. *)
-let reveal_potential_nonces state (new_proposal : Baking_state.proposal) =
+let reveal_potential_nonces state (new_proposal : Baking_state_types.proposal) =
   let open Lwt_result_syntax in
   let {
     cctxt;
@@ -527,7 +527,7 @@ let reveal_potential_nonces state (new_proposal : Baking_state.proposal) =
   } =
     state
   in
-  let new_predecessor_hash = new_proposal.Baking_state.predecessor.hash in
+  let new_predecessor_hash = new_proposal.Baking_state_types.predecessor.hash in
   if
     Block_hash.(last_predecessor <> new_predecessor_hash)
     && not (Baking_state.is_first_block_in_protocol new_proposal)
@@ -655,8 +655,8 @@ let start_revelation_worker cctxt config chain_id constants block_stream =
         ()
         [@profiler.record
           {verbosity = Notice}
-            (Block_hash.to_b58check new_proposal.Baking_state.block.hash)] ;
-        last_proposal := Some new_proposal.Baking_state.block.hash ;
+            (Block_hash.to_b58check new_proposal.Baking_state_types.block.hash)] ;
+        last_proposal := Some new_proposal.Baking_state_types.block.hash ;
         if !should_shutdown then return_unit
         else
           let* _ =
