@@ -939,7 +939,8 @@ let jobs pipeline_type =
           ~rules:
             (make_rules ~dependent:true ~changes:changeset_test_sdk_rust ())
           ["make -C sdk/rust check"; "make -C sdk/rust test"]
-        |> enable_cargo_cache |> enable_sccache
+        |> enable_cargo_cache
+        |> enable_sccache ~policy:Pull_push
       in
       [job_test_sdk_rust]
     in

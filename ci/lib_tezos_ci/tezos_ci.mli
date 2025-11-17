@@ -221,7 +221,11 @@ module Cache : sig
     variables [SCCACHE_ERROR_LOG] and [SCCACHE_LOG] respectively.
     See the sccache documentation for more information on these variables. *)
   val enable_sccache :
-    ?error_log:string -> ?log:string -> tezos_job -> tezos_job
+    ?error_log:string ->
+    ?log:string ->
+    ?policy:Gitlab_ci.Types.cache_policy ->
+    tezos_job ->
+    tezos_job
 
   (** Value of [CARGO_HOME] *)
   val cargo_home : string

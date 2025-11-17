@@ -1459,7 +1459,10 @@ module Cache = struct
     |> append_after_script
          ["eval $(opam env)"; "dune cache trim --size=" ^ cache_size]
 
-  let enable_sccache ?error_log ?log job =
+  let enable_sccache ?error_log ?log ?(policy = Gitlab_ci.Types.Pull) job =
+    let rw_mode =
+      match policy with Pull -> "READ_ONLY" | Pull_push | Push -> "READ_WRITE"
+    in
     job
     |> append_variables
          ([
@@ -1469,10 +1472,11 @@ module Cache = struct
             ("CARGO_INCREMENTAL", "0");
             (* we use GCP backend in r/w mode *)
             ("SCCACHE_GCS_BUCKET", "$GCP_SCCACHE_BUCKET");
-            ("SCCACHE_GCS_RW_MODE", "READ_WRITE");
+            ("SCCACHE_GCS_RW_MODE", rw_mode);
             ("SCCACHE_GCS_KEY_PREFIX", "sccache");
-            (* recovering if the backend is not avalable *)
+            (* if network error, fail over local rust compiler instead of stopping *)
             ("SCCACHE_IGNORE_SERVER_IO_ERROR", "1");
+            (* daemon does not stop if no client request *)
             ("SCCACHE_IDLE_TIMEOUT", "0");
           ]
          @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
