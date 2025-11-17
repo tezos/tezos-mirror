@@ -196,7 +196,7 @@ module Skip_list_cells = struct
       let open Caqti_type.Std in
       (published_level ->* t3 skip_list_cell skip_list_hash int)
       @@ {sql|
-        SELECT c.cell, c.hash, c.slot_index
+        SELECT c.cell, c.hash, s.slot_index
         FROM skip_list_cells AS c
         JOIN skip_list_slots AS s
         ON s.skip_list_cell_hash = c.hash
