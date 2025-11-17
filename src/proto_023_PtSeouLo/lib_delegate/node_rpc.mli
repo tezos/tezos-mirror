@@ -102,6 +102,16 @@ val current_level :
   unit ->
   Level.t tzresult Lwt.t
 
+val forge_seed_nonce_revelation :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?block:Shell_services.block ->
+  branch:Block_hash.t ->
+  level:Raw_level.t ->
+  nonce:Nonce.t ->
+  unit ->
+  bytes tzresult Lwt.t
+
 val fetch_dal_config :
   #Protocol_client_context.rpc_context -> Cryptobox.Config.t tzresult Lwt.t
 

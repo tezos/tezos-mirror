@@ -486,9 +486,10 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
       List.iter_es
         (fun (level, nonce) ->
           let* bytes =
-            (Plugin.RPC.Forge.seed_nonce_revelation
+            (Node_rpc.forge_seed_nonce_revelation
                cctxt
-               (chain, block)
+               ~chain
+               ~block
                ~branch
                ~level
                ~nonce

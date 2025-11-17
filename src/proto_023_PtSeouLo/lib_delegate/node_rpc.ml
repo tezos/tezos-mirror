@@ -424,6 +424,16 @@ let get_validators cctxt ~chain ?(block = `Head 0) ?(levels = []) ?delegates
 let current_level cctxt ~chain ?(block = `Head 0) ?offset () =
   Plugin.RPC.current_level cctxt ?offset (chain, block)
 
+let forge_seed_nonce_revelation cctxt ~chain ?(block = `Head 0) ~branch ~level
+    ~nonce () =
+  Plugin.RPC.Forge.seed_nonce_revelation
+    cctxt
+    (chain, block)
+    ~branch
+    ~level
+    ~nonce
+    ()
+
 let await_protocol_activation cctxt ~chain () =
   let open Lwt_result_syntax in
   let* block_stream, stop =
