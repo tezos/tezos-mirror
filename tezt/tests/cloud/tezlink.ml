@@ -471,6 +471,40 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_proxy ~faucet_pkh
     ~port:faucet_frontend_port
     ()
 
+(* It's not ideal, but the path to Umami is set in the dockerfile. We have to be
+   careful if we ever update it. *)
+let remote_umami_path = "/tmp/umami-v2"
+
+module Umami_process = struct
+  module Parameters = struct
+    type persistent_state = unit
+
+    type session_state = unit
+
+    let base_default_name = "umami"
+
+    let default_colors = Evm_node.daemon_default_colors
+  end
+
+  include Daemon.Make (Parameters)
+
+  let run ?runner ~port () =
+    let daemon =
+      create ?runner ~name:Parameters.base_default_name ~path:"sh" ()
+    in
+    run
+      ?runner
+      daemon
+      ()
+      [
+        "-c";
+        sf
+          "cd %s/apps/web && turbo preview -- --host 127.0.0.1 --port %d"
+          remote_umami_path
+          port;
+      ]
+end
+
 let umami_patch ~rpc_url ~tzkt_api_url =
   (* The Tezlink TzKT explorer requires some URL parameters suffixed to the
      different paths (block, contract, etc.), so it doesn't plug well into Umami
@@ -520,7 +554,7 @@ index 1d28850f..fbd54ed7 100644
     rpc_url
     tzkt_api_url
 
-let init_umami agent ~sequencer_proxy ~tzkt_proxy =
+let init_umami agent ~sequencer_proxy ~tzkt_proxy ~umami_proxy =
   let runner = Agent.runner agent in
   let external_tzkt_api_endpoint = proxy_external_endpoint ~runner tzkt_proxy in
   let tezlink_proxy_endpoint =
@@ -539,10 +573,13 @@ let init_umami agent ~sequencer_proxy ~tzkt_proxy =
   let patch_dst = "/tmp/umami.patch" in
   let* _ = Agent.copy ~destination:patch_dst ~source:patch_filename agent in
   let* () = Process.spawn "rm" [patch_filename] |> Process.check in
-  (* Apply the patch.
-     It's not ideal, but the path to Umami is set in the dockerfile. We have to
-     be careful if we ever update it.*)
-  run_cmd agent (sf "cd /tmp/umami-v2 && git apply %s" patch_dst)
+  (* Apply the patch. *)
+  let* () =
+    run_cmd agent (sf "cd %s && git apply %s" remote_umami_path patch_dst)
+  in
+  (* Run Umami. *)
+  let port = proxy_internal_port umami_proxy in
+  Umami_process.run ?runner ~port ()
 
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
     ~(sequencer_proxy : proxy_info) (verbose : bool)
@@ -647,6 +684,8 @@ type faucet_proxys = {
   faucet_frontend_proxy : proxy_info;
 }
 
+type umami_proxys = {tzkt_proxy : proxy_info; umami_proxy : proxy_info}
+
 let add_service cloud ~name ~url =
   let () = toplog "New service: %s: %s" name url in
   Cloud.add_service cloud ~name ~url
@@ -658,7 +697,7 @@ let add_proxy_service cloud runner name ?(url = Fun.id) proxy =
   add_service cloud ~name ~url:(url endpoint)
 
 let add_services cloud runner ~sequencer_proxy ~tzkt_proxy_opt
-    ~faucet_proxys_opt =
+    ~faucet_proxys_opt ~umami_proxys_opt =
   let add_proxy_service = add_proxy_service cloud runner in
   let* () =
     add_proxy_service
@@ -693,6 +732,11 @@ let add_services cloud runner ~sequencer_proxy ~tzkt_proxy_opt
         in
         add_proxy_service "Faucet" faucet_frontend_proxy
   in
+  let* () =
+    match umami_proxys_opt with
+    | None -> unit
+    | Some {umami_proxy; _} -> add_proxy_service "Umami" umami_proxy
+  in
   unit
 
 type dns_domains = {
@@ -700,6 +744,7 @@ type dns_domains = {
   tzkt_api_domain : string;
   faucet_domain : string;
   faucet_api_domain : string;
+  umami_domain : string;
 }
 
 let nginx_config_of_proxy_opt agent = function
@@ -746,6 +791,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               tzkt_api_domain = make_domain "api.tzkt";
               faucet_domain = make_domain "faucet";
               faucet_api_domain = make_domain "faucet.api";
+              umami_domain = make_domain "umami";
             })
           Cli.parent_dns_domain
       in
@@ -801,6 +847,21 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                deactivated (see the --tzkt option)."
         | (None | Some _), false -> none
       in
+      let* umami_proxys_opt =
+        match tzkt_proxy_opt with
+        | Some tzkt_proxy ->
+            let umami_proxy =
+              make_proxy
+                tezlink_sequencer_agent
+                ~path:None
+                ~dns_domain:
+                  (Option.map (fun doms -> doms.umami_domain) dns_domains)
+                None
+                activate_ssl
+            in
+            some {tzkt_proxy; umami_proxy}
+        | _ -> none
+      in
       let* () =
         add_services
           cloud
@@ -808,6 +869,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           ~sequencer_proxy
           ~tzkt_proxy_opt
           ~faucet_proxys_opt
+          ~umami_proxys_opt
       in
       let () = toplog "Starting Tezlink sequencer" in
       let* () =
@@ -829,10 +891,14 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               ~sequencer_proxy
               ~time_between_blocks:Cli.time_between_blocks
       and* () =
-        match tzkt_proxy_opt with
+        match umami_proxys_opt with
         | None -> unit
-        | Some tzkt_proxy ->
-            init_umami tezlink_sequencer_agent ~sequencer_proxy ~tzkt_proxy
+        | Some {tzkt_proxy; umami_proxy} ->
+            init_umami
+              tezlink_sequencer_agent
+              ~sequencer_proxy
+              ~tzkt_proxy
+              ~umami_proxy
       and* () =
         match faucet_proxys_opt with
         | None -> unit
@@ -886,9 +952,15 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           in
           nginx_config_of_proxy_opt tezlink_sequencer_agent faucet_proxy
         in
+        let* umami_nginx_config =
+          let umami_proxy =
+            Option.map (fun proxys -> proxys.umami_proxy) umami_proxys_opt
+          in
+          nginx_config_of_proxy_opt tezlink_sequencer_agent umami_proxy
+        in
         match
           rpc_nginx_config @ tzkt_nginx_config @ faucet_api_nginx_config
-          @ faucet_nginx_config
+          @ faucet_nginx_config @ umami_nginx_config
         with
         | [] -> unit
         | nginx_configs ->
