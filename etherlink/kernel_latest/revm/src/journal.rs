@@ -6,7 +6,7 @@
 use revm::{
     bytecode::Bytecode,
     context::{
-        journaled_state::{AccountInfoLoad, JournalLoadError},
+        journaled_state::{account::JournaledAccount, AccountInfoLoad, JournalLoadError},
         JournalInner,
     },
     context_interface::{
@@ -67,6 +67,7 @@ pub struct Journal<DB> {
 impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<DB> {
     type Database = DB;
     type State = EvmState;
+    type JournalEntry = JournalEntry;
 
     fn new(database: DB) -> Journal<DB> {
         Self {
@@ -148,8 +149,10 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         &mut self,
         address: Address,
         target: Address,
-    ) -> Result<StateLoad<SelfDestructResult>, DB::Error> {
-        self.inner.selfdestruct(&mut self.database, address, target)
+        skip_cold_load: bool,
+    ) -> Result<StateLoad<SelfDestructResult>, JournalLoadError<DB::Error>> {
+        self.inner
+            .selfdestruct(&mut self.database, address, target, skip_cold_load)
     }
 
     fn warm_coinbase_account(&mut self, address: Address) {
@@ -171,24 +174,6 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
     #[inline]
     fn depth(&self) -> usize {
         self.inner.depth
-    }
-
-    #[inline]
-    fn warm_account_and_storage(
-        &mut self,
-        address: Address,
-        storage_keys: impl IntoIterator<Item = StorageKey>,
-    ) -> Result<(), <Self::Database as Database>::Error> {
-        self.inner
-            .load_account_optional(
-                &mut self.database,
-                address,
-                false,
-                storage_keys,
-                false,
-            )
-            .map_err(JournalLoadError::unwrap_db_error)?;
-        Ok(())
     }
 
     #[inline]
@@ -253,7 +238,7 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
     fn load_account(
         &mut self,
         address: Address,
-    ) -> Result<StateLoad<&mut Account>, DB::Error> {
+    ) -> Result<StateLoad<&Account>, DB::Error> {
         self.inner.load_account(&mut self.database, address)
     }
 
@@ -261,7 +246,7 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
     fn load_account_code(
         &mut self,
         address: Address,
-    ) -> Result<StateLoad<&mut Account>, DB::Error> {
+    ) -> Result<StateLoad<&Account>, DB::Error> {
         self.inner.load_code(&mut self.database, address)
     }
 
@@ -342,13 +327,7 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
     {
         let spec = self.inner.spec;
         self.inner
-            .load_account_optional(
-                &mut self.database,
-                address,
-                load_code,
-                [],
-                skip_cold_load,
-            )
+            .load_account_optional(&mut self.database, address, load_code, skip_cold_load)
             .map(|a| {
                 AccountInfoLoad::new(
                     &a.data.info,
@@ -357,14 +336,41 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
                 )
             })
     }
-}
 
-impl<DB> JournalExt for Journal<DB> {
     #[inline]
     fn logs(&self) -> &[Log] {
         &self.inner.logs
     }
 
+    #[inline]
+    fn warm_access_list(&mut self, access_list: HashMap<Address, HashSet<StorageKey>>) {
+        self.inner.warm_addresses.set_access_list(access_list)
+    }
+
+    #[inline]
+    fn load_account_with_code(
+        &mut self,
+        address: Address,
+    ) -> Result<StateLoad<&Account>, <Self::Database as Database>::Error> {
+        self.inner.load_code(&mut self.database, address)
+    }
+
+    #[inline]
+    fn load_account_mut_optional_code(
+        &mut self,
+        address: Address,
+        load_code: bool,
+    ) -> Result<
+        StateLoad<JournaledAccount<'_, Self::JournalEntry>>,
+        <Self::Database as Database>::Error,
+    > {
+        self.inner
+            .load_account_mut_optional_code(&mut self.database, address, load_code, false)
+            .map_err(JournalLoadError::unwrap_db_error)
+    }
+}
+
+impl<DB> JournalExt for Journal<DB> {
     #[inline]
     fn journal(&self) -> &[JournalEntry] {
         &self.inner.journal
