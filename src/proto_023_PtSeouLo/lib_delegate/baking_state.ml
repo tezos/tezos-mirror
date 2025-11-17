@@ -32,25 +32,6 @@ module Profiler = (val Profiler.wrap Baking_profiler.baker_profiler)
 
 type validation_mode = Node | Local of Abstract_context_index.t
 
-type prequorum = {
-  level : int32;
-  round : Round.t;
-  block_payload_hash : Block_payload_hash.t;
-  preattestations : packed_operation list;
-}
-
-type block_info = {
-  hash : Block_hash.t;
-  shell : Block_header.shell_header;
-  payload_hash : Block_payload_hash.t;
-  payload_round : Round.t;
-  round : Round.t;
-  prequorum : prequorum option;
-  quorum : packed_operation list;
-  payload : Operation_pool.payload;
-  grandparent : Block_hash.t;
-}
-
 type cache = {
   known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
 }
@@ -126,12 +107,6 @@ let block_info_encoding =
 
 module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 
-type delegate_slot = {
-  delegate : Delegate.t;
-  first_slot : Slot.t;
-  attesting_power : int;
-}
-
 module Delegate_slots = struct
   (* Note that we also use the delegate slots as proposal slots. *)
   type t = {
@@ -174,13 +149,6 @@ module Delegate_slots = struct
 end
 
 type delegate_slots = Delegate_slots.t
-
-type dal_attestable_slots =
-  (Delegate_id.t
-  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
-  list
-
-type proposal = {block : block_info; predecessor : block_info}
 
 let proposal_encoding =
   let open Data_encoding in

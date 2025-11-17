@@ -1761,7 +1761,7 @@ let compute_expected_injection_time config latest_proposal at_round =
     Option.value
       ~default:Time.Protocol.epoch
       (Option.map
-         (fun b -> b.Baking_state.shell.Block_header.timestamp)
+         (fun b -> b.Baking_state_types.shell.Block_header.timestamp)
          latest_proposal)
   in
   let round = Protocol.Alpha_context.Round.to_int32 at_round in
@@ -1858,7 +1858,7 @@ let test_scenario_m9 () =
       Lwt_result_syntax.return
         (block_hash, block_header, operations, [Pass; Pass])
 
-    let latest_proposal : Baking_state.block_info option ref = ref None
+    let latest_proposal : Baking_state_types.block_info option ref = ref None
 
     let stop_on_event = function
       | Baking_state.Quorum_reached _ when !node_b_level = 1l ->
@@ -1917,7 +1917,7 @@ let test_scenario_m10 () =
   let module Node_b_hooks : Hooks = struct
     include Default_hooks
 
-    let latest_proposal : Baking_state.block_info option ref = ref None
+    let latest_proposal : Baking_state_types.block_info option ref = ref None
 
     let stop_on_event = function
       | Baking_state.Timeout (Time_to_prepare_next_level_block {at_round}) ->

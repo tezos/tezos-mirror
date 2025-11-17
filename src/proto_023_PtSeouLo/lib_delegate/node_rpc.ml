@@ -26,10 +26,9 @@
 open Protocol
 open Alpha_context
 open Baking_cache
-open Baking_state
 open Baking_state_types
 module Block_services = Block_services.Make (Protocol) (Protocol)
-module Events = Baking_events.Node_rpc
+module Events = Node_rpc_events
 
 module Profiler = struct
   include (val Profiler.wrap Baking_profiler.node_rpc_profiler)
@@ -435,7 +434,7 @@ let dal_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
     ~attestation_level delegate_slots =
   let attested_level = Int32.succ attestation_level in
   List.map
-    (fun (delegate_slot : delegate_slot) ->
+    (fun (delegate_slot : Baking_state_types.delegate_slot) ->
       let delegate_id =
         Baking_state_types.Delegate.delegate_id delegate_slot.delegate
       in

@@ -26,6 +26,7 @@
 open Protocol
 open Alpha_context
 open Baking_state
+open Baking_state_types
 
 (** {2 Action types}  *)
 
