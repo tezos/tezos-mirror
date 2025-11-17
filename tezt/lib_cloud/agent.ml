@@ -150,7 +150,7 @@ let encoding =
                 I don't have a good proposition that keeps a nice UX and is secure at the moment.
             *)
             Runner.create
-              ~options:(Ssh.ssh_options @ ["-o"; "IdentitiesOnly=yes"])
+              ~options:Ssh.ssh_options
               ~ssh_user:"root"
               ~ssh_id
               ~ssh_port
@@ -205,12 +205,8 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
     | Some _, None | None, Some _ ->
         Test.fail "Agent.make was not initialized correctly"
     | Some (address, ssh_port), Some ssh_id ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/8052
-
-           once changes in tezt are merged, ie the IdentitiesOnly option is
-           automatically inserted by tezt ssh wrapper, we can remove it here. *)
         Runner.create
-          ~options:(Ssh.ssh_options @ ["-o"; "IdentitiesOnly=yes"])
+          ~options:Ssh.ssh_options
           ~ssh_user
           ~ssh_id
           ~ssh_port
