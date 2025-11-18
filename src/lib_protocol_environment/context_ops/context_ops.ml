@@ -73,7 +73,7 @@ let err_impl_mismatch ~got =
     ~expected:"shell, memory, brassaia or brassaia_memory"
     ~got
 
-let irmin_dir = "context"
+let default_dir = "context"
 
 let brassaia_dir = "brassaia_context"
 
@@ -81,22 +81,11 @@ let tezedge_dir = "tezedge_context"
 
 let backend_variable = "TEZOS_CONTEXT_BACKEND"
 
-let irmin_context_dir root = Filename.(concat root irmin_dir)
+let context_dir root = Filename.(concat root default_dir)
 
 let brassaia_context_dir root = Filename.(concat root brassaia_dir)
 
 let tezedge_context_dir root = Filename.(concat root tezedge_dir)
-
-let context_dir root =
-  match Sys.getenv backend_variable |> String.lowercase_ascii with
-  | "tezedge" -> tezedge_context_dir root
-  | "brassaia" -> brassaia_context_dir root
-  | "irmin" | "duo" | (exception Not_found) -> irmin_context_dir root
-  | s ->
-      Fmt.failwith
-        "You tried to initialise the context with %s, this is not a known \
-         context. Try `irmin` or `brassaia`"
-        s
 
 let do_not_use__brassaia_dir root = brassaia_context_dir root
 
@@ -107,7 +96,7 @@ let do_not_use__is_duo () =
 
 let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
   let open Lwt_syntax in
-  let irmin_dir = irmin_context_dir data_dir in
+  let irmin_dir = context_dir data_dir in
   let init_context () =
     let* () = Events.(emit initializing_context) ("irmin", irmin_dir) in
     let patch_context =
@@ -121,7 +110,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
     Context.init ?patch_context ?readonly ?index_log_size irmin_dir
   in
 
-  let brassaia_dir = brassaia_context_dir data_dir in
+  let brassaia_dir = context_dir data_dir in
   let init_brassaia_context () =
     let* () = Events.(emit initializing_context) ("brassaia", brassaia_dir) in
     let patch_context =
@@ -134,7 +123,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
     in
     Brassaia.init ?patch_context ?readonly ?index_log_size brassaia_dir
   in
-  let tezedge_dir = tezedge_context_dir data_dir in
+  let tezedge_dir = context_dir data_dir in
   let init_tezedge_context () =
     let* () = Events.(emit initializing_context) ("tezedge", tezedge_dir) in
     let patch_context =
@@ -973,7 +962,7 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
   | Disk_index _ ->
       Context.Checks.Pack.Integrity_check.run
         ?ppf
-        ~root:(irmin_context_dir root)
+        ~root:(context_dir root)
         ~auto_repair
         ~always
         ~heads
@@ -984,7 +973,7 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
   | Brassaia_index _ ->
       Brassaia.Checks.Pack.Integrity_check.run
         ?ppf
-        ~root:(brassaia_context_dir root)
+        ~root:(context_dir root)
         ~auto_repair
         ~always
         ~heads
@@ -997,7 +986,7 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
       let* () =
         Context.Checks.Pack.Integrity_check.run
           ?ppf
-          ~root:(irmin_context_dir root)
+          ~root:(context_dir root)
           ~auto_repair
           ~always
           ~heads
@@ -1005,7 +994,7 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
       in
       Brassaia.Checks.Pack.Integrity_check.run
         ?ppf
-        ~root:(brassaia_context_dir root)
+        ~root:(context_dir root)
         ~auto_repair
         ~always
         ~heads
