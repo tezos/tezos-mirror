@@ -9,14 +9,18 @@
 
 #![allow(clippy::type_complexity)]
 use crate::ast::big_map::{BigMapId, InMemoryLazyStorage, LazyStorage, LazyStorageError};
+use crate::ast::micheline::IntoMicheline;
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
-use crate::ast::View;
+use crate::ast::{Micheline, View};
 use crate::ast::{Type, TypedValue};
 use crate::gas::Gas;
+use crate::typechecker::MichelineView;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::{hash::OperationHash, public_key_hash::PublicKeyHash};
+use typed_arena::Arena;
 
 #[allow(missing_docs)]
 pub trait TypecheckingCtx<'a> {
@@ -93,6 +97,13 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
     fn operation_counter(&mut self) -> u128;
 
     fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>>;
+
+    fn lookup_view_and_storage(
+        &self,
+        contract: ContractKt1Hash,
+        name: &String,
+        arena: &'a Arena<Micheline<'a>>,
+    ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))>;
 }
 
 /// [Ctx] includes "outer context" required for typechecking and interpreting
@@ -335,5 +346,28 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
 
     fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {
         Box::new(&mut self.big_map_storage)
+    }
+
+    fn lookup_view_and_storage(
+        &self,
+        contract: ContractKt1Hash,
+        view_name: &String,
+        arena: &'a Arena<Micheline<'a>>,
+    ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))> {
+        let addr = AddressHash::Kt1(contract);
+        let contract_view = self.views.get(&addr)?.get(view_name)?;
+        let view = MichelineView {
+            input_type: contract_view
+                .input_type
+                .into_micheline_optimized_legacy(arena),
+            output_type: contract_view
+                .output_type
+                .into_micheline_optimized_legacy(arena),
+            code: contract_view.code.clone(),
+        };
+        let (storage_ty, storage) = self.storage.get(&addr)?;
+        let mich_storage_ty = storage_ty.into_micheline_optimized_legacy(arena);
+        let mich_storage = storage.clone().into_micheline_optimized_legacy(arena);
+        Some((view, (mich_storage_ty, mich_storage.encode())))
     }
 }

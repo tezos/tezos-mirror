@@ -11,6 +11,7 @@ use crate::address::OriginationNonce;
 use crate::context::{big_maps::*, Context};
 use crate::get_contract_entrypoint;
 use mir::parser::Parser;
+use mir::typechecker::{MichelineContractScript, MichelineView};
 use mir::{
     ast::{
         big_map::{BigMapId, LazyStorage, LazyStorageError},
@@ -21,7 +22,7 @@ use mir::{
 use num_bigint::BigUint;
 use primitive_types::H256;
 use tezos_crypto_rs::blake2b::digest_256;
-use tezos_crypto_rs::hash::ChainId;
+use tezos_crypto_rs::hash::{ChainId, ContractKt1Hash};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::{Narith, Zarith};
@@ -240,6 +241,37 @@ impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, 'a, Host> {
 
     fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {
         Box::new(self.tc_ctx)
+    }
+
+    fn lookup_view_and_storage(
+        &self,
+        contract: ContractKt1Hash,
+        view_name: &String,
+        arena: &'a Arena<Micheline<'a>>,
+    ) -> Option<(
+        mir::typechecker::MichelineView<Micheline<'a>>,
+        (Micheline<'a>, Vec<u8>),
+    )> {
+        let account =
+            TezlinkOriginatedAccount::from_kt1(self.tc_ctx.context, &contract).ok()?;
+        let serialized_script = account.code(self.tc_ctx.host).ok()?;
+        let MichelineContractScript {
+            code: _,
+            parameter_ty: _,
+            storage_ty,
+            views,
+        } = Micheline::decode_raw(arena, &serialized_script)
+            .ok()?
+            .split_script()
+            .ok()?;
+        let view = views.get(view_name)?;
+        let owned_view = MichelineView {
+            input_type: view.input_type.clone(),
+            output_type: view.output_type.clone(),
+            code: view.code.clone(),
+        };
+        let storage = account.storage(self.tc_ctx.host).ok()?;
+        Some((owned_view, (storage_ty.clone(), storage)))
     }
 }
 
