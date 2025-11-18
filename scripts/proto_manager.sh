@@ -1892,7 +1892,16 @@ function update_files() {
 function finalize_docs() {
   log_cyan "Finalizing documentation: renaming ${protocol_source} to ${doc_label}"
 
-  version=$(echo "${protocol_source}" | cut -d'_' -f1)
+  # Extract version number - handle both "024" and "024_PtHash" formats
+  if [[ "${protocol_source}" =~ ^[0-9][0-9][0-9]_ ]]; then
+    version=$(echo "${protocol_source}" | cut -d'_' -f1)
+  elif [[ "${protocol_source}" =~ ^[a-z]*[0-9][0-9][0-9]$ ]]; then
+    # Extract digits from end (e.g., t024 -> 024)
+    version=$(echo "${protocol_source}" | grep -o '[0-9][0-9][0-9]$')
+  else
+    # Assume the whole thing is the version
+    version="${protocol_source}"
+  fi
 
   # Capitalize the doc_label for display (e.g., tallinn -> Tallinn)
   capitalized_doc_label=$(tr '[:lower:]' '[:upper:]' <<< "${doc_label:0:1}")${doc_label:1}
