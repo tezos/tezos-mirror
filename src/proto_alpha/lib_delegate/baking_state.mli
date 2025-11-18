@@ -434,6 +434,7 @@ type global_state = {
   constants : Constants.t;
   round_durations : Round.round_durations;
   operation_worker : Operation_worker.t;
+  dal_attestable_slots_worker : Dal_attestable_slots_worker.t;
   mutable forge_worker_hooks : forge_worker_hooks;
   validation_mode : validation_mode;
   delegates : Key.t list;

@@ -261,6 +261,11 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
   let*! operation_worker =
     Operation_worker.run ?monitor_node_operations ~round_durations cctxt
   in
+  let dal_attestable_slots_worker =
+    Dal_attestable_slots_worker.create
+      ~attestation_lag:constants.parametric.dal.attestation_lag
+      ~number_of_slots:constants.parametric.dal.number_of_slots
+  in
   Baking_scheduling.create_initial_state
     cctxt
     ?synchronize
@@ -268,6 +273,7 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
     ~chain
     config
     operation_worker
+    dal_attestable_slots_worker
     ~current_proposal
     round_durations
     delegates

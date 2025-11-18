@@ -616,8 +616,8 @@ let create_round_durations constants =
     (Round.Durations.create ~first_round_duration ~delay_increment_per_round)
 
 let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
-    config operation_worker round_durations ~(current_proposal : proposal)
-    ?constants delegates =
+    config operation_worker dal_attestable_slots_worker round_durations
+    ~(current_proposal : proposal) ?constants delegates =
   let open Lwt_result_syntax in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
      consider saved attestable value *)
@@ -646,6 +646,7 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       constants;
       round_durations;
       operation_worker;
+      dal_attestable_slots_worker;
       forge_worker_hooks =
         {
           push_request = (fun _ -> assert false);
@@ -1017,10 +1018,19 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
   in
   let*? round_durations = create_round_durations constants in
   let*! operation_worker = Operation_worker.run ~round_durations cctxt in
+  let dal_attestable_slots_worker =
+    Dal_attestable_slots_worker.create
+      ~attestation_lag:constants.parametric.dal.attestation_lag
+      ~number_of_slots:constants.parametric.dal.number_of_slots
+  in
   Option.iter
     (fun canceler ->
       Lwt_canceler.on_cancel canceler (fun () ->
           let*! _ = Operation_worker.shutdown_worker operation_worker in
+          let*! _ =
+            Dal_attestable_slots_worker.shutdown_worker
+              dal_attestable_slots_worker
+          in
           Lwt.return_unit))
     canceler ;
   let* initial_state =
@@ -1030,6 +1040,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
       ~chain
       config
       operation_worker
+      dal_attestable_slots_worker
       round_durations
       ~current_proposal
       ~constants
