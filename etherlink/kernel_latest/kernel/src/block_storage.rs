@@ -160,6 +160,17 @@ pub fn read_current_transactions_receipts<Host: Runtime>(
     Ok(receipts)
 }
 
+pub fn read_current_transactions_objects<Host: Runtime>(
+    host: &Host,
+    root: &impl Path,
+) -> Result<Vec<TransactionObject>, crate::Error> {
+    let transactions_objects_bytes =
+        host.store_read_all(&path::current_block_transactions_objects(root)?)?;
+    let transactions_objects =
+        rlp::Rlp::new(&transactions_objects_bytes).as_list::<TransactionObject>()?;
+    Ok(transactions_objects)
+}
+
 pub fn read_current(
     host: &mut impl Runtime,
     root: &impl Path,

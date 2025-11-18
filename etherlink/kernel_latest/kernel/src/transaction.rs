@@ -9,14 +9,18 @@ use crate::bridge::Deposit;
 use crate::fees::tx_execution_gas_limit;
 
 use crate::tick_model::constants::BASE_GAS;
-use revm_etherlink::helpers::legacy::FaDeposit;
-use revm_etherlink::precompiles::constants::FA_DEPOSIT_QUEUE_GAS_LIMIT;
+use primitive_types::{H160, U256};
+use revm_etherlink::helpers::legacy::{alloy_to_h160, FaDeposit};
+use revm_etherlink::precompiles::constants::{
+    FA_BRIDGE_SOL_ADDR, FA_DEPOSIT_QUEUE_GAS_LIMIT,
+};
 use revm_etherlink::Error;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::block::BlockFees;
 use tezos_ethereum::rlp_helpers::{self, decode_field, decode_tx_hash, next};
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
+use tezos_ethereum::tx_signature::TxSignature;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Clone)]
@@ -153,6 +157,54 @@ impl Transaction {
                 tx_execution_gas_limit(e, fees, true)
             }
             TransactionContent::FaDeposit(_) => Ok(FA_DEPOSIT_QUEUE_GAS_LIMIT),
+        }
+    }
+
+    pub fn to(&self) -> Option<H160> {
+        match &self.content {
+            TransactionContent::Deposit(Deposit { receiver, .. }) => Some(*receiver),
+            TransactionContent::FaDeposit(FaDeposit { .. }) => {
+                Some(alloy_to_h160(&FA_BRIDGE_SOL_ADDR))
+            }
+            TransactionContent::Ethereum(transaction)
+            | TransactionContent::EthereumDelayed(transaction) => transaction.to,
+        }
+    }
+
+    pub fn data(&self) -> Vec<u8> {
+        match &self.content {
+            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => vec![],
+            TransactionContent::Ethereum(transaction)
+            | TransactionContent::EthereumDelayed(transaction) => {
+                transaction.data.clone()
+            }
+        }
+    }
+
+    pub fn value(&self) -> U256 {
+        match &self.content {
+            TransactionContent::Deposit(Deposit { amount, .. }) => *amount,
+            &TransactionContent::FaDeposit(_) => U256::zero(),
+            TransactionContent::Ethereum(transaction)
+            | TransactionContent::EthereumDelayed(transaction) => transaction.value,
+        }
+    }
+
+    pub fn nonce(&self) -> u64 {
+        match &self.content {
+            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => 0,
+            TransactionContent::Ethereum(transaction)
+            | TransactionContent::EthereumDelayed(transaction) => transaction.nonce,
+        }
+    }
+
+    pub fn signature(&self) -> Option<TxSignature> {
+        match &self.content {
+            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => None,
+            TransactionContent::Ethereum(transaction)
+            | TransactionContent::EthereumDelayed(transaction) => {
+                transaction.signature.clone()
+            }
         }
     }
 }

@@ -27,7 +27,7 @@ use tezos_ethereum::{
         FromRlpBytes,
     },
     transaction::{
-        IndexedLog, TransactionHash, TransactionReceipt, TransactionStatus,
+        IndexedLog, TransactionObject, TransactionReceipt, TransactionStatus,
         TransactionType,
     },
 };
@@ -134,6 +134,21 @@ fn get_current_transaction_receipts<Host: Runtime>(
     }
 }
 
+fn get_current_transactions_objects<Host: Runtime>(
+    host: &Host,
+) -> Result<Vec<TransactionObject>, Error> {
+    match block_storage::read_current_transactions_objects(
+        host,
+        &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+    ) {
+        Ok(transactions_objects) => Ok(transactions_objects),
+        Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
+            Ok(vec![])
+        }
+        Err(err) => Err(err),
+    }
+}
+
 fn store_current_transaction_receipts<Host: Runtime>(
     host: &mut Host,
     receipts: &[TransactionReceipt],
@@ -145,20 +160,31 @@ fn store_current_transaction_receipts<Host: Runtime>(
     )
 }
 
+fn store_current_transactions_objects<Host: Runtime>(
+    host: &mut Host,
+    transactions_objects: &[TransactionObject],
+) -> Result<(), Error> {
+    block_storage::store_current_transactions_objects(
+        host,
+        &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+        transactions_objects,
+    )
+}
+
 struct ReceiptData {
     to: Option<H160>,
     type_: TransactionType,
 }
 
-fn handle_receipt<Host: Runtime>(
-    host: &mut Host,
-    block_constants: &BlockConstants,
-    from: H160,
-    receipt_data: ReceiptData,
-    hash: TransactionHash,
-    result: ExecutionResult,
-) -> Result<(), Error> {
-    let (status, contract_address, logs, gas_used) = match result {
+struct ResultData {
+    status: TransactionStatus,
+    contract_address: Option<H160>,
+    logs: Vec<revm::primitives::Log>,
+    gas_used: u64,
+}
+
+fn get_result_data(result: ExecutionResult) -> ResultData {
+    match result {
         ExecutionResult::Success {
             gas_used,
             logs,
@@ -169,14 +195,32 @@ fn handle_receipt<Host: Runtime>(
                 Output::Call(_) => None,
                 Output::Create(_, address) => address.map(|addr| H160(*addr.0)),
             };
-            (TransactionStatus::Success, contract_address, logs, gas_used)
+
+            ResultData {
+                status: TransactionStatus::Success,
+                contract_address,
+                logs,
+                gas_used,
+            }
         }
         ExecutionResult::Revert { gas_used, .. }
-        | ExecutionResult::Halt { gas_used, .. } => {
-            (TransactionStatus::Failure, None, vec![], gas_used)
-        }
-    };
+        | ExecutionResult::Halt { gas_used, .. } => ResultData {
+            status: TransactionStatus::Failure,
+            contract_address: None,
+            logs: vec![],
+            gas_used,
+        },
+    }
+}
 
+fn handle_receipt<Host: Runtime>(
+    host: &mut Host,
+    input_data: &SingleTxExecutionInput,
+    effective_gas_price: U256,
+    from: H160,
+    receipt_data: ReceiptData,
+    result_data: &ResultData,
+) -> Result<(), Error> {
     let mut receipts = get_current_transaction_receipts(host)?;
 
     let IterReceiptData {
@@ -184,8 +228,13 @@ fn handle_receipt<Host: Runtime>(
         current_cumulative_gas,
     } = get_iter_receipt_data(&receipts);
 
-    let logs: Vec<IndexedLog> = logs
-        .into_iter()
+    let log_index = (last_log + 1)
+        .try_into()
+        .map_err(|_| Error::InvalidConversion)?;
+
+    let logs: Vec<IndexedLog> = result_data
+        .logs
+        .iter()
         .map(|revm::primitives::Log { address, data }| IndexedLog {
             log: Log {
                 address: H160(*address.0),
@@ -196,31 +245,63 @@ fn handle_receipt<Host: Runtime>(
                     .collect(),
                 data: data.data.to_vec(),
             },
-            index: (last_log + 1).try_into().unwrap_or(u64::MAX),
+            index: log_index,
         })
         .collect();
 
     let logs_bloom = TransactionReceipt::logs_to_bloom(&logs);
 
     let receipt = TransactionReceipt {
-        hash,
-        index: (receipts.len() + 1).try_into().unwrap_or(u32::MAX),
-        block_number: block_constants.number,
+        hash: input_data.tx.tx_hash,
+        index: (receipts.len() + 1)
+            .try_into()
+            .map_err(|_| Error::InvalidConversion)?,
+        block_number: input_data.block_number,
         from,
         to: receipt_data.to,
-        cumulative_gas_used: current_cumulative_gas + gas_used,
-        effective_gas_price: block_constants.base_fee_per_gas(),
-        gas_used: gas_used.into(),
-        contract_address,
+        cumulative_gas_used: current_cumulative_gas + result_data.gas_used,
+        effective_gas_price,
+        gas_used: result_data.gas_used.into(),
+        contract_address: result_data.contract_address,
         logs,
         logs_bloom,
         type_: receipt_data.type_,
-        status,
+        status: result_data.status,
     };
 
     receipts.push(receipt);
 
     store_current_transaction_receipts(host, &receipts)
+}
+
+fn handle_transaction_object<Host: Runtime>(
+    host: &mut Host,
+    from: H160,
+    input_data: &SingleTxExecutionInput,
+    gas_price: U256,
+    result_data: &ResultData,
+) -> Result<(), Error> {
+    let mut txs_objects = get_current_transactions_objects(host)?;
+
+    let tx_object = TransactionObject {
+        block_number: input_data.block_number,
+        from,
+        gas_used: result_data.gas_used.into(),
+        gas_price,
+        hash: input_data.tx.tx_hash,
+        input: input_data.tx.data(),
+        nonce: input_data.tx.nonce(),
+        to: input_data.tx.to(),
+        index: (txs_objects.len() + 1)
+            .try_into()
+            .map_err(|_| Error::InvalidConversion)?,
+        value: input_data.tx.value(),
+        signature: input_data.tx.signature(),
+    };
+
+    txs_objects.push(tx_object);
+
+    store_current_transactions_objects(host, &txs_objects)
 }
 
 fn block_constants<Host: Runtime>(
@@ -350,15 +431,25 @@ pub fn handle_run_transaction<Host: Runtime>(
         }
     };
 
+    let result_data = get_result_data(result);
+
     // Don't pass `safe_host` because we don't want this to be cached
     // but we still want it to be accessible by the node.
     handle_receipt(
         host,
-        &block_constants,
+        &input_data,
+        block_constants.base_fee_per_gas(),
         caller,
         receipt_data,
-        input_data.tx.tx_hash,
-        result,
+        &result_data,
+    )?;
+
+    handle_transaction_object(
+        host,
+        caller,
+        &input_data,
+        block_constants.base_fee_per_gas(),
+        &result_data,
     )
 }
 
@@ -369,8 +460,8 @@ mod tests {
     use crate::{
         storage::store_chain_id,
         sub_block::{
-            get_current_transaction_receipts, SingleTxExecutionInput,
-            SINGLE_TX_EXECUTION_INPUT,
+            get_current_transaction_receipts, get_current_transactions_objects,
+            SingleTxExecutionInput, SINGLE_TX_EXECUTION_INPUT,
         },
     };
     use alloy_primitives::{keccak256, Address};
@@ -462,5 +553,12 @@ mod tests {
         assert_eq!(receipt.block_number, block_number);
         assert_eq!(receipt.hash, tx_hash);
         assert!(receipt.cumulative_gas_used > U256::zero());
+
+        let objects = get_current_transactions_objects(&mock_host).unwrap();
+        assert_eq!(objects.len(), 1);
+        let object = objects.first().unwrap();
+        assert_eq!(object.block_number, block_number);
+        assert_eq!(object.hash, tx_hash);
+        assert!(object.gas_used > U256::zero());
     }
 }
