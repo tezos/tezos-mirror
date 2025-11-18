@@ -531,3 +531,6 @@ let seed_computation cctxt ~chain ~block =
   Alpha_services.Seed_computation.get cctxt (chain, block)
 
 let chain_id cctxt ~chain = Shell_services.Chain.chain_id cctxt ~chain ()
+
+let shell_header cctxt ~chain ?(block = `Head 0) () =
+  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
