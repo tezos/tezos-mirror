@@ -1148,7 +1148,7 @@ let update_to_level state level_update =
         in
         Lwt.return (dal_attestable_slots, next_level_dal_attestable_slots))
   in
-  let*! new_state =
+  let*! new_state, new_action =
     (compute_new_state
        ~current_round
        ~delegate_infos
@@ -1157,7 +1157,24 @@ let update_to_level state level_update =
        ~next_level_dal_attestable_slots
      [@profiler.record_s {verbosity = Debug} "compute new state"])
   in
-  return new_state
+  let _promise =
+    only_if_dal_feature_enabled
+      new_state
+      ~default_value:()
+      (fun dal_node_rpc_ctxt ->
+        let next_level_delegate_ids =
+          Baking_state.Delegate_infos.own_delegate_ids next_level_delegate_infos
+        in
+        (* Refresh per-delegate subscriptions for the next level. Rights/committee
+           can change at level boundaries (e.g. migrations, reorganisations, key/profile
+           updates). Doing it here makes the streams ready before we build next-level
+           attestations. *)
+        Dal_attestable_slots_worker.update_streams_subscriptions
+          state.global_state.dal_attestable_slots_worker
+          dal_node_rpc_ctxt
+          ~delegate_ids:next_level_delegate_ids)
+  in
+  return (new_state, new_action)
 
 let synchronize_round state {new_round_proposal; handle_proposal} =
   let open Lwt_result_syntax in
