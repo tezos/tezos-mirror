@@ -482,6 +482,22 @@ let dal_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
       ( delegate_id,
         get_attestable_slots dal_node_rpc_ctxt delegate_id ~attestation_level ))
 
+let monitor_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
+    ~delegate_id =
+  let open Lwt_syntax in
+  let pkh = Delegate_id.to_pkh delegate_id in
+  let* result =
+    Tezos_rpc.Context.make_streamed_call
+      Tezos_dal_node_services.Services.monitor_attestable_slots
+      dal_node_rpc_ctxt
+      ((), Tezos_crypto.Signature.Of_V2.public_key_hash pkh)
+      ()
+      ()
+  in
+  match result with
+  | Ok result -> return_ok result
+  | Error trace -> return_error trace
+
 let get_dal_profiles dal_node_rpc_ctxt =
   Tezos_rpc.Context.make_call
     Tezos_dal_node_services.Services.get_profiles

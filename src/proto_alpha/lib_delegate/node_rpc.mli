@@ -160,6 +160,18 @@ val dal_attestable_slots :
   Delegate_id.t list ->
   dal_attestable_slots
 
+(** [monitor_attestable_slots dal_node_rpc_ctxt ~delegate_id] opens a streamed RPC
+    to the DAL node for the given [~delegate_id]. Each item emitted on the stream
+    contains DAL attestable information for this delegate. *)
+val monitor_attestable_slots :
+  Tezos_rpc.Context.generic ->
+  delegate_id:Delegate_id.t ->
+  ( Tezos_dal_node_services.Types.Attestable_event.t Lwt_stream.t
+    * Tezos_rpc.Context.stopper,
+    Error_monad.tztrace )
+  result
+  Lwt.t
+
 (** [get_dal_profiles ctxt delegates] calls the DAL node RPC GET
     /profiles/ to retrieve the DAL node's profiles. *)
 val get_dal_profiles :
