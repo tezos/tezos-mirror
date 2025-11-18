@@ -822,6 +822,7 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
     ~uses:(fun protocol ->
       Constant.octez_smart_rollup_node :: Constant.octez_dal_node
       :: uses protocol)
+    ~supports:(Protocol.Until_protocol 24)
     (Printf.sprintf "%s (%s)" description variant)
     (fun protocol ->
       let l1_history_mode =
