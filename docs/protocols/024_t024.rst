@@ -13,7 +13,7 @@ protocol T024 can be found :ref:`here<t024_breaking_changes>`. These
 changes are also listed below in their respective topical section,
 tagged with **Breaking change** or **Deprecation**.
 
-The code is available in directory :src:`src/proto_024_PsD5wVTJ` of
+The code is available in directory :src:`src/proto_024_PtTALLiN` of
 the ``master`` branch of Octez and the full documentation in
 :doc:`this page <../t024/index>`.
 
