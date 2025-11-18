@@ -222,6 +222,9 @@ let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
     {verbosity = Info}
       ("compute block " ^ Block_hash.to_short_b58check block_hash ^ " info")])
 
+let protocols cctxt ~chain ?(block = `Head 0) () =
+  Shell_services.Blocks.protocols cctxt ~chain ~block ()
+
 let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
     block_hash (block_header : Tezos_base.Block_header.t) =
   let open Lwt_result_syntax in
@@ -257,7 +260,7 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
                current_protocol = pred_current_protocol;
                next_protocol = pred_next_protocol;
              } =
-          (Shell_services.Blocks.protocols
+          (protocols
              cctxt
              ~chain
              ~block:pred_block
