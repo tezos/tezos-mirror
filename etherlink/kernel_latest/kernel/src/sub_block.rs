@@ -460,8 +460,8 @@ mod tests {
     use crate::{
         storage::store_chain_id,
         sub_block::{
-            get_current_transaction_receipts, SingleTxExecutionInput,
-            SINGLE_TX_EXECUTION_INPUT,
+            get_current_transaction_receipts, get_current_transactions_objects,
+            SingleTxExecutionInput, SINGLE_TX_EXECUTION_INPUT,
         },
     };
     use alloy_primitives::{keccak256, Address};
@@ -553,5 +553,12 @@ mod tests {
         assert_eq!(receipt.block_number, block_number);
         assert_eq!(receipt.hash, tx_hash);
         assert!(receipt.cumulative_gas_used > U256::zero());
+
+        let objects = get_current_transactions_objects(&mock_host).unwrap();
+        assert_eq!(objects.len(), 1);
+        let object = objects.first().unwrap();
+        assert_eq!(object.block_number, block_number);
+        assert_eq!(object.hash, tx_hash);
+        assert!(object.gas_used > U256::zero());
     }
 }
