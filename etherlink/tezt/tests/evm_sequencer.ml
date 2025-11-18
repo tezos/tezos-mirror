@@ -17,6 +17,7 @@
                  foundryup
                  make -f etherlink.mk octez-dsn-node
                  ./scripts/install_dal_trusted_setup.sh
+                 # Install websocat (see: https://github.com/vi/websocat?tab=readme-ov-file#installation)
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file evm_sequencer.ml
 *)
 
