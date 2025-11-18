@@ -45,7 +45,7 @@ let raw_info cctxt ?(chain = `Main) hash shell_header =
   let block = `Hash (hash, 0) in
   let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let* {current_protocol = protocol; next_protocol} =
-    Shell_services.Blocks.protocols cctxt ~chain ~block ()
+    Node_rpc.protocols cctxt ~chain ~block ()
   in
   let {
     Tezos_base.Block_header.predecessor;
