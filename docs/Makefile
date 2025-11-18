@@ -22,11 +22,11 @@ PROTOCOLS     = $(NAMED_PROTOS) alpha
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
 seoul_long     = PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh
-t024_long   = PsD5wVTJc9Rg228rXbXbeoeEo8g3fgWH211U7V3qjUed11g5Gqk
+t024_long   = PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 seoul_short    = PtSeouLo
-t024_short    = PsD5wVTJ
+t024_short    = PtTALLiN
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
