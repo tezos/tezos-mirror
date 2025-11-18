@@ -958,7 +958,8 @@ let try_resolve_consensus_keys cctxt key =
       in
       try_find_delegate_key levels_to_inspect
 
-let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
+let register_dal_profiles cctxt dal_node_rpc_ctxt dal_attestable_slots_worker
+    delegates =
   let open Lwt_result_syntax in
   let*! delegates = List.map_s (try_resolve_consensus_keys cctxt) delegates in
   let register dal_ctxt =
@@ -978,7 +979,16 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
             warn ()
           else Lwt.return_unit
     in
-    Node_rpc.register_dal_profiles dal_ctxt delegates
+    let* () = Node_rpc.register_dal_profiles dal_ctxt delegates in
+    let delegate_ids = List.map Delegate_id.of_pkh delegates in
+    let*! () =
+      (* This is the earliest moment we know the final attesters and we have a live DAL RPC. *)
+      Dal_attestable_slots_worker.update_streams_subscriptions
+        dal_attestable_slots_worker
+        dal_ctxt
+        ~delegate_ids
+    in
+    return_unit
   in
   Option.iter_es
     (fun dal_ctxt ->
@@ -1050,6 +1060,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
     register_dal_profiles
       cctxt
       initial_state.global_state.dal_node_rpc_ctxt
+      dal_attestable_slots_worker
       delegates
   in
   let cloned_block_stream = Lwt_stream.clone heads_stream in

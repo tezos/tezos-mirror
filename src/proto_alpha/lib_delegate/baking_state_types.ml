@@ -11,6 +11,8 @@ open Alpha_context
 module Key_id = struct
   type t = Signature.Public_key_hash.t
 
+  let of_pkh pkh = pkh
+
   let to_pkh pkh = pkh
 
   let compare = Signature.Public_key_hash.compare
