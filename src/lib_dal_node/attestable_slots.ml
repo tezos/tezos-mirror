@@ -207,7 +207,6 @@ let get_backfill_payload ctxt ~pkh =
     in
     Stdlib.List.init count (fun i ->
         Int32.(sub (succ last_finalized_level) (of_int i)))
-    |> List.rev
   in
   List.fold_left_es
     (fun acc published_level ->
