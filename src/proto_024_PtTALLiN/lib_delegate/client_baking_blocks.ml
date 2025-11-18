@@ -194,9 +194,7 @@ let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   | Ok (first, last) ->
       let length = Int32.to_int (Int32.sub level (Raw_level.to_int32 first)) in
       let* head =
-        let* list =
-          Shell_services.Blocks.list cctxt ~chain ~heads:[hash] ~length ()
-        in
+        let* list = Node_rpc.blocks cctxt ~chain ~heads:[hash] ~length in
         match list with
         | hd :: _ -> return hd
         | [] ->
