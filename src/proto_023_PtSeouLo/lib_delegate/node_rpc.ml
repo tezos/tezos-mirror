@@ -545,3 +545,6 @@ let chain_id cctxt ~chain = Shell_services.Chain.chain_id cctxt ~chain ()
 
 let shell_header cctxt ~chain ?(block = `Head 0) () =
   Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
+
+let block_hash cctxt ~chain ~block =
+  Shell_services.Blocks.hash cctxt ~chain ~block ()
