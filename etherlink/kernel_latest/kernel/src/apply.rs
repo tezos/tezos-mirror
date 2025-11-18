@@ -49,60 +49,6 @@ use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
 use crate::transaction::{Transaction, TransactionContent};
 
-// This implementation of `Transaction` is used to share the logic of
-// transaction receipt and transaction object making. The functions
-// `make_receipt_info` and `make_object_info` use these functions to build
-// the associated infos.
-impl Transaction {
-    fn to(&self) -> Option<H160> {
-        match &self.content {
-            TransactionContent::Deposit(Deposit { receiver, .. }) => Some(*receiver),
-            TransactionContent::FaDeposit(FaDeposit { .. }) => {
-                Some(alloy_to_h160(&FA_BRIDGE_SOL_ADDR))
-            }
-            TransactionContent::Ethereum(transaction)
-            | TransactionContent::EthereumDelayed(transaction) => transaction.to,
-        }
-    }
-
-    fn data(&self) -> Vec<u8> {
-        match &self.content {
-            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => vec![],
-            TransactionContent::Ethereum(transaction)
-            | TransactionContent::EthereumDelayed(transaction) => {
-                transaction.data.clone()
-            }
-        }
-    }
-
-    fn value(&self) -> U256 {
-        match &self.content {
-            TransactionContent::Deposit(Deposit { amount, .. }) => *amount,
-            &TransactionContent::FaDeposit(_) => U256::zero(),
-            TransactionContent::Ethereum(transaction)
-            | TransactionContent::EthereumDelayed(transaction) => transaction.value,
-        }
-    }
-
-    fn nonce(&self) -> u64 {
-        match &self.content {
-            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => 0,
-            TransactionContent::Ethereum(transaction)
-            | TransactionContent::EthereumDelayed(transaction) => transaction.nonce,
-        }
-    }
-
-    fn signature(&self) -> Option<TxSignature> {
-        match &self.content {
-            TransactionContent::Deposit(_) | TransactionContent::FaDeposit(_) => None,
-            TransactionContent::Ethereum(transaction)
-            | TransactionContent::EthereumDelayed(transaction) => {
-                transaction.signature.clone()
-            }
-        }
-    }
-}
-
 pub struct TransactionReceiptInfo {
     pub tx_hash: TransactionHash,
     pub index: u32,
