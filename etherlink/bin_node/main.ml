@@ -105,6 +105,22 @@ module Params = struct
         let open Lwt_result_syntax in
         if uri = "" then return_none else return_some (Uri.of_string uri))
 
+  let runtime =
+    Tezos_clic.parameter (fun _ ->
+        let open Lwt_result_syntax in
+        let open Evm_node_lib_dev.Tezosx in
+        function
+        | "tezos" -> return Tezos
+        | name ->
+            let open Format in
+            failwith
+              "Unexpected runtime name '%s', supported values are %a"
+              name
+              (pp_print_list
+                 ~pp_sep:(fun fmt () -> fprintf fmt ",@ ")
+                 (fun fmt -> fprintf fmt "'%a'" pp_runtime))
+              known_runtimes)
+
   let event_level =
     Tezos_clic.parameter (fun _ value ->
         Lwt.return_ok (Internal_event.Level.of_string_exn value))
@@ -643,6 +659,16 @@ let replicate_arg =
       "Replicate a chain in real time from the EVM node whose address is \
        provided."
     Params.optional_endpoint
+
+let enable_runtime_arg =
+  Tezos_clic.multiple_arg
+    ~doc:
+      "Enable a Tezos X experimental runtime alongside the default Ethereum \
+       runtime of Etherlink"
+    ~long:"with-runtime"
+    ~short:'r'
+    ~placeholder:"RUNTIME"
+    Params.runtime
 
 let evm_node_private_endpoint_arg =
   Tezos_clic.arg
@@ -2647,11 +2673,12 @@ let tezlink_fund_arg =
 let tezlink_sandbox_command_args = Tezos_clic.args1 tezlink_fund_arg
 
 let etherlink_sandbox_config_args =
-  Tezos_clic.args4
+  Tezos_clic.args5
     (supported_network_arg ())
     init_from_snapshot_arg
     fund_arg
     replicate_arg
+    enable_runtime_arg
 
 let sequencer_command =
   let open Tezos_clic in
@@ -2803,7 +2830,11 @@ let sandbox_command =
                password_filename,
                disable_da_fees,
                kernel_verbosity ),
-             (network, init_from_snapshot, funded_addresses, main_endpoint) ) )
+             ( network,
+               init_from_snapshot,
+               funded_addresses,
+               main_endpoint,
+               with_runtimes ) ) )
          ()
        ->
       let open Lwt_result_syntax in
@@ -2839,6 +2870,7 @@ let sandbox_command =
             parent_chain;
             disable_da_fees;
             kernel_verbosity;
+            with_runtimes = Option.value ~default:[] with_runtimes;
             tezlink = None;
           }
       in
@@ -2957,6 +2989,7 @@ let tezlink_sandbox_command =
             parent_chain = None;
             disable_da_fees;
             kernel_verbosity;
+            with_runtimes = [];
             tezlink =
               Some
                 {

@@ -32,6 +32,11 @@ Furthermore, this kernel requires the Octez EVM node version 0.47 or higher.
 
 - Change the block storage to save only latest block. (!19744)
 
+### Tezos X Experimental Features
+
+- Adds a feature flag to control whether or not the Tezos runtime is enabled or
+  not. (!19921)
+
 ## Etherlink 5 (Ebisu)
 
 Its storage version is 38.

@@ -591,7 +591,7 @@ mod tests {
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
     use crate::chains::{
-        EvmChainConfig, MichelsonChainConfig, TezTransactions,
+        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig, TezTransactions,
         TEZLINK_SAFE_STORAGE_ROOT_PATH,
     };
     use crate::fees::DA_FEE_PER_BYTE;
@@ -829,7 +829,12 @@ mod tests {
     const DUMMY_DA_FEE: u64 = DA_FEE_PER_BYTE;
 
     fn dummy_evm_config(spec_id: SpecId) -> EvmChainConfig {
-        EvmChainConfig::create_config(DUMMY_CHAIN_ID, EvmLimits::default(), spec_id)
+        EvmChainConfig::create_config(
+            DUMMY_CHAIN_ID,
+            EvmLimits::default(),
+            spec_id,
+            ExperimentalFeatures::default(),
+        )
     }
 
     fn dummy_tez_config() -> MichelsonChainConfig {

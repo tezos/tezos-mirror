@@ -70,11 +70,33 @@ impl From<String> for ChainFamily {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct ExperimentalFeatures {
+    enable_tezos_runtime: bool,
+}
+
+impl ExperimentalFeatures {
+    pub fn read_from_storage(host: &mut impl Runtime) -> Self {
+        let enable_tezos_runtime = crate::storage::enable_tezos_runtime(host);
+
+        ExperimentalFeatures {
+            enable_tezos_runtime,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct EvmChainConfig {
     chain_id: U256,
     pub limits: EvmLimits,
     pub spec_id: SpecId,
+    pub experimental_features: ExperimentalFeatures,
+}
+
+impl EvmChainConfig {
+    pub fn enable_tezos_runtime(&self) -> bool {
+        self.experimental_features.enable_tezos_runtime
+    }
 }
 
 #[derive(Debug)]
@@ -360,11 +382,17 @@ impl ChainConfigTrait for EvmChainConfig {
 }
 
 impl EvmChainConfig {
-    pub fn create_config(chain_id: U256, limits: EvmLimits, spec_id: SpecId) -> Self {
+    pub fn create_config(
+        chain_id: U256,
+        limits: EvmLimits,
+        spec_id: SpecId,
+        experimental_features: ExperimentalFeatures,
+    ) -> Self {
         Self {
             chain_id,
             limits,
             spec_id,
+            experimental_features,
         }
     }
 
@@ -555,9 +583,17 @@ impl MichelsonChainConfig {
 }
 
 impl ChainConfig {
-    pub fn new_evm_config(chain_id: U256, limits: EvmLimits, spec_id: SpecId) -> Self {
+    pub fn new_evm_config(
+        chain_id: U256,
+        limits: EvmLimits,
+        spec_id: SpecId,
+        experimental_features: ExperimentalFeatures,
+    ) -> Self {
         ChainConfig::Evm(Box::new(EvmChainConfig::create_config(
-            chain_id, limits, spec_id,
+            chain_id,
+            limits,
+            spec_id,
+            experimental_features,
         )))
     }
 
@@ -629,6 +665,7 @@ impl Default for EvmChainConfig {
             U256::from(CHAIN_ID),
             EvmLimits::default(),
             SpecId::default(),
+            ExperimentalFeatures::default(),
         )
     }
 }
@@ -639,6 +676,7 @@ pub fn test_evm_chain_config() -> EvmChainConfig {
         U256::from(CHAIN_ID),
         EvmLimits::default(),
         SpecId::default(),
+        ExperimentalFeatures::default(),
     )
 }
 
