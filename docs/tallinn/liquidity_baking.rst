@@ -37,7 +37,7 @@ One can easily compute the value of the per block subsidy by taking into account
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
 
-.. _toggle_t024:
+.. _toggle_tallinn:
 
 Toggle vote
 ~~~~~~~~~~~
@@ -67,7 +67,7 @@ For indicative purposes, if among the non-abstaining blocks a fraction
 reached after roughly ``2*(log(1-1/(2f)) / log(0.999))``
 non-abstaining blocks, about 1386 blocks if everyone signals, 1963
 blocks if 80% do, 3583 blocks if 60% do etc. Recall for comparison
-that since :ref:`MINIMAL_BLOCK_DELAY<cs_constants_t024>` is 6
+that since :ref:`MINIMAL_BLOCK_DELAY<cs_constants_tallinn>` is 6
 seconds, there are 14400 blocks per day (assuming all blocks are
 produced at round zero.)
 

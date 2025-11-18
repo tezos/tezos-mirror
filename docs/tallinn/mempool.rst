@@ -9,20 +9,20 @@ that can be safely used to bake a new block.
 
 It ensures that :
 
-- Every operation contained are :ref:`valid<operation_validity_t024>`;
+- Every operation contained are :ref:`valid<operation_validity_tallinn>`;
 
-- every operation are :ref:`co-valid<co-valid_operations_t024>`: they can be
+- every operation are :ref:`co-valid<co-valid_operations_tallinn>`: they can be
   safely included in a block in any arbitrary order, meaning operations commute;
 
 - the merging of two mempools also maintains the aforementioned
   properties.
 
 The protocol leverages the :ref:`partial construction
-mode<partial_construction_t024>` to incrementally validate new operations while
+mode<partial_construction_tallinn>` to incrementally validate new operations while
 maintaining the aforementioned invariants.
 
 During validation, operations are never actually applied, as it is unnecessary
-for asserting their :ref:`validity<operation_validity_t024>`.
+for asserting their :ref:`validity<operation_validity_tallinn>`.
 
 Merging Mempools
 ----------------
