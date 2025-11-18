@@ -17,6 +17,7 @@ source_label=""
 long_hash=""
 short_hash=""
 capitalized_label=""
+doc_label=""
 
 skip_copy_source=""
 skip_update_protocol_tests=""
@@ -166,6 +167,7 @@ function usage() {
   stabilise="${green}--stabilise${reset}"
   snapshot="${green}--snapshot${reset}"
   hash="${green}--hash${reset}"
+  finalize_docs="${green}--finalize-docs${reset}"
   copy="${green}--copy${reset}"
   delete="${green}--delete${reset}"
   force_snapshot="${green}--force-snapshot${reset}"
@@ -175,6 +177,8 @@ function usage() {
   stockholm_023="${red}stockholm_023${reset}"
   stockholm="${magenta}stockholm${reset}"
   pt_stockholm="${red}023_PtStockh${reset}"
+  t024="${red}t024${reset}"
+  tallinn="${magenta}tallinn${reset}"
   script=${blue}$0${reset}
 
   echo -e "
@@ -188,6 +192,8 @@ ${red}Options:${reset}
     Snapshot a protocol.
   ${hash}
     Updates the hash of a protocol.
+  ${finalize_docs}
+    Finalize protocol documentation (rename docs folder and update all references).
   ${c}, ${copy}
     Copy a protocol.
   ${d}, ${delete} ${red}<protocol_source_dirname>${reset}
@@ -217,6 +223,9 @@ To update the hash of a previously snapshotted protocol:
   ${script} ${hash} ${f} ${beta} ${F}
   or
   ${script} ${hash} ${from} ${beta} ${force_snapshot}
+
+- To finalize documentation (rename docs folder from code label to human-readable name):
+  ${script} ${finalize_docs} ${from} ${t024} ${to} ${tallinn}
 
 - To copy stockholm_023 known as stockholm into beta and link it in the node, client and codec:
   ${script} ${copy} ${from} ${stockholm_023} ${as} ${stockholm} ${to} ${beta}
@@ -252,6 +261,10 @@ while true; do
     ;;
   --hash)
     command="hash"
+    shift
+    ;;
+  --finalize-docs)
+    command="finalize_docs"
     shift
     ;;
   -c | --copy)
@@ -1873,6 +1886,134 @@ function update_files() {
   done
 }
 
+function finalize_docs() {
+  log_cyan "Finalizing documentation: renaming ${protocol_source} to ${doc_label}"
+
+  version=$(echo "${protocol_source}" | cut -d'_' -f1)
+
+  # Capitalize the doc_label for display (e.g., tallinn -> Tallinn)
+  capitalized_doc_label=$(tr '[:lower:]' '[:upper:]' <<< "${doc_label:0:1}")${doc_label:1}
+
+  # Check if source docs directory exists
+  if [[ ! -d "docs/${protocol_source}" ]]; then
+    error "docs/${protocol_source}" "does not exist"
+    print_and_exit 1 "${LINENO}"
+  fi
+
+  # Check if target docs directory already exists
+  if [[ -d "docs/${doc_label}" ]]; then
+    error "docs/${doc_label}" "already exists, you should remove it first"
+    print_and_exit 1 "${LINENO}"
+  fi
+
+  # 1. Rename docs folder
+  log_blue "Renaming docs/${protocol_source} to docs/${doc_label}"
+  git mv "docs/${protocol_source}" "docs/${doc_label}"
+  commit "docs: rename docs/${protocol_source} to docs/${doc_label}"
+
+  # 2. Fix versioned links in docs
+  log_blue "Fixing versioned links in docs/${doc_label}"
+  cd "docs/${doc_label}"
+  find . -name \*.rst -exec \
+    sed -i.old \
+    -e "s/_${protocol_source}:/_${doc_label}:/g" \
+    -e "s/_${protocol_source}>/_${doc_label}>/g" \
+    -e "s/_${protocol_source}\`/_${doc_label}\`/g" \
+    -e "s/-${protocol_source}.html/-${doc_label}.html/g" \
+    -e "s/protocol ${protocol_source}/protocol ${capitalized_doc_label}/g" \
+    -e "s/Protocol ${protocol_source}/Protocol ${capitalized_doc_label}/g" \
+    -e "s/protocol $(echo "${protocol_source}" | tr '[:lower:]' '[:upper:]')/protocol ${capitalized_doc_label}/g" \
+    -e "s/Protocol $(echo "${protocol_source}" | tr '[:lower:]' '[:upper:]')/Protocol ${capitalized_doc_label}/g" \
+    \{\} \;
+  commit "docs: fix versioned links in docs/${doc_label}"
+  cd ../..
+
+  # 3. Rename and update protocol changelog
+  old_changelog="docs/protocols/${version}_${protocol_source}.rst"
+  new_changelog="docs/protocols/${version}_${doc_label}.rst"
+
+  if [[ -f "${old_changelog}" ]]; then
+    log_blue "Renaming ${old_changelog} to ${new_changelog}"
+    git mv "${old_changelog}" "${new_changelog}"
+    commit "docs: rename ${old_changelog} to ${new_changelog}"
+
+    log_blue "Updating ${new_changelog}"
+    # Update title and references in changelog
+    capitalized_protocol_source=$(tr '[:lower:]' '[:upper:]' <<< "${protocol_source:0:1}")${protocol_source:1}
+    sed -i.old \
+      -e "s/^Protocol ${capitalized_protocol_source}/Protocol ${capitalized_doc_label}/" \
+      -e "s/^Protocol $(echo "${protocol_source}" | tr '[:lower:]' '[:upper:]')/Protocol ${capitalized_doc_label}/" \
+      -e "s/protocol ${protocol_source}/protocol ${capitalized_doc_label}/g" \
+      -e "s/Protocol ${protocol_source}/Protocol ${capitalized_doc_label}/g" \
+      -e "s/protocol $(echo "${protocol_source}" | tr '[:lower:]' '[:upper:]')/protocol ${capitalized_doc_label}/g" \
+      -e "s/Protocol $(echo "${protocol_source}" | tr '[:lower:]' '[:upper:]')/Protocol ${capitalized_doc_label}/g" \
+      -e "s@\.\./${protocol_source}/index@../${doc_label}/index@g" \
+      -e "s/_${protocol_source}_/_${doc_label}_/g" \
+      -e "s/<${protocol_source}_/<${doc_label}_/g" \
+      "${new_changelog}"
+    commit_if_changes "docs: update ${new_changelog}"
+  else
+    warning "${old_changelog} does not exist, skipping"
+  fi
+
+  # 4. Update docs/index.rst
+  log_blue "Updating docs/index.rst"
+  capitalized_protocol_source=$(tr '[:lower:]' '[:upper:]' <<< "${protocol_source:0:1}")${protocol_source:1}
+  sed -i.old \
+    -e "s@${capitalized_protocol_source} Protocol Reference <${protocol_source}/index>@${capitalized_doc_label} Protocol Reference <${doc_label}/index>@g" \
+    -e "s@$(echo "${protocol_source}" | tr '[:lower:]' '[:upper:]') Protocol Reference <${protocol_source}/index>@${capitalized_doc_label} Protocol Reference <${doc_label}/index>@g" \
+    -e "s@protocols/${version}_${protocol_source}@protocols/${version}_${doc_label}@g" \
+    docs/index.rst
+  commit_if_changes "docs: update docs/index.rst"
+
+  # 5. Update docs/introduction/breaking_changes.rst
+  log_blue "Updating docs/introduction/breaking_changes.rst"
+  if [[ -f "docs/introduction/breaking_changes.rst" ]]; then
+    sed -i.old \
+      -e "s/_${protocol_source}_/_${doc_label}_/g" \
+      -e "s/<${protocol_source}_/<${doc_label}_/g" \
+      -e "s/>${protocol_source}_/>${doc_label}_/g" \
+      -e "s/\`${protocol_source}_/\`${doc_label}_/g" \
+      -e "s/protocol ${protocol_source}/protocol ${capitalized_doc_label}/g" \
+      -e "s/Protocol ${protocol_source}/Protocol ${capitalized_doc_label}/g" \
+      -e "s/protocol $(echo "${protocol_source}" | tr '[:lower:]' '[:upper:]')/protocol ${capitalized_doc_label}/g" \
+      -e "s/Protocol $(echo "${protocol_source}" | tr '[:lower:]' '[:upper:]')/Protocol ${capitalized_doc_label}/g" \
+      -e "s@protocols/${version}_${protocol_source}@protocols/${version}_${doc_label}@g" \
+      docs/introduction/breaking_changes.rst
+    commit_if_changes "docs: update docs/introduction/breaking_changes.rst"
+  fi
+
+  # 6. Update docs/protocols/alpha.rst
+  log_blue "Updating docs/protocols/alpha.rst"
+  if [[ -f "docs/protocols/alpha.rst" ]]; then
+    sed -i.old \
+      -e "s/to ${protocol_source}/to ${capitalized_doc_label}/g" \
+      -e "s/to $(echo "${protocol_source}" | tr '[:lower:]' '[:upper:]')/to ${capitalized_doc_label}/g" \
+      docs/protocols/alpha.rst
+    commit_if_changes "docs: update docs/protocols/alpha.rst"
+  fi
+
+  # 7. Update docs/Makefile
+  log_blue "Updating docs/Makefile"
+  sed -i.old \
+    -e "s/NAMED_PROTOS\(.*\) ${protocol_source}/NAMED_PROTOS\1 ${doc_label}/" \
+    -e "s/-l ${protocol_source}/-l ${doc_label}/g" \
+    -e "s/${protocol_source}_short/${doc_label}_short/g" \
+    -e "s/${protocol_source}_long/${doc_label}_long/g" \
+    -e "s/ ${protocol_source}\// ${doc_label}\//g" \
+    docs/Makefile
+  commit_if_changes "docs: update docs/Makefile"
+
+  # 8. Regenerate RPC docs
+  log_blue "Regenerating ${doc_label}/rpc.rst"
+  rm -f "docs/${doc_label}/rpc.rst"
+  make -C docs "${doc_label}"/rpc.rst
+  commit_if_changes "docs: regenerate ${doc_label}/rpc.rst"
+
+  log_green "Documentation finalized successfully!"
+  log_green "Docs renamed from ${protocol_source} to ${doc_label}"
+}
+
 function hash() {
 
   log_cyan "Computing hash"
@@ -2383,6 +2524,22 @@ hash)
   capitalized_label=$(tr '[:lower:]' '[:upper:]' <<< "${source_label:0:1}")${source_label:1}
   capitalized_source="${capitalized_label}"
   hash
+  ;;
+finalize_docs)
+  # protocol_source should be the current docs folder name (e.g., t024)
+  # protocol_target should be the desired docs folder name (e.g., tallinn)
+  if [[ -z ${protocol_source} ]]; then
+    error "Missing --from argument (current docs folder name)"
+    usage
+    print_and_exit 1 "${LINENO}"
+  fi
+  if [[ -z ${protocol_target} ]]; then
+    error "Missing --to argument (desired docs folder name)"
+    usage
+    print_and_exit 1 "${LINENO}"
+  fi
+  doc_label="${protocol_target}"
+  finalize_docs
   ;;
 copy)
   label=${protocol_target}
