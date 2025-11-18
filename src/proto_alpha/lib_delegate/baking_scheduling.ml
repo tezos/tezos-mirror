@@ -932,7 +932,7 @@ let try_resolve_consensus_keys cctxt key =
               ()
           in
           match attesting_rights with
-          | Error _ | Ok [Plugin.RPC.Validators.{delegates = []; _}] ->
+          | Error _ | Ok [Plugin.RPC.Validators.{delegates = []; _}] | Ok [] ->
               try_find_delegate_key (head_offset - 1)
           | Ok
               Plugin.RPC.Validators.
@@ -953,7 +953,7 @@ let try_resolve_consensus_keys cctxt key =
                 ] ->
               (* The primary registered key as delegate found. Return it. *)
               return delegate
-          | Ok (_ :: _ :: _) | Ok [] -> assert false
+          | Ok (_ :: _ :: _) -> assert false
         (* we query only one level, the returned list length must be 1 *)
       in
       try_find_delegate_key levels_to_inspect
