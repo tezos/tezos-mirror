@@ -938,9 +938,7 @@ module State = struct
         let* evm_state =
           Evm_state.execute
             ~pool:ctxt.execution_pool
-            ~native_execution:
-              (ctxt.configuration.kernel_execution.native_execution_policy
-             = Configuration.Never)
+            ~native_execution:false
             ~data_dir
             ~config
             ~wasm_entrypoint:"single_tx_execution"

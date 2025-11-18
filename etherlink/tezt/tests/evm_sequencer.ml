@@ -11674,24 +11674,24 @@ let test_websocket_logs_event =
   let* () = scenario rpc_node in
   unit
 
+(* TODO #7843: Adapt this test to multichain context *)
 let test_websocket_tez_newIncludedTransactions_event =
-  register_all
+  register_test
     ~__FILE__
-    ~tags:
-      ["evm"; "rpc"; "websocket"; "tez_new_included_transactions"; Tag.flaky]
-    ~title:
-      "Check that websocket event `newIncludedTransactions` is behaving \
-       correctly"
     ~time_between_blocks:Nothing
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~tags:["evm"; "rpc"; "websocket"; "tez_new_included_transactions"]
+    ~title:
+      "Check that websocket event `newIncludedTransactions` is behaving \
+       correctly"
+    ~kernel:Latest
     ~websockets:true
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
+    ~enable_dal:false
+    ~enable_multichain:false
   @@ fun {sequencer; observer; _} _protocol ->
   (*
     To avoid updating all the tooling.
@@ -11762,23 +11762,24 @@ let test_websocket_tez_newIncludedTransactions_event =
   in
   unit
 
+(* TODO #7843: Adapt this test to multichain context *)
 let test_websocket_tez_newPreconfirmedReceipts_event =
-  register_all
+  register_test
     ~__FILE__
-    ~tags:["evm"; "rpc"; "websocket"; "tez_new_preconfirmed_receipts"]
-    ~title:
-      "Check that websocket event `newPreconfirmedReceipts` is behaving \
-       correctly"
     ~time_between_blocks:Nothing
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~tags:["evm"; "rpc"; "websocket"; "tez_new_preconfirmed_receipts"]
+    ~title:
+      "Check that websocket event `newPreconfirmedReceipts` is behaving \
+       correctly"
+    ~kernel:Latest
     ~websockets:true
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
+    ~enable_dal:false
+    ~enable_multichain:false
   @@ fun {sequencer; observer; _} _protocol ->
   (*
     To avoid updating all the tooling.
