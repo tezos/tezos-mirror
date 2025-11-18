@@ -71,6 +71,34 @@ let attested_just_after_migration ctxt ~attested_level =
     && migration_level < attested_level
     && attested_level <= Int32.add migration_level new_lag)
 
+let check_is_attestable_slot_or_trap ~pkh ~(slot_id : Types.slot_id)
+    ~last_known_parameters ~shard_indices ~shards_store
+    ~number_of_assigned_shards =
+  let open Lwt_result_syntax in
+  if number_of_assigned_shards = 0 || slot_id.slot_level < 1l then return_none
+  else
+    let* number_stored_shards =
+      Store.Shards.number_of_shards_available shards_store slot_id shard_indices
+    in
+    let all_stored = number_stored_shards = number_of_assigned_shards in
+    if not all_stored then return_none
+    else if not last_known_parameters.Types.incentives_enable then
+      return_some `Attestable_slot
+    else
+      let* is_attestable_slot_with_traps =
+        is_attestable_slot_with_traps
+          shards_store
+          last_known_parameters.traps_fraction
+          pkh
+          shard_indices
+          slot_id
+        |> Errors.to_option_tzresult
+      in
+      match is_attestable_slot_with_traps with
+      | Some true -> return_some `Attestable_slot
+      | Some false -> return_some `Trap
+      | None -> return_none
+
 (** [is_attestable_slot_or_trap ctxt ~pkh ~slot_id] decides whether [~slot_id] is
     attestable for delegate [pkh] at the time of calling, and when DAL incentives
     are enabled, whether it should be considered as a trap. *)
@@ -95,32 +123,13 @@ let is_attestable_slot_or_trap ctxt ~pkh ~(slot_id : Types.slot_id) =
       fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
     in
     let number_of_assigned_shards = List.length shard_indices in
-    if number_of_assigned_shards = 0 || published_level < 1l then return_none
-    else
-      let* number_stored_shards =
-        Store.Shards.number_of_shards_available
-          shards_store
-          slot_id
-          shard_indices
-      in
-      let all_stored = number_stored_shards = number_of_assigned_shards in
-      if not all_stored then return_none
-      else if not last_known_parameters.incentives_enable then
-        return_some `Attestable_slot
-      else
-        let* is_attestable_slot_with_traps =
-          is_attestable_slot_with_traps
-            shards_store
-            last_known_parameters.traps_fraction
-            pkh
-            shard_indices
-            slot_id
-          |> Errors.to_option_tzresult
-        in
-        match is_attestable_slot_with_traps with
-        | Some true -> return_some `Attestable_slot
-        | Some false -> return_some `Trap
-        | None -> return_none
+    check_is_attestable_slot_or_trap
+      ~pkh
+      ~slot_id
+      ~last_known_parameters
+      ~shard_indices
+      ~shards_store
+      ~number_of_assigned_shards
 
 let may_notify_attestable_slot_or_trap ctxt ~(slot_id : Types.slot_id) =
   let open Lwt_result_syntax in
@@ -232,6 +241,16 @@ let get_backfill_payload ctxt ~pkh =
         (* Check each slot for attestability. *)
         let number_of_slots = proto_params.number_of_slots in
         let slot_indices = Stdlib.List.init number_of_slots Fun.id in
+        let*? lag = get_attestation_lag ctxt ~level:published_level in
+        let*? last_known_parameters =
+          let attested_level = Int32.(add published_level lag) in
+          get_proto_parameters ctxt ~level:(`Level attested_level)
+        in
+        let shards_store = Store.shards (get_store ctxt) in
+        let* shard_indices =
+          fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
+        in
+        let number_of_assigned_shards = List.length shard_indices in
         let* new_slot_ids =
           List.filter_map_ep
             (fun slot_index ->
@@ -239,7 +258,13 @@ let get_backfill_payload ctxt ~pkh =
                 Types.Slot_id.{slot_level = published_level; slot_index}
               in
               let* is_attestable_slot_or_trap =
-                is_attestable_slot_or_trap ctxt ~pkh ~slot_id
+                check_is_attestable_slot_or_trap
+                  ~pkh
+                  ~slot_id
+                  ~last_known_parameters
+                  ~shard_indices
+                  ~shards_store
+                  ~number_of_assigned_shards
               in
               match is_attestable_slot_or_trap with
               | Some `Attestable_slot -> return_some slot_id
