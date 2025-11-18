@@ -67,6 +67,7 @@ type t = {
       (** Active per-delegate subscriptions. *)
   cache : (int32, slots_by_delegate) Stdlib.Hashtbl.t;
       (** Cache of attestable slots, keyed by attestation levels. *)
+  subscriptions_lock : Lwt_mutex.t;  (** Lock for streams subscriptions. *)
 }
 
 let create_delegate_table () = Delegate_id.Table.create 10
@@ -149,6 +150,7 @@ let consume_backfill_stream state stream_handle ~delegate_id =
       return_unit
   | None ->
       let* () = Events.(emit stream_ended delegate_id) in
+      Lwt_mutex.with_lock state.subscriptions_lock @@ fun () ->
       Delegate_id.Table.remove state.streams delegate_id ;
       return_unit
   | _ ->
@@ -171,6 +173,7 @@ let rec consume_stream state stream_handle ~delegate_id =
          will detect (e.g. via [update_streams_subscriptions]) the missing entry and
          re-subscribe with backfill on the next level. *)
       let* () = Events.(emit stream_ended delegate_id) in
+      Lwt_mutex.with_lock state.subscriptions_lock @@ fun () ->
       Delegate_id.Table.remove state.streams delegate_id ;
       return_unit
   | Some (E.Attestable_slot {slot_id}) ->
@@ -214,10 +217,14 @@ let subscribe_to_new_streams state dal_node_rpc_ctxt ~delegate_ids_to_add =
             return_none)
       delegate_ids_to_add
   in
-  List.iter
-    (fun (delegate_id, stream_handle) ->
-      Delegate_id.Table.add state.streams delegate_id stream_handle)
-    new_streams ;
+  let* () =
+    Lwt_mutex.with_lock state.subscriptions_lock @@ fun () ->
+    List.iter
+      (fun (delegate_id, stream_handle) ->
+        Delegate_id.Table.replace state.streams delegate_id stream_handle)
+      new_streams ;
+    return_unit
+  in
   List.iter
     (fun (delegate_id, stream_handle) ->
       Lwt.dont_wait
@@ -233,12 +240,15 @@ let subscribe_to_new_streams state dal_node_rpc_ctxt ~delegate_ids_to_add =
   return_unit
 
 let update_streams_subscriptions state dal_node_rpc_ctxt ~delegate_ids =
-  let delegate_ids_to_add =
+  let open Lwt_syntax in
+  let* delegate_ids_to_add =
+    Lwt_mutex.with_lock state.subscriptions_lock @@ fun () ->
     let new_delegate_ids = DelegateSet.of_list delegate_ids in
     let current_delegate_ids =
       DelegateSet.of_seq @@ Delegate_id.Table.to_seq_keys state.streams
     in
-    DelegateSet.(elements (diff new_delegate_ids current_delegate_ids))
+    return
+    @@ DelegateSet.(elements (diff new_delegate_ids current_delegate_ids))
   in
   subscribe_to_new_streams state dal_node_rpc_ctxt ~delegate_ids_to_add
 
@@ -248,6 +258,7 @@ let create ~attestation_lag ~number_of_slots =
     number_of_slots;
     streams = create_delegate_table ();
     cache = Stdlib.Hashtbl.create 16;
+    subscriptions_lock = Lwt_mutex.create ();
   }
 
 let shutdown_worker state =
