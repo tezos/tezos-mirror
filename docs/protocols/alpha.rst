@@ -4,7 +4,7 @@ Protocol Alpha
 This page documents the changes brought by protocol Alpha with respect
 to Tallinn (see :ref:`naming_convention`).
 
-For changes brought by Quebec with respect to Paris, see :doc:`../protocols/021_quebec`.
+For changes brought by Tallinn with respect to Seoul, see :doc:`./023_seoul`.
 
 The code can be found in directory :src:`src/proto_alpha` of the ``master``
 branch of Octez.
