@@ -13,11 +13,11 @@
   octez-libs.base
   octez-libs.micheline
   tezos-micheline-rewriting
-  tezos-protocol-024-PsD5wVTJ.protocol
+  tezos-protocol-024-PtTALLiN.protocol
   tezos-benchmark
-  tezos-benchmark-type-inference-024-PsD5wVTJ
-  tezos-benchmark-024-PsD5wVTJ
-  octez-protocol-024-PsD5wVTJ-libs.test-helpers
+  tezos-benchmark-type-inference-024-PtTALLiN
+  tezos-benchmark-024-PtTALLiN
+  octez-protocol-024-PtTALLiN-libs.test-helpers
   octez-libs.error-monad
   prbnmcn-stats)
  (link_flags
@@ -26,11 +26,11 @@
  (flags
   (:standard)
   -open Tezos_micheline
-  -open Tezos_protocol_024_PsD5wVTJ
+  -open Tezos_protocol_024_PtTALLiN
   -open Tezos_benchmark
-  -open Tezos_benchmark_type_inference_024_PsD5wVTJ
-  -open Tezos_benchmark_024_PsD5wVTJ
-  -open Tezos_024_PsD5wVTJ_test_helpers))
+  -open Tezos_benchmark_type_inference_024_PtTALLiN
+  -open Tezos_benchmark_024_PtTALLiN
+  -open Tezos_024_PtTALLiN_test_helpers))
 
 (rule
  (alias runtest_micheline_rewriting_data)

@@ -18,11 +18,11 @@ depends: [
   "octez-protocol-023-PtSeouLo-libs" { = version }
 ]
 depopts: [
-  "octez-protocol-024-PsD5wVTJ-libs"
+  "octez-protocol-024-PtTALLiN-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
-  "octez-protocol-024-PsD5wVTJ-libs" { != version }
+  "octez-protocol-024-PtTALLiN-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

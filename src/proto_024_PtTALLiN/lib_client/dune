@@ -2,23 +2,23 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_client_024_PsD5wVTJ)
- (public_name octez-protocol-024-PsD5wVTJ-libs.client)
+ (name tezos_client_024_PtTALLiN)
+ (public_name octez-protocol-024-PtTALLiN-libs.client)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-libs.clic
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  tezos-protocol-024-PsD5wVTJ.protocol
-  tezos-protocol-024-PsD5wVTJ.protocol.lifted
+  tezos-protocol-024-PtTALLiN.protocol
+  tezos-protocol-024-PtTALLiN.protocol.lifted
   octez-shell-libs.mockup-registration
   octez-shell-libs.proxy
   octez-shell-libs.signer-backends
-  octez-protocol-024-PsD5wVTJ-libs.plugin
-  tezos-protocol-024-PsD5wVTJ.parameters
+  octez-protocol-024-PtTALLiN-libs.plugin
+  tezos-protocol-024-PtTALLiN.parameters
   octez-libs.rpc
-  octez-protocol-024-PsD5wVTJ-libs.smart-rollup
+  octez-protocol-024-PtTALLiN-libs.smart-rollup
   uri)
  (inline_tests
   (flags -verbose)
@@ -32,11 +32,11 @@
   -open Tezos_base.TzPervasives
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_protocol_024_PsD5wVTJ
-  -open Tezos_protocol_024_PsD5wVTJ_lifted
-  -open Tezos_protocol_plugin_024_PsD5wVTJ
-  -open Tezos_protocol_024_PsD5wVTJ_parameters
-  -open Tezos_smart_rollup_024_PsD5wVTJ))
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_protocol_024_PtTALLiN_lifted
+  -open Tezos_protocol_plugin_024_PtTALLiN
+  -open Tezos_protocol_024_PtTALLiN_parameters
+  -open Tezos_smart_rollup_024_PtTALLiN))
 
 (rule
  (targets client_keys.ml)

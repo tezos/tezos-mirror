@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_024_PsD5wVTJ_test_helpers)
+ (name tezos_024_PtTALLiN_test_helpers)
  (public_name octez-protocol-024-PtTALLiN-libs.test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
@@ -31,12 +31,12 @@
   -open Tezos_micheline
   -open Tezos_stdlib_unix
   -open Tezos_protocol_024_PtTALLiN
-  -open Tezos_client_024_PsD5wVTJ
+  -open Tezos_client_024_PtTALLiN
   -open Tezos_protocol_024_PtTALLiN_parameters
-  -open Tezos_protocol_plugin_024_PsD5wVTJ
+  -open Tezos_protocol_plugin_024_PtTALLiN
   -open Tezos_shell_services
   -open Tezos_crypto_dal
-  -open Tezos_smart_rollup_024_PsD5wVTJ))
+  -open Tezos_smart_rollup_024_PtTALLiN))
 
 (rule
  (targets signature.ml)

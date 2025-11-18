@@ -2,18 +2,18 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_protocol_024_PsD5wVTJ_parameters)
- (public_name tezos-protocol-024-PsD5wVTJ.parameters)
+ (name tezos_protocol_024_PtTALLiN_parameters)
+ (public_name tezos-protocol-024-PtTALLiN.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-proto-libs.protocol-environment
-  tezos-protocol-024-PsD5wVTJ.protocol)
+  tezos-protocol-024-PtTALLiN.protocol)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_024_PsD5wVTJ)
+  -open Tezos_protocol_024_PtTALLiN)
  (modules (:standard \ gen)))
 
 (rule
@@ -29,8 +29,8 @@
   octez-rust-deps
   bls12-381.archive
   octez-libs.base
-  tezos-protocol-024-PsD5wVTJ.parameters
-  tezos-protocol-024-PsD5wVTJ.protocol)
+  tezos-protocol-024-PtTALLiN.parameters
+  tezos-protocol-024-PtTALLiN.protocol)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp)
@@ -38,8 +38,8 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_024_PsD5wVTJ_parameters
-  -open Tezos_protocol_024_PsD5wVTJ)
+  -open Tezos_protocol_024_PtTALLiN_parameters
+  -open Tezos_protocol_024_PtTALLiN)
  (modules gen))
 
 (rule
@@ -63,7 +63,7 @@
  (action (run %{deps} --mainnet-with-chain-id)))
 
 (install
- (package tezos-protocol-024-PsD5wVTJ)
+ (package tezos-protocol-024-PtTALLiN)
  (section lib)
  (files
   sandbox-parameters.json test-parameters.json mainnet-parameters.json

@@ -22,8 +22,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Tezos_protocol_024_PsD5wVTJ
-open Tezos_client_024_PsD5wVTJ
+open Tezos_protocol_024_PtTALLiN
+open Tezos_client_024_PtTALLiN
 open Protocol
 
 module Proto = struct
@@ -101,8 +101,9 @@ module Proto = struct
         =
       (code_size :> int)
 
-    let actual_code_size Script_ir_translator.(Ex_code (Code {code; _})) =
-      8 * Obj.(reachable_words @@ repr code)
+    let actual_code_size
+        Script_ir_translator.(Ex_code (Code {implementation; _})) =
+      8 * Obj.(reachable_words @@ repr implementation)
 
     let parse_ty (raw_ctxt : Raw_context.t) ~allow_lazy_storage ~allow_operation
         ~allow_contract ~allow_ticket script =

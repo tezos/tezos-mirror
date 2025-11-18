@@ -3,7 +3,7 @@
 
 (library
  (name
-  src_proto_024_PsD5wVTJ_lib_protocol_test_integration_michelson_tezt_lib)
+  src_proto_024_PtTALLiN_lib_protocol_test_integration_michelson_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -16,8 +16,8 @@
   octez-protocol-024-PtTALLiN-libs.client
   tezos-benchmark
   octez-libs.micheline
-  tezos-benchmark-024-PsD5wVTJ
-  tezos-benchmark-type-inference-024-PsD5wVTJ
+  tezos-benchmark-024-PtTALLiN
+  tezos-benchmark-type-inference-024-PtTALLiN
   octez-protocol-024-PtTALLiN-libs.plugin
   tezos-protocol-024-PtTALLiN.parameters)
  (library_flags (:standard -linkall))
@@ -28,13 +28,13 @@
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_024_PtTALLiN
-  -open Tezos_024_PsD5wVTJ_test_helpers
+  -open Tezos_024_PtTALLiN_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_client_024_PsD5wVTJ
+  -open Tezos_client_024_PtTALLiN
   -open Tezos_micheline
-  -open Tezos_benchmark_024_PsD5wVTJ
-  -open Tezos_benchmark_type_inference_024_PsD5wVTJ
-  -open Tezos_protocol_plugin_024_PsD5wVTJ)
+  -open Tezos_benchmark_024_PtTALLiN
+  -open Tezos_benchmark_type_inference_024_PtTALLiN
+  -open Tezos_protocol_plugin_024_PtTALLiN)
  (modules
   test_annotations
   test_block_time_instructions
@@ -64,7 +64,7 @@
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   octez-rust-deps
-  src_proto_024_PsD5wVTJ_lib_protocol_test_integration_michelson_tezt_lib
+  src_proto_024_PtTALLiN_lib_protocol_test_integration_michelson_tezt_lib
   tezt)
  (link_flags
   (:standard)

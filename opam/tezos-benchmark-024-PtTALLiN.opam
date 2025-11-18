@@ -13,10 +13,10 @@ depends: [
   "octez-libs" { = version }
   "tezos-micheline-rewriting" { = version }
   "tezos-benchmark" { = version }
-  "tezos-benchmark-type-inference-024-PsD5wVTJ" { = version }
-  "tezos-protocol-024-PsD5wVTJ" { = version }
+  "tezos-benchmark-type-inference-024-PtTALLiN" { = version }
+  "tezos-protocol-024-PtTALLiN" { = version }
   "hashcons"
-  "octez-protocol-024-PsD5wVTJ-libs" { = version }
+  "octez-protocol-024-PtTALLiN-libs" { = version }
   "prbnmcn-stats" { = "0.0.6" }
   "octez-rust-deps" { with-test & = version }
   "bls12-381" { with-test & = version }

@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "ppx_expect"
   "octez-libs" { = version }
-  "tezos-protocol-024-PsD5wVTJ" { = version }
+  "tezos-protocol-024-PtTALLiN" { = version }
   "bls12-381" { with-test & = version }
   "octez-rust-deps" { with-test & = version }
   "octez-shell-libs" { = version }
@@ -41,4 +41,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Octez protocol 024-PsD5wVTJ libraries"
+synopsis: "Octez protocol 024-PtTALLiN libraries"

@@ -2,13 +2,13 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_layer2_utils_024_PsD5wVTJ)
- (public_name octez-protocol-024-PsD5wVTJ-libs.layer2-utils)
+ (name tezos_layer2_utils_024_PtTALLiN)
+ (public_name octez-protocol-024-PtTALLiN-libs.layer2-utils)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-024-PsD5wVTJ.protocol
-  octez-protocol-024-PsD5wVTJ-libs.client)
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-protocol-024-PtTALLiN-libs.client)
  (inline_tests
   (flags -verbose)
   (modes native)
@@ -19,5 +19,5 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_024_PsD5wVTJ
-  -open Tezos_client_024_PsD5wVTJ))
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_client_024_PtTALLiN))

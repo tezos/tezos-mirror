@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_benchmark_024_PsD5wVTJ)
- (public_name tezos-benchmark-024-PsD5wVTJ)
+ (name tezos_benchmark_024_PtTALLiN)
+ (public_name tezos-benchmark-024-PtTALLiN)
  (libraries
   octez-libs.stdlib
   octez-libs.base
@@ -11,12 +11,12 @@
   octez-libs.micheline
   tezos-micheline-rewriting
   tezos-benchmark
-  tezos-benchmark-type-inference-024-PsD5wVTJ
-  tezos-protocol-024-PsD5wVTJ.protocol
+  tezos-benchmark-type-inference-024-PtTALLiN
+  tezos-protocol-024-PtTALLiN.protocol
   octez-libs.crypto
-  tezos-protocol-024-PsD5wVTJ.parameters
+  tezos-protocol-024-PtTALLiN.parameters
   hashcons
-  octez-protocol-024-PsD5wVTJ-libs.test-helpers
+  octez-protocol-024-PtTALLiN-libs.test-helpers
   prbnmcn-stats)
  (library_flags (:standard -linkall))
  (flags
@@ -27,9 +27,9 @@
   -open Tezos_micheline
   -open Tezos_micheline_rewriting
   -open Tezos_benchmark
-  -open Tezos_benchmark_type_inference_024_PsD5wVTJ
-  -open Tezos_protocol_024_PsD5wVTJ
-  -open Tezos_024_PsD5wVTJ_test_helpers)
+  -open Tezos_benchmark_type_inference_024_PtTALLiN
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_024_PtTALLiN_test_helpers)
  (private_modules kernel rules state_space))
 
 (rule

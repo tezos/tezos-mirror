@@ -2,19 +2,19 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name main_baker_024_PsD5wVTJ)
- (public_name octez-baker-PsD5wVTJ)
- (package octez-baker-PsD5wVTJ)
+ (name main_baker_024_PtTALLiN)
+ (public_name octez-baker-PtTALLiN)
+ (package octez-baker-PtTALLiN)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-rust-deps
   bls12-381.archive
   octez-libs.base
   octez-libs.clic
-  tezos-protocol-024-PsD5wVTJ.protocol
-  octez-protocol-024-PsD5wVTJ-libs.client
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-protocol-024-PtTALLiN-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-024-PsD5wVTJ-libs.baking-commands
+  octez-protocol-024-PtTALLiN-libs.baking-commands
   octez-libs.stdlib-unix
   octez-shell-libs.client-base-unix
   octez-libs.octez-profiler.backends)
@@ -25,10 +25,10 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_024_PsD5wVTJ
-  -open Tezos_client_024_PsD5wVTJ
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_client_024_PtTALLiN
   -open Tezos_client_commands
-  -open Tezos_baking_024_PsD5wVTJ_commands
+  -open Tezos_baking_024_PtTALLiN_commands
   -open Tezos_stdlib_unix
   -open Tezos_client_base_unix
   -open Tezos_profiler_backends))
