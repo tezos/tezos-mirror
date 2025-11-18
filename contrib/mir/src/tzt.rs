@@ -224,6 +224,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 Source(v) => set_tzt_field("source", &mut m_source, v)?,
                 SenderAddr(v) => set_tzt_field("sender", &mut m_sender, v)?,
                 BigMaps(v) => set_tzt_field("big_maps", &mut m_big_maps, v)?,
+                Storages(_v) => todo!(),
             }
         }
 
@@ -477,6 +478,7 @@ pub(crate) enum TztEntity<'a> {
     Source(Micheline<'a>),
     SenderAddr(Micheline<'a>),
     BigMaps(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
+    Storages(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
 }
 
 /// Possible values for the "output" expectation field in a Tzt test. This is a

@@ -47,6 +47,8 @@ extern {
         "other_contracts" => Tok::Noun(TztPrim(TzP::other_contracts)),
         "big_map" => Tok::Noun(TztPrim(TzP::Big_map)),
         "big_maps" => Tok::Noun(TztPrim(TzP::big_maps)),
+        "storages" => Tok::Noun(TztPrim(TzP::storages)),
+        "Storage" => Tok::Noun(TztPrim(TzP::Storage)),
         "now" => Tok::Noun(TztPrim(TzP::now)),
         "source" => Tok::Noun(TztPrim(TzP::source)),
         "sender" => Tok::Noun(TztPrim(TzP::sender)),
@@ -150,6 +152,17 @@ otherContracts : Vec<(Micheline<'a>, Micheline<'a>)> = {
   "{" <s:otherContractsSeq> "}" => s
 }
 
+storageDef : (Micheline<'a>, Micheline<'a>, Micheline<'a>) = {
+  "Storage" <addr:Micheline> <ty:Micheline> <value:Micheline> => (addr, ty, value)
+}
+
+storageList :
+  Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>)> =
+{
+  "{" <s:semicolonSepSeq<storageDef>> "}" => s
+}
+
+
 bigMapsIndexed : (Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>) = {
   "big_map" <i:Micheline> <kty:Micheline> <vty:Micheline> <elts:Micheline>  => (i, kty, vty, elts)
 }
@@ -207,6 +220,7 @@ tztEntity : TztEntity<'a> = {
   "source" <Micheline> => TztEntity::Source(<>),
   "sender" <Micheline> => TztEntity::SenderAddr(<>),
   "big_maps" <bigMaps> => TztEntity::BigMaps(<>),
+  "storages" <storageList> => TztEntity::Storages(<>),
 }
 
 pub(crate) tztTestEntities : Vec<TztEntity<'a>> = semicolonSepSeq<tztEntity>;
