@@ -338,10 +338,10 @@ fi
 
 ## ensure command is known
 case ${command} in
-stabilise | snapshot | hash | copy | delete) ;;
+stabilise | snapshot | hash | copy | delete | finalize_docs) ;;
 *)
   error "Unknown command: ${command}" 1>&2
-  error "Command should be one of stabilise, snapshot, hash, copy or delete" 1>&2
+  error "Command should be one of stabilise, snapshot, hash, copy, delete or finalize_docs" 1>&2
   usage 1>&2
   print_and_exit 1 "${LINENO}"
   ;;
