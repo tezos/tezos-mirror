@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -147,6 +148,16 @@ pub fn store_current_transactions_receipts<Host: Runtime>(
         .to_vec();
     host.store_write_all(&path::current_block_transactions_receipts(root)?, &bytes)?;
     Ok(())
+}
+
+pub fn read_current_transactions_receipts<Host: Runtime>(
+    host: &Host,
+    root: &impl Path,
+) -> Result<Vec<TransactionReceipt>, crate::Error> {
+    let receipts_bytes =
+        host.store_read_all(&path::current_block_transactions_receipts(root)?)?;
+    let receipts = rlp::Rlp::new(&receipts_bytes).as_list::<TransactionReceipt>()?;
+    Ok(receipts)
 }
 
 pub fn read_current(

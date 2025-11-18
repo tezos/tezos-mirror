@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2023-2025 Functori <contact@functori.com>                   *)
 (* Copyright (c) 2023 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -53,8 +53,6 @@ val maximum_gas_per_transaction : path
 (** Kernel communication canal for individual transaction execution *)
 module Single_tx : sig
   val input_tx : path
-
-  val output_receipt : int32 -> path
 end
 
 (** Paths related to accounts. *)

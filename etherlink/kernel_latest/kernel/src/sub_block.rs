@@ -5,10 +5,11 @@
 
 use crate::{
     apply::{pure_fa_deposit, revm_run_transaction},
+    block_storage,
     bridge::{execute_deposit, DepositResult},
-    chains::{ChainConfigTrait, EvmChainConfig},
+    chains::{ChainConfigTrait, EvmChainConfig, ETHERLINK_SAFE_STORAGE_ROOT_PATH},
     configuration::fetch_pure_evm_config,
-    error::Error,
+    error::{Error, StorageError},
     gas_price::base_fee_per_gas,
     retrieve_chain_id, retrieve_da_fee,
     storage::read_sequencer_pool_address,
@@ -31,14 +32,11 @@ use tezos_ethereum::{
     },
 };
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
-use tezos_indexable_storage::IndexableStorage;
 use tezos_smart_rollup::{host::RuntimeError, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 
 const SINGLE_TX_EXECUTION_INPUT: RefPath =
     RefPath::assert_from(b"/evm/world_state/single_tx/input_tx");
-const SINGLE_TX_EXECUTION_RECEIPTS: RefPath =
-    RefPath::assert_from(b"/evm/world_state/single_tx/receipts");
 
 pub struct SingleTxExecutionInput {
     pub tx: Transaction,
@@ -101,54 +99,50 @@ fn get_evm_safe_host<'a, Host: Runtime>(
     }
 }
 
-fn get_receipt_index<Host: Runtime>(host: &mut Host) -> Result<u64, Error> {
-    let receipts_storage =
-        IndexableStorage::new_owned_path(SINGLE_TX_EXECUTION_RECEIPTS.into());
-
-    let length = receipts_storage.length(host)?;
-
-    Ok(length)
-}
-
 struct IterReceiptData {
     last_log: usize,
     current_cumulative_gas: U256,
 }
 
-fn get_iter_receipt_data<Host: Runtime>(
-    host: &mut Host,
-    nb_receipts: u64,
-) -> Result<IterReceiptData, Error> {
-    let receipts_storage =
-        IndexableStorage::new_owned_path(SINGLE_TX_EXECUTION_RECEIPTS.into());
+fn get_iter_receipt_data(receipts: &[TransactionReceipt]) -> IterReceiptData {
     let mut current_cumulative_gas = U256::zero();
     let mut last_log = 0;
 
-    for i in 0..nb_receipts {
-        let receipt_bytes = receipts_storage.get_value(host, i)?;
-        let receipt: TransactionReceipt = rlp::decode(&receipt_bytes)?;
+    for receipt in receipts {
         current_cumulative_gas += receipt.cumulative_gas_used;
         last_log += receipt.logs.len();
     }
 
-    Ok(IterReceiptData {
+    IterReceiptData {
         last_log,
         current_cumulative_gas,
-    })
+    }
 }
 
-fn store_receipt<Host: Runtime>(
+fn get_current_transaction_receipts<Host: Runtime>(
+    host: &Host,
+) -> Result<Vec<TransactionReceipt>, Error> {
+    match block_storage::read_current_transactions_receipts(
+        host,
+        &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+    ) {
+        Ok(receipts) => Ok(receipts),
+        Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
+            Ok(vec![])
+        }
+        Err(err) => Err(err),
+    }
+}
+
+fn store_current_transaction_receipts<Host: Runtime>(
     host: &mut Host,
-    receipt: TransactionReceipt,
+    receipts: &[TransactionReceipt],
 ) -> Result<(), Error> {
-    let encoded_receipt = rlp::encode(&receipt);
-
-    let speculative_receipts_storage =
-        IndexableStorage::new_owned_path(SINGLE_TX_EXECUTION_RECEIPTS.into());
-
-    speculative_receipts_storage.push_value(host, &encoded_receipt)?;
-
-    Ok(())
+    block_storage::store_current_transactions_receipts(
+        host,
+        &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+        receipts,
+    )
 }
 
 struct ReceiptData {
@@ -183,11 +177,12 @@ fn handle_receipt<Host: Runtime>(
         }
     };
 
-    let index = get_receipt_index(host)?;
+    let mut receipts = get_current_transaction_receipts(host)?;
+
     let IterReceiptData {
         last_log,
         current_cumulative_gas,
-    } = get_iter_receipt_data(host, index)?;
+    } = get_iter_receipt_data(&receipts);
 
     let logs: Vec<IndexedLog> = logs
         .into_iter()
@@ -209,7 +204,7 @@ fn handle_receipt<Host: Runtime>(
 
     let receipt = TransactionReceipt {
         hash,
-        index: index.try_into().unwrap_or(u32::MAX),
+        index: (receipts.len() + 1).try_into().unwrap_or(u32::MAX),
         block_number: block_constants.number,
         from,
         to: receipt_data.to,
@@ -223,7 +218,9 @@ fn handle_receipt<Host: Runtime>(
         status,
     };
 
-    store_receipt(host, receipt)
+    receipts.push(receipt);
+
+    store_current_transaction_receipts(host, &receipts)
 }
 
 fn block_constants<Host: Runtime>(
@@ -372,8 +369,8 @@ mod tests {
     use crate::{
         storage::store_chain_id,
         sub_block::{
-            SingleTxExecutionInput, SINGLE_TX_EXECUTION_INPUT,
-            SINGLE_TX_EXECUTION_RECEIPTS,
+            get_current_transaction_receipts, SingleTxExecutionInput,
+            SINGLE_TX_EXECUTION_INPUT,
         },
     };
     use alloy_primitives::{keccak256, Address};
@@ -382,13 +379,10 @@ mod tests {
         helpers::legacy::{alloy_to_h160, u256_to_alloy},
         storage::world_state_handler::StorageAccount,
     };
-    use rlp::{Decodable, Rlp};
     use tezos_ethereum::{
-        transaction::{TransactionReceipt, TransactionType},
-        tx_common::EthereumTransactionCommon,
+        transaction::TransactionType, tx_common::EthereumTransactionCommon,
     };
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
-    use tezos_indexable_storage::IndexableStorage;
     use tezos_smart_rollup::types::Timestamp;
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used to put traits interface in the scope
     const DUMMY_CHAIN_ID: U256 = U256::one();
@@ -462,13 +456,9 @@ mod tests {
         assert_eq!(read_input.block_number, single_tx_input.block_number);
         crate::sub_block::handle_run_transaction(&mut mock_host, read_input).unwrap();
 
-        let receipts_storage =
-            IndexableStorage::new_owned_path(SINGLE_TX_EXECUTION_RECEIPTS.into());
-        assert_eq!(receipts_storage.length(&mock_host).unwrap(), 1);
-        let receipt = TransactionReceipt::decode(&Rlp::new(
-            &receipts_storage.get_value(&mock_host, 0).unwrap(),
-        ))
-        .unwrap();
+        let receipts = get_current_transaction_receipts(&mock_host).unwrap();
+        assert_eq!(receipts.len(), 1);
+        let receipt = receipts.first().unwrap();
         assert_eq!(receipt.block_number, block_number);
         assert_eq!(receipt.hash, tx_hash);
         assert!(receipt.cumulative_gas_used > U256::zero());
