@@ -43,7 +43,7 @@ type block_info = {
 let raw_info cctxt ?(chain = `Main) hash shell_header =
   let open Lwt_result_syntax in
   let block = `Hash (hash, 0) in
-  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let* {current_protocol = protocol; next_protocol} =
     Shell_services.Blocks.protocols cctxt ~chain ~block ()
   in

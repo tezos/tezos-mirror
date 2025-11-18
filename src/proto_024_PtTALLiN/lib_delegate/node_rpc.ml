@@ -529,3 +529,5 @@ let constants cctxt ~chain ~block =
 
 let seed_computation cctxt ~chain ~block =
   Alpha_services.Seed_computation.get cctxt (chain, block)
+
+let chain_id cctxt ~chain = Shell_services.Chain.chain_id cctxt ~chain ()

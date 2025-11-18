@@ -74,9 +74,7 @@ module Baker = struct
         Config_services.user_activated_upgrades cctxt
       in
       let* constants =
-        let* chain_id =
-          Shell_services.Chain.chain_id cctxt ~chain:cctxt#chain ()
-        in
+        let* chain_id = Node_rpc.chain_id cctxt ~chain:cctxt#chain in
         Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
       in
       let block_time_s =
@@ -217,7 +215,7 @@ module VDF = struct
           Protocol_hash.pp_short
           Protocol.hash
       in
-      let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+      let* chain_id = Node_rpc.chain_id cctxt ~chain in
       let* constants =
         Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
       in
