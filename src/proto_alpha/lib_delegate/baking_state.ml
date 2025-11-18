@@ -133,6 +133,12 @@ module Delegate_infos = struct
 
   let own_delegates t = t.own_delegates
 
+  let own_delegate_ids t =
+    List.map
+      (fun delegate_info ->
+        Baking_state_types.Delegate.delegate_id delegate_info.delegate)
+      t.own_delegates
+
   let own_round_owner t ~committee_size ~round =
     let open Result_syntax in
     let* round_int = Round.to_int round |> Environment.wrap_tzresult in

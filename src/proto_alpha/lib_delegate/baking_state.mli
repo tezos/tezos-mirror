@@ -37,6 +37,9 @@ module Delegate_infos : sig
       no duplicates, the associated slot is the first one. *)
   val own_delegates : t -> delegate_info list
 
+  (** Returns the list of the delegate ids from [own_delegates]. *)
+  val own_delegate_ids : t -> Delegate_id.t list
+
   (** Returns, among our *own* delegates, the delegate (together with its
       first attesting slot) that owns the given round, if any. *)
   val own_round_owner :

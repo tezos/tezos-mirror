@@ -1138,13 +1138,13 @@ let update_to_level state level_update =
             Node_rpc.dal_attestable_slots
               dal_node_rpc_ctxt
               ~attestation_level:new_level
-              (Delegate_infos.own_delegates delegate_infos)
+              (Delegate_infos.own_delegate_ids delegate_infos)
         in
         let next_level_dal_attestable_slots =
           Node_rpc.dal_attestable_slots
             dal_node_rpc_ctxt
             ~attestation_level:(Int32.succ new_level)
-            (Delegate_infos.own_delegates next_level_delegate_infos)
+            (Delegate_infos.own_delegate_ids next_level_delegate_infos)
         in
         Lwt.return (dal_attestable_slots, next_level_dal_attestable_slots))
   in

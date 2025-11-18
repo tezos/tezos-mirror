@@ -149,14 +149,14 @@ val forge_double_baking_evidence :
   bh2:block_header ->
   (bytes, Error_monad.tztrace) result Lwt.t
 
-(** [dal_attestable_slots ctxt ~attestation_level delegates_slots] calls the DAL
+(** [dal_attestable_slots ctxt ~attestation_level delegate_ids] calls the DAL
     node RPC GET /profiles/<pkh>/attested_levels/<level>/attestable_slots/<pkh>
-    for each of the delegates in [delegate_infos] and returns the corresponding
+    for each of the delegates in [delegate_ids] and returns the corresponding
     promises. *)
 val dal_attestable_slots :
   Tezos_rpc.Context.generic ->
   attestation_level:int32 ->
-  Baking_state_types.delegate_info list ->
+  Baking_state_types.Delegate_id.t list ->
   Baking_state_types.dal_attestable_slots
 
 (** [get_dal_profiles ctxt delegates] calls the DAL node RPC GET

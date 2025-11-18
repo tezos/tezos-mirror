@@ -476,16 +476,11 @@ let get_attestable_slots dal_node_rpc_ctxt delegate_id ~attested_level =
     ()
 
 let dal_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
-    ~attestation_level delegate_infos =
+    ~attestation_level =
   let attested_level = Int32.succ attestation_level in
-  List.map
-    (fun (delegate_info : delegate_info) ->
-      let delegate_id =
-        Baking_state_types.Delegate.delegate_id delegate_info.delegate
-      in
+  List.map (fun delegate_id ->
       ( delegate_id,
         get_attestable_slots dal_node_rpc_ctxt delegate_id ~attested_level ))
-    delegate_infos
 
 let get_dal_profiles dal_node_rpc_ctxt =
   Tezos_rpc.Context.make_call
