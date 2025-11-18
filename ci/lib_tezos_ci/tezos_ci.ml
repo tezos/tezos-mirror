@@ -199,9 +199,20 @@ module Pipeline = struct
       {
         image = None;
         interruptible = Some true;
+        (* Check https://docs.gitlab.com/ci/yaml/#retry for more details *)
         retry =
           Some
-            {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]};
+            {
+              max = 2;
+              when_ =
+                [
+                  Stuck_or_timeout_failure;
+                  Runner_system_failure;
+                  Api_failure;
+                  Unknown_failure;
+                  Scheduler_failure;
+                ];
+            };
       }
 
   let default = function
