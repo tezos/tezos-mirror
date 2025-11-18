@@ -229,3 +229,10 @@ val protocols :
   ?block:Shell_services.block ->
   unit ->
   Chain_services.Blocks.protocols tzresult Lwt.t
+
+val blocks :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  heads:Block_hash.t list ->
+  length:int ->
+  Block_hash.t list list tzresult Lwt.t
