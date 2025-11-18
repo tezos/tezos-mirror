@@ -175,9 +175,7 @@ let check_parse_contract ctxt kind_with_storage expected_kind =
 let test_parse_contract kind expected_kind () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = test_context () in
-  let*@ contract_hash =
-    Contract.Internal_for_tests.get_clst_contract_hash ctxt
-  in
+  let*@ contract_hash = Contract.get_clst_contract_hash ctxt in
   let* kind_with_storage, _ = get_native_contract ctxt contract_hash kind in
   check_parse_contract ctxt kind_with_storage expected_kind
 
@@ -200,9 +198,7 @@ let execute_native_contract ctxt contract_hash kind parameter =
 let test_call_native_contract kind parameter expected_storage () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = test_context () in
-  let*@ contract_hash =
-    Contract.Internal_for_tests.get_clst_contract_hash ctxt
-  in
+  let*@ contract_hash = Contract.get_clst_contract_hash ctxt in
   let* res, _ctxt = execute_native_contract ctxt contract_hash kind parameter in
   if res.storage <> expected_storage then Test.fail "Unexpected storage" ;
   return_unit

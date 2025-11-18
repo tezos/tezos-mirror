@@ -469,6 +469,9 @@ module Contract = struct
 
   let get_delegate_status = Contract_delegate_storage.get_delegate_status
 
+  let get_clst_contract_hash ctxt =
+    Storage.Contract.Native_contracts.CLST.get ctxt
+
   module For_RPC = struct
     include Contract_storage.For_RPC
     include Delegate_slashed_deposits_storage.For_RPC
@@ -483,9 +486,6 @@ module Contract = struct
   module Internal_for_tests = struct
     include Contract_repr
     include Contract_storage
-
-    let get_clst_contract_hash ctxt =
-      Storage.Contract.Native_contracts.CLST.get ctxt
   end
 end
 

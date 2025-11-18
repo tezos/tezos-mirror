@@ -388,6 +388,23 @@ module S = struct
     let mk_call1 (service, _f) ctxt block id q =
       RPC_context.make_call1 service ctxt block id q ()
   end
+
+  module CLST = struct
+    let balance_service =
+      RPC_service.get_service
+        ~description:
+          "Returns the CLST balance of a contract. Returns 0 if the contract \
+           is originated or does not hold any CLST token."
+        ~query:RPC_query.empty
+        ~output:Script_int.n_encoding
+        RPC_path.(custom_root /: Contract.rpc_arg / "clst_balance")
+
+    let register_balance () =
+      register1 ~chunked:false balance_service (fun ctxt contract () () ->
+          let open Lwt_result_syntax in
+          let* balance, _ = Clst_storage.get_balance ctxt contract in
+          return balance)
+  end
 end
 
 module Implem = struct
@@ -790,7 +807,8 @@ let register () =
     (fun ctxt contract () () ->
       Contract.For_RPC.get_estimated_own_pending_slashed_amount ctxt contract) ;
 
-  S.Sapling.register ()
+  S.Sapling.register () ;
+  S.CLST.register_balance ()
 
 let list ctxt block = RPC_context.make_call0 S.list ctxt block () ()
 
@@ -901,3 +919,6 @@ let single_sapling_get_diff ctxt block id ?offset_commitment ?offset_nullifier
     block
     (Contract.Originated id)
     Sapling_services.{offset_commitment; offset_nullifier}
+
+let clst_balance ctxt block contract =
+  RPC_context.make_call1 S.CLST.balance_service ctxt block contract () ()

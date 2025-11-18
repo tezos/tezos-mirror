@@ -1888,6 +1888,9 @@ module Contract : sig
 
   val get_total_supply : context -> Tez.t tzresult Lwt.t
 
+  val get_clst_contract_hash :
+    context -> (Contract_hash.t, error trace) result Lwt.t
+
   module Legacy_big_map_diff : sig
     type item = private
       | Update of {
@@ -1928,9 +1931,6 @@ module Contract : sig
     val originated_contract : Origination_nonce.Internal_for_tests.t -> t
 
     val paid_storage_space : context -> t -> Z.t tzresult Lwt.t
-
-    val get_clst_contract_hash :
-      context -> (Contract_hash.t, error trace) result Lwt.t
   end
 
   (** Functions used exclusively for RPC calls *)
