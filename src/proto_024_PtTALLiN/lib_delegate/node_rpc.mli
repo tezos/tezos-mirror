@@ -209,3 +209,10 @@ val chain_id :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   Chain_id.t tzresult Lwt.t
+
+val shell_header :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?block:Shell_services.block ->
+  unit ->
+  Block_header.shell_header tzresult Lwt.t
