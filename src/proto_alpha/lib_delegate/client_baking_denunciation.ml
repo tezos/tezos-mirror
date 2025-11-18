@@ -322,7 +322,7 @@ let process_consensus_op state cctxt chain_id slot (type a)
                 Events.(emit double_op_detected) (existing_op_hash, new_op_hash)
               in
               let* op_hash =
-                Shell_services.Injection.private_operation cctxt ~chain bytes
+                Node_rpc.inject_private_operation_bytes cctxt ~chain bytes
               in
               let*! () =
                 match previously_denounced_oph with
@@ -459,9 +459,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           in
           let bytes = Signature.concat bytes Signature.zero in
           let*! () = Events.(emit double_baking_detected) () in
-          let* op_hash =
-            Shell_services.Injection.operation cctxt ~chain bytes
-          in
+          let* op_hash = Node_rpc.inject_operation_bytes cctxt ~chain bytes in
           let*! () = Events.(emit double_baking_denounced) (op_hash, bytes) in
           return
           @@ HLevel.replace
