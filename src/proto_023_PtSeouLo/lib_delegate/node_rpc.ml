@@ -554,3 +554,9 @@ let block_hash cctxt ~chain ~block =
 
 let blocks cctxt ~chain ~heads ~length =
   Shell_services.Blocks.list cctxt ~chain ~heads ~length ()
+
+let inject_private_operation_bytes cctxt ~chain bytes =
+  Shell_services.Injection.private_operation cctxt ~chain bytes
+
+let inject_operation_bytes cctxt ?async ~chain bytes =
+  Shell_services.Injection.operation cctxt ?async ~chain bytes
