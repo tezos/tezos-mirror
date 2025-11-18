@@ -1,7 +1,7 @@
 
 ./octez-client rpc get /chains/main/blocks/head/metadata
-{ "protocol": "PsD5wVTJc9Rg228rXbXbeoeEo8g3fgWH211U7V3qjUed11g5Gqk",
-  "next_protocol": "PsD5wVTJc9Rg228rXbXbeoeEo8g3fgWH211U7V3qjUed11g5Gqk",
+{ "protocol": "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu",
+  "next_protocol": "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu",
   "test_chain_status": { "status": "not_running" }, "max_operations_ttl": 2,
   "max_operation_data_length": 32768, "max_block_header_length": 289,
   "max_operation_list_length":
