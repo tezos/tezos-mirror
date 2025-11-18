@@ -349,7 +349,7 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
       operation_stream
   in
   let* shell_header =
-    (Shell_services.Blocks.Header.shell_header
+    (Node_rpc.shell_header
        cctxt
        ~chain:cctxt#chain
        ~block:(`Head 0)
