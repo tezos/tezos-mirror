@@ -105,7 +105,7 @@ let create_state (cctxt : #Protocol_client_context.full) ~preserved_levels
     blocks_stream ops_stream ops_stream_stopper =
   let open Lwt_result_syntax in
   let* constants =
-    Plugin.Alpha_services.Constants.all cctxt (cctxt#chain, cctxt#block)
+    Node_rpc.constants cctxt ~chain:cctxt#chain ~block:cctxt#block
   in
   let clean_frequency = max 1 (preserved_levels / 10) in
   let validators_rights = Validators_cache.create (preserved_levels + 2) in
