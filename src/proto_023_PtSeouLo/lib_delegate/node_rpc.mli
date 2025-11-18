@@ -192,3 +192,9 @@ val delegate_deactivated :
   ?block:Shell_services.block ->
   public_key_hash ->
   bool tzresult Lwt.t
+
+val constants :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Constants.t tzresult Lwt.t
