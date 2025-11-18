@@ -11,8 +11,8 @@
 use crate::ast::big_map::{BigMapId, InMemoryLazyStorage, LazyStorage, LazyStorageError};
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
-use crate::ast::Type;
 use crate::ast::View;
+use crate::ast::{Type, TypedValue};
 use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
@@ -135,6 +135,9 @@ pub struct Ctx<'a> {
     /// A map of contract addresses to their views. It only
     /// needs to work with smart contract, defaulting to [None] otherwise.
     pub views: HashMap<AddressHash, HashMap<String, View<'a>>>,
+    /// A map of contract addresses to their storage. It only
+    /// needs to work with smart contract, defaulting to [None] otherwise.
+    pub storage: HashMap<AddressHash, (Type, TypedValue<'a>)>,
     /// A function that maps public key hashes (i.e. effectively implicit
     /// account addresses) to their corresponding voting powers. Note that if
     /// you provide a custom function here, you also must define
@@ -236,6 +239,7 @@ impl Default for Ctx<'_> {
             total_voting_power: 0u32.into(),
             big_map_storage: InMemoryLazyStorage::new(),
             views: HashMap::new(),
+            storage: HashMap::new(),
             operation_counter: 0,
             operation_group_hash: OperationHash::from_base58_check(
                 "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
