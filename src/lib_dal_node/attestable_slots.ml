@@ -233,20 +233,21 @@ let get_backfill_payload ctxt ~pkh =
         (* Check each slot for attestability. *)
         let number_of_slots = proto_params.number_of_slots in
         let slot_indices = Stdlib.List.init number_of_slots Fun.id in
-        List.fold_left_es
-          (fun acc slot_index ->
-            let slot_id =
-              Types.Slot_id.{slot_level = published_level; slot_index}
-            in
-            let* is_attestable_slot_or_trap =
-              is_attestable_slot_or_trap ctxt ~pkh ~slot_id
-            in
-            match is_attestable_slot_or_trap with
-            | Some `Attestable_slot ->
-                return E.{acc with slot_ids = slot_id :: acc.slot_ids}
-            | Some `Trap | None -> return acc)
-          acc
-          slot_indices)
+        let* new_slot_ids =
+          List.filter_map_ep
+            (fun slot_index ->
+              let slot_id =
+                Types.Slot_id.{slot_level = published_level; slot_index}
+              in
+              let* is_attestable_slot_or_trap =
+                is_attestable_slot_or_trap ctxt ~pkh ~slot_id
+              in
+              match is_attestable_slot_or_trap with
+              | Some `Attestable_slot -> return_some slot_id
+              | Some `Trap | None -> return_none)
+            slot_indices
+        in
+        return E.{acc with slot_ids = List.append new_slot_ids acc.slot_ids})
     {slot_ids = []; no_shards_attestation_levels = []}
     published_levels
 
