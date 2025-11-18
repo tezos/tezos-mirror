@@ -279,7 +279,7 @@ let get_seed_computation ctxt =
 let get_constants ctxt = Alpha_services.Constants.all rpc_ctxt ctxt
 
 let default_test_constants =
-  Tezos_protocol_024_PsD5wVTJ_parameters.Default_parameters.constants_test
+  Tezos_protocol_024_PtTALLiN_parameters.Default_parameters.constants_test
 
 let get_issuance_per_minute ctxt =
   Adaptive_issuance_services.current_issuance_per_minute rpc_ctxt ctxt
@@ -847,7 +847,7 @@ let init_with_constants_gen ?algo ?prepare_context tup constants =
   let n = tup_n tup in
   let*? bootstrap_accounts, contracts = create_bootstrap_accounts ?algo n in
   let parameters =
-    Tezos_protocol_024_PsD5wVTJ_parameters.Default_parameters
+    Tezos_protocol_024_PtTALLiN_parameters.Default_parameters
     .parameters_of_constants
       ~bootstrap_accounts
       constants
@@ -866,7 +866,7 @@ let init_with_constants_algo_list ?prepare_context constants algo_list =
     create_bootstrap_accounts_algo_list algo_list
   in
   let parameters =
-    Tezos_protocol_024_PsD5wVTJ_parameters.Default_parameters
+    Tezos_protocol_024_PtTALLiN_parameters.Default_parameters
     .parameters_of_constants
       ~bootstrap_accounts
       constants
@@ -894,7 +894,7 @@ let init_with_parameters2 = init_with_parameters_gen T2
 
 let raw_context_from_constants constants =
   let open Lwt_result_wrap_syntax in
-  let open Tezos_protocol_024_PsD5wVTJ_parameters in
+  let open Tezos_protocol_024_PtTALLiN_parameters in
   let initial_account = Account.new_account () in
   let bootstrap_accounts =
     Account.make_bootstrap_account

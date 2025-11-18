@@ -3,7 +3,7 @@
 
 (library
  (name tezos_024_PsD5wVTJ_test_helpers)
- (public_name octez-protocol-024-PsD5wVTJ-libs.test-helpers)
+ (public_name octez-protocol-024-PtTALLiN-libs.test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -14,15 +14,15 @@
   octez-libs.base
   octez-libs.micheline
   octez-libs.stdlib-unix
-  tezos-protocol-024-PsD5wVTJ.protocol
-  octez-protocol-024-PsD5wVTJ-libs.client
-  tezos-protocol-024-PsD5wVTJ.parameters
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-protocol-024-PtTALLiN-libs.client
+  tezos-protocol-024-PtTALLiN.parameters
   octez-proto-libs.protocol-environment
-  octez-protocol-024-PsD5wVTJ-libs.plugin
+  octez-protocol-024-PtTALLiN-libs.plugin
   octez-shell-libs.shell-services
   octez-libs.plompiler
   octez-libs.crypto-dal
-  octez-protocol-024-PsD5wVTJ-libs.smart-rollup)
+  octez-protocol-024-PtTALLiN-libs.smart-rollup)
  (flags
   (:standard)
   -open Tezt_core
@@ -30,9 +30,9 @@
   -open Tezos_base.TzPervasives
   -open Tezos_micheline
   -open Tezos_stdlib_unix
-  -open Tezos_protocol_024_PsD5wVTJ
+  -open Tezos_protocol_024_PtTALLiN
   -open Tezos_client_024_PsD5wVTJ
-  -open Tezos_protocol_024_PsD5wVTJ_parameters
+  -open Tezos_protocol_024_PtTALLiN_parameters
   -open Tezos_protocol_plugin_024_PsD5wVTJ
   -open Tezos_shell_services
   -open Tezos_crypto_dal

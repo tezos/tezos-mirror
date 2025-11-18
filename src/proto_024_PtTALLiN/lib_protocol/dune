@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_environment_024_PsD5wVTJ)
- (public_name tezos-protocol-024-PsD5wVTJ.protocol.environment)
+ (public_name tezos-protocol-024-PtTALLiN.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment)
@@ -18,11 +18,11 @@
    "module Name = struct let name = \"024-PsD5wVTJ\" end\ninclude Tezos_protocol_environment.V15.Make(Name)()\n")))
 
 (library
- (name tezos_raw_protocol_024_PsD5wVTJ)
- (public_name tezos-protocol-024-PsD5wVTJ.protocol.raw)
+ (name tezos_raw_protocol_024_PtTALLiN)
+ (public_name tezos-protocol-024-PtTALLiN.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-024-PsD5wVTJ.protocol.environment)
+  tezos-protocol-024-PtTALLiN.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -291,20 +291,20 @@
   Main))
 
 (library
- (name tezos_protocol_024_PsD5wVTJ)
- (public_name tezos-protocol-024-PsD5wVTJ.protocol)
+ (name tezos_protocol_024_PtTALLiN)
+ (public_name tezos-protocol-024-PtTALLiN.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs
-  tezos-protocol-024-PsD5wVTJ.protocol.raw)
+  tezos-protocol-024-PtTALLiN.protocol.raw)
  (flags
   (:standard)
   -nopervasives)
- (modules Protocol Tezos_protocol_024_PsD5wVTJ))
+ (modules Protocol Tezos_protocol_024_PtTALLiN))
 
 (install
- (package tezos-protocol-024-PsD5wVTJ)
+ (package tezos-protocol-024-PtTALLiN)
  (section lib)
  (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
@@ -313,10 +313,10 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsD5wVTJc9Rg228rXbXbeoeEo8g3fgWH211U7V3qjUed11g5Gqk\"\nlet name = Tezos_protocol_environment_024_PsD5wVTJ.Name.name\ninclude Tezos_raw_protocol_024_PsD5wVTJ\ninclude Tezos_raw_protocol_024_PsD5wVTJ.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PsD5wVTJc9Rg228rXbXbeoeEo8g3fgWH211U7V3qjUed11g5Gqk\"\nlet name = Tezos_protocol_environment_024_PsD5wVTJ.Name.name\ninclude Tezos_raw_protocol_024_PtTALLiN\ninclude Tezos_raw_protocol_024_PsD5wVTJ.Main\n")))
 
 (rule
- (targets tezos_protocol_024_PsD5wVTJ.ml)
+ (targets tezos_protocol_024_PtTALLiN.ml)
  (action
   (write-file
    %{targets}
@@ -591,17 +591,17 @@
  (action (run %{bin:octez-protocol-compiler} -no-hash-check -warn-error +a .)))
 
 (library
- (name tezos_protocol_024_PsD5wVTJ_lifted)
- (public_name tezos-protocol-024-PsD5wVTJ.protocol.lifted)
+ (name tezos_protocol_024_PtTALLiN_lifted)
+ (public_name tezos-protocol-024-PtTALLiN.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs
-  tezos-protocol-024-PsD5wVTJ.protocol)
+  tezos-protocol-024-PtTALLiN.protocol)
  (flags
   (:standard)
   -nopervasives
-  -open Tezos_protocol_024_PsD5wVTJ)
+  -open Tezos_protocol_024_PtTALLiN)
  (modules Lifted_protocol))
 
 (rule
@@ -612,7 +612,7 @@
    "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
 
 (library
- (name tezos_protocol_024_PsD5wVTJ_functor)
+ (name tezos_protocol_024_PtTALLiN_functor)
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs)
@@ -894,11 +894,11 @@
     (run %{bin:octez-protocol-compiler.octez-protocol-packer} %{src_dir})))))
 
 (library
- (name tezos_embedded_protocol_024_PsD5wVTJ)
- (public_name tezos-protocol-024-PsD5wVTJ.embedded-protocol)
+ (name tezos_embedded_protocol_024_PtTALLiN)
+ (public_name tezos-protocol-024-PtTALLiN.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-024-PsD5wVTJ.protocol
+  tezos-protocol-024-PtTALLiN.protocol
   octez-shell-libs.protocol-updater
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))

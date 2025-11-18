@@ -366,7 +366,7 @@ let pick_addr_attester ctxt =
   match attesters with a :: _ -> return a.V.consensus_key | _ -> assert false
 
 let init_params =
-  Tezos_protocol_024_PsD5wVTJ_parameters.Default_parameters
+  Tezos_protocol_024_PtTALLiN_parameters.Default_parameters
   .parameters_of_constants
     {Context.default_test_constants with consensus_threshold_size = 0}
 

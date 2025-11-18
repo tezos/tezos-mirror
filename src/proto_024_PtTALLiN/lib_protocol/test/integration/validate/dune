@@ -8,26 +8,26 @@
   tezt.core
   bls12-381.archive
   octez-libs.base
-  tezos-protocol-024-PsD5wVTJ.protocol
+  tezos-protocol-024-PtTALLiN.protocol
   qcheck-alcotest
-  octez-protocol-024-PsD5wVTJ-libs.client
+  octez-protocol-024-PtTALLiN-libs.client
   octez-libs.test-helpers
-  octez-protocol-024-PsD5wVTJ-libs.test-helpers
+  octez-protocol-024-PtTALLiN-libs.test-helpers
   octez-libs.base-test-helpers
-  tezos-protocol-024-PsD5wVTJ.parameters
-  octez-protocol-024-PsD5wVTJ-libs.plugin)
+  tezos-protocol-024-PtTALLiN.parameters
+  octez-protocol-024-PtTALLiN-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezt_core
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_024_PsD5wVTJ
+  -open Tezos_protocol_024_PtTALLiN
   -open Tezos_client_024_PsD5wVTJ
   -open Tezos_test_helpers
   -open Tezos_024_PsD5wVTJ_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_protocol_024_PsD5wVTJ_parameters
+  -open Tezos_protocol_024_PtTALLiN_parameters
   -open Tezos_protocol_plugin_024_PsD5wVTJ)
  (modules
   generator_descriptors
@@ -56,7 +56,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-024-PsD5wVTJ-tests)
+ (package tezos-protocol-024-PtTALLiN-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

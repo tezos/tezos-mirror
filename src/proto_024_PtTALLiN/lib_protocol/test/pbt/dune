@@ -9,20 +9,20 @@
   bls12-381.archive
   octez-libs.base
   octez-libs.micheline
-  octez-protocol-024-PsD5wVTJ-libs.client
-  tezos-protocol-024-PsD5wVTJ.protocol
+  octez-protocol-024-PtTALLiN-libs.client
+  tezos-protocol-024-PtTALLiN.protocol
   octez-libs.tezos-context.merkle_proof_encoding
   octez-libs.test-helpers
-  octez-protocol-024-PsD5wVTJ-libs.test-helpers
+  octez-protocol-024-PtTALLiN-libs.test-helpers
   octez-alcotezt
   qcheck-alcotest
   tezos-benchmark
   tezos-benchmark-024-PsD5wVTJ
   tezos-benchmark-type-inference-024-PsD5wVTJ
-  octez-protocol-024-PsD5wVTJ-libs.smart-rollup
+  octez-protocol-024-PtTALLiN-libs.smart-rollup
   octez-libs.crypto-dal
   octez-libs.base-test-helpers
-  tezos-protocol-024-PsD5wVTJ.parameters)
+  tezos-protocol-024-PtTALLiN.parameters)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -31,7 +31,7 @@
   -open Tezos_base.TzPervasives
   -open Tezos_micheline
   -open Tezos_client_024_PsD5wVTJ
-  -open Tezos_protocol_024_PsD5wVTJ
+  -open Tezos_protocol_024_PtTALLiN
   -open Tezos_test_helpers
   -open Tezos_024_PsD5wVTJ_test_helpers
   -open Octez_alcotezt
@@ -40,7 +40,7 @@
   -open Tezos_smart_rollup_024_PsD5wVTJ
   -open Tezos_crypto_dal
   -open Tezos_base_test_helpers
-  -open Tezos_protocol_024_PsD5wVTJ_parameters)
+  -open Tezos_protocol_024_PtTALLiN_parameters)
  (modules
   liquidity_baking_pbt
   saturation_fuzzing
@@ -75,7 +75,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-024-PsD5wVTJ-tests)
+ (package tezos-protocol-024-PtTALLiN-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

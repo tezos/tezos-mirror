@@ -10,14 +10,14 @@
   octez-libs.base
   octez-libs.base-test-helpers
   octez-libs.micheline
-  octez-protocol-024-PsD5wVTJ-libs.client
+  octez-protocol-024-PtTALLiN-libs.client
   octez-shell-libs.client-base
-  tezos-protocol-024-PsD5wVTJ.parameters
+  tezos-protocol-024-PtTALLiN.parameters
   octez-proto-libs.protocol-environment
   octez-libs.stdlib-unix
-  tezos-protocol-024-PsD5wVTJ.protocol
+  tezos-protocol-024-PtTALLiN.protocol
   octez-libs.test-helpers
-  octez-protocol-024-PsD5wVTJ-libs.test-helpers
+  octez-protocol-024-PtTALLiN-libs.test-helpers
   octez-alcotezt
   octez-l2-libs.scoru-wasm-helpers
   octez-libs.stdlib
@@ -33,8 +33,8 @@
   -open Tezos_base_test_helpers
   -open Tezos_micheline
   -open Tezos_client_024_PsD5wVTJ
-  -open Tezos_protocol_024_PsD5wVTJ_parameters
-  -open Tezos_protocol_024_PsD5wVTJ
+  -open Tezos_protocol_024_PtTALLiN_parameters
+  -open Tezos_protocol_024_PtTALLiN
   -open Tezos_test_helpers
   -open Tezos_024_PsD5wVTJ_test_helpers
   -open Octez_alcotezt
@@ -93,7 +93,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-024-PsD5wVTJ-tests)
+ (package tezos-protocol-024-PtTALLiN-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
