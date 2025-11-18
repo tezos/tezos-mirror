@@ -140,12 +140,12 @@ let inject_vdf_revelation cctxt state setup solution chain_id hash
   | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
       if eq_vdf_setup setup seed_discriminant seed_challenge then (
         let* op_bytes =
-          Plugin.RPC.Forge.vdf_revelation
+          Node_rpc.forge_vdf_revelation
             cctxt
-            (chain, block)
+            ~chain
+            ~block
             ~branch:hash
             ~solution
-            ()
         in
         let op_bytes = Tezos_crypto.Signature.V_latest.(concat op_bytes zero) in
         let* op_hash =

@@ -434,6 +434,9 @@ let forge_seed_nonce_revelation cctxt ~chain ?(block = `Head 0) ~branch ~level
     ~nonce
     ()
 
+let forge_vdf_revelation cctxt ~chain ~block ~branch ~solution =
+  Plugin.RPC.Forge.vdf_revelation cctxt (chain, block) ~branch ~solution ()
+
 let await_protocol_activation cctxt ~chain () =
   let open Lwt_result_syntax in
   let* block_stream, stop =
