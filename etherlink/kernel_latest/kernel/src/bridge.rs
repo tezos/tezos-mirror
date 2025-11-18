@@ -16,6 +16,8 @@ use revm_etherlink::storage::world_state_handler::StorageAccount;
 use revm_etherlink::ExecutionOutcome;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
+use tezos_data_encoding::enc::BinWriter;
+use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::rlp_helpers::{decode_field_u256_le, decode_option_explicit};
 use tezos_ethereum::{
     rlp_helpers::{decode_field, next},
@@ -23,6 +25,7 @@ use tezos_ethereum::{
 };
 use tezos_evm_logging::{log, Level::Info};
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
 use tezos_tracing::trace_kernel;
 
@@ -60,15 +63,36 @@ alloy_sol_types::sol! {
     );
 }
 
+const TEZLINK_ADDRESS: u8 = 1;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum DepositReceiver {
     Ethereum(H160),
+    Tezos(Contract),
 }
 
 impl DepositReceiver {
     pub fn to_h160(&self) -> Result<H160, BridgeError> {
         match self {
             Self::Ethereum(receiver) => Ok(*receiver),
+            Self::Tezos(contract) => {
+                // TODO https://linear.app/tezos/issue/L2-641
+                // This function converts a Tezos like address to a H160
+                // to represent its wallet in the Etherlink runtime. This should
+                // be done outside of 'bridge.rs' and the conversion function
+                // may be different (for example determine the H160 from the keccak)
+                // of the Tezos contract bytes.
+                let bytes = contract
+                    .to_bytes()
+                    .map_err(|_| BridgeError::InvalidDepositReceiver(vec![]))?;
+                // Tezos addresses are 22-byte long, to canonically represent
+                // a Tezos address as a H160, we drop the first and last bytes.
+                if bytes.len() == 22 {
+                    Ok(H160::from_slice(&bytes[1..21]))
+                } else {
+                    Err(BridgeError::InvalidDepositReceiver(bytes))
+                }
+            }
         }
     }
 }
@@ -77,14 +101,43 @@ impl rlp::Encodable for DepositReceiver {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         match self {
             DepositReceiver::Ethereum(addr) => addr.rlp_append(s),
+            DepositReceiver::Tezos(contract) => {
+                s.begin_list(2);
+                s.append(&TEZLINK_ADDRESS);
+                let mut out = vec![];
+                // BinWriter returns a Result<()> but can't properly
+                // propagate it outside of rlp_append
+                let _ = contract.bin_write(&mut out);
+                s.append(&out);
+            }
         }
     }
 }
 
 impl rlp::Decodable for DepositReceiver {
     fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
-        let receiver: H160 = decode_field(decoder, "receiver")?;
-        Ok(Self::Ethereum(receiver))
+        if decoder.is_list() {
+            if decoder.item_count()? != 2 {
+                return Err(DecoderError::RlpIncorrectListLen);
+            }
+            let tag: u8 = decoder.at(0)?.as_val()?;
+            let receiver = decoder.at(1)?;
+            match tag {
+                TEZLINK_ADDRESS => {
+                    let receiver = receiver.data()?;
+                    let contract = Contract::nom_read_exact(receiver).map_err(|_| {
+                        DecoderError::Custom(
+                            "Can't decode Tezos receiver using NomReader",
+                        )
+                    })?;
+                    Ok(Self::Tezos(contract))
+                }
+                _ => Err(DecoderError::Custom("Unknown receiver tag.")),
+            }
+        } else {
+            let receiver: H160 = decode_field(decoder, "receiver")?;
+            Ok(Self::Ethereum(receiver))
+        }
     }
 }
 
@@ -92,6 +145,7 @@ impl Display for DepositReceiver {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Ethereum(address) => write!(f, "{address}"),
+            Self::Tezos(contract) => write!(f, "{}", contract.to_b58check()),
         }
     }
 }
