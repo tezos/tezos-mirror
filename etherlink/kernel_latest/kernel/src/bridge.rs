@@ -66,9 +66,9 @@ pub enum DepositReceiver {
 }
 
 impl DepositReceiver {
-    pub fn to_h160(&self) -> H160 {
+    pub fn to_h160(&self) -> Result<H160, BridgeError> {
         match self {
-            Self::Ethereum(receiver) => *receiver,
+            Self::Ethereum(receiver) => Ok(*receiver),
         }
     }
 }
@@ -211,9 +211,9 @@ impl Deposit {
     /// so that we can index successful deposits and update status.
     ///
     /// Signature: Deposit(uint256,address,uint256,uint256)
-    pub fn event_log(&self) -> Log {
+    pub fn event_log(&self) -> Result<Log, BridgeError> {
         let event_data = SolBridgeDepositEvent {
-            receiver: h160_to_alloy(&self.receiver.to_h160()),
+            receiver: h160_to_alloy(&self.receiver.to_h160()?),
             amount: u256_to_alloy(&self.amount),
             inbox_level: u256_to_alloy(&U256::from(self.inbox_level)),
             inbox_msg_id: u256_to_alloy(&U256::from(self.inbox_msg_id)),
@@ -221,7 +221,7 @@ impl Deposit {
 
         let data = SolBridgeDepositEvent::encode_data(&event_data);
 
-        Log {
+        Ok(Log {
             // Emitted by the "system" contract
             address: Address::ZERO,
             // (Event ID (non-anonymous) and indexed fields, Non-indexed fields)
@@ -229,7 +229,7 @@ impl Deposit {
                 vec![B256::from_slice(&DEPOSIT_EVENT_TOPIC)],
                 data.into(),
             ),
-        }
+        })
     }
 
     /// Returns unique deposit digest that can be used as hash for the
@@ -298,18 +298,19 @@ pub struct DepositResult {
 pub fn execute_deposit<Host: Runtime>(
     host: &mut Host,
     deposit: &Deposit,
-) -> Result<DepositResult, revm_etherlink::Error> {
+) -> Result<DepositResult, BridgeError> {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
-    let receiver = deposit.receiver.to_h160();
-    let mut to_account = StorageAccount::from_address(&h160_to_alloy(&receiver))?;
+    let receiver = deposit.receiver.to_h160()?;
+    let mut to_account = StorageAccount::from_address(&h160_to_alloy(&receiver))
+        .map_err(|_| BridgeError::InvalidDepositReceiver(receiver.as_bytes().to_vec()))?;
 
     let result = match to_account.add_balance(host, u256_to_alloy(&deposit.amount)) {
         Ok(()) => ExecutionResult::Success {
             reason: SuccessReason::Return,
             gas_used: DEPOSIT_EXECUTION_GAS_COST,
             gas_refunded: 0,
-            logs: vec![deposit.event_log()],
+            logs: vec![deposit.event_log()?],
             output: Output::Call(Bytes::from_static(&[1u8])),
         },
         Err(e) => {
@@ -590,6 +591,6 @@ mod tests {
                                         0000000000000000000000000202020202020202020202020202020202020202\
                                         0000000000000000000000000000000000000000000000000000000000000003\
                                         0000000000000000000000000000000000000000000000000000000000000004").unwrap();
-        assert_eq!(expected_log, log.data.data)
+        assert_eq!(expected_log, log.unwrap().data.data)
     }
 }

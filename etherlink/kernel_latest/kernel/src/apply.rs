@@ -128,7 +128,7 @@ fn make_object_info(
         hash: transaction.tx_hash,
         input: transaction.data(),
         nonce: transaction.nonce(),
-        to: transaction.to(),
+        to: transaction.to()?,
         index,
         value: transaction.value(),
         signature: transaction.signature(),
@@ -479,7 +479,7 @@ fn apply_deposit<Host: Runtime>(
     trace_deposit(
         host,
         transaction.value(),
-        transaction.to(),
+        transaction.to()?,
         execution_outcome.result.logs(),
         tracer_input,
     );
@@ -678,7 +678,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         estimated_ticks_used: ticks_used,
     } = transaction_result;
 
-    let to = transaction.to();
+    let to = transaction.to()?;
 
     let fee_updates = transaction
         .content
