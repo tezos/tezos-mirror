@@ -26,8 +26,6 @@
 
 module Profiler = (val Profiler.wrap Shell_profiling.requester_profiler)
 
-let profiler_init = ref false
-
 module type REQUESTER = sig
   type t
 
@@ -815,13 +813,7 @@ module Make
 
   let watch s = Lwt_watcher.create_stream s.input
 
-  let[@warning "-32"] init_profiler () =
-    if not !profiler_init then (
-      () [@profiler.record {verbosity = Notice} "start"] ;
-      profiler_init := true)
-
   let create ?random_table:random ?global_input request_param disk =
-    () [@profiler.overwrite init_profiler ()] ;
     let scheduler = Scheduler.create request_param in
     let memory = Memory_table.create ~entry_type:"entries" ?random 17 in
     let input = Lwt_watcher.create_input () in

@@ -29,8 +29,6 @@ module P2p_reader_event = Distributed_db_event.P2p_reader_event
 
 module Profiler = (val Profiler.wrap Shell_profiling.p2p_reader_profiler)
 
-let profiler_init = ref false
-
 type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
 type connection =
@@ -583,9 +581,6 @@ type worker = Worker.callback Worker.t
 
 let on_launch (_ : worker) gid
     {p2p; conn; disk; protocol_db; active_chains; unregister} =
-  if not !profiler_init then (
-    () [@profiler.record {verbosity = Notice} "start"] ;
-    profiler_init := true) ;
   let canceler = Lwt_canceler.create () in
   let state =
     {
