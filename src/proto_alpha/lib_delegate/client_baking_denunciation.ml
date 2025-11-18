@@ -449,13 +449,13 @@ let process_block (cctxt : #Protocol_client_context.full) state
           let*! block = get_block_offset level in
           let* block_hash = Alpha_block_services.hash cctxt ~chain ~block () in
           let* bytes =
-            Plugin.RPC.Forge.double_baking_evidence
+            Node_rpc.forge_double_baking_evidence
               cctxt
-              (chain, block)
+              ~chain
+              ~block
               ~branch:block_hash
               ~bh1
               ~bh2
-              ()
           in
           let bytes = Signature.concat bytes Signature.zero in
           let*! () = Events.(emit double_baking_detected) () in
