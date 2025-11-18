@@ -185,3 +185,10 @@ val get_nonce :
   level:Raw_level.t ->
   unit ->
   Alpha_services.Nonce.info tzresult Lwt.t
+
+val delegate_deactivated :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?block:Shell_services.block ->
+  public_key_hash ->
+  bool tzresult Lwt.t
