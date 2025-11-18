@@ -628,6 +628,8 @@
   "update_setint_00.tzt": true,
   "update_setint_01.tzt": true,
   "update_setint_02.tzt": true,
+  "view_00.tzt": false,
+  "view_01.tzt": false,
   "xor_bool-bool_00.tzt": true,
   "xor_bool-bool_01.tzt": true,
   "xor_bool-bool_02.tzt": true,
