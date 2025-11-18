@@ -204,3 +204,8 @@ val seed_computation :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Seed.seed_computation_status tzresult Lwt.t
+
+val chain_id :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  Chain_id.t tzresult Lwt.t
