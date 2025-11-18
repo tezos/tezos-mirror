@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Protocol ((pre)attestations)
-    Invocation:   dune exec src/proto_024_PsD5wVTJ/lib_protocol/test/integration/consensus/main.exe \
+    Invocation:   dune exec src/proto_024_PtTALLiN/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_all_bakers_attest.ml
 
     Subject:      Test all bakers attest feature and activation.

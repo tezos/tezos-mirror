@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (baking)
-    Invocation: dune exec src/proto_024_PsD5wVTJ/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_024_PtTALLiN/lib_protocol/test/unit/main.exe \
                   -- --file test_level_module.ml
     Subject:    some functions in the Level module
 *)

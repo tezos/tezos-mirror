@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Rollup layer 1 logic
-    Invocation:   dune exec src/proto_024_PsD5wVTJ/lib_protocol/test/integration/operations/main.exe \
+    Invocation:   dune exec src/proto_024_PtTALLiN/lib_protocol/test/integration/operations/main.exe \
                   -- --file test_zk_rollup.ml
     Subject:      Test zk rollup
 *)

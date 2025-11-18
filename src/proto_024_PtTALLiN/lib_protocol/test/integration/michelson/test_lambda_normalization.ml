@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Michelson)
-    Invocation: dune exec src/proto_024_PsD5wVTJ/lib_protocol/test/integration/michelson/main.exe \
+    Invocation: dune exec src/proto_024_PtTALLiN/lib_protocol/test/integration/michelson/main.exe \
                   -- --file test_lambda_normalization.ml
     Subject:    Test that lambdas are normalized to optimized format at elaboration
 *)

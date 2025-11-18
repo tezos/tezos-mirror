@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    protocol
-    Invocation:   dune exec src/proto_024_PsD5wVTJ/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_024_PtTALLiN/lib_protocol/test/unit/main.exe \
                   -- --file test_full_staking_balance_repr.ml
     Subject:      test the Full_staking_balance_repr module
 *)

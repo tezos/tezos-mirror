@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_024_PsD5wVTJ/lib_protocol/test/pbt/main.exe \
+    Invocation:   dune exec src/proto_024_PtTALLiN/lib_protocol/test/pbt/main.exe \
                   -- --file test_tez_repr.ml
     Subject:      Operations in Tez_repr
 *)

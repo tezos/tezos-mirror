@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Ticket_scanner)
-    Invocation: dune exec src/proto_024_PsD5wVTJ/lib_protocol/test/integration/michelson/main.exe \
+    Invocation: dune exec src/proto_024_PtTALLiN/lib_protocol/test/integration/michelson/main.exe \
                   -- --file test_ticket_operations_diff.ml
     Subject:    Ticket scanner tests
 *)

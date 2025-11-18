@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (origination)
-    Invocation: dune exec src/proto_024_PsD5wVTJ/lib_protocol/test/integration/operations/main.exe \
+    Invocation: dune exec src/proto_024_PtTALLiN/lib_protocol/test/integration/operations/main.exe \
                   -- --file test_origination.ml
     Subject:    On originating contracts.
 *)

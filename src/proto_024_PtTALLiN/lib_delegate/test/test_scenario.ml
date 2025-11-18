@@ -8,7 +8,7 @@
 (* Testing
    -------
    Component:    Protocol, delegate
-   Invocation:   dune exec src/proto_024_PsD5wVTJ/lib_delegate/test/main.exe \
+   Invocation:   dune exec src/proto_024_PtTALLiN/lib_delegate/test/main.exe \
                   -- --file test_scenario.ml
    Subject:      Test different scenario for delegate
 *)
