@@ -84,6 +84,13 @@ end
 
 (** A facility for registering pipelines. *)
 module Pipeline : sig
+  (** Default pipeline configuration.
+
+      It is included in [.gitlab-ci.yml] and thus all pipelines inherit it,
+      with the exception of child pipelines. You can specify different defaults
+      for child pipelines, with the default defaults being [default_config]. *)
+  val default_config : Gitlab_ci.Types.default
+
   (** Register a pipeline.
 
       [register ~description ?variables ?default name rule] will register a pipeline [name]
@@ -104,7 +111,6 @@ module Pipeline : sig
   val register :
     ?variables:Gitlab_ci.Types.variables ->
     ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
-    ?default:Gitlab_ci.Types.default ->
     description:string ->
     jobs:tezos_job list ->
     string ->
