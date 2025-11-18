@@ -10729,34 +10729,66 @@ let test_eth_send_raw_transaction_sync_rpc () =
   register_sandbox_with_observer
     ~tags:["evm"; "delayed_transaction"]
     ~title:"eth_sendRawTransactionSync waits for receipt"
-  @@ fun {sandbox; observer} ->
+  @@ fun {sandbox; observer; _} ->
+  (*
+    To avoid updating all the tooling.
+    This experimental feature will be deprecated in the short future.
+  *)
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ~preconfirmation_stream_enabled:true
+      ()
+  in
+  let* () = Evm_node.terminate sandbox in
+  let* () = Evm_node.terminate observer in
+  let* () = Evm_node.Config_file.update sandbox patch_config in
+  let* () = Evm_node.Config_file.update observer patch_config in
+  let p = Evm_node.wait_for_start_history_mode observer in
+  let* () = Evm_node.run sandbox in
+  let* () = Evm_node.run observer in
+  let* _ = p in
+  let* _res = produce_block sandbox in
   let* gas_price = Rpc.get_gas_price sandbox in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let receiver = Eth_account.bootstrap_accounts.(1) in
-  let* raw_tx =
-    Cast.craft_tx
-      ~source_private_key:sender.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:(Int32.to_int gas_price)
-      ~gas:23_300
-      ~value:(Wei.of_eth_int 10)
-      ~address:receiver.address
-      ()
-  in
   let* rpc_observer_node = run_new_rpc_endpoint observer in
-  let receipt_promise =
-    Rpc.eth_send_raw_transaction_sync ~raw_tx rpc_observer_node
+  let get_receipt_result block nonce =
+    let* raw_tx =
+      Cast.craft_tx
+        ~source_private_key:sender.private_key
+        ~chain_id:1337
+        ~nonce
+        ~gas_price:(Int32.to_int gas_price)
+        ~gas:23_300
+        ~value:(Wei.of_eth_int 10)
+        ~address:receiver.address
+        ()
+    in
+    let receipt_promise =
+      Rpc.eth_send_raw_transaction_sync ~raw_tx ~block rpc_observer_node
+    in
+    let* _ = Evm_node.wait_for_tx_queue_injecting_transaction observer in
+    Check.((Lwt.is_sleeping receipt_promise = true) bool)
+      ~error_msg:"eth_sendRawTransactionSync should wait for inclusion" ;
+    if block = Pending then
+      let*@ receipt = receipt_promise in
+      return receipt
+    else
+      let*@ _ = produce_block sandbox in
+      let*@ receipt = receipt_promise in
+      return receipt
   in
-  let* _ = Evm_node.wait_for_tx_queue_injecting_transaction observer in
-  Check.((Lwt.is_sleeping receipt_promise = true) bool)
-    ~error_msg:"eth_sendRawTransactionSync should wait for inclusion" ;
-  let*@ _ = produce_block sandbox in
-  let*@ receipt = receipt_promise in
+  let* receipt = get_receipt_result Latest 0 in
   Check.(
     (receipt.status = true)
       bool
-      ~error_msg:"Transaction should have been included and successful") ;
+      ~error_msg:
+        "Transaction should have been included and executed successfully") ;
+  let* preconfirmed_receipt = get_receipt_result Pending 1 in
+  Check.(
+    (preconfirmed_receipt.status = true)
+      bool
+      ~error_msg:"Transaction should have been executed successfully") ;
   unit
 
 let test_eth_send_raw_transaction_sync_rpc_timeouts () =
@@ -11481,7 +11513,7 @@ let test_websocket_newPendingTransactions_event =
     Background.register
       (Lwt.catch
          (fun () ->
-           let* _ =
+           let _ =
              Eth_cli.transaction_send
                ~source_private_key:sender.private_key
                ~to_public_key:sender.address
@@ -11688,7 +11720,7 @@ let test_websocket_tez_newIncludedTransactions_event =
     Background.register
       (Lwt.catch
          (fun () ->
-           let* _ =
+           let _ =
              Eth_cli.transaction_send
                ~source_private_key:sender.private_key
                ~to_public_key:sender.address

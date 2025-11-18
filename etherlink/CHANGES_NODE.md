@@ -12,6 +12,10 @@
 
 - Add new `eth_sendRawTransactionSync` endpoint to our JSON-RPC.
   Defined in [EIP-7966](https://eips.ethereum.org/EIPS/eip-7966).
+- Add an optional `block` parameter to `eth_sendRawTransactionSync`.
+  Supported values are: `Latest` and `Pending`. `Latest` means waiting the
+  block execution while `Pending` use the preconfirmation system.
+  Default value is `Latest` (!19837)
 - Add new `eth_subscribe` subscription named `tez_newIncludedTransactions`
   that allow you to get a stream of transactions that have been chosen
   to be included in the next block (!19810).

@@ -115,10 +115,11 @@ module Request = struct
   let eth_sendRawTransaction ~raw_tx =
     {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
 
-  let eth_sendRawTransactionSync ~raw_tx ~timeout =
+  let eth_sendRawTransactionSync ~raw_tx ~timeout ~block =
     {
       method_ = "eth_sendRawTransactionSync";
-      parameters = `A [`String raw_tx; `String timeout];
+      parameters =
+        `A [`String raw_tx; `String timeout; block_param_to_json block];
     }
 
   let eth_getTransactionReceipt ~tx_hash =
@@ -555,14 +556,16 @@ let send_raw_transaction ?websocket ~raw_tx evm_node =
        (fun response -> Evm_node.extract_result response |> JSON.as_string)
        response
 
-let eth_send_raw_transaction_sync ?websocket ~raw_tx ?(timeout = 0) evm_node =
+let eth_send_raw_transaction_sync ?websocket ~raw_tx ?(timeout = 0)
+    ?(block = Latest) evm_node =
   let* response =
     Evm_node.jsonrpc
       ?websocket
       evm_node
       (Request.eth_sendRawTransactionSync
          ~raw_tx
-         ~timeout:(string_of_int timeout))
+         ~timeout:(string_of_int timeout)
+         ~block)
   in
   return
   @@ decode_or_error

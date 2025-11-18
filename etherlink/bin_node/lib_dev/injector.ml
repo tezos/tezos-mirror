@@ -47,6 +47,12 @@ let send_raw_transaction_request raw_tx =
     ~input_encoding:Send_raw_transaction.input_encoding
     (Ethereum_types.hex_encode_string raw_tx)
 
+let send_raw_transaction_sync_request raw_tx timeout block_parameter =
+  construct_rpc_call
+    ~method_:Send_raw_transaction_sync.method_
+    ~input_encoding:Send_raw_transaction_sync.input_encoding
+    (raw_tx, timeout, block_parameter)
+
 let inject_transaction_request tx_object raw_tx wait_confirmation =
   construct_rpc_call
     ~method_:Inject_transaction.method_
@@ -67,6 +73,16 @@ let send_raw_transaction ~keep_alive ~timeout ~base ~raw_tx =
     ~path:Resto.Path.root
     (send_raw_transaction_request raw_tx)
     Send_raw_transaction.output_encoding
+
+let send_raw_transaction_sync ~keep_alive ~timeout ~base ~raw_tx
+    ~internal_timeout ~block_parameter =
+  call_rpc_service
+    ~keep_alive
+    ~timeout
+    ~base
+    ~path:Resto.Path.root
+    (send_raw_transaction_sync_request raw_tx internal_timeout block_parameter)
+    Send_raw_transaction_sync.output_encoding
 
 let inject_transaction ~keep_alive ~timeout ~base ~tx_object ~raw_tx
     ~wait_confirmation =

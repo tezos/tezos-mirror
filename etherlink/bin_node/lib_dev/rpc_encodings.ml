@@ -652,15 +652,43 @@ end
 module Send_raw_transaction_sync = struct
   open Ethereum_types
 
-  type input = hex * int64
+  type input = hex * int64 * Block_parameter.t
 
   type output = Transaction_receipt.t
 
+  let default_timeout = 0L
+
+  let default_block_param = Block_parameter.Latest
+
   let input_encoding =
-    Helpers.encoding_with_optional_last_param
-      hex_encoding
-      Data_encoding.int64
-      0L
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"Only raw transaction"
+          (Tag 0)
+          (tup1 hex_encoding)
+          (fun (_, _, _) -> None)
+          (fun c -> (c, default_timeout, default_block_param));
+        case
+          ~title:"Raw transaction and timeout"
+          (Tag 1)
+          (tup2 hex_encoding Data_encoding.int64)
+          (fun (_, _, _) -> None)
+          (fun (c, b) -> (c, b, default_block_param));
+        case
+          ~title:"Raw transaction and block parameter"
+          (Tag 2)
+          (tup2 hex_encoding Block_parameter.encoding)
+          (fun (_, _, _) -> None)
+          (fun (c, s) -> (c, default_timeout, s));
+        case
+          ~title:"Raw transaction, timeout and block parameter"
+          (Tag 3)
+          (tup3 hex_encoding Data_encoding.int64 Block_parameter.encoding)
+          (fun (c, b, s) -> Some (c, b, s))
+          (fun (c, b, s) -> (c, b, s));
+      ]
 
   let output_encoding = Transaction_receipt.encoding
 

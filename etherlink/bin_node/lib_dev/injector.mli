@@ -16,6 +16,19 @@ val send_raw_transaction :
   raw_tx:string ->
   (Ethereum_types.hash, string) result tzresult Lwt.t
 
+(** [send_raw_transaction_sync ~keep_alive ~base raw_txn block_parameter] uses the
+    [eth_sendRawTransaction] RPC method to inject [raw_txn] to the endpoint
+    [base], and waits for its confirmation. It will retry as many time as
+    necessary if [keep_alive] is set to true, or return an error otherwise. *)
+val send_raw_transaction_sync :
+  keep_alive:bool ->
+  timeout:float ->
+  base:Uri.t ->
+  raw_tx:Ethereum_types.hex ->
+  internal_timeout:int64 ->
+  block_parameter:Ethereum_types.Block_parameter.t ->
+  (Transaction_receipt.t, string) result tzresult Lwt.t
+
 val inject_transaction :
   keep_alive:bool ->
   timeout:float ->
