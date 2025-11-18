@@ -2,7 +2,7 @@ Protocol Alpha
 ==============
 
 This page documents the changes brought by protocol Alpha with respect
-to T024 (see :ref:`naming_convention`).
+to Tallinn (see :ref:`naming_convention`).
 
 For changes brought by Quebec with respect to Paris, see :doc:`../protocols/021_quebec`.
 
