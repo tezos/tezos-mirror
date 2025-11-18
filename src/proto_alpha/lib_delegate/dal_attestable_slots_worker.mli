@@ -21,6 +21,10 @@
     The worker's purpose is to decouple the critical consensus path from DAL
     RPC latency: streams advance in the background, therefore the cache can serve
     DAL information instantly.
+
+    When a consumer asks for attestable slots at level L for a set of delegates,
+    the worker returns an immediate "snapshot" from the cache (defaulting to an all-false
+    bitset if nothing has been observed yet).
 *)
 
 type t
@@ -33,6 +37,15 @@ val update_streams_subscriptions :
   Tezos_rpc.Context.generic ->
   delegate_ids:Baking_state_types.Delegate_id.t list ->
   unit Lwt.t
+
+(** [get_dal_attestable_slots t ctxt ~delegate_id ~attestation_level]
+    returns for [~delegate_id], the current bitset for [published_level] derived
+    from [~attestation_level], if found in the cache. *)
+val get_dal_attestable_slots :
+  t ->
+  delegate_id:Baking_state_types.Delegate_id.t ->
+  attestation_level:int32 ->
+  Tezos_dal_node_services.Types.attestable_slots option Lwt.t
 
 (** [create ~attestation_lag ~number_of_slots] creates a new worker state. This
     does not start any background thread, as streams are opened via

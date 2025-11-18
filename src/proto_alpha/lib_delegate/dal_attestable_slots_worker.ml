@@ -21,6 +21,27 @@ module Events = struct
       ~msg:"Consumed backfill stream for {delegate_id}"
       ("delegate_id", Delegate_id.encoding)
 
+  let no_attestable_slot_at_level =
+    declare_1
+      ~section
+      ~name:"no_attestable_slot_at_level"
+      ~level:Warning
+      ~msg:
+        "No attestable slots found for attestation level {attestation_level} \
+         in cache"
+      ("attestation_level", Data_encoding.int32)
+
+  let no_attestable_slot_at_level_for_delegate =
+    declare_2
+      ~section
+      ~name:"no_attestable_slot_at_level_for_delegate"
+      ~level:Warning
+      ~msg:
+        "No attestable slots found for attestation level {attestation_level} \
+         and {delegate_id} in cache"
+      ("attestation_level", Data_encoding.int32)
+      ("delegate_id", Delegate_id.encoding)
+
   let monitor_attestable_slots_failed =
     declare_2
       ~section
@@ -251,6 +272,25 @@ let update_streams_subscriptions state dal_node_rpc_ctxt ~delegate_ids =
     @@ DelegateSet.(elements (diff new_delegate_ids current_delegate_ids))
   in
   subscribe_to_new_streams state dal_node_rpc_ctxt ~delegate_ids_to_add
+
+(* TODO: Use this functionality in the baker instead of the [dal_attestable_slots] static method. *)
+let get_dal_attestable_slots state ~delegate_id ~attestation_level =
+  let open Lwt_syntax in
+  match Stdlib.Hashtbl.find_opt state.cache attestation_level with
+  | None ->
+      let* () = Events.(emit no_attestable_slot_at_level attestation_level) in
+      return_none
+  | Some slots_by_delegate -> (
+      match Delegate_id.Table.find_opt slots_by_delegate delegate_id with
+      | None ->
+          let* () =
+            Events.(
+              emit
+                no_attestable_slot_at_level_for_delegate
+                (attestation_level, delegate_id))
+          in
+          return_none
+      | Some slots -> return_some slots)
 
 let create ~attestation_lag ~number_of_slots =
   {
