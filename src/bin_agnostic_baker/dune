@@ -22,12 +22,12 @@
    (-> void_for_linking-octez-protocol-022-PsRiotum-libs-dal.empty))
   octez-protocol-023-PtSeouLo-libs.agnostic-baker
   octez-protocol-023-PtSeouLo-libs.dal
-  (select void_for_linking-octez-protocol-024-PsD5wVTJ-libs-agnostic-baker from
-   (octez-protocol-024-PsD5wVTJ-libs.agnostic-baker -> void_for_linking-octez-protocol-024-PsD5wVTJ-libs-agnostic-baker.empty)
-   (-> void_for_linking-octez-protocol-024-PsD5wVTJ-libs-agnostic-baker.empty))
-  (select void_for_linking-octez-protocol-024-PsD5wVTJ-libs-dal from
-   (octez-protocol-024-PsD5wVTJ-libs.dal -> void_for_linking-octez-protocol-024-PsD5wVTJ-libs-dal.empty)
-   (-> void_for_linking-octez-protocol-024-PsD5wVTJ-libs-dal.empty))
+  (select void_for_linking-octez-protocol-024-PtTALLiN-libs-agnostic-baker from
+   (octez-protocol-024-PtTALLiN-libs.agnostic-baker -> void_for_linking-octez-protocol-024-PtTALLiN-libs-agnostic-baker.empty)
+   (-> void_for_linking-octez-protocol-024-PtTALLiN-libs-agnostic-baker.empty))
+  (select void_for_linking-octez-protocol-024-PtTALLiN-libs-dal from
+   (octez-protocol-024-PtTALLiN-libs.dal -> void_for_linking-octez-protocol-024-PtTALLiN-libs-dal.empty)
+   (-> void_for_linking-octez-protocol-024-PtTALLiN-libs-dal.empty))
   (select void_for_linking-octez-protocol-alpha-libs-agnostic-baker from
    (octez-protocol-alpha-libs.agnostic-baker -> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)
    (-> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty))
@@ -55,7 +55,7 @@
   (progn
    (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty "")
    (write-file void_for_linking-octez-protocol-022-PsRiotum-libs-dal.empty "")
-   (write-file void_for_linking-octez-protocol-024-PsD5wVTJ-libs-agnostic-baker.empty "")
-   (write-file void_for_linking-octez-protocol-024-PsD5wVTJ-libs-dal.empty "")
+   (write-file void_for_linking-octez-protocol-024-PtTALLiN-libs-agnostic-baker.empty "")
+   (write-file void_for_linking-octez-protocol-024-PtTALLiN-libs-dal.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty "")
    (write-file void_for_linking-octez-protocol-alpha-libs-dal.empty ""))))

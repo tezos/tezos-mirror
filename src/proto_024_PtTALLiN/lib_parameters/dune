@@ -1,0 +1,70 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_024_PtTALLiN_parameters)
+ (public_name tezos-protocol-024-PtTALLiN.parameters)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-proto-libs.protocol-environment
+  tezos-protocol-024-PtTALLiN.protocol)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_024_PtTALLiN)
+ (modules (:standard \ gen)))
+
+(rule
+ (targets signature.ml)
+ (action
+  (write-file
+   %{targets}
+   "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V2")))
+
+(executable
+ (name gen)
+ (libraries
+  octez-rust-deps
+  bls12-381.archive
+  octez-libs.base
+  tezos-protocol-024-PtTALLiN.parameters
+  tezos-protocol-024-PtTALLiN.protocol)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_024_PtTALLiN_parameters
+  -open Tezos_protocol_024_PtTALLiN)
+ (modules gen))
+
+(rule
+ (targets sandbox-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --sandbox)))
+
+(rule
+ (targets test-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --test)))
+
+(rule
+ (targets mainnet-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --mainnet)))
+
+(rule
+ (targets mainnet-with-chain-id-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --mainnet-with-chain-id)))
+
+(install
+ (package tezos-protocol-024-PtTALLiN)
+ (section lib)
+ (files
+  sandbox-parameters.json test-parameters.json mainnet-parameters.json
+  mainnet-with-chain-id-parameters.json))

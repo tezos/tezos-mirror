@@ -50,7 +50,7 @@ octez-protocol-020-PsParisC-libs	all	2
 octez-protocol-021-PsQuebec-libs	all	2
 octez-protocol-022-PsRiotum-libs	all	2
 octez-protocol-023-PtSeouLo-libs	all	1
-octez-protocol-024-PsD5wVTJ-libs	all	1
+octez-protocol-024-PtTALLiN-libs	all	1
 octez-protocol-alpha-libs	all	1
 octez-protocol-compiler	exec	6
 octez-protocol-compiler-compat	all	7
@@ -64,13 +64,13 @@ octez-shell-libs	all	6
 octez-signer	exec	4
 octez-smart-rollup-node	exec	1
 octez-smart-rollup-node-Proxford	all	1
-octez-smart-rollup-node-PsD5wVTJ	all	1
 octez-smart-rollup-node-PsParisC	all	1
 octez-smart-rollup-node-PsQuebec	all	2
 octez-smart-rollup-node-PsRiotum	all	2
 octez-smart-rollup-node-PtNairob	all	2
 octez-smart-rollup-node-PtParisB	all	2
 octez-smart-rollup-node-PtSeouLo	all	1
+octez-smart-rollup-node-PtTALLiN	all	1
 octez-smart-rollup-node-alpha	all	1
 octez-smart-rollup-node-lib	all	2
 octez-version	exec	6
@@ -106,7 +106,7 @@ tezos-protocol-020-PsParisC	all	5
 tezos-protocol-021-PsQuebec	all	5
 tezos-protocol-022-PsRiotum	all	5
 tezos-protocol-023-PtSeouLo	all	5
-tezos-protocol-024-PsD5wVTJ	all	5
+tezos-protocol-024-PtTALLiN	all	5
 tezos-protocol-alpha	all	5
 tezos-protocol-demo-counter	all	5
 tezos-protocol-demo-noops	all	5

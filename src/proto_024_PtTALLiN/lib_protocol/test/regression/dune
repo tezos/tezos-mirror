@@ -1,0 +1,54 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_proto_024_PtTALLiN_lib_protocol_test_regression_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  bls12-381.archive
+  octez-libs.base
+  tezt-tezos
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-protocol-024-PtTALLiN-libs.client
+  octez-protocol-024-PtTALLiN-libs.plugin
+  octez-protocol-024-PtTALLiN-libs.test-helpers
+  octez-libs.micheline)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezt_tezos
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_client_024_PtTALLiN
+  -open Tezos_protocol_plugin_024_PtTALLiN
+  -open Tezos_024_PtTALLiN_test_helpers
+  -open Tezos_micheline)
+ (modules test_logging))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  octez-rust-deps
+  src_proto_024_PtTALLiN_lib_protocol_test_regression_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-024-PtTALLiN-tests)
+ (deps
+  (glob_files contracts/*.tz)
+  (glob_files expected/test_logging.ml/*.out))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

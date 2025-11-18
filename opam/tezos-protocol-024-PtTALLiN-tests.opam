@@ -1,0 +1,35 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "3.11.1" }
+  "ocaml" { >= "4.14" }
+  "octez-rust-deps" {with-test}
+  "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
+  "bls12-381" {with-test}
+  "octez-libs" {with-test}
+  "octez-protocol-024-PtTALLiN-libs" {with-test}
+  "tezos-protocol-024-PtTALLiN" {with-test}
+  "octez-alcotezt" {with-test}
+  "tezos-benchmark" {with-test}
+  "tezos-benchmark-024-PtTALLiN" {with-test}
+  "tezos-benchmark-type-inference-024-PtTALLiN" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.20" }
+  "tezt-tezos" {with-test}
+  "octez-shell-libs" {with-test}
+  "octez-proto-libs" {with-test}
+  "octez-l2-libs" {with-test}
+]
+build: [
+  ["rm" "-rf" "vendors" "contrib"]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+available: os-family != "windows"
+synopsis: "Tezos/Protocol: tests for economic-protocol definition"

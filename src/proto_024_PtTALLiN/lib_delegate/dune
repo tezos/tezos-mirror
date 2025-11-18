@@ -1,0 +1,128 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_baking_024_PtTALLiN)
+ (public_name octez-protocol-024-PtTALLiN-libs.baking)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.clic
+  octez-version.value
+  tezos-protocol-024-PtTALLiN.protocol
+  tezos-protocol-024-PtTALLiN.protocol.lifted
+  octez-protocol-024-PtTALLiN-libs.plugin
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-node-config
+  octez-shell-libs.client-base
+  octez-protocol-024-PtTALLiN-libs.client
+  octez-shell-libs.client-commands
+  octez-libs.stdlib
+  octez-libs.stdlib-unix
+  octez-libs.octez-profiler
+  octez-libs.rpc-http-client-unix
+  octez-libs.rpc-http-client
+  octez-shell-libs.context-ops
+  octez-libs.rpc
+  octez-libs.rpc-http
+  octez-libs.crypto-dal
+  tezos-dal-node-services
+  lwt-canceler
+  lwt-exit
+  uri
+  memtrace
+  octez-baker-lib
+  octez-baking-common-lib)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_protocol_024_PtTALLiN_lifted
+  -open Tezos_protocol_plugin_024_PtTALLiN
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_024_PtTALLiN
+  -open Tezos_client_commands
+  -open Tezos_stdlib
+  -open Tezos_stdlib_unix
+  -open Tezos_profiler
+  -open Tezos_rpc_http_client
+  -open Tezos_context_ops
+  -open Tezos_rpc_http
+  -open Tezos_crypto_dal
+  -open Octez_agnostic_baker)
+ (modules (:standard \ Baking_commands Baking_commands_registration)))
+
+(rule
+ (targets signature.ml)
+ (action
+  (write-file
+   %{targets}
+   "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V2")))
+
+(rule
+ (targets client_keys.ml)
+ (action (write-file %{targets} "include Tezos_client_base.Client_keys_v2")))
+
+(library
+ (name tezos_baking_024_PtTALLiN_commands)
+ (public_name octez-protocol-024-PtTALLiN-libs.baking-commands)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-024-PtTALLiN.protocol
+  tezos-protocol-024-PtTALLiN.parameters
+  octez-libs.stdlib-unix
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-024-PtTALLiN-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-024-PtTALLiN-libs.baking
+  octez-libs.rpc
+  uri)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_protocol_024_PtTALLiN_parameters
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_024_PtTALLiN
+  -open Tezos_client_commands
+  -open Tezos_baking_024_PtTALLiN)
+ (modules Baking_commands))
+
+(library
+ (name tezos_baking_024_PtTALLiN_commands_registration)
+ (public_name octez-protocol-024-PtTALLiN-libs.baking-commands.registration)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-proto-libs.protocol-environment
+  octez-shell-libs.shell-services
+  octez-shell-libs.client-base
+  octez-protocol-024-PtTALLiN-libs.client
+  octez-shell-libs.client-commands
+  octez-protocol-024-PtTALLiN-libs.baking
+  octez-protocol-024-PtTALLiN-libs.baking-commands
+  octez-libs.rpc)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_shell_services
+  -open Tezos_client_base
+  -open Tezos_client_024_PtTALLiN
+  -open Tezos_client_commands
+  -open Tezos_baking_024_PtTALLiN
+  -open Tezos_baking_024_PtTALLiN_commands)
+ (modules Baking_commands_registration))

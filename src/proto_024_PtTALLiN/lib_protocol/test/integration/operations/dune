@@ -1,0 +1,65 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name
+  src_proto_024_PtTALLiN_lib_protocol_test_integration_operations_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  bls12-381.archive
+  octez-alcotezt
+  octez-libs.base
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-protocol-024-PtTALLiN-libs.client
+  octez-protocol-024-PtTALLiN-libs.test-helpers
+  octez-libs.base-test-helpers
+  octez-protocol-024-PtTALLiN-libs.plugin)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Octez_alcotezt
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_client_024_PtTALLiN
+  -open Tezos_024_PtTALLiN_test_helpers
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_plugin_024_PtTALLiN)
+ (modules
+  test_activation
+  test_combined_operations
+  test_failing_noop
+  test_origination
+  test_paid_storage_increase
+  test_reveal
+  test_sc_rollup_transfer
+  test_sc_rollup
+  test_transfer
+  test_voting
+  test_zk_rollup
+  test_transfer_ticket))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  octez-rust-deps
+  src_proto_024_PtTALLiN_lib_protocol_test_integration_operations_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-024-PtTALLiN-tests)
+ (deps (glob_files contracts/*))
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

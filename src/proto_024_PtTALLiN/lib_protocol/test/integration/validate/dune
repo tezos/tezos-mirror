@@ -1,0 +1,65 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_proto_024_PtTALLiN_lib_protocol_test_integration_validate_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  bls12-381.archive
+  octez-libs.base
+  tezos-protocol-024-PtTALLiN.protocol
+  qcheck-alcotest
+  octez-protocol-024-PtTALLiN-libs.client
+  octez-libs.test-helpers
+  octez-protocol-024-PtTALLiN-libs.test-helpers
+  octez-libs.base-test-helpers
+  tezos-protocol-024-PtTALLiN.parameters
+  octez-protocol-024-PtTALLiN-libs.plugin)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_client_024_PtTALLiN
+  -open Tezos_test_helpers
+  -open Tezos_024_PtTALLiN_test_helpers
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_024_PtTALLiN_parameters
+  -open Tezos_protocol_plugin_024_PtTALLiN)
+ (modules
+  generator_descriptors
+  generators
+  manager_operation_helpers
+  test_1m_restriction
+  test_covalidity
+  test_manager_operation_validation
+  test_mempool
+  test_sanity
+  test_validation_batch
+  valid_operations_generators
+  validate_helpers))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  octez-rust-deps
+  src_proto_024_PtTALLiN_lib_protocol_test_integration_validate_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-024-PtTALLiN-tests)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

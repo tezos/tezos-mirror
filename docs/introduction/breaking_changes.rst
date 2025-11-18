@@ -18,18 +18,18 @@ In the particular case of RPC changes, you may consult complementary information
 
 
 
-.. _t024_breaking_changes:
+.. _tallinn_breaking_changes:
 
-Protocol T024
--------------
+Protocol Tallinn
+----------------
 
-:doc:`Full Protocol T024 Changelog<../protocols/024_t024>`
+:doc:`Full Protocol Tallinn Changelog<../protocols/024_tallinn>`
 
 
 6s Block Time
 ^^^^^^^^^^^^^
 
-Protocol T024 reduces the block time from 8 seconds to 6 seconds on
+Protocol Tallinn reduces the block time from 8 seconds to 6 seconds on
 mainnet. That is, a block can be produced with a delay of 6 seconds
 with respect to the previous block, if the latter is at round 0.
 
@@ -37,18 +37,18 @@ Multiple protocol and smart rollup parameters have been updated in
 consequence, to ensure that their duration in terms of
 minutes/hours/weeks remains the same as in protocol Seoul. A full list
 of affected parameters with their old and new values can be found
-:ref:`here<6s_block_time_parameters_t024>`.
+:ref:`here<6s_block_time_parameters_tallinn>`.
 
 Unlike other parameters, the value of parameter
 ``smart_rollup_max_active_outbox_levels`` remains unchanged in terms
 of blocks. This means that the actual duration of the maximal allowed
 period of withdrawal has decreased from ~14 days in protocol Seoul to
-~10 days in protocol T024.
+~10 days in protocol Tallinn.
 
 Consensus changes
 ^^^^^^^^^^^^^^^^^
 
-With the All Bakers Attest feature implemented in protocol T024 come changes to
+With the All Bakers Attest feature implemented in protocol Tallinn come changes to
 the consensus. Most of these changes will take effect only when the feature activates,
 but in some cases, the format of operations or RPCs have been updated to include
 more information.
@@ -70,15 +70,15 @@ Additionally, fields related to the consensus were added in the block metadata:
 ``attestations`` and ``preattestations``. They can be ``null`` when the corresponding
 consensus operations are not required in the block. Otherwise, they contain three fields:
 the ``total_committee_power`` and ``threshold``, as described in
-:ref:`the consensus documentation<tb_validator_t024>`, and the
+:ref:`the consensus documentation<tb_validator_tallinn>`, and the
 ``recorded_power``, summing the power of all (pre)attestations
 of the block.
 
 Breaking changes to RPCs
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-Among the :ref:`RPC changes<t024_RPC_changes>` brought by protocol
-T024, the following are potentially breaking:
+Among the :ref:`RPC changes<tallinn_RPC_changes>` brought by protocol
+Tallinn, the following are potentially breaking:
 
 - Updated RPC ``GET
   /chains/<chain_id>/blocks/<block_id>/helpers/validators`` to group
@@ -109,7 +109,7 @@ Removed obsolete fields from the block header and block receipts
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The obsolete field ``adaptive_issuance_vote`` has been removed from
-the block header in protocol T024, and fields
+the block header in protocol Tallinn, and fields
 ``adaptive_issuance_vote_ema`` and
 ``adaptive_issuance_activation_cycle`` from the block metadata.
 
@@ -121,7 +121,7 @@ mainnet) can still be queried via the RPC ``GET
 Very slight increase in gas cost when calling smart contracts
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Protocol T024 fixes a minor bug that caused some gas costs to be
+Protocol Tallinn fixes a minor bug that caused some gas costs to be
 omitted in cache functions. As a result, gas costs for smart contract
 calls has increased by at most 2 units of gas each time the cache is
 accessed.

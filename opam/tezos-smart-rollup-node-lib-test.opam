@@ -30,7 +30,7 @@ depopts: [
   "octez-smart-rollup-node-PsParisC" {with-test}
   "octez-smart-rollup-node-PsQuebec" {with-test}
   "octez-smart-rollup-node-PsRiotum" {with-test}
-  "octez-smart-rollup-node-PsD5wVTJ" {with-test}
+  "octez-smart-rollup-node-PtTALLiN" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}
 ]
 build: [

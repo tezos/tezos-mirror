@@ -1,0 +1,58 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_proto_024_PtTALLiN_lib_delegate_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  bls12-381.archive
+  octez-libs.base
+  octez-libs.test-helpers
+  octez-libs.micheline
+  octez-protocol-024-PtTALLiN-libs.client
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-libs.base-test-helpers
+  octez-protocol-024-PtTALLiN-libs.bakings.mockup-simulator
+  octez-protocol-024-PtTALLiN-libs.baking
+  tezos-protocol-024-PtTALLiN.parameters
+  octez-libs.crypto
+  octez-libs.event-logging-test-helpers
+  uri)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_test_helpers
+  -open Tezos_micheline
+  -open Tezos_client_024_PtTALLiN
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_base_test_helpers
+  -open Tezos_024_PtTALLiN_mockup_simulator
+  -open Tezos_baking_024_PtTALLiN
+  -open Tezos_event_logging_test_helpers)
+ (modules test_scenario))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  octez-rust-deps
+  src_proto_024_PtTALLiN_lib_delegate_test_tezt_lib
+  tezt)
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp))
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package octez-protocol-024-PtTALLiN-libs)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

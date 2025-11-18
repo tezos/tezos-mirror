@@ -1,0 +1,44 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmark_024_PtTALLiN)
+ (public_name tezos-benchmark-024-PtTALLiN)
+ (libraries
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
+  octez-libs.micheline
+  tezos-micheline-rewriting
+  tezos-benchmark
+  tezos-benchmark-type-inference-024-PtTALLiN
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-libs.crypto
+  tezos-protocol-024-PtTALLiN.parameters
+  hashcons
+  octez-protocol-024-PtTALLiN-libs.test-helpers
+  prbnmcn-stats)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_error_monad
+  -open Tezos_micheline
+  -open Tezos_micheline_rewriting
+  -open Tezos_benchmark
+  -open Tezos_benchmark_type_inference_024_PtTALLiN
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_024_PtTALLiN_test_helpers)
+ (private_modules kernel rules state_space))
+
+(rule
+ (targets crypto_samplers.mli)
+ (action
+  (write-file
+   %{targets}
+   "include module type of Tezos_benchmark.Crypto_samplers.V2")))
+
+(rule
+ (targets crypto_samplers.ml)
+ (action (write-file %{targets} "include Tezos_benchmark.Crypto_samplers.V2")))

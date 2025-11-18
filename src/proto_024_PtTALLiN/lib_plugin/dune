@@ -1,0 +1,43 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_plugin_024_PtTALLiN)
+ (public_name octez-protocol-024-PtTALLiN-libs.plugin)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-protocol-024-PtTALLiN-libs.smart-rollup)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_smart_rollup_024_PtTALLiN)
+ (modules (:standard \ Plugin_registerer)))
+
+(documentation (package octez-protocol-024-PtTALLiN-libs))
+
+(rule
+ (targets signature.ml)
+ (action
+  (write-file
+   %{targets}
+   "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V2")))
+
+(library
+ (name tezos_protocol_plugin_024_PtTALLiN_registerer)
+ (public_name octez-protocol-024-PtTALLiN-libs.plugin-registerer)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  tezos-protocol-024-PtTALLiN.embedded-protocol
+  octez-protocol-024-PtTALLiN-libs.plugin
+  octez-shell-libs.validation)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_embedded_protocol_024_PtTALLiN
+  -open Tezos_protocol_plugin_024_PtTALLiN
+  -open Tezos_validation)
+ (modules Plugin_registerer))

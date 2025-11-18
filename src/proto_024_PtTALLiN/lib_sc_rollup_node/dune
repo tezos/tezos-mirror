@@ -1,0 +1,82 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_smart_rollup_node_PtTALLiN)
+ (package octez-smart-rollup-node-PtTALLiN)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.stdlib-unix
+  octez-shell-libs.client-base
+  octez-shell-libs.client-base-unix
+  octez-protocol-024-PtTALLiN-libs.client
+  octez-protocol-024-PtTALLiN-libs.dal
+  octez-libs.tezos-context.encoding
+  octez-libs.tezos-context.helpers
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-protocol-024-PtTALLiN-libs.plugin
+  tezos-protocol-024-PtTALLiN.parameters
+  octez-libs.rpc
+  octez-libs.rpc-http
+  octez-libs.rpc-http-server
+  octez-libs.tezos-workers
+  tezos-dal-node-services
+  tezos-dal-node-lib
+  octez-shell-libs.shell-services
+  octez-l2-libs.smart-rollup
+  octez-protocol-024-PtTALLiN-libs.smart-rollup
+  octez-protocol-024-PtTALLiN-libs.smart-rollup-layer2
+  octez-protocol-024-PtTALLiN-libs.layer2-utils
+  octez-l2-libs.layer2_store
+  octez-l2-libs.riscv_context
+  octez-l2-libs.irmin_context
+  octez-crawler
+  octez-libs.tree-encoding
+  octez-libs.data-encoding
+  octez-internal-libs.irmin_pack
+  octez-internal-libs.irmin_pack.unix
+  octez-internal-libs.irmin
+  aches
+  aches-lwt
+  octez-injector
+  octez-smart-rollup-node-lib
+  octez-libs.scoru-wasm
+  octez-l2-libs.scoru-wasm-fast
+  octez-riscv-pvm
+  octez-libs.crypto-dal
+  octez-version.value)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib_unix
+  -open Tezos_client_base
+  -open Tezos_client_base_unix
+  -open Tezos_client_024_PtTALLiN
+  -open Tezos_dal_024_PtTALLiN
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_protocol_plugin_024_PtTALLiN
+  -open Tezos_protocol_024_PtTALLiN_parameters
+  -open Tezos_workers
+  -open Tezos_dal_node_lib
+  -open Tezos_shell_services
+  -open Octez_smart_rollup
+  -open Tezos_smart_rollup_024_PtTALLiN
+  -open Tezos_smart_rollup_layer2_024_PtTALLiN
+  -open Tezos_layer2_utils_024_PtTALLiN
+  -open Tezos_layer2_store
+  -open Tezos_layer2_riscv_context
+  -open Tezos_layer2_irmin_context
+  -open Octez_crawler
+  -open Octez_injector
+  -open Octez_smart_rollup_node
+  -open Tezos_crypto_dal))
+
+(rule
+ (targets signature.ml)
+ (action
+  (write-file
+   %{targets}
+   "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V2")))

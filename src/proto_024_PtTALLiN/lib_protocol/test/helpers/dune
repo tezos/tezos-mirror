@@ -1,0 +1,46 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_024_PtTALLiN_test_helpers)
+ (public_name octez-protocol-024-PtTALLiN-libs.test-helpers)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  tezt-tezos
+  tezt
+  qcheck-alcotest
+  octez-libs.test-helpers
+  octez-libs.base
+  octez-libs.micheline
+  octez-libs.stdlib-unix
+  tezos-protocol-024-PtTALLiN.protocol
+  octez-protocol-024-PtTALLiN-libs.client
+  tezos-protocol-024-PtTALLiN.parameters
+  octez-proto-libs.protocol-environment
+  octez-protocol-024-PtTALLiN-libs.plugin
+  octez-shell-libs.shell-services
+  octez-libs.plompiler
+  octez-libs.crypto-dal
+  octez-protocol-024-PtTALLiN-libs.smart-rollup)
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Tezos_micheline
+  -open Tezos_stdlib_unix
+  -open Tezos_protocol_024_PtTALLiN
+  -open Tezos_client_024_PtTALLiN
+  -open Tezos_protocol_024_PtTALLiN_parameters
+  -open Tezos_protocol_plugin_024_PtTALLiN
+  -open Tezos_shell_services
+  -open Tezos_crypto_dal
+  -open Tezos_smart_rollup_024_PtTALLiN))
+
+(rule
+ (targets signature.ml)
+ (action
+  (write-file
+   %{targets}
+   "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V2")))

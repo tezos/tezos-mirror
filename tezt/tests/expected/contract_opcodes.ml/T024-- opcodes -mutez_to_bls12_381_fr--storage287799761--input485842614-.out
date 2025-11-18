@@ -1,5 +1,5 @@
 
-./octez-client --protocol PsD5wVTJc9Rg228rXbXbeoeEo8g3fgWH211U7V3qjUed11g5Gqk --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/mutez_to_bls12_381_fr.tz on storage 0x02 and input 16 --level 1 --trace-stack
+./octez-client --protocol PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/mutez_to_bls12_381_fr.tz on storage 0x02 and input 16 --level 1 --trace-stack
 storage
   0x1000000000000000000000000000000000000000000000000000000000000000
 emitted operations
