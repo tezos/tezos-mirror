@@ -143,7 +143,7 @@ redirectcheck:
 # - on each other protocol including alpha, also checking label defs (option -l)
 .PHONY: xrefscheck
 xrefscheck:
-	$(CHECKXREFS) t024
+	$(CHECKXREFS) tallinn
 	$(CHECKXREFS) seoul
 	$(CHECKXREFS) -l alpha
 
