@@ -1992,6 +1992,10 @@ function finalize_docs() {
       -e "s/Protocol $(echo "${protocol_source}" | tr '[:lower:]' '[:upper:]')/Protocol ${capitalized_doc_label}/g" \
       -e "s@protocols/${version}_${protocol_source}@protocols/${version}_${doc_label}@g" \
       docs/introduction/breaking_changes.rst
+
+    # Fix title underlines in docs/introduction/breaking_changes.rst
+    perl -i.old -0pe 's/^(.+)\n([=\-^]+)$/my $title = $1; my $underline = $2; my $len = length $title; my $u_len = length $underline; if ($len != $u_len) { $underline = substr($underline, 0, 1) x $len; } "$title\n$underline"/gme' docs/introduction/breaking_changes.rst
+
     commit_if_changes "docs: update docs/introduction/breaking_changes.rst"
   fi
 
