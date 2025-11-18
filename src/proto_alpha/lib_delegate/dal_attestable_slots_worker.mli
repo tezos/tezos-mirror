@@ -5,6 +5,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** The DAL attestable slots worker keeps per-delegate subscriptions to
+    the DAL node’s streaming RPC [GET /profiles/<pkh>/monitor/attestable_slots)].
+    Each stream emits attestable slots events as soon as they are available from
+    the DAL node. Check {!Tezos_dal_node_services.Types.Attestable_event.t} for
+    the possible types of events available.
+
+    Incoming events are folded into an in-memory cache keyed by attestation level
+    and delegate id. For each (attestation_level, delegate), the worker maintains a
+    boolean bitset of attestable slots. This cache is filled continuously and independently
+    of the baker’s main loop so that consensus code never waits on the network. There can
+    be a little overhead for the backfill of the cache, which is done at stream subscription
+    (usually at startup).
+
+    The worker's purpose is to decouple the critical consensus path from DAL
+    RPC latency: streams advance in the background, therefore the cache can serve
+    DAL information instantly.
+*)
+
 type t
 
 (** [update_streams_subscriptions state dal_node_rpc_ctxt ~delegate_ids] reconciles
