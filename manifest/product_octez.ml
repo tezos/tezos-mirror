@@ -6444,7 +6444,7 @@ end = struct
             ("test_storage", true);
             ("test_token", true);
             ( "test_native_contracts",
-              N.(number >= 025 && name_dash <> "024-PsD5wVTJ") );
+              N.(number >= 025 && name_dash <> "024-PtTALLiN") );
           ]
           |> conditional_list
         in
@@ -6559,7 +6559,7 @@ end = struct
             ("test_local_contexts", N.(number >= 016));
             ("test_dal_slot_proof", N.(number >= 016));
             ( "test_dal_past_parameters_storage",
-              N.(number >= 025 && name_dash <> "024-PsD5wVTJ") );
+              N.(number >= 025 && name_dash <> "024-PtTALLiN") );
             ("test_adaptive_issuance", N.(number >= 018));
             ("test_adaptive_issuance_ema", N.(number <= 023));
             ("test_percentage", N.(number >= 019));
@@ -6569,7 +6569,7 @@ end = struct
             ("test_consecutive_round_zero", N.(number >= 022));
             ("test_address_registry", N.(number >= 024));
             ( "test_native_contracts",
-              N.(number >= 025 && name_dash <> "024-PsD5wVTJ")
+              N.(number >= 025 && name_dash <> "024-PtTALLiN")
               (* This condition is temporary: as proto_024 is still in `dev`
                  it doesn't have a number and it would be targeted as valid. *)
             );
@@ -8150,7 +8150,7 @@ let hash = Protocol.hash
 
   let _023_PtSeouLo = active (Name.v "PtSeouLo" 023)
 
-  let _024_PsD5wVTJ = active (Name.dev "024_PsD5wVTJ")
+  let _024_PtTALLiN = active (Name.dev "024_PtTALLiN")
 
   let alpha = active (Name.dev "alpha")
 
