@@ -537,3 +537,6 @@ let delegate_deactivated cctxt ~chain ?(block = `Head 0) pkh =
 
 let constants cctxt ~chain ~block =
   Plugin.Alpha_services.Constants.all cctxt (chain, block)
+
+let seed_computation cctxt ~chain ~block =
+  Alpha_services.Seed_computation.get cctxt (chain, block)
