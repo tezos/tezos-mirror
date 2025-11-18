@@ -180,6 +180,16 @@ let locked_round_of_bytes b =
       return_some r
   | _ -> tzfail Invalid_fitness
 
+(** [predecessor_round_of_bytes bytes] assumes that [bytes] encode the 32-bit
+    big-endian representation of the predecessor of the opposite of the
+    [predecessor_round] value (0 -> -1, 1 -> -2, etc.).
+
+    This encoding ensures that, when compared lexicographically as raw bytes,
+    the encoding of 0 is the largest possible 32-bit value (\255\255\255\255),
+    1 the second largest (\255\255\255\254), and so on.
+
+    We revert this transformation when decoding to recover the original
+    [predecessor_round] value. *)
 let predecessor_round_of_bytes neg_predecessor_round =
   let open Result_syntax in
   let* neg_predecessor_round = int32_of_bytes neg_predecessor_round in
@@ -195,6 +205,12 @@ let to_raw {level; locked_round; predecessor_round; round} =
     Bytes.of_string Constants_repr.fitness_version_number;
     int32_to_bytes (Raw_level_repr.to_int32 level);
     locked_round_to_bytes locked_round;
+    (* [predecessor_round] is encoded as the 32-bit big-endian representation of
+       the predecessor of the opposite of its value (0 -> -1, 1 -> -2, etc.).
+
+       This encoding ensures that, when compared lexicographically as raw bytes,
+       the encoding of 0 is the largest possible 32-bit value
+       (\255\255\255\255), 1 the second largest (\255\255\255\254), etc.. *)
     int32_to_bytes
       (Int32.pred (Int32.neg (Round_repr.to_int32 predecessor_round)));
     int32_to_bytes (Round_repr.to_int32 round);
