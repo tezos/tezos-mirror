@@ -64,7 +64,7 @@ include Compare.Make (struct
           if i = 0 then compare_rec f1 f2 else i
       | _, _ -> assert false
     in
-    let len = compare (List.length f1) (List.length f2) in
+    let len = List.compare_lengths f1 f2 in
     if len = 0 then compare_rec f1 f2 else len
 end)
 
