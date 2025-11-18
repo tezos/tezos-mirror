@@ -551,3 +551,6 @@ let shell_header cctxt ~chain ?(block = `Head 0) () =
 
 let block_hash cctxt ~chain ~block =
   Shell_services.Blocks.hash cctxt ~chain ~block ()
+
+let blocks cctxt ~chain ~heads ~length =
+  Shell_services.Blocks.list cctxt ~chain ~heads ~length ()
