@@ -39,7 +39,7 @@ those available to end-users on Tezos Mainnet. The complete list of
 operations, including those corresponding to features in development
 or available only on test networks, is given in the
 :package-api:`OCaml Documentation
-<tezos-protocol-024-PsD5wVTJ/Tezos_raw_protocol_024_PsD5wVTJ/Operation_repr/index.html>`.
+<tezos-protocol-024-PtTALLiN/Tezos_raw_protocol_024_PtTALLiN/Operation_repr/index.html>`.
 
 .. _validation_passes_t024:
 
@@ -149,10 +149,10 @@ conflicting :ref:`consensus operations<consensus_operations_t024>`:
   preattested, or respectively attested, two different block candidates, at the same level and at
   the same round. The bulk of the evidence, the two arguments
   provided, consists of the two offending preattestations, respectively attestations.
-  
+
   Beside the two offending operations, there is a ``slot`` field containing the delegate's slot used in the offending operations.
   More precisely, each offending operation may be either a standalone operation for this slot, or an :ref:`aggregate operation<consensus_operations_t024>` containing this slot in its committee.
-  
+
   In protocols older than S, there were two operations, ``Double_preattestation_evidence`` and ``Double_attestation_evidence``, instead of ``Double_consensus_operation_evidence``, which did not exist.
 
 - The ``Double_baking_evidence`` allows for accusing a delegate of

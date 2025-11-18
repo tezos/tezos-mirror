@@ -71,7 +71,7 @@ specified by the :package-api:`Protocol
 module in the :doc:`protocol
 environment<../shell/protocol_environment>` ``V15``, and it is
 implemented by this protocol in the
-:package-api:`Main<tezos-protocol-024-PsD5wVTJ/Tezos_raw_protocol_024_PsD5wVTJ/Main/index.html>`
+:package-api:`Main<tezos-protocol-024-PtTALLiN/Tezos_raw_protocol_024_PtTALLiN/Main/index.html>`
 module.
 
 The rest of this document is organized as follows: we first describe
