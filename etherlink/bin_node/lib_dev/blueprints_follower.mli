@@ -23,9 +23,10 @@ type finalized_levels_handler =
   end_l2_level:Ethereum_types.quantity ->
   unit tzresult Lwt.t
 
-(** A [next_block_timestamp_handler] is a function that is called for
-    every next block timestamp fetched from a remote EVM. *)
-type next_block_timestamp_handler = Time.Protocol.t -> unit tzresult Lwt.t
+(** A [next_block_info_handler] is a function that is called for
+    every next block informations (timestamp + number) fetched from a remote EVM. *)
+type next_block_info_handler =
+  Time.Protocol.t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 
 (** A [next_block_timestamp_handler] is a function that is called for
     every transaction included in the next block fetched from a remote EVM. *)
@@ -39,8 +40,8 @@ type inclusion_handler = Broadcast.transaction -> unit tzresult Lwt.t
 
     - [on_new_blueprint] is called for each new blueprint received, in order.
     - [on_finalized_levels] is called when the remote EVM notifies finalized levels.
-    - [on_next_block_timestamp] is called whenever the remote EVM provides
-      the timestamp of an upcoming block.
+    - [on_next_block_info] is called whenever the remote EVM provides
+      the informations of an upcoming block.
     - [on_inclusion] is called for each transaction included in the next block.
 
     [next_blueprint_number] is the height of the current local head, while
@@ -55,7 +56,7 @@ val start :
   next_blueprint_number:quantity ->
   on_new_blueprint:new_blueprint_handler ->
   on_finalized_levels:finalized_levels_handler ->
-  on_next_block_timestamp:next_block_timestamp_handler ->
+  on_next_block_info:next_block_info_handler ->
   on_inclusion:inclusion_handler ->
   unit ->
   'a tzresult Lwt.t

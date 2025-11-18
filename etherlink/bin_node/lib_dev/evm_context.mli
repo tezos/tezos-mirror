@@ -182,6 +182,19 @@ val potential_observer_reorg :
   Blueprint_types.with_events ->
   Ethereum_types.quantity option tzresult Lwt.t
 
+(** Update the EVM context using the latest next block information
+    received from the stream (timestamp + block number), and start a new
+    internal state based on it for single transaction execution. *)
+val next_block_info :
+  Time.Protocol.t -> Ethereum_types.quantity -> (unit, tztrace) result Lwt.t
+
+(** [execute_single_transaction evm_state transaction time number tx_index] executes
+    a single Ethereum transaction within the current future block state.
+    Returns the execution outcome as [Transaction_receipt.t].
+    Can be None if single execution was locked by a divergence or stream startup *)
+val execute_single_transaction :
+  Broadcast.transaction -> (Transaction_receipt.t option, tztrace) result Lwt.t
+
 (** Watcher that gets notified each time a new block is produced. *)
 val head_watcher :
   Transaction_object.t Ethereum_types.Subscription.output Lwt_watcher.input

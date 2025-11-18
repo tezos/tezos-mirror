@@ -34,6 +34,15 @@ module World_state = struct
   let make s = EVM.make (root ^ s)
 end
 
+module Single_tx = struct
+  let single_tx_path = World_state.make "/single_tx"
+
+  let input_tx = single_tx_path ^ "/input_tx"
+
+  let output_receipt index =
+    single_tx_path ^ "/receipts/" ^ Int32.to_string index
+end
+
 let etherlink_root = World_state.make ""
 
 let root_of_chain_family (type f) (chain_family : f L2_types.chain_family) =

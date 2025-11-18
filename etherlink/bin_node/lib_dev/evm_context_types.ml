@@ -42,6 +42,14 @@ module Request = struct
         end_l2_level : Ethereum_types.quantity;
       }
         -> (unit, tztrace) t
+    | Next_block_info : {
+        timestamp : Time.Protocol.t;
+        number : Ethereum_types.quantity;
+      }
+        -> (unit, tztrace) t
+    | Execute_single_transaction :
+        Broadcast.transaction
+        -> (Transaction_receipt.t option, tztrace) t
 
   let name (type a b) (t : (a, b) t) =
     match t with
@@ -52,6 +60,8 @@ module Request = struct
     | Wasm_pvm_version -> "Wasm_pvm_version"
     | Potential_observer_reorg _ -> "Potential_observer_reorg"
     | Finalized_levels _ -> "Finalized_levels"
+    | Execute_single_transaction _ -> "Execute_single_transaction"
+    | Next_block_info _ -> "Next_block_info"
 
   type view = View : _ t -> view
 
@@ -163,6 +173,15 @@ module Request = struct
             | _ -> None)
           (fun ((), l1_level, start_l2_level, end_l2_level) ->
             View (Finalized_levels {l1_level; start_l2_level; end_l2_level}));
+        case
+          (Tag 8)
+          ~title:"Execute_single_transaction"
+          (obj2
+             (req "request" (constant "execute_single_transaction"))
+             (req "tx" Broadcast.transaction_encoding))
+          (function
+            | View (Execute_single_transaction tx) -> Some ((), tx) | _ -> None)
+          (fun ((), tx) -> View (Execute_single_transaction tx));
       ]
 
   let pp ppf view =

@@ -105,10 +105,11 @@ let on_finalized_levels ~rollup_node_tracking ~l1_level ~start_l2_level
     Evm_context.apply_finalized_levels ~l1_level ~start_l2_level ~end_l2_level
   else return_unit
 
-let on_next_block_timestamp ts =
+let on_next_block_info timestamp number =
   let open Lwt_result_syntax in
-  let*! () = Events.next_block_timestamp ts in
-  return ()
+  let*! () = Events.next_block_timestamp timestamp in
+  let* () = Evm_context.next_block_info timestamp number in
+  return_unit
 
 let on_inclusion (txn : Broadcast.transaction) =
   let open Lwt_result_syntax in
@@ -119,11 +120,14 @@ let on_inclusion (txn : Broadcast.transaction) =
         let*? obj = Transaction_object.decode txn in
         let*! () = Events.inclusion (Transaction_object.hash obj) in
         return_unit
+    | Common (Michelson _op) -> return_unit
     | Delayed {hash; _} ->
         let*! () = Events.inclusion hash in
         return_unit
-    | _ -> return_unit
   in
+
+  let* opt_receipt = Evm_context.execute_single_transaction txn in
+  Option.iter Broadcast.notify_preconfirmed_receipt opt_receipt ;
   return_unit
 
 let install_finalizer_observer ~rollup_node_tracking
@@ -350,7 +354,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         ~next_blueprint_number
         ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
         ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
-        ~on_next_block_timestamp
+        ~on_next_block_info
         ~on_inclusion
         ()
     and* () =

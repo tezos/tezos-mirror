@@ -18,6 +18,8 @@ type transaction =
   | Common of common_transaction
   | Delayed of Evm_events.Delayed_transaction.t
 
+val transaction_encoding : transaction Data_encoding.t
+
 (** Type of messages that are broadcasted to all evm nodes. *)
 type message =
   | Blueprint of Blueprint_types.with_events
@@ -26,7 +28,10 @@ type message =
       start_l2_level : Ethereum_types.quantity;
       end_l2_level : Ethereum_types.quantity;
     }
-  | Next_block_timestamp of Time.Protocol.t
+  | Next_block_info of {
+      timestamp : Time.Protocol.t;
+      number : Ethereum_types.quantity;
+    }
   | Included_transaction of transaction
 
 val message_encoding : message Data_encoding.t
@@ -48,9 +53,19 @@ val notify_finalized_levels :
   end_l2_level:Ethereum_types.quantity ->
   unit
 
-(** [notify_next_block_timestamp timestamp] advertizes the next block [timestamp] to the broadcast stream *)
-val notify_next_block_timestamp : Time.Protocol.t -> unit
+(** [notify_next_block_info timestamp number] advertizes the next block [timestamp] and [number]
+    to the broadcast stream *)
+val notify_next_block_info : Time.Protocol.t -> Ethereum_types.quantity -> unit
 
 (** [notify_inclusion tx] advertizes [tx] as the latest transaction to be included in the next block
     to the broadcast stream *)
 val notify_inclusion : transaction -> unit
+
+(** [create_receipt_stream ()] returns a new stream that can be used to be
+    notified of pre-confirmed receipts after transactions are executed individualy. *)
+val create_receipt_stream :
+  unit -> Transaction_receipt.t Lwt_stream.t * Lwt_watcher.stopper
+
+(** [notify_inclusion tx] advertizes [receipt] as the latest pre-confirmed receipt
+    _only_ to the receipt stream *)
+val notify_preconfirmed_receipt : Transaction_receipt.t -> unit

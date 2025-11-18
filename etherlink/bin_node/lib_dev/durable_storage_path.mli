@@ -50,6 +50,13 @@ val sequencer_key : path
 
 val maximum_gas_per_transaction : path
 
+(** Kernel communication canal for individual transaction execution *)
+module Single_tx : sig
+  val input_tx : path
+
+  val output_receipt : int32 -> path
+end
+
 (** Paths related to accounts. *)
 module Accounts : sig
   (** Path to the account's info. Should be used in place of `balance`, `nonce` and `code` *)
