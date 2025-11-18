@@ -1513,6 +1513,14 @@ types:
       type: n
     - id: size
       type: z
+  baking_power:
+    seq:
+    - id: baking_power_tag
+      type: u1
+      enum: baking_power_tag
+    - id: some
+      type: s8be
+      if: (baking_power_tag == baking_power_tag::some)
   ballot:
     seq:
     - id: source
@@ -1674,8 +1682,8 @@ types:
     seq:
     - id: slots
       type: int31
-    - id: stake
-      type: s8be
+    - id: baking_power
+      type: baking_power
   contents:
     seq:
     - id: contents_entries
@@ -3656,8 +3664,8 @@ types:
     seq:
     - id: slots
       type: int31
-    - id: stake
-      type: s8be
+    - id: baking_power
+      type: baking_power
   transaction:
     seq:
     - id: source
@@ -4815,6 +4823,9 @@ enums:
   backtracked_tag:
     0: to_contract
     2: to_smart_rollup
+  baking_power_tag:
+    0: none
+    1: some
   bool:
     0: false
     255: true
