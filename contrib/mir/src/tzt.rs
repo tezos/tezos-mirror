@@ -103,6 +103,8 @@ pub struct TztTest<'a> {
     /// mapping between integers representing big_map indices and descriptions of big maps
     /// as defined by the `big_maps` field.
     pub big_maps: Option<InMemoryLazyStorage<'a>>,
+    /// mapping from address to storage value
+    pub storages: Option<HashMap<AddressHash, (Type, TypedValue<'a>)>>,
     /// Initial value for "now" in the context.
     pub now: Option<BigInt>,
     /// Address that directly or indirectly initiated the current transaction
@@ -194,6 +196,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_now: Option<BigInt> = None;
         let mut m_source: Option<Micheline> = None;
         let mut m_sender: Option<Micheline> = None;
+        let mut m_storages: Option<Vec<(Micheline, Micheline, Micheline)>> = None;
 
         // This would hold the untypechecked, expected output value. This is because If the self
         // and parameters values are specified, then we need to fetch them and populate the context
@@ -224,7 +227,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 Source(v) => set_tzt_field("source", &mut m_source, v)?,
                 SenderAddr(v) => set_tzt_field("sender", &mut m_sender, v)?,
                 BigMaps(v) => set_tzt_field("big_maps", &mut m_big_maps, v)?,
-                Storages(_v) => todo!(),
+                Storages(v) => set_tzt_field("storages", &mut m_storages, v)?,
             }
         }
 
@@ -360,6 +363,34 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             None => None,
         };
 
+        let storages = match m_storages {
+            Some(tzt_storages) => {
+                let tzt_storages: HashMap<AddressHash, (Type, TypedValue)> = tzt_storages
+                    .into_iter()
+                    .map(|(address_raw, storage_type_raw, storage_raw)| {
+                        let typed_address =
+                            typecheck_value(&address_raw, &mut Ctx::default(), &Type::Address)?;
+                        let storage_type = parse_ty(Ctx::default().gas(), &storage_type_raw)?;
+                        let storage =
+                            typecheck_value(&storage_raw, &mut Ctx::default(), &storage_type)?;
+
+                        let address = match typed_address {
+                            TypedValue::Address(Address {
+                                hash,
+                                entrypoint: _,
+                            }) => hash,
+                            _ => return Err("Invalid address for storage".into()),
+                        };
+
+                        Ok((address, (storage_type, storage)))
+                    })
+                    .collect::<Result<HashMap<_, _>, Self::Error>>()?;
+
+                Some(tzt_storages)
+            }
+            None => None,
+        };
+
         Ok(TztTest {
             code: m_code.ok_or("code section not found in test")?,
             input: m_input.ok_or("input section not found in test")?,
@@ -378,6 +409,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             self_addr,
             other_contracts,
             big_maps,
+            storages,
             now: m_now,
             source,
             sender,
