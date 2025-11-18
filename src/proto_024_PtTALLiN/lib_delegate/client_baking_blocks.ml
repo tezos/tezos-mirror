@@ -77,7 +77,7 @@ let raw_info cctxt ?(chain = `Main) hash shell_header =
 
 let info cctxt ?(chain = `Main) block =
   let open Lwt_result_syntax in
-  let* hash = Shell_services.Blocks.hash cctxt ~chain ~block () in
+  let* hash = Node_rpc.block_hash cctxt ~chain ~block in
   let* shell_header = Node_rpc.shell_header cctxt ~chain ~block () in
   raw_info cctxt ~chain hash shell_header
 
@@ -185,7 +185,7 @@ let monitor_heads cctxt ~next_protocols chain =
 
 let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   let open Lwt_result_syntax in
-  let* hash = Shell_services.Blocks.hash cctxt ~chain ~block () in
+  let* hash = Node_rpc.block_hash cctxt ~chain ~block in
   let* {level; _} = Node_rpc.shell_header cctxt ~chain ~block () in
   let*! result = Node_rpc.levels_in_current_cycle cctxt ~offset ~chain ~block in
   match result with
