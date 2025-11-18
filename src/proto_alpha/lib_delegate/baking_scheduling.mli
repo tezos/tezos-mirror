@@ -52,6 +52,9 @@ val retry :
   'a ->
   'b tzresult Lwt.t
 
+val try_resolve_consensus_keys :
+  #Protocol_client_context.rpc_context -> Key.t -> public_key_hash Lwt.t
+
 (** [run context ?canceler ?stop_on_event ?on_error ?constants chain
     baking_configuration consensus_keys] is the entry point of the baker
     automaton. This function performs the following tasks:

@@ -72,18 +72,41 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
       ~attestation_lag:constants.parametric.dal.attestation_lag
       ~number_of_slots:constants.parametric.dal.number_of_slots
   in
-  Baking_scheduling.create_initial_state
-    cctxt
-    ?dal_node_rpc_ctxt
-    ?synchronize
-    ~chain
-    config
-    operation_worker
-    dal_attestable_slots_worker
-    round_durations
-    ~current_proposal
-    ~constants
-    delegates
+  let* state =
+    Baking_scheduling.create_initial_state
+      cctxt
+      ?dal_node_rpc_ctxt
+      ?synchronize
+      ~chain
+      config
+      operation_worker
+      dal_attestable_slots_worker
+      round_durations
+      ~current_proposal
+      ~constants
+      delegates
+  in
+  let*! () =
+    Baking_actions.only_if_dal_feature_enabled
+      state
+      ~default_value:()
+      (fun dal_node_rpc_ctxt ->
+        let*! delegates =
+          List.map_s
+            (Baking_scheduling.try_resolve_consensus_keys cctxt)
+            delegates
+        in
+        let delegate_ids =
+          List.map Baking_state_types.Delegate_id.of_pkh delegates
+        in
+        (* Ensures the DAL attestable slots cache is populated in time for the
+           first block’s attestation. *)
+        Dal_attestable_slots_worker.update_streams_subscriptions
+          state.global_state.dal_attestable_slots_worker
+          dal_node_rpc_ctxt
+          ~delegate_ids)
+  in
+  return state
 
 let get_current_proposal cctxt ?cache () =
   let open Lwt_result_syntax in

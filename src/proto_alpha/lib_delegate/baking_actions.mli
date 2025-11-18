@@ -141,6 +141,12 @@ val inject_consensus_votes :
     and updates the state accordingly. *)
 val update_to_level : state -> level_update -> (state * t) tzresult Lwt.t
 
+val only_if_dal_feature_enabled :
+  state ->
+  default_value:'a ->
+  (Tezos_rpc.Context.generic -> 'a Lwt.t) ->
+  'a Lwt.t
+
 (** [may_get_dal_content state unsigned_consensus_vote], if the DAL feature is
     enabled, recovers the attestable slots by calling
     [Node_rpc.get_attestable_slots] and computes the corresponding [dal_content]. *)
