@@ -1928,7 +1928,7 @@ function finalize_docs() {
     -e "s/protocol $(echo "${protocol_source}" | tr '[:lower:]' '[:upper:]')/protocol ${capitalized_doc_label}/g" \
     -e "s/Protocol $(echo "${protocol_source}" | tr '[:lower:]' '[:upper:]')/Protocol ${capitalized_doc_label}/g" \
     \{\} \;
-  commit "docs: fix versioned links in docs/${doc_label}"
+  commit_if_changes "docs: fix versioned links in docs/${doc_label}"
   cd ../..
 
   # 3. Rename and update protocol changelog
