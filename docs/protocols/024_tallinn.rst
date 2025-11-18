@@ -1,7 +1,7 @@
-Protocol T024
+Protocol Tallinn
 =================
 
-This page lists the changes brought by protocol T024 with respect
+This page lists the changes brought by protocol Tallinn with respect
 to Seoul (see :ref:`naming_convention`).
 For the list of changes brought by Seoul with respect to Rio, see :doc:`./023_seoul`.
 
@@ -9,19 +9,19 @@ For a higher-level overview of the most salient new features see the
 `announcement blog <https://research-development.nomadic-labs.com/blog.html>`__.
 
 An overview of breaking changes and deprecations introduced in
-protocol T024 can be found :ref:`here<t024_breaking_changes>`. These
+protocol Tallinn can be found :ref:`here<tallinn_breaking_changes>`. These
 changes are also listed below in their respective topical section,
 tagged with **Breaking change** or **Deprecation**.
 
 The code is available in directory :src:`src/proto_024_PtTALLiN` of
 the ``master`` branch of Octez and the full documentation in
-:doc:`this page <../t024/index>`.
+:doc:`this page <../tallinn/index>`.
 
 
 Environment Version
 -------------------
 
-Protocol t024 uses the same environment version V15 as protocol
+Protocol Tallinn uses the same environment version V15 as protocol
 Seoul.
 
 
@@ -53,7 +53,7 @@ Michelson
 Gas improvements
 ----------------
 
-.. _t024_RPC_changes:
+.. _tallinn_RPC_changes:
 
 RPC Changes
 -----------
@@ -123,7 +123,7 @@ Blocks and block receipts
   ``attestations`` and ``preattestations``. They can be ``null`` when the corresponding
   consensus operations are not required in the block. Otherwise, they contain three fields:
   the ``total_committee_power`` and ``threshold``, as described in
-  :ref:`the consensus documentation<tb_validator_t024>`, and the
+  :ref:`the consensus documentation<tb_validator_tallinn>`, and the
   ``recorded_power``, summing the power of all (pre)attestations
   of the block. (MR :gl:`!19835`)
 
@@ -153,7 +153,7 @@ Errors
 Protocol parameters
 -------------------
 
-.. _6s_block_time_parameters_t024:
+.. _6s_block_time_parameters_tallinn:
 
 6s Block Time (MRs :gl:`!19045`, :gl:`!19473`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -234,7 +234,7 @@ Feature flags
   ``all_bakers_attest_activation_threshold``. This causes
   all-bakers-attest to activate as soon as the ratio of bakers that
   use a tz4 consensus keys exceeds the specified threshold, set to 50%
-  in protocol t024. (MR :gl:`!19093`)
+  in protocol Tallinn. (MR :gl:`!19093`)
 
 
 Bug Fixes
