@@ -391,8 +391,8 @@ fi
 
 log_blue "${msg}."
 
-# Check if the protocol source exists
-if [[ ! -d "src/proto_${protocol_source}" ]]; then
+# Check if the protocol source exists (not needed for finalize_docs)
+if [[ ${command} != "finalize_docs" && ! -d "src/proto_${protocol_source}" ]]; then
   error "'src/proto_${protocol_source}'" "does not exist" 1>&2
   print_and_exit 1 "${LINENO}"
 fi
