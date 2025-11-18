@@ -191,9 +191,7 @@ let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   let* {level; _} =
     Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
   in
-  let*! result =
-    Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block)
-  in
+  let*! result = Node_rpc.levels_in_current_cycle cctxt ~offset ~chain ~block in
   match result with
   | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_nil
   | Error _ as err -> Lwt.return err
