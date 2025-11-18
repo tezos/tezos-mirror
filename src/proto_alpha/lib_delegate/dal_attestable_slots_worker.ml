@@ -81,13 +81,21 @@ type stream_handle = {
 
 type slots_by_delegate = Types.attestable_slots Delegate_id.Table.t
 
+module Level_map =
+  Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+    (struct
+      include Int32
+
+      let hash = Hashtbl.hash
+    end)
+
 type t = {
   attestation_lag : int;
   number_of_slots : int;
   streams : stream_handle Delegate_id.Table.t;
       (** Active per-delegate subscriptions. *)
-  cache : (int32, slots_by_delegate) Stdlib.Hashtbl.t;
-      (** Cache of attestable slots, keyed by attestation levels. *)
+  cache : slots_by_delegate Level_map.t;
+      (** Bounded FIFO cache of attestable slots, keyed by attestation levels. *)
   subscriptions_lock : Lwt_mutex.t;  (** Lock for streams subscriptions. *)
 }
 
@@ -97,11 +105,11 @@ let create_delegate_table () = Delegate_id.Table.create 10
     cache bucket for the given [~attestation_level]. If none exists yet, it
     creates an empty one, stores it in [state.cache], and returns it. *)
 let get_slots_by_delegate state ~attestation_level =
-  match Stdlib.Hashtbl.find_opt state.cache attestation_level with
+  match Level_map.find_opt state.cache attestation_level with
   | Some slots_by_delegate -> slots_by_delegate
   | None ->
       let slots_by_delegate = create_delegate_table () in
-      Stdlib.Hashtbl.add state.cache attestation_level slots_by_delegate ;
+      Level_map.replace state.cache attestation_level slots_by_delegate ;
       slots_by_delegate
 
 (** [update_cache_with_attestable_slot state ?is_trap ~delegate_id ~slot_id] adds [~slot_id]
@@ -276,7 +284,7 @@ let update_streams_subscriptions state dal_node_rpc_ctxt ~delegate_ids =
 (* TODO: Use this functionality in the baker instead of the [dal_attestable_slots] static method. *)
 let get_dal_attestable_slots state ~delegate_id ~attestation_level =
   let open Lwt_syntax in
-  match Stdlib.Hashtbl.find_opt state.cache attestation_level with
+  match Level_map.find_opt state.cache attestation_level with
   | None ->
       let* () = Events.(emit no_attestable_slot_at_level attestation_level) in
       return_none
@@ -297,7 +305,9 @@ let create ~attestation_lag ~number_of_slots =
     attestation_lag;
     number_of_slots;
     streams = create_delegate_table ();
-    cache = Stdlib.Hashtbl.create 16;
+    cache =
+      (* a [2 * lag] size should be enough; we use more for safety *)
+      Level_map.create (3 * attestation_lag);
     subscriptions_lock = Lwt_mutex.create ();
   }
 
@@ -310,7 +320,7 @@ let shutdown_worker state =
       |> List.of_seq
     in
     Delegate_id.Table.clear state.streams ;
-    Stdlib.Hashtbl.reset state.cache ;
+    Level_map.clear state.cache ;
     return stoppers
   in
   List.iter (fun stopper -> stopper ()) stoppers ;
