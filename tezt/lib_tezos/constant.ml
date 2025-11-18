@@ -114,7 +114,7 @@ let _octez_accuser_seoul =
   Uses.make ~tag:"accuser_ptseoulo" ~path:"./octez-accuser-PtSeouLo" ()
 
 let _octez_accuser_tallinn =
-  Uses.make ~tag:"accuser_tallinn" ~path:"./octez-accuser-PsD5wVTJ" ()
+  Uses.make ~tag:"accuser_tallinn" ~path:"./octez-accuser-PtTALLiN" ()
 
 let _octez_accuser_alpha =
   Uses.make ~tag:"accuser_alpha" ~path:"./octez-accuser-alpha" ()
