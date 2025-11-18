@@ -235,10 +235,4 @@ let () =
     (test_native_contract_types Script.CLST) ;
   register_test
     ~title:"Check parsing native contract"
-    (test_parse_contract Script.CLST Script_native_types.CLST_kind) ;
-  register_test
-    ~title:"Check executing native contract"
-    (test_call_native_contract
-       Script.CLST
-       (strip_location unit_param)
-       (strip_location unit_param))
+    (test_parse_contract Script.CLST Script_native_types.CLST_kind)

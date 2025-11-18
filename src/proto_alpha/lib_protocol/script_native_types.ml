@@ -33,6 +33,23 @@ module Helpers = struct
 
   let int_ty () = {untyped = prim Script.T_int []; typed = Ty_ex_c int_t}
 
+  let nat_ty () = {untyped = prim Script.T_nat []; typed = Ty_ex_c nat_t}
+
+  let address_ty () =
+    {untyped = prim Script.T_address []; typed = Ty_ex_c address_t}
+
+  let address_big_map_ty (type value)
+      ({untyped = unty_value; typed = Ty_ex_c ty_value; _} : value ty_node) :
+      (address, value) big_map ty_node tzresult =
+    let open Result_syntax in
+    let* big_map_t : ((address, value) big_map, _) ty =
+      big_map_t loc address_t ty_value
+    in
+    let untyped_big_map =
+      prim Script.T_big_map [(address_ty ()).untyped; unty_value]
+    in
+    return {untyped = untyped_big_map; typed = Ty_ex_c big_map_t}
+
   let pair_ty (type a b) ({untyped = unty1; typed = Ty_ex_c ty1; _} : a ty_node)
       ({untyped = unty2; typed = Ty_ex_c ty2; _} : b ty_node) :
       (a * b) ty_node tzresult =
@@ -92,14 +109,18 @@ end
 module CLST_types = struct
   open Helpers
 
+  type nat = Script_int.n Script_int.num
+
   type arg = unit
 
-  type storage = unit
+  type ledger = (address, nat) big_map
+
+  type storage = ledger
 
   let arg_type : arg ty_node * arg entrypoints =
     finalize_no_entrypoint (unit_ty ())
 
-  let storage_type : storage ty_node = unit_ty ()
+  let storage_type : storage ty_node tzresult = address_big_map_ty (nat_ty ())
 end
 
 type ('arg, 'storage) kind =
@@ -117,7 +138,7 @@ let get_typed_kind_and_types =
       let {typed = Ty_ex_c arg_type; untyped = _}, entrypoints =
         CLST_types.arg_type
       in
-      let {typed = Ty_ex_c storage_type; untyped = _} =
+      let* {typed = Ty_ex_c storage_type; untyped = _} =
         CLST_types.storage_type
       in
       return
@@ -143,6 +164,6 @@ module Internal_for_tests = struct
     function
     | Script_native_repr.CLST ->
         let arg_type, arg_entrypoints = CLST_types.arg_type in
-        let storage_type = CLST_types.storage_type in
+        let* storage_type = CLST_types.storage_type in
         return (Ex (arg_type, arg_entrypoints, storage_type))
 end

@@ -8,12 +8,17 @@
 (** Native contracts types declaration and combinators. *)
 
 open Alpha_context
+open Script_typed_ir
 
 (** Types declaration of CLST contracts (entrypoints and storage). *)
 module CLST_types : sig
+  type nat = Script_int.n Script_int.num
+
   type arg = unit
 
-  type storage = unit
+  type ledger = (address, nat) big_map
+
+  type storage = ledger
 end
 
 (** Typed equivalent of `Script_native_repr.kind` *)
@@ -38,7 +43,7 @@ module Internal_for_tests : sig
     typed : 'ty Script_typed_ir.ty_ex_c;
   }
 
-  type ('arg, 'storage) tys = 'arg ty_node * 'storage ty_node
+  type ('arg, 'storage) tys = 'arg ty_node * 'arg entrypoints * 'storage ty_node
 
   type ex_ty_node = Ex : ('arg, 'storage) tys -> ex_ty_node
 
