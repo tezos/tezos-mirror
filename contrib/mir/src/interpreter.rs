@@ -33,6 +33,7 @@ use crate::gas::{interpret_cost, OutOfGas};
 use crate::interpreter::interpret_cost::SigCostError;
 use crate::irrefutable_match::irrefutable_match;
 use crate::lexer::Prim;
+use crate::serializer::DecodeError;
 use crate::stack::*;
 use crate::typechecker::{typecheck_contract_address, typecheck_value, TcError};
 
@@ -60,6 +61,12 @@ pub enum InterpretError<'a> {
     /// An error occurred when working with `big_map` storage.
     #[error("lazy storage error: {0}")]
     LazyStorageError(#[from] LazyStorageError),
+    /// Error when decoding serialized data
+    #[error(transparent)]
+    DecodeError(#[from] DecodeError),
+    /// Error when typechecking unserialized data
+    #[error(transparent)]
+    TcError(#[from] TcError),
 }
 
 impl<'a> From<SigCostError> for InterpretError<'a> {
@@ -1833,10 +1840,57 @@ fn interpret_one<'a>(
         }
         I::Seq(nested) => interpret(nested, ctx, arena, stack)?,
         I::IView {
-            name: _,
+            name,
             return_type: _,
         } => {
+            let input = stack.pop().unwrap_or_else(|| unreachable_state());
+            let Address {
+                hash,
+                entrypoint: _,
+            } = pop!(V::Address);
+
             ctx.gas().consume(interpret_cost::VIEW)?;
+
+            let kt1 = match hash {
+                AddressHash::Kt1(kt1) => kt1,
+                _ => {
+                    stack.push(V::Option(None));
+                    return Ok(());
+                }
+            };
+
+            let Some((view, (storage_ty, storage))) = ctx.lookup_view_and_storage(kt1, name, arena)
+            else {
+                stack.push(V::Option(None));
+                return Ok(());
+            };
+
+            let storage_ty = storage_ty.parse_ty(ctx.gas())?;
+
+            let storage = Micheline::decode_raw(arena, &storage)?
+                .typecheck_value(ctx, &storage_ty.into_micheline_optimized_legacy(arena))?;
+
+            let input_type = view.input_type.parse_ty(ctx.gas())?;
+            let output_type = view.output_type.parse_ty(ctx.gas())?;
+
+            if let Micheline::Seq(instrs) = view.code {
+                if let Ok(Lambda::Lambda { code, .. }) = crate::typechecker::typecheck_lambda(
+                    instrs,
+                    ctx.gas(),
+                    Type::Pair(Rc::new((input_type, storage_ty))),
+                    output_type.clone(),
+                    false,
+                ) {
+                    let mut stk = stk![TypedValue::new_pair(input, storage)];
+                    interpret(code.as_ref(), ctx, arena, &mut stk)?;
+                    let result = stk.pop().unwrap_or_else(|| unreachable_state());
+                    stack.push(V::new_option(Some(result)));
+                } else {
+                    stack.push(V::Option(None));
+                }
+            } else {
+                stack.push(V::Option(None));
+            }
         }
     }
     Ok(())

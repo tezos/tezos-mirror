@@ -2693,7 +2693,8 @@ pub(crate) fn typecheck_value<'a>(
     })
 }
 
-fn typecheck_lambda<'a>(
+#[allow(missing_docs)]
+pub fn typecheck_lambda<'a>(
     instrs: &'a [Micheline<'a>],
     gas: &mut Gas,
     in_ty: Type,
