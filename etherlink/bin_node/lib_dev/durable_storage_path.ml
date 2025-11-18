@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2023-2025 Functori <contact@functori.com>                   *)
 (* Copyright (c) 2023 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
@@ -38,9 +38,6 @@ module Single_tx = struct
   let single_tx_path = World_state.make "/single_tx"
 
   let input_tx = single_tx_path ^ "/input_tx"
-
-  let output_receipt index =
-    single_tx_path ^ "/receipts/" ^ Int32.to_string index
 end
 
 let etherlink_root = World_state.make ""
