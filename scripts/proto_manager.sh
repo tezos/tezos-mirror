@@ -278,7 +278,10 @@ while true; do
     ;;
   -f | --from)
     protocol_source="$2"
-    source_hash=$(grep -oP '(?<="hash": ")[^"]*' "src/proto_${protocol_source}/lib_protocol/TEZOS_PROTOCOL")
+    # Only read hash if the protocol directory exists (not needed for finalize_docs)
+    if [[ -f "src/proto_${protocol_source}/lib_protocol/TEZOS_PROTOCOL" ]]; then
+      source_hash=$(grep -oP '(?<="hash": ")[^"]*' "src/proto_${protocol_source}/lib_protocol/TEZOS_PROTOCOL")
+    fi
     shift 2
     ;;
   -t | --to)
