@@ -197,7 +197,10 @@ val execute_single_transaction :
 
 (** Watcher that gets notified each time a new block is produced. *)
 val head_watcher :
-  Transaction_object.t Ethereum_types.Subscription.output Lwt_watcher.input
+  ( Transaction_object.t,
+    Transaction_receipt.t )
+  Ethereum_types.Subscription.output
+  Lwt_watcher.input
 
 (** Watcher that gets notified each time a new receipt is produced. *)
 val receipt_watcher : Transaction_receipt.t Lwt_watcher.input

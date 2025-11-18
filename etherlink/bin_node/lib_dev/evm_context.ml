@@ -164,7 +164,10 @@ let execution_config, execution_config_waker = Lwt.task ()
 let lock_data_dir ~data_dir = Data_dir.lock ~data_dir
 
 let head_watcher :
-    Transaction_object.t Ethereum_types.Subscription.output Lwt_watcher.input =
+    ( Transaction_object.t,
+      Transaction_receipt.t )
+    Ethereum_types.Subscription.output
+    Lwt_watcher.input =
   Lwt_watcher.create_input ()
 
 let receipt_watcher : Transaction_receipt.t Lwt_watcher.input =
@@ -935,9 +938,7 @@ module State = struct
         let* evm_state =
           Evm_state.execute
             ~pool:ctxt.execution_pool
-            ~native_execution:
-              (ctxt.configuration.kernel_execution.native_execution_policy
-             = Configuration.Never)
+            ~native_execution:false
             ~data_dir
             ~config
             ~wasm_entrypoint:"single_tx_execution"

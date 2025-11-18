@@ -399,6 +399,7 @@ module Subscription : sig
     | NewPendingTransactions
     | Syncing
     | NewIncludedTransactions
+    | NewPreconfirmedReceipts
     | Etherlink of etherlink_extension
 
   val kind_encoding : kind Data_encoding.t
@@ -427,15 +428,17 @@ module Subscription : sig
 
   type etherlink_extension_output = L1_l2_levels of l1_l2_levels_output
 
-  type 'transaction_object output =
+  type ('transaction_object, 'receipt) output =
     | NewHeads of 'transaction_object block
     | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
     | NewIncludedTransactions of 'transaction_object
+    | NewPreconfirmedReceipts of 'receipt
     | Etherlink of etherlink_extension_output
 
   val output_encoding :
     'transaction_object Data_encoding.t ->
-    'transaction_object output Data_encoding.t
+    'receipt Data_encoding.t ->
+    ('transaction_object, 'receipt) output Data_encoding.t
 end

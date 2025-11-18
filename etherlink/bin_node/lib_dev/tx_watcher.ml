@@ -8,7 +8,12 @@
 
 (** Watcher that gets notified each time a transaction is added to the
     pending state. *)
-let txs_watcher = Lwt_watcher.create_input ()
+let txs_watcher :
+    ( Transaction_object.t,
+      Transaction_receipt.t )
+    Ethereum_types.Subscription.output
+    Lwt_watcher.input =
+  Lwt_watcher.create_input ()
 
 let create_stream () = Lwt_watcher.create_stream txs_watcher
 

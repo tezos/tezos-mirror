@@ -79,7 +79,11 @@ val subscribe :
   t ->
   ?timeout:timeout ->
   Subscribe.input ->
-  Transaction_object.t Ethereum_types.Subscription.output tzresult subscription
+  ( Transaction_object.t,
+    Transaction_receipt.t )
+  Ethereum_types.Subscription.output
+  tzresult
+  subscription
   tzresult
   Lwt.t
 

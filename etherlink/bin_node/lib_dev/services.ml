@@ -261,7 +261,10 @@ let block_transaction_count block =
 type sub_stream = {
   kind : Ethereum_types.Subscription.kind;
   stream :
-    Transaction_object.t Ethereum_types.Subscription.output tzresult
+    ( Transaction_object.t,
+      Transaction_receipt.t )
+    Ethereum_types.Subscription.output
+    tzresult
     Lwt_stream.t;
   stopper : unit -> bool tzresult Lwt.t;
 }
@@ -348,6 +351,17 @@ let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
                      include tezlink transaction in preconfirmation stream *)
                   None
               | _ -> None)
+            stream
+        in
+        return (stream, stopper)
+    | NewPreconfirmedReceipts ->
+        let stream, stopper = Broadcast.create_receipt_stream () in
+        let stream =
+          Lwt_stream.filter_map
+            (function
+              | receipt ->
+                  Some
+                    (Ethereum_types.Subscription.NewPreconfirmedReceipts receipt))
             stream
         in
         return (stream, stopper)
@@ -471,6 +485,7 @@ let get_proxied_subscription ws_client ~timeout
         Logs {address = None; topics = None}
     | NewPendingTransactions -> NewPendingTransactions
     | NewIncludedTransactions -> NewIncludedTransactions
+    | NewPreconfirmedReceipts -> NewPreconfirmedReceipts
     | Syncing -> Syncing
     | Etherlink (L1_L2_levels _) ->
         (* Don't fetch historic levels through websocket *)
@@ -490,7 +505,8 @@ let eth_subscribe_rpc_mode ~timeout ~(kind : Ethereum_types.Subscription.kind)
   let* proxied = get_proxied_subscription ws_client ~timeout kind in
   let* stream, stopper =
     match kind with
-    | NewHeads | NewPendingTransactions | Syncing | NewIncludedTransactions ->
+    | NewHeads | NewPendingTransactions | Syncing | NewIncludedTransactions
+    | NewPreconfirmedReceipts ->
         return @@ Lwt_watcher.create_stream proxied.watcher
     | Logs {address; topics} ->
         let stream, stopper = Lwt_watcher.create_stream proxied.watcher in
@@ -1628,7 +1644,8 @@ let encode_subscription_response subscription r =
     | Ok r ->
         Data_encoding.Json.construct
           (Ethereum_types.Subscription.output_encoding
-             Transaction_object.encoding)
+             Transaction_object.encoding
+             Transaction_receipt.encoding)
           r
     | Error err ->
         let msg =

@@ -1370,6 +1370,7 @@ module Subscription = struct
     | NewPendingTransactions
     | Syncing
     | NewIncludedTransactions
+    | NewPreconfirmedReceipts
     | Etherlink of etherlink_extension
 
   let etherlink_extension_encoding =
@@ -1436,6 +1437,12 @@ module Subscription = struct
           (tup1 (constant "syncing"))
           (function Syncing -> Some () | _ -> None)
           (fun () -> Syncing);
+        case
+          ~title:"tez_newPreconfirmedReceipts"
+          (Tag 0xfd)
+          (tup1 (constant "tez_newPreconfirmedReceipts"))
+          (function NewPreconfirmedReceipts -> Some () | _ -> None)
+          (fun () -> NewPreconfirmedReceipts);
         case
           ~title:"tez_newIncludedTransactions"
           (Tag 0xfe)
@@ -1520,15 +1527,16 @@ module Subscription = struct
 
   type etherlink_extension_output = L1_l2_levels of l1_l2_levels_output
 
-  type 'transaction_object output =
+  type ('transaction_object, 'receipt) output =
     | NewHeads of 'transaction_object block
     | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
     | NewIncludedTransactions of 'transaction_object
+    | NewPreconfirmedReceipts of 'receipt
     | Etherlink of etherlink_extension_output
 
-  let output_encoding transaction_object_encoding =
+  let output_encoding transaction_object_encoding receipt_encoding =
     let open Data_encoding in
     union
       [
@@ -1568,5 +1576,11 @@ module Subscription = struct
           transaction_object_encoding
           (function NewIncludedTransactions tx -> Some tx | _ -> None)
           (fun tx -> NewIncludedTransactions tx);
+        case
+          ~title:"tez_newPreconfirmedReceipts"
+          (Tag 6)
+          receipt_encoding
+          (function NewPreconfirmedReceipts r -> Some r | _ -> None)
+          (fun r -> NewPreconfirmedReceipts r);
       ]
 end

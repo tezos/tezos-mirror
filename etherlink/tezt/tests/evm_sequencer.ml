@@ -11674,24 +11674,24 @@ let test_websocket_logs_event =
   let* () = scenario rpc_node in
   unit
 
+(* TODO #7843: Adapt this test to multichain context *)
 let test_websocket_tez_newIncludedTransactions_event =
-  register_all
+  register_test
     ~__FILE__
-    ~tags:
-      ["evm"; "rpc"; "websocket"; "tez_new_included_transactions"; Tag.flaky]
-    ~title:
-      "Check that websocket event `newIncludedTransactions` is behaving \
-       correctly"
     ~time_between_blocks:Nothing
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~tags:["evm"; "rpc"; "websocket"; "tez_new_included_transactions"]
+    ~title:
+      "Check that websocket event `newIncludedTransactions` is behaving \
+       correctly"
+    ~kernel:Latest
     ~websockets:true
-    ~use_multichain:
-      (* TODO #7843: Adapt this test to multichain context *)
-      Register_without_feature
+    ~enable_dal:false
+    ~enable_multichain:false
   @@ fun {sequencer; observer; _} _protocol ->
   (*
     To avoid updating all the tooling.
@@ -11760,6 +11760,83 @@ let test_websocket_tez_newIncludedTransactions_event =
       rpc_node
       "0x10318840345abfa7d61f34ce6b09061176f375062802646f98dc2e88f0639bdf"
   in
+  unit
+
+(* TODO #7843: Adapt this test to multichain context *)
+let test_websocket_tez_newPreconfirmedReceipts_event =
+  register_test
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~eth_bootstrap_accounts:
+      ((Array.to_list Eth_account.bootstrap_accounts
+       |> List.map (fun a -> a.Eth_account.address))
+      @ Eth_account.lots_of_address)
+    ~tags:["evm"; "rpc"; "websocket"; "tez_new_preconfirmed_receipts"]
+    ~title:
+      "Check that websocket event `newPreconfirmedReceipts` is behaving \
+       correctly"
+    ~kernel:Latest
+    ~websockets:true
+    ~enable_dal:false
+    ~enable_multichain:false
+  @@ fun {sequencer; observer; _} _protocol ->
+  (*
+    To avoid updating all the tooling.
+    This experimental feature will be deprecated in the short future.
+  *)
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ~preconfirmation_stream_enabled:true
+      ()
+  in
+  let* () = Evm_node.terminate sequencer in
+  let* () = Evm_node.terminate observer in
+  let* () = Evm_node.Config_file.update sequencer patch_config in
+  let* () = Evm_node.Config_file.update observer patch_config in
+  let p = Evm_node.wait_for_start_history_mode observer in
+  let* () = Evm_node.run sequencer in
+  let* () = Evm_node.run observer in
+  let* _ = p in
+  let* _res = produce_block sequencer in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let scenario evm_node transaction_hash =
+    let* websocket = Evm_node.open_websocket evm_node in
+    let* id = Rpc.subscribe ~websocket ~kind:NewPreconfirmedReceipts evm_node in
+    (* In observer mode, the transaction will never be mined which will cause
+       the following lines of code to be blocking hence the [Background.register]. *)
+    Background.register
+      (Lwt.catch
+         (fun () ->
+           let* _ =
+             Eth_cli.transaction_send
+               ~source_private_key:sender.private_key
+               ~to_public_key:sender.address
+               ~value:(Wei.of_eth_int 10)
+               ~endpoint:(Evm_node.endpoint evm_node)
+               ()
+           in
+           unit)
+         (fun exn ->
+           Log.debug "TX send failed because %s" (Printexc.to_string exn) ;
+           unit)) ;
+    let* receipt = Websocket.recv ~timeout:10. websocket in
+    let receipt =
+      JSON.(
+        receipt |-> "params" |-> "result"
+        |> Transaction.transaction_receipt_of_json)
+    in
+    Check.((transaction_hash = receipt.transactionHash) string)
+      ~error_msg:"Received tx_hash was %R, expected %L" ;
+    check_unsubscription ~websocket ~id ~sequencer evm_node
+  in
+  Log.info "Scenario with observer" ;
+  let* () =
+    scenario
+      observer
+      "0x1b5678a27af55582f2bd6fa07223ff59ee93e16c228e40a948d09ee593560d36"
+  in
+  let* _ = produce_block_and_wait_for_sync ~sequencer observer in
   unit
 
 let test_node_correctly_uses_batcher_heap =
@@ -14739,6 +14816,7 @@ let () =
   test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
   test_websocket_logs_event [Protocol.Alpha] ;
   test_websocket_tez_newIncludedTransactions_event [Protocol.Alpha] ;
+  test_websocket_tez_newPreconfirmedReceipts_event [Protocol.Alpha] ;
   test_node_correctly_uses_batcher_heap [Protocol.Alpha] ;
   test_init_config_network "mainnet" ;
   test_init_config_network "testnet" ;
