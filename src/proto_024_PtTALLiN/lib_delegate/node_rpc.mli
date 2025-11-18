@@ -236,3 +236,16 @@ val blocks :
   heads:Block_hash.t list ->
   length:int ->
   Block_hash.t list list tzresult Lwt.t
+
+val inject_private_operation_bytes :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  bytes ->
+  Operation_hash.t tzresult Lwt.t
+
+val inject_operation_bytes :
+  #Protocol_client_context.rpc_context ->
+  ?async:bool ->
+  chain:Shell_services.chain ->
+  bytes ->
+  Operation_hash.t tzresult Lwt.t
