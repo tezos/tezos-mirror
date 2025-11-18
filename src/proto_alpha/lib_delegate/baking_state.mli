@@ -283,11 +283,6 @@ type level_state = {
   next_level_latest_forge_request : Round.t option;
       (** Some if a forge request has been sent for the next level on the given
           round *)
-  dal_attestable_slots : dal_attestable_slots;
-      (** For each (own) delegate having a DAL slot at the current level, store
-          a promise to obtain the attestable slots for that level. *)
-  next_level_dal_attestable_slots : dal_attestable_slots;
-      (** and similarly for the next level *)
 }
 
 val pp_level_state : Format.formatter -> level_state -> unit

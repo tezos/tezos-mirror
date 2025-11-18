@@ -246,8 +246,3 @@ type delegate_info = {
   attestation_slot : Slot.t;
   attesting_power : int64;
 }
-
-type dal_attestable_slots =
-  (Delegate_id.t
-  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
-  list

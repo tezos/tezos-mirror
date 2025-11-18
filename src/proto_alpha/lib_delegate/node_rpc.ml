@@ -488,23 +488,6 @@ let fetch_dal_config cctxt =
   | Error e -> return_error e
   | Ok dal_config -> return_ok dal_config
 
-let get_attestable_slots dal_node_rpc_ctxt delegate_id ~attestation_level =
-  let pkh = Delegate_id.to_pkh delegate_id in
-  let attested_level = Int32.succ attestation_level in
-  warn_on_stalling_rpc ~rpc_name:"get_attestable_slots"
-  @@ Tezos_rpc.Context.make_call
-       Tezos_dal_node_services.Services.get_attestable_slots
-       dal_node_rpc_ctxt
-       (((), Tezos_crypto.Signature.Of_V2.public_key_hash pkh), attested_level)
-       ()
-       ()
-
-let dal_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
-    ~attestation_level =
-  List.map (fun delegate_id ->
-      ( delegate_id,
-        get_attestable_slots dal_node_rpc_ctxt delegate_id ~attestation_level ))
-
 let monitor_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
     ~delegate_id =
   let open Lwt_syntax in

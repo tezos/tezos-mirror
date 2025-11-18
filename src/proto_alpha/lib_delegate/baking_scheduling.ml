@@ -694,26 +694,6 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
     else None
   in
   let current_level = current_proposal.block.shell.level in
-  let dal_attestable_slots =
-    Option.fold
-      ~none:[]
-      ~some:(fun dal_node_rpc_ctxt ->
-        Node_rpc.dal_attestable_slots
-          dal_node_rpc_ctxt
-          ~attestation_level:current_level
-          (Delegate_infos.own_delegate_ids delegate_infos))
-      dal_node_rpc_ctxt
-  in
-  let next_level_dal_attestable_slots =
-    Option.fold
-      ~none:[]
-      ~some:(fun dal_node_rpc_ctxt ->
-        Node_rpc.dal_attestable_slots
-          dal_node_rpc_ctxt
-          ~attestation_level:(Int32.succ current_level)
-          (Delegate_infos.own_delegate_ids next_level_delegate_infos))
-      dal_node_rpc_ctxt
-  in
   let level_state =
     {
       current_level;
@@ -726,8 +706,6 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       delegate_infos;
       next_level_delegate_infos;
       next_level_latest_forge_request = None;
-      dal_attestable_slots;
-      next_level_dal_attestable_slots;
     }
   in
   let* round_state =
