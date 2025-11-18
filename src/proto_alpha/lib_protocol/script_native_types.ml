@@ -111,14 +111,21 @@ module CLST_types = struct
 
   type nat = Script_int.n Script_int.num
 
-  type arg = unit
+  type deposit = unit
+
+  type arg = deposit
 
   type ledger = (address, nat) big_map
 
   type storage = ledger
 
-  let arg_type : arg ty_node * arg entrypoints =
-    finalize_no_entrypoint (unit_ty ())
+  let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
+    make_entrypoint_leaf "deposit" (unit_ty ())
+
+  let arg_type : (arg ty_node * arg entrypoints) tzresult =
+    let open Result_syntax in
+    let* deposit_type = deposit_type in
+    return (finalize_entrypoint deposit_type)
 
   let storage_type : storage ty_node tzresult = address_big_map_ty (nat_ty ())
 end
@@ -135,7 +142,7 @@ let get_typed_kind_and_types =
   let open Result_syntax in
   function
   | Script_native_repr.CLST ->
-      let {typed = Ty_ex_c arg_type; untyped = _}, entrypoints =
+      let* {typed = Ty_ex_c arg_type; untyped = _}, entrypoints =
         CLST_types.arg_type
       in
       let* {typed = Ty_ex_c storage_type; untyped = _} =
@@ -163,7 +170,7 @@ module Internal_for_tests = struct
     let open Result_syntax in
     function
     | Script_native_repr.CLST ->
-        let arg_type, arg_entrypoints = CLST_types.arg_type in
+        let* arg_type, arg_entrypoints = CLST_types.arg_type in
         let* storage_type = CLST_types.storage_type in
         return (Ex (arg_type, arg_entrypoints, storage_type))
 end

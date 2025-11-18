@@ -14,7 +14,9 @@ open Script_typed_ir
 module CLST_types : sig
   type nat = Script_int.n Script_int.num
 
-  type arg = unit
+  type deposit = unit
+
+  type arg = deposit
 
   type ledger = (address, nat) big_map
 
