@@ -627,7 +627,7 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
   let* constants =
     match constants with
     | Some c -> return c
-    | None -> Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+    | None -> Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
   in
   let* validation_mode =
     Baking_state.(
@@ -1003,7 +1003,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
   let* constants =
     match constants with
     | Some c -> return c
-    | None -> Plugin.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+    | None -> Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
   in
   let* () = perform_sanity_check cctxt ~chain_id in
   let cache = Baking_cache.Block_cache.create 10 in

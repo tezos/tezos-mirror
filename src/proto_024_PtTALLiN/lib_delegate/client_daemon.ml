@@ -77,7 +77,7 @@ module Baker = struct
         let* chain_id =
           Shell_services.Chain.chain_id cctxt ~chain:cctxt#chain ()
         in
-        Plugin.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+        Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
       in
       let block_time_s =
         Int64.to_float
@@ -219,7 +219,7 @@ module VDF = struct
       in
       let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
       let* constants =
-        Plugin.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+        Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
       in
       let canceler = Lwt_canceler.create () in
       let _ =
