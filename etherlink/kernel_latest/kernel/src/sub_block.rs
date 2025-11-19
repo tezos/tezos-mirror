@@ -9,7 +9,7 @@ use crate::{
     bridge::{execute_deposit, DepositResult},
     chains::{ChainConfigTrait, EvmChainConfig, ETHERLINK_SAFE_STORAGE_ROOT_PATH},
     configuration::fetch_pure_evm_config,
-    error::{Error, StorageError},
+    error::{Error, StorageError, TransferError},
     gas_price::base_fee_per_gas,
     l2block::L2Block,
     retrieve_chain_id, retrieve_da_fee,
@@ -481,6 +481,18 @@ pub fn handle_run_transaction<Host: Runtime>(
     };
 
     let result_data = get_result_data(result);
+
+    let fee_updates = input_data
+        .tx
+        .content
+        .fee_updates(&block_constants.block_fees, result_data.gas_used.into());
+    fee_updates
+        .apply(host, caller, Some(block_constants.coinbase))
+        .map_err(|_| {
+            Error::Transfer(TransferError::Custom(
+                "Applying fees to the sequencer pool address failed",
+            ))
+        })?;
 
     // Don't pass `safe_host` because we don't want this to be cached
     // but we still want it to be accessible by the node.

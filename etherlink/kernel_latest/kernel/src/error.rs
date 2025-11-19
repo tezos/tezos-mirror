@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
-// SPDX-FileCopyrightText: 2023-2024 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Trilitech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
@@ -33,6 +33,8 @@ pub enum TransferError {
     InvalidAddressFormat(Utf8Error),
     #[error("Transaction error: invalid chain id {expected} but got {actual}")]
     InvalidChainId { expected: U256, actual: U256 },
+    #[error("Transaction error: {0}")]
+    Custom(&'static str),
 }
 
 #[derive(Error, Debug, Eq, PartialEq)]
