@@ -126,7 +126,10 @@ omitted in cache functions. As a result, gas costs for smart contract
 calls has increased by at most 2 units of gas each time the cache is
 accessed.
 
+.. _v24_breaking_changes:
 
+Octez Version 24
+----------------
 
 .. _v23_breaking_changes:
 
