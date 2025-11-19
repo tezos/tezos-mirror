@@ -204,3 +204,55 @@ val seed_computation :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Seed.seed_computation_status tzresult Lwt.t
+
+val chain_id :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  Chain_id.t tzresult Lwt.t
+
+val shell_header :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?block:Shell_services.block ->
+  unit ->
+  Block_header.shell_header tzresult Lwt.t
+
+val block_hash :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Block_hash.t tzresult Lwt.t
+
+val protocols :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?block:Shell_services.block ->
+  unit ->
+  Chain_services.Blocks.protocols tzresult Lwt.t
+
+val blocks :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  heads:Block_hash.t list ->
+  length:int ->
+  Block_hash.t list list tzresult Lwt.t
+
+val inject_private_operation_bytes :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  bytes ->
+  Operation_hash.t tzresult Lwt.t
+
+val inject_operation_bytes :
+  #Protocol_client_context.rpc_context ->
+  ?async:bool ->
+  chain:Shell_services.chain ->
+  bytes ->
+  Operation_hash.t tzresult Lwt.t
+
+val block_resulting_context_hash :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?block:Shell_services.block ->
+  unit ->
+  Context_hash.t tzresult Lwt.t

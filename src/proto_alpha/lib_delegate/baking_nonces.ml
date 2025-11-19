@@ -506,7 +506,7 @@ let inject_seed_nonce_revelation (cctxt : #Protocol_client_context.full) ~chain
           in
           let bytes = Signature.concat bytes Signature.zero in
           let* oph =
-            (Shell_services.Injection.operation
+            (Node_rpc.inject_operation_bytes
                ~async:true
                cctxt
                ~chain

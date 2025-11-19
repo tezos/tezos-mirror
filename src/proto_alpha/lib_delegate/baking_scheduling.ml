@@ -623,7 +623,7 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
      consider saved attestable value *)
   let open Baking_state in
-  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let* constants =
     match constants with
     | Some c -> return c
@@ -998,7 +998,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
     config delegates =
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Launch.keys_used delegates) in
-  let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let* chain_id = Node_rpc.chain_id cctxt ~chain in
   let*! () = Events.emit Node_rpc_events.chain_id chain_id in
   let* constants =
     match constants with

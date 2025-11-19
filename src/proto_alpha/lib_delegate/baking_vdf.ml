@@ -148,9 +148,7 @@ let inject_vdf_revelation cctxt state setup solution chain_id hash
             ~solution
         in
         let op_bytes = Tezos_crypto.Signature.V_latest.(concat op_bytes zero) in
-        let* op_hash =
-          Shell_services.Injection.operation cctxt ~chain op_bytes
-        in
+        let* op_hash = Node_rpc.inject_operation_bytes cctxt ~chain op_bytes in
         (* If injection is successful, update the status to [Injected]. *)
         state.computation_status <- Injected ;
         let*! () =

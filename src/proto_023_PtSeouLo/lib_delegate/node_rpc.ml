@@ -222,6 +222,9 @@ let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
     {verbosity = Info}
       ("compute block " ^ Block_hash.to_short_b58check block_hash ^ " info")])
 
+let protocols cctxt ~chain ?(block = `Head 0) () =
+  Shell_services.Blocks.protocols cctxt ~chain ~block ()
+
 let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
     block_hash (block_header : Tezos_base.Block_header.t) =
   let open Lwt_result_syntax in
@@ -257,7 +260,7 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
                current_protocol = pred_current_protocol;
                next_protocol = pred_next_protocol;
              } =
-          (Shell_services.Blocks.protocols
+          (protocols
              cctxt
              ~chain
              ~block:pred_block
@@ -540,3 +543,23 @@ let constants cctxt ~chain ~block =
 
 let seed_computation cctxt ~chain ~block =
   Alpha_services.Seed_computation.get cctxt (chain, block)
+
+let chain_id cctxt ~chain = Shell_services.Chain.chain_id cctxt ~chain ()
+
+let shell_header cctxt ~chain ?(block = `Head 0) () =
+  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
+
+let block_hash cctxt ~chain ~block =
+  Shell_services.Blocks.hash cctxt ~chain ~block ()
+
+let blocks cctxt ~chain ~heads ~length =
+  Shell_services.Blocks.list cctxt ~chain ~heads ~length ()
+
+let inject_private_operation_bytes cctxt ~chain bytes =
+  Shell_services.Injection.private_operation cctxt ~chain bytes
+
+let inject_operation_bytes cctxt ?async ~chain bytes =
+  Shell_services.Injection.operation cctxt ?async ~chain bytes
+
+let block_resulting_context_hash cctxt ~chain ?(block = `Head 0) () =
+  Shell_services.Blocks.resulting_context_hash cctxt ~chain ~block ()

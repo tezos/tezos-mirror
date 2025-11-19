@@ -405,7 +405,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
   let chain = `Hash global_state.chain_id in
   let pred_block = `Hash (predecessor.hash, 0) in
   let* pred_resulting_context_hash =
-    (Shell_services.Blocks.resulting_context_hash
+    (Node_rpc.block_resulting_context_hash
        cctxt
        ~chain
        ~block:pred_block
