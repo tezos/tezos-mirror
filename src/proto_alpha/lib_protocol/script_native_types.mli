@@ -16,7 +16,9 @@ module CLST_types : sig
 
   type deposit = unit
 
-  type arg = deposit
+  type withdraw = nat
+
+  type arg = (deposit, withdraw) or_
 
   type ledger = (address, nat) big_map
 

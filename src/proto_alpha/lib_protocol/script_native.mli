@@ -10,7 +10,12 @@ open Script_native_types
 open Script_typed_ir
 
 module CLST_contract : sig
-  type error += Empty_deposit | Non_implicit_contract of Destination.t
+  type error +=
+    | Empty_transfer
+    | Non_empty_transfer of Destination.t * Tez.t
+    | Non_implicit_contract of Destination.t
+    | Balance_too_low of Destination.t * CLST_types.nat * CLST_types.nat
+    | Amount_too_large of Destination.t * CLST_types.nat
 end
 
 (* [execute ctxt kind arg storage] executes the given native contract [kind]

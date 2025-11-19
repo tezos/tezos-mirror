@@ -57,7 +57,7 @@ let test_deposit_zero =
   match b with
   | Ok _ ->
       Test.fail "Empty deposits on CLST are forbidden and expected to fail"
-  | Error trace -> Error_helpers.expect_clst_empty_deposit ~loc:__LOC__ trace
+  | Error trace -> Error_helpers.expect_clst_empty_transfer ~loc:__LOC__ trace
 
 (*
    Contract taking a contract (or <contract>%<entrypoint>) as parameter, and

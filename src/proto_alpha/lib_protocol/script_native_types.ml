@@ -113,7 +113,9 @@ module CLST_types = struct
 
   type deposit = unit
 
-  type arg = deposit
+  type withdraw = nat
+
+  type arg = (deposit, withdraw) or_
 
   type ledger = (address, nat) big_map
 
@@ -122,10 +124,15 @@ module CLST_types = struct
   let deposit_type : (deposit ty_node * deposit entrypoints_node) tzresult =
     make_entrypoint_leaf "deposit" (unit_ty ())
 
+  let withdraw_type : (withdraw ty_node * withdraw entrypoints_node) tzresult =
+    make_entrypoint_leaf "withdraw" (nat_ty ())
+
   let arg_type : (arg ty_node * arg entrypoints) tzresult =
     let open Result_syntax in
-    let* deposit_type = deposit_type in
-    return (finalize_entrypoint deposit_type)
+    let* deposit_type in
+    let* withdraw_type in
+    let* arg_type = make_entrypoint_node deposit_type withdraw_type in
+    return (finalize_entrypoint arg_type)
 
   let storage_type : storage ty_node tzresult = address_big_map_ty (nat_ty ())
 end

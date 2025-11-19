@@ -12,7 +12,12 @@ open Script_typed_ir
 module CLST_contract = struct
   open Script_native_types.CLST_types
 
-  type error += Empty_deposit | Non_implicit_contract of Destination.t
+  type error +=
+    | Empty_transfer
+    | Non_empty_transfer of Destination.t * Tez.t
+    | Non_implicit_contract of Destination.t
+    | Balance_too_low of Destination.t * nat * nat
+    | Amount_too_large of Destination.t * nat
 
   let is_implicit : Destination.t -> bool = function
     | Destination.Contract (Contract.Implicit _) -> true
@@ -22,7 +27,7 @@ module CLST_contract = struct
       (() : deposit) (storage : storage) :
       ((operation Script_list.t, storage) pair * context) tzresult Lwt.t =
     let open Lwt_result_syntax in
-    let*? () = error_when Tez.(step_constants.amount = zero) Empty_deposit in
+    let*? () = error_when Tez.(step_constants.amount = zero) Empty_transfer in
     let*? () =
       error_when
         (not (is_implicit step_constants.sender))
@@ -40,13 +45,75 @@ module CLST_contract = struct
     in
     let new_amount = Script_int.(add_n added_amount amount) in
     let* new_ledger, ctxt =
-      Script_big_map.update ctxt address (Some new_amount) storage
+      Clst_storage.set_balance_from_storage ctxt storage address new_amount
     in
     return ((Script_list.empty, new_ledger), ctxt)
 
+  let execute_withdraw (ctxt, (step_constants : Script_typed_ir.step_constants))
+      (amount : withdraw) (storage : storage) :
+      ((operation Script_list.t, storage) pair * context) tzresult Lwt.t =
+    let open Lwt_result_syntax in
+    let*? () =
+      error_when
+        Tez.(step_constants.amount <> zero)
+        (Non_empty_transfer (step_constants.sender, step_constants.amount))
+    in
+    let*? () =
+      error_when
+        Compare.Int.(Script_int.(compare zero_n amount) = 0)
+        Empty_transfer
+    in
+    let*? () =
+      error_when
+        Compare.Int.(
+          Script_int.(compare (of_int64 Int64.max_int) (int amount)) < 0)
+        (Amount_too_large (step_constants.sender, amount))
+    in
+    let* typed_account =
+      match step_constants.sender with
+      | Contract (Implicit pkh) -> return (Typed_implicit pkh)
+      | sender -> tzfail (Non_implicit_contract sender)
+    in
+    let address =
+      {destination = step_constants.sender; entrypoint = Entrypoint.default}
+    in
+    let* current_amount, ctxt =
+      Clst_storage.get_balance_from_storage ctxt storage address
+    in
+    let* removed_amount =
+      if Compare.Int.(Script_int.compare current_amount amount < 0) then
+        tzfail (Balance_too_low (step_constants.sender, current_amount, amount))
+      else return amount
+    in
+    let new_amount = Script_int.(abs (sub current_amount removed_amount)) in
+    let* new_ledger, ctxt =
+      Clst_storage.set_balance_from_storage ctxt storage address new_amount
+    in
+    let amount_tez =
+      Tez.of_mutez_exn
+        (Option.value ~default:0L (Script_int.to_int64 removed_amount))
+    in
+    let gas_counter, outdated_ctxt =
+      Local_gas_counter.local_gas_counter_and_outdated_context ctxt
+    in
+    let* op, outdated_ctxt, gas_counter =
+      Script_interpreter_defs.transfer
+        (outdated_ctxt, step_constants)
+        gas_counter
+        amount_tez
+        Micheline.dummy_location
+        typed_account
+        ()
+    in
+    let ctxt = Local_gas_counter.update_context gas_counter outdated_ctxt in
+    return ((Script_list.of_list [op], new_ledger), ctxt)
+
   let execute (ctxt, (step_constants : step_constants)) (value : arg)
       (storage : storage) =
-    execute_deposit (ctxt, step_constants) value storage
+    match value with
+    | L () (* deposit *) -> execute_deposit (ctxt, step_constants) () storage
+    | R amount (* withdraw *) ->
+        execute_withdraw (ctxt, step_constants) amount storage
 end
 
 let execute (type arg storage) (ctxt, step_constants)
@@ -59,14 +126,35 @@ let execute (type arg storage) (ctxt, step_constants)
 let () =
   register_error_kind
     `Branch
-    ~id:"clst.empty_deposit"
-    ~title:"Empty deposit"
-    ~description:"Forbidden to deposit 0ꜩ to CLST contract."
+    ~id:"clst.empty_transfer"
+    ~title:"Empty transfer"
+    ~description:"Forbidden to deposit or withdraw 0ꜩ on CLST contract."
     ~pp:(fun ppf () ->
-      Format.fprintf ppf "Deposit of 0ꜩ on CLST are forbidden.")
+      Format.fprintf ppf "Deposit or withdraw 0ꜩ on CLST are forbidden.")
     Data_encoding.unit
-    (function CLST_contract.Empty_deposit -> Some () | _ -> None)
-    (fun () -> CLST_contract.Empty_deposit) ;
+    (function CLST_contract.Empty_transfer -> Some () | _ -> None)
+    (fun () -> CLST_contract.Empty_transfer) ;
+  register_error_kind
+    `Branch
+    ~id:"clst.non_empty_transfer"
+    ~title:"Non empty transfer"
+    ~description:"Transferred amount is not used"
+    ~pp:(fun ppf (address, amount) ->
+      Format.fprintf
+        ppf
+        "Transferred amount %a from contract %a is not used"
+        Tez.pp
+        amount
+        Destination.pp
+        address)
+    Data_encoding.(
+      obj2 (req "address" Destination.encoding) (req "amount" Tez.encoding))
+    (function
+      | CLST_contract.Non_empty_transfer (address, amount) ->
+          Some (address, amount)
+      | _ -> None)
+    (fun (address, amount) ->
+      CLST_contract.Non_empty_transfer (address, amount)) ;
   register_error_kind
     `Branch
     ~id:"clst.non_implicit_contract"
@@ -81,4 +169,49 @@ let () =
     Data_encoding.(obj1 (req "address" Destination.encoding))
     (function
       | CLST_contract.Non_implicit_contract address -> Some address | _ -> None)
-    (fun address -> CLST_contract.Non_implicit_contract address)
+    (fun address -> CLST_contract.Non_implicit_contract address) ;
+  register_error_kind
+    `Branch
+    ~id:"clst.balance_too_low"
+    ~title:"Balance is too low"
+    ~description:"Spending more clst tokens than the contract has"
+    ~pp:(fun ppf (address, balance, amount) ->
+      Format.fprintf
+        ppf
+        "Balance of contract %a too low (%s) to spend %s"
+        Destination.pp
+        address
+        (Script_int.to_string balance)
+        (Script_int.to_string amount))
+    Data_encoding.(
+      obj3
+        (req "address" Destination.encoding)
+        (req "balance" Script_int.n_encoding)
+        (req "amount" Script_int.n_encoding))
+    (function
+      | CLST_contract.Balance_too_low (address, balance, amount) ->
+          Some (address, balance, amount)
+      | _ -> None)
+    (fun (address, balance, amount) ->
+      CLST_contract.Balance_too_low (address, balance, amount)) ;
+  register_error_kind
+    `Branch
+    ~id:"clst.amount_too_large"
+    ~title:"Amount is too large"
+    ~description:"Amount is too large for transfer"
+    ~pp:(fun ppf (address, amount) ->
+      Format.fprintf
+        ppf
+        "Amount %s is too large to transfer to contract %a"
+        (Script_int.to_string amount)
+        Destination.pp
+        address)
+    Data_encoding.(
+      obj2
+        (req "address" Destination.encoding)
+        (req "amount" Script_int.n_encoding))
+    (function
+      | CLST_contract.Amount_too_large (address, amount) ->
+          Some (address, amount)
+      | _ -> None)
+    (fun (address, amount) -> CLST_contract.Amount_too_large (address, amount))
