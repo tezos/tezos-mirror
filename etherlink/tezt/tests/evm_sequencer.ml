@@ -2776,69 +2776,6 @@ let test_observer_applies_blueprint =
 
   unit
 
-let test_observer_receives_preconfirmations =
-  register_test
-    ~__FILE__
-    ~time_between_blocks:Nothing
-    ~tags:["evm"; "observer"; "sub_block"; "preconfirmation"]
-    ~title:"Observer receives preconfirmations"
-    ~kernel:Latest
-    ~enable_dal:false
-    ~enable_multichain:false
-  @@ fun {sequencer; observer; _} _protocol ->
-  (*
-    To avoid updating all the tooling.
-    This experimental feature will be deprecated in the short future.
-  *)
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~preconfirmation_stream_enabled:true
-      ()
-  in
-  let* () = Evm_node.terminate sequencer in
-  let* () = Evm_node.terminate observer in
-  let* () = Evm_node.Config_file.update sequencer patch_config in
-  let* () = Evm_node.Config_file.update observer patch_config in
-  let p = Evm_node.wait_for_start_history_mode observer in
-  let* () = Evm_node.run sequencer in
-  let* () = Evm_node.run observer in
-  let* _ = p in
-
-  (*
-    1. Produce one block to initialize internal timestamp
-    2. Observer receives the transaction
-    3. Transaction is added to the transaction queue
-    4. Transaction is forwarded to the sequencer
-    5. Sequencer validates the transaction
-    6. Sequencer streams the result back to the observer
-    7. Sequencer produces block in order to access the receipt
-    8. Hashes are the same
-  *)
-  let* _res = produce_block sequencer in
-  let add = Evm_node.wait_for_tx_queue_add_transaction sequencer in
-  let next_ts = Evm_node.wait_for_next_block_timestamp observer in
-  let preconf = Evm_node.wait_for_inclusion observer in
-  let p =
-    Eth_cli.transaction_send
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-      ~to_public_key:Eth_account.bootstrap_accounts.(1).address
-      ~value:(Wei.of_eth_int 10)
-      ~endpoint:(Evm_node.endpoint observer)
-      ()
-  in
-  let* _ = add in
-  let* _ = next_ts in
-  let* streamed_txn_hash = preconf in
-  let* _res = produce_block sequencer in
-  let* txn_hash = p in
-  Check.(
-    (txn_hash = streamed_txn_hash)
-      string
-      ~error_msg:
-        "txn hash received through the preconfirmation stream does not match \
-         expected value") ;
-  unit
-
 let test_observer_applies_blueprint_dont_track_rollup_node =
   register_all
     ~__FILE__
@@ -10726,105 +10663,6 @@ let test_relay_restricted_rpcs =
   let*@? _ = Rpc.tez_kernelVersion sequencer in
   unit
 
-let test_eth_send_raw_transaction_sync_rpc () =
-  register_sandbox_with_observer
-    ~tags:["evm"; "delayed_transaction"]
-    ~title:"eth_sendRawTransactionSync waits for receipt"
-  @@ fun {sandbox; observer; _} ->
-  (*
-    To avoid updating all the tooling.
-    This experimental feature will be deprecated in the short future.
-  *)
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~preconfirmation_stream_enabled:true
-      ()
-  in
-  let* () = Evm_node.terminate sandbox in
-  let* () = Evm_node.terminate observer in
-  let* () = Evm_node.Config_file.update sandbox patch_config in
-  let* () = Evm_node.Config_file.update observer patch_config in
-  let p = Evm_node.wait_for_start_history_mode observer in
-  let* () = Evm_node.run sandbox in
-  let* () = Evm_node.run observer in
-  let* _ = p in
-  let* _res = produce_block sandbox in
-  let* gas_price = Rpc.get_gas_price sandbox in
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let receiver = Eth_account.bootstrap_accounts.(1) in
-  let* rpc_observer_node = run_new_rpc_endpoint observer in
-  let get_receipt_result block nonce =
-    let* raw_tx =
-      Cast.craft_tx
-        ~source_private_key:sender.private_key
-        ~chain_id:1337
-        ~nonce
-        ~gas_price:(Int32.to_int gas_price)
-        ~gas:23_300
-        ~value:(Wei.of_eth_int 10)
-        ~address:receiver.address
-        ()
-    in
-    let receipt_promise =
-      Rpc.eth_send_raw_transaction_sync ~raw_tx ~block rpc_observer_node
-    in
-    let* _ = Evm_node.wait_for_tx_queue_injecting_transaction observer in
-    Check.((Lwt.is_sleeping receipt_promise = true) bool)
-      ~error_msg:"eth_sendRawTransactionSync should wait for inclusion" ;
-    if block = Pending then
-      let*@ receipt = receipt_promise in
-      return receipt
-    else
-      let*@ _ = produce_block sandbox in
-      let*@ receipt = receipt_promise in
-      return receipt
-  in
-  let* receipt = get_receipt_result Latest 0 in
-  Check.(
-    (receipt.status = true)
-      bool
-      ~error_msg:
-        "Transaction should have been included and executed successfully") ;
-  let* preconfirmed_receipt = get_receipt_result Pending 1 in
-  Check.(
-    (preconfirmed_receipt.status = true)
-      bool
-      ~error_msg:"Transaction should have been executed successfully") ;
-  unit
-
-let test_eth_send_raw_transaction_sync_rpc_timeouts () =
-  register_sandbox_with_observer
-    ~tags:["evm"; "delayed_transaction"]
-    ~title:"eth_sendRawTransactionSync timeouts"
-  @@ fun {sandbox; observer} ->
-  let* gas_price = Rpc.get_gas_price sandbox in
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let receiver = Eth_account.bootstrap_accounts.(1) in
-  let* raw_tx =
-    Cast.craft_tx
-      ~source_private_key:sender.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:(Int32.to_int gas_price)
-      ~gas:23_300
-      ~value:(Wei.of_eth_int 10)
-      ~address:receiver.address
-      ()
-  in
-  let* rpc_observer_node = run_new_rpc_endpoint observer in
-  let receipt_promise =
-    Rpc.eth_send_raw_transaction_sync ~raw_tx ~timeout:5000 rpc_observer_node
-  in
-  let* _ = Evm_node.wait_for_tx_queue_injecting_transaction observer in
-  Check.((Lwt.is_sleeping receipt_promise = true) bool)
-    ~error_msg:"eth_sendRawTransactionSync should wait for inclusion" ;
-  let* receipt = receipt_promise in
-  match receipt with
-  | Ok _ ->
-      Test.fail
-        "eth_sendRawTransactionSync should have timed out, but got a receipt"
-  | Error _ -> unit
-
 let test_tx_pool_pending_nonce () =
   register_sandbox
     ~tags:["evm"; "tx_pool"]
@@ -14704,7 +14542,6 @@ let () =
   test_observer_applies_blueprint_from_rpc_node protocols ;
   test_observer_applies_blueprint_when_restarted protocols ;
   test_observer_applies_blueprint_when_sequencer_restarted protocols ;
-  test_observer_receives_preconfirmations protocols ;
   test_observer_forwards_transaction protocols ;
   test_observer_timeout_when_necessary protocols ;
   test_sequencer_is_reimbursed protocols ;
@@ -14793,8 +14630,6 @@ let () =
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
   test_proxy_node_can_forward_to_evm_endpoint protocols ;
-  test_eth_send_raw_transaction_sync_rpc () ;
-  test_eth_send_raw_transaction_sync_rpc_timeouts () ;
   test_tx_pool_pending_nonce () ;
   test_da_fees_after_execution protocols ;
   test_trace_transaction_calltracer_failed_create protocols ;
