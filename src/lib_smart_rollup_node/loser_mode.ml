@@ -254,6 +254,13 @@ let is_invalid_dal_parameters = function
   | Failure _ | Invalid_dal_page _ -> None
   | Invalid_dal_parameters parameters -> Some parameters
 
+let make_random_bytes =
+  let alphabet =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  in
+  let len = String.length alphabet in
+  fun page_size -> Bytes.init page_size (fun _ -> alphabet.[Random.int len])
+
 let is_invalid_dal_page ~inbox_level ~published_level ~slot_index ~page_index
     ~page_size ~honest_payload =
   let open Lwt_syntax in
@@ -289,13 +296,13 @@ let is_invalid_dal_page ~inbox_level ~published_level ~slot_index ~page_index
               None
           | `Flip, None ->
               let+ () = emit "flipped <None>" in
-              Some (Bytes.make page_size 'L')
+              Some (make_random_bytes page_size)
           | `Alter, None ->
               let+ () = emit "cannot alter <None>" in
               None
           | `Alter, Some data ->
-              let lll = Bytes.make page_size 'L' in
-              let zzz = Bytes.make page_size 'Z' in
+              let lll = make_random_bytes page_size in
+              let zzz = make_random_bytes page_size in
               let+ () = emit "altered <Some data>" in
               Option.some (if Bytes.equal data lll then zzz else lll)
         in
