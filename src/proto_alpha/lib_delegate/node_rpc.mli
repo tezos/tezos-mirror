@@ -302,3 +302,7 @@ val mempool_monitor_operations :
   * (unit -> unit))
   tzresult
   Lwt.t
+
+val user_activated_upgrades :
+  #Protocol_client_context.rpc_context ->
+  (int32 * Protocol_hash.t) list tzresult Lwt.t
