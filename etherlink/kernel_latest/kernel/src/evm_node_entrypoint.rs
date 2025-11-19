@@ -87,3 +87,40 @@ where
         }
     }
 }
+
+#[allow(dead_code)]
+#[no_mangle]
+pub extern "C" fn assemble_block() {
+    let mut sdk_host = unsafe { RollupHost::new() };
+    assemble_block_fn(&mut sdk_host, WasmInternalHost());
+}
+
+pub fn assemble_block_fn<Host, I>(host: &mut Host, internal: I)
+where
+    Host: tezos_smart_rollup_host::runtime::Runtime,
+    I: InternalRuntime,
+{
+    let mut host: KernelHost<Host, &mut Host, I> = KernelHost::init(host, internal);
+    let assemble_block_input = match sub_block::read_assemble_block_input(&mut host) {
+        Ok(Some(input)) => input,
+        Ok(None) => {
+            log!(host, Error, "No assemble block input found in storage");
+            return;
+        }
+        Err(err) => {
+            log!(
+                host,
+                Error,
+                "Error while reading assemble block input: {:?}",
+                err
+            );
+            return;
+        }
+    };
+    match sub_block::assemble_block(&mut host, assemble_block_input) {
+        Ok(()) => (),
+        Err(err) => {
+            log!(host, Error, "Error while assembling block: {:?}", err);
+        }
+    }
+}
