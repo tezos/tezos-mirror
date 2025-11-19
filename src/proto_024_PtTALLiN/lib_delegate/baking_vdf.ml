@@ -93,11 +93,7 @@ let get_level_info cctxt level =
   let open Lwt_result_syntax in
   let level = Raw_level.to_int32 level in
   let* {protocol_data = {level_info; _}; _} =
-    Protocol_client_context.Alpha_block_services.metadata
-      cctxt
-      ~chain:cctxt#chain
-      ~block:(`Level level)
-      ()
+    Node_rpc.block_metadata cctxt ~chain:cctxt#chain ~block:(`Level level)
   in
   return level_info
 
