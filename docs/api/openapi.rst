@@ -50,11 +50,24 @@ Their OpenAPI specification can be found at:
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
+Tallinn RPCs
+------------
+
+The OpenAPI specifications for RPCs which are specific to the Tallinn (``PtTALLiN``)
+protocol proposal can be found at:
+
+- `tallinn-openapi-rc <../_static/tallinn-openapi-rc.html>`__ (version 24.0~beta1)
+
+The OpenAPI specifications for RPCs which are related to the mempool
+and specific to the Tallinn protocol proposal can be found at:
+
+- `tallinn-mempool-openapi-rc <../_static/tallinn-mempool-openapi-rc.html>`__ (version 24.0~beta1)
+
 Seoul RPCs
 ----------
 
 The OpenAPI specifications for RPCs which are specific to the Seoul (``PtSeouLo``)
-protocol proposal can be found at:
+protocol can be found at:
 
 - `seoul-openapi <../_static/seoul-openapi.html>`__ (version 23.2)
 - `seoul-openapi-rc <../_static/seoul-openapi-rc.html>`__ (version 24.0~beta1)
@@ -87,6 +100,14 @@ protocol in use. Their specification is given in the sections below.
 seen in the field ``.info.version`` within each file.)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
+
+Tallinn RPCs
+------------
+
+The OpenAPI specifications for the RPCs of the smart rollup node for the Tallinn
+(``PtTALLiN``) protocol proposal can be found at:
+
+- `tallinn-smart-rollup-node-openapi-rc <../_static/tallinn-smart-rollup-node-openapi-rc.html>`__ (version 24.0~beta1)
 
 Seoul RPCs
 ----------
