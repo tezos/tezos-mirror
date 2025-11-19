@@ -162,7 +162,9 @@ impl Transaction {
 
     pub fn to(&self) -> Option<H160> {
         match &self.content {
-            TransactionContent::Deposit(Deposit { receiver, .. }) => Some(*receiver),
+            TransactionContent::Deposit(Deposit { receiver, .. }) => {
+                Some(receiver.to_h160())
+            }
             TransactionContent::FaDeposit(FaDeposit { .. }) => {
                 Some(alloy_to_h160(&FA_BRIDGE_SOL_ADDR))
             }

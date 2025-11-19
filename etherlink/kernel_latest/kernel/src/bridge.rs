@@ -5,6 +5,8 @@
 
 //! Native token (TEZ) bridge primitives and helpers.
 
+use std::fmt::Display;
+
 use alloy_sol_types::SolEvent;
 use primitive_types::{H160, H256, U256};
 use revm::context::result::{ExecutionResult, Output, SuccessReason};
@@ -57,9 +59,45 @@ alloy_sol_types::sol! {
     );
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum DepositReceiver {
+    Ethereum(H160),
+}
+
+impl DepositReceiver {
+    pub fn to_h160(&self) -> H160 {
+        match self {
+            Self::Ethereum(receiver) => *receiver,
+        }
+    }
+}
+
+impl rlp::Encodable for DepositReceiver {
+    fn rlp_append(&self, s: &mut rlp::RlpStream) {
+        match self {
+            DepositReceiver::Ethereum(addr) => addr.rlp_append(s),
+        }
+    }
+}
+
+impl rlp::Decodable for DepositReceiver {
+    fn decode(decoder: &Rlp) -> Result<Self, DecoderError> {
+        let receiver: H160 = decode_field(decoder, "receiver")?;
+        Ok(Self::Ethereum(receiver))
+    }
+}
+
+impl Display for DepositReceiver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Ethereum(address) => write!(f, "{address}"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct DepositInfo {
-    pub receiver: H160,
+    pub receiver: DepositReceiver,
     pub chain_id: Option<U256>,
 }
 
@@ -74,8 +112,8 @@ impl DepositInfo {
             if decoder.item_count()? != 2 {
                 return Err(DecoderError::RlpIncorrectListLen);
             }
-            let mut it = decoder.iter();
-            let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
+            let mut it: rlp::RlpIterator<'_, '_> = decoder.iter();
+            let receiver: DepositReceiver = decode_field(&next(&mut it)?, "receiver")?;
             let chain_id: Option<U256> = decode_option_explicit(
                 &next(&mut it)?,
                 "chain_id",
@@ -95,7 +133,7 @@ pub struct Deposit {
     /// Deposit amount in wei
     pub amount: U256,
     /// Deposit receiver on L2
-    pub receiver: H160,
+    pub receiver: DepositReceiver,
     /// Inbox level containing the original deposit message
     pub inbox_level: u32,
     /// Inbox message id
@@ -115,7 +153,7 @@ impl Deposit {
             // Legacy format, input is exactly the receiver EVM address
             let receiver = H160::from_slice(&input_bytes);
             Ok(DepositInfo {
-                receiver,
+                receiver: DepositReceiver::Ethereum(receiver),
                 chain_id: None,
             })
         } else if input_length == Self::RECEIVER_AND_CHAIN_ID_LENGTH {
@@ -124,7 +162,7 @@ impl Deposit {
             let chain_id =
                 U256::from_little_endian(&input_bytes[Self::RECEIVER_LENGTH..]);
             Ok(DepositInfo {
-                receiver,
+                receiver: DepositReceiver::Ethereum(receiver),
                 chain_id: Some(chain_id),
             })
         } else {
@@ -174,7 +212,7 @@ impl Deposit {
     /// Signature: Deposit(uint256,address,uint256,uint256)
     pub fn event_log(&self) -> Log {
         let event_data = SolBridgeDepositEvent {
-            receiver: h160_to_alloy(&self.receiver),
+            receiver: h160_to_alloy(&self.receiver.to_h160()),
             amount: u256_to_alloy(&self.amount),
             inbox_level: u256_to_alloy(&U256::from(self.inbox_level)),
             inbox_msg_id: u256_to_alloy(&U256::from(self.inbox_msg_id)),
@@ -225,7 +263,7 @@ impl Decodable for Deposit {
                 let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
                 Ok(Self {
                     amount,
-                    receiver,
+                    receiver: DepositReceiver::Ethereum(receiver),
                     inbox_level: 0,
                     inbox_msg_id: 0,
                 })
@@ -233,7 +271,9 @@ impl Decodable for Deposit {
             4 => {
                 let mut it = decoder.iter();
                 let amount: U256 = decode_field(&next(&mut it)?, "amount")?;
-                let receiver: H160 = decode_field(&next(&mut it)?, "receiver")?;
+                let receiver_decoder = next(&mut it)?;
+                let receiver: DepositReceiver =
+                    decode_field(&receiver_decoder, "receiver")?;
                 let inbox_level: u32 = decode_field(&next(&mut it)?, "inbox_level")?;
                 let inbox_msg_id: u32 = decode_field(&next(&mut it)?, "inbox_msg_id")?;
                 Ok(Self {
@@ -259,7 +299,8 @@ pub fn execute_deposit<Host: Runtime>(
 ) -> Result<DepositResult, revm_etherlink::Error> {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
-    let mut to_account = StorageAccount::from_address(&h160_to_alloy(&deposit.receiver))?;
+    let receiver = deposit.receiver.to_h160();
+    let mut to_account = StorageAccount::from_address(&h160_to_alloy(&receiver))?;
 
     let result = match to_account.add_balance(host, u256_to_alloy(&deposit.amount)) {
         Ok(()) => ExecutionResult::Success {
@@ -304,7 +345,9 @@ mod tests {
     };
     use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
 
-    use crate::bridge::{DepositInfo, DepositResult, DEPOSIT_EVENT_TOPIC};
+    use crate::bridge::{
+        DepositInfo, DepositReceiver, DepositResult, DEPOSIT_EVENT_TOPIC,
+    };
 
     use super::{execute_deposit, Deposit};
 
@@ -322,7 +365,7 @@ mod tests {
     fn dummy_deposit() -> Deposit {
         Deposit {
             amount: U256::from(1u64),
-            receiver: H160::from([2u8; 20]),
+            receiver: DepositReceiver::Ethereum(H160::from([2u8; 20])),
             inbox_level: 3,
             inbox_msg_id: 4,
         }
@@ -359,7 +402,7 @@ mod tests {
             deposit,
             Deposit {
                 amount: tezos_ethereum::wei::eth_from_mutez(2),
-                receiver: H160([1u8; 20]),
+                receiver: DepositReceiver::Ethereum(H160([1u8; 20])),
                 inbox_level: 0,
                 inbox_msg_id: 0,
             }
@@ -382,7 +425,7 @@ mod tests {
             deposit,
             Deposit {
                 amount: tezos_ethereum::wei::eth_from_mutez(2),
-                receiver: H160::from([1u8; 20]),
+                receiver: DepositReceiver::Ethereum(H160::from([1u8; 20])),
                 inbox_level: 0,
                 inbox_msg_id: 0,
             }
@@ -419,7 +462,7 @@ mod tests {
         // DepositInfo with no chain_id representation should be 24 bytes long
         const RLP_DEPOSIT_NO_CHAIN_ID: usize = 24;
         let deposit_info = DepositInfo {
-            receiver,
+            receiver: DepositReceiver::Ethereum(receiver),
             chain_id: None,
         };
         let mut stream = RlpStream::new();
@@ -434,7 +477,7 @@ mod tests {
         // DepositInfo with no chain_id representation should be 56 bytes long
         const RLP_DEPOSIT_CHAIN_ID: usize = 56;
         let deposit_info = DepositInfo {
-            receiver,
+            receiver: DepositReceiver::Ethereum(receiver),
             chain_id: Some(chain_id),
         };
         let mut stream = RlpStream::new();
@@ -494,7 +537,7 @@ mod tests {
             res,
             Deposit {
                 amount: U256::one(),
-                receiver: H160::from([1u8; 20]),
+                receiver: DepositReceiver::Ethereum(H160::from([1u8; 20])),
                 inbox_level: 0,
                 inbox_msg_id: 0,
             }
