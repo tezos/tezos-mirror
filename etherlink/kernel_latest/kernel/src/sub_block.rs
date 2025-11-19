@@ -11,24 +11,30 @@ use crate::{
     configuration::fetch_pure_evm_config,
     error::{Error, StorageError},
     gas_price::base_fee_per_gas,
+    l2block::L2Block,
     retrieve_chain_id, retrieve_da_fee,
     storage::read_sequencer_pool_address,
     transaction::{Transaction, TransactionContent},
 };
+use alloy_consensus::{proofs::ordered_trie_root_with_encoder, EMPTY_ROOT_HASH};
+use ethbloom::Bloom;
 use ethereum::Log;
 use primitive_types::{H160, H256, U256};
 use revm::context::result::{ExecutionResult, Output};
-use revm_etherlink::{precompiles::constants::SYSTEM_SOL_ADDR, ExecutionOutcome};
+use revm_etherlink::{
+    precompiles::constants::SYSTEM_SOL_ADDR,
+    storage::world_state_handler::EVM_ACCOUNTS_PATH, ExecutionOutcome,
+};
 use rlp::{Decodable, Encodable};
 use tezos_ethereum::{
-    block::{BlockConstants, BlockFees},
+    block::{BlockConstants, BlockFees, EthBlock},
     rlp_helpers::{
         append_timestamp, decode_field, decode_field_u256_le, decode_timestamp, next,
         FromRlpBytes,
     },
     transaction::{
         IndexedLog, TransactionObject, TransactionReceipt, TransactionStatus,
-        TransactionType,
+        TransactionType, TRANSACTION_HASH_SIZE,
     },
 };
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
@@ -388,14 +394,12 @@ pub fn handle_run_transaction<Host: Runtime>(
     // See !19515.
     let mut safe_host = get_evm_safe_host(host, &config);
     safe_host.start()?;
-    let mut block_constants = block_constants(
+    let block_constants = block_constants(
         &mut safe_host,
         &config,
         input_data.timestamp,
         input_data.block_number,
     )?;
-    block_constants.timestamp = input_data.timestamp.as_u64().into();
-    block_constants.number = input_data.block_number;
 
     let RunOutcome {
         result,
@@ -496,6 +500,112 @@ pub fn handle_run_transaction<Host: Runtime>(
         block_constants.base_fee_per_gas(),
         &result_data,
     )
+}
+
+fn state_root_hash<Host: Runtime>(host: &mut Host) -> Result<Vec<u8>, Error> {
+    match host.store_get_hash(&EVM_ACCOUNTS_PATH) {
+        Ok(hash) => Ok(hash),
+        _ => Ok(vec![0u8; 32]),
+    }
+}
+
+fn read_current_block_hash<Host: Runtime>(host: &Host) -> Result<H256, Error> {
+    match block_storage::read_current_hash(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH) {
+        Ok(block_hash) => Ok(block_hash),
+        Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
+            Ok(H256::zero())
+        }
+        Err(err) => Err(err),
+    }
+}
+
+fn receipts_root(receipts: &[TransactionReceipt]) -> Vec<u8> {
+    if receipts.is_empty() {
+        EMPTY_ROOT_HASH.to_vec()
+    } else {
+        ordered_trie_root_with_encoder(receipts, |obj, buf| obj.encode_2718(buf)).to_vec()
+    }
+}
+
+fn objects_root(objects: &[TransactionObject]) -> Vec<u8> {
+    if objects.is_empty() {
+        EMPTY_ROOT_HASH.to_vec()
+    } else {
+        ordered_trie_root_with_encoder(objects, |obj, buf| obj.encode_2718(buf)).to_vec()
+    }
+}
+
+fn get_block_receipt_info(receipts: &[TransactionReceipt]) -> BlockReceiptInfo {
+    let mut valid_txs = vec![];
+    let mut logs_bloom = Bloom::default();
+    let mut cumulative_gas = U256::zero();
+
+    for receipt in receipts {
+        valid_txs.push(receipt.hash);
+        logs_bloom.accrue_bloom(&receipt.logs_bloom);
+        cumulative_gas += receipt.gas_used;
+    }
+
+    BlockReceiptInfo {
+        valid_txs,
+        logs_bloom,
+        cumulative_gas,
+    }
+}
+
+#[derive(Default)]
+struct BlockReceiptInfo {
+    valid_txs: Vec<[u8; TRANSACTION_HASH_SIZE]>,
+    logs_bloom: Bloom,
+    cumulative_gas: U256,
+}
+
+pub fn assemble_block<Host: Runtime>(
+    host: &mut Host,
+    input_data: AssembleBlockInput,
+) -> Result<(), Error> {
+    let config = get_evm_config(host)?;
+    let state_root = state_root_hash(host)?;
+    let receipts = get_current_transaction_receipts(host)?;
+    let objects = get_current_transactions_objects(host)?;
+    let receipts_root = receipts_root(&receipts);
+    let transactions_root = objects_root(&objects);
+    let parent_hash = read_current_block_hash(host)?;
+    let block_constants =
+        block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
+    let base_fee_per_gas = base_fee_per_gas(
+        host,
+        input_data.timestamp,
+        block_constants.block_fees.minimum_base_fee_per_gas(),
+    );
+
+    let BlockReceiptInfo {
+        valid_txs,
+        logs_bloom,
+        cumulative_gas,
+    } = get_block_receipt_info(&receipts);
+
+    let sub_block = EthBlock::new(
+        input_data.block_number,
+        valid_txs,
+        input_data.timestamp,
+        parent_hash,
+        logs_bloom,
+        transactions_root,
+        state_root,
+        receipts_root,
+        cumulative_gas,
+        &block_constants,
+        base_fee_per_gas,
+    );
+
+    block_storage::store_current(
+        host,
+        &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+        &L2Block::Etherlink(Box::new(sub_block)),
+    )?;
+
+    Ok(())
 }
 
 #[cfg(test)]
