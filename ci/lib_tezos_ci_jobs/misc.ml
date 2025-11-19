@@ -61,6 +61,22 @@ let job_test_liquidity_baking_scripts =
       "./scripts/ci/test_liquidity_baking_scripts.sh";
     ]
 
+let job_oc_script_test_release_versions =
+  CI.job
+    "oc.script:test_octez_release_versions"
+    ~__POS__
+    ~stage:Test
+    ~description:"Test how src/lib_version parses Git tags."
+    ~image:Tezos_ci.Images.CI.build
+    ~only_if_changed:
+      ["scripts/test_octez_release_version.sh"; "src/lib_version/**/*"]
+    [
+      "./scripts/ci/take_ownership.sh";
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      "./scripts/test_octez_release_version.sh";
+    ]
+
 let job_test_release_versions =
   CI.job
     "oc:scripts:release_script_values"
@@ -82,12 +98,14 @@ let register () =
     [
       (Auto, job_script_b58_prefix);
       (Auto, job_test_liquidity_baking_scripts);
+      (Auto, job_oc_script_test_release_versions);
       (Auto, job_test_release_versions);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
       (Auto, job_script_b58_prefix);
       (Auto, job_test_liquidity_baking_scripts);
+      (Auto, job_oc_script_test_release_versions);
       (Auto, job_test_release_versions);
     ] ;
   ()

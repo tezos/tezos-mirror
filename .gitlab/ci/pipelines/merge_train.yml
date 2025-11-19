@@ -1656,59 +1656,6 @@ oc.script:snapshot_alpha_and_link:
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
 
-oc.script:test_octez_release_versions:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - lwt_domain/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/test_octez_release_version.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 test_sdk_rust:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
@@ -2985,6 +2932,36 @@ oc.test-liquidity-baking-scripts:
   - . ./scripts/version.sh
   - eval $(opam env)
   - ./scripts/ci/test_liquidity_baking_scripts.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+oc.script:test_octez_release_versions:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - scripts/test_octez_release_version.sh
+    - src/lib_version/**/*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - ./scripts/test_octez_release_version.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
