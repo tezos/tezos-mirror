@@ -235,7 +235,12 @@ let try_migrate_legacy_nonces state =
                   return existing_nonces
               | false -> (
                   let* nonce_info =
-                    Alpha_services.Nonce.get cctxt (chain, `Head 0) nonce_level
+                    Node_rpc.get_nonce
+                      cctxt
+                      ~chain
+                      ~block:(`Head 0)
+                      ~level:nonce_level
+                      ()
                   in
                   match nonce_info with
                   | Missing nonce_hash when Nonce.check_hash nonce nonce_hash ->
@@ -339,10 +344,12 @@ let partition_unrevealed_nonces {cctxt; chain; _} nonces
                  nonce_revelation_threshold has not passed. See [Nonce_storage.check_unrevealed]
               *)
               let+ nonce_info =
-                (Alpha_services.Nonce.get
+                (Node_rpc.get_nonce
                    cctxt
-                   (chain, `Head 0)
-                   level
+                   ~chain
+                   ~block:(`Head 0)
+                   ~level
+                   ()
                  [@profiler.aggregate_s
                    {verbosity = Debug} "get nonce information"])
               in
