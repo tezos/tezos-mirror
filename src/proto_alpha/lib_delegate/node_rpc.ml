@@ -561,3 +561,6 @@ let inject_operation_bytes cctxt ?async ~chain bytes =
 
 let block_resulting_context_hash cctxt ~chain ?(block = `Head 0) () =
   Shell_services.Blocks.resulting_context_hash cctxt ~chain ~block ()
+
+let live_blocks cctxt ~chain ?(block = `Head 0) () =
+  Chain_services.Blocks.live_blocks cctxt ~chain ~block ()
