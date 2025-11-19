@@ -172,15 +172,6 @@ let changeset_ocaml_check_files =
     changeset_base
     @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "**/*.ml"; "**/*.mli"])
 
-let changeset_lift_limits_patch =
-  Changeset.(
-    changeset_base
-    @ make
-        [
-          "src/bin_tps_evaluation/lift_limits.patch";
-          "src/proto_alpha/lib_protocol/main.ml";
-        ])
-
 (* The linting job runs over the set of [source_directories]
    defined in [scripts/lint.sh] that must be included here: *)
 let changeset_lint_files =

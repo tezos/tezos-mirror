@@ -13,6 +13,31 @@
 
 module CI = Cacio.Shared
 
+let job_check_lift_limits_patch =
+  CI.job
+    "oc.check_lift_limits_patch"
+    ~__POS__
+    ~stage:Test
+    ~description:
+      "Check that src/bin_tps_evaluation/lift_limits.patch still applies."
+    ~image:Tezos_ci.Images.CI.build
+    ~only_if_changed:
+      [
+        "src/bin_tps_evaluation/lift_limits.patch";
+        "src/proto_alpha/lib_protocol/main.ml";
+      ]
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    [
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      (* Check that the patch only modifies the src/proto_alpha/lib_protocol. *)
+      "[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | cut \
+       -f3) = \"src/proto_alpha/lib_protocol/main.ml\" ]";
+      "git apply src/bin_tps_evaluation/lift_limits.patch";
+      "dune build @src/proto_alpha/lib_protocol/check";
+    ]
+
 let job_python_check =
   CI.job
     "oc.python_check"
@@ -171,6 +196,7 @@ let job_test_release_versions =
 let register () =
   CI.register_before_merging_jobs
     [
+      (Auto, job_check_lift_limits_patch);
       (Auto, job_python_check);
       (Auto, job_integration_compiler_rejections);
       (Auto, job_script_test_gen_genesis);
@@ -182,6 +208,7 @@ let register () =
     ] ;
   CI.register_schedule_extended_test_jobs
     [
+      (Auto, job_check_lift_limits_patch);
       (Auto, job_python_check);
       (Auto, job_integration_compiler_rejections);
       (Auto, job_script_test_gen_genesis);
