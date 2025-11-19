@@ -22,6 +22,8 @@ This website contains technical documentation about both Octez and the Tezos pro
 
 The current latest release of Octez is :doc:`../releases/version-23`.
 
+A beta version for :doc:`../releases/version-24` is also available.
+
 For installing instructions, see :doc:`./howtoget`.
 
 Mainnet & Test Networks

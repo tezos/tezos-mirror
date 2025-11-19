@@ -1,0 +1,3533 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Octez DAL Node RPC",
+    "description": "The RPC API for the Octez DAL node.",
+    "version": "Octez 24.0~beta1 (TBD)"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "description": "Performs health checks on the DAL node, evaluating key components of the DAL node. Returns a health status indicating whether the DAL node is 'Up', 'Down', or 'Degraded' based on the results of these checks.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "degraded",
+                        "up",
+                        "ko",
+                        "no",
+                        "ok",
+                        "down"
+                      ]
+                    },
+                    "checks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "$ref": "#/components/schemas/unistring"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "degraded",
+                              "up",
+                              "ko",
+                              "no",
+                              "ok",
+                              "down"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "status"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "checks"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/last_processed_level": {
+      "get": {
+        "description": "Returns the last (finalized) L1 level which was processed by the DAL node.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/levels/{int32}/slots/{int}/commitment": {
+      "get": {
+        "description": "Return the commitment associated to the given slot index and published at the given level, if any. The commitment is fetched from the skip-list storage. Note that the commitment is not present in the storage immediately after publication, but only when its attestation status is known and final.",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Commitment representation for the DAL (Base58Check-encoded)",
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/unistring"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/levels/{int32}/slots/{int}/content": {
+      "get": {
+        "description": "Retrieve the content of the slot whose id is given.",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/levels/{int32}/slots/{int}/pages": {
+      "get": {
+        "description": "Fetch slot as list of pages",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/levels/{int32}/slots/{int}/pages/{int}/proof": {
+      "get": {
+        "description": "Compute the proof associated with a page of a given slot.",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Commitment representation for the DAL (Base58Check-encoded)",
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/unistring"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/levels/{int32}/slots/{int}/shards/{int}/content": {
+      "get": {
+        "description": "Fetch shard as bytes",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -1073741824,
+                        "maximum": 1073741823
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/levels/{int32}/slots/{int}/status": {
+      "get": {
+        "description": "Return the status for the given slot. For operator nodes only.",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "title": "waiting_attestation",
+                      "type": "string",
+                      "enum": [
+                        "waiting_attestation"
+                      ]
+                    },
+                    {
+                      "title": "attested",
+                      "type": "string",
+                      "enum": [
+                        "attested"
+                      ]
+                    },
+                    {
+                      "title": "unattested",
+                      "type": "string",
+                      "enum": [
+                        "unattested"
+                      ]
+                    },
+                    {
+                      "title": "unpublished",
+                      "type": "string",
+                      "enum": [
+                        "unpublished"
+                      ]
+                    },
+                    {
+                      "title": "attested_with_lag",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "attested"
+                          ]
+                        },
+                        "attestation_lag": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "attestation_lag"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitor/synchronized": {
+      "get": {
+        "description": "Returns the stream of synchronization statuses of the DAL node with the L1 node.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "title": "Catching_up",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Catching_up"
+                          ]
+                        },
+                        "levels_to_process": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "levels_to_process"
+                      ]
+                    },
+                    {
+                      "title": "Synced",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Synced"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "title": "Lagging",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Lagging"
+                          ]
+                        },
+                        "levels_to_process": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "levels_to_process"
+                      ]
+                    },
+                    {
+                      "title": "L1_bootstrapping",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "L1_bootstrapping"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "title": "L1_unreachable",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "L1_unreachable"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "title": "Unknown",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Unknown"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/connect": {
+      "post": {
+        "description": "Connect to a new peer.",
+        "parameters": [
+          {
+            "name": "timeout",
+            "in": "query",
+            "description": "A span of time in seconds",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "Identifier for a peer point",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/unistring"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/backoffs": {
+      "get": {
+        "description": "Get the backoffs of the peers with a backoff, per topic.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "topic": {
+                        "type": "object",
+                        "properties": {
+                          "slot_index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          },
+                          "pkh": {
+                            "$ref": "#/components/schemas/Signature.Public_key_hash"
+                          }
+                        },
+                        "required": [
+                          "slot_index",
+                          "pkh"
+                        ]
+                      },
+                      "backoffs": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "peer": {
+                              "type": "object",
+                              "properties": {
+                                "peer_id": {
+                                  "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                                },
+                                "maybe_reachable_point": {
+                                  "$ref": "#/components/schemas/p2p_point.id"
+                                }
+                              },
+                              "required": [
+                                "peer_id",
+                                "maybe_reachable_point"
+                              ]
+                            },
+                            "backoff": {
+                              "$ref": "#/components/schemas/timestamp.system"
+                            }
+                          },
+                          "required": [
+                            "peer",
+                            "backoff"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "topic",
+                      "backoffs"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/connections": {
+      "get": {
+        "description": "Get this node's currently active connections.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "peer": {
+                        "type": "object",
+                        "properties": {
+                          "peer_id": {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          "maybe_reachable_point": {
+                            "$ref": "#/components/schemas/p2p_point.id"
+                          }
+                        },
+                        "required": [
+                          "peer_id",
+                          "maybe_reachable_point"
+                        ]
+                      },
+                      "connection": {
+                        "type": "object",
+                        "properties": {
+                          "topics": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "slot_index": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 255
+                                },
+                                "pkh": {
+                                  "$ref": "#/components/schemas/Signature.Public_key_hash"
+                                }
+                              },
+                              "required": [
+                                "slot_index",
+                                "pkh"
+                              ]
+                            }
+                          },
+                          "direct": {
+                            "type": "boolean"
+                          },
+                          "outbound": {
+                            "type": "boolean"
+                          },
+                          "bootstrap": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "topics",
+                          "direct",
+                          "outbound",
+                          "bootstrap"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "peer",
+                      "connection"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/fanout": {
+      "get": {
+        "description": "Returns the fanout peers per topic alongside the last publication time on the topic.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "topic": {
+                        "type": "object",
+                        "properties": {
+                          "slot_index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          },
+                          "pkh": {
+                            "$ref": "#/components/schemas/Signature.Public_key_hash"
+                          }
+                        },
+                        "required": [
+                          "slot_index",
+                          "pkh"
+                        ]
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
+                        }
+                      },
+                      "last_publication_time": {
+                        "$ref": "#/components/schemas/timestamp.system"
+                      }
+                    },
+                    "required": [
+                      "topic",
+                      "peers",
+                      "last_publication_time"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/mesh": {
+      "get": {
+        "description": "Get the mesh of the peer. Concretely, the RPC returns a list of topics, where each topic is associated to the remote peers with which the current node shares a full connection (on that topic). Optional arguments allow to restrict the output to a given delegate or slot index.",
+        "parameters": [
+          {
+            "name": "delegate",
+            "in": "query",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot_index",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "topic": {
+                        "type": "object",
+                        "properties": {
+                          "slot_index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          },
+                          "pkh": {
+                            "$ref": "#/components/schemas/Signature.Public_key_hash"
+                          }
+                        },
+                        "required": [
+                          "slot_index",
+                          "pkh"
+                        ]
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "topic",
+                      "peers"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/message_cache": {
+      "get": {
+        "description": "Get the number of message ids in the message cache, grouped by heartbeat tick and topic.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "tick": {
+                        "$ref": "#/components/schemas/int64"
+                      },
+                      "per_topic_cache_size": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "topic": {
+                              "type": "object",
+                              "properties": {
+                                "slot_index": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 255
+                                },
+                                "pkh": {
+                                  "$ref": "#/components/schemas/Signature.Public_key_hash"
+                                }
+                              },
+                              "required": [
+                                "slot_index",
+                                "pkh"
+                              ]
+                            },
+                            "num_ids": {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            }
+                          },
+                          "required": [
+                            "topic",
+                            "num_ids"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "tick",
+                      "per_topic_cache_size"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/pkhs/peers": {
+      "get": {
+        "description": "When the 'all' flag is given, get an association list between each topic subscribed to by the connected peers and the remote peers subscribed to that topic. If the 'all' flag is not given, then restrict the output to the topics this peer is subscribed to.",
+        "parameters": [
+          {
+            "name": "all",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "pkh": {
+                        "$ref": "#/components/schemas/Signature.Public_key_hash"
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "pkh",
+                      "peers"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/reconnection_delays": {
+      "get": {
+        "description": "For each unreachable point, retrieve the time remaining until the next reconnection attempt.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "point": {
+                        "$ref": "#/components/schemas/p2p_point.id"
+                      },
+                      "delay": {
+                        "$ref": "#/components/schemas/unistring"
+                      }
+                    },
+                    "required": [
+                      "point",
+                      "delay"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/scores": {
+      "get": {
+        "description": "Get the scores of the peers with a known score.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "peer": {
+                        "type": "object",
+                        "properties": {
+                          "peer_id": {
+                            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                          },
+                          "maybe_reachable_point": {
+                            "$ref": "#/components/schemas/p2p_point.id"
+                          }
+                        },
+                        "required": [
+                          "peer_id",
+                          "maybe_reachable_point"
+                        ]
+                      },
+                      "score": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "peer",
+                      "score"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/slot_indexes/peers": {
+      "get": {
+        "description": "When the 'all' flag is given, get an association list between each public key hash part of a topic subscribed to by the connected peers and the remote peers subscribed to such topics. If the 'all' flag is not given, then restrict the output to the topics this peer is subscribed to.",
+        "parameters": [
+          {
+            "name": "all",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "slot_index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "slot_index",
+                      "peers"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/topics": {
+      "get": {
+        "description": "Get the topics this node is currently subscribed to.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "slot_index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "pkh": {
+                        "$ref": "#/components/schemas/Signature.Public_key_hash"
+                      }
+                    },
+                    "required": [
+                      "slot_index",
+                      "pkh"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/gossipsub/topics/peers": {
+      "get": {
+        "description": "When the 'all' flag is given, get an association list between each topic subscribed to by the connected peers and the remote peers subscribed to that topic. If the 'all' flag is not given, then restrict the output to the topics this peer is subscribed to.",
+        "parameters": [
+          {
+            "name": "all",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "topic": {
+                        "type": "object",
+                        "properties": {
+                          "slot_index": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 255
+                          },
+                          "pkh": {
+                            "$ref": "#/components/schemas/Signature.Public_key_hash"
+                          }
+                        },
+                        "required": [
+                          "slot_index",
+                          "pkh"
+                        ]
+                      },
+                      "peers": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "peer_id": {
+                              "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                            },
+                            "maybe_reachable_point": {
+                              "$ref": "#/components/schemas/p2p_point.id"
+                            }
+                          },
+                          "required": [
+                            "peer_id",
+                            "maybe_reachable_point"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "topic",
+                      "peers"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/peers": {
+      "get": {
+        "description": "By default, get the list of known peers. When the 'connected' flag is given, then only get the connected peers.",
+        "parameters": [
+          {
+            "name": "connected",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "peer": {
+                        "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                      }
+                    },
+                    "required": [
+                      "peer"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/peers/by-id/{peer_id}": {
+      "get": {
+        "description": "Get info of the requested peer",
+        "parameters": [
+          {
+            "name": "peer_id",
+            "in": "path",
+            "description": "A cryptographic node identity (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "info": {
+                      "type": "object",
+                      "properties": {
+                        "score": {
+                          "type": "number"
+                        },
+                        "trusted": {
+                          "type": "boolean"
+                        },
+                        "conn_metadata": {
+                          "type": "object",
+                          "properties": {
+                            "advertised_net_addr": {
+                              "$ref": "#/components/schemas/p2p_address"
+                            },
+                            "advertised_net_port": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "is_bootstrap_peer": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "is_bootstrap_peer"
+                          ]
+                        },
+                        "peer_metadata": {},
+                        "state": {
+                          "$ref": "#/components/schemas/p2p_peer.state"
+                        },
+                        "reachable_at": {
+                          "$ref": "#/components/schemas/p2p_connection.id"
+                        },
+                        "stat": {
+                          "$ref": "#/components/schemas/p2p_stat"
+                        },
+                        "last_failed_connection": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/timestamp.system"
+                              }
+                            ]
+                          }
+                        },
+                        "last_rejected_connection": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/timestamp.system"
+                              }
+                            ]
+                          }
+                        },
+                        "last_established_connection": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/timestamp.system"
+                              }
+                            ]
+                          }
+                        },
+                        "last_disconnection": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/timestamp.system"
+                              }
+                            ]
+                          }
+                        },
+                        "last_seen": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/timestamp.system"
+                              }
+                            ]
+                          }
+                        },
+                        "last_miss": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/timestamp.system"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "score",
+                        "trusted",
+                        "peer_metadata",
+                        "state",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "info"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "description": "Change the permissions of a given peer. With `{acl: ban}`: blacklist the given peer and remove it from the whitelist if present. With `{acl: open}`: removes the peer from the blacklist and whitelist. With `{acl: trust}`: trust the given peer permanently and remove it from the blacklist if present. The peer cannot be blocked (but its host IP still can). In all cases, the updated information for the peer is returned. If input is omitted, this is equivalent to using the `GET` version of this RPC.",
+        "parameters": [
+          {
+            "name": "peer_id",
+            "in": "path",
+            "description": "A cryptographic node identity (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "acl": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "trust",
+                      "ban"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "info": {
+                      "type": "object",
+                      "properties": {
+                        "score": {
+                          "type": "number"
+                        },
+                        "trusted": {
+                          "type": "boolean"
+                        },
+                        "conn_metadata": {
+                          "type": "object",
+                          "properties": {
+                            "advertised_net_addr": {
+                              "$ref": "#/components/schemas/p2p_address"
+                            },
+                            "advertised_net_port": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "is_bootstrap_peer": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "is_bootstrap_peer"
+                          ]
+                        },
+                        "peer_metadata": {},
+                        "state": {
+                          "$ref": "#/components/schemas/p2p_peer.state"
+                        },
+                        "reachable_at": {
+                          "$ref": "#/components/schemas/p2p_connection.id"
+                        },
+                        "stat": {
+                          "$ref": "#/components/schemas/p2p_stat"
+                        },
+                        "last_failed_connection": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/timestamp.system"
+                              }
+                            ]
+                          }
+                        },
+                        "last_rejected_connection": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/timestamp.system"
+                              }
+                            ]
+                          }
+                        },
+                        "last_established_connection": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/timestamp.system"
+                              }
+                            ]
+                          }
+                        },
+                        "last_disconnection": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/timestamp.system"
+                              }
+                            ]
+                          }
+                        },
+                        "last_seen": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/timestamp.system"
+                              }
+                            ]
+                          }
+                        },
+                        "last_miss": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "$ref": "#/components/schemas/p2p_connection.id"
+                              },
+                              {
+                                "$ref": "#/components/schemas/timestamp.system"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "score",
+                        "trusted",
+                        "peer_metadata",
+                        "state",
+                        "stat"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "info"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/peers/disconnect/{peer_id}": {
+      "delete": {
+        "description": "Disconnect from a peer.",
+        "parameters": [
+          {
+            "name": "peer_id",
+            "in": "path",
+            "description": "A cryptographic node identity (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "wait",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/peers/info": {
+      "get": {
+        "description": "Get list of known peers and their corresponding info.",
+        "parameters": [
+          {
+            "name": "connected",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "peer": {
+                        "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                      },
+                      "info": {
+                        "type": "object",
+                        "properties": {
+                          "score": {
+                            "type": "number"
+                          },
+                          "trusted": {
+                            "type": "boolean"
+                          },
+                          "conn_metadata": {
+                            "type": "object",
+                            "properties": {
+                              "advertised_net_addr": {
+                                "$ref": "#/components/schemas/p2p_address"
+                              },
+                              "advertised_net_port": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 65535
+                              },
+                              "is_bootstrap_peer": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "is_bootstrap_peer"
+                            ]
+                          },
+                          "peer_metadata": {},
+                          "state": {
+                            "$ref": "#/components/schemas/p2p_peer.state"
+                          },
+                          "reachable_at": {
+                            "$ref": "#/components/schemas/p2p_connection.id"
+                          },
+                          "stat": {
+                            "$ref": "#/components/schemas/p2p_stat"
+                          },
+                          "last_failed_connection": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/p2p_connection.id"
+                                },
+                                {
+                                  "$ref": "#/components/schemas/timestamp.system"
+                                }
+                              ]
+                            }
+                          },
+                          "last_rejected_connection": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/p2p_connection.id"
+                                },
+                                {
+                                  "$ref": "#/components/schemas/timestamp.system"
+                                }
+                              ]
+                            }
+                          },
+                          "last_established_connection": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/p2p_connection.id"
+                                },
+                                {
+                                  "$ref": "#/components/schemas/timestamp.system"
+                                }
+                              ]
+                            }
+                          },
+                          "last_disconnection": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/p2p_connection.id"
+                                },
+                                {
+                                  "$ref": "#/components/schemas/timestamp.system"
+                                }
+                              ]
+                            }
+                          },
+                          "last_seen": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/p2p_connection.id"
+                                },
+                                {
+                                  "$ref": "#/components/schemas/timestamp.system"
+                                }
+                              ]
+                            }
+                          },
+                          "last_miss": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/components/schemas/p2p_connection.id"
+                                },
+                                {
+                                  "$ref": "#/components/schemas/timestamp.system"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "score",
+                          "trusted",
+                          "peer_metadata",
+                          "state",
+                          "stat"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "peer",
+                      "info"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/points": {
+      "get": {
+        "description": "By default, get the list of known points. When the 'connected' flag is given, only get the connected points.",
+        "parameters": [
+          {
+            "name": "connected",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "point": {
+                        "$ref": "#/components/schemas/p2p_point.id"
+                      }
+                    },
+                    "required": [
+                      "point"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/points/by-id/{point}": {
+      "get": {
+        "description": "Get info of the requested point",
+        "parameters": [
+          {
+            "name": "point",
+            "in": "path",
+            "description": "A network point (ipv4:port or [ipv6]:port).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "info": {
+                      "$ref": "#/components/schemas/p2p_point.info"
+                    }
+                  },
+                  "required": [
+                    "info"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/points/disconnect/{point}": {
+      "delete": {
+        "description": "Disconnect from a point.",
+        "parameters": [
+          {
+            "name": "point",
+            "in": "path",
+            "description": "A network point (ipv4:port or [ipv6]:port).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "wait",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p2p/points/info": {
+      "get": {
+        "description": "By default, get the list of known points and their corresponding info. When the 'connected' flag is given, then only get the connected points.",
+        "parameters": [
+          {
+            "name": "connected",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "point": {
+                        "$ref": "#/components/schemas/p2p_point.id"
+                      },
+                      "info": {
+                        "$ref": "#/components/schemas/p2p_point.info"
+                      }
+                    },
+                    "required": [
+                      "point",
+                      "info"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profiles": {
+      "get": {
+        "description": "Return the list of current profiles tracked by the DAL node.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "title": "Bootstrap node",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "bootstrap"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    {
+                      "title": "Controller",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "controller"
+                          ]
+                        },
+                        "controller_profiles": {
+                          "type": "object",
+                          "properties": {
+                            "operators": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer",
+                                "minimum": -1073741824,
+                                "maximum": 1073741823
+                              }
+                            },
+                            "observers": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer",
+                                "minimum": -1073741824,
+                                "maximum": 1073741823
+                              }
+                            },
+                            "attesters": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Signature.Public_key_hash"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "controller_profiles"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "description": "Update the list of profiles tracked by the DAL node. Note that it does not take the bootstrap profile as it is incompatible with other profiles.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "operators": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    }
+                  },
+                  "observers": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    }
+                  },
+                  "attesters": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Signature.Public_key_hash"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profiles/{pkh}/attested_levels/{int32}/assigned_shard_indices": {
+      "get": {
+        "description": "Return the shard indexes assigned to the given public key hash at the given level.",
+        "parameters": [
+          {
+            "name": "pkh",
+            "in": "path",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": -32768,
+                    "maximum": 32767
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profiles/{pkh}/attested_levels/{int32}/attestable_slots": {
+      "get": {
+        "description": "Return the currently attestable slots at the given attested level by the given public key hash. A slot is attestable at level [l] if it is published at level [l - attestation_lag] and *all* the shards assigned at level [l] to the given public key hash are available in the DAL node's store.",
+        "parameters": [
+          {
+            "name": "pkh",
+            "in": "path",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "title": "attestable_slots_set",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "attestable_slots_set"
+                          ]
+                        },
+                        "attestable_slots_set": {
+                          "type": "array",
+                          "items": {
+                            "type": "boolean"
+                          }
+                        },
+                        "published_level": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "attestable_slots_set",
+                        "published_level"
+                      ]
+                    },
+                    {
+                      "title": "not_in_committee",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "not_in_committee"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/profiles/{pkh}/monitor/attestable_slots": {
+      "get": {
+        "description": "Stream attestable slot ids for a given public key hash [pkh]. A slot is attestable for attested level L if it was published at (L - attestation_lag) and *all* shards assigned at level L to [pkh] are available in the DAL node's store. If some shards of the slot are detected as traps for the baker, the slot should not be attested, so the id is not sent via the stream.",
+        "parameters": [
+          {
+            "name": "pkh",
+            "in": "path",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "title": "attestable_slot",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "attestable_slot"
+                          ]
+                        },
+                        "slot_id": {
+                          "type": "object",
+                          "properties": {
+                            "slot_level": {
+                              "type": "integer",
+                              "minimum": -2147483648,
+                              "maximum": 2147483647
+                            },
+                            "slot_index": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            }
+                          },
+                          "required": [
+                            "slot_level",
+                            "slot_index"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "slot_id"
+                      ]
+                    },
+                    {
+                      "title": "no_shards_assigned",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "no_shards_assigned"
+                          ]
+                        },
+                        "attestation_level": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "attestation_level"
+                      ]
+                    },
+                    {
+                      "title": "slot_has_trap",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "slot_has_trap"
+                          ]
+                        },
+                        "slot_id": {
+                          "type": "object",
+                          "properties": {
+                            "slot_level": {
+                              "type": "integer",
+                              "minimum": -2147483648,
+                              "maximum": 2147483647
+                            },
+                            "slot_index": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            }
+                          },
+                          "required": [
+                            "slot_level",
+                            "slot_index"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "slot_id"
+                      ]
+                    },
+                    {
+                      "title": "backfill",
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "backfill"
+                          ]
+                        },
+                        "backfill_payload": {
+                          "type": "object",
+                          "properties": {
+                            "slot_ids": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "slot_level": {
+                                    "type": "integer",
+                                    "minimum": -2147483648,
+                                    "maximum": 2147483647
+                                  },
+                                  "slot_index": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 255
+                                  }
+                                },
+                                "required": [
+                                  "slot_level",
+                                  "slot_index"
+                                ]
+                              }
+                            },
+                            "no_shards_attestation_levels": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              }
+                            }
+                          },
+                          "required": [
+                            "slot_ids",
+                            "no_shards_attestation_levels"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "backfill_payload"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/protocol_parameters": {
+      "get": {
+        "description": "Returns the protocol parameters as known by the DAL node. An optional 'level' argument can specify for which level to retrieve them.",
+        "parameters": [
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "feature_enable": {
+                      "type": "boolean"
+                    },
+                    "incentives_enable": {
+                      "type": "boolean"
+                    },
+                    "number_of_slots": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "attestation_lag": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "attestation_threshold": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "traps_fraction": {
+                      "type": "object",
+                      "properties": {
+                        "numerator": {
+                          "$ref": "#/components/schemas/bignum"
+                        },
+                        "denominator": {
+                          "$ref": "#/components/schemas/bignum"
+                        }
+                      },
+                      "required": [
+                        "numerator",
+                        "denominator"
+                      ]
+                    },
+                    "cryptobox_parameters": {
+                      "type": "object",
+                      "properties": {
+                        "redundancy_factor": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        },
+                        "page_size": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 65535
+                        },
+                        "slot_size": {
+                          "type": "integer",
+                          "minimum": -1073741824,
+                          "maximum": 1073741823
+                        },
+                        "number_of_shards": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 65535
+                        }
+                      },
+                      "required": [
+                        "redundancy_factor",
+                        "page_size",
+                        "slot_size",
+                        "number_of_shards"
+                      ]
+                    },
+                    "sc_rollup_challenge_window_in_blocks": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "commitment_period_in_blocks": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "dal_attested_slots_validity_lag": {
+                      "type": "integer",
+                      "minimum": -1073741824,
+                      "maximum": 1073741823
+                    },
+                    "blocks_per_cycle": {
+                      "type": "integer",
+                      "minimum": -2147483648,
+                      "maximum": 2147483647
+                    },
+                    "minimal_block_delay": {
+                      "$ref": "#/components/schemas/int64"
+                    }
+                  },
+                  "required": [
+                    "feature_enable",
+                    "incentives_enable",
+                    "number_of_slots",
+                    "attestation_lag",
+                    "attestation_threshold",
+                    "traps_fraction",
+                    "cryptobox_parameters",
+                    "sc_rollup_challenge_window_in_blocks",
+                    "commitment_period_in_blocks",
+                    "dal_attested_slots_validity_lag",
+                    "blocks_per_cycle",
+                    "minimal_block_delay"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/published_levels/{int32}/known_traps": {
+      "get": {
+        "description": "For a given published level, return all the traps known by the node. Optional arguments allow to restrict the output to a given delegate or slot index.",
+        "parameters": [
+          {
+            "name": "int32",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "delegate",
+            "in": "query",
+            "description": "A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot_index",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "delegate": {
+                        "$ref": "#/components/schemas/Signature.Public_key_hash"
+                      },
+                      "slot_index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      },
+                      "shard": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "proof": {
+                        "$ref": "#/components/schemas/DAL_commitment"
+                      }
+                    },
+                    "required": [
+                      "delegate",
+                      "slot_index",
+                      "shard",
+                      "proof"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/slots": {
+      "post": {
+        "description": "Post a slot to the DAL node, computes its commitment and commitment proof, then computes the correspoding shards with their proof. The result of this RPC can be directly used to publish a slot header. If the sent data is smaller than the size of a DAL slot, it is padded with the character provided as padding query parameter (defaults to \\000). If the slot_index query parameter is provided, the DAL node checks that its profile allows to publish data on the given slot index. However, slot_index is optional and has NO SEMANTIC EFFECT on the produced commitment. It exists solely to help reverse proxies route POST /slots requests to a DAL node subscribed to the corresponding topics.",
+        "parameters": [
+          {
+            "name": "padding",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slot_index",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "Universal string representation",
+                "description": "Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid byte sequences.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "invalid_utf8_string": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 255
+                        }
+                      }
+                    },
+                    "required": [
+                      "invalid_utf8_string"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "commitment": {
+                      "$ref": "#/components/schemas/DAL_commitment"
+                    },
+                    "commitment_proof": {
+                      "type": "string",
+                      "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                    }
+                  },
+                  "required": [
+                    "commitment",
+                    "commitment_proof"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/synchronized": {
+      "get": {
+        "description": "Returns the current synchronization status of the DAL node with the L1 node.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "title": "Catching_up",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Catching_up"
+                          ]
+                        },
+                        "levels_to_process": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "levels_to_process"
+                      ]
+                    },
+                    {
+                      "title": "Synced",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Synced"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "title": "Lagging",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Lagging"
+                          ]
+                        },
+                        "levels_to_process": {
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "levels_to_process"
+                      ]
+                    },
+                    {
+                      "title": "L1_bootstrapping",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "L1_bootstrapping"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "title": "L1_unreachable",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "L1_unreachable"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "title": "Unknown",
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "Unknown"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "description": "version",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "network_version": {
+                      "type": "object",
+                      "properties": {
+                        "chain_name": {
+                          "$ref": "#/components/schemas/distributed_db_version.name"
+                        },
+                        "gossipsub": {
+                          "$ref": "#/components/schemas/distributed_db_version"
+                        },
+                        "p2p_version": {
+                          "$ref": "#/components/schemas/p2p_version"
+                        }
+                      },
+                      "required": [
+                        "chain_name",
+                        "gossipsub",
+                        "p2p_version"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "network_version"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Crypto_box.Public_key_hash": {
+        "title": "A Cryptobox public key ID (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "DAL_commitment": {
+        "title": "Commitment representation for the DAL (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature.Public_key_hash": {
+        "title": "A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "bignum": {
+        "title": "Big number",
+        "description": "Decimal representation of a big number",
+        "type": "string"
+      },
+      "distributed_db_version": {
+        "description": "A version number for the distributed DB protocol",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535
+      },
+      "distributed_db_version.name": {
+        "description": "A name for the distributed DB protocol",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "int64": {
+        "title": "64 bit integers",
+        "description": "Decimal representation of 64 bit integers",
+        "type": "string"
+      },
+      "p2p_address": {
+        "description": "An address for locating peers.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "p2p_connection.id": {
+        "description": "The identifier for a p2p connection. It includes an address and a port number.",
+        "type": "object",
+        "properties": {
+          "addr": {
+            "$ref": "#/components/schemas/p2p_address"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          }
+        },
+        "required": [
+          "addr"
+        ]
+      },
+      "p2p_peer.state": {
+        "description": "The state a peer connection can be in: accepted (when the connection is being established), running (when the connection is already established), disconnected (otherwise).",
+        "type": "string",
+        "enum": [
+          "running",
+          "accepted",
+          "disconnected"
+        ]
+      },
+      "p2p_point.id": {
+        "description": "Identifier for a peer point",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "p2p_point.info": {
+        "description": "Information about a peer point. Includes flags, state, and records about past events.",
+        "type": "object",
+        "properties": {
+          "trusted": {
+            "type": "boolean"
+          },
+          "greylisted_until": {
+            "$ref": "#/components/schemas/timestamp.system"
+          },
+          "state": {
+            "$ref": "#/components/schemas/p2p_point.state"
+          },
+          "p2p_peer_id": {
+            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+          },
+          "last_failed_connection": {
+            "$ref": "#/components/schemas/timestamp.system"
+          },
+          "last_rejected_connection": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                },
+                {
+                  "$ref": "#/components/schemas/timestamp.system"
+                }
+              ]
+            }
+          },
+          "last_established_connection": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                },
+                {
+                  "$ref": "#/components/schemas/timestamp.system"
+                }
+              ]
+            }
+          },
+          "last_disconnection": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                },
+                {
+                  "$ref": "#/components/schemas/timestamp.system"
+                }
+              ]
+            }
+          },
+          "last_seen": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+                },
+                {
+                  "$ref": "#/components/schemas/timestamp.system"
+                }
+              ]
+            }
+          },
+          "last_miss": {
+            "$ref": "#/components/schemas/timestamp.system"
+          },
+          "expected_peer_id": {
+            "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+          }
+        },
+        "required": [
+          "trusted",
+          "state"
+        ]
+      },
+      "p2p_point.state": {
+        "description": "The state a connection to a peer point can be in: requested (connection open from here), accepted (handshake), running (connection already established), disconnected (no connection).",
+        "oneOf": [
+          {
+            "title": "Requested",
+            "type": "object",
+            "properties": {
+              "event_kind": {
+                "type": "string",
+                "enum": [
+                  "requested"
+                ]
+              }
+            },
+            "required": [
+              "event_kind"
+            ]
+          },
+          {
+            "title": "Accepted",
+            "type": "object",
+            "properties": {
+              "event_kind": {
+                "type": "string",
+                "enum": [
+                  "accepted"
+                ]
+              },
+              "p2p_peer_id": {
+                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+              }
+            },
+            "required": [
+              "event_kind",
+              "p2p_peer_id"
+            ]
+          },
+          {
+            "title": "Running",
+            "type": "object",
+            "properties": {
+              "event_kind": {
+                "type": "string",
+                "enum": [
+                  "running"
+                ]
+              },
+              "p2p_peer_id": {
+                "$ref": "#/components/schemas/Crypto_box.Public_key_hash"
+              }
+            },
+            "required": [
+              "event_kind",
+              "p2p_peer_id"
+            ]
+          },
+          {
+            "title": "Disconnected",
+            "type": "object",
+            "properties": {
+              "event_kind": {
+                "type": "string",
+                "enum": [
+                  "disconnected"
+                ]
+              }
+            },
+            "required": [
+              "event_kind"
+            ]
+          }
+        ]
+      },
+      "p2p_stat": {
+        "description": "Statistics about the p2p network.",
+        "type": "object",
+        "properties": {
+          "total_sent": {
+            "$ref": "#/components/schemas/int64"
+          },
+          "total_recv": {
+            "$ref": "#/components/schemas/int64"
+          },
+          "current_inflow": {
+            "type": "integer",
+            "minimum": -1073741824,
+            "maximum": 1073741823
+          },
+          "current_outflow": {
+            "type": "integer",
+            "minimum": -1073741824,
+            "maximum": 1073741823
+          }
+        },
+        "required": [
+          "total_sent",
+          "total_recv",
+          "current_inflow",
+          "current_outflow"
+        ]
+      },
+      "p2p_version": {
+        "description": "A version number for the p2p layer.",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535
+      },
+      "timestamp.rfc": {
+        "title": "RFC 3339 formatted timestamp",
+        "description": "A date in RFC 3339 notation.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "timestamp.system": {
+        "description": "A timestamp as seen by the underlying, local computer: subsecond-level precision, epoch or rfc3339 based.",
+        "oneOf": [
+          {
+            "title": "RFC encoding",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/timestamp.rfc"
+              }
+            ]
+          },
+          {
+            "title": "Second since epoch",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/int64"
+              }
+            ]
+          }
+        ]
+      },
+      "unistring": {
+        "title": "Universal string representation",
+        "description": "Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid byte sequences.",
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "invalid_utf8_string": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              }
+            },
+            "required": [
+              "invalid_utf8_string"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

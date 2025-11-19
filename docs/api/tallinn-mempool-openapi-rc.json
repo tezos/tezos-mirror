@@ -1,0 +1,3668 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Octez Mempool RPC",
+    "description": "The RPC API for the mempool served by the Octez node.",
+    "version": "Octez 24.0~beta1 (TBD)"
+  },
+  "paths": {
+    "/ban_operation": {
+      "post": {
+        "description": "Remove an operation from the mempool if present. Also add it to the set of banned operations to prevent it from being fetched/processed/injected in the future. Note: If the baker has already received the operation, then it's necessary to restart it to flush the operation from it.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "A Tezos operation ID (Base58Check-encoded)",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/unistring"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/filter": {
+      "get": {
+        "description": "Get the configuration of the mempool's filter and bounds. Values of the form [ \"21\", \"20\" ] are rational numbers given as a numerator and a denominator, e.g. 21/20 = 1.05. The minimal_fees (in mutez), minimal_nanotez_per_gas_unit, and minimal_nanotez_per_byte are requirements that a manager operation must meet to be considered by the mempool. replace_by_fee_factor is how much better a manager operation must be to replace a previous valid operation **from the same manager** (both its fee and its fee/gas ratio must exceed the old operation's by at least this factor). max_operations and max_total_bytes are the bounds on respectively the number of valid operations in the mempool and the sum of their sizes in bytes.",
+        "parameters": [
+          {
+            "name": "include_default",
+            "in": "query",
+            "description": "Show fields equal to their default value (set by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Set the configuration of the mempool's filter and bounds. **If any of the fields is absent from the input JSON, then it is set to the default value for this field (i.e. its value in the default configuration), even if it previously had a different value.** If the input JSON does not describe a valid configuration, then the configuration is left unchanged. This RPC also returns the new configuration of the mempool (which may differ from the input if the latter omits fields or is invalid). You may call [octez-client rpc get '/chains/main/mempool/filter?include_default=true'] to see an example of JSON describing a valid configuration. See the description of that RPC for details on each configurable value.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitor_operations": {
+      "get": {
+        "description": "Monitor the mempool operations.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "description": "Supported RPC versions are version \"1\" (default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "validated",
+            "in": "query",
+            "description": "Include validated operations (set by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "refused",
+            "in": "query",
+            "description": "Include refused operations",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "outdated",
+            "in": "query",
+            "description": "Include outdated operations",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch_refused",
+            "in": "query",
+            "description": "Include branch refused operations",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch_delayed",
+            "in": "query",
+            "description": "Include branch delayed operations (set by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "validation_pass",
+            "in": "query",
+            "description": "Include operations filtered by validation pass (all by default)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sources",
+            "in": "query",
+            "description": "Include operations filtered by sources (all by default)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "description": "An operation's shell header.",
+                    "type": "object",
+                    "properties": {
+                      "hash": {
+                        "$ref": "#/components/schemas/Operation_hash"
+                      },
+                      "protocol": {
+                        "type": "string",
+                        "enum": [
+                          "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
+                        ]
+                      },
+                      "branch": {
+                        "$ref": "#/components/schemas/block_hash"
+                      },
+                      "contents": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
+                        }
+                      },
+                      "signature": {
+                        "$ref": "#/components/schemas/Signature.V2"
+                      },
+                      "error": {
+                        "$ref": "#/components/schemas/error_opt"
+                      }
+                    },
+                    "required": [
+                      "hash",
+                      "protocol",
+                      "branch",
+                      "contents"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pending_operations": {
+      "get": {
+        "description": "List the prevalidated operations.",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "description": "Supported RPC versions are version \"2\" (default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "validated",
+            "in": "query",
+            "description": "Include validated operations (true by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "refused",
+            "in": "query",
+            "description": "Include refused operations (true by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "outdated",
+            "in": "query",
+            "description": "Include outdated operations (true by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch_refused",
+            "in": "query",
+            "description": "Include branch refused operations (true by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch_delayed",
+            "in": "query",
+            "description": "Include branch delayed operations (true by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "validation_pass",
+            "in": "query",
+            "description": "Include operations filtered by validation pass (all by default)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "description": "Include operations filtered by source (all by default)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operation_hash",
+            "in": "query",
+            "description": "Include operations filtered by hash (all by default)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "validated": {
+                      "type": "array",
+                      "items": {
+                        "description": "An operation's shell header.",
+                        "type": "object",
+                        "properties": {
+                          "hash": {
+                            "$ref": "#/components/schemas/Operation_hash"
+                          },
+                          "branch": {
+                            "$ref": "#/components/schemas/block_hash"
+                          },
+                          "contents": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
+                            }
+                          },
+                          "signature": {
+                            "$ref": "#/components/schemas/Signature.V2"
+                          }
+                        },
+                        "required": [
+                          "hash",
+                          "branch",
+                          "contents"
+                        ]
+                      }
+                    },
+                    "refused": {
+                      "type": "array",
+                      "items": {
+                        "description": "An operation's shell header.",
+                        "type": "object",
+                        "properties": {
+                          "hash": {
+                            "$ref": "#/components/schemas/Operation_hash"
+                          },
+                          "protocol": {
+                            "type": "string",
+                            "enum": [
+                              "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
+                            ]
+                          },
+                          "branch": {
+                            "$ref": "#/components/schemas/block_hash"
+                          },
+                          "contents": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
+                            }
+                          },
+                          "signature": {
+                            "$ref": "#/components/schemas/Signature.V2"
+                          },
+                          "error": {
+                            "$ref": "#/components/schemas/error"
+                          }
+                        },
+                        "required": [
+                          "hash",
+                          "protocol",
+                          "branch",
+                          "contents",
+                          "error"
+                        ]
+                      }
+                    },
+                    "outdated": {
+                      "type": "array",
+                      "items": {
+                        "description": "An operation's shell header.",
+                        "type": "object",
+                        "properties": {
+                          "hash": {
+                            "$ref": "#/components/schemas/Operation_hash"
+                          },
+                          "protocol": {
+                            "type": "string",
+                            "enum": [
+                              "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
+                            ]
+                          },
+                          "branch": {
+                            "$ref": "#/components/schemas/block_hash"
+                          },
+                          "contents": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
+                            }
+                          },
+                          "signature": {
+                            "$ref": "#/components/schemas/Signature.V2"
+                          },
+                          "error": {
+                            "$ref": "#/components/schemas/error"
+                          }
+                        },
+                        "required": [
+                          "hash",
+                          "protocol",
+                          "branch",
+                          "contents",
+                          "error"
+                        ]
+                      }
+                    },
+                    "branch_refused": {
+                      "type": "array",
+                      "items": {
+                        "description": "An operation's shell header.",
+                        "type": "object",
+                        "properties": {
+                          "hash": {
+                            "$ref": "#/components/schemas/Operation_hash"
+                          },
+                          "protocol": {
+                            "type": "string",
+                            "enum": [
+                              "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
+                            ]
+                          },
+                          "branch": {
+                            "$ref": "#/components/schemas/block_hash"
+                          },
+                          "contents": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
+                            }
+                          },
+                          "signature": {
+                            "$ref": "#/components/schemas/Signature.V2"
+                          },
+                          "error": {
+                            "$ref": "#/components/schemas/error"
+                          }
+                        },
+                        "required": [
+                          "hash",
+                          "protocol",
+                          "branch",
+                          "contents",
+                          "error"
+                        ]
+                      }
+                    },
+                    "branch_delayed": {
+                      "type": "array",
+                      "items": {
+                        "description": "An operation's shell header.",
+                        "type": "object",
+                        "properties": {
+                          "hash": {
+                            "$ref": "#/components/schemas/Operation_hash"
+                          },
+                          "protocol": {
+                            "type": "string",
+                            "enum": [
+                              "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
+                            ]
+                          },
+                          "branch": {
+                            "$ref": "#/components/schemas/block_hash"
+                          },
+                          "contents": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
+                            }
+                          },
+                          "signature": {
+                            "$ref": "#/components/schemas/Signature.V2"
+                          },
+                          "error": {
+                            "$ref": "#/components/schemas/error"
+                          }
+                        },
+                        "required": [
+                          "hash",
+                          "protocol",
+                          "branch",
+                          "contents",
+                          "error"
+                        ]
+                      }
+                    },
+                    "unprocessed": {
+                      "type": "array",
+                      "items": {
+                        "description": "An operation's shell header.",
+                        "type": "object",
+                        "properties": {
+                          "hash": {
+                            "$ref": "#/components/schemas/Operation_hash"
+                          },
+                          "protocol": {
+                            "type": "string",
+                            "enum": [
+                              "PtTALLiNtPec7mE7yY4m3k26J8Qukef3E3ehzhfXgFZKGtDdAXu"
+                            ]
+                          },
+                          "branch": {
+                            "$ref": "#/components/schemas/block_hash"
+                          },
+                          "contents": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/024-PtTALLiN.operation.alpha.contents"
+                            }
+                          },
+                          "signature": {
+                            "$ref": "#/components/schemas/Signature.V2"
+                          }
+                        },
+                        "required": [
+                          "hash",
+                          "protocol",
+                          "branch",
+                          "contents"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "validated",
+                    "refused",
+                    "outdated",
+                    "branch_refused",
+                    "branch_delayed",
+                    "unprocessed"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/request_operations": {
+      "post": {
+        "description": "Request the operations of our peers or a specific peer if specified via a query parameter.",
+        "parameters": [
+          {
+            "name": "peer_id",
+            "in": "query",
+            "description": "A cryptographic node identity (Base58Check-encoded)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unban_all_operations": {
+      "post": {
+        "description": "Clear the set of banned operations.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unban_operation": {
+      "post": {
+        "description": "Remove an operation from the set of banned operations (nothing happens if it was not banned).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "title": "A Tezos operation ID (Base58Check-encoded)",
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/unistring"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "024-PtTALLiN.block_header.alpha.full_header": {
+        "title": "Shell header",
+        "description": "Block header's shell-related content. It contains information such as the block level, its predecessor and timestamp.",
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "proto": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "predecessor": {
+            "$ref": "#/components/schemas/block_hash"
+          },
+          "timestamp": {
+            "$ref": "#/components/schemas/timestamp.protocol"
+          },
+          "validation_pass": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "operations_hash": {
+            "$ref": "#/components/schemas/Operation_list_list_hash"
+          },
+          "fitness": {
+            "$ref": "#/components/schemas/fitness"
+          },
+          "context": {
+            "$ref": "#/components/schemas/Context_hash"
+          },
+          "payload_hash": {
+            "$ref": "#/components/schemas/value_hash"
+          },
+          "payload_round": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "proof_of_work_nonce": {
+            "type": "string",
+            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+          },
+          "seed_nonce_hash": {
+            "$ref": "#/components/schemas/cycle_nonce"
+          },
+          "liquidity_baking_toggle_vote": {
+            "$ref": "#/components/schemas/024-PtTALLiN.liquidity_baking_vote"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Signature.V2"
+          }
+        },
+        "required": [
+          "level",
+          "proto",
+          "predecessor",
+          "timestamp",
+          "validation_pass",
+          "operations_hash",
+          "fitness",
+          "context",
+          "payload_hash",
+          "payload_round",
+          "proof_of_work_nonce",
+          "liquidity_baking_toggle_vote",
+          "signature"
+        ]
+      },
+      "024-PtTALLiN.contract_id": {
+        "title": "A contract handle",
+        "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "024-PtTALLiN.contract_id.originated": {
+        "title": "A contract handle -- originated account",
+        "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 originated contract hash.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "024-PtTALLiN.entrypoint": {
+        "title": "entrypoint",
+        "description": "Named entrypoint to a Michelson smart contract",
+        "oneOf": [
+          {
+            "title": "default",
+            "type": "string",
+            "enum": [
+              "default"
+            ]
+          },
+          {
+            "title": "root",
+            "type": "string",
+            "enum": [
+              "root"
+            ]
+          },
+          {
+            "title": "do",
+            "type": "string",
+            "enum": [
+              "do"
+            ]
+          },
+          {
+            "title": "set_delegate",
+            "type": "string",
+            "enum": [
+              "set_delegate"
+            ]
+          },
+          {
+            "title": "remove_delegate",
+            "type": "string",
+            "enum": [
+              "remove_delegate"
+            ]
+          },
+          {
+            "title": "deposit",
+            "type": "string",
+            "enum": [
+              "deposit"
+            ]
+          },
+          {
+            "title": "stake",
+            "type": "string",
+            "enum": [
+              "stake"
+            ]
+          },
+          {
+            "title": "unstake",
+            "type": "string",
+            "enum": [
+              "unstake"
+            ]
+          },
+          {
+            "title": "finalize_unstake",
+            "type": "string",
+            "enum": [
+              "finalize_unstake"
+            ]
+          },
+          {
+            "title": "set_delegate_parameters",
+            "type": "string",
+            "enum": [
+              "set_delegate_parameters"
+            ]
+          },
+          {
+            "title": "named",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/unistring"
+              }
+            ]
+          }
+        ]
+      },
+      "024-PtTALLiN.inlined.consensus_operation": {
+        "description": "An operation's shell header.",
+        "type": "object",
+        "properties": {
+          "branch": {
+            "$ref": "#/components/schemas/block_hash"
+          },
+          "operations": {
+            "$ref": "#/components/schemas/024-PtTALLiN.inlined.consensus_operation.contents"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Signature.V2"
+          }
+        },
+        "required": [
+          "branch",
+          "operations"
+        ]
+      },
+      "024-PtTALLiN.inlined.consensus_operation.contents": {
+        "oneOf": [
+          {
+            "title": "Preattestation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "preattestation"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "round": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "block_payload_hash": {
+                "$ref": "#/components/schemas/value_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "slot",
+              "level",
+              "round",
+              "block_payload_hash"
+            ]
+          },
+          {
+            "title": "Attestation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "attestation"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "round": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "block_payload_hash": {
+                "$ref": "#/components/schemas/value_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "slot",
+              "level",
+              "round",
+              "block_payload_hash"
+            ]
+          },
+          {
+            "title": "Attestation_with_dal",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "attestation_with_dal"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "round": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "block_payload_hash": {
+                "$ref": "#/components/schemas/value_hash"
+              },
+              "dal_attestation": {
+                "$ref": "#/components/schemas/bignum"
+              }
+            },
+            "required": [
+              "kind",
+              "slot",
+              "level",
+              "round",
+              "block_payload_hash",
+              "dal_attestation"
+            ]
+          },
+          {
+            "title": "Preattestations_aggregate",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "preattestations_aggregate"
+                ]
+              },
+              "consensus_content": {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "round": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "block_payload_hash": {
+                    "$ref": "#/components/schemas/value_hash"
+                  }
+                },
+                "required": [
+                  "level",
+                  "round",
+                  "block_payload_hash"
+                ]
+              },
+              "committee": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "consensus_content",
+              "committee"
+            ]
+          },
+          {
+            "title": "Attestations_aggregate",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "attestations_aggregate"
+                ]
+              },
+              "consensus_content": {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "round": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "block_payload_hash": {
+                    "$ref": "#/components/schemas/value_hash"
+                  }
+                },
+                "required": [
+                  "level",
+                  "round",
+                  "block_payload_hash"
+                ]
+              },
+              "committee": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65535
+                    },
+                    "dal_attestation": {
+                      "$ref": "#/components/schemas/bignum"
+                    }
+                  },
+                  "required": [
+                    "slot"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "consensus_content",
+              "committee"
+            ]
+          }
+        ]
+      },
+      "024-PtTALLiN.liquidity_baking_vote": {
+        "oneOf": [
+          {
+            "title": "per_block_vote_on",
+            "type": "string",
+            "enum": [
+              "on"
+            ]
+          },
+          {
+            "title": "per_block_vote_off",
+            "type": "string",
+            "enum": [
+              "off"
+            ]
+          },
+          {
+            "title": "per_block_vote_pass",
+            "type": "string",
+            "enum": [
+              "pass"
+            ]
+          }
+        ]
+      },
+      "024-PtTALLiN.michelson.v1.primitives": {
+        "type": "string",
+        "enum": [
+          "SHA256",
+          "PUSH",
+          "GET_AND_UPDATE",
+          "RENAME",
+          "False",
+          "CAST",
+          "ISNAT",
+          "unit",
+          "PACK",
+          "EMIT",
+          "string",
+          "chain_id",
+          "Pair",
+          "constant",
+          "IF_CONS",
+          "INDEX_ADDRESS",
+          "signature",
+          "storage",
+          "OR",
+          "chest",
+          "view",
+          "UNPACK",
+          "ADD",
+          "DIP",
+          "lambda",
+          "MEM",
+          "BYTES",
+          "SENDER",
+          "ADDRESS",
+          "CDR",
+          "SAPLING_EMPTY_STATE",
+          "nat",
+          "LOOP",
+          "GET_ADDRESS_INDEX",
+          "mutez",
+          "SHA512",
+          "CREATE_ACCOUNT",
+          "BLAKE2B",
+          "READ_TICKET",
+          "LE",
+          "sapling_transaction_deprecated",
+          "bytes",
+          "timestamp",
+          "or",
+          "CHAIN_ID",
+          "ticket",
+          "SELF_ADDRESS",
+          "SOURCE",
+          "IMPLICIT_ACCOUNT",
+          "contract",
+          "AMOUNT",
+          "CHECK_SIGNATURE",
+          "tx_rollup_l2_address",
+          "LSR",
+          "EQ",
+          "Elt",
+          "OPEN_CHEST",
+          "NIL",
+          "CREATE_CONTRACT",
+          "LSL",
+          "TRANSFER_TOKENS",
+          "JOIN_TICKETS",
+          "SWAP",
+          "Some",
+          "parameter",
+          "option",
+          "never",
+          "VIEW",
+          "None",
+          "SLICE",
+          "bool",
+          "ABS",
+          "key",
+          "DUG",
+          "key_hash",
+          "CAR",
+          "GET",
+          "HASH_KEY",
+          "CONCAT",
+          "LEVEL",
+          "SAPLING_VERIFY_UPDATE",
+          "TOTAL_VOTING_POWER",
+          "Lambda_rec",
+          "SIZE",
+          "map",
+          "STEPS_TO_QUOTA",
+          "IF_NONE",
+          "UNPAIR",
+          "CONS",
+          "Unit",
+          "CONTRACT",
+          "MUL",
+          "UPDATE",
+          "EXEC",
+          "PAIR",
+          "SPLIT_TICKET",
+          "RIGHT",
+          "int",
+          "AND",
+          "NEG",
+          "big_map",
+          "BALANCE",
+          "SET_DELEGATE",
+          "NEVER",
+          "MIN_BLOCK_TIME",
+          "INT",
+          "bls12_381_fr",
+          "ITER",
+          "True",
+          "Right",
+          "Ticket",
+          "GT",
+          "DIG",
+          "operation",
+          "SUB",
+          "EDIV",
+          "MAP",
+          "IF_LEFT",
+          "list",
+          "VOTING_POWER",
+          "LAMBDA_REC",
+          "Left",
+          "bls12_381_g2",
+          "TICKET_DEPRECATED",
+          "bls12_381_g1",
+          "sapling_state",
+          "DUP",
+          "LEFT",
+          "chest_key",
+          "pair",
+          "SHA3",
+          "LAMBDA",
+          "NOT",
+          "KECCAK",
+          "NOW",
+          "NAT",
+          "GE",
+          "set",
+          "address",
+          "NEQ",
+          "IF",
+          "FAILWITH",
+          "NONE",
+          "SUB_MUTEZ",
+          "XOR",
+          "LOOP_LEFT",
+          "PAIRING_CHECK",
+          "DROP",
+          "EMPTY_BIG_MAP",
+          "UNIT",
+          "sapling_transaction",
+          "TICKET",
+          "EMPTY_MAP",
+          "APPLY",
+          "LT",
+          "SOME",
+          "IS_IMPLICIT_ACCOUNT",
+          "COMPARE",
+          "EMPTY_SET",
+          "SELF",
+          "code"
+        ]
+      },
+      "024-PtTALLiN.mutez": {
+        "$ref": "#/components/schemas/positive_bignum"
+      },
+      "024-PtTALLiN.operation.alpha.contents": {
+        "oneOf": [
+          {
+            "title": "Attestation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "attestation"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "round": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "block_payload_hash": {
+                "$ref": "#/components/schemas/value_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "slot",
+              "level",
+              "round",
+              "block_payload_hash"
+            ]
+          },
+          {
+            "title": "Attestation_with_dal",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "attestation_with_dal"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "round": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "block_payload_hash": {
+                "$ref": "#/components/schemas/value_hash"
+              },
+              "dal_attestation": {
+                "$ref": "#/components/schemas/bignum"
+              }
+            },
+            "required": [
+              "kind",
+              "slot",
+              "level",
+              "round",
+              "block_payload_hash",
+              "dal_attestation"
+            ]
+          },
+          {
+            "title": "Preattestation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "preattestation"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "round": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "block_payload_hash": {
+                "$ref": "#/components/schemas/value_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "slot",
+              "level",
+              "round",
+              "block_payload_hash"
+            ]
+          },
+          {
+            "title": "Attestations_aggregate",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "attestations_aggregate"
+                ]
+              },
+              "consensus_content": {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "round": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "block_payload_hash": {
+                    "$ref": "#/components/schemas/value_hash"
+                  }
+                },
+                "required": [
+                  "level",
+                  "round",
+                  "block_payload_hash"
+                ]
+              },
+              "committee": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 65535
+                    },
+                    "dal_attestation": {
+                      "$ref": "#/components/schemas/bignum"
+                    }
+                  },
+                  "required": [
+                    "slot"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "consensus_content",
+              "committee"
+            ]
+          },
+          {
+            "title": "Preattestations_aggregate",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "preattestations_aggregate"
+                ]
+              },
+              "consensus_content": {
+                "type": "object",
+                "properties": {
+                  "level": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "round": {
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "block_payload_hash": {
+                    "$ref": "#/components/schemas/value_hash"
+                  }
+                },
+                "required": [
+                  "level",
+                  "round",
+                  "block_payload_hash"
+                ]
+              },
+              "committee": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "consensus_content",
+              "committee"
+            ]
+          },
+          {
+            "title": "Double_consensus_operation_evidence",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "double_consensus_operation_evidence"
+                ]
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "op1": {
+                "$ref": "#/components/schemas/024-PtTALLiN.inlined.consensus_operation"
+              },
+              "op2": {
+                "$ref": "#/components/schemas/024-PtTALLiN.inlined.consensus_operation"
+              }
+            },
+            "required": [
+              "kind",
+              "slot",
+              "op1",
+              "op2"
+            ]
+          },
+          {
+            "title": "Seed_nonce_revelation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "seed_nonce_revelation"
+                ]
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "nonce": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              }
+            },
+            "required": [
+              "kind",
+              "level",
+              "nonce"
+            ]
+          },
+          {
+            "title": "Vdf_revelation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "vdf_revelation"
+                ]
+              },
+              "solution": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "solution"
+            ]
+          },
+          {
+            "title": "Double_baking_evidence",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "double_baking_evidence"
+                ]
+              },
+              "bh1": {
+                "$ref": "#/components/schemas/024-PtTALLiN.block_header.alpha.full_header"
+              },
+              "bh2": {
+                "$ref": "#/components/schemas/024-PtTALLiN.block_header.alpha.full_header"
+              }
+            },
+            "required": [
+              "kind",
+              "bh1",
+              "bh2"
+            ]
+          },
+          {
+            "title": "Dal_entrapment_evidence",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "dal_entrapment_evidence"
+                ]
+              },
+              "attestation": {
+                "$ref": "#/components/schemas/024-PtTALLiN.inlined.consensus_operation"
+              },
+              "consensus_slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              },
+              "slot_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "shard_with_proof": {
+                "type": "object",
+                "properties": {
+                  "shard": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -1073741824,
+                          "maximum": 1073741823
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "proof": {
+                    "$ref": "#/components/schemas/DAL_commitment"
+                  }
+                },
+                "required": [
+                  "shard",
+                  "proof"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "attestation",
+              "consensus_slot",
+              "slot_index",
+              "shard_with_proof"
+            ]
+          },
+          {
+            "title": "Activate_account",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "activate_account"
+                ]
+              },
+              "pkh": {
+                "$ref": "#/components/schemas/Ed25519.Public_key_hash"
+              },
+              "secret": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              }
+            },
+            "required": [
+              "kind",
+              "pkh",
+              "secret"
+            ]
+          },
+          {
+            "title": "Proposals",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "proposals"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "period": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "proposals": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Protocol_hash"
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "period",
+              "proposals"
+            ]
+          },
+          {
+            "title": "Ballot",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ballot"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "period": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "proposal": {
+                "$ref": "#/components/schemas/Protocol_hash"
+              },
+              "ballot": {
+                "type": "string",
+                "enum": [
+                  "nay",
+                  "yay",
+                  "pass"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "period",
+              "proposal",
+              "ballot"
+            ]
+          },
+          {
+            "title": "Reveal",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "reveal"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "public_key": {
+                "$ref": "#/components/schemas/Signature.Public_key"
+              },
+              "proof": {
+                "$ref": "#/components/schemas/Bls12_381_signature"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "public_key"
+            ]
+          },
+          {
+            "title": "Transaction",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "transaction"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "amount": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "destination": {
+                "$ref": "#/components/schemas/024-PtTALLiN.contract_id"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "entrypoint": {
+                    "$ref": "#/components/schemas/024-PtTALLiN.entrypoint"
+                  },
+                  "value": {}
+                },
+                "required": [
+                  "entrypoint",
+                  "value"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "amount",
+              "destination"
+            ]
+          },
+          {
+            "title": "Origination",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "origination"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "balance": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "delegate": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "script": {
+                "$ref": "#/components/schemas/024-PtTALLiN.scripted.contracts"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "balance",
+              "script"
+            ]
+          },
+          {
+            "title": "Delegation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "delegation"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "delegate": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit"
+            ]
+          },
+          {
+            "title": "Set_deposits_limit",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "set_deposits_limit"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "limit": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit"
+            ]
+          },
+          {
+            "title": "Increase_paid_storage",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "increase_paid_storage"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "amount": {
+                "$ref": "#/components/schemas/bignum"
+              },
+              "destination": {
+                "$ref": "#/components/schemas/024-PtTALLiN.contract_id.originated"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "amount",
+              "destination"
+            ]
+          },
+          {
+            "title": "Update_consensus_key",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "update_consensus_key"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "pk": {
+                "$ref": "#/components/schemas/Signature.Public_key"
+              },
+              "proof": {
+                "$ref": "#/components/schemas/Bls12_381_signature"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "pk"
+            ]
+          },
+          {
+            "title": "Update_companion_key",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "update_companion_key"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "pk": {
+                "$ref": "#/components/schemas/Signature.Public_key"
+              },
+              "proof": {
+                "$ref": "#/components/schemas/Bls12_381_signature"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "pk"
+            ]
+          },
+          {
+            "title": "Drain_delegate",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "drain_delegate"
+                ]
+              },
+              "consensus_key": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "delegate": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "destination": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "consensus_key",
+              "delegate",
+              "destination"
+            ]
+          },
+          {
+            "title": "Failing_noop",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "failing_noop"
+                ]
+              },
+              "arbitrary": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              }
+            },
+            "required": [
+              "kind",
+              "arbitrary"
+            ]
+          },
+          {
+            "title": "Register_global_constant",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "register_global_constant"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "value": {}
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "value"
+            ]
+          },
+          {
+            "title": "Transfer_ticket",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "transfer_ticket"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "ticket_contents": {},
+              "ticket_ty": {},
+              "ticket_ticketer": {
+                "$ref": "#/components/schemas/024-PtTALLiN.contract_id"
+              },
+              "ticket_amount": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "destination": {
+                "$ref": "#/components/schemas/024-PtTALLiN.contract_id"
+              },
+              "entrypoint": {
+                "$ref": "#/components/schemas/unistring"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "ticket_contents",
+              "ticket_ty",
+              "ticket_ticketer",
+              "ticket_amount",
+              "destination",
+              "entrypoint"
+            ]
+          },
+          {
+            "title": "Dal_publish_commitment",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "dal_publish_commitment"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "slot_header": {
+                "type": "object",
+                "properties": {
+                  "slot_index": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255
+                  },
+                  "commitment": {
+                    "$ref": "#/components/schemas/DAL_commitment"
+                  },
+                  "commitment_proof": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  }
+                },
+                "required": [
+                  "slot_index",
+                  "commitment",
+                  "commitment_proof"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "slot_header"
+            ]
+          },
+          {
+            "title": "Smart_rollup_originate",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "smart_rollup_originate"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "pvm_kind": {
+                "type": "string",
+                "enum": [
+                  "wasm_2_0_0",
+                  "arith",
+                  "riscv"
+                ]
+              },
+              "kernel": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              },
+              "parameters_ty": {},
+              "whitelist": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Signature.Public_key_hash"
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "pvm_kind",
+              "kernel",
+              "parameters_ty"
+            ]
+          },
+          {
+            "title": "Smart_rollup_add_messages",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "smart_rollup_add_messages"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "message": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "message"
+            ]
+          },
+          {
+            "title": "Smart_rollup_cement",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "smart_rollup_cement"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "rollup": {
+                "$ref": "#/components/schemas/smart_rollup_address"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "rollup"
+            ]
+          },
+          {
+            "title": "Smart_rollup_publish",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "smart_rollup_publish"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "rollup": {
+                "$ref": "#/components/schemas/smart_rollup_address"
+              },
+              "commitment": {
+                "type": "object",
+                "properties": {
+                  "compressed_state": {
+                    "$ref": "#/components/schemas/smart_rollup_state_hash"
+                  },
+                  "inbox_level": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "predecessor": {
+                    "$ref": "#/components/schemas/smart_rollup_commitment_hash"
+                  },
+                  "number_of_ticks": {
+                    "$ref": "#/components/schemas/int64"
+                  }
+                },
+                "required": [
+                  "compressed_state",
+                  "inbox_level",
+                  "predecessor",
+                  "number_of_ticks"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "rollup",
+              "commitment"
+            ]
+          },
+          {
+            "title": "Smart_rollup_refute",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "smart_rollup_refute"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "rollup": {
+                "$ref": "#/components/schemas/smart_rollup_address"
+              },
+              "opponent": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "refutation": {
+                "oneOf": [
+                  {
+                    "title": "Start",
+                    "type": "object",
+                    "properties": {
+                      "refutation_kind": {
+                        "type": "string",
+                        "enum": [
+                          "start"
+                        ]
+                      },
+                      "player_commitment_hash": {
+                        "$ref": "#/components/schemas/smart_rollup_commitment_hash"
+                      },
+                      "opponent_commitment_hash": {
+                        "$ref": "#/components/schemas/smart_rollup_commitment_hash"
+                      }
+                    },
+                    "required": [
+                      "refutation_kind",
+                      "player_commitment_hash",
+                      "opponent_commitment_hash"
+                    ]
+                  },
+                  {
+                    "title": "Move",
+                    "type": "object",
+                    "properties": {
+                      "refutation_kind": {
+                        "type": "string",
+                        "enum": [
+                          "move"
+                        ]
+                      },
+                      "choice": {
+                        "$ref": "#/components/schemas/positive_bignum"
+                      },
+                      "step": {
+                        "oneOf": [
+                          {
+                            "title": "Dissection",
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "state": {
+                                  "$ref": "#/components/schemas/smart_rollup_state_hash"
+                                },
+                                "tick": {
+                                  "$ref": "#/components/schemas/positive_bignum"
+                                }
+                              },
+                              "required": [
+                                "tick"
+                              ]
+                            }
+                          },
+                          {
+                            "title": "Proof",
+                            "type": "object",
+                            "properties": {
+                              "pvm_step": {
+                                "type": "string",
+                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                              },
+                              "input_proof": {
+                                "oneOf": [
+                                  {
+                                    "title": "inbox proof",
+                                    "type": "object",
+                                    "properties": {
+                                      "input_proof_kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "inbox_proof"
+                                        ]
+                                      },
+                                      "level": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2147483647
+                                      },
+                                      "message_counter": {
+                                        "$ref": "#/components/schemas/positive_bignum"
+                                      },
+                                      "serialized_proof": {
+                                        "type": "string",
+                                        "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                      }
+                                    },
+                                    "required": [
+                                      "input_proof_kind",
+                                      "level",
+                                      "message_counter",
+                                      "serialized_proof"
+                                    ]
+                                  },
+                                  {
+                                    "title": "reveal proof",
+                                    "type": "object",
+                                    "properties": {
+                                      "input_proof_kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "reveal_proof"
+                                        ]
+                                      },
+                                      "reveal_proof": {
+                                        "oneOf": [
+                                          {
+                                            "title": "raw data proof",
+                                            "type": "object",
+                                            "properties": {
+                                              "reveal_proof_kind": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "raw_data_proof"
+                                                ]
+                                              },
+                                              "raw_data": {
+                                                "type": "string",
+                                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                              }
+                                            },
+                                            "required": [
+                                              "reveal_proof_kind",
+                                              "raw_data"
+                                            ]
+                                          },
+                                          {
+                                            "title": "metadata proof",
+                                            "type": "object",
+                                            "properties": {
+                                              "reveal_proof_kind": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "metadata_proof"
+                                                ]
+                                              }
+                                            },
+                                            "required": [
+                                              "reveal_proof_kind"
+                                            ]
+                                          },
+                                          {
+                                            "title": "dal page proof",
+                                            "type": "object",
+                                            "properties": {
+                                              "reveal_proof_kind": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "dal_page_proof"
+                                                ]
+                                              },
+                                              "dal_page_id": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "published_level": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 2147483647
+                                                  },
+                                                  "slot_index": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 255
+                                                  },
+                                                  "page_index": {
+                                                    "type": "integer",
+                                                    "minimum": -32768,
+                                                    "maximum": 32767
+                                                  }
+                                                },
+                                                "required": [
+                                                  "published_level",
+                                                  "slot_index",
+                                                  "page_index"
+                                                ]
+                                              },
+                                              "dal_proof": {
+                                                "type": "string",
+                                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                              }
+                                            },
+                                            "required": [
+                                              "reveal_proof_kind",
+                                              "dal_page_id",
+                                              "dal_proof"
+                                            ]
+                                          },
+                                          {
+                                            "title": "dal parameters proof",
+                                            "type": "object",
+                                            "properties": {
+                                              "reveal_proof_kind": {
+                                                "type": "string",
+                                                "enum": [
+                                                  "dal_parameters_proof"
+                                                ]
+                                              }
+                                            },
+                                            "required": [
+                                              "reveal_proof_kind"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "input_proof_kind",
+                                      "reveal_proof"
+                                    ]
+                                  },
+                                  {
+                                    "title": "first input",
+                                    "type": "object",
+                                    "properties": {
+                                      "input_proof_kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "first_input"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "input_proof_kind"
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "pvm_step"
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "refutation_kind",
+                      "choice",
+                      "step"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "rollup",
+              "opponent",
+              "refutation"
+            ]
+          },
+          {
+            "title": "Smart_rollup_timeout",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "smart_rollup_timeout"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "rollup": {
+                "$ref": "#/components/schemas/smart_rollup_address"
+              },
+              "stakers": {
+                "type": "object",
+                "properties": {
+                  "alice": {
+                    "$ref": "#/components/schemas/Signature.Public_key_hash"
+                  },
+                  "bob": {
+                    "$ref": "#/components/schemas/Signature.Public_key_hash"
+                  }
+                },
+                "required": [
+                  "alice",
+                  "bob"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "rollup",
+              "stakers"
+            ]
+          },
+          {
+            "title": "Smart_rollup_execute_outbox_message",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "smart_rollup_execute_outbox_message"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "rollup": {
+                "$ref": "#/components/schemas/smart_rollup_address"
+              },
+              "cemented_commitment": {
+                "$ref": "#/components/schemas/smart_rollup_commitment_hash"
+              },
+              "output_proof": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "rollup",
+              "cemented_commitment",
+              "output_proof"
+            ]
+          },
+          {
+            "title": "Smart_rollup_recover_bond",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "smart_rollup_recover_bond"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "rollup": {
+                "$ref": "#/components/schemas/smart_rollup_address"
+              },
+              "staker": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "rollup",
+              "staker"
+            ]
+          },
+          {
+            "title": "Zk_rollup_origination",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "zk_rollup_origination"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "public_parameters": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              },
+              "circuits_info": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/unistring"
+                      },
+                      {
+                        "oneOf": [
+                          {
+                            "title": "Public",
+                            "type": "object",
+                            "properties": {
+                              "public": {}
+                            },
+                            "required": [
+                              "public"
+                            ]
+                          },
+                          {
+                            "title": "Private",
+                            "type": "object",
+                            "properties": {
+                              "private": {}
+                            },
+                            "required": [
+                              "private"
+                            ]
+                          },
+                          {
+                            "title": "Fee",
+                            "type": "object",
+                            "properties": {
+                              "fee": {}
+                            },
+                            "required": [
+                              "fee"
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              "init_state": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                }
+              },
+              "nb_ops": {
+                "type": "integer",
+                "minimum": -1073741824,
+                "maximum": 1073741823
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "public_parameters",
+              "circuits_info",
+              "init_state",
+              "nb_ops"
+            ]
+          },
+          {
+            "title": "Zk_rollup_publish",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "zk_rollup_publish"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "zk_rollup": {
+                "$ref": "#/components/schemas/Zk_rollup_hash"
+              },
+              "op": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "op_code": {
+                            "type": "integer",
+                            "minimum": -1073741824,
+                            "maximum": 1073741823
+                          },
+                          "price": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "$ref": "#/components/schemas/script_expr"
+                              },
+                              "amount": {
+                                "$ref": "#/components/schemas/bignum"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "amount"
+                            ]
+                          },
+                          "l1_dst": {
+                            "$ref": "#/components/schemas/Signature.Public_key_hash"
+                          },
+                          "rollup_id": {
+                            "$ref": "#/components/schemas/Zk_rollup_hash"
+                          },
+                          "payload": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                            }
+                          }
+                        },
+                        "required": [
+                          "op_code",
+                          "price",
+                          "l1_dst",
+                          "rollup_id",
+                          "payload"
+                        ]
+                      },
+                      {
+                        "nullable": true,
+                        "oneOf": [
+                          {
+                            "title": "Some",
+                            "type": "object",
+                            "properties": {
+                              "contents": {
+                                "$ref": "#/components/schemas/micheline.024-PtTALLiN.michelson_v1.expression"
+                              },
+                              "ty": {
+                                "$ref": "#/components/schemas/micheline.024-PtTALLiN.michelson_v1.expression"
+                              },
+                              "ticketer": {
+                                "$ref": "#/components/schemas/024-PtTALLiN.contract_id"
+                              }
+                            },
+                            "required": [
+                              "contents",
+                              "ty",
+                              "ticketer"
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "zk_rollup",
+              "op"
+            ]
+          },
+          {
+            "title": "Zk_rollup_update",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "zk_rollup_update"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/024-PtTALLiN.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "zk_rollup": {
+                "$ref": "#/components/schemas/Zk_rollup_hash"
+              },
+              "update": {
+                "type": "object",
+                "properties": {
+                  "pending_pis": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/unistring"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "new_state": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                }
+                              },
+                              "fee": {
+                                "type": "string",
+                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                              },
+                              "exit_validity": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "new_state",
+                              "fee",
+                              "exit_validity"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "private_pis": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/unistring"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "new_state": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                }
+                              },
+                              "fee": {
+                                "type": "string",
+                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                              }
+                            },
+                            "required": [
+                              "new_state",
+                              "fee"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "fee_pi": {
+                    "type": "object",
+                    "properties": {
+                      "new_state": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                        }
+                      }
+                    },
+                    "required": [
+                      "new_state"
+                    ]
+                  },
+                  "proof": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  }
+                },
+                "required": [
+                  "pending_pis",
+                  "private_pis",
+                  "fee_pi",
+                  "proof"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "zk_rollup",
+              "update"
+            ]
+          }
+        ]
+      },
+      "024-PtTALLiN.scripted.contracts": {
+        "type": "object",
+        "properties": {
+          "code": {},
+          "storage": {}
+        },
+        "required": [
+          "code",
+          "storage"
+        ]
+      },
+      "Bls12_381_signature": {
+        "title": "A Bls12_381 signature (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Context_hash": {
+        "title": "A hash of context (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "DAL_commitment": {
+        "title": "Commitment representation for the DAL (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Ed25519.Public_key_hash": {
+        "title": "An Ed25519 public key hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Operation_hash": {
+        "title": "A Tezos operation ID (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Operation_list_list_hash": {
+        "title": "A list of list of operations (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Protocol_hash": {
+        "title": "A Tezos protocol ID (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature.Public_key": {
+        "title": "A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature.Public_key_hash": {
+        "title": "A Ed25519, Secp256k1, P256, or BLS public key hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature.V2": {
+        "title": "A Ed25519, Secp256k1, P256 or BLS signature (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Zk_rollup_hash": {
+        "title": "A zk rollup address (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "bignum": {
+        "title": "Big number",
+        "description": "Decimal representation of a big number",
+        "type": "string"
+      },
+      "block_hash": {
+        "title": "A block identifier (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "cycle_nonce": {
+        "title": "A nonce hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "error": {
+        "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+      },
+      "error_opt": {
+        "description": "An optional error-trace (None indicates no error). The full list of errors is available with the global RPC `GET errors`"
+      },
+      "fitness": {
+        "title": "Block fitness",
+        "description": "The fitness, or score, of a block, that allow the Tezos to decide which chain is the best. A fitness value is a list of byte sequences. They are compared as follows: shortest lists are smaller; lists of the same length are compared according to the lexicographical order.",
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+        }
+      },
+      "int64": {
+        "title": "64 bit integers",
+        "description": "Decimal representation of 64 bit integers",
+        "type": "string"
+      },
+      "micheline.024-PtTALLiN.michelson_v1.expression": {
+        "oneOf": [
+          {
+            "title": "Int",
+            "type": "object",
+            "properties": {
+              "int": {
+                "$ref": "#/components/schemas/bignum"
+              }
+            },
+            "required": [
+              "int"
+            ]
+          },
+          {
+            "title": "String",
+            "type": "object",
+            "properties": {
+              "string": {
+                "$ref": "#/components/schemas/unistring"
+              }
+            },
+            "required": [
+              "string"
+            ]
+          },
+          {
+            "title": "Bytes",
+            "type": "object",
+            "properties": {
+              "bytes": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              }
+            },
+            "required": [
+              "bytes"
+            ]
+          },
+          {
+            "title": "Sequence",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/micheline.024-PtTALLiN.michelson_v1.expression"
+            }
+          },
+          {
+            "title": "Prim__generic",
+            "description": "Generic primitive (any number of args with or without annotations)",
+            "type": "object",
+            "properties": {
+              "prim": {
+                "$ref": "#/components/schemas/024-PtTALLiN.michelson.v1.primitives"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/micheline.024-PtTALLiN.michelson_v1.expression"
+                }
+              },
+              "annots": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/unistring"
+                }
+              }
+            },
+            "required": [
+              "prim"
+            ]
+          }
+        ]
+      },
+      "positive_bignum": {
+        "title": "Positive big number",
+        "description": "Decimal representation of a positive big number",
+        "type": "string"
+      },
+      "script_expr": {
+        "title": "A script expression ID (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "smart_rollup_address": {
+        "title": "A smart rollup address (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "smart_rollup_commitment_hash": {
+        "title": "The hash of a commitment of a smart rollup (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "smart_rollup_state_hash": {
+        "title": "The hash of the VM state of a smart rollup (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "timestamp.protocol": {
+        "description": "A timestamp as seen by the protocol: second-level precision, epoch based.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "unistring": {
+        "title": "Universal string representation",
+        "description": "Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid byte sequences.",
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "invalid_utf8_string": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              }
+            },
+            "required": [
+              "invalid_utf8_string"
+            ]
+          }
+        ]
+      },
+      "value_hash": {
+        "title": "Hash of a consensus value (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      }
+    }
+  }
+}

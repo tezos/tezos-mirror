@@ -45,22 +45,38 @@ The node provides some RPCs which are independent of the protocol.
 Their OpenAPI specification can be found at:
 
 - `rpc-openapi <../_static/rpc-openapi.html>`__ (version 23.2)
+- `rpc-openapi-rc <../_static/rpc-openapi-rc.html>`__ (version 24.0~beta1)
 - `rpc-openapi-dev <../_static/rpc-openapi-dev.html>`__ (version master)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
+
+Tallinn RPCs
+------------
+
+The OpenAPI specifications for RPCs which are specific to the Tallinn (``PtTALLiN``)
+protocol proposal can be found at:
+
+- `tallinn-openapi-rc <../_static/tallinn-openapi-rc.html>`__ (version 24.0~beta1)
+
+The OpenAPI specifications for RPCs which are related to the mempool
+and specific to the Tallinn protocol proposal can be found at:
+
+- `tallinn-mempool-openapi-rc <../_static/tallinn-mempool-openapi-rc.html>`__ (version 24.0~beta1)
 
 Seoul RPCs
 ----------
 
 The OpenAPI specifications for RPCs which are specific to the Seoul (``PtSeouLo``)
-protocol proposal can be found at:
+protocol can be found at:
 
-- `seoul-openapi-rc <../_static/seoul-openapi.html>`__ (version 23.2)
+- `seoul-openapi <../_static/seoul-openapi.html>`__ (version 23.2)
+- `seoul-openapi-rc <../_static/seoul-openapi-rc.html>`__ (version 24.0~beta1)
 
 The OpenAPI specifications for RPCs which are related to the mempool
 and specific to the Seoul protocol proposal can be found at:
 
-- `seoul-mempool-openapi-rc <../_static/seoul-mempool-openapi.html>`__ (version 23.2)
+- `seoul-mempool-openapi <../_static/seoul-mempool-openapi.html>`__ (version 23.2)
+- `seoul-mempool-openapi-rc <../_static/seoul-mempool-openapi-rc.html>`__ (version 24.0~beta1)
 
 Alpha RPCs
 ----------
@@ -85,13 +101,22 @@ seen in the field ``.info.version`` within each file.)
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
+Tallinn RPCs
+------------
+
+The OpenAPI specifications for the RPCs of the smart rollup node for the Tallinn
+(``PtTALLiN``) protocol proposal can be found at:
+
+- `tallinn-smart-rollup-node-openapi-rc <../_static/tallinn-smart-rollup-node-openapi-rc.html>`__ (version 24.0~beta1)
+
 Seoul RPCs
 ----------
 
 The OpenAPI specifications for the RPCs of the smart rollup node for the Seoul
-(``PtSeoul``) protocol proposal can be found at:
+(``PtSeouLo``) protocol can be found at:
 
 - `seoul-smart-rollup-node-openapi <../_static/seoul-smart-rollup-node-openapi.html>`__ (version 23.2)
+- `seoul-smart-rollup-node-openapi-rc <../_static/seoul-smart-rollup-node-openapi-rc.html>`__ (version 24.0~beta1)
 
 Alpha RPCs
 ----------
@@ -110,6 +135,7 @@ The DAL node also provides RPCs.
 Their OpenAPI specification can be found at:
 
 - `dal-node-openapi <../_static/dal-node-openapi.html>`__ (version 23.2)
+- `dal-node-openapi-rc <../_static/dal-node-openapi-rc.html>`__ (version 24.0~beta1)
 - `dal-node-openapi <../_static/dal-node-openapi-dev.html>`__ (version master)
 
 .. _openapi_generate:
