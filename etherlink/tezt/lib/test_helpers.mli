@@ -24,9 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Michelson type to use when originating the EVM rollup. *)
-val evm_type : string
-
 (** [u16_to_bytes n] translate an int in a binary string of two bytes
     (little endian).
     NB: Ints greater than 2 bytes are truncated. *)
@@ -64,11 +61,6 @@ val genesis_timestamp : Client.timestamp
 val days : int -> Ptime.span
 
 val get_timestamp : int -> string
-
-(** [next_rollup_node_level ~sc_rollup_node ~client] moves
-    [sc_rollup_node] to the next level l1. *)
-val next_rollup_node_level :
-  sc_rollup_node:Sc_rollup_node.t -> client:Client.t -> int Lwt.t
 
 (** [produce_block timestampt ~sc_rollup_node ~client] moves
     [evm_node] to the next L2 level. *)
@@ -282,6 +274,7 @@ val init_sequencer_sandbox :
   ?evm_version:Evm_version.t ->
   ?eth_bootstrap_accounts:string list ->
   ?sequencer_keys:Account.key list ->
+  ?with_runtimes:Tezosx_runtime.t list ->
   unit ->
   Evm_node.t Lwt.t
 
@@ -329,3 +322,36 @@ val check_operations :
 (** [produce_block_and_wait_for ~sequencer n] Produces a block and wait for
     blueprint [n] to be applied. *)
 val produce_block_and_wait_for : sequencer:Evm_node.t -> int -> unit Lwt.t
+
+val register_sandbox :
+  __FILE__:string ->
+  ?kernel:Kernel.t ->
+  ?tx_queue_tx_per_addr_limit:int ->
+  title:string ->
+  ?set_account_code:(string * string) list ->
+  ?da_fee_per_byte:Wei.t ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  tags:string list ->
+  ?patch_config:(JSON.t -> JSON.t) ->
+  ?websockets:bool ->
+  ?sequencer_keys:Account.key list ->
+  ?with_runtimes:Tezosx_runtime.t list ->
+  (Evm_node.t -> unit Lwt.t) ->
+  unit
+
+type sandbox_test = {sandbox : Evm_node.t; observer : Evm_node.t}
+
+val register_sandbox_with_observer :
+  __FILE__:string ->
+  ?kernel:Kernel.t ->
+  ?tx_queue_tx_per_addr_limit:int ->
+  title:string ->
+  ?set_account_code:(string * string) list ->
+  ?da_fee_per_byte:Wei.t ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  tags:string list ->
+  ?patch_config:(JSON.t -> JSON.t) ->
+  ?websockets:bool ->
+  ?sequencer_keys:Account.key list ->
+  (sandbox_test -> unit Lwt.t) ->
+  unit

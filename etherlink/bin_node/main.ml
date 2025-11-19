@@ -2463,7 +2463,7 @@ let make_kernel_config_command =
           (config_key_flag ~name:"enable_fa_bridge")
           (config_key_flag ~name:"enable_revm")
           (config_key_arg ~name:"dal_slots" ~placeholder:"0,1,4,6,..."))
-       (args8
+       (args9
           (config_key_flag ~name:"enable_dal")
           (config_key_flag ~name:"enable_multichain")
           l2_chain_ids_arg
@@ -2473,7 +2473,8 @@ let make_kernel_config_command =
           (config_key_flag ~name:"enable_fast_withdrawal")
           (config_key_flag ~name:"enable_fast_fa_withdrawal")
           evm_version_arg
-          set_account_code))
+          set_account_code
+          enable_runtime_arg))
     (prefixes ["make"; "kernel"; "installer"; "config"]
     @@ param
          ~name:"kernel config file"
@@ -2511,7 +2512,8 @@ let make_kernel_config_command =
              enable_fast_withdrawal,
              enable_fast_fa_withdrawal,
              evm_version,
-             set_account_code ) )
+             set_account_code,
+             with_runtimes ) )
          output
          ()
        ->
@@ -2548,6 +2550,7 @@ let make_kernel_config_command =
         ?max_delayed_inbox_blueprint_length
         ?enable_fast_withdrawal
         ?enable_fast_fa_withdrawal
+        ?with_runtimes
         ~output
         ())
 

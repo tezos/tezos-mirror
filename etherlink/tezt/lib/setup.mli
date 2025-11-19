@@ -131,6 +131,7 @@ val register_test :
   ?signatory:bool ->
   ?l2_setups:Evm_node.l2_setup list ->
   ?sequencer_sunset_sec:int ->
+  ?with_runtimes:Tezosx_runtime.t list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
@@ -184,6 +185,7 @@ val register_multichain_test :
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
   ?sequencer_sunset_sec:int ->
+  ?with_runtimes:Tezosx_runtime.t list ->
   (multichain_sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
@@ -290,6 +292,7 @@ val setup_sequencer :
   ?signatory:bool ->
   ?l2_chains:Evm_node.l2_setup list ->
   ?sequencer_sunset_sec:int ->
+  ?with_runtimes:Tezosx_runtime.t list ->
   Protocol.t ->
   sequencer_setup Lwt.t
 

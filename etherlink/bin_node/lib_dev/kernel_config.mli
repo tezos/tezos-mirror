@@ -44,6 +44,7 @@ val make :
   ?set_account_code:(string * string) list ->
   ?max_delayed_inbox_blueprint_length:string * string ->
   ?evm_version:evm_version ->
+  ?with_runtimes:Tezosx.runtime list ->
   output:string ->
   unit ->
   unit tzresult Lwt.t
