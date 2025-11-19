@@ -3227,6 +3227,7 @@ let _brassaia_data_tests =
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
+        vector;
       ]
 
 let _brassaia_eio_data_tests =
@@ -3244,6 +3245,7 @@ let _brassaia_eio_data_tests =
         octez_stdlib_unix |> open_;
         octez_test_helpers |> open_;
         tezt_lib |> open_ |> open_ ~m:"Base";
+        vector;
       ]
 
 let _irmin_generic_key_tests =

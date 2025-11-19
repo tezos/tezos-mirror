@@ -78,6 +78,7 @@ let _release_page_base_lib =
     ~path:"ci/bin_release_page"
     ~release_status:Unreleased
     ~modules:["base"]
+    ~profile:"release-tools-deps"
     ~deps:[unix; clap; tezt_json_lib]
 
 let _release_page =
@@ -87,6 +88,7 @@ let _release_page =
     ~path:"ci/bin_release_page"
     ~release_status:Unreleased
     ~modules:["release_page"]
+    ~profile:"release-tools-deps"
     ~deps:[unix; clap; tezt_json_lib; _release_page_base_lib |> open_]
 
 let _version_manager =
@@ -96,6 +98,7 @@ let _version_manager =
     ~path:"ci/bin_release_page"
     ~release_status:Unreleased
     ~modules:["version_manager"]
+    ~profile:"release-tools-deps"
     ~deps:[unix; clap; tezt_json_lib; rss; _release_page_base_lib |> open_]
 
 let ci_grafazos =

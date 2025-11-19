@@ -4,9 +4,9 @@ set -eu
 
 help() {
   cat << EOT
-This script updates opam/virtual/octez-deps.opam.locked.
-This lock file contains the version number for all of Octez dependencies,
-both direct and indirect. It does not include dev-only dependencies.
+This script updates lock files in opam/virtual/.
+These lock files contain the version number for our dependencies,
+both direct and indirect. They do not include dev-only dependencies.
 
 To produce this lock file, this scripts asks opam to use the commit:
 
@@ -108,7 +108,7 @@ opam pin add https://github.com/vch9/base.git#7f6581ba5e29fd340266cb901a59f24ebf
 #   may want to install.
 # We use --fake to tell opam not to actually compile the packages.
 echo "---- Run: 'opam install'"
-opam install --yes --deps-only --fake opam/virtual/octez-deps.opam opam/virtual/octez-dev-deps.opam --update-invariant
+opam install --yes --deps-only --fake opam/virtual/octez-deps.opam opam/virtual/octez-dev-deps.opam opam/virtual/release-tools-deps.opam --update-invariant
 
 # The utop package is a special case.
 # The pyml package, which is an actual dependency, optionally depends on utop.
@@ -120,6 +120,7 @@ opam remove --yes --fake utop
 
 echo "---- Run: 'opam lock'"
 opam lock opam/virtual/octez-deps.opam
+opam lock opam/virtual/release-tools-deps.opam
 
 # Starting with `ocaml/opam-repository` commit hash
 # 0b240d2960133fd3d8aa8f008d7aa79534caa3b9, ocaml-base-compiler now explicitly
@@ -145,3 +146,6 @@ EOF
 
 mv octez-deps.opam.locked opam/virtual
 echo "---- Updated: opam/virtual/octez-deps.opam.locked"
+
+mv release-tools-deps.opam.locked opam/virtual
+echo "---- Updated: opam/virtual/release-tools-deps.opam.locked"

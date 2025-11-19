@@ -13,7 +13,8 @@
   octez-libs.brassaia_eio_test_helpers
   octez-libs.stdlib-unix
   octez-libs.test-helpers
-  tezt)
+  tezt
+  vector)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
