@@ -238,40 +238,58 @@ let get_backfill_payload ctxt ~pkh =
         let*? proto_params =
           get_proto_parameters ctxt ~level:(`Level published_level)
         in
-        (* Check each slot for attestability. *)
-        let number_of_slots = proto_params.number_of_slots in
-        let slot_indices = Stdlib.List.init number_of_slots Fun.id in
-        let*? lag = get_attestation_lag ctxt ~level:published_level in
-        let*? last_known_parameters =
-          let attested_level = Int32.(add published_level lag) in
-          get_proto_parameters ctxt ~level:(`Level attested_level)
+        let slot_indices =
+          Stdlib.List.init proto_params.number_of_slots Fun.id
         in
-        let shards_store = Store.shards (get_store ctxt) in
-        let* shard_indices =
-          fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
-        in
-        let number_of_assigned_shards = List.length shard_indices in
-        let* new_slot_ids =
-          List.filter_map_ep
-            (fun slot_index ->
-              let slot_id =
-                Types.Slot_id.{slot_level = published_level; slot_index}
+        let store = get_store ctxt in
+        let candidate_slot_indices =
+          let statuses_cache = Store.statuses_cache store in
+          List.filter_map
+            (fun index ->
+              let status_opt =
+                Store.Statuses_cache.get_slot_status
+                  statuses_cache
+                  {slot_level = published_level; slot_index = index}
               in
-              let* is_attestable_slot_or_trap =
-                check_is_attestable_slot_or_trap
-                  ~pkh
-                  ~slot_id
-                  ~last_known_parameters
-                  ~shard_indices
-                  ~shards_store
-                  ~number_of_assigned_shards
-              in
-              match is_attestable_slot_or_trap with
-              | Some `Attestable_slot -> return_some slot_id
-              | Some `Trap | None -> return_none)
+              match status_opt with
+              | Some `Unpublished -> None
+              | _ -> Some index)
             slot_indices
         in
-        return E.{acc with slot_ids = List.append new_slot_ids acc.slot_ids})
+        if candidate_slot_indices = [] then return acc
+        else
+          (* Check each slot for attestability. *)
+          let*? lag = get_attestation_lag ctxt ~level:published_level in
+          let*? last_known_parameters =
+            let attested_level = Int32.(add published_level lag) in
+            get_proto_parameters ctxt ~level:(`Level attested_level)
+          in
+          let shards_store = Store.shards store in
+          let* shard_indices =
+            fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
+          in
+          let number_of_assigned_shards = List.length shard_indices in
+          let* new_slot_ids =
+            List.filter_map_ep
+              (fun slot_index ->
+                let slot_id =
+                  Types.Slot_id.{slot_level = published_level; slot_index}
+                in
+                let* is_attestable_slot_or_trap =
+                  check_is_attestable_slot_or_trap
+                    ~pkh
+                    ~slot_id
+                    ~last_known_parameters
+                    ~shard_indices
+                    ~shards_store
+                    ~number_of_assigned_shards
+                in
+                match is_attestable_slot_or_trap with
+                | Some `Attestable_slot -> return_some slot_id
+                | Some `Trap | None -> return_none)
+              candidate_slot_indices
+          in
+          return E.{acc with slot_ids = List.append new_slot_ids acc.slot_ids})
     {slot_ids = []; no_shards_attestation_levels = []}
     published_levels
 
