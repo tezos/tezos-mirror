@@ -297,9 +297,7 @@ let process_consensus_op state cctxt chain_id slot (type a)
                  in {!Protocol.Validate}. *)
               let*! block = get_block_offset level in
               let chain = `Hash chain_id in
-              let* block_hash =
-                Alpha_block_services.hash cctxt ~chain ~block ()
-              in
+              let* block_hash = Node_rpc.block_hash cctxt ~chain ~block in
               let forge op1 op2 =
                 Node_rpc.forge_double_consensus_operation_evidence
                   cctxt
@@ -389,7 +387,7 @@ let process_operations (cctxt : #Protocol_client_context.full) state
 let context_block_header cctxt ~chain b_hash =
   let open Lwt_result_syntax in
   let* ({shell; protocol_data; _} : Alpha_block_services.block_header) =
-    Alpha_block_services.header cctxt ~chain ~block:(`Hash (b_hash, 0)) ()
+    Node_rpc.block_header cctxt ~chain ~block:(`Hash (b_hash, 0))
   in
   return {Alpha_context.Block_header.shell; protocol_data}
 
@@ -445,7 +443,7 @@ let process_block (cctxt : #Protocol_client_context.full) state
           in
           (* If the blocks are on different chains then skip it *)
           let*! block = get_block_offset level in
-          let* block_hash = Alpha_block_services.hash cctxt ~chain ~block () in
+          let* block_hash = Node_rpc.block_hash cctxt ~chain ~block in
           let* bytes =
             Node_rpc.forge_double_baking_evidence
               cctxt
@@ -510,7 +508,7 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
       Raw_level.max level state.highest_level_encountered ;
     (* Processing blocks *)
     let* () =
-      let*! block_info = Alpha_block_services.info cctxt ~chain ~block () in
+      let*! block_info = Node_rpc.block_info cctxt ~chain ~block in
       match block_info with
       | Ok block_info -> (
           let* () = process_block cctxt state block_info in
@@ -553,15 +551,7 @@ let log_errors_and_continue ~name p =
   | Error errs -> B_Events.(emit daemon_error) (name, errs)
 
 let start_ops_monitor cctxt =
-  Alpha_block_services.Mempool.monitor_operations
-    cctxt
-    ~chain:cctxt#chain
-    ~validated:true
-    ~branch_delayed:true
-    ~branch_refused:false
-    ~refused:false
-    ~outdated:false
-    ()
+  Node_rpc.mempool_monitor_operations cctxt ~chain:cctxt#chain
 
 let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
     valid_blocks_stream =
