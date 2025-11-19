@@ -584,3 +584,6 @@ let mempool_monitor_operations cctxt ~chain =
     ~refused:false
     ~outdated:false
     ()
+
+let user_activated_upgrades cctxt =
+  Config_services.user_activated_upgrades cctxt
