@@ -660,6 +660,10 @@ fn migrate_to<Host: Runtime>(
             allow_path_not_found(host.store_delete(&EVM_TRANSACTIONS_OBJECTS))?;
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V42 => {
+            // Dummy migration for sub block latency entrypoints
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 

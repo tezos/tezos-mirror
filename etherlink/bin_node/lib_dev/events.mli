@@ -63,6 +63,10 @@ val ignored_kernel_arg : unit -> unit Lwt.t
     since it was started in Archive mode. *)
 val ignored_periodic_snapshot : unit -> unit Lwt.t
 
+(** [ignored_periodic_snapshot_arg ()] advertises that the EVM node will
+    be ignoring the all the incoming preconfirmation data. *)
+val ignored_preconfirmations : unit -> unit Lwt.t
+
 (** [catching_up_evm_event ~from ~to_] advertises that the sequencer
     is catching up on event produced by the evm kernel in the rollup
     node from L1 level [from] to [to_]. *)

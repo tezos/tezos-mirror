@@ -109,6 +109,16 @@ let ignored_periodic_snapshot =
     ~level:Warning
     ()
 
+let ignored_preconfirmations =
+  declare_0
+    ~section
+    ~name:"ignored_preconfirmations"
+    ~msg:
+      "Inclusion preconfirmations and preconfirmed receipts will be ignored \
+       since the kernel does not support it"
+    ~level:Warning
+    ()
+
 let catching_up_evm_event =
   Internal_event.Simple.declare_2
     ~section
@@ -558,6 +568,8 @@ let failed_sequencer_upgrade ~new_sequencer ~found_sequencer
 let ignored_kernel_arg () = emit ignored_kernel_arg ()
 
 let ignored_periodic_snapshot () = emit ignored_periodic_snapshot ()
+
+let ignored_preconfirmations () = emit ignored_preconfirmations ()
 
 let catching_up_evm_event ~from ~to_ = emit catching_up_evm_event (from, to_)
 

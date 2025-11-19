@@ -1176,6 +1176,14 @@ ignored_periodic_snapshot_arg:
     { /* ignored_periodic_snapshot_arg version 0 */
       "ignored_periodic_snapshot_arg.v0": any }
   
+ignored_preconfirmations:
+  description: Inclusion preconfirmations and preconfirmed receipts will be ignored since the kernel does not support it
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* ignored_preconfirmations version 0 */
+      "ignored_preconfirmations.v0": any }
+  
 import_finished:
   description: snapshot import is finished
   level: notice
