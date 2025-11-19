@@ -13,6 +13,29 @@
 
 module CI = Cacio.Shared
 
+(* Requires Python.
+   Can be changed to a python image, but using the build docker image
+   to keep in sync with the python version used for the tests. *)
+let job_script_b58_prefix =
+  CI.job
+    "oc.script:b58_prefix"
+    ~__POS__
+    ~stage:Test
+    ~description:""
+    ~image:Tezos_ci.Images.CI.test
+    ~only_if_changed:
+      [
+        "scripts/b58_prefix/b58_prefix.py";
+        "scripts/b58_prefix/test_b58_prefix.py";
+      ]
+    [
+      ". ./scripts/version.sh";
+      ". $HOME/.venv/bin/activate";
+      "poetry run pylint scripts/b58_prefix/b58_prefix.py \
+       --disable=missing-docstring --disable=invalid-name";
+      "poetry run pytest scripts/b58_prefix/test_b58_prefix.py";
+    ]
+
 let job_test_liquidity_baking_scripts =
   CI.job
     "oc.test-liquidity-baking-scripts"
@@ -57,11 +80,13 @@ let job_test_release_versions =
 let register () =
   CI.register_before_merging_jobs
     [
+      (Auto, job_script_b58_prefix);
       (Auto, job_test_liquidity_baking_scripts);
       (Auto, job_test_release_versions);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
+      (Auto, job_script_b58_prefix);
       (Auto, job_test_liquidity_baking_scripts);
       (Auto, job_test_release_versions);
     ] ;

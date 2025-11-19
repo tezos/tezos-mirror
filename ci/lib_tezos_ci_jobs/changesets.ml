@@ -230,15 +230,6 @@ let changeset_script_snapshot_alpha_and_link =
           "scripts/user_activated_upgrade.sh";
         ])
 
-let changeset_script_b58_prefix =
-  Changeset.(
-    changeset_base
-    @ make
-        [
-          "scripts/b58_prefix/b58_prefix.py";
-          "scripts/b58_prefix/test_b58_prefix.py";
-        ])
-
 let changeset_test_sdk_rust =
   Changeset.(
     changeset_base

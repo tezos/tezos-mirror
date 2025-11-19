@@ -1709,39 +1709,6 @@ oc.script:test_octez_release_versions:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.script:b58_prefix:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - scripts/b58_prefix/b58_prefix.py
-    - scripts/b58_prefix/test_b58_prefix.py
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - trigger
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - . $HOME/.venv/bin/activate
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring
-    --disable=invalid-name
-  - poetry run pytest scripts/b58_prefix/test_b58_prefix.py
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 test_sdk_rust:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
@@ -2954,6 +2921,37 @@ select_tezts:
     paths:
     - selected_tezts.tsl
     when: always
+
+oc.script:b58_prefix:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - scripts/b58_prefix/b58_prefix.py
+    - scripts/b58_prefix/test_b58_prefix.py
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - . $HOME/.venv/bin/activate
+  - poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring
+    --disable=invalid-name
+  - poetry run pytest scripts/b58_prefix/test_b58_prefix.py
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.test-liquidity-baking-scripts:
   image: ${ci_image_name}/build:${ci_image_tag}
