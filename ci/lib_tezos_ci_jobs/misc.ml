@@ -13,6 +13,38 @@
 
 module CI = Cacio.Shared
 
+let job_script_snapshot_alpha_and_link =
+  CI.job
+    "oc.script:snapshot_alpha_and_link"
+    ~__POS__
+    ~stage:Test
+    ~description:
+      "Test that Alpha can be snapshotted using snapshot_alpha_and_link.sh."
+    ~image:Tezos_ci.Images.CI.build
+    ~cpu:Very_high
+    ~only_if_changed:
+      [
+        "src/proto_alpha/**/*";
+        "scripts/snapshot_alpha_and_link.sh";
+        "scripts/snapshot_alpha.sh";
+        "scripts/user_activated_upgrade.sh";
+      ]
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    ~dune_cache:
+      (Cacio.dune_cache
+         ~key:
+           ("dune-build-cache-"
+           ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id))
+         ~policy:Pull
+         ())
+    [
+      "./scripts/ci/take_ownership.sh";
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      "./scripts/ci/script:snapshot_alpha_and_link.sh";
+    ]
+
 (* Requires Python.
    Can be changed to a python image, but using the build docker image
    to keep in sync with the python version used for the tests. *)
@@ -96,6 +128,7 @@ let job_test_release_versions =
 let register () =
   CI.register_before_merging_jobs
     [
+      (Auto, job_script_snapshot_alpha_and_link);
       (Auto, job_script_b58_prefix);
       (Auto, job_test_liquidity_baking_scripts);
       (Auto, job_oc_script_test_release_versions);
@@ -103,6 +136,7 @@ let register () =
     ] ;
   CI.register_schedule_extended_test_jobs
     [
+      (Auto, job_script_snapshot_alpha_and_link);
       (Auto, job_script_b58_prefix);
       (Auto, job_test_liquidity_baking_scripts);
       (Auto, job_oc_script_test_release_versions);

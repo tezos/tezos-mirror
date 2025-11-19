@@ -537,24 +537,6 @@ let jobs pipeline_type =
     @ bin_packages_jobs
   in
 
-  (* Dependencies for jobs that should run immediately after jobs
-     [job_build_x86_64] in [Before_merging] if they are present
-     (otherwise, they run immediately after [job_start]). In
-     [Scheduled_extended_test] we are not in a hurry and we let them
-     be [Staged []]. *)
-  let order_after_build =
-    match pipeline_type with
-    | Before_merging | Merge_train ->
-        Dependent
-          (Job job_start
-          :: [
-               Optional job_build_x86_64_release;
-               Optional job_build_x86_64_extra_dev;
-               Optional job_build_x86_64_extra_exp;
-             ])
-    | Schedule_extended_test -> Staged []
-  in
-
   (* Test jobs*)
   let test =
     let job_ocaml_check : tezos_job =
@@ -898,26 +880,6 @@ let jobs pipeline_type =
         ~before_script:(before_script ~eval_opam:true [])
         ["dune build scripts/gen-genesis/gen_genesis.exe"]
     in
-    let job_oc_script_snapshot_alpha_and_link : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.script:snapshot_alpha_and_link"
-        ~stage:Stages.test
-        ~image:Images.CI.build
-        ~cpu:Very_high
-        ~dependencies:order_after_build
-          (* Since the above dependencies are only for ordering, we do not set [dependent] *)
-        ~rules:(make_rules ~changes:changeset_script_snapshot_alpha_and_link ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        ["./scripts/ci/script:snapshot_alpha_and_link.sh"]
-      |> enable_cargo_cache |> enable_sccache
-      |> enable_dune_cache ~key:build_cache_key ~policy:Pull
-    in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
       let compile_octez_rules =
@@ -1115,7 +1077,6 @@ let jobs pipeline_type =
         job_oc_python_check;
         job_oc_integration_compiler_rejections;
         job_oc_script_test_gen_genesis;
-        job_oc_script_snapshot_alpha_and_link;
       ]
     in
 

@@ -217,19 +217,6 @@ let changeset_semgrep_files =
 (** Set of Jsonnet files for formatting ([jsonnetfmt --test]). *)
 let changeset_jsonnet_fmt_files = Changeset.(make ["**/*.jsonnet"])
 
-(* We only need to run the [oc.script:snapshot_alpha_and_link] job if
-   protocol Alpha or if the scripts changed. *)
-let changeset_script_snapshot_alpha_and_link =
-  Changeset.(
-    changeset_base
-    @ make
-        [
-          "src/proto_alpha/**/*";
-          "scripts/snapshot_alpha_and_link.sh";
-          "scripts/snapshot_alpha.sh";
-          "scripts/user_activated_upgrade.sh";
-        ])
-
 let changeset_test_sdk_rust =
   Changeset.(
     changeset_base
