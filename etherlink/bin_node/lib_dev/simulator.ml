@@ -315,7 +315,7 @@ module MakeTezlink (SimulationBackend : SimulationBackend) = struct
           log_kernel_debug_file = Some "simulate_call";
         }
 
-  let simulate_operation ~chain_id ~skip_signature
+  let simulate_operation ~chain_id ~skip_signature ~read
       (op : Imported_protocol.operation) _hash block =
     let open Lwt_result_syntax in
     let*? input =
@@ -323,6 +323,22 @@ module MakeTezlink (SimulationBackend : SimulationBackend) = struct
       |> Result.map_error_e @@ fun e ->
          Result_syntax.tzfail (Operation_serialization_error e)
     in
+    (* First, prevalidate the operation because there is no point
+       in simulating it if it's invalid (invalid operations don't
+       produce any receipt). *)
+    let* (prevalidation_res : (Tezos_types.Operation.t, string) result) =
+      Tezlink_prevalidation.parse_and_validate_for_queue
+        ~check_signature:(not skip_signature)
+        ~read
+        input
+    in
+    let* () =
+      match prevalidation_res with
+      | Ok _op -> return_unit
+      | Error message -> Error_monad.failwith "Prevalidation error: %s" message
+    in
+
+    (* Now, the actual simulation. *)
     let* bytes = call_simulation ~input ~skip_signature block in
     let*? operations =
       Tezos_services.Current_block_services.deserialize_operations

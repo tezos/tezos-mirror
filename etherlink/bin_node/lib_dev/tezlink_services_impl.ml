@@ -242,6 +242,7 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
 
   let simulate_operation ~chain_id ~skip_signature op hash block =
     let open Lwt_result_syntax in
+    let read = read ~block in
     let* block = shell_block_param_to_eth_block_param block in
-    simulate_operation ~chain_id ~skip_signature op hash block
+    simulate_operation ~read ~chain_id ~skip_signature op hash block
 end
