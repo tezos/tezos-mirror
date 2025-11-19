@@ -132,6 +132,35 @@ let job_release_page ~test ?dependencies () =
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~tag:Gcp_not_interruptible
 
+let job_update_release_page =
+  job
+    ~__POS__
+    ~image:Images.CI.release_page
+    ~stage:Stages.publish
+    ~description:
+      "A job to update the Octez release page. If running in a test pipleine, \
+       the assets are pushed in the [release-page-test.nomadic-labs.com] \
+       bucket. Otherwise they are pushed in [site.prod.octez.tezos.com]. Then \
+       its [index.html] is updated accordingly."
+    ~name:"update_release-page"
+    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Days 1))
+         ["./index.md"; "index.html"])
+    ~before_script:["eval $(opam env)"]
+    ~after_script:["cp /tmp/release_page*/index.md ./index.md"]
+    ~variables:
+      [
+        ("S3_BUCKET", "site-prod.octez.tezos.com");
+        ("BUCKET_PATH", "/releases");
+        ("URL", "octez.tezos.com");
+        ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
+      ]
+    ["./scripts/releases/update_publish_release_page.sh"]
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~tag:Gcp_not_interruptible
+
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
     If [test] is true (default is [false]), then the Docker images are
