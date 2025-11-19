@@ -38,6 +38,9 @@ use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 const SINGLE_TX_EXECUTION_INPUT: RefPath =
     RefPath::assert_from(b"/evm/world_state/single_tx/input_tx");
 
+const ASSEMBLE_BLOCK_INPUT: RefPath =
+    RefPath::assert_from(b"/evm/world_state/assemble_block/input");
+
 pub struct SingleTxExecutionInput {
     pub tx: Transaction,
     pub timestamp: Timestamp,
@@ -67,6 +70,48 @@ impl Decodable for SingleTxExecutionInput {
             timestamp,
             block_number,
         })
+    }
+}
+
+pub struct AssembleBlockInput {
+    pub timestamp: Timestamp,
+    pub block_number: U256,
+}
+
+impl Encodable for AssembleBlockInput {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        append_timestamp(stream, self.timestamp);
+        stream.append(&self.block_number);
+    }
+}
+
+impl Decodable for AssembleBlockInput {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        if decoder.item_count()? != 2 {
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
+        }
+        let mut it = decoder.iter();
+        let timestamp = decode_timestamp(&next(&mut it)?)?;
+        let block_number = decode_field_u256_le(&next(&mut it)?, "Block number")?;
+        Ok(AssembleBlockInput {
+            timestamp,
+            block_number,
+        })
+    }
+}
+
+pub fn read_assemble_block_input<Host: Runtime>(
+    host: &mut Host,
+) -> Result<Option<AssembleBlockInput>, Error> {
+    match host.store_read_all(&ASSEMBLE_BLOCK_INPUT) {
+        Ok(bytes) => {
+            let input = AssembleBlockInput::from_rlp_bytes(&bytes)?;
+            host.store_delete(&ASSEMBLE_BLOCK_INPUT)?;
+            Ok(Some(input))
+        }
+        Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(err) => Err(err.into()),
     }
 }
 
