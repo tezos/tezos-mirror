@@ -13,6 +13,31 @@
 
 module CI = Cacio.Shared
 
+let job_test_liquidity_baking_scripts =
+  CI.job
+    "oc.test-liquidity-baking-scripts"
+    ~__POS__
+    ~stage:Test
+    ~description:"Test the liquidity baking scripts."
+    ~image:Tezos_ci.Images.CI.build
+    ~needs_legacy:
+      [
+        (Artifacts, Code_verification.job_build_x86_64_release Before_merging);
+        (Artifacts, Code_verification.job_build_x86_64_extra_exp Before_merging);
+        (Artifacts, Code_verification.job_build_x86_64_extra_dev Before_merging);
+      ]
+    ~only_if_changed:
+      [
+        "src/**/*";
+        "scripts/ci/test_liquidity_baking_scripts.sh";
+        "scripts/check-liquidity-baking-scripts.sh";
+      ]
+    [
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      "./scripts/ci/test_liquidity_baking_scripts.sh";
+    ]
+
 let job_test_release_versions =
   CI.job
     "oc:scripts:release_script_values"
@@ -30,6 +55,14 @@ let job_test_release_versions =
     ["scripts/ci/test_release_values.sh"]
 
 let register () =
-  CI.register_before_merging_jobs [(Auto, job_test_release_versions)] ;
-  CI.register_schedule_extended_test_jobs [(Auto, job_test_release_versions)] ;
+  CI.register_before_merging_jobs
+    [
+      (Auto, job_test_liquidity_baking_scripts);
+      (Auto, job_test_release_versions);
+    ] ;
+  CI.register_schedule_extended_test_jobs
+    [
+      (Auto, job_test_liquidity_baking_scripts);
+      (Auto, job_test_release_versions);
+    ] ;
   ()

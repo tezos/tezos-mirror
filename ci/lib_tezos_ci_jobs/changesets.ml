@@ -239,16 +239,6 @@ let changeset_script_b58_prefix =
           "scripts/b58_prefix/test_b58_prefix.py";
         ])
 
-let changeset_test_liquidity_baking_scripts =
-  Changeset.(
-    changeset_base
-    @ make
-        [
-          "src/**/*";
-          "scripts/ci/test_liquidity_baking_scripts.sh";
-          "scripts/check-liquidity-baking-scripts.sh";
-        ])
-
 let changeset_test_sdk_rust =
   Changeset.(
     changeset_base

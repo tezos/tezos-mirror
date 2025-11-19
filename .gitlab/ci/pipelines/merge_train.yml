@@ -1742,43 +1742,6 @@ oc.script:b58_prefix:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.test-liquidity-baking-scripts:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - scripts/check-liquidity-baking-scripts.sh
-    - scripts/ci/test_liquidity_baking_scripts.sh
-    - src/**/*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/test_liquidity_baking_scripts.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 test_sdk_rust:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
@@ -2991,6 +2954,42 @@ select_tezts:
     paths:
     - selected_tezts.tsl
     when: always
+
+oc.test-liquidity-baking-scripts:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - scripts/check-liquidity-baking-scripts.sh
+    - scripts/ci/test_liquidity_baking_scripts.sh
+    - src/**/*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  - oc.build_x86_64-released
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - ./scripts/ci/test_liquidity_baking_scripts.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc:scripts:release_script_values:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
