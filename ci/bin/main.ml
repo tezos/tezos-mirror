@@ -545,7 +545,13 @@ let () =
          Release_tag.job_release_page ~test:false ();
        ]
       @ Cacio.get_global_publish_release_page_jobs ())
-    ~description:"Pipeline that updates and publishes the release page."
+    ~description:"Pipeline that updates and publishes the release page." ;
+  register
+    "update_release_page"
+    If.(api_update_release_page && on_tezos_namespace)
+    ~jobs:
+      [Tezos_ci.job_datadog_pipeline_trace; Release_tag.job_update_release_page]
+    ~description:"Custom update of the release page."
 
 (** {2 Entry point of the generator binary} *)
 
