@@ -282,8 +282,11 @@ impl TezlinkOriginatedAccount {
         &self,
         host: &impl Runtime,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
-        let path = context::code::code_path(self)?;
-        Ok(host.store_read_all(&path)?)
+        let code_path = context::code::code_path(self)?;
+        let code_size_path = context::code::code_size_path(self)?;
+        let Narith(code_size) = read_nom_value(host, &code_size_path)?;
+        let code = host.store_read(&code_path, 0, code_size.try_into()?)?;
+        Ok(code)
     }
 
     fn set_code_size(
@@ -311,8 +314,11 @@ impl TezlinkOriginatedAccount {
         &self,
         host: &impl Runtime,
     ) -> Result<Vec<u8>, tezos_storage::error::Error> {
-        let path = context::code::storage_path(self)?;
-        Ok(host.store_read_all(&path)?)
+        let storage_path = context::code::storage_path(self)?;
+        let storage_size_path = context::code::storage_size_path(self)?;
+        let Narith(storage_size) = read_nom_value(host, &storage_size_path)?;
+        let storage = host.store_read(&storage_path, 0, storage_size.try_into()?)?;
+        Ok(storage)
     }
 
     fn set_storage_size(
