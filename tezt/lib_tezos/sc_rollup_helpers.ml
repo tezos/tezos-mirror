@@ -979,7 +979,7 @@ let bake_until ?hook cond n client =
    its deposit while the honest one has not.
 
 *)
-let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
+let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind ?with_dal
     {
       loser_modes;
       inputs;
@@ -1005,6 +1005,12 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
   let published_commitments = ref [] in
   let detected_timeouts = Hashtbl.create 5 in
   let dissections = Hashtbl.create 17 in
+
+  let* dal_node =
+    match with_dal with
+    | None -> Lwt.return_none
+    | Some init_dal_node -> init_dal_node node client
+  in
 
   let run_honest_node sc_rollup_node =
     let gather_conflicts_promise =
@@ -1062,8 +1068,18 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
     in
     if priority = `Priority_honest then
       prioritize_refute_operations sc_rollup_node ;
+    let arguments =
+      Option.fold
+        ~none:[]
+        ~some:(fun dal -> [Sc_rollup_node.Dal_node dal])
+        dal_node
+    in
     let* () =
-      Sc_rollup_node.run ~event_level:`Debug sc_rollup_node sc_rollup_address []
+      Sc_rollup_node.run
+        ~event_level:`Debug
+        sc_rollup_node
+        sc_rollup_address
+        arguments
     in
     return
       [
@@ -1083,6 +1099,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
         Sc_rollup_node.create
           Operator
           node
+          ?dal_node
           ~base_dir:(Client.base_dir client)
           ~default_operator
           ~name:rollup_node_name

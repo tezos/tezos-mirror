@@ -3180,7 +3180,7 @@ let test_can_stake ~kind =
 
 let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp ?boot_sector
-    ?(extra_tags = []) ({allow_degraded; _} as scenario) =
+    ?(extra_tags = []) ?with_dal ({allow_degraded; _} as scenario) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
@@ -3210,7 +3210,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
       variant = Some variant;
       description = "refutation games winning strategies";
     }
-    (test_refutation_scenario_aux ~mode ~kind scenario)
+    (test_refutation_scenario_aux ?with_dal ~mode ~kind scenario)
 
 let test_refutation protocols ~kind =
   let challenge_window = 10 in
@@ -3427,7 +3427,9 @@ let test_refutation protocols ~kind =
 let test_invalid_dal_parameters protocols =
   test_refutation_scenario
     ~uses:(fun _protocol ->
-      [Constant.WASM.echo_dal_reveal; Constant.smart_rollup_installer])
+      [
+        Constant.WASM.echo_dal_reveal_parameters; Constant.smart_rollup_installer;
+      ])
     ~kind:"wasm_2_0_0"
     ~mode:Operator
     ~challenge_window:10
@@ -3438,7 +3440,7 @@ let test_invalid_dal_parameters protocols =
       (read_kernel
          ~base:""
          ~suffix:""
-         (Uses.path Constant.WASM.echo_dal_reveal))
+         (Uses.path Constant.WASM.echo_dal_reveal_parameters))
     (refutation_scenario_parameters
        ~loser_modes:["reveal_dal_parameters 6 6 6 6"]
        (inputs_for 10)
