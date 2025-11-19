@@ -909,7 +909,7 @@ let try_resolve_consensus_keys cctxt key =
   let levels_to_inspect = 50 in
   let pkh = Key_id.to_pkh key.Key.id in
   let* res =
-    Plugin.Alpha_services.Delegate.deactivated cctxt (`Main, `Head 0) pkh
+    Node_rpc.delegate_deactivated cctxt ~chain:`Main ~block:(`Head 0) pkh
   in
   match res with
   | Ok _deactivated ->

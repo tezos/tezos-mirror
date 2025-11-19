@@ -520,3 +520,6 @@ let get_dal_health dal_node_rpc_ctxt =
 
 let get_nonce cctxt ~chain ?(block = `Head 0) ~level () =
   Alpha_services.Nonce.get cctxt (chain, block) level
+
+let delegate_deactivated cctxt ~chain ?(block = `Head 0) pkh =
+  Plugin.Alpha_services.Delegate.deactivated cctxt (chain, block) pkh
