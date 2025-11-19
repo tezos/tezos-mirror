@@ -620,22 +620,6 @@ let jobs pipeline_type =
         ]
       |> enable_cargo_cache |> enable_sccache
     in
-    let job_oc_python_check : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.python_check"
-        ~image:Images.CI.test
-        ~stage:Stages.test
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_python_files ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~init_python_venv:true
-             [])
-        ["./scripts/ci/lint_misc_python_check.sh"]
-    in
     let jobs_unit : tezos_job list =
       let build_dependencies : Runner.Arch.t -> _ = function
         | Amd64 ->
@@ -1042,7 +1026,7 @@ let jobs pipeline_type =
       in
       [job_test_kernels; job_audit_riscv_deps; job_check_riscv_kernels]
     in
-    let jobs_misc = [job_oc_check_lift_limits_patch; job_oc_python_check] in
+    let jobs_misc = [job_oc_check_lift_limits_patch] in
 
     let jobs_packaging =
       match pipeline_type with

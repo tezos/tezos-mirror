@@ -13,6 +13,23 @@
 
 module CI = Cacio.Shared
 
+let job_python_check =
+  CI.job
+    "oc.python_check"
+    ~__POS__
+    ~stage:Test
+    ~description:
+      "Run Python checks (environment in sync. with the image, lint, \
+       typecheck)."
+    ~image:Tezos_ci.Images.CI.test
+    ~only_if_changed:["poetry.lock"; "pyproject.toml"; "**/*.py"]
+    [
+      "./scripts/ci/take_ownership.sh";
+      ". ./scripts/version.sh";
+      ". $HOME/.venv/bin/activate";
+      "./scripts/ci/lint_misc_python_check.sh";
+    ]
+
 let job_integration_compiler_rejections =
   CI.job
     "oc.integration:compiler-rejections"
@@ -154,6 +171,7 @@ let job_test_release_versions =
 let register () =
   CI.register_before_merging_jobs
     [
+      (Auto, job_python_check);
       (Auto, job_integration_compiler_rejections);
       (Auto, job_script_test_gen_genesis);
       (Auto, job_script_snapshot_alpha_and_link);
@@ -164,6 +182,7 @@ let register () =
     ] ;
   CI.register_schedule_extended_test_jobs
     [
+      (Auto, job_python_check);
       (Auto, job_integration_compiler_rejections);
       (Auto, job_script_test_gen_genesis);
       (Auto, job_script_snapshot_alpha_and_link);

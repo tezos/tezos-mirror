@@ -198,10 +198,6 @@ let changeset_lint_files =
           "etherlink/**/*";
         ])
 
-(** Set of Python files. *)
-let changeset_python_files =
-  Changeset.(changeset_base @ make ["poetry.lock"; "pyproject.toml"; "**/*.py"])
-
 (** Set of Rust files for formatting ([cargo fmt --check]). *)
 let changeset_rust_fmt_files = Changeset.(changeset_base @ make ["**/*.rs"])
 
