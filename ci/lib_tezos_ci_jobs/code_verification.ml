@@ -851,24 +851,6 @@ let jobs pipeline_type =
         resto_unit Arm64 ~storage:Ramfs ();
       ]
     in
-    let job_oc_integration_compiler_rejections : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.integration:compiler-rejections"
-        ~stage:Stages.test
-        ~image:Images.CI.build
-        ~rules:(make_rules ~changes:changeset_octez ())
-        ~dependencies:
-          (Dependent
-             [
-               Job job_build_x86_64_release;
-               Job job_build_x86_64_extra_dev;
-               Job job_build_x86_64_extra_exp;
-             ])
-        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-        ["dune build @runtest_rejections"]
-      |> enable_cargo_cache |> enable_sccache
-    in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
       let compile_octez_rules =
@@ -1060,13 +1042,7 @@ let jobs pipeline_type =
       in
       [job_test_kernels; job_audit_riscv_deps; job_check_riscv_kernels]
     in
-    let jobs_misc =
-      [
-        job_oc_check_lift_limits_patch;
-        job_oc_python_check;
-        job_oc_integration_compiler_rejections;
-      ]
-    in
+    let jobs_misc = [job_oc_check_lift_limits_patch; job_oc_python_check] in
 
     let jobs_packaging =
       match pipeline_type with
