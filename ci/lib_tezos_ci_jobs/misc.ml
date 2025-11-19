@@ -13,6 +13,16 @@
 
 module CI = Cacio.Shared
 
+let job_script_test_gen_genesis =
+  CI.job
+    "oc.script:test-gen-genesis"
+    ~__POS__
+    ~stage:Test
+    ~description:"Check that scripts/gen-genesis/gen_genesis.exe still builds."
+    ~image:Tezos_ci.Images.CI.build
+    ~only_if_changed:(Changesets.changeset_octez |> Tezos_ci.Changeset.encode)
+    ["eval $(opam env)"; "dune build scripts/gen-genesis/gen_genesis.exe"]
+
 let job_script_snapshot_alpha_and_link =
   CI.job
     "oc.script:snapshot_alpha_and_link"
@@ -128,6 +138,7 @@ let job_test_release_versions =
 let register () =
   CI.register_before_merging_jobs
     [
+      (Auto, job_script_test_gen_genesis);
       (Auto, job_script_snapshot_alpha_and_link);
       (Auto, job_script_b58_prefix);
       (Auto, job_test_liquidity_baking_scripts);
@@ -136,6 +147,7 @@ let register () =
     ] ;
   CI.register_schedule_extended_test_jobs
     [
+      (Auto, job_script_test_gen_genesis);
       (Auto, job_script_snapshot_alpha_and_link);
       (Auto, job_script_b58_prefix);
       (Auto, job_test_liquidity_baking_scripts);

@@ -869,17 +869,6 @@ let jobs pipeline_type =
         ["dune build @runtest_rejections"]
       |> enable_cargo_cache |> enable_sccache
     in
-    let job_oc_script_test_gen_genesis : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.script:test-gen-genesis"
-        ~stage:Stages.test
-        ~image:Images.CI.build
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_octez ())
-        ~before_script:(before_script ~eval_opam:true [])
-        ["dune build scripts/gen-genesis/gen_genesis.exe"]
-    in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
       let compile_octez_rules =
@@ -1076,7 +1065,6 @@ let jobs pipeline_type =
         job_oc_check_lift_limits_patch;
         job_oc_python_check;
         job_oc_integration_compiler_rejections;
-        job_oc_script_test_gen_genesis;
       ]
     in
 
