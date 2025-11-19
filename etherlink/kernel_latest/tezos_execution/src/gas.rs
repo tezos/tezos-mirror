@@ -50,13 +50,16 @@ impl Cost {
     pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Self {
         // Saturate msg.len() to u32::MAX then cast to u32
         let len = msg.len().min(u32::MAX as usize) as u32;
-        let value = match k {
+        // We charge gas for serialization of the operation +
+        // execution of the signature check
+        let serialization_cost = len << 5;
+        let check_sig_cost = match k {
             PublicKey::Ed25519(..) => 65_800 + ((len >> 3) + len),
             PublicKey::Secp256k1(..) => 51_600 + ((len >> 3) + len),
             PublicKey::P256(..) => 341_000 + ((len >> 3) + len),
             PublicKey::Bls(..) => 1_570_000 + (3 * len),
         };
-        Cost(value)
+        Cost(serialization_cost + check_sig_cost)
     }
 }
 
