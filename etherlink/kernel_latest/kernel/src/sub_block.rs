@@ -9,26 +9,32 @@ use crate::{
     bridge::{execute_deposit, DepositResult},
     chains::{ChainConfigTrait, EvmChainConfig, ETHERLINK_SAFE_STORAGE_ROOT_PATH},
     configuration::fetch_pure_evm_config,
-    error::{Error, StorageError},
+    error::{Error, StorageError, TransferError},
     gas_price::base_fee_per_gas,
+    l2block::L2Block,
     retrieve_chain_id, retrieve_da_fee,
     storage::read_sequencer_pool_address,
     transaction::{Transaction, TransactionContent},
 };
+use alloy_consensus::{proofs::ordered_trie_root_with_encoder, EMPTY_ROOT_HASH};
+use ethbloom::Bloom;
 use ethereum::Log;
 use primitive_types::{H160, H256, U256};
 use revm::context::result::{ExecutionResult, Output};
-use revm_etherlink::{precompiles::constants::SYSTEM_SOL_ADDR, ExecutionOutcome};
+use revm_etherlink::{
+    precompiles::constants::SYSTEM_SOL_ADDR,
+    storage::world_state_handler::EVM_ACCOUNTS_PATH, ExecutionOutcome,
+};
 use rlp::{Decodable, Encodable};
 use tezos_ethereum::{
-    block::{BlockConstants, BlockFees},
+    block::{BlockConstants, BlockFees, EthBlock},
     rlp_helpers::{
         append_timestamp, decode_field, decode_field_u256_le, decode_timestamp, next,
         FromRlpBytes,
     },
     transaction::{
         IndexedLog, TransactionObject, TransactionReceipt, TransactionStatus,
-        TransactionType,
+        TransactionType, TRANSACTION_HASH_SIZE,
     },
 };
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
@@ -37,6 +43,9 @@ use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 
 const SINGLE_TX_EXECUTION_INPUT: RefPath =
     RefPath::assert_from(b"/evm/world_state/single_tx/input_tx");
+
+const ASSEMBLE_BLOCK_INPUT: RefPath =
+    RefPath::assert_from(b"/evm/world_state/assemble_block/input");
 
 pub struct SingleTxExecutionInput {
     pub tx: Transaction,
@@ -67,6 +76,48 @@ impl Decodable for SingleTxExecutionInput {
             timestamp,
             block_number,
         })
+    }
+}
+
+pub struct AssembleBlockInput {
+    pub timestamp: Timestamp,
+    pub block_number: U256,
+}
+
+impl Encodable for AssembleBlockInput {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        append_timestamp(stream, self.timestamp);
+        stream.append(&self.block_number);
+    }
+}
+
+impl Decodable for AssembleBlockInput {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        if decoder.item_count()? != 2 {
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
+        }
+        let mut it = decoder.iter();
+        let timestamp = decode_timestamp(&next(&mut it)?)?;
+        let block_number = decode_field_u256_le(&next(&mut it)?, "Block number")?;
+        Ok(AssembleBlockInput {
+            timestamp,
+            block_number,
+        })
+    }
+}
+
+pub fn read_assemble_block_input<Host: Runtime>(
+    host: &mut Host,
+) -> Result<Option<AssembleBlockInput>, Error> {
+    match host.store_read_all(&ASSEMBLE_BLOCK_INPUT) {
+        Ok(bytes) => {
+            let input = AssembleBlockInput::from_rlp_bytes(&bytes)?;
+            host.store_delete(&ASSEMBLE_BLOCK_INPUT)?;
+            Ok(Some(input))
+        }
+        Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(err) => Err(err.into()),
     }
 }
 
@@ -343,14 +394,12 @@ pub fn handle_run_transaction<Host: Runtime>(
     // See !19515.
     let mut safe_host = get_evm_safe_host(host, &config);
     safe_host.start()?;
-    let mut block_constants = block_constants(
+    let block_constants = block_constants(
         &mut safe_host,
         &config,
         input_data.timestamp,
         input_data.block_number,
     )?;
-    block_constants.timestamp = input_data.timestamp.as_u64().into();
-    block_constants.number = input_data.block_number;
 
     let RunOutcome {
         result,
@@ -433,6 +482,18 @@ pub fn handle_run_transaction<Host: Runtime>(
 
     let result_data = get_result_data(result);
 
+    let fee_updates = input_data
+        .tx
+        .content
+        .fee_updates(&block_constants.block_fees, result_data.gas_used.into());
+    fee_updates
+        .apply(host, caller, Some(block_constants.coinbase))
+        .map_err(|_| {
+            Error::Transfer(TransferError::Custom(
+                "Applying fees to the sequencer pool address failed",
+            ))
+        })?;
+
     // Don't pass `safe_host` because we don't want this to be cached
     // but we still want it to be accessible by the node.
     handle_receipt(
@@ -453,15 +514,127 @@ pub fn handle_run_transaction<Host: Runtime>(
     )
 }
 
+fn state_root_hash<Host: Runtime>(host: &mut Host) -> Result<Vec<u8>, Error> {
+    match host.store_get_hash(&EVM_ACCOUNTS_PATH) {
+        Ok(hash) => Ok(hash),
+        _ => Ok(vec![0u8; 32]),
+    }
+}
+
+fn read_current_block_hash<Host: Runtime>(host: &Host) -> Result<H256, Error> {
+    match block_storage::read_current_hash(host, &ETHERLINK_SAFE_STORAGE_ROOT_PATH) {
+        Ok(block_hash) => Ok(block_hash),
+        Err(Error::Storage(StorageError::Runtime(RuntimeError::PathNotFound))) => {
+            Ok(H256::zero())
+        }
+        Err(err) => Err(err),
+    }
+}
+
+fn receipts_root(receipts: &[TransactionReceipt]) -> Vec<u8> {
+    if receipts.is_empty() {
+        EMPTY_ROOT_HASH.to_vec()
+    } else {
+        ordered_trie_root_with_encoder(receipts, |obj, buf| obj.encode_2718(buf)).to_vec()
+    }
+}
+
+fn objects_root(objects: &[TransactionObject]) -> Vec<u8> {
+    if objects.is_empty() {
+        EMPTY_ROOT_HASH.to_vec()
+    } else {
+        ordered_trie_root_with_encoder(objects, |obj, buf| obj.encode_2718(buf)).to_vec()
+    }
+}
+
+fn get_block_receipt_info(receipts: &[TransactionReceipt]) -> BlockReceiptInfo {
+    let mut valid_txs = vec![];
+    let mut logs_bloom = Bloom::default();
+    let mut cumulative_gas = U256::zero();
+
+    for receipt in receipts {
+        valid_txs.push(receipt.hash);
+        logs_bloom.accrue_bloom(&receipt.logs_bloom);
+        cumulative_gas += receipt.gas_used;
+    }
+
+    BlockReceiptInfo {
+        valid_txs,
+        logs_bloom,
+        cumulative_gas,
+    }
+}
+
+#[derive(Default)]
+struct BlockReceiptInfo {
+    valid_txs: Vec<[u8; TRANSACTION_HASH_SIZE]>,
+    logs_bloom: Bloom,
+    cumulative_gas: U256,
+}
+
+pub fn assemble_block<Host: Runtime>(
+    host: &mut Host,
+    input_data: AssembleBlockInput,
+) -> Result<(), Error> {
+    let config = get_evm_config(host)?;
+    let state_root = state_root_hash(host)?;
+    let receipts = get_current_transaction_receipts(host)?;
+    let objects = get_current_transactions_objects(host)?;
+    let receipts_root = receipts_root(&receipts);
+    let transactions_root = objects_root(&objects);
+    let parent_hash = read_current_block_hash(host)?;
+    let block_constants =
+        block_constants(host, &config, input_data.timestamp, input_data.block_number)?;
+    let base_fee_per_gas = base_fee_per_gas(
+        host,
+        input_data.timestamp,
+        block_constants.block_fees.minimum_base_fee_per_gas(),
+    );
+
+    let BlockReceiptInfo {
+        valid_txs,
+        logs_bloom,
+        cumulative_gas,
+    } = get_block_receipt_info(&receipts);
+
+    let sub_block = EthBlock::new(
+        input_data.block_number,
+        valid_txs,
+        input_data.timestamp,
+        parent_hash,
+        logs_bloom,
+        transactions_root,
+        state_root,
+        receipts_root,
+        cumulative_gas,
+        &block_constants,
+        base_fee_per_gas,
+    );
+
+    block_storage::store_current(
+        host,
+        &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+        &L2Block::Etherlink(Box::new(sub_block)),
+    )?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
 
     use crate::{
+        block_storage,
+        chains::{ChainFamily, ETHERLINK_SAFE_STORAGE_ROOT_PATH},
+        l2block::L2Block,
         storage::store_chain_id,
         sub_block::{
-            get_current_transaction_receipts, get_current_transactions_objects,
-            SingleTxExecutionInput, SINGLE_TX_EXECUTION_INPUT,
+            assemble_block, get_current_transaction_receipts,
+            get_current_transactions_objects, handle_run_transaction,
+            read_assemble_block_input, read_single_tx_execution_input,
+            AssembleBlockInput, SingleTxExecutionInput, ASSEMBLE_BLOCK_INPUT,
+            SINGLE_TX_EXECUTION_INPUT,
         },
     };
     use alloy_primitives::{keccak256, Address};
@@ -474,7 +647,7 @@ mod tests {
         transaction::TransactionType, tx_common::EthereumTransactionCommon,
     };
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
-    use tezos_smart_rollup::types::Timestamp;
+    use tezos_smart_rollup::{host::RuntimeError, types::Timestamp};
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime; // Used to put traits interface in the scope
     const DUMMY_CHAIN_ID: U256 = U256::one();
 
@@ -488,13 +661,26 @@ mod tests {
     fn store_tx_execution_input(
         host: &mut MockKernelHost,
         tx: &SingleTxExecutionInput,
-    ) -> Result<(), tezos_smart_rollup::host::RuntimeError> {
+    ) -> Result<(), RuntimeError> {
         let encoded_tx = rlp::encode(tx);
-        host.store_write_all(&SINGLE_TX_EXECUTION_INPUT, encoded_tx.as_ref())
+        host.store_write_all(&SINGLE_TX_EXECUTION_INPUT, &encoded_tx)
     }
 
+    fn store_assemble_block_input(
+        host: &mut MockKernelHost,
+        assemble_block_input: &AssembleBlockInput,
+    ) -> Result<(), RuntimeError> {
+        let encoded_input = rlp::encode(assemble_block_input);
+        host.store_write_all(&ASSEMBLE_BLOCK_INPUT, &encoded_input)
+    }
+
+    // This test will:
+    // * execute a single isolated transaction
+    // * check for the receipt and object under the current block
+    // * assemble the block
+    // * check that the receipt/object are consistent
     #[test]
-    fn basic_single_tx_execution() {
+    fn base_sub_block_flow() {
         let mut mock_host = MockKernelHost::default();
         let sender =
             Address::from_str("0xaf1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
@@ -537,16 +723,27 @@ mod tests {
             timestamp,
             block_number,
         };
+        let assemble_block_input = AssembleBlockInput {
+            timestamp,
+            block_number,
+        };
         store_tx_execution_input(&mut mock_host, &single_tx_input).unwrap();
+        store_assemble_block_input(&mut mock_host, &assemble_block_input).unwrap();
 
-        let read_input = crate::sub_block::read_single_tx_execution_input(&mut mock_host)
+        let read_single_tx_input = read_single_tx_execution_input(&mut mock_host)
             .unwrap()
             .unwrap();
-        assert_eq!(read_input.tx.tx_hash, single_tx_input.tx.tx_hash);
-        assert_eq!(read_input.timestamp, single_tx_input.timestamp);
-        assert_eq!(read_input.block_number, single_tx_input.block_number);
-        crate::sub_block::handle_run_transaction(&mut mock_host, read_input).unwrap();
+        assert_eq!(read_single_tx_input.tx.tx_hash, single_tx_input.tx.tx_hash);
+        assert_eq!(read_single_tx_input.timestamp, single_tx_input.timestamp);
+        assert_eq!(
+            read_single_tx_input.block_number,
+            single_tx_input.block_number
+        );
 
+        // Execute single isolated transaction
+        handle_run_transaction(&mut mock_host, read_single_tx_input).unwrap();
+
+        // Check for receipts and objects
         let receipts = get_current_transaction_receipts(&mock_host).unwrap();
         assert_eq!(receipts.len(), 1);
         let receipt = receipts.first().unwrap();
@@ -560,5 +757,31 @@ mod tests {
         assert_eq!(object.block_number, block_number);
         assert_eq!(object.hash, tx_hash);
         assert!(object.gas_used > U256::zero());
+
+        // Assemble block
+        let read_assemble_block_input =
+            read_assemble_block_input(&mut mock_host).unwrap().unwrap();
+        assemble_block(&mut mock_host, read_assemble_block_input).unwrap();
+
+        // Check that current block is consistent with receipts and objects
+        let current_block = block_storage::read_current(
+            &mut mock_host,
+            &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+            &ChainFamily::Evm,
+        )
+        .unwrap();
+
+        match current_block {
+            L2Block::Etherlink(eth_block) => {
+                let nb_txs = eth_block.transactions.len();
+                assert_eq!(nb_txs, receipts.len());
+                assert_eq!(nb_txs, objects.len());
+                let first_tx = eth_block.transactions.first().unwrap();
+                assert_eq!(first_tx, &receipt.hash);
+                assert_eq!(first_tx, &object.hash);
+                assert!(eth_block.gas_used > U256::zero());
+            }
+            L2Block::Tezlink(_) => panic!("Etherlink block was expected"),
+        }
     }
 }
