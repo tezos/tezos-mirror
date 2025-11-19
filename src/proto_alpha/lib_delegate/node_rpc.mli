@@ -249,3 +249,10 @@ val inject_operation_bytes :
   chain:Shell_services.chain ->
   bytes ->
   Operation_hash.t tzresult Lwt.t
+
+val block_resulting_context_hash :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?block:Shell_services.block ->
+  unit ->
+  Context_hash.t tzresult Lwt.t
