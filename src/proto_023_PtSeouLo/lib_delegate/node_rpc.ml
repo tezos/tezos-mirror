@@ -534,3 +534,6 @@ let get_nonce cctxt ~chain ?(block = `Head 0) ~level () =
 
 let delegate_deactivated cctxt ~chain ?(block = `Head 0) pkh =
   Plugin.Alpha_services.Delegate.deactivated cctxt (chain, block) pkh
+
+let constants cctxt ~chain ~block =
+  Plugin.Alpha_services.Constants.all cctxt (chain, block)

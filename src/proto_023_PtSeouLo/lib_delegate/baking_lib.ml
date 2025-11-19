@@ -56,7 +56,7 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
   let monitor_node_operations = monitor_node_mempool in
   let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
   let* constants =
-    Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+    Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)
   in
   let*? round_durations =
     Round.Durations.create
