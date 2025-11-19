@@ -198,3 +198,9 @@ val constants :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Constants.t tzresult Lwt.t
+
+val seed_computation :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Seed.seed_computation_status tzresult Lwt.t

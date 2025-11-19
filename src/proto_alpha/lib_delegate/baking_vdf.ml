@@ -87,7 +87,7 @@ let log_errors_and_continue ~name p =
 let get_seed_computation cctxt chain_id hash =
   let chain = `Hash chain_id in
   let block = `Hash (hash, 0) in
-  Alpha_services.Seed_computation.get cctxt (chain, block)
+  Node_rpc.seed_computation cctxt ~chain ~block
 
 let get_level_info cctxt level =
   let open Lwt_result_syntax in
