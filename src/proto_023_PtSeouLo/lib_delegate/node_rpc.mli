@@ -256,3 +256,10 @@ val block_resulting_context_hash :
   ?block:Shell_services.block ->
   unit ->
   Context_hash.t tzresult Lwt.t
+
+val live_blocks :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?block:Shell_services.block ->
+  unit ->
+  Block_hash.Set.t tzresult Lwt.t

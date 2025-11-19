@@ -606,7 +606,7 @@ let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
         t
     | Some t -> t
   in
-  let* chain_id = Chain_services.chain_id cctxt () in
+  let* chain_id = Node_rpc.chain_id ~chain:`Main cctxt in
   (* main loop *)
   (* Only allocate once the termination promise *)
   let terminated =
