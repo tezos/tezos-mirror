@@ -103,12 +103,16 @@ pub struct TztTest<'a> {
     /// mapping between integers representing big_map indices and descriptions of big maps
     /// as defined by the `big_maps` field.
     pub big_maps: Option<InMemoryLazyStorage<'a>>,
+    /// mapping from address to storage value
+    pub storages: Option<HashMap<AddressHash, (Type, TypedValue<'a>)>>,
     /// Initial value for "now" in the context.
     pub now: Option<BigInt>,
     /// Address that directly or indirectly initiated the current transaction
     pub source: Option<PublicKeyHash>,
     /// Address that directly initiated the current transaction
     pub sender: Option<AddressHash>,
+    /// Views in test
+    pub views: Option<HashMap<AddressHash, HashMap<String, View<'a>>>>,
 }
 
 fn populate_ctx_with_known_contracts(
@@ -194,6 +198,18 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_now: Option<BigInt> = None;
         let mut m_source: Option<Micheline> = None;
         let mut m_sender: Option<Micheline> = None;
+        let mut m_storages: Option<Vec<(Micheline, Micheline, Micheline)>> = None;
+        let mut m_views: Option<
+            Vec<(
+                micheline::Micheline<'_>,
+                Vec<(
+                    micheline::Micheline<'_>,
+                    micheline::Micheline<'_>,
+                    micheline::Micheline<'_>,
+                    micheline::Micheline<'_>,
+                )>,
+            )>,
+        > = None;
 
         // This would hold the untypechecked, expected output value. This is because If the self
         // and parameters values are specified, then we need to fetch them and populate the context
@@ -224,6 +240,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 Source(v) => set_tzt_field("source", &mut m_source, v)?,
                 SenderAddr(v) => set_tzt_field("sender", &mut m_sender, v)?,
                 BigMaps(v) => set_tzt_field("big_maps", &mut m_big_maps, v)?,
+                Storages(v) => set_tzt_field("storages", &mut m_storages, v)?,
+                Views(v) => set_tzt_field("views", &mut m_views, v)?,
             }
         }
 
@@ -359,6 +377,96 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             None => None,
         };
 
+        let storages = match m_storages {
+            Some(tzt_storages) => {
+                let tzt_storages: HashMap<AddressHash, (Type, TypedValue)> = tzt_storages
+                    .into_iter()
+                    .map(|(address_raw, storage_type_raw, storage_raw)| {
+                        let typed_address =
+                            typecheck_value(&address_raw, &mut Ctx::default(), &Type::Address)?;
+                        let storage_type = parse_ty(Ctx::default().gas(), &storage_type_raw)?;
+                        let storage =
+                            typecheck_value(&storage_raw, &mut Ctx::default(), &storage_type)?;
+
+                        let address = match typed_address {
+                            TypedValue::Address(Address {
+                                hash,
+                                entrypoint: _,
+                            }) => hash,
+                            _ => return Err("Invalid address for storage".into()),
+                        };
+
+                        Ok((address, (storage_type, storage)))
+                    })
+                    .collect::<Result<HashMap<_, _>, Self::Error>>()?;
+
+                Some(tzt_storages)
+            }
+            None => None,
+        };
+
+        let views = match m_views {
+            Some(tzt_views) => {
+                let tzt_views: HashMap<AddressHash, HashMap<String, View>> = tzt_views
+                    .into_iter()
+                    .map(|(address_raw, views)| {
+                        let typed_address =
+                            typecheck_value(&address_raw, &mut Ctx::default(), &Type::Address)?;
+                        let views: HashMap<String, View> = views
+                            .into_iter()
+                            .map(|(name_raw, arg_type_raw, return_type_raw, code)| {
+                                let name = match name_raw {
+                                    Micheline::String(name) => name,
+                                    _ => return Err("View does not have a valid name.".into()),
+                                };
+
+                                let input_type = parse_ty(Ctx::default().gas(), &arg_type_raw)?;
+                                let output_type = parse_ty(Ctx::default().gas(), &return_type_raw)?;
+                                Ok((
+                                    name,
+                                    View {
+                                        input_type,
+                                        output_type,
+                                        code,
+                                    },
+                                ))
+                            })
+                            .collect::<Result<HashMap<_, _>, Self::Error>>()?;
+
+                        let address = match typed_address {
+                            TypedValue::Address(Address {
+                                hash,
+                                entrypoint: _,
+                            }) => hash,
+                            _ => return Err("Invalid address for view".into()),
+                        };
+
+                        Ok((address, views))
+                    })
+                    .collect::<Result<HashMap<_, _>, Self::Error>>()?;
+
+                Some(tzt_views)
+            }
+            None => None,
+        };
+
+        match views.clone() {
+            Some(v) => {
+                if let Some(s) = storages.clone() {
+                    for view_key in v.keys() {
+                        if s.get(view_key).is_none() {
+                            return Err(format!(
+                                "The {view_key:?} appears in `views` but not in `storages`."
+                            ))?;
+                        }
+                    }
+                } else {
+                    return Err(format!("The `storages` tzt primitive is missing but mandatory when using the `views` tzt primitive."))?;
+                }
+            }
+            None => (),
+        }
+
         Ok(TztTest {
             code: m_code.ok_or("code section not found in test")?,
             input: m_input.ok_or("input section not found in test")?,
@@ -377,6 +485,8 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             self_addr,
             other_contracts,
             big_maps,
+            storages,
+            views,
             now: m_now,
             source,
             sender,
@@ -477,6 +587,13 @@ pub(crate) enum TztEntity<'a> {
     Source(Micheline<'a>),
     SenderAddr(Micheline<'a>),
     BigMaps(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
+    Storages(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
+    Views(
+        Vec<(
+            Micheline<'a>,
+            Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>,
+        )>,
+    ),
 }
 
 /// Possible values for the "output" expectation field in a Tzt test. This is a
