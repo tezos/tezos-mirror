@@ -42,6 +42,7 @@ use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
+use tezos_tracing::trace_kernel;
 
 use crate::bridge::{execute_deposit, Deposit, DepositResult};
 use crate::chains::EvmLimits;
@@ -246,6 +247,7 @@ fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &[u8
     }
 }
 
+#[trace_kernel]
 #[allow(clippy::too_many_arguments)]
 #[instrument(skip_all)]
 pub fn revm_run_transaction<Host: Runtime>(
@@ -542,6 +544,7 @@ impl From<&FaDeposit> for SolFaDepositWithoutProxy {
     }
 }
 
+#[trace_kernel]
 pub fn pure_fa_deposit<Host: Runtime>(
     host: &mut Host,
     fa_deposit: &FaDeposit,

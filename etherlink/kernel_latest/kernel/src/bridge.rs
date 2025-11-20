@@ -24,6 +24,7 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::Info};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
+use tezos_tracing::trace_kernel;
 
 use crate::tick_model::constants::TICKS_FOR_DEPOSIT;
 
@@ -293,6 +294,7 @@ pub struct DepositResult {
     pub estimated_ticks_used: u64,
 }
 
+#[trace_kernel]
 pub fn execute_deposit<Host: Runtime>(
     host: &mut Host,
     deposit: &Deposit,
