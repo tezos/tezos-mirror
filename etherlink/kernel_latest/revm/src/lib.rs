@@ -1398,9 +1398,9 @@ mod test {
         };
         use tezos_crypto_rs::hash::ContractKt1Hash;
         use tezos_evm_runtime::runtime::MockKernelHost;
-        use tezos_smart_rollup_encoding::{
-            contract::Contract,
-            michelson::{ticket::FA2_1Ticket, MichelsonOption, MichelsonPair},
+        use tezos_protocol::contract::Contract;
+        use tezos_smart_rollup_encoding::michelson::{
+            ticket::FA2_1Ticket, MichelsonOption, MichelsonPair,
         };
         use StaticCaller::makeStaticCallCall;
 

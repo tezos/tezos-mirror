@@ -20,6 +20,7 @@ num-traits = "0.2.8"
 
 tezos_data_encoding.workspace = true
 tezos_crypto_rs.workspace = true
+tezos-protocol.workspace = true
 
 # Adding these to 'dev_dependencies' causes the rand feature in crypto to be enabled
 # on wasm builds, when building the entire workspace.

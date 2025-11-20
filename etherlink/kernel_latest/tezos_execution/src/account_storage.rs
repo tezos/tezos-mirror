@@ -9,9 +9,10 @@ use crate::context;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::{
     host::ValueType,
-    types::{Contract, PublicKey, PublicKeyHash},
+    types::{PublicKey, PublicKeyHash},
 };
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};

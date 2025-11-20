@@ -1426,6 +1426,7 @@ version = "0.2.2"
 dependencies = [
  "hex",
  "serde_json",
+ "tezos-protocol",
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",

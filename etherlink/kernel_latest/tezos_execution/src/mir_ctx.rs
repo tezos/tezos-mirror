@@ -26,8 +26,9 @@ use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
 use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::host::RuntimeError;
-use tezos_smart_rollup::types::{Contract, Timestamp};
+use tezos_smart_rollup::types::Timestamp;
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 use tezos_tezlink::enc_wrappers::{BlockNumber, ScriptExprHash};
 use tezos_tezlink::lazy_storage_diff::{

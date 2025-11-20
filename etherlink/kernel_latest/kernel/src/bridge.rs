@@ -341,9 +341,9 @@ mod tests {
     use tezos_crypto_rs::hash::ContractKt1Hash;
     use tezos_ethereum::rlp_helpers::{append_option_explicit, append_u256_le};
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_smart_rollup::{
-        michelson::{ticket::FA2_1Ticket, MichelsonNat, MichelsonOption, MichelsonPair},
-        types::Contract,
+    use tezos_protocol::contract::Contract;
+    use tezos_smart_rollup::michelson::{
+        ticket::FA2_1Ticket, MichelsonNat, MichelsonOption, MichelsonPair,
     };
     use tezos_smart_rollup_encoding::michelson::MichelsonBytes;
 

@@ -315,8 +315,8 @@ const MAX_ENVELOPE_CONTENT_SIZE: usize =
 
 #[cfg(test)]
 mod test {
+    use tezos_protocol::contract::Contract;
     use tezos_smart_rollup_encoding::{
-        contract::Contract,
         michelson::ticket::StringTicket,
         michelson::{MichelsonPair, MichelsonString},
     };

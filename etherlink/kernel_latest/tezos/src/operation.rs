@@ -16,7 +16,8 @@ use tezos_data_encoding::{
     enc::{BinError, BinWriter},
     nom::NomReader,
 };
-use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+use tezos_protocol::contract::Contract;
+use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use thiserror::Error;
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
@@ -348,7 +349,8 @@ mod tests {
         hash::{HashType, UnknownSignature},
         public_key::PublicKey,
     };
-    use tezos_smart_rollup::types::{Contract, PublicKeyHash};
+    use tezos_protocol::contract::Contract;
+    use tezos_smart_rollup::types::PublicKeyHash;
 
     #[test]
     fn operation_rlp_roundtrip() {

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 //! Arbitrary string ticket generation.
-use crate::contract::Contract;
+use tezos_protocol::contract::Contract;
 
 use super::StringTicket;
 use num_traits::Zero;

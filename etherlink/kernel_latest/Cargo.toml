@@ -99,6 +99,7 @@ tezos-smart-rollup-encoding = { path = "../../src/kernel_sdk/encoding", default-
 tezos-smart-rollup-installer-config = { path = "../../src/kernel_sdk/installer-config" }
 tezos-smart-rollup-mock = { path = "../../src/kernel_sdk/mock" }
 tezos-smart-rollup-storage = { path = "../../src/kernel_sdk/storage" }
+tezos-protocol = { path = "../../sdk/rust/protocol" }
 
 # property based testing
 rand = { version = "0.8" }

@@ -20,6 +20,7 @@ tezos-smart-rollup-host.workspace = true
 num-bigint.workspace = true
 tezos_data_encoding.workspace = true
 nom.workspace = true
+tezos-protocol.workspace = true
 
 rlp.workspace = true
 mir.workspace = true

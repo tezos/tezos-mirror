@@ -47,8 +47,8 @@ mod test {
     use crypto::hash::ContractKt1Hash;
     use crypto::hash::HashTrait;
 
+    use tezos_protocol::contract::Contract;
     use tezos_smart_rollup_encoding::{
-        contract::Contract,
         inbox::InboxMessage,
         inbox::InternalInboxMessage,
         inbox::Transfer,
