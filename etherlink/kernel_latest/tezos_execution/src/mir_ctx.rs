@@ -43,6 +43,7 @@ pub struct TcCtx<'operation, Host: Runtime> {
     pub context: &'operation Context,
     pub gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: &'operation mut BTreeMap<Zarith, StorageDiff>,
+    pub next_temporary_id: BigMapId,
 }
 
 pub struct OperationCtx<'operation> {
@@ -329,6 +330,21 @@ impl<Host: Runtime> TcCtx<'_, Host> {
             }),
         );
     }
+
+    fn generate_id(&mut self, temporary: bool) -> Result<BigMapId, LazyStorageError> {
+        if temporary {
+            let new_id = self.next_temporary_id.clone();
+            self.next_temporary_id = new_id.succ();
+            Ok(new_id)
+        } else {
+            let next_id_path = next_id_path(self.context)?;
+            let id: BigMapId =
+                read_nom_value(self.host, &next_id_path).unwrap_or(0.into());
+            store_bin(&id.succ(), self.host, &next_id_path)
+                .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+            Ok(id)
+        }
+    }
 }
 
 /// Function to retrieve the hash of a TypedValue.
@@ -540,11 +556,10 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
         &mut self,
         key_type: &Type,
         value_type: &Type,
-        _temporary: bool,
+        temporary: bool,
     ) -> Result<BigMapId, LazyStorageError> {
         let arena = Arena::new();
-        let next_id_path = next_id_path(self.context)?;
-        let id: BigMapId = read_nom_value(self.host, &next_id_path).unwrap_or(0.into());
+        let id = self.generate_id(temporary)?;
         let key_type_path = key_type_path(self.context, &id)?;
         let value_type_path = value_type_path(self.context, &id)?;
         let key_type_encoded = key_type.into_micheline_optimized_legacy(&arena).encode();
@@ -554,8 +569,6 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
             .store_write_all(&value_type_path, &value_type_encoded)?;
         self.host
             .store_write_all(&key_type_path, &key_type_encoded)?;
-        store_bin(&id.succ(), self.host, &next_id_path)
-            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
 
         // Write in the diff that there was an allocation
         self.big_map_diff_alloc(id.value.clone(), key_type_encoded, value_type_encoded);
@@ -565,11 +578,9 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
     fn big_map_copy(
         &mut self,
         id: &BigMapId,
-        _temporary: bool,
+        temporary: bool,
     ) -> Result<BigMapId, LazyStorageError> {
-        let next_id_path = next_id_path(self.context)?;
-        let dest_id: BigMapId = read_nom_value(self.host, &next_id_path)
-            .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
+        let dest_id = self.generate_id(temporary)?;
 
         // Retrieve the path of the key_type
         let src_key_type_path = key_type_path(self.context, id)?;
@@ -590,9 +601,6 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
 
         // Copy the content of the big_map
         BigMapKeys::copy_keys_in_storage(self.host, self.context, id, &dest_id)?;
-
-        store_bin(&dest_id.succ(), self.host, &next_id_path)
-            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
 
         // Write in the diff that there was a copy
         self.big_map_diff_copy(dest_id.value.clone(), id.value.clone());
@@ -621,7 +629,9 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
 mod tests {
     use super::*;
     use crate::gas::TezlinkOperationGas;
-    use mir::ast::big_map::{dump_big_map_updates, BigMap, BigMapContent, BigMapFromId};
+    use mir::ast::big_map::{
+        dump_big_map_updates, BigMap, BigMapContent, BigMapFromId, BigMapId,
+    };
     use std::collections::BTreeMap;
     use tezos_evm_runtime::runtime::MockKernelHost;
 
@@ -633,6 +643,7 @@ mod tests {
                 context: $context,
                 gas: &mut gas,
                 big_map_diff: &mut BTreeMap::new(),
+                next_temporary_id: BigMapId { value: (-1).into() },
             };
         };
     }

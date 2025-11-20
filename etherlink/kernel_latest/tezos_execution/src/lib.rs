@@ -8,7 +8,7 @@ use context::Context;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens, TypedValue};
 use mir::context::TypecheckingCtx;
 use mir::{
-    ast::{IntoMicheline, Micheline},
+    ast::{big_map::BigMapId, IntoMicheline, Micheline},
     context::CtxTrait,
     gas::Gas,
     parser::Parser,
@@ -898,6 +898,7 @@ fn apply_operation<Host: Runtime>(
         context,
         gas: &mut gas,
         big_map_diff: &mut BTreeMap::new(),
+        next_temporary_id: BigMapId { value: (-1).into() },
     };
     let parser = Parser::new();
     match &validated_operation.content.operation {
