@@ -704,6 +704,7 @@ pub fn dump_big_map_updates<'a>(
     storage: &mut (impl LazyStorage<'a> + ?Sized),
     started_with_map_ids: &[BigMapId],
     finished_with_maps: &mut [&mut BigMap<'a>],
+    temporary: bool,
 ) -> Result<(), LazyStorageError> {
     // Note: this function is similar to `extract_lazy_storage_diff` from the
     // Tezos protocol implementation. The difference is that we don't have
@@ -717,7 +718,6 @@ pub fn dump_big_map_updates<'a>(
     // * If a contract produces an operation with a big map, we immediately
     // deduplicate big map ID there too (the Tezos protocol implementation does
     // not).
-    // * There is no need to implement temporary lazy storage for now.
 
     // The `finished_with_maps` vector above is supposed to contain all big maps
     // remaining on stack at the end of contract execution. After this function
@@ -737,6 +737,9 @@ pub fn dump_big_map_updates<'a>(
     // that in the vast majority of the real-life cases big maps are not
     // de-facto copied, so the vector will usually stay empty and produce no
     // allocations.
+    //
+    // The temporary boolean means that the result computed by the function should be
+    // considered as a temporary big_map
     type NonEmpty<T> = (T, Vec<T>);
     let mut grouped_maps: BTreeMap<BigMapId, NonEmpty<&mut BigMapFromId>> = BTreeMap::new();
     for map in finished_with_maps {
@@ -756,7 +759,7 @@ pub fn dump_big_map_updates<'a>(
             BigMapContent::InMemory(ref mut m) => {
                 // The entire big map is still in memory. We have to
                 // create a new map in the storage.
-                let id = storage.big_map_new(&map.key_type, &map.value_type, false)?;
+                let id = storage.big_map_new(&map.key_type, &map.value_type, temporary)?;
                 storage.big_map_bulk_update(
                     &id,
                     mem::take(m)
@@ -784,7 +787,7 @@ pub fn dump_big_map_updates<'a>(
         // If there are any big maps with duplicate ID, we first copy them in
         // the storage.
         for map in other_maps {
-            let new_id = storage.big_map_copy(&id, false)?;
+            let new_id = storage.big_map_copy(&id, temporary)?;
             storage.big_map_bulk_update(&new_id, mem::take(&mut map.overlay))?;
             map.id = new_id
         }
@@ -823,7 +826,7 @@ mod test_big_map_to_storage_update {
             key_type: Type::Int,
             value_type: Type::Int,
         };
-        dump_big_map_updates(storage, &[], &mut [&mut map]).unwrap();
+        dump_big_map_updates(storage, &[], &mut [&mut map], false).unwrap();
 
         check_is_dumped_map(map, 0.into());
         assert_eq!(
@@ -866,7 +869,7 @@ mod test_big_map_to_storage_update {
             key_type: Type::Int,
             value_type: Type::Int,
         };
-        dump_big_map_updates(storage, &[], &mut [&mut map]).unwrap();
+        dump_big_map_updates(storage, &[], &mut [&mut map], false).unwrap();
 
         check_is_dumped_map(map, 0.into());
         assert_eq!(
@@ -917,7 +920,13 @@ mod test_big_map_to_storage_update {
             key_type: Type::Int,
             value_type: Type::Int,
         };
-        dump_big_map_updates(storage, &[], &mut [&mut map1_1, &mut map1_2, &mut map2]).unwrap();
+        dump_big_map_updates(
+            storage,
+            &[],
+            &mut [&mut map1_1, &mut map1_2, &mut map2],
+            false,
+        )
+        .unwrap();
 
         check_is_dumped_map(map1_1, 0.into());
         check_is_dumped_map(map1_2, 2.into()); // newly created map
@@ -974,7 +983,7 @@ mod test_big_map_to_storage_update {
             key_type: Type::Int,
             value_type: Type::Int,
         };
-        dump_big_map_updates(storage, &[map_id1, map_id2], &mut [&mut map1]).unwrap();
+        dump_big_map_updates(storage, &[map_id1, map_id2], &mut [&mut map1], false).unwrap();
 
         assert_eq!(
             storage.big_maps,

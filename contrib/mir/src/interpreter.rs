@@ -121,23 +121,36 @@ impl<'a> ContractScript<'a> {
 
         // TODO: https://gitlab.com/tezos/tezos/-/issues/8061
         // Handle errors instead of panicking.
-        let mut result = stack.pop().expect("empty execution stack");
-        let mut finished_with_maps = vec![];
-        result.view_big_maps_mut(&mut finished_with_maps);
-        dump_big_map_updates(
-            *ctx.lazy_storage(),
-            &started_with_map_ids,
-            &mut finished_with_maps,
-        )?;
+        let result = stack.pop().expect("empty execution stack");
         match result {
-            V::Pair(p) => match *p {
-                (V::List(vec), storage) => Ok((
-                    vec.into_iter()
-                        .map(|x| (*irrefutable_match!(x; V::Operation))),
-                    storage,
-                )),
-                (v, _) => panic!("expected `list operation`, got {v:?}"),
-            },
+            V::Pair(p) => {
+                let (mut operation_list, mut storage) = *p;
+                // Handle storage big_maps (those big_maps are definitive and will be stored in the durable_storage)
+                let mut storage_big_maps = vec![];
+                storage.view_big_maps_mut(&mut storage_big_maps);
+                let lazy_storage = *ctx.lazy_storage();
+                dump_big_map_updates(
+                    lazy_storage,
+                    &started_with_map_ids,
+                    &mut storage_big_maps,
+                    false,
+                )?;
+                // Handle big_maps that appears in the operation list, those big_maps are temporary and it depends to
+                // the internal operation to determine what to do with it
+                let mut operations_big_maps = vec![];
+                operation_list.view_big_maps_mut(&mut operations_big_maps);
+                dump_big_map_updates(lazy_storage, &[], &mut operations_big_maps, true)?;
+
+                match operation_list {
+                    V::List(vec) => Ok((
+                        vec.into_iter()
+                            .map(|x| (*irrefutable_match!(x; V::Operation))),
+                        storage,
+                    )),
+                    v => panic!("expected `list operation`, got {v:?}"),
+                }
+            }
+
             v => panic!("expected `pair 'a 'b`, got {v:?}"),
         }
     }

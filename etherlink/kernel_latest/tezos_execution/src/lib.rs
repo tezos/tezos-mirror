@@ -531,7 +531,7 @@ fn handle_storage_with_big_maps<'a, Host: Runtime>(
     storage.view_big_maps_mut(&mut big_maps);
 
     // Dump big_map allocation, starting with empty big_maps
-    mir::ast::big_map::dump_big_map_updates(ctx, &[], &mut big_maps)
+    mir::ast::big_map::dump_big_map_updates(ctx, &[], &mut big_maps, false)
         .map_err(|err| OriginationError::MirBigMapAllocation(err.to_string()))?;
     let storage = storage
         .into_micheline_optimized_legacy(&parser.arena)

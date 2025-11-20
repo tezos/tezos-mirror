@@ -734,7 +734,7 @@ mod tests {
             key_type: Type::Int,
             value_type: Type::String,
         };
-        dump_big_map_updates(&mut storage, &[], &mut [&mut map]).unwrap();
+        dump_big_map_updates(&mut storage, &[], &mut [&mut map], false).unwrap();
 
         check_is_dumped_map(map, 0.into());
 
@@ -839,7 +839,7 @@ mod tests {
             key_type: Type::Int,
             value_type: Type::String,
         };
-        dump_big_map_updates(&mut storage, &[], &mut [&mut map]).unwrap();
+        dump_big_map_updates(&mut storage, &[], &mut [&mut map], false).unwrap();
 
         check_is_dumped_map(map, 0.into());
 
@@ -918,6 +918,7 @@ mod tests {
             &mut storage,
             &[map_id1.clone(), map_id2.clone()],
             &mut [&mut map1],
+            false,
         )
         .unwrap();
 
