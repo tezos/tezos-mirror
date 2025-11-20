@@ -3455,12 +3455,106 @@ let test_invalid_dal_parameters protocols =
 
 (* kernel_imported_publish_level is the imported published level hardcoded in
    the [Constant.WASM.echo_dal_reveal_pages] kernel. *)
-let with_dal_ready_for_echo_dal_reveal_pages ~operator_profiles:_
-    ~kernel_imported_publish_level:_ ~may_publish_and_attest_slot:_
-    ~expected_attestation_lag:_ =
- fun _protocol _tezos_node _tezos_client ->
-  (* Will be implemented in the next commit *)
-  assert false
+let with_dal_ready_for_echo_dal_reveal_pages ~operator_profiles
+    ~kernel_imported_publish_level ~may_publish_and_attest_slot
+    ~expected_attestation_lag =
+ fun protocol tezos_node tezos_client ->
+  (* We create and start a DAL node with the given producer profile. *)
+  let dal_node = Dal_node.create ~node:tezos_node () in
+  let* () = Dal_node.init_config ~operator_profiles dal_node in
+  let* () = Dal_node.run dal_node ~wait_ready:true in
+  let* () =
+    match may_publish_and_attest_slot with
+    | None ->
+        (* No slot to publish and atest *)
+        unit
+    | Some (published_level, slot_index) ->
+        (* We want to publish a slot at the given level and index, and then attest it. *)
+        let* curr_level = Node.get_level tezos_node in
+        if curr_level > published_level then
+          Test.fail
+            "publish level (%d) smaller than current level (%d)@."
+            published_level
+            curr_level ;
+        (* Advance the L1 chain until [published_level - 1]. *)
+        let* () =
+          Client.bake_for ~count:(published_level - curr_level - 1) tezos_client
+        in
+        let* _lvl = Node.wait_for_level tezos_node (published_level - 1) in
+        let* dal_parameters = Dal_common.Parameters.from_client tezos_client in
+        let attestation_lag = dal_parameters.attestation_lag in
+        let slot_size = dal_parameters.cryptobox.slot_size in
+        if expected_attestation_lag <> attestation_lag then
+          Test.fail
+            "Expected attestation_lag %d, got %d@."
+            expected_attestation_lag
+            attestation_lag ;
+        Dal.publish_store_and_attest_slot
+          ~protocol
+          tezos_client
+          tezos_node
+          dal_node
+          Constant.bootstrap1
+          ~index:slot_index
+          ~content:
+            (Dal_common.Helpers.make_slot
+               ~slot_size
+               (String.make slot_size 'T'))
+          ~attestation_lag
+          ~number_of_slots:dal_parameters.number_of_slots
+  in
+  (* Whether we published and attested a slot or not, we advance the L1 chain
+     until [kernel_imported_publish_level + expected_attestation_lag] is
+     finalized to ensure that the DAL node can answer the rollup's requests
+     about the slot 1 published at level [kernel_imported_publish_level]. *)
+  let target_final_l1_level =
+    kernel_imported_publish_level + expected_attestation_lag
+  in
+  let* curr_level = Node.get_level tezos_node in
+  let block_finality = 2 in
+  let num_blocks_to_bake =
+    target_final_l1_level + block_finality - curr_level
+  in
+  let* () =
+    if num_blocks_to_bake <= 0 then unit
+    else
+      let wait_for_target_final_l1_level =
+        Dal_node.wait_for dal_node "dal_new_L1_final_block.v0" (fun e ->
+            if JSON.(e |-> "level" |> as_int) = target_final_l1_level then
+              Some ()
+            else None)
+      in
+      let* () =
+        (* [Client.bake_for ~count] doesn't work here / is flaky. *)
+        repeat num_blocks_to_bake (fun () -> Client.bake_for tezos_client)
+      in
+      wait_for_target_final_l1_level
+  in
+  (* Ensure that in case we wanted an attested slot, it's indeed attested
+     (otherwise, we'd not test the desired configuration). *)
+  let* () =
+    match may_publish_and_attest_slot with
+    | None -> unit
+    | Some (published_level, slot_index) ->
+        let open Dal_common.RPC in
+        let open Dal_common.RPC.Local in
+        let* slot_status =
+          call dal_node
+          @@ get_level_slot_status ~slot_level:published_level ~slot_index
+        in
+        Check.(slot_status = Attested expected_attestation_lag)
+          ~__LOC__
+          Dal_common.Check.slot_id_status_typ
+          ~error_msg:
+            "The value of the fetched status should match the expected one \
+             (current = %L, expected = %R)" ;
+        Log.info
+          "Slot published at level %d and index %d is attested as expected@."
+          published_level
+          slot_index ;
+        unit
+  in
+  Lwt.return_some dal_node
 
 type case = {
   inbox_level : int;
