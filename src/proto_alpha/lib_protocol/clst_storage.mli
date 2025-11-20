@@ -9,6 +9,10 @@ open Alpha_context
 open Script_native_types
 open Script_typed_ir
 
+(** [token_id] is the token identifier of CLST, being 0 by default for FA2
+    single asset contracts. *)
+val token_id : CLST_types.nat
+
 (** [get_storage ctxt] returns the storage retrieved and parsed from the
     context. It doesn't fail if the storage didn't exist in the context, i.e.
     the CLST contract has not been originated. *)
