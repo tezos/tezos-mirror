@@ -766,3 +766,6 @@ end
 
 (** Add common variables used by jobs compiling kernels *)
 val enable_kernels : tezos_job -> tezos_job
+
+(** Get the number of times the [job] function was called. *)
+val get_number_of_declared_jobs : unit -> int

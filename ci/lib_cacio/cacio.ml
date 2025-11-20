@@ -746,6 +746,10 @@ let get_release_tag_rexes () = !release_tag_rexes
 (* [job_select_tezts] will be initialized further down. *)
 let job_select_tezts = ref None
 
+let number_of_declared_jobs = ref 0
+
+let get_number_of_declared_jobs () = !number_of_declared_jobs
+
 (* We could avoid using a functor if we required the user of this module
    to pass the component's [name] and [paths] to the functions that need them,
    but in practice this would be less convenient since all functions need at least
@@ -782,6 +786,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?(cargo_cache = false) ?(cargo_target_caches = false) ?sccache ?dune_cache
       ?(test_coverage = false) ?allow_failure ?retry ?timeout
       ?(image_dependencies = []) ?services name script =
+    incr number_of_declared_jobs ;
     let name = make_name name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
