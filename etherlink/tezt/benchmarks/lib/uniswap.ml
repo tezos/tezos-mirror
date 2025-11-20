@@ -312,12 +312,14 @@ let swap_xtz ~nb_hops env iteration sender_index =
       env.rpc_node
       env.router_addr
       sender
-      ~gas_limit:(Z.of_int (260_000 * nb_hops)) (* Rough approximation *)
+      ~gas_limit:(Z.of_int (2_600_000 * nb_hops)) (* Rough approximation *)
       ~value:(Z.of_int (10000 + (iteration * 100)))
       ~name:"swapExactETHForTokens" (* "swapETHForExactTokens" *)
       params_ty
       params
-      ~check_success:true
+      ~check_success:false
+    (* Don't check success as this is an additional RPC and will slow the
+       benchmark down. It can be set to true for debugging. *)
   in
   unit
 
@@ -386,7 +388,7 @@ let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
       ~relay_endpoint:endpoint
       ~rpc_endpoint:endpoint
   in
-  let tx_queue = Tx_queue.beacon ~tick_interval:0.5 in
+  let tx_queue = Tx_queue.beacon ~tick_interval:0.25 in
   Log.report "Deploying WXTZ" ;
   let* wxtz_addr = deploy_contract ~rpc_node infos ~sequencer sender `ERC20 in
   Log.info "  WXTZ: %s" wxtz_addr ;

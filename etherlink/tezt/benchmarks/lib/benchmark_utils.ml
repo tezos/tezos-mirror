@@ -11,7 +11,13 @@ open Floodgate_lib
 
 type parameters = {
   mutable profiling : bool;
-  mutable time_between_blocks : float;
+  mutable time_between_blocks :
+    [ `Manual of float
+      (** [`Manual t] the sandbox node will not produce any block by itself but
+          the tezt benchmark will call [produce_block] every [t] seconds *)
+    | `Auto of float
+      (** [`Auto t] the sandbox node will produce a block every [t] seconds *)
+    ];
   mutable iterations : int;
   mutable accounts : int option;
   mutable contracts : int option;
@@ -26,7 +32,7 @@ let parameters =
   (* default values *)
   {
     profiling = false;
-    time_between_blocks = 0.5;
+    time_between_blocks = `Manual 0.5;
     iterations = 5;
     accounts = None;
     contracts = None;
@@ -40,7 +46,7 @@ let parameters =
 module type PARAMETERS = sig
   val profiling : bool
 
-  val time_between_blocks : float
+  val time_between_blocks : [`Manual of float | `Auto of float]
 
   val iterations : int
 
@@ -74,13 +80,31 @@ module Parameters () : PARAMETERS = struct
         "Report profiling information (needs perf on linux and xctrace on \
          macos)"
 
+  let tbb =
+    Clap.typ
+      ~name:"time_between_blocks"
+      ~dummy:parameters.time_between_blocks
+      ~parse:(fun s ->
+        match String.split_on_char ':' s with
+        | ["auto"; v] -> Some (`Auto (float_of_string v))
+        | ["manual"; v] -> Some (`Manual (float_of_string v))
+        | _ -> None)
+      ~show:(function
+        | `Auto v -> "auto:" ^ string_of_float v
+        | `Manual v -> "manual:" ^ string_of_float v)
+
   let time_between_blocks =
-    Clap.default_float
+    Clap.default
+      tbb
       ~section
       ~long:"time_between_blocks"
       ~short:'T'
-      ~placeholder:"seconds"
-      ~description:"Number of seconds between blocks"
+      ~placeholder:"[auto|manual]:seconds"
+      ~description:
+        "Number of seconds between blocks. With auto:t the sequencer will \
+         produce a block every t seconds, while with manual:t the sequencer \
+         will not produce any block by itself but the tezt benchmark will call \
+         produce_block every t seconds."
       parameters.time_between_blocks
 
   let iterations =
@@ -196,14 +220,16 @@ let nb_confirmed = ref 0
 
 let wait_for_application ?(time_between_blocks = parameters.time_between_blocks)
     ?(max_blocks =
-      max 1 (int_of_float ((parameters.timeout /. time_between_blocks) +. 1.)))
-    sequencer f =
+      let (`Auto tbb | `Manual tbb) = time_between_blocks in
+      max 1 (int_of_float ((parameters.timeout /. tbb) +. 1.))) sequencer f =
+  let (`Auto tbb | `Manual tbb) = time_between_blocks in
+  let produce_block =
+    match time_between_blocks with
+    | `Auto _ -> fun () -> Lwt.return_ok 0
+    | `Manual _ -> fun () -> produce_block sequencer
+  in
   let* res =
-    wait_for_application
-      f
-      ~time_between_blocks
-      ~max_blocks
-      ~produce_block:(fun _ -> produce_block sequencer)
+    wait_for_application f ~time_between_blocks:tbb ~max_blocks ~produce_block
   in
   if !nb_dropped <> 0 then
     Log.info ~color:Log.Color.FG.red "%d operations DROPPED" !nb_dropped ;

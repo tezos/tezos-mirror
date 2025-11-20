@@ -277,6 +277,8 @@ module Tezt_cloud_cli : sig
 
   val artifacts_dir : string option
 
+  val binaries_path : string
+
   val teztale_artifacts : bool
 
   val faketime : string option
