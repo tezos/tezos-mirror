@@ -791,8 +791,14 @@ pub fn dump_big_map_updates<'a>(
             storage.big_map_bulk_update(&new_id, mem::take(&mut map.overlay))?;
             map.id = new_id
         }
+        if temporary || id.is_temporary() {
+            // The only remaining big map should also be copied if the result is expected to be temporary
+            // The big_map should also be copied if it's a temporary one
+            let new_id = storage.big_map_copy(&id, temporary)?;
+            main_map.id = new_id;
+        }
         // The only remaining big map we update in the lazy storage in-place.
-        storage.big_map_bulk_update(&id, mem::take(&mut main_map.overlay))?
+        storage.big_map_bulk_update(&main_map.id, mem::take(&mut main_map.overlay))?
     }
 
     Ok(())
