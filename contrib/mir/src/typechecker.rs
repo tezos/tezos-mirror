@@ -2512,7 +2512,7 @@ pub(crate) fn typecheck_value<'a>(
             } else {
                 BTreeMap::default()
             };
-            let content = big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+            let content = big_map::BigMapContent::FromId(big_map::BigMapFromId {
                 id: big_map_id,
                 overlay,
             });
@@ -6227,7 +6227,7 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                content: big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+                content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                     id: id0.clone(),
                     overlay: BTreeMap::new()
                 }),
@@ -6319,7 +6319,7 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                content: big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+                content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                     id: id0.clone(),
                     overlay: BTreeMap::from([(TypedValue::int(7), Some(TypedValue::int(8)))])
                 }),
@@ -6336,7 +6336,7 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                content: big_map::BigMapContent::FromLazyStorage(big_map::BigMapFromLazyStorage {
+                content: big_map::BigMapContent::FromId(big_map::BigMapFromId {
                     id: id0,
                     overlay: BTreeMap::from([(TypedValue::int(7), None)])
                 }),

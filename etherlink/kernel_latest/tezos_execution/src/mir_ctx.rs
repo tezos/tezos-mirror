@@ -616,9 +616,7 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
 mod tests {
     use super::*;
     use crate::gas::TezlinkOperationGas;
-    use mir::ast::big_map::{
-        dump_big_map_updates, BigMap, BigMapContent, BigMapFromLazyStorage,
-    };
+    use mir::ast::big_map::{dump_big_map_updates, BigMap, BigMapContent, BigMapFromId};
     use std::collections::BTreeMap;
     use tezos_evm_runtime::runtime::MockKernelHost;
 
@@ -638,7 +636,7 @@ mod tests {
     fn check_is_dumped_map(map: BigMap, id: BigMapId) {
         match map.content {
             BigMapContent::InMemory(_) => panic!("Big map has not been dumped"),
-            BigMapContent::FromLazyStorage(map) => {
+            BigMapContent::FromId(map) => {
                 assert_eq!((map.id, map.overlay), (id, BTreeMap::new()))
             }
         };
@@ -888,7 +886,7 @@ mod tests {
         storage
             .big_map_update(&map_id2, TypedValue::int(0), Some(TypedValue::int(0)))
             .unwrap();
-        let content_diff = BigMapContent::FromLazyStorage(BigMapFromLazyStorage {
+        let content_diff = BigMapContent::FromId(BigMapFromId {
             id: map_id1.clone(),
             overlay: BTreeMap::from([(TypedValue::int(1), Some(TypedValue::int(1)))]),
         });
