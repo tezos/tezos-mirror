@@ -80,6 +80,11 @@ let balance_job job ~target ~verbose =
        it is useless to run more than [stats.count / effective_tezt_job_count] jobs. *)
     ceil (min ideal (float stats.count /. float effective_tezt_job_count))
   in
+  let expected_minutes_per_job =
+    Stats.Duration.minutes stats.total_duration
+    /. recommended_job_count
+    /. float effective_tezt_job_count
+  in
   if verbose then (
     echo "%s:" job.name ;
     echo "- test count: %d" stats.count ;
@@ -93,10 +98,14 @@ let balance_job job ~target ~verbose =
     echo
       "- recommended job count: %g (about %.2f minutes per job with -j %d)"
       recommended_job_count
-      (Stats.Duration.minutes stats.total_duration
-      /. recommended_job_count
-      /. float effective_tezt_job_count)
+      expected_minutes_per_job
       job.tezt_job_count)
-  else echo "%s: %g" job.name recommended_job_count
+  else
+    echo
+      "%s: %g (~%.2f min/job with -j %d)"
+      job.name
+      recommended_job_count
+      expected_minutes_per_job
+      job.tezt_job_count
 
 let run ~target ~verbose = List.iter (balance_job ~target ~verbose) jobs
