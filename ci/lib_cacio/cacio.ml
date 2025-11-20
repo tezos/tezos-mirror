@@ -785,6 +785,15 @@ let output_tezt_job_list path =
 module Make (Component : COMPONENT) : COMPONENT_API = struct
   let default_only_if_changed = Tezos_ci.Changeset.make Component.paths
 
+  let is_a_valid_name =
+    String.for_all (function
+      | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' | '-' -> true
+      | _ -> false)
+
+  let () =
+    if not (is_a_valid_name Component.name) then
+      failwith @@ sf "Cacio: invalid component name: %S" Component.name
+
   (* Users of Cacio just specify a [string] for the [name];
      we don't want them to provide a [string option].
      But in this module, we want the type-checker to force us to check
@@ -927,6 +936,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?tezt_exe ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
       ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
       ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = []) variant =
+    if not (is_a_valid_name variant) then
+      failwith @@ sf "Cacio.tezt_job: invalid variant name: %S" variant ;
     let select_tezts =
       match pipeline with `merge_request -> true | `scheduled -> false
     in
