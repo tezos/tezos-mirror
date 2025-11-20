@@ -176,7 +176,8 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     ?timestamp ?rollup_node_name ?whitelist_enable ?whitelist ?operator
     ?operators ?(uses = fun _protocol -> []) ?rpc_external ?allow_degraded
-    ?kernel_debug_log ?preimages_dir {variant; tags; description} scenario =
+    ?kernel_debug_log ?preimages_dir ?dal_attested_slots_validity_lag
+    {variant; tags; description} scenario =
   let uses protocol =
     (Constant.octez_smart_rollup_node :: Option.to_list preimages_dir)
     @ uses protocol
@@ -201,6 +202,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       ?timestamp
       ?whitelist_enable
       ~riscv_pvm_enable
+      ?dal_attested_slots_validity_lag
       protocol
   in
   let operator =
@@ -3178,14 +3180,16 @@ let test_can_stake ~kind =
   let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:20. in
   unit
 
-let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
-    ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp ?boot_sector
-    ?(extra_tags = []) ?with_dal ({allow_degraded; _} as scenario) =
+let test_refutation_scenario ?regression ?commitment_period ?challenge_window
+    ~variant ~mode ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp
+    ?boot_sector ?(extra_tags = []) ?with_dal ?dal_attested_slots_validity_lag
+    ({allow_degraded; _} as scenario) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
        flakyness. *)
-    List.compare_length_with scenario.loser_modes 1 <= 0
+    if Option.is_some regression then regression
+    else Some (List.compare_length_with scenario.loser_modes 1 <= 0)
   in
   let tags =
     ["refutation"] @ if mode = Sc_rollup_node.Accuser then ["accuser"] else []
@@ -3193,7 +3197,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   let tags = if ci_disabled then Tag.ci_disabled :: tags else tags in
   let variant = variant ^ if mode = Accuser then "+accuser" else "" in
   test_full_scenario
-    ~regression
+    ?regression
     ?hooks:None (* We only want to capture dissections manually *)
     ?commitment_period
     ~kind
@@ -3205,6 +3209,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ?challenge_window
     ~rollup_node_name:"honest"
     ~allow_degraded
+    ?dal_attested_slots_validity_lag
     {
       tags = tags @ extra_tags;
       variant = Some variant;

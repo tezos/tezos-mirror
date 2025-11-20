@@ -154,6 +154,7 @@ val setup_l1 :
   ?minimal_block_delay:int ->
   ?dal_incentives:bool ->
   ?dal_rewards_weight:int ->
+  ?dal_attested_slots_validity_lag:int ->
   Protocol.t ->
   (Node.t * Client.t) Lwt.t
 
