@@ -37,9 +37,11 @@ use tezos_ethereum::{
         TransactionType, TRANSACTION_HASH_SIZE,
     },
 };
+use tezos_evm_logging::__trace_kernel_add_attrs;
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::{host::RuntimeError, types::Timestamp};
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
+use tezos_tracing::trace_kernel;
 
 const SINGLE_TX_EXECUTION_INPUT: RefPath =
     RefPath::assert_from(b"/evm/world_state/single_tx/input_tx");
@@ -264,6 +266,7 @@ fn get_result_data(result: ExecutionResult) -> ResultData {
     }
 }
 
+#[trace_kernel]
 fn handle_receipt<Host: Runtime>(
     host: &mut Host,
     input_data: &SingleTxExecutionInput,
@@ -325,6 +328,7 @@ fn handle_receipt<Host: Runtime>(
     store_current_transaction_receipts(host, &receipts)
 }
 
+#[trace_kernel]
 fn handle_transaction_object<Host: Runtime>(
     host: &mut Host,
     from: H160,
@@ -384,10 +388,32 @@ struct RunOutcome {
     receipt_data: ReceiptData,
 }
 
+#[trace_kernel]
 pub fn handle_run_transaction<Host: Runtime>(
     host: &mut Host,
     input_data: SingleTxExecutionInput,
 ) -> Result<(), Error> {
+    let __attrs = [
+        (
+            "etherlink.transaction.hash".to_string(),
+            tezos_evm_logging::OTelAttrValue::String(format!(
+                "{}",
+                revm::primitives::B256::from(input_data.tx.tx_hash)
+            )),
+        ),
+        (
+            "etherlink.block.number".to_string(),
+            tezos_evm_logging::OTelAttrValue::Int(
+                input_data.block_number.try_into().unwrap_or_default(),
+            ),
+        ),
+        (
+            "etherlink.sbl".to_string(),
+            tezos_evm_logging::OTelAttrValue::Bool(true),
+        ),
+    ];
+    __trace_kernel_add_attrs!(host, __attrs);
+
     let config = get_evm_config(host)?;
     // Safe storage isn't necessary as it can be managed by the node
     // but using it on kernel allow us to make cache and in-memory in it.
@@ -572,10 +598,25 @@ struct BlockReceiptInfo {
     cumulative_gas: U256,
 }
 
+#[trace_kernel]
 pub fn assemble_block<Host: Runtime>(
     host: &mut Host,
     input_data: AssembleBlockInput,
 ) -> Result<(), Error> {
+    let __attrs = [
+        (
+            "etherlink.block.number".to_string(),
+            tezos_evm_logging::OTelAttrValue::Int(
+                input_data.block_number.try_into().unwrap_or_default(),
+            ),
+        ),
+        (
+            "etherlink.sbl".to_string(),
+            tezos_evm_logging::OTelAttrValue::Bool(true),
+        ),
+    ];
+    __trace_kernel_add_attrs!(host, __attrs);
+
     let config = get_evm_config(host)?;
     let state_root = state_root_hash(host)?;
     let receipts = get_current_transaction_receipts(host)?;
