@@ -31,6 +31,8 @@ module Agent_configuration : sig
 
   type vm = private {
     machine_type : string;
+    disk_type : string option;
+    disk_size_gb : int option;
     docker_image : docker_image;
     max_run_duration : int option;
     binaries_path : string;
@@ -51,6 +53,8 @@ module Agent_configuration : sig
     os:Os.t ->
     binaries_path:string ->
     ?max_run_duration:int ->
+    ?disk_type:string ->
+    ?disk_size_gb:int ->
     machine_type:string ->
     docker_image:docker_image ->
     name:string ->

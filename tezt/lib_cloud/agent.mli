@@ -17,6 +17,8 @@ module Configuration : sig
 
   type vm = private {
     machine_type : string;
+    disk_type : string option;
+    disk_size_gb : int option;
     docker_image : docker_image;
     max_run_duration : int option;
     binaries_path : string;
@@ -40,6 +42,10 @@ module Configuration : sig
 
     Default value for [machine_type] is [n1-standard-2].
 
+    Default value for [disk_type] is [pd-ssd].
+
+    Default value for [disk_size_gb] is [200].
+
     Default value for [docker_image] is [Custom {tezt_cloud}] where [tezt_cloud]
     is the value provided by the environment variable [$TEZT_CLOUD].
     *)
@@ -48,6 +54,8 @@ module Configuration : sig
     ?binaries_path:string ->
     ?max_run_duration:int option ->
     ?machine_type:string ->
+    ?disk_type:string ->
+    ?disk_size_gb:int ->
     ?docker_image:docker_image ->
     ?name:string ->
     unit ->

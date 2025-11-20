@@ -198,16 +198,27 @@ module VM = struct
     let () = Log.report "Terraform.VM.init" in
     Process.run ~name ~color "terraform" (chdir Path.terraform_vm @ ["init"])
 
-  let deploy ~auto_approve ~max_run_duration ~machine_type ~base_port
-      ~ports_per_vm ~number_of_vms ~docker_image ~os ~prometheus_port =
+  let deploy ~auto_approve ~max_run_duration ~machine_type ~disk_type
+      ~disk_size_gb ~base_port ~ports_per_vm ~number_of_vms ~docker_image ~os
+      ~prometheus_port =
     let* project_id = Gcloud.project_id () in
     let max_run_duration =
       match max_run_duration with
       | None -> []
       | Some value -> ["--var"; Format.asprintf "max_run_duration=%d" value]
     in
+    let disk_type =
+      match disk_type with
+      | None -> []
+      | Some d -> ["--var"; Format.sprintf "disk_type=%s" d]
+    in
+    let disk_size_gb =
+      match disk_size_gb with
+      | None -> []
+      | Some s -> ["--var"; Format.sprintf "disk_size_gb=%d" s]
+    in
     let args =
-      max_run_duration
+      max_run_duration @ disk_type @ disk_size_gb
       @ [
           "--var";
           Format.asprintf "base_port=%d" base_port;
@@ -274,7 +285,13 @@ module VM = struct
     let zone = JSON.(json |-> "zone" |-> "value" |> as_string) in
     Lwt.return zone
 
-  let machine_type () =
+  type machine_specs = {
+    machine_type : string;
+    disk_type : string option;
+    disk_size_gb : int option;
+  }
+
+  let machine_specs () =
     let* output =
       Process.run_and_read_stdout
         ~name
@@ -282,14 +299,18 @@ module VM = struct
         "terraform"
         (chdir Path.terraform_vm @ ["output"; "-json"])
     in
-    let json = JSON.parse ~origin:"VM.machine_type" output in
+    let json = JSON.parse ~origin:"VM.output" output in
     (* TODO: find a better fix *)
     let machine_type =
       match JSON.(json |-> "machine_type" |-> "value" |> as_string_opt) with
       | Some machine_type -> machine_type
       | None -> "n1-standard-2"
     in
-    Lwt.return machine_type
+    let disk_type = JSON.(json |-> "disk_type" |-> "value" |> as_string_opt) in
+    let disk_size_gb =
+      JSON.(json |-> "disk_size_gb" |-> "value" |> as_int_opt)
+    in
+    Lwt.return {machine_type; disk_type; disk_size_gb}
 
   let destroy workspaces ~project_id =
     workspaces
@@ -297,14 +318,25 @@ module VM = struct
            Lwt.catch
              (fun () ->
                let* () = Workspace.select workspace in
-               let* machine_type = machine_type () in
+               let* vm = machine_specs () in
+               let disk_type =
+                 match vm.disk_type with
+                 | None -> []
+                 | Some d -> ["--var"; Format.sprintf "disk_type=%s" d]
+               in
+               let disk_size_gb =
+                 match vm.disk_size_gb with
+                 | None -> []
+                 | Some s -> ["--var"; Format.sprintf "disk_size_gb=%d" s]
+               in
                let vars =
                  [
                    "--var";
                    Format.asprintf "project_id=%s" project_id;
                    "--var";
-                   Format.asprintf "machine_type=%s" machine_type;
+                   Format.asprintf "machine_type=%s" vm.machine_type;
                  ]
+                 @ disk_type @ disk_size_gb
                in
                let* () =
                  (* Remote machines could have been destroyed
