@@ -12071,6 +12071,39 @@ let test_denunciation_when_all_bakers_attest protocol dal_parameters _cryptobox
   in
   unit
 
+let test_statuses_backfill_at_restart _protocol dal_parameters _cryptobox
+    _l1_node client dal_node =
+  let index = 0 in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let* _ =
+    Helpers.publish_and_store_slot client dal_node Constant.bootstrap1 ~index
+    @@ Helpers.make_slot ~slot_size "Hello world!"
+  in
+  let* lvl_inject = Client.level client in
+  let slot_level = lvl_inject + 1 in
+  Log.info "Bake a few blocks" ;
+  let* () = bake_for ~count:3 client in
+  let* () = Dal_node.terminate dal_node in
+  let* () = bake_for ~count:3 client in
+  let* () = Dal_node.run dal_node in
+  let* () =
+    check_slot_status
+      ~__LOC__
+      dal_node
+      ~expected_status:Waiting_attestation
+      ~slot_level
+      ~slot_index:index
+  in
+  let* () =
+    check_slot_status
+      ~__LOC__
+      dal_node
+      ~expected_status:Unpublished
+      ~slot_level
+      ~slot_index:(index + 1)
+  in
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -12449,6 +12482,12 @@ let register ~protocols =
     ~all_bakers_attest_activation_threshold:Q.(Z.one /// Z.of_int 2)
     "Trap is denounced when all bakers attest"
     test_denunciation_when_all_bakers_attest
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["restart"; "statuses"]
+    "Status information is backfilled at restart"
+    ~operator_profiles:[0]
+    test_statuses_backfill_at_restart
     protocols ;
 
   (* Tests with all nodes *)
