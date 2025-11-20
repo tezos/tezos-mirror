@@ -14,11 +14,13 @@ depends: [
   "octez-libs"
   "tezt-tezos"
   "tezt-cloud"
+  "bls12-381"
+  "crunch" { >= "3.3.0" }
+  "floodgate" { = version }
   "octez-rust-deps" {with-test}
   "ppx_import" {with-test}
   "ppx_deriving" {with-test}
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
-  "bls12-381" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "octez-alcotezt" {with-test}
   "octez-l2-libs" {with-test}

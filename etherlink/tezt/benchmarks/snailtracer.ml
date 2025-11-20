@@ -9,6 +9,7 @@
 open Evm_node_lib_dev_encoding
 open Evm_node_lib_dev
 open Setup
+open Etherlink_benchmark_lib
 open Benchmark_utils
 open Floodgate_lib
 
