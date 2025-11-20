@@ -260,7 +260,7 @@ This is no longer necessary with the unique ``octez-baker`` executable.
 
    It is possible to bake and attest using a dedicated :ref:`consensus_key` instead of the delegate's key.
 
-The baker uses the same format of configuration file as the client (see :ref:`client_conf_file`).
+The baker uses the same format of configuration file as the client, and the default configuration file for the baker is the same as the default configuration file for the client (see :ref:`client_conf_file`).
 
 .. warning::
 
