@@ -22,6 +22,25 @@ let register_test ~title =
     ~file_tags:["clst"]
     ~title:("CLST: " ^ title)
 
+let run_view ~contract ~view_name ~input (block : Block.t) =
+  let chain_id = Chain_id.of_block_hash block.hash in
+  Plugin.RPC.Scripts.run_script_view
+    ~gas:None
+    ~other_contracts:None
+    ~extra_big_maps:None
+    ~contract
+    ~view:view_name
+    ~input
+    ~unlimited_gas:true
+    ~now:None
+    ~chain_id
+    ~level:None
+    ~sender:None
+    ~payer:None
+    ~unparsing_mode:Script_ir_unparser.Readable
+    Block.rpc_ctxt
+    block
+
 let get_clst_hash ctxt =
   let open Lwt_result_wrap_syntax in
   let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
@@ -280,3 +299,37 @@ let () =
   | Ok _ -> Test.fail "Transferring to withdraw is forbidden"
   | Error trace ->
       Error_helpers.expect_clst_non_empty_transfer ~loc:__LOC__ trace
+
+let () =
+  register_test ~title:"Test get_balance view" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, sender = Context.init1 () in
+  let* clst_hash = get_clst_hash (B b) in
+  let amount = Tez.of_mutez_exn 100000000L in
+  let* deposit_tx = Op.clst_deposit (B b) sender amount in
+  let* b = Block.bake ~operation:deposit_tx b in
+  let* balance =
+    run_view
+      ~contract:clst_hash
+      ~view_name:"get_balance"
+      ~input:
+        Environment.Micheline.(
+          Prim
+            ( dummy_location,
+              Script.D_Pair,
+              [
+                String (dummy_location, Contract.to_b58check sender);
+                Int (dummy_location, Z.zero);
+              ],
+              [] )
+          |> strip_locations)
+      b
+  in
+  let balance =
+    match balance |> Environment.Micheline.root with
+    | Environment.Micheline.Int (_, balance_z) -> balance_z |> Z.to_int64
+    | _ -> Test.fail "Unexpected output"
+  in
+  let amount = Tez.to_mutez amount in
+  let* () = Assert.equal_int64 ~loc:__LOC__ amount balance in
+  return_unit
