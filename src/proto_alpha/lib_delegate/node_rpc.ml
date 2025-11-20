@@ -44,32 +44,40 @@ module RPC_profiler = struct
     RPC_profiler.create_reset_block_section RPC_profiler.rpc_client_profiler
 end
 
+let warn_on_stalling_rpc ~rpc_name f =
+  Utils.event_on_stalling_promise
+    ~event:(fun sum -> Node_rpc_events.(emit stalling_rpc (rpc_name, sum)))
+    f
+
 let inject_block cctxt ?(force = false) ~chain signed_block_header operations =
   let signed_shell_header_bytes =
     Data_encoding.Binary.to_bytes_exn Block_header.encoding signed_block_header
   in
-  Shell_services.Injection.block
-    ~async:true
-    cctxt
-    ~chain
-    ~force
-    signed_shell_header_bytes
-    operations
+  warn_on_stalling_rpc ~rpc_name:"inject_block"
+  @@ Shell_services.Injection.block
+       ~async:true
+       cctxt
+       ~chain
+       ~force
+       signed_shell_header_bytes
+       operations
 
 let inject_operation cctxt ~chain operation =
   let encoded_op =
     Data_encoding.Binary.to_bytes_exn Operation.encoding operation
   in
-  Shell_services.Injection.operation cctxt ~async:true ~chain encoded_op
+  warn_on_stalling_rpc ~rpc_name:"inject_operation"
+  @@ Shell_services.Injection.operation cctxt ~async:true ~chain encoded_op
 
 let preapply_block cctxt ~chain ~head ~timestamp ~protocol_data operations =
-  Block_services.Helpers.Preapply.block
-    cctxt
-    ~chain
-    ~timestamp
-    ~block:(`Hash (head, 0))
-    operations
-    ~protocol_data
+  warn_on_stalling_rpc ~rpc_name:"preapply_block"
+  @@ Block_services.Helpers.Preapply.block
+       cctxt
+       ~chain
+       ~timestamp
+       ~block:(`Hash (head, 0))
+       operations
+       ~protocol_data
 
 let extract_prequorum (preattestations : packed_operation list) =
   match preattestations with
@@ -153,11 +161,12 @@ let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
       | None ->
           let open Protocol_client_context in
           ((let* operations =
-              Alpha_block_services.Operations.operations
-                cctxt
-                ~chain
-                ~block:(`Hash (block_hash, 0))
-                ()
+              warn_on_stalling_rpc ~rpc_name:"operations"
+              @@ Alpha_block_services.Operations.operations
+                   cctxt
+                   ~chain
+                   ~block:(`Hash (block_hash, 0))
+                   ()
             in
             let packed_operations =
               List.map
@@ -212,7 +221,12 @@ let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
       ("compute block " ^ Block_hash.to_short_b58check block_hash ^ " info")])
 
 let protocols cctxt ~chain ?(block = `Head 0) () =
-  Shell_services.Blocks.protocols cctxt ~chain ~block ()
+  warn_on_stalling_rpc ~rpc_name:"protocols"
+  @@ Shell_services.Blocks.protocols cctxt ~chain ~block ()
+
+let raw_header cctxt ~chain ?(block = `Head 0) () =
+  warn_on_stalling_rpc ~rpc_name:"raw_header"
+  @@ Shell_services.Blocks.raw_header cctxt ~chain ~block ()
 
 let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
     block_hash (block_header : Tezos_base.Block_header.t) =
@@ -263,9 +277,7 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
           let in_protocol =
             Protocol_hash.(pred_current_protocol = Protocol.hash)
           in
-          let* raw_header_b =
-            Shell_services.Blocks.raw_header cctxt ~chain ~block:pred_block ()
-          in
+          let* raw_header_b = raw_header cctxt ~chain ~block:pred_block () in
           let predecessor_header =
             (Data_encoding.Binary.of_bytes_exn
                Tezos_base.Block_header.encoding
@@ -274,7 +286,7 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
           in
           let* grandparent =
             let* raw_header =
-              Shell_services.Blocks.raw_header
+              raw_header
                 cctxt
                 ~chain
                 ~block:(`Hash (predecessor_header.shell.predecessor, 0))
@@ -403,52 +415,59 @@ let get_validators cctxt ~chain ?(block = `Head 0) ?(levels = []) ?delegates
       (fun level -> Environment.wrap_tzresult (Raw_level.of_int32 level))
       levels
   in
-  (Plugin.RPC.Validators.get
-     cctxt
-     (chain, block)
-     ~levels
-     ?delegates
-     ?consensus_keys
-   [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
+  warn_on_stalling_rpc ~rpc_name:"get_validators"
+  @@ (Plugin.RPC.Validators.get
+        cctxt
+        (chain, block)
+        ~levels
+        ?delegates
+        ?consensus_keys
+      [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
 
 let current_level cctxt ~chain ?(block = `Head 0) ?offset () =
-  Plugin.RPC.current_level cctxt ?offset (chain, block)
+  warn_on_stalling_rpc ~rpc_name:"current_level"
+  @@ Plugin.RPC.current_level cctxt ?offset (chain, block)
 
 let forge_seed_nonce_revelation cctxt ~chain ?(block = `Head 0) ~branch ~level
     ~nonce () =
-  Plugin.RPC.Forge.seed_nonce_revelation
-    cctxt
-    (chain, block)
-    ~branch
-    ~level
-    ~nonce
-    ()
+  warn_on_stalling_rpc ~rpc_name:"forge_seed_nonce_revelation"
+  @@ Plugin.RPC.Forge.seed_nonce_revelation
+       cctxt
+       (chain, block)
+       ~branch
+       ~level
+       ~nonce
+       ()
 
 let forge_vdf_revelation cctxt ~chain ~block ~branch ~solution =
-  Plugin.RPC.Forge.vdf_revelation cctxt (chain, block) ~branch ~solution ()
+  warn_on_stalling_rpc ~rpc_name:"forge_vdg_revelation"
+  @@ Plugin.RPC.Forge.vdf_revelation cctxt (chain, block) ~branch ~solution ()
 
 let levels_in_current_cycle cctxt ~offset ~chain ~block =
-  Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block)
+  warn_on_stalling_rpc ~rpc_name:"levels_in_current_cycle"
+  @@ Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block)
 
 let forge_double_consensus_operation_evidence cctxt ~chain ~block ~branch ~slot
     ~op1 ~op2 =
-  Plugin.RPC.Forge.double_consensus_operation_evidence
-    cctxt
-    (chain, block)
-    ~branch
-    ~slot
-    ~op1
-    ~op2
-    ()
+  warn_on_stalling_rpc ~rpc_name:"forge_double_consensus_operation_evidence"
+  @@ Plugin.RPC.Forge.double_consensus_operation_evidence
+       cctxt
+       (chain, block)
+       ~branch
+       ~slot
+       ~op1
+       ~op2
+       ()
 
 let forge_double_baking_evidence cctxt ~chain ~block ~branch ~bh1 ~bh2 =
-  Plugin.RPC.Forge.double_baking_evidence
-    cctxt
-    (chain, block)
-    ~branch
-    ~bh1
-    ~bh2
-    ()
+  warn_on_stalling_rpc ~rpc_name:"forge_double_baking_evidence"
+  @@ Plugin.RPC.Forge.double_baking_evidence
+       cctxt
+       (chain, block)
+       ~branch
+       ~bh1
+       ~bh2
+       ()
 
 let await_protocol_activation cctxt ~chain () =
   let open Lwt_result_syntax in
@@ -461,7 +480,10 @@ let await_protocol_activation cctxt ~chain () =
 
 let fetch_dal_config cctxt =
   let open Lwt_syntax in
-  let* r = Config_services.dal_config cctxt in
+  let* r =
+    warn_on_stalling_rpc ~rpc_name:"fetch_dal_config"
+    @@ Config_services.dal_config cctxt
+  in
   match r with
   | Error e -> return_error e
   | Ok dal_config -> return_ok dal_config
@@ -469,12 +491,13 @@ let fetch_dal_config cctxt =
 let get_attestable_slots dal_node_rpc_ctxt delegate_id ~attestation_level =
   let pkh = Delegate_id.to_pkh delegate_id in
   let attested_level = Int32.succ attestation_level in
-  Tezos_rpc.Context.make_call
-    Tezos_dal_node_services.Services.get_attestable_slots
-    dal_node_rpc_ctxt
-    (((), Tezos_crypto.Signature.Of_V2.public_key_hash pkh), attested_level)
-    ()
-    ()
+  warn_on_stalling_rpc ~rpc_name:"get_attestable_slots"
+  @@ Tezos_rpc.Context.make_call
+       Tezos_dal_node_services.Services.get_attestable_slots
+       dal_node_rpc_ctxt
+       (((), Tezos_crypto.Signature.Of_V2.public_key_hash pkh), attested_level)
+       ()
+       ()
 
 let dal_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
     ~attestation_level =
@@ -499,14 +522,17 @@ let monitor_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
   | Error trace -> return_error trace
 
 let get_dal_profiles dal_node_rpc_ctxt =
-  Tezos_rpc.Context.make_call
-    Tezos_dal_node_services.Services.get_profiles
-    dal_node_rpc_ctxt
-    ()
-    ()
-    ()
+  warn_on_stalling_rpc ~rpc_name:"get_dal_profiles"
+  @@ Tezos_rpc.Context.make_call
+       Tezos_dal_node_services.Services.get_profiles
+       dal_node_rpc_ctxt
+       ()
+       ()
+       ()
 
 let register_dal_profiles dal_node_rpc_ctxt delegates =
+  warn_on_stalling_rpc ~rpc_name:"register_dal_profiles"
+  @@
   let profiles =
     Tezos_dal_node_services.Controller_profiles.make
       ~attesters:
@@ -523,56 +549,77 @@ let register_dal_profiles dal_node_rpc_ctxt delegates =
     profiles
 
 let get_dal_health dal_node_rpc_ctxt =
-  Tezos_rpc.Context.make_call
-    Tezos_dal_node_services.Services.health
-    dal_node_rpc_ctxt
-    ()
-    ()
-    ()
+  warn_on_stalling_rpc ~rpc_name:"get_dal_health"
+  @@ Tezos_rpc.Context.make_call
+       Tezos_dal_node_services.Services.health
+       dal_node_rpc_ctxt
+       ()
+       ()
+       ()
 
 let get_nonce cctxt ~chain ?(block = `Head 0) ~level () =
-  Alpha_services.Nonce.get cctxt (chain, block) level
+  warn_on_stalling_rpc ~rpc_name:"get_nonce"
+  @@ Alpha_services.Nonce.get cctxt (chain, block) level
 
 let delegate_deactivated cctxt ~chain ?(block = `Head 0) pkh =
-  Plugin.Alpha_services.Delegate.deactivated cctxt (chain, block) pkh
+  warn_on_stalling_rpc ~rpc_name:"delegate_deactivated"
+  @@ Plugin.Alpha_services.Delegate.deactivated cctxt (chain, block) pkh
 
 let constants cctxt ~chain ~block =
-  Plugin.Alpha_services.Constants.all cctxt (chain, block)
+  warn_on_stalling_rpc ~rpc_name:"constants"
+  @@ Plugin.Alpha_services.Constants.all cctxt (chain, block)
 
 let seed_computation cctxt ~chain ~block =
-  Alpha_services.Seed_computation.get cctxt (chain, block)
+  warn_on_stalling_rpc ~rpc_name:"seed_computation"
+  @@ Alpha_services.Seed_computation.get cctxt (chain, block)
 
-let chain_id cctxt ~chain = Shell_services.Chain.chain_id cctxt ~chain ()
+let chain_id cctxt ~chain =
+  warn_on_stalling_rpc ~rpc_name:"chain_id"
+  @@ Shell_services.Chain.chain_id cctxt ~chain ()
 
 let shell_header cctxt ~chain ?(block = `Head 0) () =
-  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
+  warn_on_stalling_rpc ~rpc_name:"shell_header"
+  @@ Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
 
 let block_hash cctxt ~chain ~block =
-  Shell_services.Blocks.hash cctxt ~chain ~block ()
+  warn_on_stalling_rpc ~rpc_name:"block_hash"
+  @@ Shell_services.Blocks.hash cctxt ~chain ~block ()
 
 let blocks cctxt ~chain ~heads ~length =
-  Shell_services.Blocks.list cctxt ~chain ~heads ~length ()
+  warn_on_stalling_rpc ~rpc_name:"blocks"
+  @@ Shell_services.Blocks.list cctxt ~chain ~heads ~length ()
 
 let inject_private_operation_bytes cctxt ~chain bytes =
-  Shell_services.Injection.private_operation cctxt ~chain bytes
+  warn_on_stalling_rpc ~rpc_name:"inject_private_operation"
+  @@ Shell_services.Injection.private_operation cctxt ~chain bytes
 
 let inject_operation_bytes cctxt ?async ~chain bytes =
-  Shell_services.Injection.operation cctxt ?async ~chain bytes
+  warn_on_stalling_rpc ~rpc_name:"inject_operation"
+  @@ Shell_services.Injection.operation cctxt ?async ~chain bytes
 
 let block_resulting_context_hash cctxt ~chain ?(block = `Head 0) () =
-  Shell_services.Blocks.resulting_context_hash cctxt ~chain ~block ()
+  warn_on_stalling_rpc ~rpc_name:"resulting_context_hash"
+  @@ Shell_services.Blocks.resulting_context_hash cctxt ~chain ~block ()
 
 let live_blocks cctxt ~chain ?(block = `Head 0) () =
-  Chain_services.Blocks.live_blocks cctxt ~chain ~block ()
+  warn_on_stalling_rpc ~rpc_name:"live_blocks"
+  @@ Chain_services.Blocks.live_blocks cctxt ~chain ~block ()
 
 let block_header cctxt ~chain ~block =
-  Protocol_client_context.Alpha_block_services.header cctxt ~chain ~block ()
+  warn_on_stalling_rpc ~rpc_name:"block_header"
+  @@ Protocol_client_context.Alpha_block_services.header cctxt ~chain ~block ()
 
 let block_info cctxt ~chain ~block =
-  Protocol_client_context.Alpha_block_services.info cctxt ~chain ~block ()
+  warn_on_stalling_rpc ~rpc_name:"block_info"
+  @@ Protocol_client_context.Alpha_block_services.info cctxt ~chain ~block ()
 
 let block_metadata cctxt ~chain ~block =
-  Protocol_client_context.Alpha_block_services.metadata cctxt ~chain ~block ()
+  warn_on_stalling_rpc ~rpc_name:"block_metadata"
+  @@ Protocol_client_context.Alpha_block_services.metadata
+       cctxt
+       ~chain
+       ~block
+       ()
 
 let mempool_monitor_operations cctxt ~chain =
   Protocol_client_context.Alpha_block_services.Mempool.monitor_operations
@@ -586,4 +633,5 @@ let mempool_monitor_operations cctxt ~chain =
     ()
 
 let user_activated_upgrades cctxt =
-  Config_services.user_activated_upgrades cctxt
+  warn_on_stalling_rpc ~rpc_name:"user_activated_upgrades"
+  @@ Config_services.user_activated_upgrades cctxt
