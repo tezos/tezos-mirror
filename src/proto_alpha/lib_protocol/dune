@@ -547,7 +547,7 @@
   dependent_bool.ml dependent_bool.mli
   script_list.ml script_list.mli
   script_typed_ir.ml script_typed_ir.mli
-  script_native_types.ml
+  script_native_types.ml script_native_types.mli
   script_typed.ml script_typed.mli
   script_comparable.ml script_comparable.mli
   gas_comparable_input_size.ml gas_comparable_input_size.mli
@@ -851,7 +851,7 @@
   dependent_bool.ml dependent_bool.mli
   script_list.ml script_list.mli
   script_typed_ir.ml script_typed_ir.mli
-  script_native_types.ml
+  script_native_types.ml script_native_types.mli
   script_typed.ml script_typed.mli
   script_comparable.ml script_comparable.mli
   gas_comparable_input_size.ml gas_comparable_input_size.mli
@@ -1139,7 +1139,7 @@
   dependent_bool.ml dependent_bool.mli
   script_list.ml script_list.mli
   script_typed_ir.ml script_typed_ir.mli
-  script_native_types.ml
+  script_native_types.ml script_native_types.mli
   script_typed.ml script_typed.mli
   script_comparable.ml script_comparable.mli
   gas_comparable_input_size.ml gas_comparable_input_size.mli

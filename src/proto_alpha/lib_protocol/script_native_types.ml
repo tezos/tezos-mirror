@@ -10,8 +10,6 @@ open Script_typed_ir
 
 (** Types declaration for native contracts. *)
 
-type z_n = Script_int.z Script_int.num
-
 module Helpers = struct
   open Micheline
 
@@ -25,6 +23,11 @@ module Helpers = struct
 
   let unit_ty ?loc () =
     {untyped = prim ?loc Script.T_unit []; typed = Ty_ex_c unit_t}
+
+  (* Some combinators are unused for now but will be used later, and they serve as an
+     example to implement the rest. They are not exported as they are specific
+     to building native contracts types. *)
+  [@@@ocaml.warning "-32"]
 
   let int_ty ?loc () =
     {untyped = prim ?loc Script.T_int []; typed = Ty_ex_c int_t}
