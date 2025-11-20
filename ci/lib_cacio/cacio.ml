@@ -752,6 +752,7 @@ let get_number_of_declared_jobs () = !number_of_declared_jobs
 
 (* Data to be written using [output_tezt_job_list]. *)
 type tezt_job_info = {
+  pipeline : [`merge_request | `scheduled];
   component : string option;
   variant : string option;
   parallel_jobs : int;
@@ -764,14 +765,17 @@ let output_tezt_job_list path =
   let ch = open_out path in
   Fun.protect ~finally:(fun () -> close_out ch) @@ fun () ->
   ( Fun.flip List.iter !tezt_jobs
-  @@ fun {component; variant; parallel_jobs; parallel_tests} ->
+  @@ fun {pipeline; component; variant; parallel_jobs; parallel_tests} ->
     let component = Option.value component ~default:"" in
     let variant = Option.value variant ~default:"" in
     assert (not @@ String.exists (( = ) ',') component) ;
     assert (not @@ String.exists (( = ) ',') variant) ;
     Printf.fprintf
       ch
-      "%s,%s,%d,%d\n"
+      "%s,%s,%s,%d,%d\n"
+      (match pipeline with
+      | `merge_request -> "merge_request"
+      | `scheduled -> "scheduled")
       component
       variant
       parallel_jobs
@@ -1109,6 +1113,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     in
     let tezt_job_info =
       {
+        pipeline;
         component = Component.name;
         variant = (if variant = "" then None else Some variant);
         parallel_jobs;

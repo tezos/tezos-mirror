@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module String_map = Map.Make (String)
+
 let sf = Printf.sprintf
 
 let echo x = Printf.ksprintf print_endline x
@@ -12,6 +14,7 @@ let echo x = Printf.ksprintf print_endline x
 let ( // ) = Filename.concat
 
 type tezt_job = {
+  pipeline : [`merge_request | `scheduled];
   name : string;
   component : string option;
   variant : string option;
@@ -23,7 +26,17 @@ type tezt_job = {
 let parse_job_line line =
   match String.split_on_char ',' line with
   | [""] -> []
-  | [component; variant; parallel_jobs; parallel_tests] ->
+  | [pipeline; component; variant; parallel_jobs; parallel_tests] ->
+      let pipeline =
+        match pipeline with
+        | "merge_request" -> `merge_request
+        | "scheduled" -> `scheduled
+        | _ ->
+            failwith
+            @@ sf
+                 "failed to parse the list of jobs: invalid pipeline type: %S"
+                 pipeline
+      in
       let component = if component = "" then None else Some component in
       let variant = if variant = "" then None else Some variant in
       let name =
@@ -59,7 +72,15 @@ let parse_job_line line =
                parallel_tests"
       in
       let job =
-        {name; component; variant; directory; parallel_jobs; parallel_tests}
+        {
+          pipeline;
+          name;
+          component;
+          variant;
+          directory;
+          parallel_jobs;
+          parallel_tests;
+        }
       in
       [job]
   | _ ->
@@ -76,6 +97,25 @@ let jobs () =
     | line -> read (parse_job_line line @ acc)
   in
   read []
+
+let only_keep_one_occurrence_of_each_job jobs =
+  let check_and_add_to_map acc job =
+    match String_map.find_opt job.name acc with
+    | None -> String_map.add job.name job acc
+    | Some same_job ->
+        if same_job.parallel_jobs <> job.parallel_jobs then
+          (* This is not very important, it only affects the display of the current
+             value of parallel_jobs, and the emoji. Still odd since jobs usually
+             are defined the same in all pipeline types. So it is worth a warning. *)
+          Printf.eprintf
+            "Warning: job %S is defined multiple times with different parallel \
+             jobs in cacio-tezt-jobs.\n\
+             %!"
+            job.name ;
+        acc
+  in
+  let map = List.fold_left check_and_add_to_map String_map.empty jobs in
+  List.map snd (String_map.bindings map)
 
 let balance_job job ~target ~verbose =
   let tests =
@@ -140,4 +180,6 @@ let balance_job job ~target ~verbose =
       expected_minutes_per_job
       job.parallel_tests
 
-let run ~target ~verbose = List.iter (balance_job ~target ~verbose) (jobs ())
+let run ~target ~verbose =
+  jobs () |> only_keep_one_occurrence_of_each_job
+  |> List.iter (balance_job ~target ~verbose)
