@@ -155,6 +155,11 @@ module Slots_handlers = struct
         let hash = Hashtbl.hash
       end)
 
+  let error_pp ppf (slot : [`Not_found | `Other of error trace]) =
+    match slot with
+    | `Not_found -> Format.pp_print_string ppf "slot not found"
+    | `Other errors -> pp_print_trace ppf errors
+
   let post_slot =
     let slots_cache =
       Injected_slots_cache.create Constants.not_yet_published_cache_size
@@ -171,70 +176,124 @@ module Slots_handlers = struct
                       commitment) ->
               return (commitment, commitment_proof)
           | _ ->
-              let cryptobox = Node_context.get_cryptobox ctxt in
-              let profile = Node_context.get_profile_ctxt ctxt in
-              let* () =
-                if not (Profile_manager.is_prover_profile profile) then
-                  fail (Errors.other [No_prover_profile])
-                else return_unit
-              in
-              let* () =
-                match query#slot_index with
-                | Some slot_index
-                  when not
-                         (Profile_manager.can_publish_on_slot_index
-                            slot_index
-                            profile) ->
-                    fail
-                      (Errors.other [Cannot_publish_on_slot_index slot_index])
-                | None | Some _ -> return_unit
-              in
-              let* proto_parameters =
-                Node_context.get_proto_parameters ctxt ~level:`Last_proto
-                |> Lwt.return
-                |> lwt_map_error (fun e -> `Other e)
-              in
-              let slot_size = proto_parameters.cryptobox_parameters.slot_size in
-              let slot_length = String.length slot in
-              let*? slot_bytes =
-                if slot_length > slot_size then
-                  Error
-                    (Errors.other
-                       [
-                         Post_slot_too_large
-                           {expected = slot_size; got = slot_length};
-                       ])
-                else if slot_length = slot_size then Ok (Bytes.of_string slot)
-                else
-                  let padding =
-                    String.make (slot_size - slot_length) query#padding
-                  in
-                  Ok (Bytes.of_string (slot ^ padding))
-              in
-              let*? polynomial =
-                Slot_manager.polynomial_from_slot cryptobox slot_bytes
-              in
-              let*? commitment = Slot_manager.commit cryptobox polynomial in
-              let*? commitment_proof =
-                commitment_proof_from_polynomial cryptobox polynomial
-              in
-              let shards_proofs_precomputation =
-                Node_context.get_shards_proofs_precomputation ctxt
-              in
-              let* () =
-                Slot_manager.add_commitment_shards
-                  ~shards_proofs_precomputation
-                  store
-                  cryptobox
-                  commitment
-                  slot_bytes
-                  polynomial
-              in
-              Injected_slots_cache.replace
-                slots_cache
-                slot
-                (commitment, commitment_proof) ;
-              return (commitment, commitment_proof))
+              (let cryptobox = Node_context.get_cryptobox ctxt in
+               let profile = Node_context.get_profile_ctxt ctxt in
+               let* () =
+                 if not (Profile_manager.is_prover_profile profile) then
+                   fail (Errors.other [No_prover_profile])
+                 else return_unit
+               in
+               let* () =
+                 match query#slot_index with
+                 | Some slot_index
+                   when not
+                          (Profile_manager.can_publish_on_slot_index
+                             slot_index
+                             profile) ->
+                     fail
+                       (Errors.other [Cannot_publish_on_slot_index slot_index])
+                 | None | Some _ -> return_unit
+               in
+               let* proto_parameters =
+                 (Node_context.get_proto_parameters ctxt ~level:`Last_proto
+                 |> Lwt.return
+                 |> lwt_map_error (fun e -> `Other e))
+                 [@profiler.wrap_f
+                   {driver_ids = [Opentelemetry]}
+                     (Opentelemetry_helpers.trace_slot_no_commitment
+                        ~slot
+                        ~name:"get_proto_parameters")]
+               in
+               let slot_size =
+                 proto_parameters.cryptobox_parameters.slot_size
+               in
+               let slot_length = String.length slot in
+               let*? slot_bytes =
+                 (if slot_length > slot_size then
+                    Error
+                      (Errors.other
+                         [
+                           Post_slot_too_large
+                             {expected = slot_size; got = slot_length};
+                         ])
+                  else if slot_length = slot_size then Ok (Bytes.of_string slot)
+                  else
+                    let padding =
+                      String.make (slot_size - slot_length) query#padding
+                    in
+                    Ok (Bytes.of_string (slot ^ padding)))
+                 [@profiler.wrap_f
+                   {driver_ids = [Opentelemetry]}
+                     (Opentelemetry_helpers.trace_slot_no_commitment
+                        ~attrs:[]
+                        ~slot
+                        ~name:"padding_slot")]
+               in
+               let*? polynomial =
+                 (Slot_manager.polynomial_from_slot
+                    cryptobox
+                    slot_bytes
+                  [@profiler.wrap_f
+                    {driver_ids = [Opentelemetry]}
+                      (Opentelemetry_helpers.trace_slot_no_commitment
+                         ~slot
+                         ~name:"computing_polynomial")])
+               in
+               let*? commitment =
+                 (Slot_manager.commit
+                    cryptobox
+                    polynomial
+                  [@profiler.wrap_f
+                    {driver_ids = [Opentelemetry]}
+                      (Opentelemetry_helpers.trace_slot_no_commitment
+                         ~slot
+                         ~name:"computing_commitment")])
+               in
+               let*? commitment_proof =
+                 (commitment_proof_from_polynomial
+                    cryptobox
+                    polynomial
+                  [@profiler.wrap_f
+                    {driver_ids = [Opentelemetry]}
+                      (Opentelemetry_helpers.trace_slot_no_commitment
+                         ~slot
+                         ~name:"computing_commitment_proof")])
+               in
+               let shards_proofs_precomputation =
+                 (Node_context.get_shards_proofs_precomputation
+                    ctxt
+                  [@profiler.wrap_f
+                    {driver_ids = [Opentelemetry]}
+                      (Opentelemetry_helpers.trace_slot_no_commitment
+                         ~slot
+                         ~name:"shard_proof_precomputation")])
+               in
+               let* () =
+                 (Slot_manager.add_commitment_shards
+                    ~shards_proofs_precomputation
+                    store
+                    cryptobox
+                    commitment
+                    slot_bytes
+                    polynomial
+                  [@profiler.wrap_f
+                    {driver_ids = [Opentelemetry]}
+                      (Opentelemetry_helpers.trace_slot_no_commitment
+                         ~slot
+                         ~name:"add_commitment_s_shards")])
+               in
+               Injected_slots_cache.replace
+                 slots_cache
+                 slot
+                 (commitment, commitment_proof) ;
+               return (commitment, commitment_proof))
+              [@profiler.wrap_f
+                {driver_ids = [Opentelemetry]}
+                  (Opentelemetry_helpers.trace_slot_after_es
+                     ~name:"inject_slot"
+                     ?slot_index:query#slot_index
+                     ~error_pp
+                     ~commitment_of_result:fst)])
 
   let get_slot_commitment ctxt slot_level slot_index () () =
     call_handler1 (fun () ->
