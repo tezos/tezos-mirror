@@ -49,6 +49,13 @@ let env_var_ignore_topics = "TEZOS_IGNORE_TOPICS_I_KNOW_WHAT_I_AM_DOING"
 
 let env_ignore_topics = env_value_starts_with_yes ~env_var:env_var_ignore_topics
 
+(** This variable is used to instruct the DAL node to publish dummy data regularly. *)
+let allow_publication_regularly =
+  "TEZOS_DAL_PUBLISH_REGULARLY_I_KNOW_WHAT_I_AM_DOING"
+
+let env_publication_regularly =
+  env_value_starts_with_yes ~env_var:allow_publication_regularly
+
 let merge_experimental_features _ _configuration = ()
 
 let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
@@ -56,7 +63,8 @@ let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
     ?metrics_addr ?profile ?(peers = []) ?history_mode ?service_name
     ?service_namespace ?experimental_features ?fetch_trusted_setup
     ?(verbose = false) ?(ignore_l1_config_peers = false)
-    ?(disable_amplification = false) ?batching_configuration configuration =
+    ?(disable_amplification = false) ?batching_configuration
+    ?publish_slots_regularly configuration =
   let profile =
     match profile with
     | None -> configuration.Configuration_file.profile
@@ -108,6 +116,11 @@ let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
       Option.value
         ~default:configuration.batching_configuration
         batching_configuration;
+    publish_slots_regularly =
+      Option.fold
+        ~none:configuration.publish_slots_regularly
+        ~some:Option.some
+        publish_slots_regularly;
   }
 
 let profile ?attesters ?operators ?observers ?(bootstrap = false) () =
@@ -617,6 +630,39 @@ module Term = struct
       "batching-time-interval"
 
   let batching_configuration = arg_to_cmdliner batching_configuration_arg
+
+  let publish_slots_regularly_arg =
+    let open Configuration_file in
+    let pp fmt {frequency; slot_index; secret_key} =
+      Format.fprintf
+        fmt
+        "%d-%d-%a"
+        frequency
+        slot_index
+        Signature.Secret_key.pp
+        secret_key
+    in
+    let parse str =
+      match String.split_on_char '-' str with
+      | [frequency; slot_index; secret_key] ->
+          Ok
+            {
+              frequency = int_of_string frequency;
+              slot_index = int_of_string slot_index;
+              secret_key = Signature.Secret_key.of_b58check_exn secret_key;
+            }
+      | _ -> Error "Unrecognized argument"
+    in
+    make_arg
+      ~parse
+      ~doc:
+        "The frequency of the publication of blocks, the slot on which blocks \
+         are published and the secret key used to publish those blocks."
+      ~placeholder:"INT-INT-STR"
+      ~pp
+      "publish-slots-regularly"
+
+  let publish_slots_regularly = arg_to_cmdliner publish_slots_regularly_arg
 end
 
 (** [wrap_with_error main_promise] wraps a promise that returns a tzresult
@@ -677,7 +723,8 @@ module Run = struct
        ignore_l1_config_peers
        disable_amplification
        ignore_topics
-       batching_configuration ->
+       batching_configuration
+       publish_slots_regularly ->
     let open Lwt_result_syntax in
     let data_dir =
       Option.value ~default:Configuration_file.default.data_dir data_dir
@@ -710,6 +757,7 @@ module Run = struct
         ~ignore_l1_config_peers
         ~disable_amplification
         ?batching_configuration
+        ?publish_slots_regularly
     in
     let* () =
       if env_disable_shard_validation && not disable_shard_validation then
@@ -738,6 +786,23 @@ module Run = struct
           env_var_ignore_topics
       else return ignore_topics
     in
+    let* () =
+      if env_publication_regularly && Option.is_none publish_slots_regularly
+      then
+        failwith
+          "The environment variable to produce regularly %s was set, but the \
+           option '--publish-slots-regularly' was not provided."
+          allow_publication_regularly
+      else if
+        (not env_publication_regularly)
+        && Option.is_some publish_slots_regularly
+      then
+        failwith
+          "The option '--publish-slots-regularly' was provided, but the \
+           environment variable to allow regular production %s was not set."
+          allow_publication_regularly
+      else return_unit
+    in
     Daemon.run
       ~disable_shard_validation
       ~ignore_pkhs
@@ -757,7 +822,8 @@ module Run = struct
        $ operator_profile $ observer_profile $ bootstrap_profile $ peers
        $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
        $ disable_shard_validation $ verbose $ ignore_l1_config_peers
-       $ disable_amplification $ ignore_topics $ batching_configuration))
+       $ disable_amplification $ ignore_topics $ batching_configuration
+       $ publish_slots_regularly))
 
   let cmd = Cmdliner.Cmd.v info term
 end
@@ -994,7 +1060,7 @@ module Action = struct
       ?service_namespace ?fetch_trusted_setup
       ?(disable_shard_validation = false) ?(verbose = false)
       ?(ignore_l1_config_peers = false) ?(disable_amplification = false)
-      ?ignore_topics ?batching_configuration () =
+      ?ignore_topics ?batching_configuration ?publish_slots_regularly () =
     Run.action
       data_dir
       config_file
@@ -1021,6 +1087,7 @@ module Action = struct
       disable_amplification
       ignore_topics
       batching_configuration
+      publish_slots_regularly
 
   let mk_config_action action =
    fun ?data_dir
