@@ -490,6 +490,9 @@ val get_global_test_publish_release_page_jobs : unit -> Tezos_ci.tezos_job list
     and [non_release_tag_test] pipelines. *)
 val get_release_tag_rexes : unit -> string list
 
+(** Get the number of times the [job] function was called. *)
+val get_number_of_declared_jobs : unit -> int
+
 (** {2 Future work} *)
 
 (** One idea would be to have Cacio provide a dedicated function to create Tezt jobs.

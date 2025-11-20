@@ -542,7 +542,14 @@ let () =
         ~variables
         ~filename:".gitlab-ci.yml"
         () ;
-      Tezos_ci.check_files ~remove_extra_files:Cli.config.remove_extra_files ()
+      Tezos_ci.check_files ~remove_extra_files:Cli.config.remove_extra_files () ;
+      if Cli.config.verbose then
+        (* Note: [Tezos_ci] jobs include [Cacio] jobs, since [Cacio] registers
+           jobs using [Tezos_ci.job]. *)
+        Printf.printf
+          "%d/%d jobs were defined using Cacio.\n%!"
+          (Cacio.get_number_of_declared_jobs ())
+          (Tezos_ci.get_number_of_declared_jobs ())
   | List_pipelines -> Pipeline.list_pipelines ()
   | Overview_pipelines -> Pipeline.overview_pipelines ()
   | Describe_pipeline {name} -> Pipeline.describe_pipeline name
