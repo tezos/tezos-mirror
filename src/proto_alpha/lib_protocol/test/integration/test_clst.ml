@@ -28,6 +28,29 @@ let get_clst_hash ctxt =
   let*@ hash = Contract.get_clst_contract_hash alpha_ctxt in
   return hash
 
+let create_funded_account ~funder ~amount_mutez b =
+  let open Lwt_result_wrap_syntax in
+  let account = Account.new_account () in
+  let account = Contract.Implicit account.Account.pkh in
+  let* op =
+    Op.transaction (B b) funder account (Tez.of_mutez_exn amount_mutez)
+  in
+  let* b = Block.bake ~operation:op b in
+  return (account, b)
+
+let check_clst_balance_diff ~loc initial_balance_mutez diff_mutez b account =
+  let open Lwt_result_syntax in
+  let* balance =
+    Plugin.Contract_services.clst_balance Block.rpc_ctxt b account
+  in
+  let balance =
+    Option.value_f
+      ~default:(fun () -> assert false)
+      (Script_int.to_int64 balance)
+  in
+  let expected_balance = Int64.add initial_balance_mutez diff_mutez in
+  Assert.equal_int64 ~loc expected_balance balance
+
 let test_deposit =
   register_test ~title:"Test deposit of a non null amount" @@ fun () ->
   let open Lwt_result_wrap_syntax in
@@ -35,17 +58,7 @@ let test_deposit =
   let amount = Tez.of_mutez_exn 100000000L in
   let* deposit_tx = Op.clst_deposit (Context.B b) sender amount in
   let* b = Block.bake ~operation:deposit_tx b in
-  let* balance =
-    Plugin.Contract_services.clst_balance Block.rpc_ctxt b sender
-  in
-  let amount = Tez.to_mutez amount in
-  let balance =
-    Option.value_f
-      ~default:(fun () -> assert false)
-      (Script_int.to_int64 balance)
-  in
-  Check.((amount = balance) int64 ~error_msg:"Expected %L, got %R") ;
-  return_unit
+  check_clst_balance_diff ~loc:__LOC__ 0L (Tez.to_mutez amount) b sender
 
 let test_deposit_zero =
   register_test ~title:"Test depositing 0 tez amount is forbidden" @@ fun () ->
@@ -146,3 +159,124 @@ let test_deposit_from_originated_contract =
         "Deposits from smart contracts are forbidden and expected to fail"
   | Error trace ->
       Error_helpers.expect_clst_non_implicit_depositer ~loc:__LOC__ trace
+
+let () =
+  register_test ~title:"Test simple withdraw" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, funder = Context.init1 ~consensus_threshold_size:0 () in
+  let initial_bal_mutez = 300_000_000L in
+  let* account, b =
+    create_funded_account ~funder ~amount_mutez:initial_bal_mutez b
+  in
+  let initial_clst_bal_mutez = 100_000_000L in
+  let* deposit_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      ~fee:Tez.zero
+      (B b)
+      account
+      (Tez.of_mutez_exn initial_clst_bal_mutez)
+  in
+  let* b = Block.bake ~operation:deposit_tx b in
+  let* () =
+    check_clst_balance_diff ~loc:__LOC__ 0L initial_clst_bal_mutez b account
+  in
+
+  let* balance_before = Context.Contract.balance (B b) account in
+  let withdrawal_amount_mutez = 30_000_000L in
+  let* withdraw_tx =
+    Op.clst_withdraw ~fee:Tez.zero (B b) account withdrawal_amount_mutez
+  in
+  let* b = Block.bake ~operation:withdraw_tx b in
+  let* () =
+    Assert.balance_was_credited
+      ~loc:__LOC__
+      (B b)
+      account
+      balance_before
+      (Tez.of_mutez_exn withdrawal_amount_mutez)
+  in
+  let* () =
+    check_clst_balance_diff
+      ~loc:__LOC__
+      initial_clst_bal_mutez
+      (Int64.neg withdrawal_amount_mutez)
+      b
+      account
+  in
+  return_unit
+
+let () =
+  register_test ~title:"Test overwithdraw" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, funder = Context.init1 ~consensus_threshold_size:0 () in
+  let initial_bal_mutez = 300_000_000L in
+  let* account, b =
+    create_funded_account ~funder ~amount_mutez:initial_bal_mutez b
+  in
+  let withdrawal_amount_mutez = 30_000_000L in
+  let* withdraw_tx =
+    Op.clst_withdraw
+      ~force_reveal:true
+      ~fee:Tez.zero
+      (B b)
+      account
+      withdrawal_amount_mutez
+  in
+  let*! b = Block.bake ~operation:withdraw_tx b in
+  match b with
+  | Ok _ ->
+      Test.fail
+        "Withdrawing more clst tokens than the contract has is forbidden"
+  | Error trace -> Error_helpers.expect_clst_balance_too_low ~loc:__LOC__ trace
+
+let () =
+  register_test ~title:"Test zero withdraw" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, funder = Context.init1 ~consensus_threshold_size:0 () in
+  let initial_bal_mutez = 300_000_000L in
+  let* account, b =
+    create_funded_account ~funder ~amount_mutez:initial_bal_mutez b
+  in
+  let withdrawal_amount_mutez = 0L in
+  let* withdraw_tx =
+    Op.clst_withdraw
+      ~force_reveal:true
+      ~fee:Tez.zero
+      (B b)
+      account
+      withdrawal_amount_mutez
+  in
+  let*! b = Block.bake ~operation:withdraw_tx b in
+  match b with
+  | Ok _ -> Test.fail "Withdrawing 0 tez is forbidden"
+  | Error trace -> Error_helpers.expect_clst_empty_transfer ~loc:__LOC__ trace
+
+let () =
+  register_test ~title:"Test withdraw with non-zero transfer" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, funder = Context.init1 ~consensus_threshold_size:0 () in
+  let initial_bal_mutez = 300_000_000L in
+  let* account, b =
+    create_funded_account ~funder ~amount_mutez:initial_bal_mutez b
+  in
+  let* clst_hash = get_clst_hash (Context.B b) in
+  let withdrawal_amount_mutez = 10L in
+  let* withdraw_tx =
+    Op.transaction
+      ~force_reveal:true
+      ~fee:Tez.zero
+      (B b)
+      account
+      (Contract.Originated clst_hash)
+      (Tez.of_mutez_exn 30_000L)
+      ~entrypoint:(Entrypoint.of_string_strict_exn "withdraw")
+      ~parameters:
+        (Alpha_context.Script.lazy_expr
+           (Expr.from_string (Int64.to_string withdrawal_amount_mutez)))
+  in
+  let*! b = Block.bake ~operation:withdraw_tx b in
+  match b with
+  | Ok _ -> Test.fail "Transferring to withdraw is forbidden"
+  | Error trace ->
+      Error_helpers.expect_clst_non_empty_transfer ~loc:__LOC__ trace

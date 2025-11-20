@@ -1583,3 +1583,24 @@ let clst_deposit ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
     src
     (Contract.Originated clst_hash)
     amount
+
+let clst_withdraw ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) (src : Contract.t) (amount : int64) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  let parameters =
+    Alpha_context.Script.lazy_expr (Expr.from_string (Int64.to_string amount))
+  in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "withdraw")
+    ~parameters
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    Tez.zero
