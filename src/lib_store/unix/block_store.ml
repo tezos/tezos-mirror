@@ -1462,8 +1462,8 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
   (* Do not allow multiple merges: force waiting for a potential
      previous merge. *)
   ()
-  [@profiler.reset_block_section
-    {verbosity = Notice} (Block_repr.hash new_head)] ;
+  [@profiler.overwrite
+    Profiler.reset_block_section (Block_repr.hash new_head, [])] ;
   let*! () = Lwt_mutex.lock block_store.merge_mutex in
   protect
     ~on_error:(fun err ->

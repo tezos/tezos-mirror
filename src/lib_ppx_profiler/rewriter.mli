@@ -22,7 +22,6 @@ type action =
   | Record
   | Record_f
   | Record_s
-  | Reset_block_section
   | Span
   | Span_f
   | Span_s

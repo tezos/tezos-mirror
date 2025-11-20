@@ -497,9 +497,7 @@ let[@warning "-32"] profiling_section =
       | `On_launch -> "ON_LAUNCH"
       | `Block b -> Block_hash.to_b58check (Store.Block.hash b)
     in
-    List.map
-      (Tezos_profiler.Profiler.section_maker ~cpu:None equal to_string)
-      profilers
+    List.map (Tezos_profiler.Profiler.section_maker equal to_string) profilers
   in
   fun section -> List.iter (fun f -> f section) section_makers
 

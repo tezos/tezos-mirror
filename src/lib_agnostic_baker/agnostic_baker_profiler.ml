@@ -13,5 +13,5 @@ let init profiler_maker =
   | Some instance -> plug agnostic_baker_profiler instance
   | None -> ()
 
-let create_reset_block_section ~cpu =
-  section_maker ~cpu Block_hash.equal Block_hash.to_b58check
+let create_reset_block_section =
+  section_maker Block_hash.equal Block_hash.to_b58check

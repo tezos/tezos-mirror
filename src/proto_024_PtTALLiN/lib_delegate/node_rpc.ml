@@ -354,10 +354,8 @@ let monitor_valid_proposals cctxt ~chain ?cache () =
   in
   let stream =
     let map (_chain_id, block_hash, block_header, operations) =
-      () [@profiler.reset_block_section {profiler_module = Profiler} block_hash] ;
-      ()
-      [@profiler.reset_block_section
-        {profiler_module = RPC_profiler} block_hash] ;
+      () [@profiler.overwrite Profiler.reset_block_section (block_hash, [])] ;
+      () [@profiler.overwrite RPC_profiler.reset_block_section (block_hash, [])] ;
       (let*! map_result =
          proposal cctxt ?cache ~operations ~chain block_hash block_header
        in
@@ -382,7 +380,7 @@ let monitor_heads cctxt ~chain ?cache () =
   in
   let stream =
     let map (block_hash, block_header) =
-      () [@profiler.reset_block_section block_hash] ;
+      () [@profiler.overwrite Profiler.reset_block_section (block_hash, [])] ;
       (let*! map_result =
          proposal cctxt ?cache ~chain block_hash block_header
        in

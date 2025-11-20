@@ -424,7 +424,7 @@ type 'a section_maker = 'a * metadata -> unit
     @param profiler - profiler instance used to track sections and record profiling data. *)
 val section_maker :
   ?verbosity:verbosity ->
-  cpu:bool option ->
+  ?cpu:bool ->
   ('a -> 'a -> bool) ->
   ('a -> string) ->
   profiler ->
