@@ -97,6 +97,17 @@ module type T = sig
     tb_slot:tb_slot ->
     unit tzresult Lwt.t
 
+  val publish :
+    Tezos_rpc.Context.generic ->
+    block_level:int32 ->
+    source:Signature.Public_key_hash.t ->
+    slot_index:slot_index ->
+    commitment:Tezos_crypto_dal.Cryptobox.commitment ->
+    commitment_proof:Tezos_crypto_dal.Cryptobox.commitment_proof ->
+    src_sk:Signature.Secret_key.t ->
+    unit ->
+    Operation_hash.t tzresult Lwt.t
+
   val is_delegate :
     Tezos_rpc.Context.generic ->
     pkh:Signature.Public_key_hash.t ->
