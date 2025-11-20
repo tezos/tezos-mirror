@@ -1009,7 +1009,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind ?with_dal
   let* dal_node =
     match with_dal with
     | None -> Lwt.return_none
-    | Some init_dal_node -> init_dal_node node client
+    | Some init_dal_node -> init_dal_node protocol node client
   in
 
   let run_honest_node sc_rollup_node =

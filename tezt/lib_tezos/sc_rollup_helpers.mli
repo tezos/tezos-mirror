@@ -401,9 +401,9 @@ val reveal_hash : protocol:'a -> kind:string -> string -> reveal_hash
 val test_refutation_scenario_aux :
   mode:Sc_rollup_node.mode ->
   kind:string ->
-  ?with_dal:(Node.t -> Client.t -> Dal_node.t option Lwt.t) ->
+  ?with_dal:(Protocol.t -> Node.t -> Client.t -> Dal_node.t option Lwt.t) ->
   refutation_scenario_parameters ->
-  'a ->
+  Protocol.t ->
   Sc_rollup_node.t ->
   string ->
   Node.t ->
