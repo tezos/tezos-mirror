@@ -83,6 +83,14 @@ pub enum EncodingError {
 }
 
 #[derive(Error, Debug)]
+pub enum TezlinkSimulationError {
+    #[error("Unexpected end of inbox")]
+    UnexpectedEndOfInbox,
+    #[error("Unexpected simulation input: {0:?}, expecting either 0x00 to skip signature checking or 0x01 to check signature")]
+    UnexpectedSkipSigTag(Vec<u8>),
+}
+
+#[derive(Error, Debug)]
 #[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[error(transparent)]
@@ -101,6 +109,8 @@ pub enum Error {
     InvalidRunTransaction(revm_etherlink::Error),
     #[error("Simulation failed: {0}")]
     Simulation(revm_etherlink::Error),
+    #[error("Tezlink simulation failed: {0}")]
+    TezlinkSimulation(TezlinkSimulationError),
     #[error(transparent)]
     UpgradeError(UpgradeProcessError),
     #[error(transparent)]

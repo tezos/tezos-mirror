@@ -67,4 +67,12 @@ module type S = sig
     list
     tzresult
     Lwt.t
+
+  val simulate_operation :
+    chain_id:Chain_id.t ->
+    skip_signature:bool ->
+    Tezlink_imports.Imported_protocol.operation ->
+    Operation_hash.t ->
+    block_param ->
+    Tezlink_imports.Imported_protocol.operation_receipt tzresult Lwt.t
 end

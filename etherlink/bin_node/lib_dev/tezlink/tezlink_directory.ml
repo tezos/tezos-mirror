@@ -402,32 +402,41 @@ let build_block_static_directory ~l2_chain_id
              _chain_id,
              _operation_inclusion_latency )
          ->
-         let*? _chain = check_chain chain in
-         let*? _block = check_block block in
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
          let hash = Alpha_context.Operation.hash_packed operation in
-         let op = operation.protocol_data in
-         let*? mock_result =
-           Tezlink_mock.Operation_metadata.operation_metadata hash op
+         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+         let* result =
+           Backend.simulate_operation
+             ~chain_id
+             ~skip_signature:true
+             operation
+             hash
+             block
          in
-         return (op, mock_result))
+         return (operation.protocol_data, result))
   |> register
        ~service:Tezos_services.preapply_operations
        ~impl:(fun {block; chain} param ops ->
-         let*? _chain = check_chain chain in
-         let*? _block = check_block block in
-         let*? receipts =
-           List.map_e
-             (fun (op : Alpha_context.packed_operation) ->
-               let open Result_syntax in
-               let hash = Alpha_context.Operation.hash_packed op in
-               let op = op.protocol_data in
-               let* mock_result =
-                 Tezlink_mock.Operation_metadata.operation_metadata hash op
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+         let* receipts =
+           List.map_es
+             (fun (operation : Alpha_context.packed_operation) ->
+               let hash = Alpha_context.Operation.hash_packed operation in
+               let* result =
+                 Backend.simulate_operation
+                   ~chain_id
+                   ~skip_signature:false
+                   operation
+                   hash
+                   block
                in
-               return (op, mock_result))
+               return (operation.protocol_data, result))
              ops
          in
-         Lwt_result_syntax.return (param#version, receipts))
+         return (param#version, receipts))
   |> register
        ~service:Tezos_services.raw_json_cycle
        ~impl:(fun ({block; chain}, _cycle) () () ->

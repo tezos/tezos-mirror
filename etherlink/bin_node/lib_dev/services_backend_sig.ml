@@ -15,6 +15,8 @@ module type S = sig
 
   module Tracer_etherlink : Tracer_sig.S
 
+  module SimulatorBackend : Simulator.SimulationBackend
+
   val block_param_to_block_number :
     chain_family:_ L2_types.chain_family ->
     Ethereum_types.Block_parameter.extended ->
@@ -115,7 +117,7 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   module Etherlink = struct
     include Etherlink_durable_storage.Make (Backend.Reader)
     include Publisher.Make (Backend.TxEncoder) (Backend.Publisher)
-    include Simulator.Make (Backend.SimulatorBackend)
+    include Simulator.MakeEtherlink (Backend.SimulatorBackend)
 
     let replay number =
       let open Lwt_result_syntax in
@@ -131,11 +133,12 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
     Tracer_sig.Make (Executor) (Etherlink_block_storage) (Backend.Tracer)
   module Tezlink_block_storage =
     Tezlink_durable_storage.Make_block_storage (Backend.Reader)
+  module SimulatorBackend = Backend.SimulatorBackend
 
   module Tezlink =
     Tezlink_services_impl.Make
       (struct
-        include Backend.Reader
+        include Backend.SimulatorBackend
 
         let block_param_to_block_number =
           Backend.block_param_to_block_number ~chain_family:L2_types.Michelson

@@ -748,6 +748,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     hash: OperationHash,
     operation: Operation,
     block_ctx: &BlockCtx,
+    skip_signature_check: bool,
 ) -> Result<Vec<OperationResultSum>, OperationError> {
     let mut safe_host = SafeStorage {
         host,
@@ -758,19 +759,23 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 
     log!(safe_host, Debug, "Verifying that the batch is valid");
 
-    let validation_info =
-        match validate::execute_validation(&mut safe_host, context, operation) {
-            Ok(validation_info) => validation_info,
-            Err(validity_err) => {
-                log!(
-                    safe_host,
-                    Debug,
-                    "Reverting the changes because the batch is invalid."
-                );
-                safe_host.revert()?;
-                return Err(OperationError::Validation(validity_err));
-            }
-        };
+    let validation_info = match validate::execute_validation(
+        &mut safe_host,
+        context,
+        operation,
+        skip_signature_check,
+    ) {
+        Ok(validation_info) => validation_info,
+        Err(validity_err) => {
+            log!(
+                safe_host,
+                Debug,
+                "Reverting the changes because the batch is invalid."
+            );
+            safe_host.revert()?;
+            return Err(OperationError::Validation(validity_err));
+        }
+    };
 
     log!(safe_host, Debug, "Batch is valid!");
 
@@ -1373,6 +1378,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         );
 
         let expected_error =
@@ -1405,6 +1411,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         );
 
         let expected_error =
@@ -1437,6 +1444,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         );
 
         let expected_error =
@@ -1483,6 +1491,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1544,6 +1553,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1600,6 +1610,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         );
 
         let expected_error = OperationError::Validation(ValidityError::InvalidSignature);
@@ -1641,6 +1652,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1712,6 +1724,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1787,6 +1800,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1873,6 +1887,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -1984,6 +1999,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect("validate_and_apply_operation should not have failed with a kernel error")
         .remove(0);
@@ -2113,6 +2129,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2222,6 +2239,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2300,6 +2318,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2362,6 +2381,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -2441,6 +2461,7 @@ mod tests {
             OperationHash(H256::zero()),
             batch,
             &block_ctx!(),
+            false,
         )
         .unwrap();
 
@@ -2609,6 +2630,7 @@ mod tests {
             OperationHash(H256::zero()),
             batch,
             &block_ctx!(),
+            false,
         );
 
         let expected_error =
@@ -2702,6 +2724,7 @@ mod tests {
             OperationHash(H256::zero()),
             batch,
             &block_ctx!(),
+            false,
         )
         .unwrap();
 
@@ -2815,6 +2838,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3028,6 +3052,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3190,6 +3215,7 @@ mod tests {
             operation.hash().unwrap(),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3252,6 +3278,7 @@ mod tests {
             operation.hash().unwrap(),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3318,6 +3345,7 @@ mod tests {
             operation.hash().unwrap(),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3395,6 +3423,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3594,6 +3623,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -3819,6 +3849,7 @@ mod tests {
             OperationHash(H256::zero()),
             batch,
             &block_ctx!(),
+            false,
         )
         .unwrap();
 
@@ -4083,6 +4114,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4157,6 +4189,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4197,6 +4230,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4238,6 +4272,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",
@@ -4287,6 +4322,7 @@ mod tests {
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
+            false,
         )
         .expect(
             "validate_and_apply_operation should not have failed with a kernel error",

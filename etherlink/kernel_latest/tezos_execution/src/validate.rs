@@ -248,6 +248,7 @@ pub fn execute_validation<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     operation: tezos_tezlink::operation::Operation,
+    skip_signature_check: bool,
 ) -> Result<ValidatedBatch, ValidityError> {
     if operation.content.is_empty() {
         return Err(ValidityError::EmptyBatch);
@@ -267,7 +268,17 @@ pub fn execute_validation<Host: Runtime>(
     let (pk, source_account) = validate_source(host, context, &unvalidated_operation)?;
     match verify_signature(operation, &pk, &mut validation_gas) {
         Ok(true) => log!(host, Debug, "Validation: OK - Signature is valid."),
-        _ => return Err(ValidityError::InvalidSignature),
+        _ => {
+            if skip_signature_check {
+                log!(
+                    host,
+                    Debug,
+                    "Validation: Signature is invalid but signature check is disabled."
+                )
+            } else {
+                return Err(ValidityError::InvalidSignature);
+            }
+        }
     }
 
     let mut source_balance = source_account
