@@ -16,17 +16,16 @@ depends: [
   "octez-shell-libs" { = version }
   "octez-baker-lib" { = version }
   "octez-protocol-023-PtSeouLo-libs" { = version }
+  "octez-protocol-024-PtTALLiN-libs" { = version }
 ]
 depopts: [
   "octez-protocol-021-PsQuebec-libs"
   "octez-protocol-022-PsRiotum-libs"
-  "octez-protocol-024-PtTALLiN-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
   "octez-protocol-021-PsQuebec-libs" { != version }
   "octez-protocol-022-PsRiotum-libs" { != version }
-  "octez-protocol-024-PtTALLiN-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [
