@@ -841,8 +841,9 @@ pub mod interpret_cost {
         Crypto(#[from] CryptoError),
     }
 
-    pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Result<u32, SigCostError> {
-        let len = Checked::from(msg.len());
+    pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Result<u32, CryptoError> {
+        let len = msg.len().min(u32::MAX as usize) as u32;
+        let serialization_cost = len << 5;
         let checked_cost = match k {
             PublicKey::Ed25519(..) => 65_800 + ((len >> 3) + len),
             PublicKey::Secp256k1(..) => 51_600 + ((len >> 3) + len),
@@ -851,13 +852,13 @@ pub mod interpret_cost {
             PublicKey::Bls(..) => 1_570_000 + (len * 3),
             #[cfg(not(feature = "bls"))]
             PublicKey::Bls(..) => {
-                return Err(SigCostError::Crypto(CryptoError::Unsupported(
+                return Err(CryptoError::Unsupported(
                     "bls feature disabled, tz4 signature verification not supported",
-                )))
+                ))
             }
         };
 
-        checked_cost.as_gas_cost().map_err(SigCostError::from)
+        Ok(serialization_cost + checked_cost)
     }
 
     pub fn slice(length: usize) -> Result<u32, OutOfGas> {

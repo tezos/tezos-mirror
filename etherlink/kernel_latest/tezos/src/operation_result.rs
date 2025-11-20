@@ -18,6 +18,7 @@ use nom::error::ParseError;
 use std::fmt::Debug;
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::hash::UnknownSignature;
+use tezos_crypto_rs::CryptoError;
 use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom as tezos_nom;
 use tezos_data_encoding::nom::error::DecodeError;
@@ -80,6 +81,13 @@ impl From<gas::OutOfGas> for ValidityError {
         ValidityError::OutOfGas
     }
 }
+
+impl From<CryptoError> for ValidityError {
+    fn from(_: CryptoError) -> Self {
+        ValidityError::InvalidSignature
+    }
+}
+
 impl From<SigCostError> for ValidityError {
     fn from(e: SigCostError) -> Self {
         match e {
