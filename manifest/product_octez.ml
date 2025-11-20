@@ -3925,6 +3925,7 @@ let octez_context_ops =
         octez_context |> open_;
         octez_context_brassaia |> open_;
         octez_shell_context |> open_;
+        octez_stdlib_unix |> open_;
         octez_brassaia_context |> open_;
         octez_tezedge_context |> open_;
         octez_duo_context_lib |> open_;
