@@ -3453,6 +3453,154 @@ let test_invalid_dal_parameters protocols =
        ~priority:`Priority_honest)
     protocols
 
+(* kernel_imported_publish_level is the imported published level hardcoded in
+   the [Constant.WASM.echo_dal_reveal_pages] kernel. *)
+let with_dal_ready_for_echo_dal_reveal_pages ~operator_profiles:_
+    ~kernel_imported_publish_level:_ ~may_publish_and_attest_slot:_
+    ~expected_attestation_lag:_ =
+ fun _protocol _tezos_node _tezos_client ->
+  (* Will be implemented in the next commit *)
+  assert false
+
+type case = {
+  inbox_level : int;
+  player_priority : [`Priority_loser | `Priority_honest];
+  attestation_status : [`Attested | `Unattested];
+      (* TODO: We might want to distinguish "Published | Unpublished" for the
+         Unattested case in the future. *)
+}
+
+let player_priority_to_string = function
+  | `Priority_loser -> "Priority_loser"
+  | `Priority_honest -> "Priority_honest"
+
+let attestation_status_to_string = function
+  | `Attested -> "Attested"
+  | `Unattested -> "Unattested"
+
+let test_refutation_with_dal_page_import protocols =
+  (* This is the published level for which the toy kernel
+     [Constant.WASM.echo_dal_reveal_pages] asks to import page 2 of slot 1. *)
+  let published_level = 15 in
+  (* This is the test's attestation lag (checked in the scenario). *)
+  let dal_lag = 5 in
+  (* This is the slot index at which we'll possibly publish a slot. *)
+  let slot_index = 1 in
+  (* Once a slot is attested, its import is valid for this number of
+     blocks. After that, any import is considered invalid. *)
+  let dal_ttl = 50 in
+
+  (* First dimension of the tests: we vary inbox_level at which the divergence
+     between the honest and loser rollups will happen. This stress-tests various
+     corner cases regarding the level at which the import request is sent
+     w.r.t. published level.  *)
+  let dimension_inbox_level =
+    [
+      (* Test import around published_level. Nothing should be imported *)
+      published_level - 1;
+      published_level + 0;
+      published_level + 1;
+      (* Test import around attested_level. Nothing should be imported for the
+         first level below. For the two others, the page should be imported if
+         the slot is attested. *)
+      published_level + dal_lag - 1;
+      published_level + dal_lag + 0;
+      published_level + dal_lag + 1;
+      (* Test import attested_level + TLL. The slot's page should not be
+         imported for the third case below, even if it is attested, because its
+         TTL expired.  *)
+      published_level + dal_ttl + dal_lag - 1;
+      published_level + dal_ttl + dal_lag + 0;
+      published_level + dal_ttl + dal_lag + 1;
+    ]
+  in
+
+  (* Second dimension of the tests: Which player will start the game. This will
+     have an impact on which one will provide the final proof. *)
+  let dimension_player_priority = [`Priority_loser; `Priority_honest] in
+
+  (* Third dimension of the tests: We will test both with attested an unattested
+     slots. *)
+  let dimension_attested = [`Attested; `Unattested] in
+
+  (* The list of tests, as a cartesian product of 3 dimensions above. *)
+  let all_cases =
+    List.fold_left
+      (fun accu inbox_level ->
+        List.fold_left
+          (fun accu player_priority ->
+            List.fold_left
+              (fun accu attestation_status ->
+                {inbox_level; player_priority; attestation_status} :: accu)
+              accu
+              dimension_attested)
+          accu
+          dimension_player_priority)
+      []
+      dimension_inbox_level
+  in
+
+  List.iter
+    (fun {inbox_level; attestation_status; player_priority} ->
+      (* One test name for each dimensions combination. *)
+      let variant =
+        Format.sprintf
+          "dal_page_flipped_at_inbox_level_%d_%s_%s"
+          inbox_level
+          (player_priority_to_string player_priority)
+          (attestation_status_to_string attestation_status)
+      in
+      (* The behaviour of the loser mode is parameterized by the inbox level at
+         which the payload of imported page is flipped. *)
+      let loser_modes =
+        (* See src/lib_smart_rollup_node/loser_mode.mli for the semantics of this
+            loser mode. *)
+        [
+          Format.sprintf
+            "reveal_dal_page published_level:15 slot_index:1 page_index:2 \
+             strategy:flip inbox_level:%d"
+            inbox_level;
+        ]
+      in
+      let may_publish_and_attest_slot =
+        if attestation_status = `Unattested then None
+        else Some (published_level, slot_index)
+      in
+      let with_dal =
+        with_dal_ready_for_echo_dal_reveal_pages
+          ~operator_profiles:[slot_index]
+          ~kernel_imported_publish_level:published_level
+          ~expected_attestation_lag:dal_lag
+          ~may_publish_and_attest_slot
+      in
+      let priority =
+        (player_priority :> [`No_priority | `Priority_honest | `Priority_loser])
+      in
+      test_refutation_scenario
+        ~uses:(fun _protocol ->
+          [Constant.WASM.echo_dal_reveal_pages; Constant.octez_dal_node])
+        ~kind:"wasm_2_0_0"
+        ~mode:Operator
+        ~challenge_window:150
+        ~timeout:120
+        ~commitment_period:10
+        ~dal_attested_slots_validity_lag:dal_ttl
+        ~variant
+        ~boot_sector:
+          (read_kernel
+             ~base:""
+             ~suffix:""
+             (Uses.path Constant.WASM.echo_dal_reveal_pages))
+        (refutation_scenario_parameters
+           ~loser_modes
+           (inputs_for 10)
+           ~final_level:100
+           ~priority)
+        protocols
+        ~regression:false
+        ~with_dal)
+    all_cases
+
 (** Run one of the refutation tests with an accuser instead of a full operator. *)
 let test_accuser protocols =
   test_refutation_scenario
@@ -7434,6 +7582,7 @@ let register_protocol_independent () =
   test_injector_auto_discard protocols ;
   test_accuser protocols ;
   test_invalid_dal_parameters protocols ;
+  test_refutation_with_dal_page_import protocols ;
   test_bailout_refutation protocols ;
   test_multiple_batcher_key ~kind protocols ;
   test_batcher_order_msgs ~kind protocols ;
