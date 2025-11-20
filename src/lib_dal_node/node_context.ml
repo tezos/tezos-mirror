@@ -163,11 +163,20 @@ let storage_period ctxt proto_parameters =
       `Finite n
 
 let level_to_gc ctxt proto_parameters ~current_level =
+  let open Lwt_result_syntax in
   match storage_period ctxt proto_parameters with
-  | `Always -> None
-  | `Finite n ->
+  | `Always -> return_none
+  | `Finite n -> (
       let level = Int32.(sub current_level (of_int n)) in
-      if level < 1l then None else Some level
+      if level < 1l then return_none
+      else
+        let* first_seen_level_opt =
+          Store.First_seen_level.load (Store.first_seen_level ctxt.store)
+        in
+        match first_seen_level_opt with
+        | None -> return_none
+        | Some first_seen_level ->
+            if level < first_seen_level then return_none else return_some level)
 
 let get_profile_ctxt ctxt = ctxt.profile_ctxt
 
