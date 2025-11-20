@@ -47,24 +47,29 @@ let duration_ns test =
       test.successful_runs.total_time
       (Int64.of_int test.successful_runs.count)
 
+let duration_minutes test = Int64.to_float (duration_ns test) /. 60_000_000.
+
 type t = test list
 
 let decode (json : JSON.t) : t = JSON.(json |> as_list |> List.map decode_test)
 
 let input_file acc filename = (JSON.parse_file filename |> decode) :: acc
 
-let rec input_file_or_directory acc path =
-  if Sys.is_directory path then
-    let sub_paths = Sys.readdir path |> Array.map (Filename.concat path) in
-    Array.fold_left input_file_or_directory acc sub_paths
-  else input_file acc path
-
-let input ~recursive paths : t =
-  List.fold_left
-    (if recursive then input_file_or_directory else input_file)
-    []
-    paths
-  |> List.flatten
+let input ~recursive paths =
+  let rec input_file_or_directory ~recursive acc path =
+    if Sys.is_directory path then
+      let sub_paths = Sys.readdir path |> Array.map (Filename.concat path) in
+      Array.fold_left
+        (fun acc path ->
+          if recursive then input_file_or_directory ~recursive:true acc path
+          else if Filename.check_suffix path ".json" then input_file acc path
+          else acc)
+        acc
+        sub_paths
+    else if Filename.check_suffix path ".json" then input_file acc path
+    else []
+  in
+  List.fold_left (input_file_or_directory ~recursive) [] paths |> List.flatten
 
 let matches tsl test =
   TSL.eval
