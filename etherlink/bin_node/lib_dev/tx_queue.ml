@@ -446,6 +446,12 @@ struct
             (fun _ -> assert false);
           case
             Json_only
+            ~title:"Size_info"
+            (obj1 (req "request" (constant "size_info")))
+            (function View Size_info -> Some () | _ -> None)
+            (fun _ -> assert false);
+          case
+            Json_only
             ~title:"Pop_transactions"
             (obj1 (req "request" (constant "pop_transactions")))
             (function
