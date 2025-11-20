@@ -3650,7 +3650,7 @@ mod interpreter_tests {
         ctx.big_map_storage = InMemoryLazyStorage::new();
         let big_map_id = ctx
             .big_map_storage
-            .big_map_new(&Type::Int, &Type::String)
+            .big_map_new(&Type::Int, &Type::String, false)
             .unwrap();
         ctx.big_map_storage
             .big_map_update(
@@ -3835,7 +3835,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         let big_map_id = ctx
             .big_map_storage
-            .big_map_new(&Type::Int, &Type::String)
+            .big_map_new(&Type::Int, &Type::String, false)
             .unwrap();
         ctx.big_map_storage
             .big_map_bulk_update(
@@ -4290,7 +4290,7 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             let id = ctx
                 .big_map_storage
-                .big_map_new(&Type::Int, &Type::String)
+                .big_map_new(&Type::Int, &Type::String, false)
                 .unwrap();
             ctx.big_map_storage
                 .big_map_bulk_update(&id, content)
@@ -4376,7 +4376,7 @@ mod interpreter_tests {
             let mut ctx = Ctx::default();
             let id = ctx
                 .big_map_storage
-                .big_map_new(&Type::Int, &Type::String)
+                .big_map_new(&Type::Int, &Type::String, false)
                 .unwrap();
             ctx.big_map_storage
                 .big_map_bulk_update(&id, content)

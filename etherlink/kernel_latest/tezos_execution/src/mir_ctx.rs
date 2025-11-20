@@ -540,6 +540,7 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
         &mut self,
         key_type: &Type,
         value_type: &Type,
+        _temporary: bool,
     ) -> Result<BigMapId, LazyStorageError> {
         let arena = Arena::new();
         let next_id_path = next_id_path(self.context)?;
@@ -561,7 +562,11 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
         Ok(id)
     }
 
-    fn big_map_copy(&mut self, id: &BigMapId) -> Result<BigMapId, LazyStorageError> {
+    fn big_map_copy(
+        &mut self,
+        id: &BigMapId,
+        _temporary: bool,
+    ) -> Result<BigMapId, LazyStorageError> {
         let next_id_path = next_id_path(self.context)?;
         let dest_id: BigMapId = read_nom_value(self.host, &next_id_path)
             .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
@@ -736,7 +741,9 @@ mod tests {
     fn test_map_updates_to_storage() {
         let mut host = MockKernelHost::default();
         make_default_ctx!(storage, &mut host, &Context::init_context());
-        let map_id = storage.big_map_new(&Type::Int, &Type::String).unwrap();
+        let map_id = storage
+            .big_map_new(&Type::Int, &Type::String, false)
+            .unwrap();
         storage
             .big_map_update(
                 &map_id,
@@ -826,7 +833,7 @@ mod tests {
         check_is_dumped_map(map, 0.into());
 
         let copied_id = storage
-            .big_map_copy(&0.into())
+            .big_map_copy(&0.into(), false)
             .expect("Failed to copy big_map in storage");
 
         assert_eq!(copied_id, 1.into());
@@ -848,7 +855,7 @@ mod tests {
         make_default_ctx!(storage, &mut host, &Context::init_context());
         let key_type = Type::Int;
         let value_type = Type::Int;
-        let map_id = storage.big_map_new(&key_type, &value_type).unwrap();
+        let map_id = storage.big_map_new(&key_type, &value_type, false).unwrap();
         let key = TypedValue::int(0);
         let value = TypedValue::int(0);
         storage
@@ -878,11 +885,11 @@ mod tests {
     fn test_remove_with_dump() {
         let mut host = MockKernelHost::default();
         make_default_ctx!(storage, &mut host, &Context::init_context());
-        let map_id1 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let map_id1 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
             .big_map_update(&map_id1, TypedValue::int(0), Some(TypedValue::int(0)))
             .unwrap();
-        let map_id2 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let map_id2 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
             .big_map_update(&map_id2, TypedValue::int(0), Some(TypedValue::int(0)))
             .unwrap();

@@ -4,7 +4,7 @@
 
 //! `big_map` typed representation and utilities for working with `big_map`s.
 
-use num_bigint::BigInt;
+use num_bigint::{BigInt, Sign};
 use num_traits::One;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
@@ -53,10 +53,19 @@ impl BigMapId {
     /// Get successor of the id
     pub fn succ(&self) -> Self {
         let Zarith(ref int_value) = self.value;
-        let result = int_value + BigInt::one();
+        let result = if self.is_temporary() {
+            int_value - BigInt::one()
+        } else {
+            int_value + BigInt::one()
+        };
         BigMapId {
             value: Zarith(result),
         }
+    }
+
+    /// Tells if a big_map id is temporary
+    pub fn is_temporary(&self) -> bool {
+        self.value.0.sign() == Sign::Minus
     }
 }
 
@@ -271,13 +280,18 @@ pub trait LazyStorage<'a> {
         &mut self,
         key_type: &Type,
         value_type: &Type,
+        temporary: bool,
     ) -> Result<BigMapId, LazyStorageError>;
 
     /// Allocate a new big map, filling it with the contents from another map
     /// in the lazy storage.
     ///
     /// The specified big map id must point to a valid map in the lazy storage.
-    fn big_map_copy(&mut self, id: &BigMapId) -> Result<BigMapId, LazyStorageError>;
+    fn big_map_copy(
+        &mut self,
+        id: &BigMapId,
+        temporary: bool,
+    ) -> Result<BigMapId, LazyStorageError>;
 
     /// Remove a big map.
     ///
@@ -335,6 +349,7 @@ impl<'a> MapInfo<'a> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InMemoryLazyStorage<'a> {
     next_id: BigMapId,
+    next_temp_id: BigMapId,
     big_maps: BTreeMap<BigMapId, MapInfo<'a>>,
 }
 
@@ -343,6 +358,7 @@ impl<'a> InMemoryLazyStorage<'a> {
     pub fn new() -> Self {
         InMemoryLazyStorage {
             next_id: 0.into(),
+            next_temp_id: (-1).into(),
             big_maps: BTreeMap::new(),
         }
     }
@@ -354,12 +370,22 @@ impl<'a> InMemoryLazyStorage<'a> {
             .max()
             .map(|id| id.succ())
             .unwrap_or_else(|| 0.into());
-        InMemoryLazyStorage { next_id, big_maps }
+        InMemoryLazyStorage {
+            next_id,
+            next_temp_id: (-1).into(),
+            big_maps,
+        }
     }
 
     fn get_next_id(&mut self) -> BigMapId {
         let id = self.next_id.clone();
         self.next_id = self.next_id.succ();
+        id
+    }
+
+    fn get_next_temp_id(&mut self) -> BigMapId {
+        let id = self.next_temp_id.clone();
+        self.next_id = self.next_temp_id.succ();
         id
     }
 
@@ -432,8 +458,13 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         &mut self,
         key_type: &Type,
         value_type: &Type,
+        temporary: bool,
     ) -> Result<BigMapId, LazyStorageError> {
-        let id = self.get_next_id();
+        let id = if temporary {
+            self.get_next_temp_id()
+        } else {
+            self.get_next_id()
+        };
         self.big_maps.insert(
             id.clone(),
             MapInfo {
@@ -450,8 +481,16 @@ impl<'a> LazyStorage<'a> for InMemoryLazyStorage<'a> {
         Ok(())
     }
 
-    fn big_map_copy(&mut self, copied_id: &BigMapId) -> Result<BigMapId, LazyStorageError> {
-        let id = self.get_next_id();
+    fn big_map_copy(
+        &mut self,
+        copied_id: &BigMapId,
+        temporary: bool,
+    ) -> Result<BigMapId, LazyStorageError> {
+        let id = if temporary {
+            self.get_next_temp_id()
+        } else {
+            self.get_next_id()
+        };
         let info = self.access_big_map(copied_id)?.clone();
         self.big_maps.insert(id.clone(), info);
         Ok(id)
@@ -522,7 +561,7 @@ mod test_big_map_operations {
     fn test_get_mem_backed_by_storage() {
         let arena = &Arena::new();
         let storage = &mut InMemoryLazyStorage::new();
-        let map_id = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let map_id = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
             .big_map_update(&map_id, TypedValue::int(0), Some(TypedValue::int(0)))
             .unwrap();
@@ -717,7 +756,7 @@ pub fn dump_big_map_updates<'a>(
             BigMapContent::InMemory(ref mut m) => {
                 // The entire big map is still in memory. We have to
                 // create a new map in the storage.
-                let id = storage.big_map_new(&map.key_type, &map.value_type)?;
+                let id = storage.big_map_new(&map.key_type, &map.value_type, false)?;
                 storage.big_map_bulk_update(
                     &id,
                     mem::take(m)
@@ -745,7 +784,7 @@ pub fn dump_big_map_updates<'a>(
         // If there are any big maps with duplicate ID, we first copy them in
         // the storage.
         for map in other_maps {
-            let new_id = storage.big_map_copy(&id)?;
+            let new_id = storage.big_map_copy(&id, false)?;
             storage.big_map_bulk_update(&new_id, mem::take(&mut map.overlay))?;
             map.id = new_id
         }
@@ -806,7 +845,7 @@ mod test_big_map_to_storage_update {
     #[test]
     fn test_map_updates_to_storage() {
         let storage = &mut InMemoryLazyStorage::new();
-        let map_id = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let map_id = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
             .big_map_update(&map_id, TypedValue::int(0), Some(TypedValue::int(0)))
             .unwrap();
@@ -849,8 +888,8 @@ mod test_big_map_to_storage_update {
     #[test]
     fn test_duplicate_ids() {
         let storage = &mut InMemoryLazyStorage::new();
-        let map_id1 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
-        let map_id2 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let map_id1 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
+        let map_id2 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         let content = BigMapContent::FromId(BigMapFromId {
             id: map_id1.clone(),
             overlay: BTreeMap::from([(TypedValue::int(11), Some(TypedValue::int(11)))]),
@@ -918,11 +957,11 @@ mod test_big_map_to_storage_update {
     #[test]
     fn test_remove_ids() {
         let storage = &mut InMemoryLazyStorage::new();
-        let map_id1 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let map_id1 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
             .big_map_update(&map_id1, TypedValue::int(0), Some(TypedValue::int(0)))
             .unwrap();
-        let map_id2 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let map_id2 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
             .big_map_update(&map_id2, TypedValue::int(0), Some(TypedValue::int(0)))
             .unwrap();

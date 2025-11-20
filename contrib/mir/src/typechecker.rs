@@ -6214,7 +6214,7 @@ mod typecheck_tests {
     fn test_parsing_big_map_value() {
         let mut ctx = Ctx::default();
         let storage = &mut ctx.big_map_storage;
-        let id0 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let id0 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
             .big_map_update(&id0, TypedValue::int(5), Some(TypedValue::int(5)))
             .unwrap();
