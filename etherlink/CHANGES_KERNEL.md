@@ -31,6 +31,8 @@ Furthermore, this kernel requires the Octez EVM node version 0.47 or higher.
 ### Internal
 
 - Change the block storage to save only latest block. (!19744)
+- Storage version for sub-block latency entrypoints is V42. Also used to check for incompatibility
+  in the node at the time of executing the inclusion preconfirmation stream. (!19956)
 
 ### Tezos X Experimental Features
 
