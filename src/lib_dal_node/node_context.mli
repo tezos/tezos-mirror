@@ -180,11 +180,15 @@ val storage_period : t -> Types.proto_parameters -> [`Always | `Finite of int]
 (** [level_to_gc ctxt proto_parameters ~current_level] returns the oldest level
     that should have attested data (like shards and slots, skip list cells)
     stored; during [current_level], such data for commitments published at the
-    returned level will be removed. The returned level is non-negative. In case
+    returned level will be removed. The returned level is non-negative and will
+    not be inferior to the [first_seen_level] stored in the store. In case
     no removal is needed (either because the node is thus configured, or the
     current_level is not big enough), the function returns [None]. *)
 val level_to_gc :
-  t -> Types.proto_parameters -> current_level:int32 -> int32 option
+  t ->
+  Types.proto_parameters ->
+  current_level:int32 ->
+  int32 option tzresult Lwt.t
 
 (** [fetch_assigned_shard_indices ctxt ~level ~pkh] fetches from L1 the shard
     indices assigned to [pkh] at [level].  It internally caches the DAL

@@ -68,7 +68,10 @@ let remove_slots_and_shards ~slot_size (store : Store.t)
 let remove_old_level_stored_data proto_parameters ctxt current_level =
   let open Lwt_result_syntax in
   let store = Node_context.get_store ctxt in
-  match Node_context.level_to_gc ctxt proto_parameters ~current_level with
+  let* level_to_gc =
+    Node_context.level_to_gc ctxt proto_parameters ~current_level
+  in
+  match level_to_gc with
   | None -> return_unit
   | Some oldest_level ->
       (* The protocol parameters to consider when cleaning are the ones at the
