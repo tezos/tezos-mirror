@@ -1,40 +1,24 @@
 # Changelog
 
-## Unreleased
+## Version 0.48 (2025-11-24)
+
+This release of the EVM node adds a new JSON-RPC method
+`eth_sendRawTransactionSync` as per
+[EIP-7966](https://eips.ethereum.org/EIPS/eip-7966) and adds the ground work for
+the future sub-block latency feature.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
 
 ### Breaking changes
 
-- Proxy mode can't serve data of blocks older than the last one. (!19744)
-
-### Configuration changes
+- Starting with kernel storage version 41, the proxy mode won't serve data of
+  blocks older than the last one. (!19677, !19744)
 
 ### RPCs changes
 
 - Add new `eth_sendRawTransactionSync` endpoint to our JSON-RPC.
-  Defined in [EIP-7966](https://eips.ethereum.org/EIPS/eip-7966).
-- Add an optional `block` parameter to `eth_sendRawTransactionSync`.
-  Supported values are: `Latest` and `Pending`. `Latest` means waiting the
-  block execution while `Pending` use the preconfirmation system.
-  Default value is `Latest` (!19837)
-- Add new `eth_subscribe` subscription named `tez_newIncludedTransactions`
-  that allow you to get a stream of transactions that have been chosen
-  to be included in the next block (!19810).
-  (only available with experimental feature preconfirmation_stream_enabled)
-- Add new `eth_subscribe` subscription name `tez_newPreconfirmedReceipts`
-  that allow you to get a stream of transaction preconfirmed receipts (!19837)
-
-### Monitoring changes
-
-### Command-line interface changes
-
-### Execution changes
-
-- Fix a regression introduced in v0.35 leading the EVM node to accumulate
-  unused data in its context. (!19988)
-
-### Storage changes
-
-### Documentation changes
+  Defined in [EIP-7966](https://eips.ethereum.org/EIPS/eip-7966). (!19797)
 
 ### Experimental features changes
 
@@ -42,6 +26,26 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+- A new flag `experimental_features.preconfirmation_stream_enabled` is added and
+  can be set to get sub-block latency for preconfirmations for
+  transactions. Note: This feature is only available with a development
+  kernel. (!19606)
+- Add an optional `block` parameter to `eth_sendRawTransactionSync`.
+  Supported values are: `latest` and `pending`. `latest` means waiting the
+  block execution while `pending` use the preconfirmation system.
+  Default value is `latest`. (!19837)
+- Add new `eth_subscribe` subscription named `tez_newIncludedTransactions` that
+  notifies transactions that have been chosen to be included in the next block
+  (only available with experimental feature
+  `preconfirmation_stream_enabled`). (!19810)
+- Add new `eth_subscribe` subscription named `tez_newPreconfirmedReceipts`
+  that notifies transactions preconfirmed receipts. (!19837)
+
+### Execution changes
+
+- Fix a regression introduced in v0.35 leading the EVM node to accumulate
+  unused data in its context. (!19988)
 
 ## Version 0.47 (2025-10-31) 🎃
 
