@@ -217,8 +217,14 @@ struct
     | None -> return_unit
     | Some check_verify ->
         let*? proof, _input_opt = res in
-        let@ res = Hist.verify_proof params page_id skip_list proof in
-        let res = Result.map (fun (bytes_opt, _lag) -> bytes_opt) res in
+        let@ res =
+          Hist.verify_proof
+            params
+            page_id
+            skip_list
+            proof
+            ~page_id_is_valid:(fun ~dal_attestation_lag:_ _page_id -> true)
+        in
         check_verify res page_info
 
   (* Some check functions. *)

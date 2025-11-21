@@ -290,28 +290,23 @@ module Dal_helpers = struct
       ~commit_inbox_level dal_parameters page_id dal_snapshot proof
       ~dal_attested_slots_validity_lag =
     let open Result_syntax in
-    let* input_opt, attestation_lag =
+    let* input_opt =
       Dal_slot_repr.History.verify_proof
         dal_parameters
         page_id
         dal_snapshot
         proof
+        ~page_id_is_valid:
+          (page_id_is_valid
+             dal_parameters
+             ~dal_activation_level
+             ~origination_level:
+               metadata.Sc_rollup_metadata_repr.origination_level
+             ~commit_inbox_level
+             ~dal_number_of_slots
+             ~dal_attested_slots_validity_lag)
     in
-    let dal_attestation_lag =
-      Dal_slot_repr.History.attestation_lag_value attestation_lag
-    in
-    if
-      page_id_is_valid
-        dal_parameters
-        ~dal_activation_level
-        ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
-        ~dal_attestation_lag
-        ~commit_inbox_level
-        ~dal_number_of_slots
-        page_id
-        ~dal_attested_slots_validity_lag
-    then return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input_opt))
-    else return_none
+    return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input_opt))
 
   let produce ~metadata ~dal_activation_level ~dal_number_of_slots
       ~commit_inbox_level dal_parameters ~attestation_threshold_percent

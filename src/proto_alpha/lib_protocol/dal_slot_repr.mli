@@ -531,10 +531,11 @@ module History : sig
       list is returned, alongside the page's bytes if the slot is attested. *)
   val verify_proof :
     parameters ->
+    page_id_is_valid:(dal_attestation_lag:int -> Page.t -> bool) ->
     Page.t ->
     t ->
     proof ->
-    (bytes option * attestation_lag_kind) tzresult
+    bytes option tzresult
 
   (** Given a DAL proof, this function returns the values of the fields
       [attestation_threshold_percent] [restricted_commitments_publishers] stored
