@@ -399,11 +399,22 @@ module S = struct
         ~output:Script_int.n_encoding
         RPC_path.(custom_root /: Contract.rpc_arg / "clst_balance")
 
-    let register_balance () =
+    let total_supply_service =
+      RPC_service.get_service
+        ~description:"Returns the total supply of CLST tokens."
+        ~query:RPC_query.empty
+        ~output:Script_int.n_encoding
+        RPC_path.(open_root / "context" / "clst" / "total_supply")
+
+    let register () =
       register1 ~chunked:false balance_service (fun ctxt contract () () ->
           let open Lwt_result_syntax in
           let* balance, _ = Clst_storage.get_balance ctxt contract in
-          return balance)
+          return balance) ;
+      register0 ~chunked:false total_supply_service (fun ctxt () () ->
+          let open Lwt_result_syntax in
+          let* total_supply, _ = Clst_storage.get_total_supply ctxt in
+          return total_supply)
   end
 end
 
@@ -790,7 +801,7 @@ let register () =
       Contract.For_RPC.get_estimated_own_pending_slashed_amount ctxt contract) ;
 
   S.Sapling.register () ;
-  S.CLST.register_balance ()
+  S.CLST.register ()
 
 let list ctxt block = RPC_context.make_call0 S.list ctxt block () ()
 
@@ -904,3 +915,6 @@ let single_sapling_get_diff ctxt block id ?offset_commitment ?offset_nullifier
 
 let clst_balance ctxt block contract =
   RPC_context.make_call1 S.CLST.balance_service ctxt block contract () ()
+
+let clst_total_supply ctxt block =
+  RPC_context.make_call0 S.CLST.total_supply_service ctxt block () ()

@@ -66,3 +66,13 @@ let set_balance_from_storage ctxt (ledger, total_supply) contract amount =
     Script_big_map.update ctxt contract (Some amount) ledger
   in
   return ((ledger, total_supply), ctxt)
+
+let get_total_supply ctxt =
+  let open Lwt_result_syntax in
+  let* storage_opt, ctxt = get_storage ctxt in
+  let total_supply =
+    match storage_opt with
+    | Some (_ledger, total_supply) -> total_supply
+    | None -> Script_int.zero_n
+  in
+  return (total_supply, ctxt)

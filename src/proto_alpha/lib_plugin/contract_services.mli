@@ -194,6 +194,11 @@ val clst_balance :
   Contract.t ->
   Script_int.n Script_int.num shell_tzresult Lwt.t
 
+val clst_total_supply :
+  'a #RPC_context.simple ->
+  'a ->
+  Script_int.n Script_int.num shell_tzresult Lwt.t
+
 val register : unit -> unit
 
 (** Functions used in the implementation of this file's RPCs, but also
