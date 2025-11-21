@@ -12,3 +12,4 @@ This covers libraries and frameworks available in Octez, but also guidelines for
    clic
    data_encoding
    event_logging_framework
+   protocol_development

@@ -2,7 +2,8 @@ Protocol Proposals
 ==================
 
 This document explains in detail the process followed by a team crosscutting Nomadic Labs, Trilitech and Functori for developing and submitting Protocol Proposals (hereafter called "the protocol team"), which are proposals for amending the Tezos :doc:`economic protocol <../active/index>`.
-This playbook covers more generally their whole lifecycle, including discovering and managing related issues.
+This playbook covers more generally their whole lifecycle, including development, testing, injection, activation, and managing issues discovered during all these phases.
+For a tutorial focused specifically on developing protocols, check rather :doc:`./protocol_development`.
 
 .. note::
 
