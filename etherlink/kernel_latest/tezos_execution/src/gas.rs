@@ -10,7 +10,6 @@
 /// Every Gas Related Function or Constant should be defined here.
 use mir::gas;
 use tezos_data_encoding::types::Narith;
-use tezos_smart_rollup::types::PublicKey;
 use thiserror::Error;
 
 pub struct TezlinkOperationGas {
@@ -28,7 +27,7 @@ pub enum GasLimitError {
     CannotConvertToU32(num_bigint::TryFromBigIntError<num_bigint::BigUint>),
 }
 
-pub struct Cost(u32);
+pub struct Cost(pub u32);
 impl Cost {
     /// This corresponds to the defaults costs in gas.
     /// Currently can be found in Tezos source code at: src/proto_023_PtSeouLo/lib_protocol/michelson_v1_gas.ml
@@ -41,25 +40,6 @@ impl Cost {
 
     pub fn transaction() -> Self {
         Cost(Self::GAS_COST_TRANSACTION)
-    }
-
-    /// Calculates the gas cost for signature verification based on the public key type and message length.
-    /// Currently can be found in Tezos source code at: src/proto_023_PtSeouLo/lib_protocol/michelson_v1_gas.ml
-    /// And also in MIR : contrib/mir/src/gas.rs
-    /// TODO: !19851, call MIR instead of duplicating this function
-    pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Self {
-        // Saturate msg.len() to u32::MAX then cast to u32
-        let len = msg.len().min(u32::MAX as usize) as u32;
-        // We charge gas for serialization of the operation +
-        // execution of the signature check
-        let serialization_cost = len << 5;
-        let check_sig_cost = match k {
-            PublicKey::Ed25519(..) => 65_800 + ((len >> 3) + len),
-            PublicKey::Secp256k1(..) => 51_600 + ((len >> 3) + len),
-            PublicKey::P256(..) => 341_000 + ((len >> 3) + len),
-            PublicKey::Bls(..) => 1_570_000 + (3 * len),
-        };
-        Cost(serialization_cost + check_sig_cost)
     }
 }
 

@@ -281,9 +281,12 @@ pub mod interpret_cost {
     use checked::Checked;
     use num_bigint::{BigInt, BigUint};
     use num_traits::Zero;
+    use tezos_crypto_rs::public_key::PublicKey;
+    use tezos_crypto_rs::CryptoError;
+    use thiserror::Error;
 
     use super::{AsGasCost, BigIntByteSize, Log2i, OutOfGas};
-    use crate::ast::{Key, Micheline, Or, Ticket, TypedValue};
+    use crate::ast::{Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
@@ -830,16 +833,32 @@ pub mod interpret_cost {
         }
     }
 
-    pub fn check_signature(k: &Key, msg: &[u8]) -> Result<u32, OutOfGas> {
-        let len = Checked::from(msg.len());
-        match k {
-            Key::Ed25519(..) => 65800 + ((len >> 3) + len),
-            Key::Secp256k1(..) => 51600 + ((len >> 3) + len),
-            Key::P256(..) => 341000 + ((len >> 3) + len),
+    #[derive(Debug, Error)]
+    pub enum SigCostError {
+        #[error(transparent)]
+        OutOfGas(#[from] OutOfGas),
+        #[error(transparent)]
+        Crypto(#[from] CryptoError),
+    }
+
+    pub fn check_signature(k: &PublicKey, msg: &[u8]) -> Result<u32, CryptoError> {
+        let len = msg.len().min(u32::MAX as usize) as u32;
+        let serialization_cost = len << 5;
+        let checked_cost = match k {
+            PublicKey::Ed25519(..) => 65_800 + ((len >> 3) + len),
+            PublicKey::Secp256k1(..) => 51_600 + ((len >> 3) + len),
+            PublicKey::P256(..) => 341_000 + ((len >> 3) + len),
             #[cfg(feature = "bls")]
-            Key::Bls(..) => 1570000 + (len * 3),
-        }
-        .as_gas_cost()
+            PublicKey::Bls(..) => 1_570_000 + (len * 3),
+            #[cfg(not(feature = "bls"))]
+            PublicKey::Bls(..) => {
+                return Err(CryptoError::Unsupported(
+                    "bls feature disabled, tz4 signature verification not supported",
+                ))
+            }
+        };
+
+        Ok(serialization_cost + checked_cost)
     }
 
     pub fn slice(length: usize) -> Result<u32, OutOfGas> {

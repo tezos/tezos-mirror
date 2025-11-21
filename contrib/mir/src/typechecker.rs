@@ -17,7 +17,7 @@ use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
-use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
+use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError, public_key::PublicKey};
 use tezos_data_encoding::nom::{error::convert_error, NomReader};
 
 pub mod type_props;
@@ -2502,23 +2502,30 @@ pub(crate) fn typecheck_value<'a>(
         (T::Bytes, V::Bytes(bs)) => TV::Bytes(bs.clone()),
         (T::Key, V::String(str)) => {
             ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
-            TV::Key(Key::from_base58_check(str).map_err(|e| TcError::ByteReprError(T::Key, e))?)
+            TV::Key(
+                PublicKey::from_b58check(str)
+                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
+            )
         }
         (T::Key, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
-            TV::Key(Key::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Key, e))?)
+            TV::Key(
+                PublicKey::nom_read_exact(bs)
+                    .map_err(|e| TcError::ByteReprError(T::Key, e.into()))?,
+            )
         }
         (T::Signature, V::String(str)) => {
             ctx.gas().consume(gas::tc_cost::KEY_READABLE)?;
             TV::Signature(
                 Signature::from_base58_check(str)
-                    .map_err(|e| TcError::ByteReprError(T::Signature, e))?,
+                    .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?,
             )
         }
         (T::Signature, V::Bytes(bs)) => {
             ctx.gas().consume(gas::tc_cost::KEY_OPTIMIZED)?;
             TV::Signature(
-                Signature::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::Signature, e))?,
+                Signature::try_from(bs.clone())
+                    .map_err(|e| TcError::ByteReprError(T::Signature, e.into()))?,
             )
         }
         (T::KeyHash, V::String(str)) => {

@@ -165,7 +165,7 @@ from_s_for_sig!(P256Signature, P256);
 from_s_for_sig!(BlsSignature, Bls);
 from_s_for_sig!(UnknownSignature, Unknown);
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum TryFromSignatureError {
     #[error("Incorrect signature kind {0:?}.")]
     InvalidKind(HashType),
