@@ -247,15 +247,14 @@ module Build = struct
       ~extra:true
       "script-inputs/dev-executables"
 
-  let job_build_arm64_extra_exp ?rules () : tezos_job =
+  let job_build_arm64_exp ?rules () : tezos_job =
     job_build_dynamic_binaries
-      ~name:"oc.build_arm64-extra-exp"
+      ~name:"oc.build_arm64-exp"
       ?rules
       ~__POS__
       ~arch:Arm64
       ~storage:Ramfs
       ~sccache_size:"2G"
-      ~extra:true
       "script-inputs/experimental-executables"
 
   let job_build_kernels ?rules () : tezos_job =

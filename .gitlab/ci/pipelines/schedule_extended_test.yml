@@ -432,7 +432,7 @@ oc.build_arm64-extra-dev:
     - etherlink-governance-observer
     when: on_success
 
-oc.build_arm64-extra-exp:
+oc.build_arm64-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -471,8 +471,6 @@ oc.build_arm64-extra-exp:
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/experimental-executables
-    BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
-      tezt/tests/main.exe
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
@@ -1273,7 +1271,7 @@ oc.unit:non-proto-arm64:
   - oc.docker:ci:arm64
   - oc.build_arm64-released
   - oc.build_arm64-extra-dev
-  - oc.build_arm64-extra-exp
+  - oc.build_arm64-exp
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -1428,7 +1426,7 @@ de.unit:arm64:
   - oc.docker:ci:arm64
   - oc.build_arm64-released
   - oc.build_arm64-extra-dev
-  - oc.build_arm64-extra-exp
+  - oc.build_arm64-exp
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -1482,7 +1480,7 @@ resto.unit:arm64:
   - oc.docker:ci:arm64
   - oc.build_arm64-released
   - oc.build_arm64-extra-dev
-  - oc.build_arm64-extra-exp
+  - oc.build_arm64-exp
   dependencies:
   - oc.docker:ci:arm64
   timeout: 10 minutes

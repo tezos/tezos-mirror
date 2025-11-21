@@ -160,9 +160,7 @@ let jobs =
   let job_build_arm64_release =
     job_build_arm64_release ~rules:build_arm_rules ()
   in
-  let job_build_arm64_extra_exp =
-    job_build_arm64_extra_exp ~rules:build_arm_rules ()
-  in
+  let job_build_arm64_exp = job_build_arm64_exp ~rules:build_arm_rules () in
   let job_build_arm64_extra_dev =
     job_build_arm64_extra_dev ~rules:build_arm_rules ()
   in
@@ -173,7 +171,7 @@ let jobs =
     job_static_arm64;
     job_build_arm64_release;
     job_build_arm64_extra_dev;
-    job_build_arm64_extra_exp;
+    job_build_arm64_exp;
     (* Stage: sanity *)
     job_datadog_pipeline_trace;
     (* Stage: test_coverage *)

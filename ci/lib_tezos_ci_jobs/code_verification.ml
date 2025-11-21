@@ -446,8 +446,8 @@ let jobs pipeline_type =
   let job_build_arm64_extra_dev : Tezos_ci.tezos_job =
     job_build_arm64_extra_dev ~rules:build_arm_rules ()
   in
-  let job_build_arm64_extra_exp : Tezos_ci.tezos_job =
-    job_build_arm64_extra_exp ~rules:build_arm_rules ()
+  let job_build_arm64_exp : Tezos_ci.tezos_job =
+    job_build_arm64_exp ~rules:build_arm_rules ()
   in
 
   let job_build_kernels = job_build_kernels pipeline_type in
@@ -524,7 +524,7 @@ let jobs pipeline_type =
     [
       job_build_arm64_release;
       job_build_arm64_extra_dev;
-      job_build_arm64_extra_exp;
+      job_build_arm64_exp;
       job_static_x86_64_experimental;
       job_static_arm64_experimental;
       job_build_x86_64_release;
@@ -616,7 +616,7 @@ let jobs pipeline_type =
               [
                 Job job_build_arm64_release;
                 Job job_build_arm64_extra_dev;
-                Job job_build_arm64_extra_exp;
+                Job job_build_arm64_exp;
               ]
       in
       let rules =
