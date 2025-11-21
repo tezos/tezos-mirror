@@ -12,8 +12,8 @@ use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_tezlink::{
     operation::{
-        serialize_unsigned_operation, ManagerOperation, Operation, OperationContent,
-        RevealContent,
+        serialize_unsigned_operation, ManagerOperation, ManagerOperationContent,
+        OperationContent,
     },
     operation_result::{Balance, CounterError, UpdateOrigin, ValidityError},
 };
@@ -103,10 +103,10 @@ fn compute_fees_balance_updates(
 fn get_revealed_key<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
-    first_content: &OperationContent,
+    first_content: &ManagerOperationContent,
 ) -> Result<PublicKey, ValidityError> {
     match first_content {
-        OperationContent::Reveal(RevealContent { pk, proof: _ }) => Ok(pk.clone()),
+        ManagerOperationContent::Reveal(content) => Ok(content.operation.pk.clone()),
         _ => {
             let manager = account
                 .manager(host)
@@ -136,12 +136,12 @@ fn check_storage_limit(
 fn validate_source<Host: Runtime>(
     host: &Host,
     context: &Context,
-    content: &Vec<ManagerOperation<OperationContent>>,
+    content: &[ManagerOperationContent],
 ) -> Result<(PublicKey, TezlinkImplicitAccount), ValidityError> {
-    let source = &content[0].source;
+    let source = &content[0].source();
 
     for c in content {
-        if c.source != *source {
+        if c.source() != *source {
             return Err(ValidityError::MultipleSources);
         }
     }
@@ -157,7 +157,7 @@ fn validate_source<Host: Runtime>(
         return Err(ValidityError::EmptyImplicitContract);
     }
 
-    let pk = get_revealed_key(host, &account, &content[0].operation)?;
+    let pk = get_revealed_key(host, &account, &content[0])?;
 
     Ok((pk, account))
 }
@@ -224,18 +224,19 @@ pub struct ValidatedBatch {
 }
 
 pub fn verify_signature(
-    operation: Operation,
+    content: &[ManagerOperationContent],
+    signature: tezos_crypto_rs::hash::UnknownSignature,
+    branch: tezos_tezlink::enc_wrappers::BlockHash,
     pk: &PublicKey,
     validation_gas: &mut TezlinkOperationGas,
 ) -> Result<bool, ValidityError> {
-    let serialized_unsigned_operation =
-        serialize_unsigned_operation(&operation.branch, &operation.content)
-            .map_err(|_| ValidityError::InvalidSignature)?;
+    let serialized_unsigned_operation = serialize_unsigned_operation(&branch, content)
+        .map_err(|_| ValidityError::InvalidSignature)?;
     validation_gas.consume(crate::gas::Cost::check_signature(
         pk,
         &serialized_unsigned_operation,
     ))?;
-    let signature = &operation.signature.into();
+    let signature = &signature.into();
     // The verify_signature function never returns false. If the verification
     // is incorrect the function will return an Error and it's up to us to
     // transform that into a `false` boolean if we want.
@@ -255,19 +256,19 @@ pub fn execute_validation<Host: Runtime>(
         return Err(ValidityError::EmptyBatch);
     }
 
-    let mut unvalidated_operation: Vec<ManagerOperation<OperationContent>> = operation
-        .content
-        .clone()
-        .into_iter()
-        .map(Into::into)
-        .collect();
-
     // Initialize the validation gas using the gas limit of the first operation in the batch
-    let mut validation_gas =
-        TezlinkOperationGas::start(&unvalidated_operation[0].gas_limit)
-            .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
-    let (pk, source_account) = validate_source(host, context, &unvalidated_operation)?;
-    match verify_signature(operation, &pk, &mut validation_gas) {
+    let mut validation_gas = TezlinkOperationGas::start(operation.content[0].gas_limit())
+        .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
+
+    let (pk, source_account) = validate_source(host, context, &operation.content)?;
+
+    match verify_signature(
+        &operation.content,
+        operation.signature,
+        operation.branch,
+        &pk,
+        &mut validation_gas,
+    ) {
         Ok(true) => log!(host, Debug, "Validation: OK - Signature is valid."),
         _ => {
             if skip_signature_check {
@@ -281,6 +282,9 @@ pub fn execute_validation<Host: Runtime>(
             }
         }
     }
+
+    let mut unvalidated_operation: Vec<ManagerOperation<OperationContent>> =
+        operation.content.into_iter().map(Into::into).collect();
 
     let mut source_balance = source_account
         .balance(host)

@@ -5,7 +5,6 @@
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::enc_wrappers::{BlockHash, OperationHash};
-use crate::operation_result::{OperationResultSum, OperationWithMetadata};
 use mir::ast::michelson_address::entrypoint;
 use primitive_types::H256;
 use rlp::Decodable;
@@ -140,6 +139,24 @@ pub enum ManagerOperationContent {
     Origination(ManagerOperation<OriginationContent>),
 }
 
+impl ManagerOperationContent {
+    pub fn gas_limit(&self) -> &Narith {
+        match self {
+            ManagerOperationContent::Reveal(op) => &op.gas_limit,
+            ManagerOperationContent::Transfer(op) => &op.gas_limit,
+            ManagerOperationContent::Origination(op) => &op.gas_limit,
+        }
+    }
+
+    pub fn source(&self) -> &PublicKeyHash {
+        match self {
+            ManagerOperationContent::Reveal(op) => &op.source,
+            ManagerOperationContent::Transfer(op) => &op.source,
+            ManagerOperationContent::Origination(op) => &op.source,
+        }
+    }
+}
+
 impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
     fn from(op: ManagerOperation<OperationContent>) -> Self {
         let ManagerOperation {
@@ -239,7 +256,7 @@ impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
 
 pub fn serialize_unsigned_operation(
     branch: &BlockHash,
-    content: &Vec<ManagerOperationContent>,
+    content: &[ManagerOperationContent],
 ) -> Result<Vec<u8>, BinError> {
     // Watermark comes from `src/lib_crypto/signature_v2.ml`
     // The watermark for a ManagerOperation is always `Generic_operation`
@@ -268,28 +285,13 @@ pub enum SignatureErrors {
 pub fn sign_operation(
     sk: &SecretKeyEd25519,
     branch: &BlockHash,
-    content: &Vec<ManagerOperationContent>,
+    content: &[ManagerOperationContent],
 ) -> Result<UnknownSignature, SignatureErrors> {
     let serialized_unsigned_operation = serialize_unsigned_operation(branch, content)?;
 
     let signature = sk.sign(serialized_unsigned_operation)?;
 
     Ok(signature.into())
-}
-
-pub fn zip_operations(
-    operation: Operation,
-    receipt: Vec<OperationResultSum>,
-) -> Vec<OperationWithMetadata> {
-    operation
-        .content
-        .into_iter()
-        .zip(receipt)
-        .map(|(c, r)| OperationWithMetadata {
-            content: c,
-            receipt: r,
-        })
-        .collect::<Vec<OperationWithMetadata>>()
 }
 
 #[cfg(test)]
