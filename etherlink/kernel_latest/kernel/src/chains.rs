@@ -526,7 +526,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
-            let operations = match tezos_execution::validate_and_apply_operation(
+            let processed_operations = match tezos_execution::validate_and_apply_operation(
                 host,
                 &context,
                 hash.clone(),
@@ -555,7 +555,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 branch,
                 op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                     OperationBatchWithMetadata {
-                        operations,
+                        operations: processed_operations,
                         signature,
                     },
                 ),
