@@ -112,7 +112,7 @@ let transaction_retried_confirmed =
 let transaction_retried_failed =
   declare_2
     ~section
-    ~name:"transaction_retried_confirmed"
+    ~name:"transaction_retried_failed"
     ~msg:"Transaction from {address} failed after {attempt} attempts."
     ~level:Warning
     ("address", Ethereum_types.address_encoding)
