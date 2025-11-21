@@ -318,7 +318,7 @@ module Dal_helpers = struct
       ~restricted_commitments_publishers page_id ~page_info ~get_history
       confirmed_slots_history ~dal_attested_slots_validity_lag =
     let open Lwt_result_syntax in
-    let* proof, content_opt, attestation_lag =
+    let* proof, content_opt =
       Dal_slot_repr.History.produce_proof
         dal_parameters
         ~attestation_threshold_percent
@@ -327,25 +327,19 @@ module Dal_helpers = struct
         ~page_info
         ~get_history
         confirmed_slots_history
+        ~page_id_is_valid:
+          (page_id_is_valid
+             dal_parameters
+             ~dal_number_of_slots
+             ~dal_activation_level
+             ~origination_level:
+               metadata.Sc_rollup_metadata_repr.origination_level
+             ~commit_inbox_level
+             ~dal_attested_slots_validity_lag)
     in
-    let dal_attestation_lag =
-      Dal_slot_repr.History.attestation_lag_value attestation_lag
-    in
-    if
-      page_id_is_valid
-        dal_parameters
-        ~dal_number_of_slots
-        ~dal_activation_level
-        ~origination_level:metadata.Sc_rollup_metadata_repr.origination_level
-        ~dal_attestation_lag
-        ~commit_inbox_level
-        page_id
-        ~dal_attested_slots_validity_lag
-    then
-      return
-        ( Some (Reveal_proof (Dal_page_proof {proof; page_id})),
-          Some (Sc_rollup_PVM_sig.Reveal (Dal_page content_opt)) )
-    else return (None, None)
+    return
+      ( Some (Reveal_proof (Dal_page_proof {proof; page_id})),
+        Some (Sc_rollup_PVM_sig.Reveal (Dal_page content_opt)) )
 
   let validate_dal_input_request proof ~proof_page_id ~request_page_id
       ~request_attestation_threshold_percent

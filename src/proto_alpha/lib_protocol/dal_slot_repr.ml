@@ -1462,9 +1462,9 @@ module History = struct
         Under these assumptions, we recall that we maintain an invariant
         ensuring that we a have a cell per slot index in the skip list at every level
         after DAL activation. *)
-    let produce_proof_repr dal_params ~attestation_threshold_percent
-        ~restricted_commitments_publishers page_id ~page_info ~get_history
-        slots_hist =
+    let produce_proof_repr dal_params ~page_id_is_valid
+        ~attestation_threshold_percent ~restricted_commitments_publishers
+        page_id ~page_info ~get_history slots_hist =
       let open Lwt_result_syntax in
       let Page.{slot_id = target_slot_id; page_index = _} = page_id in
       (* We first search for the slots attested at level [published_level]. *)
@@ -1476,10 +1476,45 @@ module History = struct
          {!produce_proof_repr}. *)
       match search_result.Skip_list.last_cell with
       | Deref_returned_none ->
-          tzfail
-          @@ dal_proof_error
-               "Skip_list.search returned 'Deref_returned_none': Slots history \
-                cache is ill-formed or has too few entries."
+          (* We do not know the exact attestation lag here and we failed to
+             fetch the target cell from the skip-list DB. To decide whether the
+             page id could still be valid, we conservatively consider the whole
+             interval of possible attestation lags, from [0] up to
+             [legacy_attestation_lag] (our historical upper bound):
+
+             - If [page_id_is_valid] holds either with [~dal_attestation_lag =
+             0] or with [~dal_attestation_lag = legacy_attestation_lag], then
+             there exists at least one admissible lag for which the page id may
+             still be valid. In that case, the failure is possibly due to
+             missing skip-list cells in the operator's context. We cannot safely
+             produce a proof: the operator must first fetch and store the
+             missing cells. Later, the proof may still be requalified as
+             [Invalid_page_id] if the actual attestation lag rules it out; see
+             the second call to [page_id_is_valid] below.
+
+             - If [page_id_is_valid] does not hold for either extremal value,
+             the page id is definitely invalid for any lag in the admissible
+             range, and returning [Invalid_page_id] is sound. *)
+          let max_attestation_lag = legacy_attestation_lag in
+          if
+            page_id_is_valid ~dal_attestation_lag:max_attestation_lag page_id
+            || page_id_is_valid ~dal_attestation_lag:0 page_id
+          then
+            (* Page id may be valid, but we are missing skip-list cells. *)
+            tzfail
+            @@ dal_proof_error
+                 "Skip_list.search returned 'Deref_returned_none': Slots \
+                  history cache is ill-formed or has too few entries."
+          else
+            (* Page id is definitely invalid, even under the upper bound. *)
+            return
+              ( Invalid_page_id
+                  {
+                    target_cell_and_inc_proof = None;
+                    attestation_threshold_percent;
+                    restricted_commitments_publishers;
+                  },
+                None )
       | No_exact_or_lower_ptr ->
           tzfail
           @@ dal_proof_error
@@ -1497,79 +1532,92 @@ module History = struct
       | Found target_cell ->
           let* proof, page_opt =
             let inc_proof = List.rev search_result.Skip_list.rev_path in
+            let target_cell_content = Skip_list.content target_cell in
             let is_commitment_attested =
-              Skip_list.content target_cell
-              |> is_commitment_attested
-                   ~attestation_threshold_percent
-                   ~restricted_commitments_publishers
+              is_commitment_attested
+                ~attestation_threshold_percent
+                ~restricted_commitments_publishers
+                target_cell_content
             in
-            match (page_info, is_commitment_attested) with
-            | Some (page_data, page_proof), Some commitment ->
-                (* The case where the slot to which the page is supposed to belong
+            let {attestation_lag; header_id = _} =
+              Content.content_id target_cell_content
+            in
+            let dal_attestation_lag = attestation_lag_value attestation_lag in
+            if not (page_id_is_valid ~dal_attestation_lag page_id) then
+              return
+                ( Invalid_page_id
+                    {
+                      target_cell_and_inc_proof = Some (target_cell, inc_proof);
+                      attestation_threshold_percent;
+                      restricted_commitments_publishers;
+                    },
+                  None )
+            else
+              match (page_info, is_commitment_attested) with
+              | Some (page_data, page_proof), Some commitment ->
+                  (* The case where the slot to which the page is supposed to belong
                  is found and the page's information are given. *)
-                let*? () =
-                  (* We check the page's proof against the commitment. *)
-                  check_page_proof
-                    dal_params
-                    page_proof
-                    page_data
-                    page_id
-                    commitment
-                in
-                (* All checks succeeded. We return a `Page_confirmed` proof. *)
-                return
-                  ( Page_confirmed
-                      {
-                        target_cell;
-                        inc_proof;
-                        page_data;
-                        page_proof;
-                        attestation_threshold_percent;
-                        restricted_commitments_publishers;
-                      },
-                    Some page_data )
-            | None, None ->
-                (* The slot corresponding to the given page's index is not found in
+                  let*? () =
+                    (* We check the page's proof against the commitment. *)
+                    check_page_proof
+                      dal_params
+                      page_proof
+                      page_data
+                      page_id
+                      commitment
+                  in
+                  (* All checks succeeded. We return a `Page_confirmed` proof. *)
+                  return
+                    ( Page_confirmed
+                        {
+                          target_cell;
+                          inc_proof;
+                          page_data;
+                          page_proof;
+                          attestation_threshold_percent;
+                          restricted_commitments_publishers;
+                        },
+                      Some page_data )
+              | None, None ->
+                  (* The slot corresponding to the given page's index is not found in
                  the attested slots of the page's level, and no information is
                  given for that page. So, we produce a proof that the page is not
                  attested. *)
-                return
-                  ( Page_unconfirmed
-                      {
-                        target_cell;
-                        inc_proof;
-                        attestation_threshold_percent;
-                        restricted_commitments_publishers;
-                      },
-                    None )
-            | None, Some _ ->
-                (* Mismatch: case where no page information are given, but the
+                  return
+                    ( Page_unconfirmed
+                        {
+                          target_cell;
+                          inc_proof;
+                          attestation_threshold_percent;
+                          restricted_commitments_publishers;
+                        },
+                      None )
+              | None, Some _ ->
+                  (* Mismatch: case where no page information are given, but the
                  slot is attested. *)
-                tzfail
-                @@ dal_proof_error
-                     "The page ID's slot is confirmed, but no page content and \
-                      proof are provided."
-            | Some _, None ->
-                (* Mismatch: case where page information are given, but the slot
+                  tzfail
+                  @@ dal_proof_error
+                       "The page ID's slot is confirmed, but no page content \
+                        and proof are provided."
+              | Some _, None ->
+                  (* Mismatch: case where page information are given, but the slot
                  is not attested. *)
-                tzfail
-                @@ dal_proof_error
-                     "The page ID's slot is not confirmed, but page content \
-                      and proof are provided."
+                  tzfail
+                  @@ dal_proof_error
+                       "The page ID's slot is not confirmed, but page content \
+                        and proof are provided."
           in
-          let {attestation_lag; header_id = _} =
-            Skip_list.content target_cell |> Content.content_id
-          in
-          return (proof, page_opt, attestation_lag)
+          return (proof, page_opt)
 
-    let produce_proof dal_params ~attestation_threshold_percent
-        ~restricted_commitments_publishers page_id ~page_info ~get_history
-        slots_hist :
-        (proof * Page.content option * attestation_lag_kind) tzresult Lwt.t =
+    let produce_proof dal_params ~page_id_is_valid
+        ~attestation_threshold_percent ~restricted_commitments_publishers
+        page_id ~page_info ~get_history slots_hist :
+        (proof * Page.content option) tzresult Lwt.t =
       let open Lwt_result_syntax in
-      let* proof_repr, page_data, attestation_lag =
+      let* proof_repr, page_data =
         produce_proof_repr
           dal_params
+          ~page_id_is_valid
           ~attestation_threshold_percent
           ~restricted_commitments_publishers
           page_id
@@ -1578,7 +1626,7 @@ module History = struct
           slots_hist
       in
       let*? serialized_proof = serialize_proof proof_repr in
-      return (serialized_proof, page_data, attestation_lag)
+      return (serialized_proof, page_data)
 
     (* Given a starting cell [snapshot] and a (final) [target], this function
        checks that the provided [inc_proof] encodes a minimal path from
