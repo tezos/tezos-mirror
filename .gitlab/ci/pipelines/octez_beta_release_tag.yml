@@ -1457,3 +1457,43 @@ octez-smart-rollup-node.docker:merge_manifests:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
   retry: 0
+
+publish:release-page:
+  image: ${ci_image_name}/release-page:${ci_image_tag}
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  rules:
+  - when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-arm64-linux-binaries
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build:static-x86_64-linux-binaries
+  - oc.build:static-arm64-linux-binaries
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/releases/publish_release_page.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - cp /tmp/release_page*/index.md ./index.md
+  variables:
+    S3_BUCKET: site-prod.octez.tezos.com
+    BUCKET_PATH: /releases
+    URL: octez.tezos.com
+    DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - ./index.md
+    - index.html
+  retry: 0
