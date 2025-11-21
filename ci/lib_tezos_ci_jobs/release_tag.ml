@@ -365,7 +365,6 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
         job_promote_to_latest_test;
         job_opam_release ~dry_run:true ();
         job_release_page;
-        job_dispatch_call;
       ]
   | _ -> []
 
