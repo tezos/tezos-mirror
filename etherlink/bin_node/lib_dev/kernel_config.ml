@@ -237,7 +237,8 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     ?max_blueprint_lookahead_in_seconds ?remove_whitelist ?enable_fa_bridge
     ?enable_revm ?enable_dal ?dal_slots ?enable_fast_withdrawal
     ?enable_fast_fa_withdrawal ?enable_multichain ?set_account_code
-    ?max_delayed_inbox_blueprint_length ?evm_version ~output () =
+    ?max_delayed_inbox_blueprint_length ?evm_version ?(with_runtimes = [])
+    ~output () =
   let eth_bootstrap_accounts =
     let open Ethereum_types in
     match eth_bootstrap_accounts with
@@ -299,6 +300,12 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
           @@ match evm_version with Shanghai -> Z.zero | Cancun -> Z.one ))
       evm_version
   in
+  let with_runtimes =
+    List.map
+      (fun runtime ->
+        Installer_config.make ~key:(Tezosx.feature_flag runtime) ~value:"")
+      with_runtimes
+  in
   let instrs =
     (if mainnet_compat then make_instr ticketer
      else
@@ -350,6 +357,6 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     @ make_instr
         ~convert:(fun s -> Ethereum_types.u16_to_bytes (int_of_string s))
         max_delayed_inbox_blueprint_length
-    @ chain_ids_instr
+    @ chain_ids_instr @ with_runtimes
   in
   Installer_config.to_file instrs ~output

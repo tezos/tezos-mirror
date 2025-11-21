@@ -695,6 +695,7 @@ val make_kernel_installer_config :
   ?enable_fast_fa_withdrawal:bool ->
   ?enable_multichain:bool ->
   ?evm_version:Evm_version.t ->
+  ?with_runtimes:Tezosx_runtime.t list ->
   output:string ->
   unit ->
   (Process.t, unit) Runnable.t

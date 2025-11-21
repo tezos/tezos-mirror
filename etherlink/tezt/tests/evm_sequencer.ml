@@ -135,7 +135,7 @@ let send_raw_transaction_to_delayed_inbox ?(wait_for_next_level = true)
   in
   let* () =
     if wait_for_next_level then
-      let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+      let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
       unit
     else unit
   in
@@ -178,7 +178,7 @@ let send_deposit_to_delayed_inbox ?(rlp = false) ~amount ~l1_contracts
       ~burn_cap:Tez.one
       client
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
 let send_fa_deposit_to_delayed_inbox ?(proxy = "") ~amount ~l1_contracts
@@ -209,71 +209,8 @@ let send_fa_deposit_to_delayed_inbox ?(proxy = "") ~amount ~l1_contracts
       ~burn_cap:Tez.one
       client
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   unit
-
-let register_sandbox ?tx_queue_tx_per_addr_limit ~title ?set_account_code
-    ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
-    ?sequencer_keys body =
-  Test.register
-    ~__FILE__
-    ~title
-    ~tags
-    ~uses_admin_client:false
-    ~uses_client:false
-    ~uses_node:false
-    ~uses:
-      [
-        Constant.octez_evm_node;
-        Constant.WASM.evm_kernel;
-        Constant.smart_rollup_installer;
-      ]
-  @@ fun () ->
-  let* sequencer =
-    init_sequencer_sandbox
-      ?tx_queue_tx_per_addr_limit
-      ?set_account_code
-      ?da_fee_per_byte
-      ?minimum_base_fee_per_gas
-      ?patch_config
-      ?websockets
-      ?sequencer_keys
-      ()
-  in
-  body sequencer
-
-type sandbox_test = {sandbox : Evm_node.t; observer : Evm_node.t}
-
-let register_sandbox_with_observer ?tx_queue_tx_per_addr_limit ~title
-    ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags
-    ?patch_config ?websockets ?(sequencer_keys = [Constant.bootstrap1]) body =
-  Test.register
-    ~__FILE__
-    ~title
-    ~tags
-    ~uses_admin_client:false
-    ~uses_client:false
-    ~uses_node:false
-    ~uses:
-      [
-        Constant.octez_evm_node;
-        Constant.WASM.evm_kernel;
-        Constant.smart_rollup_installer;
-      ]
-  @@ fun () ->
-  let* sandbox =
-    init_sequencer_sandbox
-      ?tx_queue_tx_per_addr_limit
-      ?set_account_code
-      ?da_fee_per_byte
-      ?minimum_base_fee_per_gas
-      ?patch_config
-      ?websockets
-      ~sequencer_keys
-      ()
-  in
-  let* observer = Setup.run_new_observer_node ~sc_rollup_node:None sandbox in
-  body {sandbox; observer}
 
 let register_upgrade_all ~title ~tags ~genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.all)
@@ -379,7 +316,7 @@ let test_make_l2_kernel_installer_config chain_family =
       ~keys:[]
       ~kind:"wasm_2_0_0"
       ~boot_sector:("file:" ^ kernel)
-      ~parameters_ty:evm_type
+      ~parameters_ty:Rollup.evm_type
       client
   in
   let* () =
@@ -548,7 +485,7 @@ let test_observer_reset =
       ~keys:[]
       ~kind:"wasm_2_0_0"
       ~boot_sector:("file:" ^ valid_kernel)
-      ~parameters_ty:evm_type
+      ~parameters_ty:Rollup.evm_type
       client
   in
   let* () =
@@ -704,8 +641,8 @@ let test_observer_reset =
         ()
     in
     (* Make the published blueprint final. *)
-    let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-    let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+    let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+    let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
     unit
   and* () = Evm_node.wait_for_reset observer_victim1 in
   (* The observer has reset because of the divergence. Let's see how it
@@ -771,7 +708,7 @@ let test_remove_sequencer =
      progressing. *)
   let* _ =
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Both are at genesis *)
@@ -796,7 +733,7 @@ let test_remove_sequencer =
   and* () =
     (* Produce L1 blocks to show that only the proxy is progressing *)
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   Check.((exit_code = Some 100) (option int))
@@ -838,7 +775,7 @@ let test_patch_state =
          ~key:path
          ()
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* () = Sc_rollup_node.terminate sc_rollup_node in
   let* () =
     Sc_rollup_node.patch_durable_storage sc_rollup_node ~key:path ~value:"00"
@@ -861,6 +798,7 @@ let test_patch_state =
 
 let test_persistent_state () =
   register_sandbox_with_observer
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "observer"]
     ~title:"EVM node state is persistent across runs"
   @@ fun {sandbox; observer} ->
@@ -1212,7 +1150,7 @@ let test_sequencer_too_ahead =
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
   let* _ =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let new_blocks = 3l in
@@ -1281,7 +1219,7 @@ let test_resilient_to_rollup_node_disconnect =
     (* bake 2 block so evm_node sees it as finalized in
        `rollup_node_follower` *)
     repeat 2 (fun () ->
-        let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
 
@@ -1339,7 +1277,7 @@ let test_resilient_to_rollup_node_disconnect =
     bake_until
       ~__LOC__
       ~bake:(fun () ->
-        let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
         unit)
       ~result_f:(fun () ->
@@ -1549,7 +1487,7 @@ let wait_for_event ?(timeout = 30.) ?(levels = 10) event_watcher ~sequencer
   let rec rollup_node_loop n =
     if n = 0 then Test.fail error_msg
     else
-      let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+      let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
       let*@ _ = produce_block sequencer in
       if Option.is_some !event_value then unit else rollup_node_loop (n - 1)
   in
@@ -2037,7 +1975,7 @@ let test_delayed_transaction_peeked =
   (* We bake enough blocks for the sequencer to realize there's a deposit. *)
   let* () =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Send an upgrade to the rollup node, but don't finalize the block, so the
@@ -2105,7 +2043,7 @@ let test_invalid_delayed_transaction =
   (* We bake enough blocks for the sequencer to see the transaction. *)
   let* () =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let*@ _ = produce_block sequencer in
@@ -2317,7 +2255,7 @@ let test_fa_withdrawal_is_included =
       ()
   in
 
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Check ticket balance for the zero account on L1 *)
   let* l1_balance =
@@ -2492,8 +2430,8 @@ let test_delayed_deposit_from_init_rollup_node =
       client
   in
   (* Bake an extra block for a finalized deposit. *)
-  let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
-  let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Run a new sequencer that is initialized from a rollup node that has the
      delayed deposit in its state. *)
@@ -2604,7 +2542,7 @@ let test_init_from_rollup_node_data_dir =
     (* bake 2 blocks so rollup context is for the finalized l1 level
        and can't be reorged. *)
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* () = Evm_node.init_from_rollup_node_data_dir evm_node' sc_rollup_node in
@@ -2665,8 +2603,8 @@ let test_init_from_rollup_node_with_delayed_inbox =
       client
   in
   (* Finalize the transaction. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Start a new sequencer, the previous sequencer is doomed. *)
   let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
@@ -2958,7 +2896,7 @@ let test_get_balance_block_param =
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
   let* _ =
     repeat 2 (fun _ ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let observer_partial_history =
@@ -3057,7 +2995,7 @@ let test_get_block_by_number_block_param =
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
   let* _ =
     repeat 2 (fun _ ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let observer_partial_history =
@@ -3522,7 +3460,7 @@ let test_empty_block_on_upgrade =
      upgrade. *)
   let* () =
     repeat 3 (fun _ ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
 
@@ -3746,7 +3684,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
      so we need to have 2 tezos levels before the sequencer sees the upgrade *)
   let* _ =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
 
@@ -3851,7 +3789,7 @@ let test_clean_bps =
   in
   let* () = send_chunks chunks sequencer_account.alias in
 
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* check the bp is in storage *)
   let* subkeys =
@@ -3879,7 +3817,7 @@ let test_clean_bps =
       raw_transfer
   in
   (* Bake a new L1 block to force the flush. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* check that their generation is old*)
   let* generation =
@@ -3965,7 +3903,7 @@ let test_delayed_inbox_flushing_event =
       raw_transfer
   in
   (* Bake a new L1 block to force the flush. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* l1_level = Client.level client in
   (* Wait for the events and finalize the level. *)
   let wait_for_processed_l1_level =
@@ -3973,8 +3911,8 @@ let test_delayed_inbox_flushing_event =
   in
   let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
 
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
@@ -4058,7 +3996,7 @@ let test_flushed_blueprint_reorg =
     Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
   in
   (* We mark at which level the delayed inbox was flushed. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* flushed_delayed_inbox_level = Client.level client in
   let wait_for_processed_l1_level =
     Evm_node.wait_for_processed_l1_level
@@ -4067,7 +4005,7 @@ let test_flushed_blueprint_reorg =
   in
   let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
   (* A new block will make the {!add_delayed_tx_level} final. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* _ = wait_for_add_delayed_inbox in
 
   (* Produce a bunch of L2 blocks. The sequencer is aware of the delayed inbox
@@ -4082,7 +4020,7 @@ let test_flushed_blueprint_reorg =
   let*@ speculative_head = Rpc.get_block_by_number ~block:"latest" sequencer in
 
   (* A new block will make the {!flushed_delayed_inbox_levle} final. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
@@ -4202,9 +4140,9 @@ let test_multiple_flushed_blueprints =
   let*@ proxy_head_before_flush = Rpc.block_number proxy in
 
   (* Both delayed transaction added *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   (* Flush of delayed inbox in kernel *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   (* We mark at which level the delayed inbox was flushed. *)
   let* flushed_delayed_inbox_level = Client.level client in
 
@@ -4223,8 +4161,8 @@ let test_multiple_flushed_blueprints =
   (* Make the {!flushed_delayed_inbox_level} final and ait until the
      event is completely processed. Head of sequencer and proxy should
      be in sync. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client
   and* _ = wait_for_first_flush
   and* _ = wait_for_second_flush
   and* _ = wait_for_processed_l1_level in
@@ -4326,7 +4264,7 @@ let test_observer_reorg_on_blueprint_stream =
       sequencer
   in
   (* We mark at which level the delayed inbox was flushed. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* flushed_delayed_inbox_level = Client.level client in
   let wait_for_processed_l1_level =
     Evm_node.wait_for_processed_l1_level
@@ -4336,7 +4274,7 @@ let test_observer_reorg_on_blueprint_stream =
   let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
   let wait_for_observer_reset = Evm_node.wait_for_reset observer in
   (* A new block will make the {!add_delayed_inbox_level} final. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* _ = wait_for_add_delayed_inbox in
 
   (* Produce a bunch of L2 blocks. The sequencer is aware of the delayed inbox
@@ -4350,7 +4288,7 @@ let test_observer_reorg_on_blueprint_stream =
   in
 
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
@@ -4439,7 +4377,7 @@ let test_observer_reorg_on_blueprint_catchup =
       sequencer
   in
   (* We mark at which level the delayed inbox was flushed. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* flushed_delayed_inbox_level = Client.level client in
   let wait_for_processed_l1_level =
     Evm_node.wait_for_processed_l1_level
@@ -4448,7 +4386,7 @@ let test_observer_reorg_on_blueprint_catchup =
   in
   let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
   (* A new block will make the {!add_delayed_inbox_level} final. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* _ = wait_for_add_delayed_inbox in
 
   (* Produce a bunch of L2 blocks. The sequencer is aware of the delayed inbox
@@ -4468,7 +4406,7 @@ let test_observer_reorg_on_blueprint_catchup =
   let* () = Evm_node.terminate observer in
 
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
      should be in sync. *)
@@ -4565,11 +4503,11 @@ let test_flushed_blueprint_reorg_late =
 
   (* We mark at which level the delayed inbox was flushed. *)
   let* flushed_delayed_inbox_level =
-    next_rollup_node_level ~sc_rollup_node ~client
+    Rollup.next_rollup_node_level ~sc_rollup_node ~client
   in
 
   (* A new block will make the add delayed inbox event final. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client
   and* _ =
     Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
   in
@@ -4586,7 +4524,7 @@ let test_flushed_blueprint_reorg_late =
   let*@ speculative_head = Rpc.get_block_by_number ~block:"latest" sequencer in
 
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client
   and* _ =
     (* Wait until the event is completely processed. Head of sequencer and proxy
        should be in sync. *)
@@ -4700,11 +4638,11 @@ let test_flushed_blueprint_reorg_done_late =
 
   (* We mark at which level the delayed inbox was flushed. *)
   let* flushed_delayed_inbox_level =
-    next_rollup_node_level ~sc_rollup_node ~client
+    Rollup.next_rollup_node_level ~sc_rollup_node ~client
   in
 
   (* A new block will make the add delayed event. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client
   and* _ =
     Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
   in
@@ -4726,7 +4664,7 @@ let test_flushed_blueprint_reorg_done_late =
   let*@ speculative_head = Rpc.get_block_by_number ~block:"latest" sequencer in
 
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client
   and* _ =
     (* Wait until the event is completely processed. Head of sequencer and proxy
        should be in sync. *)
@@ -4833,8 +4771,8 @@ let test_upgrade_injected_before_flush_level =
       ~upgrade_to:kernel
       ~activation_timestamp
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Produces 2 valid blocks and wait until they are synchronized. *)
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
@@ -4863,14 +4801,14 @@ let test_upgrade_injected_before_flush_level =
       tx
   in
   (* Flush the delayed inbox. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* flush_l1_level = Client.level client in
 
   (* Make the flush final. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   let* _ = Evm_node.wait_for_processed_l1_level ~level:flush_l1_level sequencer
-  and* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  and* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* The sequencer should trigger the upgrade *)
   let* _ =
@@ -4981,7 +4919,7 @@ let test_upgrade_activated_after_flush_level =
   (* Produces 2 valid blocks and wait until they are synchronized. *)
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
 
   (* Shutdown the rollup, restart it without Batcher mode, we will be able
@@ -4991,7 +4929,7 @@ let test_upgrade_activated_after_flush_level =
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup_address [] in
   let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
 
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client
   and* _ =
     repeat 2 (fun () ->
         let* _ = produce_block ~timestamp:after_timestamp sequencer in
@@ -4999,7 +4937,7 @@ let test_upgrade_activated_after_flush_level =
   (* make sure the upgrade is done on invalid branch *)
   and* _ = Evm_node.wait_for_successful_upgrade sequencer in
 
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   (* Send a delayed transaction. *)
   let* _hash =
     let* tx =
@@ -5022,14 +4960,14 @@ let test_upgrade_activated_after_flush_level =
       tx
   in
   (* Flush the delayed inbox. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* flush_l1_level = Client.level client in
 
   (* Make the flush final. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   let* _ = Evm_node.wait_for_processed_l1_level ~level:flush_l1_level sequencer
-  and* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  and* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* () = check_head_consistency ~left:proxy ~right:sequencer () in
 
   let* _ =
@@ -5146,7 +5084,7 @@ let test_upgrade_injected_after_flush_level =
   in
   let* _ =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   and* _ = Evm_node.wait_for_pending_upgrade sequencer in
 
@@ -5172,14 +5110,14 @@ let test_upgrade_injected_after_flush_level =
       tx
   in
   (* Flush the delayed inbox. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* flush_l1_level = Client.level client in
 
   (* Make the flush final. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   let* _ = Evm_node.wait_for_processed_l1_level ~level:flush_l1_level sequencer
-  and* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  and* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   let* _ =
     repeat 2 (fun () ->
@@ -5312,7 +5250,7 @@ let test_flushed_blueprint_reorg_upgrade =
     Evm_node.wait_for_processed_l1_level
       ~level:add_delayed_inbox_level
       sequencer
-  and* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  and* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let*@ speculative_head = Rpc.get_block_by_number ~block:"latest" sequencer in
 
   (* Wait until the event is completely processed. Head of sequencer and proxy
@@ -5324,7 +5262,7 @@ let test_flushed_blueprint_reorg_upgrade =
   and* _ = Evm_node.wait_for_flush_delayed_inbox sequencer
   and* _ = Evm_node.wait_for_pending_upgrade sequencer
   (* A new block will make the {!flushed_delayed_inbox_level} final. *)
-  and* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  and* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   let* () = check_head_consistency ~left:proxy ~right:sequencer () in
 
@@ -5383,7 +5321,7 @@ let test_delayed_transfer_timeout =
   (* Kill the sequencer *)
   let* () = Evm_node.terminate sequencer in
   let endpoint = Evm_node.endpoint proxy in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
   let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
@@ -5414,7 +5352,7 @@ let test_delayed_transfer_timeout =
      forced *)
   let* _ =
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
@@ -5475,7 +5413,7 @@ let test_forced_blueprint_takes_pred_timestamp =
       ~sc_rollup_address
       raw_transfer
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
   Check.(
@@ -5537,7 +5475,7 @@ let test_forced_blueprint_takes_l1_timestamp =
       raw_transfer
   in
   let* l1_timestamp = l1_timestamp client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
   (* The forced block will have a timestamp of l1_timestamp. *)
@@ -5574,7 +5512,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
   (* Kill the sequencer *)
   let* () = Evm_node.terminate sequencer in
   let endpoint = Evm_node.endpoint proxy in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
   let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
@@ -5608,7 +5546,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
   *)
   let* _ =
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
@@ -5620,7 +5558,7 @@ let test_delayed_transfer_timeout_fails_l1_levels =
   (* Wait until it's forced *)
   let* _ =
     repeat 15 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
@@ -5772,7 +5710,7 @@ let test_force_kernel_upgrade =
      kernel will not upgrade. *)
   let* () =
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Assert the kernel version is the same, it proves the upgrade did not
@@ -5828,7 +5766,7 @@ let test_external_transaction_to_delayed_inbox_fails =
   let* () =
     repeat 10 (fun () ->
         let*@ _ = produce_block sequencer in
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+        let* _ = Rollup.next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   (* Response should be none *)
@@ -5847,7 +5785,7 @@ let test_proxy_node_can_forward_to_evm_endpoint =
     ~tags:["proxy"; "evm_node_endpoint"]
     ~title:"Proxy node can forward transactions to another EVM node"
   @@ fun {sequencer; proxy; sc_rollup_node; client; _} _protocol ->
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   (* We restart the proxy node with a companion EVM node (the sequencer, in
      this case). It is expected that, in this configuration, it will forward
      its transactions to the sequencer, which means said transactions will be
@@ -5920,7 +5858,7 @@ let test_delayed_inbox_flushing =
   (* Kill the sequencer *)
   let* () = Evm_node.terminate sequencer in
   let endpoint = Evm_node.endpoint proxy in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let sender = Eth_account.bootstrap_accounts.(0).address in
   let _ = Rpc.block_number proxy in
   let receiver = Eth_account.bootstrap_accounts.(1).address in
@@ -5950,7 +5888,7 @@ let test_delayed_inbox_flushing =
   (* Bake a few blocks but not enough for the first tx to be forced! *)
   let* _ =
     repeat 10 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Send the second transaction, a transfer from
@@ -5979,7 +5917,7 @@ let test_delayed_inbox_flushing =
      the second one. However, the latter should also be included. *)
   let* _ =
     repeat 10 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* sender_balance_next = Eth_cli.balance ~account:sender ~endpoint () in
@@ -6092,7 +6030,7 @@ let test_timestamp_from_the_future =
   let number_of_blocks_to_wait = if enable_dal then 20 else 5 in
   let* _ =
     repeat number_of_blocks_to_wait (fun () ->
-        let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _l1_lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
 
@@ -6158,7 +6096,7 @@ let test_sequencer_sunset =
   let upgrade_info = Evm_node.wait_for_evm_event Sequencer_upgrade sequencer in
   let* () =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+        let* _ = Rollup.next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   and* _upgrade_info = upgrade_info in
 
@@ -6294,7 +6232,7 @@ let test_sequencer_upgrade =
   in
   let* () =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+        let* _ = Rollup.next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   and* _upgrade_info = upgrade_info
   and* _upgrade_info_observer = upgrade_info_observer in
@@ -6355,7 +6293,7 @@ let test_sequencer_upgrade =
       ~__LOC__
       ~timeout_in_blocks:100
       ~timeout:60.
-      ~bake:(fun () -> next_rollup_node_level ~client ~sc_rollup_node)
+      ~bake:(fun () -> Rollup.next_rollup_node_level ~client ~sc_rollup_node)
       ~result_f:has_sequencer_changed
       ()
   in
@@ -6405,7 +6343,7 @@ let test_sequencer_upgrade =
   (* maybe unnecessary check here, we already not the block production failed. *)
   let* () =
     repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+        let* _ = Rollup.next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
@@ -6634,7 +6572,7 @@ let test_duplicate_sequencer_upgrade =
       ~__LOC__
       ~timeout_in_blocks:100
       ~timeout:60.
-      ~bake:(fun () -> next_rollup_node_level ~client ~sc_rollup_node)
+      ~bake:(fun () -> Rollup.next_rollup_node_level ~client ~sc_rollup_node)
       ~result_f:has_sequencer_changed
       ()
   in
@@ -6728,7 +6666,9 @@ let test_sequencer_diverge =
   let* () =
     (* 2 to make sure it has been finalized *)
     repeat 2 (fun () ->
-        let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _l1_level =
+          Rollup.next_rollup_node_level ~sc_rollup_node ~client
+        in
         unit)
   in
   (* We duplicate the sequencer by creating a snapshot and importing it *)
@@ -6796,7 +6736,7 @@ let test_sequencer_diverge =
     and* _ = produce_block ~timestamp:"2020-01-01T00:12:00Z" sequencer_bis in
     let number_of_blocks = if enable_dal then 20 else 5 in
     repeat number_of_blocks (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+        let* _ = Rollup.next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
 
@@ -6848,7 +6788,7 @@ let test_sequencer_can_catch_up_on_event =
   let* () =
     (* produces some blocks so the rollup node applies latest produced block. *)
     repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let check json =
@@ -6910,8 +6850,8 @@ let test_sequencer_dont_read_level_twice =
 
   (* We bake two blocks, so that the EVM node can process the deposit and
      create a blueprint with it. *)
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* We expect the deposit to be in this block. *)
   let* _ = produce_block sequencer in
@@ -7176,7 +7116,7 @@ let test_stage_one_reboot =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_total_ticks ()
   in
-  let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+  let* _ = Rollup.next_rollup_node_level ~client ~sc_rollup_node in
   let* total_tick_number_with_expected_reboots =
     Sc_rollup_node.RPC.call sc_rollup_node
     @@ Sc_rollup_rpc.get_global_block_total_ticks ()
@@ -7323,7 +7263,9 @@ let test_blueprint_limit_with_delayed_inbox =
      by the sequencer *)
   let* () =
     repeat 4 (fun () ->
-        let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _l1_level =
+          Rollup.next_rollup_node_level ~sc_rollup_node ~client
+        in
         unit)
   in
   let* _requests, _hashes =
@@ -7560,7 +7502,7 @@ let test_preimages_endpoint =
 
   let* () =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* () = Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
@@ -7581,7 +7523,7 @@ let test_preimages_endpoint =
   in
   let* _ =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+        let* _ = Rollup.next_rollup_node_level ~client ~sc_rollup_node in
         unit)
   in
   (* Create a file server that serves the preimages. *)
@@ -7666,7 +7608,7 @@ let test_preimages_endpoint_retry =
   let* () = Evm_node.terminate sequencer in
   let finalizeL1 () =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Prepares the sequencer without [preimages-dir], to force the use of
@@ -9608,7 +9550,7 @@ let test_deposit_and_fast_withdraw =
   (* We bake enough blocks for the sequencer to realize there's a deposit. *)
   let* () =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* We create a L2 block to include the deposit *)
@@ -9792,7 +9734,7 @@ let test_deposit_and_fa_fast_withdraw =
   Check.((int_of_string @@ String.trim receiver_balance = 0) int)
     ~error_msg:"Expected %R as initial balance instead of %L" ;
   let* () = Client.bake_for_and_wait ~keys:[] client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Execute the deposit of 100 tez to the rollup. The depositor is the admin account, and the receiver is the Ethereum address. *)
   let* () =
@@ -9809,7 +9751,7 @@ let test_deposit_and_fa_fast_withdraw =
   (* We bake enough blocks for the sequencer to realize there's a deposit. *)
   let* () =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* We create a L2 block to include the deposit *)
@@ -9860,7 +9802,7 @@ let test_deposit_and_fa_fast_withdraw =
       receipt
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   let* receiver_balance =
     Client.ticket_balance
@@ -10082,7 +10024,7 @@ let test_observer_finalized_view =
   (* Ensure blueprints are finalized by baking two more blocks *)
   let* _l1_lvl =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
 
@@ -10126,7 +10068,7 @@ let test_finalized_persistent =
               ~timeout:5.
               sequencer
               Int32.(to_int number)
-          and* _ = next_rollup_node_level ~sc_rollup_node ~client in
+          and* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
           unit)
         (fun _ ->
           bake_until_blueprint_finalized
@@ -10242,7 +10184,7 @@ let test_finalized_view =
       (Int32.to_int sequencer_head)
   and* _ =
     repeat 3 @@ fun () ->
-    let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+    let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
     unit
   in
   let*@ finalized_proxy_block = Rpc.block_number finalized_proxy in
@@ -10386,7 +10328,7 @@ let test_finalized_block_param =
      allow to finalized the first four blocks posted earlier. *)
   let* () =
     repeat 2 @@ fun () ->
-    let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+    let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
     let* _ = produce_block sequencer in
     unit
   in
@@ -10665,6 +10607,7 @@ let test_relay_restricted_rpcs =
 
 let test_tx_pool_pending_nonce () =
   register_sandbox
+    ~__FILE__
     ~tags:["evm"; "tx_pool"]
     ~title:"Transaction pool pending nonce"
   @@ fun sequencer ->
@@ -10830,8 +10773,8 @@ let test_produce_block_with_no_delayed_transactions =
   let wait_for =
     Evm_node.wait_for_processed_l1_level ~level:l1_level sequencer
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   let* _ = wait_for in
 
   let*@ n = Rpc.produce_block ~with_delayed_transactions:false sequencer in
@@ -11077,6 +11020,7 @@ let test_websocket_max_message_length () =
     |> Evm_node.patch_config_websockets_if_enabled ~max_message_length
   in
   register_sandbox
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "max"]
     ~title:"Websocket server does not accept messages larger than maximum"
     ~patch_config
@@ -11134,6 +11078,7 @@ let test_websocket_rate_limit strategy =
               ])
   in
   register_sandbox
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "rate_limit"; strategy_str]
     ~title:(sf "Websocket server limits rate of messages (%s)" strategy_str)
     ~patch_config
@@ -11234,6 +11179,7 @@ let test_websocket_frames_rate_limit () =
   in
 
   register_sandbox
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "rate_limit"; "frames"]
     ~title:"Websocket server limits rate of frames"
     ~patch_config
@@ -11288,6 +11234,7 @@ let test_websocket_heartbeat_monitoring () =
     |> Evm_node.patch_config_websockets_if_enabled ~monitor_heartbeat:true
   in
   register_sandbox
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "monitoring"]
     ~title:"Websocket server closes connection when client unresponsive"
     ~patch_config
@@ -12529,14 +12476,14 @@ let test_tx_queue_clear =
   let wait_for_processed_l1_level_add =
     Evm_node.wait_for_processed_l1_level ~level:add_level sequencer
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Mark at which level the delayed inbox was flushed. *)
   let* flushed_level = Client.level client in
   let wait_for_processed_l1_level_flushed =
     Evm_node.wait_for_processed_l1_level ~level:flushed_level sequencer
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client
   and* _ = wait_for_processed_l1_level_add in
 
   (* Produce one L2 block. The sequencer is aware of the delayed inbox
@@ -12545,7 +12492,7 @@ let test_tx_queue_clear =
   let wait_for_clear = Evm_node.wait_for_tx_queue_cleared observer in
   let*@ _ = Rpc.produce_block ~with_delayed_transactions:false sequencer in
 
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client
   and* _ = wait_for_flush
   and* _ = wait_for_processed_l1_level_flushed
   and* () = wait_for_clear in
@@ -13105,7 +13052,7 @@ let test_deposit_event =
   (* Bake two blocks to let the sequencer see the deposit *)
   let* () =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Produce an Etherlink block *)
@@ -13253,7 +13200,7 @@ let test_fa_deposit_and_withdrawals_events =
   let* () =
     (* Keep the following number >= 4, otherwise the test becomes flaky. *)
     repeat 4 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Produce an Etherlink block *)
@@ -13954,7 +13901,7 @@ let test_sequencer_key_change_fails_if_governance_upgrade_exists =
   in
   let* () =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* _res = waiting_sequencer_upgrade in

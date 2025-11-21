@@ -98,7 +98,7 @@ let test_publish_blueprints_on_dal ~dal_slot =
        finalized in `rollup_node_follower` *)
     if enable_dal then
       repeat 2 (fun () ->
-          let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
+          let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
           unit)
     else unit
   in

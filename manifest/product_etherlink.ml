@@ -428,6 +428,7 @@ let _etherlink_tezts =
       "gc";
       "tezlink";
       "preconfirmation";
+      "tezosx";
     ]
     ~path:"etherlink/tezt/tests"
     ~opam:"tezt-etherlink"

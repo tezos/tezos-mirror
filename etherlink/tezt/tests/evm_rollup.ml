@@ -414,7 +414,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       ~keys:[]
       ~kind:pvm_kind
       ~boot_sector:("file:" ^ output)
-      ~parameters_ty:evm_type
+      ~parameters_ty:Rollup.evm_type
       ~src:originator_key
       client
   in
@@ -447,7 +447,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         in
         return
           ( (fun () ->
-              let* l = next_rollup_node_level ~sc_rollup_node ~client in
+              let* l = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
               return (Ok l)),
             evm_node )
     | Setup_sequencer
@@ -2649,7 +2649,7 @@ let gen_test_kernel_upgrade ?setup_kernel_root_hash ?admin_contract ?timestamp
     both. *)
     let* () =
       repeat 3 (fun () ->
-          let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+          let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
           unit)
     in
     let* _ = produce_block () in
@@ -2936,7 +2936,7 @@ let test_sequencer_and_kernel_upgrade_via_kernel_admin =
   in
   let* () =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* _res = waiting_sequencer_upgrade in
@@ -2955,7 +2955,7 @@ let test_sequencer_and_kernel_upgrade_via_kernel_admin =
   let waiting_kernel_upgrade = Evm_node.wait_for_pending_upgrade evm_node in
   let* () =
     repeat 2 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* _res = waiting_kernel_upgrade in
@@ -3204,7 +3204,7 @@ let gen_kernel_migration_test ~from ~to_ ?eth_bootstrap_accounts ?chain_id
   in
   (* wait for the migration to be processed *)
   let* _l1_level =
-    next_rollup_node_level
+    Rollup.next_rollup_node_level
       ~sc_rollup_node:evm_setup.sc_rollup_node
       ~client:evm_setup.client
   in
@@ -4828,7 +4828,7 @@ let test_migrate_proxy_to_sequencer_future =
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer_node in
   let* () =
     repeat 10 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   (* Run the sequencer from the rollup node state. *)
@@ -4967,7 +4967,7 @@ let test_migrate_proxy_to_sequencer_past =
        applied in `apply_blueprint` is deleted, meaning nothing is executed
        in the stage-2. *)
     repeat 3 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let sequencer_node =
@@ -5923,7 +5923,7 @@ let test_whitelist_is_executed =
     repeat
       ((commitment_period * challenge_window) + 3)
       (fun () ->
-        let* _lvl = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let* found_whitelist = get_whitelist () in
@@ -6187,7 +6187,7 @@ let test_rpc_state_value_and_subkeys =
   let* _ = produce_block () in
   let* () =
     repeat 3 (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
   let*@! kernel_version = Rpc.state_value evm_node "/evm/kernel_root_hash" in

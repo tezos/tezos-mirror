@@ -34,7 +34,8 @@
   eth_call
   gc
   tezlink
-  preconfirmation))
+  preconfirmation
+  tezosx))
 
 (executable
  (name main)

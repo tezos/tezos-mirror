@@ -1747,7 +1747,7 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
     ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_revm = false)
     ?(enable_dal = false) ?dal_slots ?(enable_fast_withdrawal = false)
     ?(enable_fast_fa_withdrawal = false) ?(enable_multichain = false)
-    ?evm_version ~output () =
+    ?evm_version ?(with_runtimes = []) ~output () =
   let set_account_code =
     List.flatten
     @@ List.map
@@ -1760,6 +1760,11 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
     @@ List.map
          (fun l2_chain_id -> ["--l2-chain-id"; string_of_int l2_chain_id])
          l2_chain_ids
+  in
+  let with_runtimes =
+    List.concat_map
+      (fun runtime -> ["--with-runtime"; Tezosx_runtime.to_string runtime])
+      with_runtimes
   in
   let cmd =
     ["make"; "kernel"; "installer"; "config"; output]
@@ -1829,15 +1834,15 @@ let make_kernel_installer_config ?(l2_chain_ids = [])
         Wei.to_string
         eth_bootstrap_balance
     @ Cli_arg.optional_arg "evm-version" Evm_version.to_string evm_version
-    @
-    match eth_bootstrap_accounts with
-    | None -> []
-    | Some eth_bootstrap_accounts ->
-        List.flatten
-        @@ List.map
-             (fun eth_bootstrap_account ->
-               ["--eth-bootstrap-account"; eth_bootstrap_account])
-             eth_bootstrap_accounts
+    @ (match eth_bootstrap_accounts with
+      | None -> []
+      | Some eth_bootstrap_accounts ->
+          List.flatten
+          @@ List.map
+               (fun eth_bootstrap_account ->
+                 ["--eth-bootstrap-account"; eth_bootstrap_account])
+               eth_bootstrap_accounts)
+    @ with_runtimes
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
   Runnable.{value = process; run = Process.check}

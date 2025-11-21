@@ -26,9 +26,6 @@
 
 open Sc_rollup_helpers
 
-let evm_type =
-  "or (or (pair bytes (ticket (pair nat (option bytes)))) bytes) bytes"
-
 let u16_to_bytes n =
   let bytes = Bytes.make 2 'a' in
   Bytes.set_uint16_le bytes 0 n ;
@@ -72,10 +69,6 @@ let days n = Ptime.Span.of_int_s (n * 86400)
 let get_timestamp i =
   Ptime.add_span genesis_time (days (i + 1))
   |> Option.get |> Client.Time.to_notation
-
-let next_rollup_node_level ~sc_rollup_node ~client =
-  let* l1_level = Client.bake_for_and_wait_level ~keys:[] client in
-  Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node l1_level
 
 let produce_block ?timestamp evm_node =
   match Evm_node.mode evm_node with
@@ -170,7 +163,7 @@ let check_block_info ~previous_block_info ~current_block_info ~chain_id
 let next_evm_level ~evm_node ~sc_rollup_node ~client =
   match Evm_node.mode evm_node with
   | Proxy ->
-      let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
+      let* _l1_level = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
       unit
   | Sequencer _ | Sandbox _ | Tezlink_sandbox _ ->
       let open Rpc.Syntax in
@@ -207,7 +200,7 @@ let force_kernel_upgrade ~sc_rollup_address ~sc_rollup_node ~client =
       client
       (sf "hex:[%S]" force_kernel_upgrade_payload)
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
 let upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract ~client
@@ -229,7 +222,7 @@ let upgrade ~sc_rollup_node ~sc_rollup_address ~admin ~admin_contract ~client
       ~burn_cap:Tez.one
       client
   in
-  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+  let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
   return root_hash
 
 let check_block_consistency ~left ~right ?error_msg ~block () =
@@ -310,7 +303,7 @@ let bake_until ?__LOC__ ?(timeout_in_blocks = 20) ?(timeout = 30.) ~bake
 let bake_until_sync ?__LOC__ ?timeout_in_blocks ?timeout ~sc_rollup_node ~proxy
     ~sequencer ~client () =
   let bake () =
-    let* _l1_lvl = next_rollup_node_level ~sc_rollup_node ~client in
+    let* _l1_lvl = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
     unit
   in
   let result_f () =
@@ -425,7 +418,7 @@ let find_and_execute_withdrawal ?(outbox_lookup_depth = 10) ~withdrawal_level
     repeat
       ((commitment_period * challenge_window) + 3)
       (fun () ->
-        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        let* _ = Rollup.next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
 
@@ -494,7 +487,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       List.map
         (fun account -> account.Eth_account.address)
         (Array.to_list Eth_account.bootstrap_accounts)) ?(sequencer_keys = [])
-    () =
+    ?with_runtimes () =
   let wallet_dir = Temp.dir "wallet" in
   let output_config = Temp.file "config.yaml" in
   let preimages_dir = Temp.dir "wasm_2_0_0" in
@@ -507,6 +500,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       ~output:output_config
       ~eth_bootstrap_accounts
       ?evm_version
+      ?with_runtimes
       ?sequencer:
         (Option.map (fun k -> k.Account.public_key)
         @@ List.nth_opt sequencer_keys 0)
@@ -622,3 +616,75 @@ let produce_block_and_wait_for ~sequencer n =
     unit
   and* () = Evm_node.wait_for_blueprint_applied sequencer n in
   return ()
+
+let register_sandbox ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit ~title
+    ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags
+    ?patch_config ?websockets ?sequencer_keys ?with_runtimes body =
+  Test.register
+    ~__FILE__
+    ~title
+    ~tags:
+      (tags
+      @ (Option.map (fun k -> Kernel.to_uses_and_tags k |> fst) kernel
+        |> Option.to_list))
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    ~uses:
+      [
+        Constant.octez_evm_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ]
+  @@ fun () ->
+  let* sequencer =
+    init_sequencer_sandbox
+      ?kernel:(Option.map (fun k -> Kernel.to_uses_and_tags k |> snd) kernel)
+      ?tx_queue_tx_per_addr_limit
+      ?set_account_code
+      ?da_fee_per_byte
+      ?minimum_base_fee_per_gas
+      ?patch_config
+      ?websockets
+      ?sequencer_keys
+      ?with_runtimes
+      ()
+  in
+  body sequencer
+
+type sandbox_test = {sandbox : Evm_node.t; observer : Evm_node.t}
+
+let register_sandbox_with_observer ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit
+    ~title ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags
+    ?patch_config ?websockets ?(sequencer_keys = [Constant.bootstrap1]) body =
+  Test.register
+    ~__FILE__
+    ~title
+    ~tags:
+      (tags
+      @ (Option.map (fun k -> Kernel.to_uses_and_tags k |> fst) kernel
+        |> Option.to_list))
+    ~uses_admin_client:false
+    ~uses_client:false
+    ~uses_node:false
+    ~uses:
+      [
+        Constant.octez_evm_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ]
+  @@ fun () ->
+  let* sandbox =
+    init_sequencer_sandbox
+      ?kernel:(Option.map (fun k -> Kernel.to_uses_and_tags k |> snd) kernel)
+      ?tx_queue_tx_per_addr_limit
+      ?set_account_code
+      ?da_fee_per_byte
+      ?minimum_base_fee_per_gas
+      ?patch_config
+      ?websockets
+      ~sequencer_keys
+      ()
+  in
+  let* observer = Setup.run_new_observer_node ~sc_rollup_node:None sandbox in
+  body {sandbox; observer}
