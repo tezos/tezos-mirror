@@ -93,6 +93,14 @@ val website : bool
     *)
 val machine_type : string
 
+(** Enable to specify a disk type for GCP machines. The string must be a machine
+    description compliant with GCP (ex: "pdd-ssd" or "hyperdisk-balanced").
+*)
+val disk_type : string option
+
+(** Enable to specify the size of disks for GCP machines, in GB. *)
+val disk_size_gb : int option
+
 (** Specify the dockerfile alias to use. If not specified, the image
     name will be given by the value of the variable `TEZT_CLOUD`. *)
 val dockerfile_alias : string option

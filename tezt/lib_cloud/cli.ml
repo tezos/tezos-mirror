@@ -33,6 +33,8 @@ type config = {
   process_monitoring : bool option;
   website : bool option;
   machine_type : string option;
+  disk_type : string option;
+  disk_size_gb : int option;
   dockerfile_alias : string option;
   website_port : int option;
   max_run_duration : int option;
@@ -87,6 +89,8 @@ let encoding =
            process_monitoring;
            website;
            machine_type;
+           disk_type;
+           disk_size_gb;
            dockerfile_alias;
            website_port;
            max_run_duration;
@@ -161,7 +165,9 @@ let encoding =
             tc_delay,
             tc_jitter,
             artifacts_dir,
-            teztale_artifacts ) ) ))
+            teztale_artifacts,
+            disk_type,
+            disk_size_gb ) ) ))
     (fun ( ( ( localhost,
                ssh_host,
                monitoring,
@@ -209,7 +215,9 @@ let encoding =
                tc_delay,
                tc_jitter,
                artifacts_dir,
-               teztale_artifacts ) ) )
+               teztale_artifacts,
+               disk_type,
+               disk_size_gb ) ) )
        ->
       {
         localhost;
@@ -235,6 +243,8 @@ let encoding =
         process_monitoring;
         website;
         machine_type;
+        disk_type;
+        disk_size_gb;
         dockerfile_alias;
         website_port;
         max_run_duration;
@@ -309,7 +319,7 @@ let encoding =
                 (opt "binaries_path" string)
                 (opt "log_rotation" int31)
                 (opt "slack_channel_id" string)))
-          (obj8
+          (obj10
              (opt "slack_bot_token" string)
              (opt "daily_logs_artifacts" bool)
              (opt "retrieve_ppx_profiling_traces" bool)
@@ -317,7 +327,9 @@ let encoding =
              (opt "tc_delay" (tup2 float float))
              (opt "tc_jitter" (tup2 float float))
              (opt "artifacts_dir" string)
-             (opt "teztale_artifacts" bool))))
+             (opt "teztale_artifacts" bool)
+             (opt "disk_type" string)
+             (opt "disk_size_gb" int31))))
 
 let section =
   Clap.section
@@ -592,6 +604,23 @@ let machine_type =
     (Option.value
        ~default:Types.Agent_configuration.default_gcp_machine_type
        config.machine_type)
+
+let disk_type =
+  Clap.optional_string
+    ~section
+    ~long:"disk-type"
+    ~description:
+      "Can specify a disk type to use for GCP machines (see \
+       https://docs.cloud.google.com/compute/docs/disks). Default is pd-ssd."
+    ()
+
+let disk_size_gb =
+  Clap.optional_int
+    ~section
+    ~long:"disk-size-gb"
+    ~description:
+      "Can specify the size of disk to use for GCP machines. Default is 200."
+    ()
 
 let dockerfile_alias =
   let from_cli =
@@ -938,6 +967,8 @@ let to_json_config ?scenario_config () =
     process_monitoring = Some process_monitoring;
     website = Some website;
     machine_type = Some machine_type;
+    disk_type;
+    disk_size_gb;
     dockerfile_alias;
     website_port = Some website_port;
     max_run_duration = Some max_run_duration;

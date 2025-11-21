@@ -56,8 +56,8 @@ module Configuration = struct
       incr cpt ;
       Format.asprintf "agent-%03d" !cpt
 
-  let make ?os ?binaries_path ?max_run_duration ?machine_type ?docker_image
-      ?(name = gen_name ()) () =
+  let make ?os ?binaries_path ?max_run_duration ?machine_type ?disk_type
+      ?disk_size_gb ?docker_image ?(name = gen_name ()) () =
     let os = Option.value ~default:Cli.os os in
     let binaries_path = Option.value ~default:Cli.binaries_path binaries_path in
     let max_run_duration =
@@ -67,6 +67,12 @@ module Configuration = struct
       Option.value ~default max_run_duration
     in
     let machine_type = Option.value ~default:Cli.machine_type machine_type in
+    let disk_type =
+      match disk_type with Some d -> Some d | None -> Cli.disk_type
+    in
+    let disk_size_gb =
+      match disk_size_gb with Some s -> Some s | None -> Cli.disk_size_gb
+    in
     let docker_image =
       Option.value ~default:(Gcp {alias = Env.dockerfile_alias}) docker_image
     in
@@ -74,6 +80,8 @@ module Configuration = struct
       ~os
       ~binaries_path
       ?max_run_duration
+      ?disk_type
+      ?disk_size_gb
       ~machine_type
       ~docker_image
       ~name

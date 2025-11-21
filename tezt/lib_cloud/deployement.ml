@@ -67,11 +67,18 @@ module Remote = struct
       Agent.Configuration.uri_of_docker_image
         vm_configuration.Agent.Configuration.docker_image
     in
-    let machine_type = vm_configuration.machine_type in
-    let max_run_duration = vm_configuration.max_run_duration in
+    let {
+      Agent.Configuration.machine_type;
+      disk_type;
+      disk_size_gb;
+      max_run_duration;
+      os;
+      _;
+    } =
+      vm_configuration
+    in
     let ports_per_vm = Env.ports_per_vm in
     let base_port = Env.vm_base_port in
-    let os = vm_configuration.os in
     let auto_approve = Env.auto_approve in
     let prometheus_port = Env.prometheus_port in
     let artifacts_dir = Env.artifacts_dir in
@@ -80,6 +87,8 @@ module Remote = struct
         ~auto_approve
         ~max_run_duration
         ~machine_type
+        ~disk_type
+        ~disk_size_gb
         ~base_port
         ~ports_per_vm
         ~number_of_vms
