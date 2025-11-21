@@ -181,6 +181,7 @@
         "Shared_stake",
         "Delegate_consensus_key",
         "Delegate_storage",
+        "Swrr_sampler",
         "Delegate_sampler",
         "Delegate_rewards",
         "Consensus_parameters_storage",
