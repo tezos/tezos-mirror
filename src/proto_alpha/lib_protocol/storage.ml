@@ -396,6 +396,18 @@ module Contract = struct
          end))
          (Make_index (Contract_repr.Index))
 
+  module SWRR_credit =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["swrr_credit"]
+      end)
+      (struct
+        type t = Z.t
+
+        let encoding = Data_encoding.z
+      end)
+
   module Counter =
     Indexed_context.Make_map
       (Registered)
@@ -1311,6 +1323,19 @@ module Cycle = struct
                  (req "active_stake" Stake_repr.encoding)))
       end)
 
+  module Selected_bakers =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["selected_bakers"]
+      end)
+      (struct
+        type t = Signature.Public_key_hash.t list
+
+        let encoding =
+          Data_encoding.(Variable.list Signature.Public_key_hash.encoding)
+      end)
+
   module Total_active_stake =
     Indexed_context.Make_map
       (Registered)
@@ -1504,6 +1529,7 @@ module Stake = struct
 
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
   module Total_active_stake = Cycle.Total_active_stake
+  module Selected_bakers = Cycle.Selected_bakers
 end
 
 type consensus_pk_in_R = Cycle.consensus_pk_in_R = {

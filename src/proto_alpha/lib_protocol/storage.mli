@@ -209,6 +209,12 @@ module Contract : sig
       with type elt = Contract_repr.t
        and type t = Raw_context.t * Contract_repr.t
 
+  module SWRR_credit :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Z.t
+       and type t := Raw_context.t
+
   (** Tez that were part of frozen deposits (either [own_frozen] or
       [staked_frozen] in {!Staking_balance}) but have been requested to be
       unstaked by a staker.
@@ -609,6 +615,12 @@ module Stake : sig
     Indexed_data_storage
       with type key = Cycle_repr.t
        and type value = (Signature.Public_key_hash.t * Stake_repr.t) list
+       and type t := Raw_context.t
+
+  module Selected_bakers :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Signature.Public_key_hash.t list
        and type t := Raw_context.t
 
   (** Sum of the active stakes of all the delegates with
