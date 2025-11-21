@@ -123,7 +123,7 @@ In order to set the Tezos package repository to your machine, do:
   export release=trixie
 
 We also maintain a separate repository for release candidates. To set
-the last release candidate simply prepend ``RC/`` to the distribution name
+the last release candidate or Beta simply prepend ``RC/`` or ``BETA/`` to the distribution name
 as in ``export distribution=RC/debian``.
 
 Now add the Tezos package repository:
@@ -196,7 +196,7 @@ To update the local dnf registry run:
   dnf update
 
 We also maintain a separate repository for release candidates. To install
-the last release candidate simply prepend ``RC/`` to the distribution name
+the last release candidate or Beta simply prepend ``RC/`` or ``BETA/`` to the distribution name
 as in ``export distribution=RC/rockylinux``
 
 Then, to install the binaries, run the following commands:
