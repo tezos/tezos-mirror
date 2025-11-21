@@ -76,6 +76,7 @@ type dal = {
   dynamic_lag_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
+  attestation_lags : int list;
   attestation_threshold : int;
   cryptobox_parameters : Dal.parameters;
   minimal_participation_ratio : Q.t;

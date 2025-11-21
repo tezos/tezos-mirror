@@ -108,6 +108,7 @@ module Plugin = struct
       dynamic_lag_enable;
       number_of_slots;
       attestation_lag;
+      attestation_lags = _;
       attestation_threshold;
       minimal_participation_ratio = _;
       rewards_ratio = _;

@@ -867,6 +867,7 @@ module Constants : sig
       dynamic_lag_enable : bool;
       number_of_slots : int;
       attestation_lag : int;
+      attestation_lags : int list;
       attestation_threshold : int;
       cryptobox_parameters : Dal.parameters;
       minimal_participation_ratio : Q.t;
@@ -1099,6 +1100,10 @@ module Constants : sig
   val dal_number_of_shards : context -> int
 
   val dal_attestation_lag : context -> int
+
+  val dal_attestation_lags : context -> int list
+
+  val dal_number_of_lags : context -> int
 
   val sc_rollup_arith_pvm_enable : context -> bool
 

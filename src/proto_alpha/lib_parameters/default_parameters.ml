@@ -160,6 +160,7 @@ let default_dal =
       dynamic_lag_enable = false;
       number_of_slots = 32;
       attestation_lag = 5;
+      attestation_lags = [5];
       attestation_threshold = 66;
       cryptobox_parameters = default_cryptobox_parameters;
       minimal_participation_ratio = Q.(64 // 100);

@@ -1055,6 +1055,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  dynamic_lag_enable;
                  number_of_slots;
                  attestation_lag;
+                 attestation_lags;
                  attestation_threshold;
                  cryptobox_parameters;
                  minimal_participation_ratio;
@@ -1070,6 +1071,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             dynamic_lag_enable;
             number_of_slots;
             attestation_lag;
+            attestation_lags;
             attestation_threshold;
             cryptobox_parameters;
             minimal_participation_ratio;
@@ -1370,6 +1372,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             dynamic_lag_enable = false;
             number_of_slots;
             attestation_lag = 5;
+            attestation_lags = [5];
             attestation_threshold;
             cryptobox_parameters;
             minimal_participation_ratio;

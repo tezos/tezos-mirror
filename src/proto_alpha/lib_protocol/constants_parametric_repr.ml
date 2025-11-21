@@ -51,6 +51,7 @@ type dal = {
   dynamic_lag_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
+  attestation_lags : int list;
   attestation_threshold : int;
   cryptobox_parameters : Dal.parameters;
   minimal_participation_ratio : Q.t;
@@ -86,6 +87,7 @@ let dal_encoding =
            dynamic_lag_enable;
            number_of_slots;
            attestation_lag;
+           attestation_lags;
            attestation_threshold;
            cryptobox_parameters;
            minimal_participation_ratio;
@@ -98,6 +100,7 @@ let dal_encoding =
           dynamic_lag_enable,
           number_of_slots,
           attestation_lag,
+          attestation_lags,
           attestation_threshold,
           minimal_participation_ratio,
           rewards_ratio,
@@ -108,6 +111,7 @@ let dal_encoding =
              dynamic_lag_enable,
              number_of_slots,
              attestation_lag,
+             attestation_lags,
              attestation_threshold,
              minimal_participation_ratio,
              rewards_ratio,
@@ -120,6 +124,7 @@ let dal_encoding =
         dynamic_lag_enable;
         number_of_slots;
         attestation_lag;
+        attestation_lags;
         attestation_threshold;
         cryptobox_parameters;
         minimal_participation_ratio;
@@ -127,12 +132,13 @@ let dal_encoding =
         traps_fraction;
       })
     (merge_objs
-       (obj9
+       (obj10
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
           (req "dynamic_lag_enable" bool)
           (req "number_of_slots" uint16)
           (req "attestation_lag" uint8)
+          (req "attestation_lags" (list uint8))
           (req "attestation_threshold" uint8)
           (req
              "minimal_participation_ratio"
