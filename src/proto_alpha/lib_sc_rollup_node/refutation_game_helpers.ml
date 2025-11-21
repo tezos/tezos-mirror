@@ -160,10 +160,20 @@ let generate_proof (node_ctxt : _ Node_context.t)
           )
     | _ -> return (None, max_int)
   in
+  let state = PVM.Ctxt_wrapper.of_node_pvmstate start_state in
   let* page_info =
+    (* The page content that could be imported at the current import level of
+       the PVM. It is expected to be [None] if the page id is not valid or if
+       the slot is not attested. *)
+    let*! import_level =
+      let*! import_level = PVM.get_current_level state in
+      match import_level with
+      | Some level -> Raw_level.to_int32 level |> Lwt.return
+      | None -> Lwt.return node_ctxt.genesis_info.level
+    in
     page_info_from_pvm_state
       constants
-      ~inbox_level:game.inbox_level
+      ~inbox_level:import_level
       node_ctxt
       start_state
   in
@@ -172,7 +182,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
 
     let context : context = (Ctxt_wrapper.of_node_context context).index
 
-    let state = Ctxt_wrapper.of_node_pvmstate start_state
+    let state = state
 
     let reveal hash =
       let open Lwt_syntax in
