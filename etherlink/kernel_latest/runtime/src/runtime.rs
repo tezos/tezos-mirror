@@ -33,15 +33,20 @@ use tezos_smart_rollup_mock::MockHost;
 // Set by the node, contains the verbosity for the logs
 pub const VERBOSITY_PATH: RefPath = RefPath::assert_from(b"/evm/logging_verbosity");
 
+pub trait IsEvmNode {
+    fn is_evm_node(&self) -> bool;
+}
+
 pub trait Runtime:
-    SdkRuntime + InternalRuntime + ExtendedRuntime + Verbosity + WithGas
+    SdkRuntime + InternalRuntime + ExtendedRuntime + Verbosity + WithGas + IsEvmNode
 {
 }
 
 // If a type implements the Runtime, InternalRuntime and ExtendedRuntime traits,
 // it also implements the kernel Runtime.
-impl<T: SdkRuntime + InternalRuntime + ExtendedRuntime + Verbosity + WithGas> Runtime
-    for T
+impl<
+        T: SdkRuntime + InternalRuntime + ExtendedRuntime + Verbosity + WithGas + IsEvmNode,
+    > Runtime for T
 {
 }
 
@@ -66,6 +71,7 @@ pub struct KernelHost<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal> {
     pub internal: Internal,
     pub logs_verbosity: Level,
     pub execution_gas_used: u64,
+    pub is_evm_node: bool,
     pub _pd: PhantomData<R>,
 }
 
@@ -314,6 +320,7 @@ where
             internal: &mut self.internal,
             logs_verbosity: self.logs_verbosity,
             execution_gas_used: self.execution_gas_used,
+            is_evm_node: self.is_evm_node,
             _pd: PhantomData,
         }
     }
@@ -338,6 +345,15 @@ pub fn read_logs_verbosity<Host: tezos_smart_rollup_host::runtime::Runtime>(
     }
 }
 
+// If the flag is set, the kernel consider that this is local evm node execution.
+const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
+
+pub fn evm_node_flag<Host: tezos_smart_rollup_host::runtime::Runtime>(
+    host: &Host,
+) -> bool {
+    Ok(Some(ValueType::Value)) == host.store_has(&EVM_NODE_FLAG)
+}
+
 impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> WithGas
     for KernelHost<R, Host, Internal>
 {
@@ -350,16 +366,26 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> W
     }
 }
 
+impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> IsEvmNode
+    for KernelHost<R, Host, Internal>
+{
+    fn is_evm_node(&self) -> bool {
+        self.is_evm_node
+    }
+}
+
 impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, I: InternalRuntime>
     KernelHost<R, Host, I>
 {
     pub fn init(host: Host, internal: I) -> Self {
         let logs_verbosity = read_logs_verbosity(host.borrow());
+        let is_evm_node = evm_node_flag(host.borrow());
         Self {
             host,
             internal,
             logs_verbosity,
             execution_gas_used: 0,
+            is_evm_node,
             _pd: PhantomData,
         }
     }
@@ -373,6 +399,7 @@ impl Default for MockKernelHost {
             internal: MockInternal(),
             logs_verbosity: Level::default(),
             execution_gas_used: 0,
+            is_evm_node: false,
             _pd: PhantomData,
         }
     }
@@ -387,6 +414,7 @@ impl MockKernelHost {
             internal,
             logs_verbosity: Level::default(),
             execution_gas_used: 0,
+            is_evm_node: false,
             _pd: PhantomData,
         }
     }

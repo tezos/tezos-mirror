@@ -9,11 +9,11 @@ use crate::{
     delayed_inbox::DelayedInbox,
     retrieve_minimum_base_fee_per_gas,
     storage::{
-        dal_slots, enable_dal, evm_node_flag, is_enable_fa_bridge,
-        max_blueprint_lookahead_in_seconds, read_admin, read_chain_family,
-        read_delayed_transaction_bridge, read_kernel_governance,
-        read_kernel_security_governance, read_maximum_allowed_ticks,
-        read_or_set_maximum_gas_per_transaction, read_sequencer_governance, sequencer,
+        dal_slots, enable_dal, is_enable_fa_bridge, max_blueprint_lookahead_in_seconds,
+        read_admin, read_chain_family, read_delayed_transaction_bridge,
+        read_kernel_governance, read_kernel_security_governance,
+        read_maximum_allowed_ticks, read_or_set_maximum_gas_per_transaction,
+        read_sequencer_governance, sequencer,
     },
     tick_model::constants::{MAXIMUM_GAS_LIMIT, MAX_ALLOWED_TICKS},
 };
@@ -250,7 +250,7 @@ pub fn fetch_configuration<Host: Runtime>(host: &mut Host) -> Configuration {
     let sequencer = sequencer(host).unwrap_or_default();
     let enable_fa_bridge = is_enable_fa_bridge(host).unwrap_or_default();
     let dal: Option<DalConfiguration> = fetch_dal_configuration(host);
-    let evm_node_flag = evm_node_flag(host).unwrap_or(false);
+    let evm_node_flag = host.is_evm_node();
     match sequencer {
         Some(sequencer) => {
             let delayed_bridge = read_delayed_transaction_bridge(host)
