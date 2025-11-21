@@ -466,6 +466,9 @@ let get_delayed_inbox_item evm_state hash =
       return res
   | _ -> failwith "invalid delayed inbox item"
 
+let clear_events evm_state =
+  delete ~kind:Directory evm_state Durable_storage_path.Evm_events.events
+
 let clear_block_storage chain_family block evm_state =
   let open Lwt_syntax in
   let* storage_version = Lwt_result.get_exn (storage_version evm_state) in
