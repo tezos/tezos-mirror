@@ -405,6 +405,8 @@ fn transfer<'a, Host: Runtime>(
             // consumption, i.e. it does not include that of its internal
             // operations.
             let consumed_milligas = ctx.tc_ctx.gas.milligas_consumed_by_operation();
+            let lazy_storage_diff =
+                convert_big_map_diff(std::mem::take(ctx.tc_ctx.big_map_diff));
             execute_internal_operations(
                 ctx.tc_ctx,
                 ctx.operation_ctx,
@@ -417,8 +419,6 @@ fn transfer<'a, Host: Runtime>(
                 TransferError::FailedToExecuteInternalOperation(err.to_string())
             })?;
             log!(ctx.host(), Debug, "Transfer operation succeeded");
-            let lazy_storage_diff =
-                convert_big_map_diff(std::mem::take(ctx.tc_ctx.big_map_diff));
             Ok(TransferSuccess {
                 storage: Some(new_storage),
                 lazy_storage_diff,
