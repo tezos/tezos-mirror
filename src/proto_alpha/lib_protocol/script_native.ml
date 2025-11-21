@@ -133,14 +133,33 @@ module CLST_contract = struct
       in
       return (Ex_view {name; ty; implementation})
 
+    let total_supply : storage ex_view tzresult =
+      let open Result_syntax in
+      let* name = Script_string.of_string "get_total_supply" in
+      let implementation (ctxt, _step_constants) (() : unit)
+          ((_ledger, total_supply) : storage) =
+        let open Lwt_result_syntax in
+        return (total_supply, ctxt)
+      in
+      return
+        (Ex_view {name; ty = CLST_types.total_supply_view_ty; implementation})
+
     let view_map : storage Script_native_types.view_map tzresult =
       let open Result_syntax in
       let* (Ex_view {name = get_balance_name; _} as get_balance) = balance in
-      return
-      @@ Script_map.update
-           get_balance_name
-           (Some get_balance)
-           (Script_map.empty string_t)
+      let* (Ex_view {name = get_total_supply_name; _} as get_total_supply) =
+        total_supply
+      in
+      let view_map =
+        Script_map.update
+          get_balance_name
+          (Some get_balance)
+          (Script_map.empty string_t)
+      in
+      let view_map =
+        Script_map.update get_total_supply_name (Some get_total_supply) view_map
+      in
+      return view_map
   end
 end
 

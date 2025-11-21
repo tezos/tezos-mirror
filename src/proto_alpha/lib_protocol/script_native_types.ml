@@ -163,10 +163,15 @@ module CLST_types = struct
 
   type balance_view = (address * nat, nat) view_type
 
+  type total_supply_view = (unit, nat) view_type
+
   let balance_view_ty =
     let open Result_syntax in
     let* {typed = input_ty; _} = pair_ty (address_ty ()) (nat_ty ()) in
     return {input_ty; output_ty = (nat_ty ()).typed}
+
+  let total_supply_view_ty =
+    {input_ty = (unit_ty ()).typed; output_ty = (nat_ty ()).typed}
 end
 
 type ('arg, 'storage) kind =
