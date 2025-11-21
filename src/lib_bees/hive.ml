@@ -90,3 +90,42 @@ let get_error bee_name =
      to be called from within an existing worker loop. *)
   | None -> raise (Unknown_worker bee_name)
   | Some (Worker {switch; _}) -> Eio.Switch.get_error switch
+
+(* [main_job] encapsulates a closure to be executed on the main domain
+   and a resolver to return the result to the caller. *)
+type main_job =
+  | Job : {
+      run : unit -> 'a;
+      resolver : ('a, exn) result Eio.Promise.u;
+    }
+      -> main_job
+
+(* A stream of jobs to be executed on the main domain. *)
+let main_jobs = Eio.Stream.create max_int
+
+(* [run_main_jobs] is a daemon that consumes jobs from [main_jobs] and
+   executes them. It is started on the main domain by [Event_loop.on_main_run]. *)
+let () =
+  let rec run_main_jobs () : [`Stop_daemon] =
+    let (Job {run; resolver}) = Eio.Stream.take main_jobs in
+    let outcome =
+      match run () with value -> Ok value | exception exn -> Error exn
+    in
+    Eio.Promise.resolve resolver outcome ;
+    run_main_jobs ()
+  in
+  Tezos_base_unix.Event_loop.on_main_run (fun _env switch ->
+      Eio.Fiber.fork_daemon ~sw:switch run_main_jobs)
+
+let run_on_main f =
+  match Tezos_base_unix.Event_loop.main_switch () with
+  | None ->
+      invalid_arg
+        "Tezos_bees.Hive.run_on_main called before Event_loop main_run \
+         has          started"
+  | Some _ -> (
+      let promise, resolver = Eio.Promise.create () in
+      Eio.Stream.add main_jobs (Job {run = f; resolver}) ;
+      match Eio.Promise.await promise with
+      | Ok value -> value
+      | Error exn -> raise exn)
