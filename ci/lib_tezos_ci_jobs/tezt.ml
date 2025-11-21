@@ -51,7 +51,7 @@ let tests_tag_selector ?(time_sensitive = false) ?(slow = false)
 let common_needs =
   [
     (Cacio.Artifacts, Code_verification.job_build_x86_64_release Before_merging);
-    (Artifacts, Code_verification.job_build_x86_64_extra_exp Before_merging);
+    (Artifacts, Code_verification.job_build_x86_64_exp Before_merging);
     (Artifacts, Code_verification.job_build_x86_64_extra_dev Before_merging);
     (Artifacts, Code_verification.job_build_kernels Before_merging);
   ]
@@ -163,7 +163,7 @@ let job_tezt_static_binaries =
            Since we only need the name, this is fine.
            We did the same in the docs/ci. *)
         (Artifacts, Master_branch.job_static_x86_64);
-        (Artifacts, Code_verification.job_build_x86_64_extra_exp Before_merging);
+        (Artifacts, Code_verification.job_build_x86_64_exp Before_merging);
         (Artifacts, Code_verification.job_build_x86_64_extra_dev Before_merging);
         (* No need for kernels for this job. *)
       ]
