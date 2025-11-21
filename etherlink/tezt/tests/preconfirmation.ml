@@ -86,6 +86,7 @@ let get_receipt_result ?(timeout = 0) sender_pk nonce_counter gas_price
     let* receipt = receipt_promise in
     return receipt
   else
+    let* _ = Evm_node.wait_for_inclusion observer in
     let*@ _ = produce_block sandbox in
     let* receipt = receipt_promise in
     return receipt
@@ -253,6 +254,7 @@ let test_eth_send_raw_transaction_sync_rpc_multiple_transactions_per_block () =
   register_sandbox_with_observer
     ~tags:["evm"; "delayed_transaction"]
     ~title:"eth_sendRawTransactionSync with multiple transactions per block"
+    ~tx_queue_tx_per_addr_limit:20
   @@ fun {sandbox; observer} ->
   let* () = setup_experimental_feature sandbox observer in
   let* gas_price = Rpc.get_gas_price sandbox in
