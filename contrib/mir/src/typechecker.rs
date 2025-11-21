@@ -294,6 +294,7 @@ impl<'arena, 'script> MichelineContractScript<&'script Micheline<'arena>> {
         self,
         gas: &mut Gas,
         allow_lazy_storage_in_storage: bool,
+        typecheck_views: bool,
     ) -> Result<ContractScript<'arena>, TcError> {
         let MichelineContractScript {
             parameter_ty,
@@ -307,29 +308,31 @@ impl<'arena, 'script> MichelineContractScript<&'script Micheline<'arena>> {
         let mut views = HashMap::new();
         for (name, view) in mich_views {
             let input_type = view.input_type.parse_ty(gas)?;
-            input_type.ensure_prop(gas, TypeProperty::ViewInput)?;
             let output_type = view.output_type.parse_ty(gas)?;
-            output_type.ensure_prop(gas, TypeProperty::ViewOutput)?;
-            match view.code {
-                Micheline::Seq(instrs) => {
-                    typecheck_lambda(
-                        instrs,
-                        gas,
-                        Type::Pair(Rc::new((input_type.clone(), storage.clone()))),
-                        output_type.clone(),
-                        false,
-                    )?;
-                    views.insert(
-                        name,
-                        View {
-                            input_type,
-                            output_type,
-                            code: view.code.clone(),
-                        },
-                    );
+            if typecheck_views {
+                input_type.ensure_prop(gas, TypeProperty::ViewInput)?;
+                output_type.ensure_prop(gas, TypeProperty::ViewOutput)?;
+                match view.code {
+                    Micheline::Seq(instrs) => {
+                        typecheck_lambda(
+                            instrs,
+                            gas,
+                            Type::Pair(Rc::new((input_type.clone(), storage.clone()))),
+                            output_type.clone(),
+                            false,
+                        )?;
+                    }
+                    _ => return Err(TcError::NonSeqViewInstrs(name)),
                 }
-                _ => return Err(TcError::NonSeqViewInstrs(name)),
             }
+            views.insert(
+                name,
+                View {
+                    input_type,
+                    output_type,
+                    code: view.code.clone(),
+                },
+            );
         }
         parameter.ensure_prop(gas, TypeProperty::Passable)?;
         storage.ensure_prop(
@@ -2304,9 +2307,9 @@ pub(crate) fn typecheck_instruction<'a>(
             let allow_lazy_storage_in_storage = true;
             #[cfg(not(feature = "allow_lazy_storage_transfer"))]
             let allow_lazy_storage_in_storage = false;
-            let contract_script = cs
-                .split_script()?
-                .typecheck_script(gas, allow_lazy_storage_in_storage)?;
+            let contract_script =
+                cs.split_script()?
+                    .typecheck_script(gas, allow_lazy_storage_in_storage, false)?;
             ensure_ty_eq(gas, &contract_script.storage, new_storage)?;
             stack.drop_top(3);
             stack.push(Type::Address);
@@ -6049,7 +6052,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Passable,
                 Type::Operation
@@ -6069,7 +6072,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Storable,
                 Type::Operation
@@ -6089,7 +6092,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -6126,7 +6129,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -6146,7 +6149,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Comparable,
                 Type::new_list(Type::Unit)
@@ -6166,7 +6169,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::BigMapValue,
                 Type::new_contract(Type::Unit)
@@ -6338,7 +6341,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Storable,
                 Type::new_contract(Type::Unit)
@@ -6374,7 +6377,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Passable,
                 Type::Operation
@@ -6394,7 +6397,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
                 parameter: Type::Unit,
                 storage: Type::Unit,
@@ -6421,7 +6424,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
                 parameter: Type::Unit,
                 storage: Type::Unit,
@@ -6456,7 +6459,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
                 parameter: Type::Unit,
                 storage: Type::Unit,
@@ -6548,7 +6551,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::ViewInput,
                 Type::BigMap(Rc::new((Type::String, Type::Nat)))
@@ -6567,7 +6570,7 @@ mod typecheck_tests {
                 r#"view "big_map_output_view" unit (big_map string nat) { DROP ; EMPTY_BIG_MAP string nat; };"#,
             ))
             .unwrap()
-            .split_script().unwrap().typecheck_script(&mut gas, true),
+            .split_script().unwrap().typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::ViewOutput,
                 Type::BigMap(Rc::new((Type::String, Type::Nat)))
@@ -6588,7 +6591,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::NoMatchingOverload {
                 instr: Prim::MUL,
                 stack: stk![Type::String, Type::Nat],
@@ -6610,7 +6613,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::NonSeqViewInstrs("non_seq_view".into()))
         );
     }
@@ -6627,7 +6630,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
                 parameter: Type::new_contract(Type::Unit),
                 storage: Type::Unit,
@@ -6653,7 +6656,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::InvalidTypeProperty(
                 TypeProperty::Pushable,
                 Type::new_contract(Type::Unit)
@@ -7072,7 +7075,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
                 parameter: Type::new_or(Type::Int, Type::Unit),
                 storage: Type::Unit,
@@ -7109,7 +7112,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Err(TcError::EntrypointError(ByteReprError::WrongFormat(
                 "entrypoint name must be at most 31 characters long, but it is 32 characters long"
                     .into()
@@ -7131,7 +7134,7 @@ mod typecheck_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true),
+            .typecheck_script(&mut gas, true, true),
             Ok(ContractScript {
                 parameter: Type::new_or(Type::Int, Type::Unit),
                 storage: Type::Unit,
@@ -7231,7 +7234,7 @@ mod typecheck_tests {
             parse_contract_script(s)
                 .unwrap()
                 .split_script()?
-                .typecheck_script(&mut Gas::default(), true)
+                .typecheck_script(&mut Gas::default(), true, true)
         };
 
         // duplicate
@@ -8738,7 +8741,7 @@ mod typecheck_tests {
         let cs = cs_mich
             .split_script()
             .unwrap()
-            .typecheck_script(&mut gas, true)
+            .typecheck_script(&mut gas, true, true)
             .unwrap();
         assert_eq!(
             typecheck_instruction(

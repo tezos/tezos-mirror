@@ -63,7 +63,7 @@ fn main() {
     let contract_typechecked = contract_micheline
         .split_script()
         .unwrap()
-        .typecheck_script(ctx.gas(), true)
+        .typecheck_script(ctx.gas(), true, true)
         .unwrap();
     run_contract(
         30.into(),

@@ -99,7 +99,7 @@
 //! let mut ctx = Ctx::default();
 //! // You can change various things about the context here, see [Ctx]
 //! // documentation.
-//! let contract_typechecked = contract_micheline.split_script().unwrap().typecheck_script(ctx.gas(), true).unwrap();
+//! let contract_typechecked = contract_micheline.split_script().unwrap().typecheck_script(ctx.gas(), true, true).unwrap();
 //! // We construct parameter and storage manually, but you'd probably
 //! // parse or deserialize them from some sort of input/storage, so we use
 //! // parser and decoder respectively.
@@ -367,7 +367,7 @@ mod tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(ctx.gas(), true)
+            .typecheck_script(ctx.gas(), true, true)
             .unwrap()
             .interpret(
                 ctx,
@@ -1065,7 +1065,7 @@ mod tests {
         let cs = cs_mich
             .split_script()
             .unwrap()
-            .typecheck_script(&mut Gas::default(), true)
+            .typecheck_script(&mut Gas::default(), true, true)
             .unwrap();
         let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
         let expected_op = TypedValue::new_operation(
@@ -1263,7 +1263,7 @@ mod multisig_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(&mut Gas::default(), true)
+            .typecheck_script(&mut Gas::default(), true, true)
             .unwrap()
             .interpret(
                 &mut ctx,
@@ -1338,7 +1338,7 @@ mod multisig_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(ctx.gas(), true)
+            .typecheck_script(ctx.gas(), true, true)
             .unwrap()
             .interpret(
                 &mut ctx,
@@ -1396,7 +1396,7 @@ mod multisig_tests {
             .unwrap()
             .split_script()
             .unwrap()
-            .typecheck_script(ctx.gas(), true)
+            .typecheck_script(ctx.gas(), true, true)
             .unwrap()
             .interpret(
                 &mut ctx,

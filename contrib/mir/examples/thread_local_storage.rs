@@ -33,7 +33,7 @@ fn run_contract(parameter: Micheline) {
     let contract_typechecked = contract_micheline
         .split_script()
         .unwrap()
-        .typecheck_script(ctx.gas(), true)
+        .typecheck_script(ctx.gas(), true, true)
         .unwrap();
     STORAGE.with(|storage| {
         storage.replace_with(|storage| {

@@ -6728,7 +6728,7 @@ mod interpreter_tests {
         let cs = cs_mich
             .split_script()
             .unwrap()
-            .typecheck_script(ctx.gas(), true)
+            .typecheck_script(ctx.gas(), true, true)
             .unwrap();
         let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
         let expected_op = TypedValue::new_operation(
@@ -6784,7 +6784,7 @@ mod interpreter_tests {
         let cs = cs_mich
             .split_script()
             .unwrap()
-            .typecheck_script(&mut Gas::default(), true)
+            .typecheck_script(&mut Gas::default(), true, true)
             .unwrap();
 
         let expected_entrypoints = HashMap::from([
@@ -6895,7 +6895,7 @@ mod interpreter_tests {
         let cs = cs_mich
             .split_script()
             .unwrap()
-            .typecheck_script(&mut Gas::default(), true)
+            .typecheck_script(&mut Gas::default(), true, true)
             .unwrap();
 
         let parsed_entrypoints = cs.annotations;
@@ -7044,7 +7044,7 @@ mod interpreter_tests {
         let cs = cs_mich
             .split_script()
             .unwrap()
-            .typecheck_script(&mut Gas::default(), true)
+            .typecheck_script(&mut Gas::default(), true, true)
             .unwrap();
 
         let parsed_entrypoints = cs.annotations;
@@ -7193,7 +7193,7 @@ mod interpreter_tests {
         let cs = cs_mich
             .split_script()
             .unwrap()
-            .typecheck_script(&mut Gas::default(), true)
+            .typecheck_script(&mut Gas::default(), true, true)
             .unwrap();
 
         let parsed_entrypoints = cs.annotations;

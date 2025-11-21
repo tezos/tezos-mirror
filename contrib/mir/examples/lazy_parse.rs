@@ -41,7 +41,7 @@ fn run_contract(parameter: Micheline, storage: Micheline) {
     let contract_typechecked = contract_micheline
         .split_script()
         .unwrap()
-        .typecheck_script(ctx.gas(), true)
+        .typecheck_script(ctx.gas(), true, true)
         .unwrap();
 
     let (_, new_storage) = contract_typechecked
