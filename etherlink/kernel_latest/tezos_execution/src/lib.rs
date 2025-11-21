@@ -1363,12 +1363,12 @@ mod tests {
         let script_micheline = parser.parse_top_level(script).unwrap();
 
         account
-            .set_code(host, &script_micheline.encode())
-            .expect("Set code should have succeeded");
-
-        account
-            .set_storage(host, &storage_micheline.encode())
-            .expect("Set storage should have succeeded");
+            .init(
+                host,
+                &script_micheline.encode(),
+                &storage_micheline.encode(),
+            )
+            .expect("Account initialisation should have succeeded");
 
         account
             .set_balance(host, balance)
