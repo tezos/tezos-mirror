@@ -62,6 +62,7 @@ end)
 
 let job_build_evm_node_static =
   Cacio.parameterize @@ fun arch ->
+  let arch_string = Tezos_ci.Runner.Arch.show_easy_to_distinguish arch in
   CI.job
     ("build_evm_node_static_"
     ^ Tezos_ci.Runner.Arch.show_easy_to_distinguish arch)
@@ -75,17 +76,23 @@ let job_build_evm_node_static =
     ~only_if_changed:Files.(node @ sdks)
     ~artifacts:
       (Gitlab_ci.Util.artifacts
-         ~name:"evm-binaries"
+         ~name:"octez-binaries"
          ~when_:On_success
-         ["octez-evm-*"; "etherlink-*"])
+         ["octez-binaries/$ARCH/*"])
     ~cargo_cache:true
     ~cargo_target_caches:true
     ~sccache:(Cacio.sccache ~cache_size:"2G" ())
+    ~variables:
+      [
+        ("ARCH", arch_string);
+        ("EXECUTABLE_FILES", "script-inputs/etherlink-experimental-executables");
+        ("VERSION_EXECUTABLE", "octez-evm-node");
+      ]
     [
       "./scripts/ci/take_ownership.sh";
       ". ./scripts/version.sh";
       "eval $(opam env)";
-      "make evm-node-static";
+      "./scripts/ci/build_static_binaries.sh";
     ]
 
 let job_lint_wasm_runtime =

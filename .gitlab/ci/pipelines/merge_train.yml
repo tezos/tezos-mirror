@@ -4576,12 +4576,15 @@ etherlink.build_evm_node_static_arm64:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
-  - make evm-node-static
+  - ./scripts/ci/build_static_binaries.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    ARCH: arm64
+    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
+    VERSION_EXECUTABLE: octez-evm-node
     CARGO_NET_OFFLINE: "false"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
@@ -4589,10 +4592,9 @@ etherlink.build_evm_node_static_arm64:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
   artifacts:
-    name: evm-binaries
+    name: octez-binaries
     paths:
-    - octez-evm-*
-    - etherlink-*
+    - octez-binaries/$ARCH/*
     when: on_success
 
 etherlink.build_evm_node_static_x86_64:
@@ -4636,12 +4638,15 @@ etherlink.build_evm_node_static_x86_64:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
-  - make evm-node-static
+  - ./scripts/ci/build_static_binaries.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
+    ARCH: x86_64
+    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
+    VERSION_EXECUTABLE: octez-evm-node
     CARGO_NET_OFFLINE: "false"
     OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
     OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
@@ -4649,10 +4654,9 @@ etherlink.build_evm_node_static_x86_64:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
   artifacts:
-    name: evm-binaries
+    name: octez-binaries
     paths:
-    - octez-evm-*
-    - etherlink-*
+    - octez-binaries/$ARCH/*
     when: on_success
 
 teztrec_schedule_extended_test:
