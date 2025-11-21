@@ -1047,6 +1047,32 @@ module History = struct
               that level are not valid to be imported by the DAL anymore) should
               be handled by the caller. In fact, the [proof_repr] type here only
               covers levels where a new cell has been added to the skip list. *)
+      | Invalid_page_id of {
+          target_cell_and_inc_proof : (history * inclusion_proof) option;
+              (** There are two kinds of invalidity:
+
+                  - It is not possible to get a target cell, and it is clear
+                  from the given inputs that the page ID is either in the future
+                  or far in the past (TTL expired) w.r.t. our max attestation
+                  lag value; this case is represented by [None].
+
+                  - We can access the target cell of the page ID (thus we
+                  provide it with the inclusion proof above), and validating the
+                  page with the attestation lag of that cell tells us that the
+                  page is invalid. *)
+          attestation_threshold_percent : int option;
+              (** In case of Adjustable DAL, [attestation_threshold_percent] is set
+                  to some attestation threshold defined by the rollup kernel. For
+                  regular DAL, it's set to None. *)
+          restricted_commitments_publishers : Contract_repr.t list option;
+              (** In case of Adjustable DAL, [restricted_commitments_publishers]
+                  is set to the rollup's list of authorized addresses, if
+                  any. For regular DAL, it's set to None. *)
+        }
+          (** This case covers situations where the requested/imported page's ID
+              is either in the future w.r.t. attestation lag, in the past
+              w.r.t. (attested) slots validity window, or in the past w.r.t.
+              DAL activation level / rollup origination level. *)
 
     let proof_repr_encoding =
       let open Data_encoding in
@@ -1141,8 +1167,45 @@ module History = struct
                 restricted_commitments_publishers;
               })
       in
-
-      union [case_page_confirmed; case_page_unconfirmed]
+      let case_invalid_page_id =
+        case
+          ~title:"invalid page id representation"
+          (Tag 2)
+          (obj4
+             (req "kind" (constant "invalid_page_id"))
+             (opt
+                "target_cell_and_inc_proof"
+                (tup2 history_encoding (list history_encoding)))
+             (opt "attestation_threshold_percent" uint8)
+             (opt
+                "restricted_commitments_publishers"
+                (list Contract_repr.encoding)))
+          (function
+            | Invalid_page_id
+                {
+                  target_cell_and_inc_proof;
+                  attestation_threshold_percent;
+                  restricted_commitments_publishers;
+                } ->
+                Some
+                  ( (),
+                    target_cell_and_inc_proof,
+                    attestation_threshold_percent,
+                    restricted_commitments_publishers )
+            | _ -> None)
+          (fun ( (),
+                 target_cell_and_inc_proof,
+                 attestation_threshold_percent,
+                 restricted_commitments_publishers )
+             ->
+            Invalid_page_id
+              {
+                target_cell_and_inc_proof;
+                attestation_threshold_percent;
+                restricted_commitments_publishers;
+              })
+      in
+      union [case_page_confirmed; case_page_unconfirmed; case_invalid_page_id]
 
     (** Proof's type is set to bytes and not a structural datatype because
         when a proof appears in a tezos operation or in an rpc, a user can not
@@ -1251,6 +1314,34 @@ module History = struct
                   (List.length inc_proof)
                   pp_inclusion_proof
                   inc_proof
+                  (Format.pp_print_option Format.pp_print_int)
+                  attestation_threshold_percent
+                  pp_whitelist
+                  restricted_commitments_publishers
+            | Invalid_page_id
+                {
+                  target_cell_and_inc_proof;
+                  attestation_threshold_percent;
+                  restricted_commitments_publishers;
+                } ->
+                let pp_target_and_proof fmt = function
+                  | None -> Format.fprintf fmt "pp_target_and_proof = <None>"
+                  | Some (target_cell, inc_proof) ->
+                      Format.fprintf
+                        fmt
+                        "target_cell = %a | inc_proof:[size=%d@ | path=%a]@"
+                        pp_history
+                        target_cell
+                        (List.length inc_proof)
+                        pp_inclusion_proof
+                        inc_proof
+                in
+                Format.fprintf
+                  fmt
+                  "Page_unconfirmed (%a attestation_threshold_percent:%a@ \
+                   commitment_publisher:%a)"
+                  pp_target_and_proof
+                  target_cell_and_inc_proof
                   (Format.pp_print_option Format.pp_print_int)
                   attestation_threshold_percent
                   pp_whitelist
@@ -1548,6 +1639,7 @@ module History = struct
               inc_proof,
               attestation_threshold_percent,
               restricted_commitments_publishers )
+        | Invalid_page_id _ -> failwith "REFUTE_TODO"
       in
       let cell_content = Skip_list.content target_cell in
       (* We check that the target cell has the same level and index than the
@@ -1601,6 +1693,7 @@ module History = struct
                 commitment
             in
             return_some page_data
+        | Invalid_page_id _, _ -> failwith "REFUTE_TODO"
       in
       return (data_opt, attestation_lag)
 
@@ -1616,6 +1709,8 @@ module History = struct
       | Page_confirmed
           {attestation_threshold_percent; restricted_commitments_publishers; _}
       | Page_unconfirmed
+          {attestation_threshold_percent; restricted_commitments_publishers; _}
+      | Invalid_page_id
           {attestation_threshold_percent; restricted_commitments_publishers; _}
         ->
           (attestation_threshold_percent, restricted_commitments_publishers)
