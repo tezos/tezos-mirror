@@ -199,6 +199,42 @@ let blockchain_network_ghostnet =
           ];
       }
 
+let blockchain_network_shadownet =
+  make_blockchain_network
+    ~alias:"shadownet"
+    {
+      time = Time.Protocol.of_notation_exn "2025-08-07T20:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BMJTFWBgqGUzsvW4JLS1XuCYnpH18pBsLb5UvPCv2eiNC5vUeps";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [
+              ( "genesis_pubkey",
+                `String "edpktosVHk2f3Yrz9Jb6rMrk6uVy4sTxVhP2iyF39AdgzvsTWgbaLy"
+              );
+            ];
+      }
+    ~chain_name:"TEZOS_SHADOWNET_2025-08-07T20:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~default_bootstrap_peers:["shadownet.teztnets.com"; "shadownet.tzinit.org"]
+    ~dal_config:
+      {
+        activated = true;
+        bootstrap_peers =
+          [
+            "dal.shadownet.teztnets.com:11732";
+            "shadownet.bootstrap.dal.nomadic-labs.com:11732";
+          ];
+      }
+
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -314,6 +350,7 @@ let builtin_blockchain_networks_with_tags =
     (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
     (19, blockchain_network_ghostnet);
+    (20, blockchain_network_shadownet);
   ]
   |> List.map (fun (tag, network) ->
          match network.alias with
