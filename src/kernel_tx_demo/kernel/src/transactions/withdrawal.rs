@@ -7,12 +7,13 @@
 
 use crypto::hash::ContractKt1Hash;
 use tezos_data_encoding::enc::BinWriter;
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_core::MAX_OUTPUT_SIZE;
 #[cfg(feature = "debug")]
 use tezos_smart_rollup_debug::debug_msg;
+use tezos_smart_rollup_encoding::entrypoint::Entrypoint;
 use tezos_smart_rollup_encoding::michelson::ticket::StringTicket;
 use tezos_smart_rollup_encoding::outbox::{OutboxMessage, OutboxMessageTransaction};
-use tezos_smart_rollup_encoding::{contract::Contract, entrypoint::Entrypoint};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 /// Withdrawal to be sent to L1.

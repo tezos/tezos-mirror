@@ -8,7 +8,8 @@ use tezos_crypto_rs::PublicKeySignatureVerifier;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+use tezos_protocol::contract::Contract;
+use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_tezlink::{
     operation::{
         serialize_unsigned_operation, ManagerOperation, Operation, OperationContent,

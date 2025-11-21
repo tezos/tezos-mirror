@@ -16,13 +16,14 @@ use tezos_data_encoding::{
     nom::{error::DecodeError, NomReader},
     types::Zarith,
 };
+use tezos_protocol::contract::Contract;
 use tezos_smart_rollup_encoding::michelson::{
     ticket::TicketError, MichelsonBytes, MichelsonContract, MichelsonNat,
     MichelsonOption, MichelsonPair, MichelsonTimestamp,
 };
 use tezos_smart_rollup_encoding::outbox::OutboxMessage;
 use tezos_smart_rollup_encoding::{
-    contract::Contract, entrypoint::Entrypoint, michelson::ticket::FA2_1Ticket,
+    entrypoint::Entrypoint, michelson::ticket::FA2_1Ticket,
     outbox::OutboxMessageTransaction,
 };
 

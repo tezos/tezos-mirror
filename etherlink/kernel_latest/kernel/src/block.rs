@@ -626,7 +626,7 @@ mod tests {
     use tezos_execution::account_storage::TezlinkImplicitAccount;
     use tezos_execution::account_storage::TezlinkOriginatedAccount;
     use tezos_execution::context;
-    use tezos_smart_rollup::types::Contract;
+    use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::types::PublicKey;
     use tezos_smart_rollup::types::PublicKeyHash;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;

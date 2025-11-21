@@ -22,6 +22,7 @@ num-bigint.workspace = true
 rlp.workspace = true
 nom.workspace = true
 ethereum.workspace = true
+tezos-protocol.workspace = true
 
 # SDK
 tezos-evm-runtime.workspace = true

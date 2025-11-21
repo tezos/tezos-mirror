@@ -21,7 +21,8 @@ use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
-use tezos_smart_rollup::types::{Contract, PublicKey};
+use tezos_protocol::contract::Contract;
+use tezos_smart_rollup::types::PublicKey;
 use tezos_tezlink::enc_wrappers::OperationHash;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
 use tezos_tezlink::operation::{Operation, OriginationContent, Script};
@@ -995,7 +996,8 @@ mod tests {
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
-    use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+    use tezos_protocol::contract::Contract;
+    use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
     use tezos_tezlink::{
         block::TezBlock,
         enc_wrappers::OperationHash,

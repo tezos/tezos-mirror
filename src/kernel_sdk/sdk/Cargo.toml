@@ -71,6 +71,10 @@ optional = true
 workspace = true
 optional = true
 
+[dependencies.tezos-protocol]
+workspace = true
+optional = true
+
 [dependencies.serde_json]
 version = "1.0.115"
 optional = true
@@ -91,7 +95,7 @@ default = [
 crypto = ["dep:tezos_crypto_rs"]
 bls = ["tezos-smart-rollup-encoding/bls"]
 debug_alloc = ["tezos-smart-rollup-debug/alloc"]
-alloc = ["tezos-smart-rollup-entrypoint/alloc"]
+alloc = ["tezos-smart-rollup-entrypoint/alloc", "tezos-protocol"]
 dlmalloc = ["tezos-smart-rollup-entrypoint/dlmalloc"]
 panic-hook = ["tezos-smart-rollup-entrypoint/default"]
 data-encoding = [

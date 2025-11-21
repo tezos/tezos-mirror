@@ -461,12 +461,13 @@ mod tests {
 
     use alloy_sol_types::SolCall;
     use tezos_evm_runtime::runtime::Runtime;
+    use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::michelson::ticket::FA2_1Ticket;
     use tezos_smart_rollup::michelson::{
         MichelsonBytes, MichelsonContract, MichelsonNat, MichelsonOption, MichelsonPair,
     };
     use tezos_smart_rollup::outbox::{OutboxMessage, OutboxMessageTransaction};
-    use tezos_smart_rollup::types::{Contract, Entrypoint};
+    use tezos_smart_rollup::types::Entrypoint;
     use tezos_smart_rollup_encoding::inbox::ExternalMessageFrame;
     use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
     use tezos_smart_rollup_host::path::RefPath;

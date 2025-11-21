@@ -5,10 +5,8 @@
 //! Arbitrary contract generation
 
 use super::Contract;
-use crypto::hash::ContractKt1Hash;
-use crypto::hash::HashTrait;
-use crypto::hash::HashType;
 use proptest::prelude::*;
+use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait, HashType};
 
 impl Contract {
     /// Randomly selected originated contract.

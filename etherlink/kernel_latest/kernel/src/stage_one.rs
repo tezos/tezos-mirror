@@ -244,6 +244,7 @@ mod tests {
     use tezos_crypto_rs::hash::{HashTrait, SecretKeyEd25519, UnknownSignature};
     use tezos_data_encoding::types::Bytes;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_protocol::contract::Contract;
     use tezos_smart_rollup::{
         michelson::{
             ticket::FA2_1Ticket, MichelsonBytes, MichelsonOption, MichelsonOr,
@@ -251,7 +252,6 @@ mod tests {
         },
         types::PublicKeyHash,
     };
-    use tezos_smart_rollup_encoding::contract::Contract;
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
     use tezos_smart_rollup_mock::TransferMetadata;
     // SdkRuntime is not used directly but necessary to add the Runtime trait in

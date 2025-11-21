@@ -61,6 +61,7 @@ tezos-smart-rollup-storage.workspace = true
 num-bigint.workspace = true
 
 tezos_data_encoding.workspace = true
+tezos-protocol.workspace = true
 
 proptest = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }

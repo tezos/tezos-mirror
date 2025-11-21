@@ -34,11 +34,12 @@
 //! messages to be pushed to the queue.
 //!
 //! ```rust
+//! use tezos_protocol::contract::Contract;
 //! use tezos_smart_rollup::prelude::*;
 //! use tezos_smart_rollup::outbox::*;
 //! use tezos_smart_rollup::inbox::InboxMessage;
 //! use tezos_smart_rollup::michelson::MichelsonString;
-//! use tezos_smart_rollup::types::{Contract, Entrypoint};
+//! use tezos_smart_rollup::types::Entrypoint;
 //!
 //! fn kernel_run(host: &mut impl Runtime) {
 //!   while let Ok(Some(message)) = host.read_input() {
@@ -280,8 +281,9 @@ mod test {
     use super::*;
     use crate::michelson::MichelsonBytes;
     use crate::testing::prelude::*;
-    use crate::types::{Contract, Entrypoint};
+    use crate::types::Entrypoint;
     use tezos_data_encoding::nom::NomReader;
+    use tezos_protocol::contract::Contract;
     use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 
     #[test]

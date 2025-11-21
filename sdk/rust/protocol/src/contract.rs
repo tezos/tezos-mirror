@@ -19,6 +19,9 @@ use tezos_data_encoding::nom::{NomReader, NomResult};
 
 use tezos_crypto_rs::public_key_hash::PublicKeyHash;
 
+#[cfg(feature = "testing")]
+pub mod testing;
+
 /// Contract id - of either an implicit account or originated account.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Contract {
