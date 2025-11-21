@@ -96,7 +96,11 @@ let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
         match retry_attempt with
         | Always -> retry_transfer (attempt + 1)
         | Never -> return_unit
-        | Number max_attempt when attempt >= max_attempt -> return_unit
+        | Number max_attempt when attempt >= max_attempt ->
+            let* () =
+              Floodgate_events.transaction_retried_failed account attempt
+            in
+            return_unit
         | Number _ -> retry_transfer (attempt + 1)
       in
       let callback reason =
@@ -111,6 +115,14 @@ let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
               Floodgate_events.transaction_confirmed
                 account
                 Ptime.(diff end_ start)
+            in
+            let* () =
+              if attempt > 0 then
+                Floodgate_events.transaction_retried_confirmed
+                  account
+                  attempt
+                  Ptime.(diff end_ start)
+              else return_unit
             in
             if is_last_nonce then loop () else return_unit
         | `Dropped ->

@@ -35,9 +35,19 @@ val transaction_confirmed : Account.t -> Ptime.Span.t -> unit Lwt.t
     has been refused by the relay endpoint. *)
 val transaction_refused : Account.t -> unit Lwt.t
 
-(** [transaction_refused account] advertises that it is likely that a
+(** [transaction_dropped account] advertises that it is likely that a
     transaction from [account] has been dropped by the relay endpoint. *)
 val transaction_dropped : Account.t -> unit Lwt.t
+
+(** [transaction_retried_confirmed account attempt time] advertises
+    that a transaction from [account] that was previously dropped have
+    been confirmed after [attempt] on [time] sec. *)
+val transaction_retried_confirmed : Account.t -> int -> Ptime.span -> unit Lwt.t
+
+(** [transaction_retried_failed account attempt] advertises that a
+    transaction from [account] that was retried [attempt] failed to be
+    confirmed.. *)
+val transaction_retried_failed : Account.t -> int -> unit Lwt.t
 
 (** [reimbursed_controller account] advertises that the transaction reimbursing
     the controller used to fund [account] has been accepted by the relay
