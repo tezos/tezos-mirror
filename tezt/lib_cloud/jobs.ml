@@ -13,6 +13,7 @@ module Cli = C
 let docker_build =
   let cache = Hashtbl.create 11 in
   fun ?(docker_image = Agent.Configuration.Gcp {alias = Env.dockerfile_alias})
+      ?(args = [])
       ~push
       ~ssh_public_key
       ()
@@ -55,7 +56,7 @@ let docker_build =
         let* output = Process.run_and_read_stdout "git" ["rev-parse"; "HEAD"] in
         Lwt.return (String.trim output)
       in
-      let args =
+      let auto_args =
         match docker_image with
         | Gcp _ ->
             [
@@ -68,6 +69,7 @@ let docker_build =
         | Octez_release {tag} ->
             [("SSH_PUBLIC_KEY", ssh_public_key); ("RELEASE_TAG", tag)]
       in
+      let args = auto_args @ args in
       Log.info "Building image from %s..." Env.tezt_cloud ;
       let* () = Docker.build ~alias ~args () |> Process.check in
       let* () =
