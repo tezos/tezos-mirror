@@ -236,7 +236,6 @@ module Build = struct
         ["./scripts/ci/build_full_unreleased.sh"]
       |> enable_cargo_cache
       |> enable_sccache ~cache_size:sccache_size
-      |> enable_cargo_target_caches
     in
     (* Disable coverage for arm64 *)
     if arch = Amd64 then Coverage.enable_instrumentation job else job

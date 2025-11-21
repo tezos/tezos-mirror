@@ -276,10 +276,6 @@ oc.build_arm64-extra-dev:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-targets-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo_targets/_target
-    policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -302,9 +298,6 @@ oc.build_arm64-extra-dev:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
-    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
-    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -340,10 +333,6 @@ oc.build_arm64-extra-exp:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-targets-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo_targets/_target
-    policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -366,9 +355,6 @@ oc.build_arm64-extra-exp:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
-    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
-    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
