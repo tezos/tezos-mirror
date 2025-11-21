@@ -39,6 +39,7 @@ type future_block_state = {
 
 type session_state = {
   mutable context : Pvm.Context.rw;
+  mutable storage_version : int;
   mutable finalized_number : Ethereum_types.quantity;
   mutable next_blueprint_number : Ethereum_types.quantity;
   mutable current_block_hash : Ethereum_types.block_hash;
@@ -203,6 +204,7 @@ module State = struct
     let dup
         {
           context;
+          storage_version;
           finalized_number;
           next_blueprint_number;
           current_block_hash;
@@ -215,6 +217,7 @@ module State = struct
         } =
       {
         context;
+        storage_version;
         finalized_number;
         next_blueprint_number;
         current_block_hash;
@@ -230,6 +233,7 @@ module State = struct
     let apply session
         {
           context;
+          storage_version;
           finalized_number;
           next_blueprint_number;
           current_block_hash;
@@ -241,6 +245,7 @@ module State = struct
           future_block_state;
         } =
       session.context <- context ;
+      session.storage_version <- storage_version ;
       session.finalized_number <- finalized_number ;
       session.next_blueprint_number <- next_blueprint_number ;
       session.current_block_hash <- current_block_hash ;
@@ -457,12 +462,9 @@ module State = struct
     return res
 
   let on_new_delayed_transaction ~pool ~native_execution ~delayed_transaction
-      evm_state =
+      ~storage_version evm_state =
     let open Lwt_result_syntax in
     let*! data_dir, config = execution_config in
-    let* storage_version =
-      Durable_storage.storage_version (read_from_state evm_state)
-    in
     if storage_version < 15 then
       Evm_state.execute
         ~pool
@@ -531,6 +533,7 @@ module State = struct
     (* Find the [l2_level] evm_state. *)
     let*! context = Pvm.Context.checkout_exn ctxt.index checkpoint in
     let*! evm_state = Pvm.State.get context in
+    let* storage_version = Evm_state.storage_version evm_state in
     (* Clear the TX queue if needed, to preserve its invariants about nonces always increasing. *)
     let* () =
       let (Ex_tx_container tx_container) = ctxt.tx_container in
@@ -555,6 +558,7 @@ module State = struct
     let* current_block_hash =
       Evm_state.current_block_hash ~chain_family evm_state
     in
+    ctxt.session.storage_version <- storage_version ;
     ctxt.session.next_blueprint_number <- next_blueprint_number ;
     ctxt.session.evm_state <- evm_state ;
     ctxt.session.current_block_hash <- current_block_hash ;
@@ -1218,7 +1222,19 @@ module State = struct
       split_info ;
     if applied_sequencer_upgrade then
       ctxt.session.pending_sequencer_upgrade <- None ;
-    if applied_kernel_upgrade then ctxt.session.pending_upgrade <- None ;
+    let* () =
+      if applied_kernel_upgrade then (
+        let* storage_version = Evm_state.storage_version evm_state in
+        ctxt.session.pending_upgrade <- None ;
+        Result.iter
+          (* Etherlink kernel always set a storage version, the error case
+             should never happen. *)
+          (fun storage_version ->
+            ctxt.session.storage_version <- storage_version)
+          storage_version ;
+        return_unit)
+      else return_unit
+    in
     ctxt.session.post_transaction_run_hook <-
       Some
         (fun () ->
@@ -1413,6 +1429,7 @@ module State = struct
     | New_delayed_transaction delayed_transaction ->
         let* evm_state =
           on_new_delayed_transaction
+            ~storage_version:ctxt.session.storage_version
             ~pool:ctxt.execution_pool
             ~native_execution:
               (ctxt.configuration.kernel_execution.native_execution_policy
@@ -1889,6 +1906,8 @@ module State = struct
                initial kernel"
     in
 
+    let* storage_version = Evm_state.storage_version evm_state in
+
     let* last_split_block =
       match history_mode with
       | Rolling _ | Full _ -> Evm_store.Irmin_chunks.latest conn
@@ -1903,6 +1922,7 @@ module State = struct
         session =
           {
             context;
+            storage_version;
             finalized_number;
             next_blueprint_number;
             current_block_hash;
