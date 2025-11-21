@@ -44,10 +44,12 @@ module CLST_contract = struct
       |> Script_int.of_int64 |> Script_int.abs
     in
     let new_amount = Script_int.(add_n added_amount amount) in
-    let* new_ledger, ctxt =
+    let* new_storage, ctxt =
       Clst_storage.set_balance_from_storage ctxt storage address new_amount
     in
-    return ((Script_list.empty, new_ledger), ctxt)
+    let new_ledger, total_supply = new_storage in
+    let total_supply = Script_int.add_n total_supply added_amount in
+    return ((Script_list.empty, (new_ledger, total_supply)), ctxt)
 
   let execute_withdraw (ctxt, (step_constants : Script_typed_ir.step_constants))
       (amount : withdraw) (storage : storage) :
@@ -86,7 +88,7 @@ module CLST_contract = struct
       else return amount
     in
     let new_amount = Script_int.(abs (sub current_amount removed_amount)) in
-    let* new_ledger, ctxt =
+    let* new_storage, ctxt =
       Clst_storage.set_balance_from_storage ctxt storage address new_amount
     in
     let amount_tez =
@@ -106,7 +108,9 @@ module CLST_contract = struct
         ()
     in
     let ctxt = Local_gas_counter.update_context gas_counter outdated_ctxt in
-    return ((Script_list.of_list [op], new_ledger), ctxt)
+    let new_ledger, total_supply = new_storage in
+    let total_supply = Script_int.(abs (sub total_supply removed_amount)) in
+    return ((Script_list.of_list [op], (new_ledger, total_supply)), ctxt)
 
   let execute (ctxt, (step_constants : step_constants)) (value : arg)
       (storage : storage) =
@@ -121,10 +125,10 @@ module CLST_contract = struct
       let* name = Script_string.of_string "get_balance" in
       let* ty = CLST_types.balance_view_ty in
       let implementation (ctxt, _step_constants) ((address : address), token_id)
-          (ledger : storage) =
+          (storage : storage) =
         let open Lwt_result_syntax in
         if Compare.Int.(Script_int.compare token_id Clst_storage.token_id = 0)
-        then Clst_storage.get_balance_from_storage ctxt ledger address
+        then Clst_storage.get_balance_from_storage ctxt storage address
         else return (Script_int.zero_n, ctxt)
       in
       return (Ex_view {name; ty; implementation})

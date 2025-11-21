@@ -27,7 +27,9 @@ module CLST_types : sig
 
   type ledger = (address, nat) big_map
 
-  type storage = ledger
+  type total_supply = nat
+
+  type storage = ledger * total_supply
 
   type balance_view = (address * nat, nat) view_type
 

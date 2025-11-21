@@ -11,7 +11,12 @@ type with_storage = {kind : t; storage : Script_repr.lazy_expr}
 
 module CLST_contract = struct
   let initial_storage =
-    Micheline.(Seq (dummy_location, []))
+    Micheline.(
+      Prim
+        ( dummy_location,
+          Michelson_v1_primitives.D_Pair,
+          [Seq (dummy_location, []); Int (dummy_location, Z.zero)],
+          [] ))
     |> Micheline.strip_locations |> Script_repr.lazy_expr
 
   let with_initial_storage = {kind = CLST; storage = initial_storage}
