@@ -53,7 +53,7 @@ val init :
   ?index_log_size:int ->
   data_dir:string ->
   unit ->
-  index Lwt.t
+  index tzresult Lwt.t
 
 val index : t -> index
 

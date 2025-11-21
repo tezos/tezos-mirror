@@ -95,10 +95,10 @@ let do_not_use__is_duo () =
   | _ | (exception Not_found) -> false
 
 let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let irmin_dir = context_dir data_dir in
   let init_context () =
-    let* () = Events.(emit initializing_context) ("irmin", irmin_dir) in
+    let*! () = Events.(emit initializing_context) ("irmin", irmin_dir) in
     let patch_context =
       Option.map
         (fun f context ->
@@ -107,12 +107,15 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
           return @@ Shell_context.unwrap_disk_context context)
         patch_context
     in
-    Context.init ?patch_context ?readonly ?index_log_size irmin_dir
+    let*! index =
+      Context.init ?patch_context ?readonly ?index_log_size irmin_dir
+    in
+    return index
   in
 
   let brassaia_dir = context_dir data_dir in
   let init_brassaia_context () =
-    let* () = Events.(emit initializing_context) ("brassaia", brassaia_dir) in
+    let*! () = Events.(emit initializing_context) ("brassaia", brassaia_dir) in
     let patch_context =
       Option.map
         (fun f context ->
@@ -121,11 +124,15 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
           return @@ Brassaia_context.unwrap_disk_context context)
         patch_context
     in
-    Brassaia.init ?patch_context ?readonly ?index_log_size brassaia_dir
+    let*! index =
+      Brassaia.init ?patch_context ?readonly ?index_log_size brassaia_dir
+    in
+    return index
   in
+
   let tezedge_dir = context_dir data_dir in
   let init_tezedge_context () =
-    let* () = Events.(emit initializing_context) ("tezedge", tezedge_dir) in
+    let*! () = Events.(emit initializing_context) ("tezedge", tezedge_dir) in
     let patch_context =
       Option.map
         (fun f context ->
@@ -134,43 +141,44 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
           return @@ Tezedge_context.unwrap_disk_context context)
         patch_context
     in
-    Lwt.return (Tezedge.init ?patch_context tezedge_dir)
+    let index = Tezedge.init ?patch_context tezedge_dir in
+    return index
   in
 
-  let open Lwt_syntax in
   match kind with
   | `Disk ->
       let+ index = init_context () in
       Disk_index index
   | `Memory ->
-      let+ index =
+      let*! index =
         Tezos_context_memory.Context.init ?readonly ?index_log_size irmin_dir
       in
-      Memory_index index
+      return @@ Memory_index index
   | `Brassaia ->
       let+ index = init_brassaia_context () in
       Brassaia_index index
   | `Brassaia_memory ->
-      let+ index =
+      let*! index =
         Brassaia_memory.init ?readonly ?index_log_size brassaia_dir
       in
-      Brassaia_memory_index index
+      return @@ Brassaia_memory_index index
   | `Duo_index ->
       let* irmin_index = init_context () in
       let+ brassaia_index = init_brassaia_context () in
       Duo_index (Duo_context.make_index irmin_index brassaia_index)
   | `Duo_index_memory ->
-      let* irmin_index =
+      let*! irmin_index =
         Tezos_context_memory.Context.init ?readonly ?index_log_size irmin_dir
       in
-      let+ brassaia_index =
+      let*! brassaia_index =
         Brassaia_memory.init ?readonly ?index_log_size brassaia_dir
       in
-      Duo_memory_index
-        (Duo_memory_context.make_index irmin_index brassaia_index)
+      return
+      @@ Duo_memory_index
+           (Duo_memory_context.make_index irmin_index brassaia_index)
   | `Tezedge ->
-      let* tezedge_index = init_tezedge_context () in
-      return (Tezedge_index tezedge_index)
+      let+ tezedge_index = init_tezedge_context () in
+      Tezedge_index tezedge_index
   | `Duo_tezedge ->
       let* irmin_index = init_context () in
       let+ tezedge_index = init_tezedge_context () in
@@ -183,7 +191,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
    expected to be find. *)
 let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
     ~data_dir () =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   (* Gather the initialisation profiling otherwise aggregates will behave
      like records and create a section for each call *)
   () [@profiler.record {verbosity = Notice} "Context init"] ;
@@ -219,7 +227,7 @@ let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
   | "duo" -> (
       match kind with
       | `Disk ->
-          let* () = Events.(emit warning_experimental) () in
+          let*! () = Events.(emit warning_experimental) () in
           init
             ~kind:`Duo_index
             ?patch_context
@@ -228,7 +236,7 @@ let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
             ~data_dir
             ()
       | `Memory ->
-          let* () = Events.(emit warning_experimental) () in
+          let*! () = Events.(emit warning_experimental) () in
           init
             ~kind:`Duo_index_memory
             ?patch_context

@@ -2605,7 +2605,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
   let export_context snapshot_exporter ~data_dir context_hash =
     let open Lwt_result_syntax in
     let*! () = Event.(emit exporting_context) () in
-    let*! context_index =
+    let* context_index =
       Context_ops.init ~kind:`Disk ~readonly:true ~data_dir ()
     in
     (* Is it the right test? *)
@@ -4118,7 +4118,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
                dst_data_dir)
         else Lwt.return_unit
       in
-      let*! context_index =
+      let* context_index =
         Context_ops.init
           ~kind:`Disk
           ~readonly:false

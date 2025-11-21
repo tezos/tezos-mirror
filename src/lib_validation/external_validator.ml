@@ -95,7 +95,7 @@ module Processing = struct
     let sandbox_parameters =
       Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
     in
-    let*! context_index =
+    let* context_index =
       Context_ops.init
         ~kind:`Disk
         ~patch_context:(fun ctxt ->
