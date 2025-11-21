@@ -8,7 +8,7 @@ use tezos_evm_logging::Verbosity;
 use tezos_evm_runtime::{
     extensions::WithGas,
     internal_runtime::{ExtendedRuntime, InternalRuntime},
-    runtime::MockKernelHost,
+    runtime::{IsEvmNode, MockKernelHost},
 };
 use tezos_smart_rollup_host::{
     dal_parameters::RollupDalParameters,
@@ -240,5 +240,11 @@ impl WithGas for EvalHost {
 
     fn executed_gas(&self) -> u64 {
         self.host.executed_gas()
+    }
+}
+
+impl IsEvmNode for EvalHost {
+    fn is_evm_node(&self) -> bool {
+        panic!("`is_evm_node` should not be used by REVM");
     }
 }

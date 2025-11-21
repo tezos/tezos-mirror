@@ -7,7 +7,7 @@
 
 use crate::extensions::WithGas;
 use crate::internal_runtime::{ExtendedRuntime, InternalRuntime};
-use crate::runtime::Runtime;
+use crate::runtime::{IsEvmNode, Runtime};
 use tezos_evm_logging::Verbosity;
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
@@ -273,5 +273,11 @@ impl<Host: Runtime> WithGas for SafeStorage<&mut Host> {
 
     fn executed_gas(&self) -> u64 {
         self.host.executed_gas()
+    }
+}
+
+impl<Host: Runtime> IsEvmNode for SafeStorage<&mut Host> {
+    fn is_evm_node(&self) -> bool {
+        self.host.is_evm_node()
     }
 }

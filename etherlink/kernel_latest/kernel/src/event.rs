@@ -76,7 +76,11 @@ impl Encodable for Event<'_> {
 
 impl Event<'_> {
     pub fn store<Host: Runtime>(&self, host: &mut Host) -> anyhow::Result<()> {
-        storage::store_event(host, self)
+        if !host.is_evm_node() {
+            storage::store_event(host, self)?;
+        }
+
+        Ok(())
     }
 
     pub fn blueprint_applied(block: BlockHeader<ChainHeader>) -> Self {

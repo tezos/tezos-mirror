@@ -35,7 +35,7 @@ use revm_etherlink::inspectors::TracerInput;
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::TransactionHash;
 use tezos_evm_logging::{__trace_kernel, log, Level::*, Verbosity};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_runtime::runtime::{IsEvmNode, Runtime};
 use tezos_evm_runtime::safe_storage::SafeStorage;
 use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup::types::Timestamp;
@@ -537,7 +537,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
             )?;
             upgrade::possible_sequencer_key_change(safe_host.host, timestamp)?;
 
-            if storage::evm_node_flag(safe_host.host)? {
+            if safe_host.is_evm_node() {
                 Ok(ComputationResult::Finished)
             } else {
                 Ok(ComputationResult::RebootNeeded)

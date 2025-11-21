@@ -75,6 +75,7 @@ pub enum StorageVersion {
     V40,
     V41,
     V42,
+    V43,
 }
 
 impl From<StorageVersion> for u64 {
@@ -89,7 +90,7 @@ impl StorageVersion {
     }
 }
 
-pub const STORAGE_VERSION: StorageVersion = StorageVersion::V42;
+pub const STORAGE_VERSION: StorageVersion = StorageVersion::V43;
 
 pub const PRIVATE_FLAG_PATH: RefPath = RefPath::assert_from(b"/evm/remove_whitelist");
 
@@ -190,9 +191,6 @@ const TRACER_INPUT: RefPath = RefPath::assert_from(b"/evm/trace/input");
 // If this path contains a value, the fa bridge is enabled in the kernel.
 pub const ENABLE_FA_BRIDGE: RefPath =
     RefPath::assert_from(b"/evm/feature_flags/enable_fa_bridge");
-
-// If the flag is set, the kernel consider that this is local evm node execution.
-const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");
 
 const MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS: RefPath =
     RefPath::assert_from(b"/evm/max_blueprint_lookahead_in_seconds");
@@ -732,7 +730,7 @@ pub fn enable_dal<Host: Runtime>(host: &Host) -> anyhow::Result<bool> {
     if let Some(ValueType::Value) = host.store_has(&ENABLE_DAL)? {
         // When run from the EVM node, the DAL feature is always
         // considered as disabled.
-        let b = evm_node_flag(host)?;
+        let b = host.is_evm_node();
         Ok(!b)
     } else {
         Ok(false)
@@ -874,14 +872,6 @@ pub fn read_tracer_input<Host: Runtime>(
 
 pub fn is_enable_fa_bridge(host: &impl Runtime) -> anyhow::Result<bool> {
     if let Some(ValueType::Value) = host.store_has(&ENABLE_FA_BRIDGE)? {
-        Ok(true)
-    } else {
-        Ok(false)
-    }
-}
-
-pub fn evm_node_flag(host: &impl Runtime) -> anyhow::Result<bool> {
-    if let Some(ValueType::Value) = host.store_has(&EVM_NODE_FLAG)? {
         Ok(true)
     } else {
         Ok(false)

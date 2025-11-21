@@ -664,6 +664,11 @@ fn migrate_to<Host: Runtime>(
             // Dummy migration for sub block latency entrypoints
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V43 => {
+            // Dummy migration for advertising if events are generated
+            // when run by the EVM node or not
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
