@@ -1828,6 +1828,7 @@ dependencies = [
  "smallvec",
  "strum 0.26.3",
  "strum_macros 0.26.4",
+ "tezos-protocol",
  "tezos-smart-rollup-host",
  "tezos_crypto_rs",
  "tezos_data_encoding",

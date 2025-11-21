@@ -964,6 +964,7 @@ name = "tezos-smart-rollup"
 version = "0.2.2"
 dependencies = [
  "hex",
+ "tezos-protocol",
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
  "tezos-smart-rollup-debug",
