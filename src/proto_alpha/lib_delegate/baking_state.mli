@@ -37,6 +37,9 @@ module Delegate_infos : sig
       no duplicates, the associated slot is the first one. *)
   val own_delegates : t -> delegate_info list
 
+  (** Returns the list of the delegate ids from [own_delegates]. *)
+  val own_delegate_ids : t -> Delegate_id.t list
+
   (** Returns, among our *own* delegates, the delegate (together with its
       first attesting slot) that owns the given round, if any. *)
   val own_round_owner :
@@ -431,6 +434,7 @@ type global_state = {
   constants : Constants.t;
   round_durations : Round.round_durations;
   operation_worker : Operation_worker.t;
+  dal_attestable_slots_worker : Dal_attestable_slots_worker.t;
   mutable forge_worker_hooks : forge_worker_hooks;
   validation_mode : validation_mode;
   delegates : Key.t list;

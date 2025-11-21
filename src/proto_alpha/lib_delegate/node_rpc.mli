@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+open Baking_state_types
 
 (** Inject a block.
 
@@ -64,17 +65,17 @@ val preapply_block :
 val monitor_valid_proposals :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
-  ?cache:Baking_state_types.block_info Baking_cache.Block_cache.t ->
+  ?cache:block_info Baking_cache.Block_cache.t ->
   unit ->
-  (Baking_state_types.proposal Lwt_stream.t * (unit -> unit)) tzresult Lwt.t
+  (proposal Lwt_stream.t * (unit -> unit)) tzresult Lwt.t
 
 (** Monitor heads from the node. *)
 val monitor_heads :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
-  ?cache:Baking_state_types.block_info Baking_cache.Block_cache.t ->
+  ?cache:block_info Baking_cache.Block_cache.t ->
   unit ->
-  (Baking_state_types.proposal Lwt_stream.t * (unit -> unit)) tzresult Lwt.t
+  (proposal Lwt_stream.t * (unit -> unit)) tzresult Lwt.t
 
 (** Await the current protocol to be activated. *)
 val await_protocol_activation :
@@ -149,15 +150,27 @@ val forge_double_baking_evidence :
   bh2:block_header ->
   (bytes, Error_monad.tztrace) result Lwt.t
 
-(** [dal_attestable_slots ctxt ~attestation_level delegates_slots] calls the DAL
+(** [dal_attestable_slots ctxt ~attestation_level delegate_ids] calls the DAL
     node RPC GET /profiles/<pkh>/attested_levels/<level>/attestable_slots/<pkh>
-    for each of the delegates in [delegate_infos] and returns the corresponding
+    for each of the delegates in [delegate_ids] and returns the corresponding
     promises. *)
 val dal_attestable_slots :
   Tezos_rpc.Context.generic ->
   attestation_level:int32 ->
-  Baking_state_types.delegate_info list ->
-  Baking_state_types.dal_attestable_slots
+  Delegate_id.t list ->
+  dal_attestable_slots
+
+(** [monitor_attestable_slots dal_node_rpc_ctxt ~delegate_id] opens a streamed RPC
+    to the DAL node for the given [~delegate_id]. Each item emitted on the stream
+    contains DAL attestable information for this delegate. *)
+val monitor_attestable_slots :
+  Tezos_rpc.Context.generic ->
+  delegate_id:Delegate_id.t ->
+  ( Tezos_dal_node_services.Types.Attestable_event.t Lwt_stream.t
+    * Tezos_rpc.Context.stopper,
+    Error_monad.tztrace )
+  result
+  Lwt.t
 
 (** [get_dal_profiles ctxt delegates] calls the DAL node RPC GET
     /profiles/ to retrieve the DAL node's profiles. *)

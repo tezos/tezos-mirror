@@ -133,6 +133,12 @@ module Delegate_infos = struct
 
   let own_delegates t = t.own_delegates
 
+  let own_delegate_ids t =
+    List.map
+      (fun delegate_info ->
+        Baking_state_types.Delegate.delegate_id delegate_info.delegate)
+      t.own_delegates
+
   let own_round_owner t ~committee_size ~round =
     let open Result_syntax in
     let* round_int = Round.to_int round |> Environment.wrap_tzresult in
@@ -493,8 +499,10 @@ type global_state = {
   constants : Constants.t;
   (* round durations *)
   round_durations : Round.round_durations;
-  (* worker that monitor and aggregates new operations *)
+  (* worker that monitors and aggregates new operations *)
   operation_worker : Operation_worker.t;
+  (* worker that retrieves DAL attestable slots from the DAL node *)
+  dal_attestable_slots_worker : Dal_attestable_slots_worker.t;
   (* hooks to the consensus and block forge worker *)
   mutable forge_worker_hooks : forge_worker_hooks;
   (* the validation mode used by the baker*)
