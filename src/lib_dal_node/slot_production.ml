@@ -198,3 +198,32 @@ let produce_commitment_and_proof =
                   ~name:"store_shards_in_cache")])
         in
         return (commitment, commitment_proof)
+
+module Tests = struct
+  let publish_slot_using_client ctxt cctxt block_level slot_index secret_key
+      slot_content (module Plugin : Dal_plugin.T) =
+    let open Lwt_result_syntax in
+    let* commitment, commitment_proof =
+      produce_commitment_and_proof ctxt '\000' slot_content
+    in
+    let source =
+      Signature.Public_key.hash @@ Signature.Secret_key.to_public_key secret_key
+    in
+    let*! res =
+      Plugin.publish
+        cctxt
+        ~block_level
+        ~source
+        ~slot_index
+        ~commitment
+        ~commitment_proof
+        ~src_sk:secret_key
+        ()
+    in
+    let*! () =
+      match res with
+      | Ok op_hash -> Event.emit_publication ~block_level ~op_hash
+      | Error error -> Event.emit_publication_failed ~block_level ~error
+    in
+    return_unit
+end

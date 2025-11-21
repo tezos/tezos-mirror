@@ -1285,6 +1285,25 @@ open struct
       ~level:Error
       ~pp1:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
+
+  let publication =
+    declare_2
+      ~section
+      ~name:"publication"
+      ~msg:"Publication operation {op_hash} at level {block_level} injected"
+      ~level:Info
+      ("op_hash", Operation_hash.encoding)
+      ("block_level", Data_encoding.int32)
+
+  let publication_failed =
+    declare_2
+      ~section
+      ~name:"publication_failed"
+      ~msg:"Publication at level {block_level} failed with error: {error}"
+      ~level:Warning
+      ("block_level", Data_encoding.int32)
+      ~pp2:Error_monad.pp_print_trace
+      ("error", Error_monad.trace_encoding)
 end
 
 (* DAL node event emission functions *)
@@ -1644,3 +1663,9 @@ let emit_reception_of_shard_detailed ~level ~slot_index ~shard_index ~sender =
 let emit_skip_attesting_shards ~level = emit skip_attesting_shards level
 
 let emit_backfill_error ~error = emit backfill_error error
+
+let emit_publication ~block_level ~op_hash =
+  emit publication (op_hash, block_level)
+
+let emit_publication_failed ~block_level ~error =
+  emit publication_failed (block_level, error)

@@ -19,3 +19,18 @@ val produce_commitment_and_proof :
   string ->
   (Cryptobox.commitment * Cryptobox.commitment_proof, [> Errors.other]) result
   Lwt.t
+
+module Tests : sig
+  (** [publish_slot_using_client ctxt rpc_ctxt block_level slot_index secret_key
+      msg Plugin] uses the layer 1 node accessible through [rpc_ctxt] to inject a
+      dal_publish operation of [msg] on [slot_index] signed with [secret_key]. *)
+  val publish_slot_using_client :
+    Node_context.t ->
+    Tezos_rpc.Context.generic ->
+    int32 ->
+    int ->
+    Signature.secret_key ->
+    string ->
+    (module Dal_plugin.T) ->
+    (unit, [> Errors.other]) result Lwt.t
+end
