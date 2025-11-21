@@ -1497,6 +1497,7 @@ ocaml-check:
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+    CARGO_NET_OFFLINE: "false"
 
 oc.unit:non-proto-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}

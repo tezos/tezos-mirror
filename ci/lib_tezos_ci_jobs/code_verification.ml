@@ -577,6 +577,7 @@ let jobs pipeline_type =
            down the merge train. *)
         ["scripts/ci/dune.sh build @check --stop-on-first-error"]
       |> enable_dune_cache ~cache_size:"3GB"
+      |> enable_networked_cargo
     in
     (* This job triggers the debian child pipeline automatically if any
        files in the changeset is modified. It's the same as
