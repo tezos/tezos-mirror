@@ -31,6 +31,7 @@ let job_build_x86_64_extra_exp =
     ~name:"oc.build_amd64-extra-exp"
     ~__POS__
     ~arch:Amd64
+    ~extra:true
     "script-inputs/experimental-executables"
 
 let job_build_x86_64_extra_dev =
@@ -38,6 +39,7 @@ let job_build_x86_64_extra_dev =
     ~name:"oc.build_amd64-extra-dev"
     ~__POS__
     ~arch:Amd64
+    ~extra:true
     "script-inputs/dev-executables"
 
 let jobs () =

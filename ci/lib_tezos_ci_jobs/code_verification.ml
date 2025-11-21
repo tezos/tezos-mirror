@@ -197,6 +197,7 @@ let job_build_x86_64_extra_dev =
     ~cpu:Very_high
     ~dependencies:(dependencies_needs_start pipeline_type)
     ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
+    ~extra:true
     "script-inputs/dev-executables"
   |> enable_dune_cache ~key:build_cache_key ~policy:Push
 
@@ -209,6 +210,7 @@ let job_build_x86_64_extra_exp =
     ~cpu:Very_high
     ~dependencies:(dependencies_needs_start pipeline_type)
     ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
+    ~extra:true
     "script-inputs/experimental-executables"
   |> enable_dune_cache ~key:build_cache_key ~policy:Push
 
