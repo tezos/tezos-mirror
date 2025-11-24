@@ -654,7 +654,9 @@ let register ?proxy_files ?proxy_args ?vms ?dockerbuild_args ~__FILE__ ~title
   match vms with
   | None ->
       let default_agent =
-        let configuration = Agent.Configuration.make ~name:"default" () in
+        let configuration =
+          Agent.Configuration.make ~name:"default" ?dockerbuild_args ()
+        in
         let next_available_port =
           let cpt = ref 30_000 in
           fun () ->
@@ -740,7 +742,9 @@ let register ?proxy_files ?proxy_args ?vms ?dockerbuild_args ~__FILE__ ~title
                 ~ssh_public_key
                 ()
             in
-            let* deployement = Deployement.deploy ~configurations in
+            let* deployement =
+              Deployement.deploy ?dockerbuild_args ~configurations ()
+            in
             let* () = ensure_ready deployement in
             orchestrator ?alerts ?tasks deployement f
         | `Local_orchestrator_remote_agents ->
@@ -753,7 +757,9 @@ let register ?proxy_files ?proxy_args ?vms ?dockerbuild_args ~__FILE__ ~title
                 ~ssh_public_key
                 ()
             in
-            let* deployement = Deployement.deploy ~configurations in
+            let* deployement =
+              Deployement.deploy ?dockerbuild_args ~configurations ()
+            in
             let* () = ensure_ready deployement in
             orchestrator ?alerts ?tasks deployement f
         | `Remote_orchestrator_remote_agents | `Ssh_host _ ->
@@ -768,7 +774,9 @@ let register ?proxy_files ?proxy_args ?vms ?dockerbuild_args ~__FILE__ ~title
                   ~ssh_public_key
                   ()
               in
-              let* deployement = Deployement.deploy ~configurations in
+              let* deployement =
+                Deployement.deploy ?dockerbuild_args ~configurations ()
+              in
               let* () = ensure_ready deployement in
               init_proxy ?proxy_files ?proxy_args deployement
             else Lwt.return_unit)

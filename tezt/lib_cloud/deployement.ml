@@ -9,6 +9,15 @@ let dns_set_subdomain agent domain =
   let agent_ip = Agent.point agent |> Option.get |> fst in
   Gcloud.DNS.set_subdomain ~agent_ip ~domain
 
+let merge_dockerbuild_args global_dockerbuild_args vm_configuration =
+  let args = vm_configuration.Agent.Configuration.dockerbuild_args in
+  let global_args =
+    List.filter
+      (fun (arg, _) -> not (List.mem_assoc arg args))
+      global_dockerbuild_args
+  in
+  global_args @ args
+
 (* Infrastructure to deploy on Google Cloud *)
 module Remote = struct
   type point_info = {workspace_name : string; gcp_name : string}
@@ -181,7 +190,7 @@ module Remote = struct
       Deployment requires to create new VMs and organizing them per group of
       configuration. Each configuration leads to one terraform workspace.
     *)
-  let deploy ~proxy ~configurations =
+  let deploy ~dockerbuild_args ~proxy ~configurations =
     let agents_info = Hashtbl.create 11 in
     let workspaces_info =
       (* VMs are grouped per group of configuration. Each group leads to one workspace. *)
@@ -209,10 +218,13 @@ module Remote = struct
              (workspace_name, (vm_configuration, configurations, number_of_vms))
            ->
              let* ssh_public_key = Ssh.public_key () in
+             let args =
+               merge_dockerbuild_args dockerbuild_args vm_configuration
+             in
              let* () =
                Jobs.docker_build
                  ~docker_image:vm_configuration.Agent.Configuration.docker_image
-                 ~args:vm_configuration.dockerbuild_args
+                 ~args
                  ~push:Env.push_docker
                  ~ssh_public_key
                  ()
@@ -535,7 +547,7 @@ module Ssh_host = struct
     in
     Lwt.return agent
 
-  let deploy ~user ?ssh_id ~host ~port
+  let deploy ~user ?ssh_id ~host ~port ~dockerbuild_args
       ~(configurations : Agent.Configuration.t list) () =
     let* () = initial_host_provisionning user ?ssh_id host port in
     (* At this time, we only support deploying with root user.
@@ -559,6 +571,12 @@ module Ssh_host = struct
           let* docker_image =
             Agent.Configuration.uri_of_docker_image
               configuration.vm.docker_image
+          in
+          let build_args =
+            merge_dockerbuild_args dockerbuild_args configuration.vm
+            |> List.map (fun (k, v) ->
+                   ["--build-arg"; Format.asprintf "%s=%s" k v])
+            |> List.concat
           in
           let ssh_port = Agent.next_available_port proxy in
           (* FIXME move this constants elsewhere *)
@@ -601,7 +619,7 @@ module Ssh_host = struct
               ~network:"host"
               ~name:configuration.name
               docker_image
-              ["-D"; "-p"; string_of_int ssh_port]
+              (["-D"; "-p"; string_of_int ssh_port] @ build_args)
             |> Process.check
           in
           let () =
@@ -676,7 +694,7 @@ module Localhost = struct
       Env.tezt_cloud
       configuration.Agent.Configuration.name
 
-  let deploy ~configurations () =
+  let deploy ~configurations ~dockerbuild_args () =
     let number_of_vms = List.length configurations in
     let base_port = Env.vm_base_port in
     let ports_per_vm = Env.ports_per_vm in
@@ -699,10 +717,15 @@ module Localhost = struct
                base_port + ((i + 1) * ports_per_vm) - 1 |> string_of_int
              in
              let publish_ports = (start, stop, start, stop) in
+             let args =
+               merge_dockerbuild_args
+                 dockerbuild_args
+                 configuration.Agent.Configuration.vm
+             in
              let* () =
                Jobs.docker_build
                  ~docker_image:configuration.Agent.Configuration.vm.docker_image
-                 ~args:configuration.vm.dockerbuild_args
+                 ~args
                  ~push:false
                  ~ssh_public_key
                  ()
@@ -819,22 +842,33 @@ type t =
   | Ssh_host of Ssh_host.t
   | Localhost of Localhost.t
 
-let deploy ~configurations =
+let deploy ?(dockerbuild_args = []) ~configurations () =
   match Env.mode with
   | `Local_orchestrator_local_agents ->
-      let* localhost = Localhost.deploy ~configurations () in
+      let* localhost = Localhost.deploy ~dockerbuild_args ~configurations () in
       Lwt.return (Localhost localhost)
   | `Local_orchestrator_remote_agents ->
-      let* remote = Remote.deploy ~proxy:false ~configurations in
+      let* remote =
+        Remote.deploy ~proxy:false ~dockerbuild_args ~configurations
+      in
       Lwt.return (Remote remote)
   | `Remote_orchestrator_remote_agents ->
-      let* remote = Remote.deploy ~proxy:true ~configurations in
+      let* remote =
+        Remote.deploy ~proxy:true ~dockerbuild_args ~configurations
+      in
       Lwt.return (Remote remote)
   | `Remote_orchestrator_local_agents -> assert false
   | `Ssh_host (user, host, port) ->
       let ssh_id = Env.ssh_private_key_filename () in
       let* host =
-        Ssh_host.deploy ~user ~ssh_id ~host ~port ~configurations ()
+        Ssh_host.deploy
+          ~user
+          ~ssh_id
+          ~host
+          ~port
+          ~dockerbuild_args
+          ~configurations
+          ()
       in
       Lwt.return (Ssh_host host)
 
