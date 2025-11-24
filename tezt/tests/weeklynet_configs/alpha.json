@@ -163,5 +163,6 @@
         "numerator": 1,
         "denominator": 2
     },
-    "native_contracts_enable": true
+    "native_contracts_enable": true,
+    "swrr_new_baker_lottery_enable": false
 }

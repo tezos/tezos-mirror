@@ -431,6 +431,7 @@ let constants_mainnet : Constants.Parametric.t =
       Ratio.{numerator = 1; denominator = 2};
     (* Native contracts feature flag *)
     native_contracts_enable = false;
+    swrr_new_baker_lottery_enable = false;
   }
 
 let constants_sandbox =

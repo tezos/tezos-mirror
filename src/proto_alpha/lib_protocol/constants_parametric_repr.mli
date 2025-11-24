@@ -272,6 +272,8 @@ type t = {
   all_bakers_attest_activation_threshold : Ratio_repr.t;
   (* Native contracts feature flag *)
   native_contracts_enable : bool;
+  (* SWRR new baker lottery feature flag *)
+  swrr_new_baker_lottery_enable : bool;
 }
 
 val encoding : t Data_encoding.encoding

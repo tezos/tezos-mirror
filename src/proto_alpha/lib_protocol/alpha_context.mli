@@ -983,6 +983,7 @@ module Constants : sig
       allow_tz4_delegate_enable : bool;
       all_bakers_attest_activation_threshold : Ratio.t;
       native_contracts_enable : bool;
+      swrr_new_baker_lottery_enable : bool;
     }
 
     val encoding : t Data_encoding.t
