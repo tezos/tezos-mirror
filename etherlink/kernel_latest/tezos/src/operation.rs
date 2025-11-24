@@ -5,7 +5,7 @@
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::enc_wrappers::{BlockHash, OperationHash};
-use mir::ast::michelson_address::entrypoint;
+use mir::ast::michelson_address::Entrypoint;
 use primitive_types::H256;
 use rlp::Decodable;
 use tezos_crypto_rs::blake2b::digest_256;
@@ -21,7 +21,7 @@ use thiserror::Error;
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct Parameter {
-    pub entrypoint: entrypoint::Entrypoint,
+    pub entrypoint: Entrypoint,
     #[encoding(dynamic, bytes)]
     pub value: Vec<u8>,
 }
@@ -526,7 +526,7 @@ mod tests {
                     )
                     .unwrap(),
                     parameters: Some(Parameter {
-                        entrypoint: entrypoint::Entrypoint::try_from("action").unwrap(),
+                        entrypoint: Entrypoint::try_from("action").unwrap(),
                         value: vec![0x02, 0x00, 0x00, 0x00, 0x02, 0x03, 0x4f],
                     }),
                 },

@@ -2181,7 +2181,7 @@ mod tests {
             30_u64.into(),
             Contract::Originated(dest),
             Some(Parameter {
-                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                entrypoint: mir::ast::Entrypoint::default(),
                 value: storage_value.clone(),
             }),
         );
@@ -2296,7 +2296,7 @@ mod tests {
             30_u64.into(),
             Contract::Originated(dest),
             Some(Parameter {
-                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from(()).encode(),
             }),
         );
@@ -2377,7 +2377,7 @@ mod tests {
             30_u64.into(),
             Contract::Implicit(dest.pkh),
             Some(Parameter {
-                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from(0).encode(),
             }),
         );
@@ -2442,7 +2442,7 @@ mod tests {
             30_u64.into(),
             Contract::Implicit(dest.pkh),
             Some(Parameter {
-                entrypoint: mir::ast::entrypoint::Entrypoint::try_from("non_default")
+                entrypoint: mir::ast::Entrypoint::try_from("non_default")
                     .expect("Entrypoint should be valid"),
                 value: Micheline::from(()).encode(),
             }),
@@ -2784,7 +2784,7 @@ mod tests {
             amount: 1.into(),
             destination: Contract::Originated(succ_dest.clone()),
             parameters: Some(Parameter {
-                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from("Hello world").encode(),
             }),
         });
@@ -2793,7 +2793,7 @@ mod tests {
             amount: 1.into(),
             destination: Contract::Originated(fail_dest.clone()),
             parameters: Some(Parameter {
-                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from(()).encode(),
             }),
         });
@@ -3137,7 +3137,7 @@ mod tests {
                     amount: 0.into(),
                     destination: Contract::Originated(contract_chapo_hash),
                     parameters: Some(Parameter {
-                        entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                        entrypoint: mir::ast::Entrypoint::default(),
                         value: param_value.encode(),
                     }),
                 }),
@@ -3302,7 +3302,7 @@ mod tests {
             transfer_amount.into(),
             Contract::Originated(contract_hash.clone()),
             Some(Parameter {
-                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from(()).encode(),
             }),
         );
@@ -3365,7 +3365,7 @@ mod tests {
             transfer_amount.into(),
             Contract::Originated(contract_hash.clone()),
             Some(Parameter {
-                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from(()).encode(),
             }),
         );
@@ -3432,7 +3432,7 @@ mod tests {
             30_u64.into(),
             Contract::Originated(contract_hash.clone()),
             Some(Parameter {
-                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                entrypoint: mir::ast::Entrypoint::default(),
                 value: Micheline::from(()).encode(),
             }),
         );
@@ -3510,7 +3510,7 @@ mod tests {
                 amount: 1000.into(),
                 destination: Contract::Originated(contract_chapo_hash.clone()),
                 parameters: Some(Parameter {
-                    entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                    entrypoint: mir::ast::Entrypoint::default(),
                     value: Micheline::from(()).encode(),
                 }),
             })],
@@ -3710,7 +3710,7 @@ mod tests {
                 amount: 0.into(),
                 destination: Contract::Originated(contract_chapo_hash.clone()),
                 parameters: Some(Parameter {
-                    entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                    entrypoint: mir::ast::Entrypoint::default(),
                     value: Micheline::from(()).encode(),
                 }),
             })],
