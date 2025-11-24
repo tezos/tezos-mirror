@@ -564,3 +564,5 @@ let () =
   | List_pipelines -> Pipeline.list_pipelines ()
   | Overview_pipelines -> Pipeline.overview_pipelines ()
   | Describe_pipeline {name} -> Pipeline.describe_pipeline name
+
+let () = Cacio.output_tezt_job_list "script-inputs/cacio-tezt-jobs"
