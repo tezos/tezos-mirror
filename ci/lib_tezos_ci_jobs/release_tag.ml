@@ -365,8 +365,9 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
         job_promote_to_latest_test;
         job_opam_release ~dry_run:true ();
         job_release_page;
-        job_dispatch_call;
       ]
+  | false, Beta_release_tag -> [job_release_page; job_dispatch_call]
+  | true, Beta_release_tag -> [job_release_page]
   | _ -> []
 
 (** Create an etherlink release tag pipeline of type {!release_tag_pipeline_type}. *)
