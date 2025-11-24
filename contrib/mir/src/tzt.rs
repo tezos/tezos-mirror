@@ -13,7 +13,6 @@ use std::fmt;
 use typed_arena::Arena;
 
 use crate::ast::big_map::{BigMapId, InMemoryLazyStorage, MapInfo};
-use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
 use crate::ast::*;
 use crate::context::*;

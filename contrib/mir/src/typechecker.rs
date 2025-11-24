@@ -5,7 +5,6 @@
 //! Michelson typechecker definitions. Most functions defined as associated
 //! functions on [Micheline], see there for more.
 
-use crate::ast::michelson_address::entrypoint::{Direction, Entrypoints};
 use chrono::prelude::DateTime;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};

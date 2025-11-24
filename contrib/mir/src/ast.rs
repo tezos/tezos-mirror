@@ -49,8 +49,6 @@ pub use michelson_operation::{
 pub use or::Or;
 pub use tezos_crypto_rs::signature::Signature;
 
-use self::entrypoint::Direction;
-
 /// Representation for values of the Michelson `ticket` type.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Ticket<'a> {
@@ -698,6 +696,19 @@ pub struct ContractScript<'a> {
     /// Views. Corresponds to the script's `view` fields.
     pub views: HashMap<String, View<'a>>,
 }
+
+/// Enum representing each layer to achieve a given entrypoint
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Direction {
+    /// Left
+    Left,
+    /// Right
+    Right,
+}
+
+/// A structure mapping from entrypoints to their types. This is simply an alias
+/// for a [HashMap].
+pub type Entrypoints = HashMap<Entrypoint, Type>;
 
 #[cfg(test)]
 #[allow(missing_docs)]
