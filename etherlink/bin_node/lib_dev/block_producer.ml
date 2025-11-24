@@ -185,14 +185,9 @@ let take_delayed_transactions evm_state maximum_number_of_chunks =
   return (delayed_transactions, remaining_cumulative_size)
 
 let produce_block_with_transactions ~signer ~timestamp ~transactions_and_objects
-    ~delayed_hashes ~hash_of_tx_object head_info =
+    ~delayed_hashes head_info =
   let open Lwt_result_syntax in
-  let transactions, tx_hashes =
-    List.to_seq transactions_and_objects
-    |> Seq.map (fun (raw, obj) -> (raw, hash_of_tx_object obj))
-    |> Seq.split
-    |> fun (l, r) -> (List.of_seq l, List.of_seq r)
-  in
+  let transactions, tx_hashes = List.split transactions_and_objects in
   Misc.with_timing
     (Blueprint_events.blueprint_production
        head_info.Evm_context.next_blueprint_number)
@@ -230,37 +225,6 @@ let produce_block_with_transactions ~signer ~timestamp ~transactions_and_objects
       (tx_hashes @ delayed_hashes)
   in
   return confirmed_txs
-
-type _ transaction_object_list =
-  | Evm_tx_objects :
-      (string * Transaction_object.t) list
-      -> L2_types.evm_chain_family transaction_object_list
-  | Michelson_tx_objects :
-      (string * Tezos_types.Operation.t) list
-      -> L2_types.michelson_chain_family transaction_object_list
-
-let produce_block_with_transactions (type f)
-    ~(transactions_and_objects : f transaction_object_list option)
-    ~(tx_container : f Services_backend_sig.tx_container) =
-  match tx_container with
-  | Evm_tx_container (module Tx_container) ->
-      let transactions_and_objects =
-        match transactions_and_objects with
-        | None -> []
-        | Some (Evm_tx_objects l) -> l
-      in
-      produce_block_with_transactions
-        ~transactions_and_objects
-        ~hash_of_tx_object:Transaction_object.hash
-  | Michelson_tx_container (module Tx_container) ->
-      let transactions_and_objects =
-        match transactions_and_objects with
-        | None -> []
-        | Some (Michelson_tx_objects l) -> l
-      in
-      produce_block_with_transactions
-        ~transactions_and_objects
-        ~hash_of_tx_object:Tx_queue_types.Tezlink_operation.hash_of_tx_object
 
 let validate_etherlink_tx ~maximum_cumulative_size
     (validation_state : Validation_types.validation_state) raw_tx
@@ -300,14 +264,13 @@ let validate_tezlink_op ~maximum_cumulative_size
         return `Drop
 
 let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
-    (head_info : Evm_context.head) ~maximum_cumulative_size :
-    f transaction_object_list tzresult Lwt.t =
+    (head_info : Evm_context.head) ~maximum_cumulative_size =
   let open Lwt_result_syntax in
   (* Skip validation if chain_family is Michelson. *)
   match tx_container with
   | Michelson_tx_container (module Tx_container) ->
       if maximum_cumulative_size <= Tezos_types.Operation.minimum_operation_size
-      then return (Michelson_tx_objects [])
+      then return_nil
       else
         let read = Evm_state.read head_info.evm_state in
         let initial_validation_state =
@@ -319,12 +282,18 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
             ~validate_tx:(validate_tezlink_op ~maximum_cumulative_size)
             ~initial_validation_state
         in
-        return (Michelson_tx_objects l)
+        let l =
+          List.map
+            (fun (raw, tx) ->
+              (raw, Tx_queue_types.Tezlink_operation.hash_of_tx_object tx))
+            l
+        in
+        return l
   | Evm_tx_container (module Tx_container) ->
       (* Low key optimization to avoid even checking the txpool if there is not
          enough space for the smallest transaction. *)
       if maximum_cumulative_size <= minimum_ethereum_transaction_size then
-        return (Evm_tx_objects [])
+        return_nil
       else
         let read = Evm_state.read head_info.evm_state in
         let* minimum_base_fee_per_gas =
@@ -361,34 +330,25 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
             ~validate_tx:(validate_etherlink_tx ~maximum_cumulative_size)
             ~initial_validation_state
         in
-        return (Evm_tx_objects l)
+        let l =
+          List.map (fun (raw, tx) -> (raw, Transaction_object.hash tx)) l
+        in
+        return l
 
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
 let produce_block_if_needed (type f) ~signer ~force ~timestamp ~delayed_hashes
-    ~remaining_cumulative_size
+    ~transactions_and_objects
     ~(tx_container : f Services_backend_sig.tx_container) head_info =
   let open Lwt_result_syntax in
-  let* transactions_and_objects =
-    pop_valid_tx
-      ~tx_container
-      head_info
-      ~maximum_cumulative_size:remaining_cumulative_size
-  in
-  let n_txs =
-    match transactions_and_objects with
-    | Evm_tx_objects l -> List.length l
-    | Michelson_tx_objects l -> List.length l
-  in
-  let n = n_txs + List.length delayed_hashes in
+  let n = List.length transactions_and_objects + List.length delayed_hashes in
   if force || n > 0 then
     let* confirmed_txs =
       produce_block_with_transactions
         ~signer
         ~timestamp
-        ~transactions_and_objects:(Some transactions_and_objects)
+        ~transactions_and_objects
         ~delayed_hashes
-        ~tx_container
         head_info
     in
     let (module Tx_container) =
@@ -499,7 +459,7 @@ let produce_block (state : Types.state) ~force ~(timestamp : Time.Protocol.t)
     ~with_delayed_transactions =
   let open Lwt_result_syntax in
   match state.tx_container with
-  | Ex_tx_container tx_container -> (
+  | Ex_tx_container tx_container ->
       let (module Tx_container) =
         Services_backend_sig.tx_container_module tx_container
       in
@@ -536,12 +496,6 @@ let produce_block (state : Types.state) ~force ~(timestamp : Time.Protocol.t)
         let*! () = Block_producer_events.production_locked () in
         return `No_block
       else
-        let* delayed_hashes, remaining_cumulative_size =
-          head_info_and_delayed_transactions
-            ~with_delayed_transactions
-            head_info.evm_state
-            state.maximum_number_of_chunks
-        in
         let is_going_to_upgrade_kernel =
           match head_info.pending_upgrade with
           | Some Evm_events.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
@@ -554,34 +508,61 @@ let produce_block (state : Types.state) ~force ~(timestamp : Time.Protocol.t)
             produce_block_with_transactions
               ~signer
               ~timestamp
-              ~transactions_and_objects:None
+              ~transactions_and_objects:[]
               ~delayed_hashes:[]
-              ~tx_container
               head_info
           in
           state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
           (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
           return (`Block_produced (Seq.length hashes)))
         else
+          let* delayed_hashes, transactions_and_objects =
+            if state.preconfirmation_stream_enabled then
+              let delayed_hashes =
+                List.map
+                  (fun {Evm_events.Delayed_transaction.hash; _} -> hash)
+                  state.selected_delayed_txns
+              in
+              return
+                ( delayed_hashes,
+                  List.map
+                    (fun (raw, obj) ->
+                      match obj with
+                      | Tx_queue_types.Evm obj ->
+                          (raw, Transaction_object.hash obj)
+                      | Tx_queue_types.Michelson obj ->
+                          ( raw,
+                            Tx_queue_types.Tezlink_operation.hash_of_tx_object
+                              obj ))
+                    state.validated_txns )
+            else
+              let* delayed_hashes, remaining_cumulative_size =
+                head_info_and_delayed_transactions
+                  ~with_delayed_transactions
+                  head_info.evm_state
+                  state.maximum_number_of_chunks
+              in
+              let* transactions_and_objects =
+                pop_valid_tx
+                  ~tx_container
+                  head_info
+                  ~maximum_cumulative_size:remaining_cumulative_size
+              in
+              return (delayed_hashes, transactions_and_objects)
+          in
           let* result =
             produce_block_if_needed
               ~signer
               ~timestamp
               ~force
+              ~transactions_and_objects
               ~delayed_hashes
-              ~remaining_cumulative_size
               ~tx_container
               head_info
           in
           state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
-          match result with
-          | `Block_produced _ ->
-              let* () =
-                when_ state.preconfirmation_stream_enabled (fun () ->
-                    clear_preconfirmation_data ~state)
-              in
-              return result
-          | `No_block -> return result)
+          let* () = clear_preconfirmation_data ~state in
+          return result
 
 let preconfirm_delayed_transactions ~(state : Types.state)
     ~(head_info : Evm_context.head) =

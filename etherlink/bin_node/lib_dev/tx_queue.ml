@@ -938,13 +938,7 @@ struct
                  (Seq.map
                     (fun ({hash; _} as txn : queue_request) -> (hash, txn))
                     transactions_to_inject)) ;
-          (* Remove once produce block request uses preconfirmed transactions *)
-          let () =
-            match evm_node_endpoint with
-            | Rpc _ | Websocket _ ->
-                state.queue <- Queue.of_seq remaining_transactions
-            | Block_producer -> ()
-          in
+          state.queue <- Queue.of_seq remaining_transactions ;
           let txns =
             Pending_transactions.drop
               ~max_lifespan:(Ptime.Span.of_int_s state.config.max_lifespan_s)
