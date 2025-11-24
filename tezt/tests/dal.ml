@@ -10195,6 +10195,38 @@ let create_account_and_reveal ?source ~amount ~alias client =
   let* () = bake_for client in
   return fresh_account
 
+let create_low_stake node dal_parameters proto_params blocks_per_cycle =
+  let minimal_stake = JSON.(proto_params |-> "minimal_stake" |> as_int) in
+  let number_of_shards =
+    dal_parameters.Dal.Parameters.cryptobox.number_of_shards
+  in
+  let* bootstrap_info =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_context_delegate Constant.bootstrap1.public_key_hash
+  in
+  let bootstrap_baking_power =
+    JSON.(bootstrap_info |-> "baking_power" |> as_string) |> int_of_string
+  in
+  let total_baking_power =
+    bootstrap_baking_power * Array.length Account.Bootstrap.keys
+  in
+  (* The amount is such that this baker has only one assigned shard per cycles
+     (on average). Note that if the baker has no assigned shard, the test
+     should still pass, because we just check that it gets its DAL rewards.
+
+     Let [t] be total_baking_power, [s] be [small_baker_stake], and [1/n]
+     desired shards fraction for the small baker. We want [s / (t + s) = 1 /
+     n], ie [t + s = n * s], ie [t = (n-1) * s] ie, [s = t / (n-1)] *)
+  let desired_stake =
+    total_baking_power / ((blocks_per_cycle * number_of_shards) - 1)
+  in
+  let small_baker_stake = max desired_stake minimal_stake in
+  Log.info
+    "total_baking_power = %d, small_baker_stake = %d"
+    total_baking_power
+    small_baker_stake ;
+  return small_baker_stake
+
 (** [test_dal_rewards_distribution _protocol dal_parameters cryptobox node
     client _dal_node] verifies the correct distribution of DAL rewards among
     delegates based on their participation in DAL attestations activity.
@@ -10262,42 +10294,12 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
   let consensus_rights_delay =
     JSON.(proto_params |-> "consensus_rights_delay" |> as_int)
   in
-  let minimal_stake = JSON.(proto_params |-> "minimal_stake" |> as_int) in
   let nb_slots = dal_parameters.Dal.Parameters.number_of_slots in
   let all_slots = List.init nb_slots Fun.id in
-  let number_of_shards =
-    dal_parameters.Dal.Parameters.cryptobox.number_of_shards
-  in
 
   (* Compute the stake of the small baker. *)
   let* small_baker_stake =
-    let* bootstrap_info =
-      Node.RPC.call node
-      @@ RPC.get_chain_block_context_delegate
-           Constant.bootstrap1.public_key_hash
-    in
-    let bootstrap_baking_power =
-      JSON.(bootstrap_info |-> "baking_power" |> as_string) |> int_of_string
-    in
-    let total_baking_power =
-      bootstrap_baking_power * Array.length Account.Bootstrap.keys
-    in
-    (* The amount is such that this baker has only one assigned shard per cycles
-       (on average). Note that if the baker has no assigned shard, the test
-       should still pass, because we just check that it gets its DAL rewards.
-
-       Let [t] be total_baking_power, [s] be [small_baker_stake], and [1/n]
-       desired shards fraction for the small baker. We want [s / (t + s) = 1 /
-       n], ie [t + s = n * s], ie [t = (n-1) * s] ie, [s = t / (n-1)] *)
-    let desired_stake =
-      total_baking_power / ((blocks_per_cycle * number_of_shards) - 1)
-    in
-    let small_baker_stake = max desired_stake minimal_stake in
-    Log.info
-      "total_baking_power = %d, small_baker_stake = %d"
-      total_baking_power
-      small_baker_stake ;
-    return small_baker_stake
+    create_low_stake node dal_parameters proto_params blocks_per_cycle
   in
 
   (* Each of the 5 bootstrap accounts contributes equally to the new baker's
