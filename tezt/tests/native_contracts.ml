@@ -47,7 +47,7 @@ let test_feature_flag =
       ~protocol
       ()
   in
-  let* contract = find_native_contract_hash client "accumulator" in
+  let* contract = find_native_contract_hash client "clst" in
   if contract = None then
     Test.fail "Contract is not in the storage, the feature has not been enabled" ;
   let* parameter_file_disabled =

@@ -1124,7 +1124,7 @@ type toplevel = {
 }
 
 type ('arg, 'storage) implementation =
-      ('arg, 'storage) Script_typed_ir.implementation =
+      ('arg, 'storage) Script_typed.implementation =
   | Lambda : {
       code :
         (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
@@ -1146,7 +1146,7 @@ type ('arg, 'storage) code =
     }
       -> ('arg, 'storage) code
 
-type ex_script = Ex_script : ('a, 'c) Script_typed_ir.script -> ex_script
+type ex_script = Ex_script : ('a, 'c) Script_typed.script -> ex_script
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
@@ -5114,9 +5114,9 @@ let get_typed_native_code :
     context -> kind:Script.native_kind -> (ex_code * context) tzresult Lwt.t =
  fun ctxt ~kind ->
   let open Lwt_result_syntax in
-  let*? (Script_native.Ex_kind_and_types
+  let*? (Script_native_types.Ex_kind_and_types
            (kind, {arg_type; storage_type; entrypoints})) =
-    Script_native.get_typed_kind_and_types kind
+    Script_native_types.get_typed_kind_and_types kind
   in
   let implementation = Native {kind} in
   return

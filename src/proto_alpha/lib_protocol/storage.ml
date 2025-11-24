@@ -623,10 +623,10 @@ module Contract = struct
           let name = ["native_contracts"]
         end)
 
-    module Accumulator =
+    module CLST =
       Make_single_data_storage (Registered) (Raw_context)
         (struct
-          let name = ["accumulator"]
+          let name = ["clst"]
         end)
         (struct
           type t = Contract_hash.t

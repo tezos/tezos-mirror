@@ -9,87 +9,16 @@ open Alpha_context
 open Script_native_types
 open Script_typed_ir
 
-module Helpers = struct
-  open Micheline
+module CLST_contract = struct
+  open Script_native_types.CLST_types
 
-  (* Node describing a type in its typed and untyped version, that serves as
-     combinator to define native contract types. *)
-  type 'a ty_node = {untyped : Script.node; typed : 'a ty_ex_c}
-
-  let prim ?(loc = dummy_location) ?(annot = []) ?named prim args =
-    let annot = match named with Some name -> name :: annot | None -> annot in
-    Prim (loc, prim, args, annot)
-
-  let int_ty ?loc () =
-    {untyped = prim ?loc Script.T_int []; typed = Ty_ex_c int_t}
-
-  let pair_ty (type a b) ?(loc = dummy_location)
-      ({untyped = unty1; typed = Ty_ex_c ty1; _} : a ty_node)
-      ({untyped = unty2; typed = Ty_ex_c ty2; _} : b ty_node) :
-      (a * b) ty_node tzresult =
-    let open Result_syntax in
-    let+ pair_t = Script_typed_ir.pair_t loc ty1 ty2 in
-    {untyped = prim ~loc Script.T_pair [unty1; unty2]; typed = pair_t}
+  let execute (ctxt, _) (_value : arg) (storage : storage) =
+    Lwt_result_syntax.return ((Script_list.empty, storage), ctxt)
 end
-
-module Accumulator_contract = struct
-  open Helpers
-  open Script_native_types.Accumulator_types
-
-  let arg_type : arg ty_node = int_ty ()
-
-  let storage_type : storage ty_node tzresult = pair_ty (int_ty ()) (int_ty ())
-
-  let execute (ctxt, _) (value : arg) (acc, count) =
-    Lwt.return_ok
-      ((Script_list.empty, Script_int.(add value acc, add one count)), ctxt)
-end
-
-type ex_kind_and_types =
-  | Ex_kind_and_types :
-      (('arg, 'storage) kind * ('arg, _, 'storage, _) types)
-      -> ex_kind_and_types
-
-let get_typed_kind_and_types =
-  let open Result_syntax in
-  function
-  | Script_native_repr.Accumulator ->
-      let {typed = Ty_ex_c arg_type; untyped} = Accumulator_contract.arg_type in
-      let+ {typed = Ty_ex_c storage_type; _} =
-        Accumulator_contract.storage_type
-      in
-      (* The entrypoints will be introduced in a later MR (!19584). *)
-      let entrypoints =
-        {
-          root = {at_node = None; nested = Entrypoints_None};
-          original_type_expr = untyped;
-        }
-      in
-      Ex_kind_and_types (Accumulator_kind, {arg_type; storage_type; entrypoints})
 
 let execute (type arg storage) (ctxt, step_constants)
     (kind : (arg, storage) kind) (arg : arg) (storage : storage) :
     ((operation Script_list.t, storage) pair * context, error trace) result
     Lwt.t =
   match kind with
-  | Accumulator_kind ->
-      Accumulator_contract.execute (ctxt, step_constants) arg storage
-
-module Internal_for_tests = struct
-  type 'a ty_node = 'a Helpers.ty_node = {
-    untyped : Script.node;
-    typed : 'a ty_ex_c;
-  }
-
-  type ('arg, 'storage) tys = 'arg Helpers.ty_node * 'storage Helpers.ty_node
-
-  type ex_ty_node = Ex : ('arg, 'storage) tys -> ex_ty_node
-
-  let types_of_kind =
-    let open Result_syntax in
-    function
-    | Script_native_repr.Accumulator ->
-        let arg_type = Accumulator_contract.arg_type in
-        let* storage_type = Accumulator_contract.storage_type in
-        return (Ex (arg_type, storage_type))
-end
+  | CLST_kind -> CLST_contract.execute (ctxt, step_constants) arg storage

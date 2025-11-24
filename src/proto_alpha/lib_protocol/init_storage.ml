@@ -135,7 +135,17 @@ let initialize_accumulator_native_contract ctxt =
   (* Please note that this is the same mecanism for originating the Liquidity
      Baking contract. *)
   let operation_hash =
-    Operation_hash.hash_string ["This is the accumulator contract origination"]
+    Operation_hash.hash_string
+      (* A contract hash is generated from an origination nonce, which is itself
+         generated from the operation hash that contains its origination. As we
+         cannot originate it from an operation, we then must use a random seed.
+         This text is part of `Celestial Dew` description from Elden Ring: this
+         is a placeholder for now, let's maybe find something better (or that
+         produces a better KT1 hash). *)
+      [
+        "Once upon a time, the stars of the night sky guided fate, and this is \
+         a recollection of those times. ";
+      ]
   in
   let ctxt = Raw_context.init_origination_nonce ctxt operation_hash in
   let*? ctxt, contract_hash =
@@ -145,12 +155,9 @@ let initialize_accumulator_native_contract ctxt =
     Contract_storage.native_originate
       ctxt
       contract_hash
-      ~script:
-        (Script_native_repr.Accumulator_contract.with_initial_storage, None)
+      ~script:(Script_native_repr.CLST_contract.with_initial_storage, None)
   in
-  let* ctxt =
-    Storage.Contract.Native_contracts.Accumulator.init ctxt contract_hash
-  in
+  let* ctxt = Storage.Contract.Native_contracts.CLST.init ctxt contract_hash in
   return (Raw_context.unset_origination_nonce ctxt)
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
