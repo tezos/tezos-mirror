@@ -40,7 +40,3 @@ pub type Entrypoints = HashMap<Entrypoint, Type>;
 /// NB: default entrypoint is represented as literal "default", because it
 /// affects comparison for addresses.
 pub const DEFAULT_EP_NAME: &str = entrypoint::DEFAULT_EP_NAME;
-
-pub(crate) fn check_ep_name_len(ep: &[u8]) -> Result<(), ByteReprError> {
-    Ok(entrypoint::check_ep_name_len(ep)?)
-}

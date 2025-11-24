@@ -5,7 +5,7 @@
 //! Michelson typechecker definitions. Most functions defined as associated
 //! functions on [Micheline], see there for more.
 
-use crate::ast::michelson_address::entrypoint::{check_ep_name_len, Direction, Entrypoints};
+use crate::ast::michelson_address::entrypoint::{Direction, Entrypoints};
 use chrono::prelude::DateTime;
 use entrypoint::DEFAULT_EP_NAME;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
@@ -16,6 +16,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError, public_key::PublicKey};
 use tezos_data_encoding::nom::{error::convert_error, NomReader};
+use tezos_protocol::entrypoint;
 
 pub mod type_props;
 
@@ -2249,7 +2250,8 @@ pub(crate) fn typecheck_instruction<'a>(
             emit_val_type.ensure_prop(gas, TypeProperty::Pushable)?;
             let opt_tag = anns.get_single_field_ann()?;
             if let Option::Some(t) = &opt_tag {
-                check_ep_name_len(t.as_str().as_bytes()).map_err(TcError::EntrypointError)?;
+                entrypoint::check_ep_name_len(t.as_str().as_bytes())
+                    .map_err(|e| TcError::EntrypointError(e.into()))?;
             }
             stack.push(Type::Operation);
             I::Emit {
@@ -2262,7 +2264,8 @@ pub(crate) fn typecheck_instruction<'a>(
             emit_val_type.ensure_prop(gas, TypeProperty::Pushable)?;
             let opt_tag = anns.get_single_field_ann()?;
             if let Option::Some(t) = &opt_tag {
-                check_ep_name_len(t.as_str().as_bytes()).map_err(TcError::EntrypointError)?;
+                entrypoint::check_ep_name_len(t.as_str().as_bytes())
+                    .map_err(|e| TcError::EntrypointError(e.into()))?;
             }
             stack.push(Type::Operation);
             I::Emit {
