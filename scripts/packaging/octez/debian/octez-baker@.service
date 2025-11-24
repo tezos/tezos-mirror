@@ -1,0 +1,30 @@
+[Unit]
+Description=Octez baker for protocol %i
+Documentation=https://octez.tezos.com/docs/
+After=network.target
+PartOf=octez-baker.service
+Conflicts=octez-agnostic-baker.service
+
+
+[Service]
+# We use the octez-node default to determine the node's DATADIR
+EnvironmentFile=-/etc/default/octez-node
+EnvironmentFile=-/etc/default/octez-baker
+User=tezos
+WorkingDirectory=~
+KillMode=control-group
+Restart=on-failure
+RestartSec=10s
+Slice=octez.slice
+
+# We wrap the command in /bin/sh to identify the baker associated to $PROTOCOL
+ExecStart=/bin/sh -c "/usr/bin/octez-baker-%i --base-dir $HOME/.tezos-client run with local node $DATADIR --liquidity-baking-toggle-vote $LQVOTE $RUNTIME_OPTS $BAKING_KEY"
+
+ExecStartPre=+touch /var/log/tezos/baker-%i.log
+ExecStartPre=+chown tezos:tezos /var/log/tezos/baker-%i.log
+
+StandardOutput=append:/var/log/tezos/baker-%i.log
+StandardError=inherit
+
+[Install]
+WantedBy=multi-user.target
