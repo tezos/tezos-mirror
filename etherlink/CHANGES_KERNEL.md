@@ -7,7 +7,7 @@ up to twice the disk space they are currently using in the two weeks following
 the activation of this kernel, due to how our storage backend (Irmin) performs
 garbage collection. (!19744)
 
-Furthermore, this kernel requires the Octez EVM node version 0.47 or higher.
+Furthermore, this kernel requires the Octez EVM node version 0.48 or higher.
 
 ### Features
 
