@@ -2329,7 +2329,7 @@ pub(crate) fn typecheck_instruction<'a>(
                     check_view_name(s)?;
                     s.clone()
                 }
-                _ => return Err(TcError::UnexpectedMicheline(format!("{:?}", name))),
+                _ => return Err(TcError::UnexpectedMicheline(format!("{name:?}"))),
             };
             let _arg_type = pop!();
             pop!();
