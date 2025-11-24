@@ -1436,6 +1436,10 @@ module type Etherlink = sig
 
   val evm_node_version : [`Latest | `V of string]
 
+  val gen_report : bool
+
+  val report_path : string
+
   include Etherlink_benchmark_lib.Benchmark_utils.PARAMETERS
 end
 
@@ -1488,6 +1492,24 @@ module Etherlink () : Etherlink = struct
       ~description:"Choose the EVM node version to use for the benchmark"
       ~placeholder:"<latest|vX.Y>"
       `Latest
+
+  let gen_report =
+    Clap.flag
+      ~section
+      ~set_long:"gen-report"
+      ~unset_long:"no-gen-report"
+      ~description:
+        "Save benchmark result in csv file in current directory and generate a \
+         graphical report."
+      false
+
+  let report_path =
+    Clap.default_string
+      ~section
+      ~long:"report-path"
+      ~description:"Path in which to generate reports"
+      ~placeholder:"<path>"
+      "."
 
   include Etherlink_benchmark_lib.Benchmark_utils.Parameters ()
 end

@@ -149,6 +149,21 @@ let () =
   parameters.swap_hops <- 2 ;
   ()
 
+let gen_report report_path network kernel {p90; _} =
+  let network = Option.value network ~default:"sandbox" in
+  let kernel =
+    match kernel with
+    | `Mainnet -> network
+    | `Custom ("evm_kernel.wasm" | "./evm_kernel.wasm") -> "master"
+    | `Custom s -> String.map (function '/' -> '_' | c -> c) s
+  in
+  let csv_filename = sf "%s/p90_results_%s_%s.csv" report_path network kernel in
+  let png_filename = sf "%s/p90_results_%s_%s.png" report_path network kernel in
+  save_capacity ~csv_filename p90 ;
+  let* () = plot_capacity ~csv_filename ~network ~kernel png_filename in
+  Log.report "Capacity graph generated in %s" png_filename ;
+  unit
+
 let register (module Cli : Scenarios_cli.Etherlink) =
   let () = toplog "Parsing CLI done" in
   let name = "etherlink" in
@@ -208,7 +223,7 @@ let register (module Cli : Scenarios_cli.Etherlink) =
       ~rpc_node:sequencer
   in
   let () = toplog "Setup UniswapV2 benchmark complete" in
-  let* () =
+  let* monitor_result =
     monitor_gasometer sequencer @@ fun () ->
     let* () =
       Lwt_list.iter_s (Uniswap.step env) (List.init parameters.iterations succ)
@@ -223,4 +238,6 @@ let register (module Cli : Scenarios_cli.Etherlink) =
       "Less than half operations confirmed (%d/%d)"
       total_confirmed
       total_sent ;
-  unit
+  if Cli.gen_report then
+    gen_report Cli.report_path Cli.network Cli.kernel monitor_result
+  else unit

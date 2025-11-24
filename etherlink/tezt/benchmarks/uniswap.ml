@@ -36,12 +36,18 @@ let test_swaps () =
   let* env, shutdown =
     setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node:sequencer
   in
-  monitor_gasometer sequencer @@ fun () ->
-  let* stop_profile =
-    if parameters.profiling then profile sequencer else return (fun () -> unit)
+  let* _ =
+    monitor_gasometer sequencer @@ fun () ->
+    let* stop_profile =
+      if parameters.profiling then profile sequencer
+      else return (fun () -> unit)
+    in
+    let* () =
+      Lwt_list.iter_s (step env) (List.init parameters.iterations succ)
+    in
+    let* () = shutdown () in
+    stop_profile ()
   in
-  let* () = Lwt_list.iter_s (step env) (List.init parameters.iterations succ) in
-  let* () = shutdown () in
-  stop_profile ()
+  unit
 
 let register () = test_swaps () [Protocol.Alpha]

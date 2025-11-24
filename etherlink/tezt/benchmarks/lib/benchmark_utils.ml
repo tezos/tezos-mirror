@@ -526,6 +526,13 @@ let log_capcity evm_node what capacity =
     pp_capacity
     capacity
 
+type monitor_result = {
+  median : float;
+  p90 : float;
+  wall : float;
+  gasometer : gasometer;
+}
+
 let monitor_gasometer evm_node f =
   let gasometer = install_gasometer evm_node in
   let start_time = Ptime_clock.now () in
@@ -540,7 +547,38 @@ let monitor_gasometer evm_node f =
   log_capcity evm_node "Median" median ;
   log_capcity evm_node "90th percentile" p90 ;
   log_capcity evm_node "Wall clock" wall_clock_capacity ;
-  unit
+  return {median; p90; wall = wall_clock_capacity; gasometer}
+
+let save_capacity ~csv_filename capacity =
+  let y, m, d = Ptime.to_date @@ Ptime_clock.now () in
+  let date_str = Printf.sprintf "%04d-%02d-%02d" y m d in
+  let csv_line = Printf.sprintf "%s,%.2f\n" date_str capacity in
+  let oc = open_out_gen [Open_append; Open_creat] 0o644 csv_filename in
+  output_string oc csv_line ;
+  close_out oc
+
+let plot_capacity ~csv_filename ~network ~kernel output_filename =
+  let gnuplot_script =
+    Printf.sprintf
+      {|
+      set terminal pngcairo size 1024,768 enhanced font 'Verdana,10';
+      set output '%s';
+      set title 'Capacity over Time for %s with %s kernel';
+      set xlabel 'Date';
+      set ylabel 'Capacity (MGas/s)';
+      set timefmt '%%Y-%%m-%%d';
+      set xdata time;
+      set xtics rotate by -45;
+      set grid;
+      set datafile separator ',';
+      plot '%s' using 1:2 with linespoints title 'capacity';
+      |}
+      output_filename
+      network
+      kernel
+      csv_filename
+  in
+  Process.run "gnuplot" ["-e"; gnuplot_script]
 
 let get_mem_mb pid =
   Lwt_process.with_process_in ("ps", [|"ps"; "-p"; pid; "-o"; "rss="|])
