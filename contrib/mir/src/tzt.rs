@@ -199,17 +199,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_source: Option<Micheline> = None;
         let mut m_sender: Option<Micheline> = None;
         let mut m_storages: Option<Vec<(Micheline, Micheline, Micheline)>> = None;
-        let mut m_views: Option<
-            Vec<(
-                micheline::Micheline<'_>,
-                Vec<(
-                    micheline::Micheline<'_>,
-                    micheline::Micheline<'_>,
-                    micheline::Micheline<'_>,
-                    micheline::Micheline<'_>,
-                )>,
-            )>,
-        > = None;
+        let mut m_views: Option<Vec<(micheline::Micheline<'_>, Vec<RawNamedView<'_>>)>> = None;
 
         // This would hold the untypechecked, expected output value. This is because If the self
         // and parameters values are specified, then we need to fetch them and populate the context
@@ -568,6 +558,8 @@ impl fmt::Display for InterpreterErrorExpectation<'_> {
     }
 }
 
+type RawNamedView<'a> = (Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>);
+
 /// Helper type for use during parsing, represent a single
 /// line from the test file.
 pub(crate) enum TztEntity<'a> {
@@ -585,12 +577,7 @@ pub(crate) enum TztEntity<'a> {
     SenderAddr(Micheline<'a>),
     BigMaps(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
     Storages(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
-    Views(
-        Vec<(
-            Micheline<'a>,
-            Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>,
-        )>,
-    ),
+    Views(Vec<(Micheline<'a>, Vec<RawNamedView<'a>>)>),
 }
 
 /// Possible values for the "output" expectation field in a Tzt test. This is a
