@@ -20,7 +20,7 @@ use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use thiserror::Error;
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct Parameter {
+pub struct Parameters {
     pub entrypoint: Entrypoint,
     #[encoding(dynamic, bytes)]
     pub value: Vec<u8>,
@@ -40,7 +40,7 @@ pub struct RevealContent {
 pub struct TransferContent {
     pub amount: Narith,
     pub destination: Contract,
-    pub parameters: Option<Parameter>,
+    pub parameters: Option<Parameters>,
 }
 
 // Original code is from sdk/rust/protocol/src/operation.rs
@@ -525,7 +525,7 @@ mod tests {
                         "KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat",
                     )
                     .unwrap(),
-                    parameters: Some(Parameter {
+                    parameters: Some(Parameters {
                         entrypoint: Entrypoint::try_from("action").unwrap(),
                         value: vec![0x02, 0x00, 0x00, 0x00, 0x02, 0x03, 0x4f],
                     }),

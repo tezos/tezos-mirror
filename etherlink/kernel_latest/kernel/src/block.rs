@@ -626,7 +626,7 @@ mod tests {
     use tezos_smart_rollup_host::path::concat;
     use tezos_smart_rollup_host::path::RefPath;
     use tezos_tezlink::operation::sign_operation;
-    use tezos_tezlink::operation::Parameter;
+    use tezos_tezlink::operation::Parameters;
 
     fn read_current_number(host: &impl Runtime) -> anyhow::Result<U256> {
         Ok(crate::blueprint_storage::read_current_blueprint_header(host)?.number)
@@ -741,7 +741,7 @@ mod tests {
         source: Bootstrap,
         amount: Narith,
         destination: Contract,
-        parameters: Option<Parameter>,
+        parameters: Option<Parameters>,
     ) -> Operation {
         make_operation(
             fee,
