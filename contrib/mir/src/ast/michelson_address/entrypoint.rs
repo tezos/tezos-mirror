@@ -11,14 +11,6 @@ use crate::ast::Type;
 
 use tezos_protocol::entrypoint;
 
-use super::ByteReprError;
-
-impl From<entrypoint::ByteReprError> for ByteReprError {
-    fn from(entrypoint::ByteReprError::WrongFormat(err): entrypoint::ByteReprError) -> Self {
-        Self::WrongFormat(err)
-    }
-}
-
 /// Structure representing address entrypoint on a Tezos address, in other
 /// words, the part after `%` in `KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye%foo`.
 /// Tezos entrypoints are ASCII strings of at most 31 characters long.
