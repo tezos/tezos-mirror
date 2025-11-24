@@ -3212,6 +3212,7 @@ dependencies = [
 name = "tezos-indexable-storage-latest"
 version = "0.1.0"
 dependencies = [
+ "num-bigint",
  "rlp",
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
@@ -3390,6 +3391,7 @@ dependencies = [
  "anyhow",
  "hex",
  "nom",
+ "num-bigint",
  "primitive-types",
  "rlp",
  "sha3",

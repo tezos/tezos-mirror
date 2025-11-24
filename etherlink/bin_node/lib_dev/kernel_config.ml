@@ -143,19 +143,47 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
     | Some contracts ->
         contracts
         |> List.map (fun (address, script, storage) ->
+               let encode_len (s : string) =
+                 s |> String.length |> Z.of_int
+                 |> Data_encoding.Binary.to_string_exn Data_encoding.n
+               in
+
+               let encode_hexa_with_len x =
+                 let encoded = encode_hexa x in
+                 let encoded_len = encode_len encoded in
+                 (encoded, encoded_len)
+               in
+
                let path_prefix =
                  address |> Tezlink_durable_storage.Path.account
                  |> String.split_on_char '/' |> clean_path
                in
-               let make_account_field key value converter =
-                 make_instr ~path_prefix (Some (key, converter value))
+
+               let encoded_balance =
+                 Data_encoding.Binary.to_string_exn
+                   Tezos_types.Tez.encoding
+                   tez_bootstrap_balance
                in
-               make_account_field
-                 "balance"
-                 tez_bootstrap_balance
-                 (Data_encoding.Binary.to_string_exn Tezos_types.Tez.encoding)
-               @ make_account_field "data/code" script encode_hexa
-               @ make_account_field "data/storage" storage encode_hexa)
+
+               let encoded_script, encoded_script_len =
+                 encode_hexa_with_len script
+               in
+               let encoded_storage, encoded_storage_len =
+                 encode_hexa_with_len storage
+               in
+
+               let instr key value =
+                 make_instr ~path_prefix (Some (key, value))
+               in
+
+               [
+                 ("balance", encoded_balance);
+                 ("data/code", encoded_script);
+                 ("len/code", encoded_script_len);
+                 ("data/storage", encoded_storage);
+                 ("len/storage", encoded_storage_len);
+               ]
+               |> List.concat_map (fun (k, v) -> instr k v))
         |> List.flatten
   in
 

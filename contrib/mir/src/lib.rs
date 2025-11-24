@@ -99,7 +99,7 @@
 //! let mut ctx = Ctx::default();
 //! // You can change various things about the context here, see [Ctx]
 //! // documentation.
-//! let contract_typechecked = contract_micheline.typecheck_script(ctx.gas(), true).unwrap();
+//! let contract_typechecked = contract_micheline.split_script().unwrap().typecheck_script(ctx.gas(), true, true).unwrap();
 //! // We construct parameter and storage manually, but you'd probably
 //! // parse or deserialize them from some sort of input/storage, so we use
 //! // parser and decoder respectively.
@@ -365,7 +365,9 @@ mod tests {
         use Micheline as M;
         let interp_res = parse_contract_script(VOTE_SRC)
             .unwrap()
-            .typecheck_script(ctx.gas(), true)
+            .split_script()
+            .unwrap()
+            .typecheck_script(ctx.gas(), true, true)
             .unwrap()
             .interpret(
                 ctx,
@@ -1060,7 +1062,11 @@ mod tests {
         let cs_mich =
             parse("{ parameter unit; storage unit; code { DROP; UNIT; NIL operation; PAIR; }}")
                 .unwrap();
-        let cs = cs_mich.typecheck_script(&mut Gas::default(), true).unwrap();
+        let cs = cs_mich
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true, true)
+            .unwrap();
         let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(CreateContract {
@@ -1255,7 +1261,9 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
-            .typecheck_script(&mut Gas::default(), true)
+            .split_script()
+            .unwrap()
+            .typecheck_script(&mut Gas::default(), true, true)
             .unwrap()
             .interpret(
                 &mut ctx,
@@ -1328,7 +1336,9 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
-            .typecheck_script(ctx.gas(), true)
+            .split_script()
+            .unwrap()
+            .typecheck_script(ctx.gas(), true, true)
             .unwrap()
             .interpret(
                 &mut ctx,
@@ -1384,7 +1394,9 @@ mod multisig_tests {
 
         let interp_res = parse_contract_script(MULTISIG_SRC)
             .unwrap()
-            .typecheck_script(ctx.gas(), true)
+            .split_script()
+            .unwrap()
+            .typecheck_script(ctx.gas(), true, true)
             .unwrap()
             .interpret(
                 &mut ctx,

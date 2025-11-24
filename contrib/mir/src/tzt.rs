@@ -661,6 +661,16 @@ pub fn run_tzt_test<'a>(
         test.other_contracts.clone(),
     );
 
+    ctx.storage = match test.storages {
+        Some(v) => v,
+        None => HashMap::new(),
+    };
+
+    ctx.views = match test.views {
+        Some(v) => v,
+        None => HashMap::new(),
+    };
+
     ctx.set_big_map_storage(test.big_maps.unwrap_or_default());
 
     ctx.now = test.now.clone().unwrap_or(Ctx::default().now);

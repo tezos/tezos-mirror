@@ -31,7 +31,9 @@ fn run_contract(parameter: Micheline) {
     let contract_micheline = parser.parse_top_level(SCRIPT).unwrap();
     let mut ctx = Ctx::default();
     let contract_typechecked = contract_micheline
-        .typecheck_script(ctx.gas(), true)
+        .split_script()
+        .unwrap()
+        .typecheck_script(ctx.gas(), true, true)
         .unwrap();
     STORAGE.with(|storage| {
         storage.replace_with(|storage| {

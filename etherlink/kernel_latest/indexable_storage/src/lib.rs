@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use num_bigint::{BigUint, TryFromBigIntError};
 use rlp::DecoderError;
 use tezos_evm_logging::log;
 use tezos_evm_logging::Level::Error;
@@ -47,6 +48,10 @@ pub enum IndexableStorageError {
     ImplicitToOriginated,
     #[error("Tried casting an Originated account into an Implicit account")]
     OriginatedToImplicit,
+    #[error("Typechecking error: {0}")]
+    TcError(String),
+    #[error("BigInt conversion error: {0}")]
+    TryFromBigIntError(TryFromBigIntError<BigUint>),
 }
 
 impl From<GenStorageError> for IndexableStorageError {
@@ -72,6 +77,10 @@ impl From<GenStorageError> for IndexableStorageError {
             }
             GenStorageError::OriginatedToImplicit => {
                 IndexableStorageError::OriginatedToImplicit
+            }
+            GenStorageError::TcError(msg) => IndexableStorageError::TcError(msg),
+            GenStorageError::TryFromBigIntError(msg) => {
+                IndexableStorageError::TryFromBigIntError(msg)
             }
         }
     }

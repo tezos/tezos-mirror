@@ -9,25 +9,29 @@
 
 #![allow(clippy::type_complexity)]
 use crate::ast::big_map::{BigMapId, InMemoryLazyStorage, LazyStorage, LazyStorageError};
+use crate::ast::micheline::IntoMicheline;
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
-use crate::ast::Type;
+use crate::ast::{Micheline, View};
+use crate::ast::{Type, TypedValue};
 use crate::gas::Gas;
+use crate::typechecker::MichelineView;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::{hash::OperationHash, public_key_hash::PublicKeyHash};
+use typed_arena::Arena;
 
 #[allow(missing_docs)]
 pub trait TypecheckingCtx<'a> {
     fn gas(&mut self) -> &mut Gas;
 
-    fn lookup_contract(
+    fn lookup_entrypoints(
         &self,
         address: &AddressHash,
     ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>>;
 
     /// Get key and value types of the map.
-    ///
     /// This returns None if the map with such ID is not present in the storage.
     fn big_map_get_type(&mut self, id: &BigMapId)
         -> Result<Option<(Type, Type)>, LazyStorageError>;
@@ -47,7 +51,7 @@ impl<'a, 'b> TypecheckingCtx<'a> for PushableTypecheckingContext<'b> {
         self.gas
     }
 
-    fn lookup_contract(
+    fn lookup_entrypoints(
         &self,
         _address: &AddressHash,
     ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
@@ -93,6 +97,13 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
     fn operation_counter(&mut self) -> u128;
 
     fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>>;
+
+    fn lookup_view_and_storage(
+        &self,
+        contract: ContractKt1Hash,
+        name: &String,
+        arena: &'a Arena<Micheline<'a>>,
+    ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))>;
 }
 
 /// [Ctx] includes "outer context" required for typechecking and interpreting
@@ -131,7 +142,13 @@ pub struct Ctx<'a> {
     /// exist, or [`Some(entrypoints)`] with the map of its entrypoints. See
     /// also [Self::set_known_contracts]. Defaults to returning [None] for any
     /// address.
-    pub lookup_contract: Box<dyn Fn(&AddressHash) -> Option<Entrypoints>>,
+    pub lookup_entrypoints: Box<dyn Fn(&AddressHash) -> Option<Entrypoints>>,
+    /// A map of contract addresses to their views. It only
+    /// needs to work with smart contract, defaulting to [None] otherwise.
+    pub views: HashMap<AddressHash, HashMap<String, View<'a>>>,
+    /// A map of contract addresses to their storage. It only
+    /// needs to work with smart contract, defaulting to [None] otherwise.
+    pub storage: HashMap<AddressHash, (Type, TypedValue<'a>)>,
     /// A function that maps public key hashes (i.e. effectively implicit
     /// account addresses) to their corresponding voting powers. Note that if
     /// you provide a custom function here, you also must define
@@ -178,7 +195,7 @@ impl<'a> Ctx<'a> {
     /// something that can convert to [`HashMap<AddressHash, Entrypoints>`].
     pub fn set_known_contracts(&mut self, v: impl Into<HashMap<AddressHash, Entrypoints>>) {
         let map = v.into();
-        self.lookup_contract = Box::new(move |ah| map.get(ah).cloned());
+        self.lookup_entrypoints = Box::new(move |ah| map.get(ah).cloned());
     }
 
     /// Set a resonable implementation for [Self::big_map_storage] by providing
@@ -228,10 +245,12 @@ impl Default for Ctx<'_> {
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
-            lookup_contract: Box::new(|_| None),
+            lookup_entrypoints: Box::new(|_| None),
             voting_powers: Box::new(|_| 0u32.into()),
             total_voting_power: 0u32.into(),
             big_map_storage: InMemoryLazyStorage::new(),
+            views: HashMap::new(),
+            storage: HashMap::new(),
             operation_counter: 0,
             operation_group_hash: OperationHash::from_base58_check(
                 "onvsLP3JFZia2mzZKWaFuFkWg2L5p3BDUhzh5Kr6CiDDN3rtQ1D",
@@ -251,11 +270,11 @@ impl<'a> TypecheckingCtx<'a> for Ctx<'a> {
         &mut self.gas
     }
 
-    fn lookup_contract(
+    fn lookup_entrypoints(
         &self,
         address: &AddressHash,
     ) -> Option<HashMap<crate::ast::Entrypoint, crate::ast::Type>> {
-        (self.lookup_contract)(address)
+        (self.lookup_entrypoints)(address)
     }
 
     fn big_map_get_type(
@@ -327,5 +346,28 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
 
     fn lazy_storage(&mut self) -> Box<&mut dyn LazyStorage<'a>> {
         Box::new(&mut self.big_map_storage)
+    }
+
+    fn lookup_view_and_storage(
+        &self,
+        contract: ContractKt1Hash,
+        view_name: &String,
+        arena: &'a Arena<Micheline<'a>>,
+    ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))> {
+        let addr = AddressHash::Kt1(contract);
+        let contract_view = self.views.get(&addr)?.get(view_name)?;
+        let view = MichelineView {
+            input_type: contract_view
+                .input_type
+                .into_micheline_optimized_legacy(arena),
+            output_type: contract_view
+                .output_type
+                .into_micheline_optimized_legacy(arena),
+            code: contract_view.code.clone(),
+        };
+        let (storage_ty, storage) = self.storage.get(&addr)?;
+        let mich_storage_ty = storage_ty.into_micheline_optimized_legacy(arena);
+        let mich_storage = storage.clone().into_micheline_optimized_legacy(arena);
+        Some((view, (mich_storage_ty, mich_storage.encode())))
     }
 }
