@@ -160,17 +160,20 @@ impl Transaction {
         }
     }
 
-    pub fn to(&self) -> Option<H160> {
-        match &self.content {
+    pub fn to(&self) -> Result<Option<H160>, Error> {
+        Ok(match &self.content {
             TransactionContent::Deposit(Deposit { receiver, .. }) => {
-                Some(receiver.to_h160())
+                let receiver = receiver.to_h160().map_err(|_| {
+                    Error::Custom("Can't convert deposit receiver".to_owned())
+                })?;
+                Some(receiver)
             }
             TransactionContent::FaDeposit(FaDeposit { .. }) => {
                 Some(alloy_to_h160(&FA_BRIDGE_SOL_ADDR))
             }
             TransactionContent::Ethereum(transaction)
             | TransactionContent::EthereumDelayed(transaction) => transaction.to,
-        }
+        })
     }
 
     pub fn data(&self) -> Vec<u8> {

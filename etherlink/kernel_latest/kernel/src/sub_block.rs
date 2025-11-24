@@ -346,7 +346,7 @@ fn handle_transaction_object<Host: Runtime>(
         hash: input_data.tx.tx_hash,
         input: input_data.tx.data(),
         nonce: input_data.tx.nonce(),
-        to: input_data.tx.to(),
+        to: input_data.tx.to()?,
         index: (txs_objects.len() + 1)
             .try_into()
             .map_err(|_| Error::InvalidConversion)?,
@@ -475,11 +475,15 @@ pub fn handle_run_transaction<Host: Runtime>(
                     ))
                 })?;
 
+            let receiver = deposit
+                .receiver
+                .to_h160()
+                .map_err(|_| Error::InvalidConversion)?;
             RunOutcome {
                 result: outcome.result,
                 caller: H160::from(SYSTEM_SOL_ADDR.into_array()),
                 receipt_data: ReceiptData {
-                    to: Some(deposit.receiver.to_h160()),
+                    to: Some(receiver),
                     type_: TransactionType::Legacy,
                 },
             }
