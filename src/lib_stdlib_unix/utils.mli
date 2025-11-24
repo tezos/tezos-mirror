@@ -81,3 +81,17 @@ val retry :
   ('a -> ('b, 'err list) result Lwt.t) ->
   'a ->
   ('b, 'err list) result Lwt.t
+
+(** [event_on_stalling_promise ?max_delay ?factor ?initial_delay ~event ~f_name
+    f] Monitors the execution of function [f] and emits [event] if [f] takes
+    longer than [initial_delay] to resolve. After emitting the event, the
+    function waits again, multiplying the delay by [factor] each time, until [f]
+    completes. Optionally, [max_delay] can be used to cap the maximum wait
+    interval. *)
+val event_on_stalling_promise :
+  ?max_delay:float ->
+  ?factor:float ->
+  ?initial_delay:float ->
+  event:(float -> unit Lwt.t) ->
+  'a Lwt.t ->
+  'a Lwt.t
