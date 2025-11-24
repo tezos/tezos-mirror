@@ -298,7 +298,7 @@ let () =
       not_on_tezos_namespace && push && has_tag_match octez_beta_release_tag_re)
     ~jobs:(Release_tag.octez_jobs ~test:true Beta_release_tag)
     ~description:
-      "Dry run pipeline for `octez_beta_release_tag.\n\n\
+      "Dry run pipeline for 'octez_beta_release_tag'.\n\n\
        This pipeline checks that 'octez_beta_release_tag' pipelines work as \
        intended, without publishing any release. Developers or release \
        managers can create this pipeline by pushing a tag to a fork of \

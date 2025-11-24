@@ -58,6 +58,9 @@ case "$RELEASETYPE" in
 ReleaseCandidate | TestReleaseCandidate)
   TARGETDIR="public/$PREFIX/RC/$DISTRIBUTION"
   ;;
+Beta | TestBeta)
+  TARGETDIR="public/$PREFIX/BETA/$DISTRIBUTION"
+  ;;
 Release | TestRelease)
   TARGETDIR="public/$PREFIX/$DISTRIBUTION"
   ;;

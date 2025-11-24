@@ -89,7 +89,7 @@ gitlab_release_no_v=
 . scripts/ci/octez-packages-version.sh
 
 case "$RELEASETYPE" in
-ReleaseCandidate | TestReleaseCandidate | Release | TestRelease)
+ReleaseCandidate | TestReleaseCandidate | Release | TestRelease | Beta | TestBeta)
   DEBVERSION=$VERSION
   DEBCHANGELOG="New Release $VERSION / $CI_COMMIT_SHORT_SHA"
   EXPECTED_VERSION="Octez $(echo "$gitlab_release_no_v" | tr '-' '~')"

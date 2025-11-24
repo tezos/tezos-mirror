@@ -43,12 +43,19 @@ else
           else
             export RELEASETYPE="TestReleaseCandidate"
           fi
+        elif [ -n "${gitlab_release_beta_version:-}" ]; then
+          # protected, tag, Beta
+          if [ "${CI_PROJECT_NAMESPACE:-}" = "tezos" ]; then
+            export RELEASETYPE="Beta"
+          else
+            export RELEASETYPE="TestBeta"
+          fi
         else
           # protected, tag, Release
           if [ "${CI_PROJECT_NAMESPACE:-}" = "tezos" ]; then
             export RELEASETYPE="Release"
           else
-            RELEASETYPE="TestRelease"
+            export RELEASETYPE="TestRelease"
           fi
         fi
       else

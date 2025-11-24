@@ -15,7 +15,7 @@ gitlab_release_no_v=
 . scripts/ci/octez-packages-version.sh
 
 case "$RELEASETYPE" in
-ReleaseCandidate | TestReleaseCandidate | Release | TestRelease)
+ReleaseCandidate | TestReleaseCandidate | Release | TestRelease | Beta | TestBeta)
   # rpm versions are more strict than debian versions
   _VERSION=$(echo "${VERSION}" | tr -d '~' | tr '-' '_')
   _EPOCH="%{nil}"
