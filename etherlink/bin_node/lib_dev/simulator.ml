@@ -55,8 +55,8 @@ module MakeEtherlink (SimulationBackend : SimulationBackend) = struct
     let* storage_version =
       Durable_storage.storage_version (SimulationBackend.read simulation_state)
     in
-    if storage_version < 12 then return `V0
-    else if storage_version > 12 then return `V2
+    if Storage_version.simulation_v0 ~storage_version then return `V0
+    else if Storage_version.simulation_v2 ~storage_version then return `V2
     else
       (* We are in the unknown, some kernels with STORAGE_VERSION = 12 have
          the features, some do not. *)

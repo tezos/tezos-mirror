@@ -13,8 +13,6 @@ let root = Durable_storage_path.etherlink_root
 let post_v41_unsupported_function ~__FUNCTION__ =
   Invalid_argument (__FUNCTION__ ^ " is not supported for storage version >= 41")
 
-let legacy_storage_compatible ~storage_version = storage_version < 41
-
 module AccountInfo = struct
   type t = {
     balance : Ethereum_types.quantity;
@@ -137,7 +135,7 @@ let un_qty (Qty z) = z
 let mock_block_hash = Block_hash (Hex (String.make 64 'a'))
 
 let current_transactions_receipts block_hash storage_version read =
-  if not (legacy_storage_compatible ~storage_version) then
+  if not (Storage_version.legacy_storage_compatible ~storage_version) then
     Durable_storage.inspect_durable_and_decode_default
       read
       (Durable_storage_path.Block.current_receipts
@@ -155,7 +153,7 @@ let current_transactions_receipts block_hash storage_version read =
 let transaction_receipt read ?block_hash tx_hash =
   let open Lwt_result_syntax in
   let* storage_version = storage_version read in
-  if not (legacy_storage_compatible ~storage_version) then
+  if not (Storage_version.legacy_storage_compatible ~storage_version) then
     let* block_hash = current_block_hash read in
     let* receipts =
       current_transactions_receipts block_hash storage_version read
@@ -203,7 +201,7 @@ let transaction_receipt read ?block_hash tx_hash =
 
 let current_transactions_objects ?block_hash storage_version read =
   let open Lwt_result_syntax in
-  if not (legacy_storage_compatible ~storage_version) then
+  if not (Storage_version.legacy_storage_compatible ~storage_version) then
     let* block_hash =
       match block_hash with
       | Some bh -> return bh
@@ -231,7 +229,7 @@ let current_transactions_objects ?block_hash storage_version read =
 let transaction_object read tx_hash =
   let open Lwt_result_syntax in
   let* storage_version = storage_version read in
-  if not (legacy_storage_compatible ~storage_version) then
+  if not (Storage_version.legacy_storage_compatible ~storage_version) then
     let* transaction_objects =
       current_transactions_objects storage_version read
     in
@@ -278,7 +276,7 @@ let transaction_object_with_block_hash ?known_storage_version read block_hash
     | Some v -> return v
     | None -> storage_version read
   in
-  if not (legacy_storage_compatible ~storage_version) then
+  if not (Storage_version.legacy_storage_compatible ~storage_version) then
     raise (post_v41_unsupported_function ~__FUNCTION__)
   else
     inspect_durable_and_decode_opt
@@ -323,7 +321,7 @@ let block_by_hash ?known_storage_version read ~full_transaction_object
     | Some v -> return v
     | None -> storage_version read
   in
-  if not (legacy_storage_compatible ~storage_version) then
+  if not (Storage_version.legacy_storage_compatible ~storage_version) then
     raise (post_v41_unsupported_function ~__FUNCTION__)
   else
     let* block_opt =
@@ -343,7 +341,7 @@ let current_block ?known_storage_version read ~full_transaction_object =
     | Some v -> return v
     | None -> storage_version read
   in
-  if not (legacy_storage_compatible ~storage_version) then
+  if not (Storage_version.legacy_storage_compatible ~storage_version) then
     let* block_opt =
       inspect_durable_and_decode_opt
         read
@@ -370,7 +368,7 @@ let current_block ?known_storage_version read ~full_transaction_object =
 let blocks_by_number read ~full_transaction_object ~number =
   let open Lwt_result_syntax in
   let* storage_version = storage_version read in
-  if not (legacy_storage_compatible ~storage_version) then
+  if not (Storage_version.legacy_storage_compatible ~storage_version) then
     match number with
     | Durable_storage_path.Block.Current ->
         current_block

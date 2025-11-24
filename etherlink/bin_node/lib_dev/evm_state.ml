@@ -376,9 +376,7 @@ let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
   let root = Durable_storage_path.root_of_chain_family chain_family in
   let* storage_version = storage_version evm_state in
   let* block =
-    if
-      not (Etherlink_durable_storage.legacy_storage_compatible ~storage_version)
-    then
+    if not (Storage_version.legacy_storage_compatible ~storage_version) then
       let*! bytes =
         inspect evm_state (Durable_storage_path.Block.current_block ~root)
       in
@@ -472,8 +470,8 @@ let clear_events evm_state =
 let clear_block_storage chain_family block evm_state =
   let open Lwt_syntax in
   let* storage_version = Lwt_result.get_exn (storage_version evm_state) in
-  if not (Etherlink_durable_storage.legacy_storage_compatible ~storage_version)
-  then return evm_state
+  if not (Storage_version.legacy_storage_compatible ~storage_version) then
+    return evm_state
   else
     (* We have 2 path to clear related to block storage:
      1. The predecessor block.

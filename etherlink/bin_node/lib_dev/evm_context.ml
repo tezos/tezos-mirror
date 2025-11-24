@@ -465,7 +465,7 @@ module State = struct
       ~storage_version evm_state =
     let open Lwt_result_syntax in
     let*! data_dir, config = execution_config in
-    if storage_version < 15 then
+    if Storage_version.populate_delayed_inbox_disabled ~storage_version then
       Evm_state.execute
         ~pool
         ~data_dir
@@ -740,11 +740,7 @@ module State = struct
         let* storage_version =
           Durable_storage.storage_version (read_from_state evm_state)
         in
-        if
-          not
-            (Etherlink_durable_storage.legacy_storage_compatible
-               ~storage_version)
-        then
+        if not (Storage_version.legacy_storage_compatible ~storage_version) then
           let* receipts =
             Etherlink_durable_storage.current_transactions_receipts
               block.hash

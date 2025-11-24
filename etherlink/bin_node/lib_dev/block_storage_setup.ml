@@ -73,8 +73,7 @@ let enable ~keep_alive ~timeout ?evm_node_endpoint store =
         Evm_state.storage_version evm_node_state
       with
       | Ok storage_version ->
-          (* See case [StorageVersion::V17] in [migration::migrate_to] *)
-          storage_version < 17
+          Storage_version.kernel_has_txs_in_storage ~storage_version
       | Error _ ->
           (* This should not be possible. Etherlink kernel is designed such
              that it always write its storage version in the durable storage.
