@@ -1,10 +1,7 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                 */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+// SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+//
+// SPDX-License-Identifier: MIT
 
 use serde_json::to_writer_pretty;
 use std::collections::BTreeMap;
