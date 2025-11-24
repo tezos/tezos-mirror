@@ -1,0 +1,19 @@
+[Unit]
+Description=Octez DAL node
+Documentation=https://tezos.gitlab.io/
+After=network.target
+
+[Service]
+EnvironmentFile=-/etc/default/octez-dal-node
+User=tezos
+WorkingDirectory=~
+Restart=on-failure
+RestartSec=10s
+KillMode=control-group
+ExecStart=/usr/bin/octez-dal-node run $RUNTIME_OPTS
+StandardOutput=append:/var/log/tezos/octez-dal-node.log
+StandardError=inherit
+Slice=octez.slice
+
+[Install]
+WantedBy=multi-user.target

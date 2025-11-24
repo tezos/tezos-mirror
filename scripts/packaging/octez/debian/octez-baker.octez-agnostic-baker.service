@@ -1,0 +1,30 @@
+[Unit]
+Description=Octez agnostic baker service
+Documentation=https://octez.tezos.com/docs/
+After=network.target
+PartOf=octez-baker.service
+
+[Service]
+Type=simple
+KillMode=control-group
+Restart=on-failure
+RestartSec=10s
+TimeoutStartSec=infinity
+TimeoutStopSec=300
+User=tezos
+WorkingDirectory=~
+Slice=octez.slice
+
+EnvironmentFile=-/etc/default/octez-node
+EnvironmentFile=-/etc/default/octez-baker
+
+ExecStartPre=+touch /var/log/tezos/baker.log
+ExecStartPre=+chown tezos:tezos /var/log/tezos/baker.log
+
+ExecStart=/bin/sh -c "/usr/bin/octez-baker --base-dir $HOME/.tezos-client run with local node $DATADIR --liquidity-baking-toggle-vote $LQVOTE $RUNTIME_OPTS $BAKING_KEY"
+
+StandardOutput=append:/var/log/tezos/baker.log
+StandardError=inherit
+
+[Install]
+WantedBy=multi-user.target
