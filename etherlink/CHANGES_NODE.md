@@ -29,6 +29,9 @@
 
 ### Execution changes
 
+- Fix a regression introduced in v0.35 leading the EVM node to accumulate
+  unused data in its context. (!19988)
+
 ### Storage changes
 
 ### Documentation changes

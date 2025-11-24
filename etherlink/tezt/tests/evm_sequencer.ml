@@ -14451,6 +14451,27 @@ let test_eip3607_disabled_for_simulation =
     ~error_msg:"Expected error msg %R but got %L" ;
   unit
 
+let test_evm_events_cleanup () =
+  Test_helpers.register_sandbox
+    ~__FILE__
+    ~title:
+      "The EVM node does not accumulate unnecessary EVM events in its durable \
+       storage"
+    ~tags:["events"]
+  @@ fun sandbox ->
+  let*@ _ = Rpc.produce_block sandbox in
+  let*@ rpc_result = Rpc.state_subkeys sandbox "/evm/events" in
+  match rpc_result with
+  | None | Some [] -> unit
+  | Some l ->
+      Test.fail
+        "Expected an empty result, got %a instead"
+        Format.(
+          pp_print_list
+            ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+            pp_print_string)
+        l
+
 let protocols = Protocol.all
 
 let () =
@@ -14630,4 +14651,5 @@ let () =
   test_eip7702_auto_sign [Alpha] ;
   test_validate_encoding_compatibility_accounts [Alpha] ;
   test_eip2537 [Alpha] ;
-  test_eip3607_disabled_for_simulation [Alpha]
+  test_eip3607_disabled_for_simulation [Alpha] ;
+  test_evm_events_cleanup ()

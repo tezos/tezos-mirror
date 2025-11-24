@@ -1182,6 +1182,11 @@ module State = struct
                 Block.execution_gas execution_gas;
               ]) ;
 
+        let* evm_state =
+          if ctxt.session.storage_version >= 43 then return evm_state
+          else Lwt_result.ok (Evm_state.clear_events evm_state)
+        in
+
         return
           ( evm_state,
             context,
