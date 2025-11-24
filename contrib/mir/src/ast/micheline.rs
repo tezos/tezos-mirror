@@ -279,7 +279,6 @@ macro_rules! micheline_unsupported_instructions_common {
         Prim::SAPLING_EMPTY_STATE
             | Prim::SAPLING_VERIFY_UPDATE
             | Prim::OPEN_CHEST
-            | Prim::VIEW
             | Prim::CREATE_ACCOUNT
             | Prim::STEPS_TO_QUOTA
             | Prim::TICKET_DEPRECATED

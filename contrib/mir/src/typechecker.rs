@@ -2323,6 +2323,25 @@ pub(crate) fn typecheck_instruction<'a>(
             no_overload!(CREATE_CONTRACT, len 3)
         }
         (App(CREATE_CONTRACT, expect_args!(1), _), _) => unexpected_micheline!(),
+        (App(VIEW, [name, return_ty], _), [.., T::Address, _arg_type]) => {
+            let name = match name {
+                Micheline::String(s) => {
+                    check_view_name(s)?;
+                    s.clone()
+                }
+                _ => return Err(TcError::UnexpectedMicheline(format!("{:?}", name))),
+            };
+            let _arg_type = pop!();
+            pop!();
+            let return_type = parse_ty(gas, return_ty)?;
+            return_type.ensure_prop(gas, TypeProperty::ViewOutput)?;
+            stack.push(Type::new_option(return_type.clone()));
+            I::IView { name, return_type }
+        }
+        (App(VIEW, [_, _], _), [.., _, _]) => no_overload!(VIEW),
+        (App(VIEW, [_, _], _), [] | [_]) => no_overload!(VIEW, len 2),
+        (App(VIEW, expect_args!(2), _), _) => unexpected_micheline!(),
+
         (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
             Err(TcError::TodoInstr(*prim))?
         }
@@ -2674,7 +2693,8 @@ pub(crate) fn typecheck_value<'a>(
     })
 }
 
-fn typecheck_lambda<'a>(
+#[allow(missing_docs)]
+pub fn typecheck_lambda<'a>(
     instrs: &'a [Micheline<'a>],
     gas: &mut Gas,
     in_ty: Type,
@@ -6616,6 +6636,44 @@ mod typecheck_tests {
             .typecheck_script(&mut gas, true, true),
             Err(TcError::NonSeqViewInstrs("non_seq_view".into()))
         );
+    }
+
+    #[test]
+    fn test_script_typchecking_view_instruction_ok() {
+        let mut gas = Gas::default();
+        assert_eq!(
+            parse_contract_script(concat!(
+                "parameter unit;",
+                "storage unit;",
+                r#"code { CAR ; NIL operation ; PAIR ; PUSH address "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" ; UNIT ; VIEW "hello_view" string ; DROP ; };"#
+            ))
+            .unwrap()
+            .split_script().unwrap().typecheck_script(&mut gas, true, true),
+            Ok(ContractScript {
+                parameter: Type::Unit,
+                storage: Type::Unit,
+                code: Seq(vec![
+                    Car,
+                    Nil,
+                    Pair,
+                    Push(TypedValue::Address(addr::Address
+                        { hash: AddressHash::try_from("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq").unwrap(),
+                          entrypoint: Entrypoint::default() }
+                        )),
+                    Unit,
+                    IView { name: "hello_view".into(), return_type: Type::String }, Drop(None)]),
+                annotations: HashMap::from([(
+                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    (Vec::new(), Type::Unit)
+                )]),
+                views: HashMap::new(),
+            })
+        );
+    }
+
+    #[test]
+    fn test_typchecking_view_too_short() {
+        too_short_test(&parse("VIEW \"hello_view\" string").unwrap(), Prim::VIEW, 2);
     }
 
     #[test]

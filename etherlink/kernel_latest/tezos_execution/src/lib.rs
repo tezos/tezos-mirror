@@ -1007,7 +1007,7 @@ mod tests {
         account_storage::TezlinkOriginatedAccount, address::OriginationNonce,
         mir_ctx::BlockCtx, TezlinkImplicitAccount,
     };
-    use mir::ast::{Entrypoint, Micheline};
+    use mir::ast::{Address, Entrypoint, IntoMicheline, Micheline, TypedValue};
     use num_traits::ops::checked::CheckedSub;
     use pretty_assertions::assert_eq;
     use primitive_types::H256;
@@ -1034,6 +1034,7 @@ mod tests {
             TransferError, TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
         },
     };
+    use typed_arena::Arena;
 
     use crate::COST_PER_BYTES;
     use crate::ORIGINATION_COST;
@@ -4453,6 +4454,97 @@ mod tests {
             ),
             "Expected Successful Transfer operation result, got {:?}",
             receipts4[0].receipt
+        );
+    }
+
+    #[test]
+    fn test_view_instruction() {
+        let mut host = MockKernelHost::default();
+        let context = context::Context::init_context();
+        let src = bootstrap1();
+        let mut orignation_nonce = OriginationNonce::initial(OperationHash(H256::zero()));
+        let view_addr = orignation_nonce.generate_kt1();
+        let caller_addr = orignation_nonce.generate_kt1();
+
+        let arena = Arena::new();
+
+        init_account(&mut host, &src.pkh, 1000);
+        reveal_account(&mut host, &src);
+        let (code_view, storage_view) = (
+            r#"
+                parameter unit ;
+                storage int ;
+                code { CDR ; NIL operation ; PAIR } ;
+                view "get_value" unit int { CDR ; }
+            "#,
+            &Micheline::from(5),
+        );
+        init_contract(&mut host, &view_addr, code_view, storage_view, &0.into());
+
+        let mich_addr = TypedValue::Address(Address {
+            hash: mir::ast::AddressHash::Kt1(view_addr),
+            entrypoint: Entrypoint::default(),
+        })
+        .into_micheline_optimized_legacy(&arena);
+
+        let (code_caller, storage_caller) = (
+            r#"
+                parameter unit ;
+                storage address ;
+                code { CDR ;
+                    DUP ;
+                    UNIT ;
+                    VIEW "get_value" int ;
+                    IF_NONE { PUSH string "View failed" ; FAILWITH }
+                            { PUSH int 5 ; ASSERT_CMPEQ ; NIL operation ; PAIR } }
+            "#,
+            &mich_addr,
+        );
+
+        init_contract(
+            &mut host,
+            &caller_addr,
+            code_caller,
+            storage_caller,
+            &0.into(),
+        );
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            21000,
+            5,
+            src.clone(),
+            0.into(),
+            Contract::Originated(caller_addr),
+            None,
+        );
+
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+            &block_ctx!(),
+            false,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(receipts.len(), 1, "There should be one receipt");
+        assert!(
+            matches!(
+                &receipts[0].receipt,
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(TransferTarget::ToContrat(
+                        TransferSuccess { .. }
+                    )),
+                    ..
+                })
+            ),
+            "Expected Successful Transfer operation result, got {:?}",
+            receipts[0].receipt
         );
     }
 }
