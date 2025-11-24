@@ -160,13 +160,25 @@ let jobs =
   in
   let job_rust_based_images, job_rust_based_images_merge =
     let images =
-      let changes = Changeset.make ["images/base-images/Dockerfile.rust"] in
+      (* the changeset here and an under approximation. When adding
+         these pipelines to the merge trains, these should be refactored.
+       
+FIXME: remove changesets from [base_images.daily] which is a branch pipeline
+cf. https://gitlab.com/tezos/tezos/-/issues/8221 *)
+      let changes =
+        Changeset.make
+          [
+            "images/base-images/Dockerfile.debian";
+            "images/base-images/Dockerfile.rust";
+          ]
+      in
       make_job_base_images
         ~__POS__
         ~name:"oc.base-images.rust"
         ~image_name:"debian-rust"
-        ~base_name:"debian"
+        ~base_name:(base_dep_img "debian")
         ~matrix:[("RELEASE", ["trixie"])]
+        ~dependencies:(Dependent [Job job_debian_based_images])
         ~compilation:Native
         ~changes
         "images/base-images/Dockerfile.rust"
@@ -188,13 +200,18 @@ let jobs =
   in
   let job_debian_homebrew_base_images =
     let changes =
-      Changeset.make ["images/base-images/Dockerfile.debian-homebrew"]
+      Changeset.make
+        [
+          "images/base-images/Dockerfile.debian";
+          "images/base-images/Dockerfile.debian-homebrew";
+        ]
     in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.debian-homebrew"
       ~image_name:"debian-homebrew"
-      ~base_name:"debian"
+      ~base_name:(base_dep_img "debian")
+      ~dependencies:(Dependent [Job job_debian_based_images])
       ~matrix:[("RELEASE", ["trixie"])]
       ~compilation:Amd64_only
       ~changes

@@ -188,10 +188,13 @@ oc.base-images.rust:
   - $TAGS
   rules:
   - changes:
+    - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.rust
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
+  needs:
+  - oc.base-images.debian
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -210,7 +213,7 @@ oc.base-images.rust:
   variables:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: debian-rust
-    IMAGE_PATH: debian
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: ""
   parallel:
     matrix:
@@ -254,10 +257,13 @@ oc.base-images.debian-homebrew:
   - gcp_very_high_cpu
   rules:
   - changes:
+    - images/base-images/Dockerfile.debian
     - images/base-images/Dockerfile.debian-homebrew
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
+  needs:
+  - oc.base-images.debian
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -276,7 +282,7 @@ oc.base-images.debian-homebrew:
   variables:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: debian-homebrew
-    IMAGE_PATH: debian
+    IMAGE_PATH: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/debian:${RELEASE}-${CI_COMMIT_REF_SLUG}
     PLATFORM: linux/amd64
   parallel:
     matrix:
