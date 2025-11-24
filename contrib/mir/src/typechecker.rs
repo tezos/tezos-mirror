@@ -702,9 +702,7 @@ fn parse_parameter_ty_with_entrypoints<'a>(
         .entry(Entrypoint::default())
         .or_insert_with(|| parameter.clone());
     routed_annotations
-        .entry(FieldAnnotation::from_str_unchecked(
-            entrypoint::DEFAULT_EP_NAME,
-        ))
+        .entry(FieldAnnotation::default())
         .or_insert_with(|| (vec![], parameter.clone()));
     Ok((entrypoints, routed_annotations, parameter))
 }
@@ -2993,7 +2991,6 @@ mod typecheck_tests {
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
     use std::collections::HashMap;
-    use tezos_protocol::entrypoint::DEFAULT_EP_NAME;
     use Instruction::*;
     use Option::None;
 
@@ -6424,7 +6421,7 @@ mod typecheck_tests {
                 storage: Type::Unit,
                 code: Seq(vec![Car, Nil, Pair]),
                 annotations: HashMap::from([(
-                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    FieldAnnotation::default(),
                     (Vec::new(), Type::Unit)
                 )]),
                 views: HashMap::new(),
@@ -6451,7 +6448,7 @@ mod typecheck_tests {
                 storage: Type::Unit,
                 code: Seq(vec![Car, Nil, Pair]),
                 annotations: HashMap::from([(
-                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    FieldAnnotation::default(),
                     (Vec::new(), Type::Unit)
                 )]),
                 views: HashMap::from_iter([(
@@ -6486,7 +6483,7 @@ mod typecheck_tests {
                 storage: Type::Unit,
                 code: Seq(vec![Car, Nil, Pair]),
                 annotations: HashMap::from([(
-                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    FieldAnnotation::default(),
                     (Vec::new(), Type::Unit)
                 )]),
                 views: HashMap::from_iter([
@@ -6664,7 +6661,7 @@ mod typecheck_tests {
                     Unit,
                     IView { name: "hello_view".into(), return_type: Type::String }, Drop(None)]),
                 annotations: HashMap::from([(
-                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    FieldAnnotation::default(),
                     (Vec::new(), Type::Unit)
                 )]),
                 views: HashMap::new(),
@@ -6695,7 +6692,7 @@ mod typecheck_tests {
                 storage: Type::Unit,
                 code: Seq(vec![Drop(None), Unit, Failwith(Type::Unit)]),
                 annotations: HashMap::from([(
-                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    FieldAnnotation::default(),
                     (Vec::new(), Type::new_contract(Type::Unit))
                 )]),
                 views: HashMap::new(),
@@ -7146,7 +7143,7 @@ mod typecheck_tests {
                 ]),
                 annotations: HashMap::from([
                     (
-                        FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                        FieldAnnotation::default(),
                         (vec![Direction::Right], Type::Unit)
                     ),
                     (
@@ -7209,7 +7206,7 @@ mod typecheck_tests {
                         (vec![Direction::Left], Type::Int)
                     ),
                     (
-                        FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                        FieldAnnotation::default(),
                         (vec![Direction::Right], Type::Unit)
                     ),
                 ]),

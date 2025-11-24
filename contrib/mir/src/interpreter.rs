@@ -1948,7 +1948,6 @@ mod interpreter_tests {
     use num_bigint::BigUint;
     use tezos_crypto_rs::public_key::PublicKey;
     use tezos_data_encoding::nom::NomReader;
-    use tezos_protocol::entrypoint::DEFAULT_EP_NAME;
     use Instruction::*;
     use Option::None;
     use TypedValue as V;
@@ -6902,7 +6901,7 @@ mod interpreter_tests {
                 ),
             ),
             (
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                FieldAnnotation::default(),
                 (
                     Vec::new(),
                     Type::new_or(
@@ -7042,7 +7041,7 @@ mod interpreter_tests {
                 ),
             ),
             (
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                FieldAnnotation::default(),
                 (
                     Vec::new(),
                     Type::new_or(
@@ -7191,7 +7190,7 @@ mod interpreter_tests {
                 ),
             ),
             (
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                FieldAnnotation::default(),
                 (
                     Vec::new(),
                     Type::new_or(
@@ -7284,7 +7283,7 @@ mod interpreter_tests {
                 ),
             ),
             (
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                FieldAnnotation::default(),
                 (
                     vec![Direction::Right, Direction::Left, Direction::Left],
                     Type::Nat,

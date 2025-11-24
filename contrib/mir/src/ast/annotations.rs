@@ -83,6 +83,12 @@ impl std::fmt::Debug for Annotations<'_> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FieldAnnotation<'a>(Cow<'a, str>);
 
+impl<'a> Default for FieldAnnotation<'a> {
+    fn default() -> Self {
+        Self::from_str_unchecked(entrypoint::DEFAULT_EP_NAME)
+    }
+}
+
 impl<'a> FieldAnnotation<'a> {
     /// View the field annotation contents as a [str] slice. The leading `%` is
     /// _not_ included.
