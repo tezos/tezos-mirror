@@ -24,6 +24,7 @@ COPY --chown=tezos:nogroup --from=builder /home/tezos/evm_kernel/benchmarking_se
 COPY --chown=tezos:nogroup scripts/docker/entrypoint.* /home/tezos/bin/
 # Add scripts
 COPY --chown=tezos:nogroup scripts/alphanet_version src/bin_client/bash-completion.sh script-inputs/active_protocol_versions /home/tezos/scripts/
+COPY --chown=tezos:nogroup scripts/ci/dune.sh /home/tezos/scripts/ci/
 
 # hadolint ignore=DL3006
 FROM ${BASE_IMAGE}/${BASE_IMAGE_VERSION} as debug
