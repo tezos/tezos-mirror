@@ -7,7 +7,6 @@
 
 use crate::ast::michelson_address::entrypoint::{Direction, Entrypoints};
 use chrono::prelude::DateTime;
-use entrypoint::DEFAULT_EP_NAME;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};
 use regex::Regex;
@@ -703,7 +702,9 @@ fn parse_parameter_ty_with_entrypoints<'a>(
         .entry(Entrypoint::default())
         .or_insert_with(|| parameter.clone());
     routed_annotations
-        .entry(FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME))
+        .entry(FieldAnnotation::from_str_unchecked(
+            entrypoint::DEFAULT_EP_NAME,
+        ))
         .or_insert_with(|| (vec![], parameter.clone()));
     Ok((entrypoints, routed_annotations, parameter))
 }
@@ -2986,13 +2987,13 @@ mod typecheck_tests {
     use super::{Lambda, Or};
     use crate::ast::big_map::LazyStorage;
     use crate::ast::michelson_address as addr;
-    use crate::ast::michelson_address::entrypoint::DEFAULT_EP_NAME;
     use crate::ast::or::Or::{Left, Right};
     use crate::context::Ctx;
     use crate::gas::Gas;
     use crate::parser::test_helpers::*;
     use crate::typechecker::*;
     use std::collections::HashMap;
+    use tezos_protocol::entrypoint::DEFAULT_EP_NAME;
     use Instruction::*;
     use Option::None;
 

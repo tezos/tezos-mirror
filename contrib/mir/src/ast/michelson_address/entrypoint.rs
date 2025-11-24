@@ -28,7 +28,3 @@ pub enum Direction {
 /// A structure mapping from entrypoints to their types. This is simply an alias
 /// for a [HashMap].
 pub type Entrypoints = HashMap<Entrypoint, Type>;
-
-/// NB: default entrypoint is represented as literal "default", because it
-/// affects comparison for addresses.
-pub const DEFAULT_EP_NAME: &str = entrypoint::DEFAULT_EP_NAME;

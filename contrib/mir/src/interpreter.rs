@@ -1945,10 +1945,10 @@ mod interpreter_tests {
     use crate::context::{Ctx, TypecheckingCtx};
     use crate::gas::Gas;
     use chrono::DateTime;
-    use entrypoint::DEFAULT_EP_NAME;
     use num_bigint::BigUint;
     use tezos_crypto_rs::public_key::PublicKey;
     use tezos_data_encoding::nom::NomReader;
+    use tezos_protocol::entrypoint::DEFAULT_EP_NAME;
     use Instruction::*;
     use Option::None;
     use TypedValue as V;
