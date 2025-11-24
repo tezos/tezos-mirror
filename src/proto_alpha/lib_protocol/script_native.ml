@@ -13,22 +13,22 @@ module CLST_contract = struct
   open Script_native_types.CLST_types
 
   let execute_deposit (ctxt, (step_constants : Script_typed_ir.step_constants))
-      (() : deposit) (ledger : storage) :
+      (() : deposit) (storage : storage) :
       ((operation Script_list.t, storage) pair * context) tzresult Lwt.t =
     let open Lwt_result_syntax in
     let address =
       {destination = step_constants.sender; entrypoint = Entrypoint.default}
     in
-    let* amount_opt, ctxt = Script_big_map.get ctxt address ledger in
+    let* amount, ctxt =
+      Clst_storage.get_balance_from_storage ctxt storage address
+    in
     let added_amount =
       Tez.to_mutez step_constants.amount
       |> Script_int.of_int64 |> Script_int.abs
     in
-    let new_amount =
-      Script_int.(add_n added_amount (Option.value ~default:zero_n amount_opt))
-    in
+    let new_amount = Script_int.(add_n added_amount amount) in
     let* new_ledger, ctxt =
-      Script_big_map.update ctxt address (Some new_amount) ledger
+      Script_big_map.update ctxt address (Some new_amount) storage
     in
     return ((Script_list.empty, new_ledger), ctxt)
 
