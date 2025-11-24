@@ -286,7 +286,7 @@ pub struct MichelineContractScript<A> {
     pub views: HashMap<String, MichelineView<A>>,
 }
 
-impl<'arena, 'script> MichelineContractScript<&'script Micheline<'arena>> {
+impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
     /// Typecheck the contract script. Validates the script's types, then
     /// typechecks the code and checks the result stack is as expected. Returns
     /// typechecked script.
