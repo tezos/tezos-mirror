@@ -8,45 +8,48 @@ use crate::enc_wrappers::{BlockHash, OperationHash};
 use primitive_types::H256;
 use rlp::Decodable;
 use tezos_crypto_rs::blake2b::digest_256;
-use tezos_crypto_rs::hash::{BlsSignature, SecretKeyEd25519, UnknownSignature};
+use tezos_crypto_rs::hash::{SecretKeyEd25519, UnknownSignature};
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
     enc::{BinError, BinWriter},
     nom::NomReader,
 };
 pub use tezos_protocol::operation::{
+    ManagerOperationContent as ManagerOperation,
+    OperationContent as ManagerOperationContent,
+    OriginationContent,
     Parameters,
+    RevealContent,
+    Script,
     // Transfers are often called "transactions" in the protocol, we try
     // to consistently call them transfers to avoid confusion with the
     // Ethereum notion of transaction which is more generic as it also
     // encompasses the case of originations.
     TransactionContent as TransferContent,
 };
-use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
+#[cfg(test)]
+use tezos_smart_rollup::types::PublicKey;
+use tezos_smart_rollup::types::PublicKeyHash;
 use thiserror::Error;
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct RevealContent {
-    pub pk: PublicKey,
-    pub proof: Option<BlsSignature>,
-}
+/**
 
-// Original code is from sdk/rust/protocol/src/operation.rs
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct OriginationContent {
-    pub balance: Narith,
-    pub delegate: Option<PublicKeyHash>,
-    pub script: Script,
-}
+There is a distance between the binary format of manager operations
+and what we want to manipulate when applying them. The former is
+imposed by the protocol and corresponds to this
+ManagerOperationContent struct. The latter is
+ManagerOperation<OperationContent> and is the input type of the
+apply_operation function (in the lib.rs file of the tezos_execution
+crate).
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct Script {
-    #[encoding(dynamic, bytes)]
-    pub code: Vec<u8>,
-    #[encoding(dynamic, bytes)]
-    pub storage: Vec<u8>,
-}
+There are some fields common to all manager operations and some fields
+specific to each kind of operation. A lot can be done about a manager
+operation (in particular checking the signature and debiting the fees)
+before we dispatch on the operation kind but the binary format starts
+with the operation-kind tag, then the generic fields, and finally the
+kind-specific fields.
 
+*/
 #[derive(Clone)]
 pub enum OperationContent {
     Reveal(RevealContent),
@@ -56,16 +59,6 @@ pub enum OperationContent {
 
 // In Tezlink, we'll only support ManagerOperation so we don't
 // have to worry about other operations
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct ManagerOperation<C> {
-    pub source: PublicKeyHash,
-    pub fee: Narith,
-    pub counter: Narith,
-    pub gas_limit: Narith,
-    pub storage_limit: Narith,
-    pub operation: C,
-}
-
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct Operation {
     pub branch: BlockHash,
@@ -98,35 +91,6 @@ impl Decodable for Operation {
     }
 }
 
-/**
-
-There is a distance between the binary format of manager operations
-and what we want to manipulate when applying them. The former is
-imposed by the protocol and corresponds to this
-ManagerOperationContent struct. The latter is
-ManagerOperation<OperationContent> and is the input type of the
-apply_operation function (in the lib.rs file of the tezos_execution
-crate).
-
-There are some fields common to all manager operations and some fields
-specific to each kind of operation. A lot can be done about a manager
-operation (in particular checking the signature and debiting the fees)
-before we dispatch on the operation kind but the binary format starts
-with the operation-kind tag, then the generic fields, and finally the
-kind-specific fields.
-
-*/
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-#[encoding(tags = "u8")]
-pub enum ManagerOperationContent {
-    #[encoding(tag = 107)]
-    Reveal(ManagerOperation<RevealContent>),
-    #[encoding(tag = 108)]
-    Transaction(ManagerOperation<TransferContent>),
-    #[encoding(tag = 109)]
-    Origination(ManagerOperation<OriginationContent>),
-}
-
 pub trait ManagerOperationField {
     fn gas_limit(&self) -> &Narith;
     fn source(&self) -> &PublicKeyHash;
@@ -138,6 +102,7 @@ impl ManagerOperationField for ManagerOperationContent {
             ManagerOperationContent::Reveal(op) => &op.gas_limit,
             ManagerOperationContent::Transaction(op) => &op.gas_limit,
             ManagerOperationContent::Origination(op) => &op.gas_limit,
+            _ => todo!(),
         }
     }
 
@@ -146,6 +111,7 @@ impl ManagerOperationField for ManagerOperationContent {
             ManagerOperationContent::Reveal(op) => &op.source,
             ManagerOperationContent::Transaction(op) => &op.source,
             ManagerOperationContent::Origination(op) => &op.source,
+            _ => todo!(),
         }
     }
 }
@@ -246,6 +212,7 @@ impl ManagerOperationContentConv for ManagerOperation<OperationContent> {
                 storage_limit,
                 operation: OperationContent::Origination(c),
             },
+            _ => todo!(),
         }
     }
 }

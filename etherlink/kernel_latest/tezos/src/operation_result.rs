@@ -746,6 +746,7 @@ impl NomReader<'_> for OperationWithMetadata {
                     OperationResult::<OriginationContent>::nom_read(input)?;
                 (input, OperationResultSum::Origination(receipt))
             }
+            _ => todo!(),
         };
         Ok((input, Self { content, receipt }))
     }
