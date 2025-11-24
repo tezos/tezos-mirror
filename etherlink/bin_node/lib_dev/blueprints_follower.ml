@@ -222,7 +222,9 @@ let execute_with_policy policy f =
   | `TBD ->
       let*! head = Evm_context.head_info () in
       let* storage_version = Evm_state.storage_version head.evm_state in
-      let ignore = storage_version < 42 in
+      let ignore =
+        Storage_version.sub_block_latency_entrypoints_disabled ~storage_version
+      in
       let* () =
         when_ ignore @@ fun () ->
         Lwt_result.ok (Events.ignored_preconfirmations ())

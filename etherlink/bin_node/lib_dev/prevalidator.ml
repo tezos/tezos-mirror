@@ -80,8 +80,6 @@ module K = struct
   let eip7702_empty_account_cost = 25_000
 end
 
-let is_prague_enabled ~storage_version = storage_version >= 37
-
 type mode = Minimal | Full
 
 module Types = struct
@@ -318,7 +316,10 @@ let validate_gas_limit session (transaction : Transaction_object.t) :
       ~gas_limit
       data
   in
-  if session.storage_version < 34 then
+  if
+    Storage_version.gas_limit_validation_enabled
+      ~storage_version:session.storage_version
+  then
     if
       Compare.Z.(
         execution_gas_limit
@@ -521,7 +522,7 @@ let validate_minimum_gas_requirement ~session
     ~(transaction : Transaction_object.t) =
   let open Lwt_result_syntax in
   let is_prague_enabled =
-    is_prague_enabled ~storage_version:session.storage_version
+    Storage_version.is_prague_enabled ~storage_version:session.storage_version
   in
   let initial_gas, floor_gas =
     initial_tx_gas_computation ~transaction ~is_prague_enabled
@@ -677,7 +678,9 @@ module Handlers = struct
     let* () =
       when_
         (Transaction_object.is_eip7702 transaction_object
-        && not (is_prague_enabled ~storage_version:session.storage_version))
+        && not
+             (Storage_version.is_prague_enabled
+                ~storage_version:session.storage_version))
       @@ fun () -> tzfail Prague_not_enabled
     in
     let** next_nonce =
