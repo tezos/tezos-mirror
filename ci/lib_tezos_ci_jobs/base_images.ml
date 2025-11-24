@@ -151,6 +151,7 @@ let jobs =
   in
   let job_rust_based_images, job_rust_based_images_merge =
     let images =
+      let changes = Changeset.make ["images/base-images/Dockerfile.rust"] in
       make_job_base_images
         ~__POS__
         ~name:"oc.base-images.rust"
@@ -158,6 +159,7 @@ let jobs =
         ~base_name:"debian"
         ~matrix:[("RELEASE", ["trixie"])]
         ~compilation:Native
+        ~changes
         "images/base-images/Dockerfile.rust"
     in
     let merge =

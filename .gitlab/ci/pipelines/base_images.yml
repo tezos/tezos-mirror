@@ -198,7 +198,8 @@ oc.base-images.rust:
   tags:
   - $TAGS
   rules:
-  - changes: []
+  - changes:
+    - images/base-images/Dockerfile.rust
     when: on_success
   - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
     when: on_success
