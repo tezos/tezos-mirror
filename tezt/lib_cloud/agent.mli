@@ -20,6 +20,7 @@ module Configuration : sig
     disk_type : string option;
     disk_size_gb : int option;
     docker_image : docker_image;
+    dockerbuild_args : (string * string) list;
     max_run_duration : int option;
     binaries_path : string;
     os : Types.Os.t;
@@ -57,6 +58,7 @@ module Configuration : sig
     ?disk_type:string ->
     ?disk_size_gb:int ->
     ?docker_image:docker_image ->
+    ?dockerbuild_args:(string * string) list ->
     ?name:string ->
     unit ->
     t

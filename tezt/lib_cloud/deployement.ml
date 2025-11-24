@@ -212,6 +212,7 @@ module Remote = struct
              let* () =
                Jobs.docker_build
                  ~docker_image:vm_configuration.Agent.Configuration.docker_image
+                 ~args:vm_configuration.dockerbuild_args
                  ~push:Env.push_docker
                  ~ssh_public_key
                  ()
@@ -701,6 +702,7 @@ module Localhost = struct
              let* () =
                Jobs.docker_build
                  ~docker_image:configuration.Agent.Configuration.vm.docker_image
+                 ~args:configuration.vm.dockerbuild_args
                  ~push:false
                  ~ssh_public_key
                  ()

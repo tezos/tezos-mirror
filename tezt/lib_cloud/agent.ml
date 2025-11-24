@@ -57,7 +57,7 @@ module Configuration = struct
       Format.asprintf "agent-%03d" !cpt
 
   let make ?os ?binaries_path ?max_run_duration ?machine_type ?disk_type
-      ?disk_size_gb ?docker_image ?(name = gen_name ()) () =
+      ?disk_size_gb ?docker_image ?dockerbuild_args ?(name = gen_name ()) () =
     let os = Option.value ~default:Cli.os os in
     let binaries_path = Option.value ~default:Cli.binaries_path binaries_path in
     let max_run_duration =
@@ -82,6 +82,7 @@ module Configuration = struct
       ?max_run_duration
       ?disk_type
       ?disk_size_gb
+      ?dockerbuild_args
       ~machine_type
       ~docker_image
       ~name

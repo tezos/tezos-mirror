@@ -83,6 +83,7 @@ let agent_jingo_template agent =
               disk_type;
               disk_size_gb;
               docker_image;
+              dockerbuild_args = _;
               max_run_duration;
               binaries_path;
               os;

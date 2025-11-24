@@ -18,11 +18,11 @@ let docker_build =
       ~ssh_public_key
       ()
     ->
-    if Hashtbl.mem cache docker_image then (
+    if Hashtbl.mem cache (docker_image, args) then (
       Log.info "Docker image is already built. Nothing to do" ;
       Lwt.return_unit)
     else (
-      Hashtbl.replace cache docker_image () ;
+      Hashtbl.replace cache (docker_image, args) () ;
       let alias =
         match docker_image with
         | Gcp {alias} -> alias
