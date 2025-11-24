@@ -25,6 +25,13 @@ let fedora_releases = ["39"; "41"; "42"]
 
 let fedora_matrix = [("RELEASE", fedora_releases)]
 
+(* Helper function to standardise the path of a base image built in the same
+   pipeline. Used to build more complex base images and avoid code duplications *)
+let base_dep_img image =
+  Format.sprintf
+    "${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/%s:${RELEASE}-${CI_COMMIT_REF_SLUG}"
+    image
+
 type compilation =
   | Amd64_only (* Built on amd64 runner *)
   | Arm64_only
@@ -66,7 +73,8 @@ let jobs =
      a native runner. In this case we also must add a merge manifest job.
      *)
   let make_job_base_images ~__POS__ ~name ~matrix ~image_name ?base_name
-      ?(changes = Changeset.make []) ?(compilation = Emulated) dockerfile =
+      ?(changes = Changeset.make []) ?(compilation = Emulated) ?dependencies
+      dockerfile =
     let script =
       Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile
     in
@@ -106,6 +114,7 @@ let jobs =
         ]
       ~parallel:(Matrix [matrix @ tags])
       ~tag:(if emulated then Gcp_very_high_cpu else Dynamic)
+      ?dependencies
       [script]
   in
   let job_debian_based_images =
