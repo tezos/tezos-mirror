@@ -1878,7 +1878,7 @@ fn interpret_one<'a>(
                     instrs,
                     ctx.gas(),
                     Type::Pair(Rc::new((input_type, storage_ty))),
-                    output_type.clone(),
+                    output_type,
                     false,
                 ) {
                     let mut stk = stk![TypedValue::new_pair(input, storage)];
