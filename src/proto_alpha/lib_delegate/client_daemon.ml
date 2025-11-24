@@ -70,9 +70,7 @@ module Baker = struct
       delegates =
     let open Lwt_result_syntax in
     let process () =
-      let* user_activated_upgrades =
-        Config_services.user_activated_upgrades cctxt
-      in
+      let* user_activated_upgrades = Node_rpc.user_activated_upgrades cctxt in
       let* constants =
         let* chain_id = Node_rpc.chain_id cctxt ~chain:cctxt#chain in
         Node_rpc.constants cctxt ~chain:(`Hash chain_id) ~block:(`Head 0)

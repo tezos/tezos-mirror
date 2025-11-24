@@ -561,3 +561,29 @@ let inject_operation_bytes cctxt ?async ~chain bytes =
 
 let block_resulting_context_hash cctxt ~chain ?(block = `Head 0) () =
   Shell_services.Blocks.resulting_context_hash cctxt ~chain ~block ()
+
+let live_blocks cctxt ~chain ?(block = `Head 0) () =
+  Chain_services.Blocks.live_blocks cctxt ~chain ~block ()
+
+let block_header cctxt ~chain ~block =
+  Protocol_client_context.Alpha_block_services.header cctxt ~chain ~block ()
+
+let block_info cctxt ~chain ~block =
+  Protocol_client_context.Alpha_block_services.info cctxt ~chain ~block ()
+
+let block_metadata cctxt ~chain ~block =
+  Protocol_client_context.Alpha_block_services.metadata cctxt ~chain ~block ()
+
+let mempool_monitor_operations cctxt ~chain =
+  Protocol_client_context.Alpha_block_services.Mempool.monitor_operations
+    cctxt
+    ~chain
+    ~validated:true
+    ~branch_delayed:true
+    ~branch_refused:false
+    ~refused:false
+    ~outdated:false
+    ()
+
+let user_activated_upgrades cctxt =
+  Config_services.user_activated_upgrades cctxt

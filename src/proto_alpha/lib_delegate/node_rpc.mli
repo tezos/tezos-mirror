@@ -269,3 +269,40 @@ val block_resulting_context_hash :
   ?block:Shell_services.block ->
   unit ->
   Context_hash.t tzresult Lwt.t
+
+val live_blocks :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  ?block:Shell_services.block ->
+  unit ->
+  Block_hash.Set.t tzresult Lwt.t
+
+val block_header :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Protocol_client_context.Alpha_block_services.block_header tzresult Lwt.t
+
+val block_info :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Protocol_client_context.Alpha_block_services.block_info tzresult Lwt.t
+
+val block_metadata :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Protocol_client_context.Alpha_block_services.block_metadata tzresult Lwt.t
+
+val mempool_monitor_operations :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  (((Operation_hash.t * packed_operation) * error list option) list Lwt_stream.t
+  * (unit -> unit))
+  tzresult
+  Lwt.t
+
+val user_activated_upgrades :
+  #Protocol_client_context.rpc_context ->
+  (int32 * Protocol_hash.t) list tzresult Lwt.t

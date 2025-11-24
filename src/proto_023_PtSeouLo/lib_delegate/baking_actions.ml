@@ -417,7 +417,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
        () [@profiler.record_s {verbosity = Info} "pred resulting context hash"])
   in
   let* pred_live_blocks =
-    (Chain_services.Blocks.live_blocks
+    (Node_rpc.live_blocks
        cctxt
        ~chain
        ~block:pred_block
