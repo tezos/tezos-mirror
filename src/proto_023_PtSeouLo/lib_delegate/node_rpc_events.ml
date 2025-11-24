@@ -34,3 +34,12 @@ let chain_id =
     ~level:Info
     ~msg:"Running baker with chain id: {chain_id}"
     ("chain_id", Chain_id.encoding)
+
+let stalling_rpc =
+  declare_2
+    ~section
+    ~name:"stalling_rpc"
+    ~level:Warning
+    ~msg:"RPC {rpc_name} has not answered in the last {seconds} seconds"
+    ("rpc_name", Data_encoding.string)
+    ("seconds", Data_encoding.float)
