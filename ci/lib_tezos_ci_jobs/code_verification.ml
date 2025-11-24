@@ -309,7 +309,7 @@ let jobs pipeline_type =
           (* Check .ocamlformat files. *)
           "scripts/lint.sh --check-ocamlformat";
           (* Check actual formatting. *)
-          "dune build --profile=dev @fmt";
+          "scripts/ci/dune.sh build --profile=dev @fmt";
         ]
       |> enable_dune_cache
     in
@@ -575,7 +575,7 @@ let jobs pipeline_type =
         (* Stops on first error for easier detection of problems in
            the log and to reduce time to merge of other MRs further
            down the merge train. *)
-        ["dune build @check --stop-on-first-error"]
+        ["scripts/ci/dune.sh build @check --stop-on-first-error"]
       |> enable_dune_cache ~cache_size:"3GB"
     in
     (* This job triggers the debian child pipeline automatically if any
