@@ -249,7 +249,10 @@ endif
 ifeq (${OCTEZ_EXECUTABLES},)
 	$(error The build target requires OCTEZ_EXECUTABLES to be specified. Please use another target (e.g. 'make' or 'make release') and make sure that environment variable OCTEZ_EXECUTABLES is unset)
 endif
-	@dune build --profile=$(PROFILE) $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) \
+# [dune.sh] is a wrapper around [dune] that does not change the core build logic
+# but enables cache monitoring when DUNE_CACHE_INFO=true.
+# Useful to compute dune cache hit ratio in the CI.
+	@./scripts/ci/dune.sh build --profile=$(PROFILE) $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) \
 		$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
 		$(BUILD_EXTRA) \
 		@copy-parameters

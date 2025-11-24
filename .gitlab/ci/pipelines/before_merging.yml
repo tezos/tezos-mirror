@@ -274,7 +274,7 @@ oc.ocaml_fmt:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - scripts/lint.sh --check-ocamlformat
-  - dune build --profile=dev @fmt
+  - scripts/ci/dune.sh build --profile=dev @fmt
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -2110,7 +2110,7 @@ ocaml-check:
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - dune build @check --stop-on-first-error
+  - scripts/ci/dune.sh build @check --stop-on-first-error
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
