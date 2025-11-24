@@ -14,6 +14,7 @@ val register :
   ?proxy_files:string list ->
   ?proxy_args:string list ->
   ?vms:(unit -> Agent.Configuration.t list Lwt.t) ->
+  ?dockerbuild_args:(string * string) list ->
   __FILE__:string ->
   title:string ->
   tags:string list ->

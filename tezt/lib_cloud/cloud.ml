@@ -609,8 +609,8 @@ let adjust_traffic_control i agent =
         ]
       |> Process.check
 
-let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
-    ?tasks f =
+let register ?proxy_files ?proxy_args ?vms ?dockerbuild_args ~__FILE__ ~title
+    ~tags ?seed ?alerts ?tasks f =
   Test.register ~__FILE__ ~title ~tags ?seed @@ fun () ->
   let* () = Env.init () in
   let* vms =
@@ -654,7 +654,9 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
   match vms with
   | None ->
       let default_agent =
-        let configuration = Agent.Configuration.make ~name:"default" () in
+        let configuration =
+          Agent.Configuration.make ~name:"default" ?dockerbuild_args ()
+        in
         let next_available_port =
           let cpt = ref 30_000 in
           fun () ->
@@ -733,17 +735,31 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
             orchestrator ?alerts ?tasks deployement f
         | `Local_orchestrator_local_agents ->
             (* The scenario is executed locally and the VM are on the host machine. *)
-            let* () = Jobs.docker_build ~push:false ~ssh_public_key () in
-            let* deployement = Deployement.deploy ~configurations in
+            let* () =
+              Jobs.docker_build
+                ?args:dockerbuild_args
+                ~push:false
+                ~ssh_public_key
+                ()
+            in
+            let* deployement =
+              Deployement.deploy ?dockerbuild_args ~configurations ()
+            in
             let* () = ensure_ready deployement in
             orchestrator ?alerts ?tasks deployement f
         | `Local_orchestrator_remote_agents ->
             (* The scenario is executed locally and the VMs are on the cloud. *)
             let* () = Jobs.deploy_docker_registry () in
             let* () =
-              Jobs.docker_build ~push:Env.push_docker ~ssh_public_key ()
+              Jobs.docker_build
+                ?args:dockerbuild_args
+                ~push:Env.push_docker
+                ~ssh_public_key
+                ()
             in
-            let* deployement = Deployement.deploy ~configurations in
+            let* deployement =
+              Deployement.deploy ?dockerbuild_args ~configurations ()
+            in
             let* () = ensure_ready deployement in
             orchestrator ?alerts ?tasks deployement f
         | `Remote_orchestrator_remote_agents | `Ssh_host _ ->
@@ -752,9 +768,15 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
             if not proxy_running then
               let* () = Jobs.deploy_docker_registry () in
               let* () =
-                Jobs.docker_build ~push:Env.push_docker ~ssh_public_key ()
+                Jobs.docker_build
+                  ?args:dockerbuild_args
+                  ~push:Env.push_docker
+                  ~ssh_public_key
+                  ()
               in
-              let* deployement = Deployement.deploy ~configurations in
+              let* deployement =
+                Deployement.deploy ?dockerbuild_args ~configurations ()
+              in
               let* () = ensure_ready deployement in
               init_proxy ?proxy_files ?proxy_args deployement
             else Lwt.return_unit)

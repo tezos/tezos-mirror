@@ -34,6 +34,7 @@ module Agent_configuration : sig
     disk_type : string option;
     disk_size_gb : int option;
     docker_image : docker_image;
+    dockerbuild_args : (string * string) list;
     max_run_duration : int option;
     binaries_path : string;
     os : Os.t;
@@ -55,6 +56,7 @@ module Agent_configuration : sig
     ?max_run_duration:int ->
     ?disk_type:string ->
     ?disk_size_gb:int ->
+    ?dockerbuild_args:(string * string) list ->
     machine_type:string ->
     docker_image:docker_image ->
     name:string ->
