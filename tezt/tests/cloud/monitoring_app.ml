@@ -25,7 +25,7 @@ let network_to_image_url : Network.t -> string = function
       "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/ghostnet.png"
   | `Seoulnet ->
       "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/seoulnet.png"
-  | `Nextnet _ ->
+  | `Nextnet _ | `Tallinnnet ->
       "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/tallinnnet.png"
   | `Sandbox | `Weeklynet _ -> "no_image_yet"
 
