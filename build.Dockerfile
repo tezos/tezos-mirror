@@ -15,7 +15,7 @@ ARG GIT_SHORTREF
 ARG GIT_DATETIME
 ARG GIT_VERSION
 WORKDIR /home/tezos
-RUN mkdir -p /home/tezos/tezos/scripts /home/tezos/tezos/script-inputs /home/tezos/tezos/parameters /home/tezos/evm_kernel
+RUN mkdir -p /home/tezos/tezos/scripts/ci /home/tezos/tezos/script-inputs /home/tezos/tezos/parameters /home/tezos/evm_kernel
 COPY --chown=tezos:nogroup Makefile tezos
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions tezos/script-inputs/
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions_without_number tezos/script-inputs/
@@ -25,6 +25,7 @@ COPY --chown=tezos:nogroup script-inputs/dev-executables tezos/script-inputs/
 COPY --chown=tezos:nogroup dune tezos
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup scripts/custom-flags.sh tezos/scripts/
+COPY --chown=tezos:nogroup scripts/ci/dune.sh tezos/scripts/ci/dune.sh
 COPY --chown=tezos:nogroup src tezos/src
 COPY --chown=tezos:nogroup sdk/rust tezos/sdk/rust
 COPY --chown=tezos:nogroup irmin tezos/irmin
