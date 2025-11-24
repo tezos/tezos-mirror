@@ -450,21 +450,18 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             None => None,
         };
 
-        match views.clone() {
-            Some(v) => {
-                if let Some(s) = storages.clone() {
-                    for view_key in v.keys() {
-                        if s.get(view_key).is_none() {
-                            return Err(format!(
-                                "The {view_key:?} appears in `views` but not in `storages`."
-                            ))?;
-                        }
+        if let Some(v) = views.clone() {
+            if let Some(s) = storages.clone() {
+                for view_key in v.keys() {
+                    if !s.contains_key(view_key) {
+                        return Err(format!(
+                            "The {view_key:?} appears in `views` but not in `storages`."
+                        ))?;
                     }
-                } else {
-                    return Err(format!("The `storages` tzt primitive is missing but mandatory when using the `views` tzt primitive."))?;
                 }
+            } else {
+                return Err("The `storages` tzt primitive is missing but mandatory when using the `views` tzt primitive.".to_owned())?;
             }
-            None => (),
         }
 
         Ok(TztTest {
