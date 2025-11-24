@@ -1,9 +1,6 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! AST definitions for raw ([Micheline]) and typed representations of
 //! Michelson.

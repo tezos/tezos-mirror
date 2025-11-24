@@ -1,9 +1,6 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 #![warn(clippy::redundant_clone)]
 #![warn(missing_docs)]
 #![deny(clippy::disallowed_methods)]

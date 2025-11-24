@@ -1,9 +1,6 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Michelson typechecker definitions. Most functions defined as associated
 //! functions on [Micheline], see there for more.
