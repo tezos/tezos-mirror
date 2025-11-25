@@ -109,7 +109,13 @@ let add_inclusion_in_block block_hash validators delegate_operations =
     List.fold_left
       (fun (acc, missing)
            Data.Delegate_operations.(
-             {delegate; first_slot; attesting_power; operations} as delegate_ops)
+             {
+               delegate;
+               first_slot;
+               attesting_power;
+               operations;
+               assigned_shard_indices;
+             } as delegate_ops)
          ->
         match
           List.partition
@@ -133,6 +139,7 @@ let add_inclusion_in_block block_hash validators delegate_operations =
                       op.op.kind
                       ?ops_round:op.op.round
                       operations;
+                  assigned_shard_indices;
                 }
               :: acc,
               missing' )
@@ -161,6 +168,7 @@ let add_inclusion_in_block block_hash validators delegate_operations =
                     block_inclusion = [block_hash];
                   };
                 ];
+              assigned_shard_indices = [];
             }
           :: acc)
         updated_known
@@ -353,8 +361,13 @@ let dump_received logger path ?unaccurate level received_ops =
           List.fold_left
             (fun (acc, missing)
                  Data.Delegate_operations.(
-                   {delegate; first_slot; attesting_power; operations} as
-                   delegate_ops)
+                   {
+                     delegate;
+                     first_slot;
+                     attesting_power;
+                     operations;
+                     assigned_shard_indices;
+                   } as delegate_ops)
                ->
               match
                 List.partition
@@ -372,6 +385,7 @@ let dump_received logger path ?unaccurate level received_ops =
                         first_slot;
                         attesting_power;
                         operations = merge_operations operations new_operations;
+                        assigned_shard_indices;
                       }
                     :: acc,
                     missing' )
@@ -415,6 +429,7 @@ let dump_received logger path ?unaccurate level received_ops =
                                  block_inclusion = [];
                                })
                              ops;
+                         assigned_shard_indices = [];
                        }
                      :: acc)
                    updated_known

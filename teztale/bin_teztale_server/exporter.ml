@@ -370,6 +370,7 @@ let translate_ops info =
               first_slot;
               attesting_power = power;
               operations = translate pkh_ops;
+              assigned_shard_indices = [];
             }
           :: acc)
         info
