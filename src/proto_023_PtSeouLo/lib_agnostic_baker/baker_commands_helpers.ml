@@ -26,7 +26,8 @@ let parse_state_recorder state_recorder =
 let run_baker (cctxt : Tezos_client_base.Client_context.full) ?dal_node_rpc_ctxt
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?votes
     ?extra_operations ?pre_emptive_forge_time ?force_apply_from_round
-    ?remote_calls_timeout ?data_dir ?state_recorder ~chain ~keep_alive sources =
+    ?remote_calls_timeout ?data_dir ?state_recorder ~chain ~keep_alive
+    ~extra_nodes:_ sources =
   let open Lwt_result_syntax in
   let cctxt = new Protocol_client_context.wrap_full cctxt in
   let votes =

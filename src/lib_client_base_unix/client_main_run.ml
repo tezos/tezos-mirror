@@ -545,7 +545,6 @@ let parse_rpc_config parsed_config_file parsed_args default_media_type =
   | Some parsed_args ->
       if parsed_args.Client_config.print_timings then
         let gettimeofday = Unix.gettimeofday in
-
         {
           rpc_config with
           logger =

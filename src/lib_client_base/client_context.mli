@@ -185,4 +185,6 @@ class simple_printer : (string -> string -> unit Lwt.t) -> printer
 
 class proxy_context : full -> full
 
+class proxy_context_with_rpc : full -> Tezos_rpc.Context.generic -> full
+
 val null_printer : printer

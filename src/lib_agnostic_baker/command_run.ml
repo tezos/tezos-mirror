@@ -143,6 +143,23 @@ let create_dal_node_rpc_ctxt endpoint =
   in
   new RPC_client_unix.http_ctxt rpc_config media_types
 
+let switch_node_endpoint cctxt rpc_config endpoint =
+  let rpc_config =
+    Tezos_rpc_http_client_unix.RPC_client_unix.{rpc_config with endpoint}
+  in
+  let rpc_ctxt =
+    new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+      rpc_config
+      (Tezos_rpc_http.Media_type.Command_line.of_command_line
+         rpc_config.media_type)
+  in
+  object
+    inherit
+      Tezos_client_base.Client_context.proxy_context_with_rpc
+        cctxt
+        (rpc_ctxt :> Tezos_rpc.Context.generic)
+  end
+
 let run_baker (module Plugin : Protocol_plugin_sig.S)
     Configuration.
       {
@@ -163,7 +180,8 @@ let run_baker (module Plugin : Protocol_plugin_sig.S)
         pre_emptive_forge_time;
         remote_calls_timeout;
         allow_signing_delay;
-      } baking_mode sources cctxt =
+        extra_nodes;
+      } baking_mode sources cctxt rpc_config =
   let open Lwt_result_syntax in
   Octez_baking_common.Signing_delay.enforce_signing_delay_gating
     ~allow:allow_signing_delay ;
@@ -190,6 +208,9 @@ let run_baker (module Plugin : Protocol_plugin_sig.S)
     Option.map create_dal_node_rpc_ctxt dal_node_endpoint
   in
   let* () = check_dal_node without_dal dal_node_rpc_ctxt in
+  let extra_nodes =
+    List.map (switch_node_endpoint cctxt rpc_config) extra_nodes
+  in
   Plugin.Baker_commands_helpers.run_baker
     cctxt
     ?dal_node_rpc_ctxt
@@ -205,4 +226,5 @@ let run_baker (module Plugin : Protocol_plugin_sig.S)
     ?data_dir:baking_mode
     ~keep_alive
     ~state_recorder
+    ~extra_nodes
     sources

@@ -32,7 +32,8 @@ val baker_args :
     * bool
     * Q.t option
     * Q.t option
-    * bool,
+    * bool
+    * Uri.t list option,
     Tezos_client_base.Client_context.full )
   Tezos_clic.options
 
@@ -67,6 +68,7 @@ type t = {
   pre_emptive_forge_time : Q.t option;
   remote_calls_timeout : Q.t option;
   allow_signing_delay : bool;
+  extra_nodes : Uri.t list;
 }
 
 val create_config :
@@ -86,7 +88,8 @@ val create_config :
   * bool
   * Q.t option
   * Q.t option
-  * bool ->
+  * bool
+  * Uri.t list option ->
   t
 
 type per_block_votes_config = {

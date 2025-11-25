@@ -220,6 +220,22 @@ class proxy_context (obj : full) =
     method verbose_rpc_error_diagnostics = obj#verbose_rpc_error_diagnostics
   end
 
+(* cctxt -> cctxt with a different node rpc endpoint *)
+class proxy_context_with_rpc (cctxt : full)
+  (rpc_ctxt : Tezos_rpc.Context.generic) :
+  full =
+  object
+    inherit proxy_context cctxt
+
+    method! call_service = rpc_ctxt#call_service
+
+    method! call_streamed_service = rpc_ctxt#call_streamed_service
+
+    method! generic_media_type_call = rpc_ctxt#generic_media_type_call
+
+    method! base = rpc_ctxt#base
+  end
+
 let log _ _ = Lwt.return_unit
 
 let null_printer : #printer = new simple_printer log
