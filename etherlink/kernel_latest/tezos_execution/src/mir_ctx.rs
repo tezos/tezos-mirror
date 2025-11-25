@@ -246,7 +246,7 @@ impl<'a, Host: Runtime> CtxTrait<'a> for Ctx<'_, 'a, Host> {
     fn lookup_view_and_storage(
         &self,
         contract: ContractKt1Hash,
-        view_name: &String,
+        view_name: &str,
         arena: &'a Arena<Micheline<'a>>,
     ) -> Option<(
         mir::typechecker::MichelineView<Micheline<'a>>,
