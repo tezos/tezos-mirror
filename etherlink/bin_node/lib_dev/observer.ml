@@ -70,7 +70,16 @@ let on_new_blueprint (type f)
             ~clear_pending_queue_after:false
             ~confirmed_txs
         in
-        return `Continue
+        let*! head = Evm_context.head_info () in
+        let* storage_version = Evm_state.storage_version head.evm_state in
+        let sub_block_latency_disabled =
+          Storage_version.sub_block_latency_entrypoints_disabled
+            ~storage_version
+        in
+        return
+          (`Continue
+             Blueprints_follower.
+               {sbl_callbacks_activated = not sub_block_latency_disabled})
     | Error (Node_error.Diverged {must_exit = false; _} :: _) ->
         (* If we have diverged, but should keep the node alive. This happens
            when the node successfully reset its head. We restart the blueprints

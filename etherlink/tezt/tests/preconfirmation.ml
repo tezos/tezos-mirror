@@ -56,11 +56,17 @@ let setup_experimental_feature sandbox observer =
   let* () = Evm_node.terminate observer in
   let* () = Evm_node.Config_file.update sandbox patch_config in
   let* () = Evm_node.Config_file.update observer patch_config in
-  let p = Evm_node.wait_for_start_history_mode observer in
   let* () = Evm_node.run sandbox in
-  let* () = Evm_node.run observer in
-  let* _ = p in
+  let* _ = Evm_node.wait_for_ready sandbox in
+  let* rpc_node = run_new_rpc_endpoint sandbox in
+  let* () =
+    Evm_node.run
+      ~extra_arguments:["--evm-node-endpoint"; Evm_node.endpoint rpc_node]
+      observer
+  in
+  let* _ = Evm_node.wait_for_ready observer in
   let* _res = produce_block sandbox in
+  let* _ = Evm_node.wait_for_blueprint_applied observer 1 in
   unit
 
 let get_receipt_result ?(timeout = 0) sender_pk nonce_counter gas_price

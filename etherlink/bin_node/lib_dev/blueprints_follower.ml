@@ -7,10 +7,13 @@
 
 open Ethereum_types
 
+type sbl_callbacks_activated = {sbl_callbacks_activated : bool}
+
 type new_blueprint_handler =
   quantity ->
   Blueprint_types.with_events ->
-  [`Restart_from of quantity | `Continue] tzresult Lwt.t
+  [`Restart_from of quantity | `Continue of sbl_callbacks_activated] tzresult
+  Lwt.t
 
 type finalized_levels_handler =
   l1_level:int32 ->
@@ -211,31 +214,8 @@ module Blueprints_sequence = struct
         evm_node_endpoint
 end
 
-let execute_with_policy policy f =
-  let open Lwt_result_syntax in
-  match policy with
-  | `Undefined | `Ignore -> return policy
-  | `Execute ->
-      let* () = f () in
-      return policy
-  (* We need to wait for the first blueprint application before executing this *)
-  | `TBD ->
-      let*! head = Evm_context.head_info () in
-      let* storage_version = Evm_state.storage_version head.evm_state in
-      let ignore =
-        Storage_version.sub_block_latency_entrypoints_disabled ~storage_version
-      in
-      let* () =
-        when_ ignore @@ fun () ->
-        Lwt_result.ok (Events.ignored_preconfirmations ())
-      in
-      if ignore then return `Ignore
-      else
-        let* () = f () in
-        return `Execute
-
 let rec catchup ~multichain ~next_blueprint_number ~first_connection
-    ~inclusion_handle_policy params : Empty.t tzresult Lwt.t =
+    ~sbl_callbacks_activated params : Empty.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   Metrics.start_bootstrapping () ;
 
@@ -263,7 +243,8 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection
         let* result = params.on_new_blueprint next_blueprint_number blueprint in
         match result with
         | `Restart_from l -> return (`Cut l)
-        | `Continue -> return (`Continue (quantity_succ next_blueprint_number)))
+        | `Continue _ ->
+            return (`Continue (quantity_succ next_blueprint_number)))
       next_blueprint_number
       seq
   in
@@ -275,7 +256,7 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection
         ~next_blueprint_number:level
         ~first_connection
         params
-        ~inclusion_handle_policy
+        ~sbl_callbacks_activated
   | `Completed next_blueprint_number -> (
       let*! call_result =
         Evm_services.monitor_messages
@@ -288,7 +269,7 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection
       | Ok monitor ->
           (stream_loop [@tailcall])
             ~multichain
-            ~inclusion_handle_policy
+            ~sbl_callbacks_activated
             next_blueprint_number
             params
             monitor
@@ -297,10 +278,10 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection
             ~multichain
             ~next_blueprint_number
             ~first_connection:false
-            ~inclusion_handle_policy
+            ~sbl_callbacks_activated
             params)
 
-and stream_loop ~multichain ~inclusion_handle_policy (Qty next_blueprint_number)
+and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
     params monitor =
   let open Lwt_result_syntax in
   Metrics.stop_bootstrapping () ;
@@ -319,21 +300,17 @@ and stream_loop ~multichain ~inclusion_handle_policy (Qty next_blueprint_number)
       in
       (stream_loop [@tailcall])
         ~multichain
-        ~inclusion_handle_policy
+        ~sbl_callbacks_activated
         (Qty next_blueprint_number)
         params
         monitor
   | Ok (Some (Blueprint blueprint)) -> (
       let* r = params.on_new_blueprint (Qty next_blueprint_number) blueprint in
-      let inclusion_handle_policy =
-        if inclusion_handle_policy = `Undefined then `TBD
-        else inclusion_handle_policy
-      in
       match r with
-      | `Continue ->
+      | `Continue is_sub_block_activated ->
           (stream_loop [@tailcall])
             ~multichain
-            ~inclusion_handle_policy
+            ~sbl_callbacks_activated:is_sub_block_activated
             (Qty (Z.succ next_blueprint_number))
             params
             monitor
@@ -341,7 +318,7 @@ and stream_loop ~multichain ~inclusion_handle_policy (Qty next_blueprint_number)
           Evm_services.close_monitor monitor ;
           (catchup [@tailcall])
             ~multichain
-            ~inclusion_handle_policy
+            ~sbl_callbacks_activated
             ~next_blueprint_number:level
             ~first_connection:
               (* The connection was not interrupted, but we decided to restart
@@ -350,24 +327,30 @@ and stream_loop ~multichain ~inclusion_handle_policy (Qty next_blueprint_number)
               true
             params)
   | Ok (Some (Next_block_info {timestamp; number})) ->
-      let* inclusion_handle_policy =
-        execute_with_policy inclusion_handle_policy @@ fun () ->
-        params.on_next_block_info timestamp number
+      let* () =
+        if sbl_callbacks_activated.sbl_callbacks_activated then
+          params.on_next_block_info timestamp number
+        else
+          let*! () = Events.ignored_preconfirmations () in
+          return_unit
       in
       (stream_loop [@tailcall])
         ~multichain
-        ~inclusion_handle_policy
+        ~sbl_callbacks_activated
         (Qty next_blueprint_number)
         params
         monitor
   | Ok (Some (Included_transaction tx)) ->
-      let* inclusion_handle_policy =
-        execute_with_policy inclusion_handle_policy @@ fun () ->
-        params.on_inclusion tx
+      let* () =
+        if sbl_callbacks_activated.sbl_callbacks_activated then
+          params.on_inclusion tx
+        else
+          let*! () = Events.ignored_preconfirmations () in
+          return_unit
       in
       (stream_loop [@tailcall])
         ~multichain
-        ~inclusion_handle_policy
+        ~sbl_callbacks_activated
         (Qty next_blueprint_number)
         params
         monitor
@@ -375,7 +358,7 @@ and stream_loop ~multichain ~inclusion_handle_policy (Qty next_blueprint_number)
       Evm_services.close_monitor monitor ;
       (catchup [@tailcall])
         ~multichain
-        ~inclusion_handle_policy
+        ~sbl_callbacks_activated
         ~next_blueprint_number:(Qty next_blueprint_number)
         ~first_connection:false
         params
@@ -387,13 +370,13 @@ let start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
     ~next_blueprint_number ~on_new_blueprint ~on_finalized_levels
     ~on_next_block_info ~on_inclusion () =
   let open Lwt_result_syntax in
-  let inclusion_handle_policy = `Undefined in
+  let sbl_callbacks_activated = {sbl_callbacks_activated = false} in
   let*! res =
     catchup
       ~multichain
       ~next_blueprint_number
       ~first_connection:true
-      ~inclusion_handle_policy
+      ~sbl_callbacks_activated
       {
         time_between_blocks;
         evm_node_endpoint;
