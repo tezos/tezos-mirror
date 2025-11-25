@@ -122,6 +122,12 @@ module Block : sig
   val current_transactions_objects : root:path -> path
 end
 
+(** Paths related to block headers. *)
+module BlockHeader : sig
+  (** Path to the current block header. *)
+  val current : path
+end
+
 (** Can't be used if storage version >= 41 *)
 module Indexes : sig
   (** Make the path to the indexed block hash. *)
