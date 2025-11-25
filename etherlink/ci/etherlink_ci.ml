@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_ci
+
 module Files = struct
   let sdks = ["src/kernel_sdk/**/*"; "sdk/rust/**/*"]
 
@@ -60,40 +62,68 @@ module CI = Cacio.Make (struct
   let paths = Files.all
 end)
 
+let octez_evm_node_release_tag_re =
+  "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
+
+(** Creates a Docker build job of the given [arch]. *)
+let job_docker_build =
+  Cacio.parameterize @@ fun arch ->
+  Cacio.parameterize @@ fun test ->
+  let arch_string = Runner.Arch.show_uniform arch in
+  CI.job
+    ("docker:" ^ arch_string)
+    ~image_dependencies:[Images.CI.runtime]
+    ~__POS__
+    ~stage:Build
+    ~image:Images_external.docker
+    ~arch
+    ?storage:(if arch = Arm64 then Some Ramfs else None)
+    ~variables:
+      [
+        ("DOCKER_VERSION", "24.0.7");
+        ("CI_DOCKER_HUB", match test with `test -> "false" | `real -> "true");
+        ("IMAGE_ARCH_PREFIX", arch_string ^ "_");
+        ("EXECUTABLE_FILES", "script-inputs/octez-evm-node-executable");
+      ]
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~description:(sf "Build EVM node docker image for %s." arch_string)
+    ["./scripts/ci/docker_initialize.sh"; "./scripts/ci/docker_release.sh"]
+
 let job_build_evm_node_static =
   Cacio.parameterize @@ fun arch ->
   let arch_string = Tezos_ci.Runner.Arch.show_easy_to_distinguish arch in
-  CI.job
-    ("build_evm_node_static_"
-    ^ Tezos_ci.Runner.Arch.show_easy_to_distinguish arch)
-    ~__POS__
-    ~stage:Test
-    ~description:"Build the EVM node (statically linked)."
-    ~arch
-    ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
-    ?storage:(match arch with Arm64 -> Some Ramfs | Amd64 -> None)
-    ~image:Tezos_ci.Images.CI.build
-    ~only_if_changed:Files.(node @ sdks)
-    ~artifacts:
-      (Gitlab_ci.Util.artifacts
-         ~name:"octez-binaries"
-         ~when_:On_success
-         ["octez-binaries/$ARCH/*"])
-    ~cargo_cache:true
-    ~cargo_target_caches:true
-    ~sccache:(Cacio.sccache ~cache_size:"2G" ())
-    ~variables:
+  fun stage ->
+    CI.job
+      ("build_evm_node_static_" ^ arch_string)
+      ~__POS__
+      ~stage
+      ~description:"Build the EVM node (statically linked)."
+      ~arch
+      ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
+      ?storage:(match arch with Arm64 -> Some Ramfs | Amd64 -> None)
+      ~image:Tezos_ci.Images.CI.build
+      ~only_if_changed:Files.(node @ sdks)
+      ~artifacts:
+        (Gitlab_ci.Util.artifacts
+           ~name:"octez-binaries"
+           ~when_:On_success
+           ["octez-binaries/$ARCH/*"])
+      ~cargo_cache:true
+      ~cargo_target_caches:true
+      ~sccache:(Cacio.sccache ~cache_size:"2G" ())
+      ~variables:
+        [
+          ("ARCH", arch_string);
+          ( "EXECUTABLE_FILES",
+            "script-inputs/etherlink-experimental-executables" );
+          ("VERSION_EXECUTABLE", "octez-evm-node");
+        ]
       [
-        ("ARCH", arch_string);
-        ("EXECUTABLE_FILES", "script-inputs/etherlink-experimental-executables");
-        ("VERSION_EXECUTABLE", "octez-evm-node");
+        "./scripts/ci/take_ownership.sh";
+        ". ./scripts/version.sh";
+        "eval $(opam env)";
+        "./scripts/ci/build_static_binaries.sh";
       ]
-    [
-      "./scripts/ci/take_ownership.sh";
-      ". ./scripts/version.sh";
-      "eval $(opam env)";
-      "./scripts/ci/build_static_binaries.sh";
-    ]
 
 let job_lint_wasm_runtime =
   CI.job
@@ -349,11 +379,78 @@ let job_tezt_flaky =
     ~retry_jobs:2
     ~retry_tests:3
 
+let job_republish_docker_image =
+  Cacio.parameterize @@ fun arch ->
+  CI.job
+    ("republish-docker-image:"
+    ^ Tezos_ci.Runner.Arch.(show_easy_to_distinguish arch))
+    ~__POS__
+    ~description:
+      ("Republish the latest released docker image for arch "
+      ^ Tezos_ci.Runner.Arch.(show_easy_to_distinguish arch))
+    ~arch
+    ~stage:Build
+    ~image:Tezos_ci.Images_external.docker
+    [
+      ("etherlink/scripts/build_docker_release.sh "
+      ^ Tezos_ci.Runner.Arch.(show_easy_to_distinguish arch));
+    ]
+
+let job_gitlab_release =
+  CI.job
+    ~__POS__
+    "gitlab:octez-evm-node-release"
+    ~image:Images.ci_release
+    ~stage:Publish
+    ~description:"Create a GitLab release for Etherlink"
+    ["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
+
+let job_docker_merge =
+  Cacio.parameterize @@ fun test ->
+  CI.job
+    "docker:merge_manifests"
+    ~__POS__
+    ~stage:Publish
+    ~image:Images_external.docker
+      (* This job merges the images produced in the jobs
+         [docker:{amd64,arm64}] into a single multi-architecture image, and
+         so must be run after these jobs. *)
+    ~needs:
+      [(Job, job_docker_build Amd64 test); (Job, job_docker_build Arm64 test)]
+    ~variables:
+      [
+        ("DOCKER_VERSION", "24.0.7");
+        ("CI_DOCKER_HUB", match test with `real -> "true" | `test -> "false");
+      ]
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
+    ~description:"Merge manifest for arm64 and arm64 docker images."
+    [
+      "./scripts/ci/docker_initialize.sh";
+      "./scripts/ci/docker_merge_manifests.sh";
+    ]
+
+let job_docker_promote_to_latest =
+  CI.job
+    "docker:promote_to_latest"
+    ~__POS__
+    ~needs:[(Job, job_docker_merge `real)]
+    ~stage:Publish
+    ~image:Images_external.docker
+    ~variables:[("DOCKER_VERSION", "24.0.7"); ("CI_DOCKER_HUB", "true")]
+    ~description:"Promote the docker images to octez-evm-node-latest"
+    [
+      "./scripts/ci/docker_initialize.sh";
+      "./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest \
+       ./scripts/ci/octez-evm-node-release.sh";
+    ]
+
 let register () =
+  let open Tezos_ci.Runner.Arch in
   CI.register_before_merging_jobs
     [
-      (Manual, job_build_evm_node_static Amd64);
-      (Manual, job_build_evm_node_static Arm64);
+      (Manual, job_build_evm_node_static Amd64 Test);
+      (Manual, job_build_evm_node_static Arm64 Test);
       (Auto, job_lint_wasm_runtime);
       (Auto, job_unit_tests);
       (* We rely on the fact that [Tezos_ci_pipelines.Code_verification.job_build_kernels]
@@ -369,6 +466,32 @@ let register () =
       (Manual, job_tezt_extra `merge_request);
       (Manual, job_tezt_flaky `merge_request);
     ] ;
+  CI.register_master_jobs
+    [
+      (Manual, job_republish_docker_image Amd64);
+      (Manual, job_republish_docker_image Arm64);
+    ] ;
+  CI.register_dedicated_release_pipeline
+    ~tag_rex:octez_evm_node_release_tag_re
+    [
+      (Auto, job_docker_build Amd64 `real);
+      (Auto, job_docker_build Arm64 `real);
+      (Auto, job_docker_merge `real);
+      (Auto, job_docker_promote_to_latest);
+      (Auto, job_build_evm_node_static Amd64 Build);
+      (Auto, job_build_evm_node_static Arm64 Build);
+      (Auto, job_gitlab_release);
+    ] ;
+  CI.register_dedicated_test_release_pipeline
+    ~tag_rex:octez_evm_node_release_tag_re
+    [
+      (Auto, job_docker_build Amd64 `test);
+      (Auto, job_docker_build Arm64 `test);
+      (Auto, job_docker_merge `test);
+      (Auto, job_build_evm_node_static Amd64 Build);
+      (Auto, job_build_evm_node_static Arm64 Build);
+      (Auto, job_gitlab_release);
+    ] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for Etherlink."
@@ -381,8 +504,8 @@ let register () =
         Tezos_ci_jobs.Code_verification.job_build_kernels Schedule_extended_test;
       ]
     [
-      (Auto, job_build_evm_node_static Amd64);
-      (Auto, job_build_evm_node_static Arm64);
+      (Auto, job_build_evm_node_static Amd64 Test);
+      (Auto, job_build_evm_node_static Arm64 Test);
       (Auto, job_lint_wasm_runtime);
       (Auto, job_unit_tests);
       (Auto, job_test_kernel Schedule_extended_test);
