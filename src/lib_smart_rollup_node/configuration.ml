@@ -94,6 +94,7 @@ type t = {
   l1_monitor_finalized : bool;
   l1_rpc_timeout : float;
   loop_retry_delay : float;
+  dal_slot_status_max_fetch_attempts : int;
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
@@ -247,6 +248,8 @@ let default_l1_blocks_cache_size = 64
 let default_l2_blocks_cache_size = 64
 
 let default_l1_rpc_timeout = 60. (* seconds *)
+
+let default_dal_slot_status_max_fetch_attempts = 15 (* 15 * 1 sec*)
 
 let default_l1_monitor_finalized = false
 
@@ -551,6 +554,7 @@ let encoding default_display : t Data_encoding.t =
            cors;
            bail_on_disagree;
            opentelemetry;
+           dal_slot_status_max_fetch_attempts;
          }
        ->
       ( ( ( sc_rollup_address,
@@ -589,7 +593,8 @@ let encoding default_display : t Data_encoding.t =
               history_mode,
               cors,
               bail_on_disagree,
-              opentelemetry ) ) ) ))
+              opentelemetry,
+              dal_slot_status_max_fetch_attempts ) ) ) ))
     (fun ( ( ( sc_rollup_address,
                etherlink,
                boot_sector_file,
@@ -626,7 +631,8 @@ let encoding default_display : t Data_encoding.t =
                  history_mode,
                  cors,
                  bail_on_disagree,
-                 opentelemetry ) ) ) )
+                 opentelemetry,
+                 dal_slot_status_max_fetch_attempts ) ) ) )
        ->
       {
         sc_rollup_address;
@@ -669,6 +675,7 @@ let encoding default_display : t Data_encoding.t =
         cors;
         bail_on_disagree;
         opentelemetry;
+        dal_slot_status_max_fetch_attempts;
       })
     (merge_objs
        (merge_objs
@@ -775,7 +782,7 @@ let encoding default_display : t Data_encoding.t =
                    "unsafe-disable-wasm-kernel-checks"
                    Data_encoding.bool
                    false))
-             (obj6
+             (obj7
                 (dft "no-degraded" Data_encoding.bool false)
                 (dft
                    "gc-parameters"
@@ -788,7 +795,11 @@ let encoding default_display : t Data_encoding.t =
                    "opentelemetry"
                    ~description:"Enable or disable opentelemetry profiling"
                    Octez_telemetry.Opentelemetry_config.encoding
-                   Octez_telemetry.Opentelemetry_config.default)))))
+                   Octez_telemetry.Opentelemetry_config.default)
+                (dft
+                   "dal_slot_status_max_fetch_attempts"
+                   Data_encoding.uint8
+                   default_dal_slot_status_max_fetch_attempts)))))
 
 let encoding_no_default = encoding `Show
 
@@ -982,6 +993,8 @@ module Cli = struct
           | None -> Octez_telemetry.Opentelemetry_config.default
           | Some enable ->
               {Octez_telemetry.Opentelemetry_config.default with enable});
+        dal_slot_status_max_fetch_attempts =
+          default_dal_slot_status_max_fetch_attempts;
       }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port

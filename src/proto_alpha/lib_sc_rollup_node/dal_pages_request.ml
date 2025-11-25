@@ -144,6 +144,20 @@ module Event = struct
       ("published_level", Data_encoding.int32)
       ~pp4:Error_monad.pp_print_trace
       ("error", Error_monad.trace_encoding)
+
+  let final_slot_header_attestation_status_failure =
+    declare_4
+      ~section
+      ~name:"final_slot_header_attestation_status_failure"
+      ~msg:
+        "Failed to get a final status for slot at index {slot_index} published \
+         at level {published_level}. Reason: {reason}, {allowed_retries_count} \
+         retries left."
+      ~level:Warning
+      ("published_level", Data_encoding.int32)
+      ("slot_index", Data_encoding.int31)
+      ("allowed_retries_count", Data_encoding.int31)
+      ("reason", Data_encoding.string)
 end
 
 module Slot_id_cache =
@@ -178,23 +192,40 @@ let get_slot_header_attestation_info =
      normal operation (i.e., not for refutation games). This size can then be
      adapted as needed. *)
   let cache = Slot_id_cache.create 16 in
-  fun dal_cctxt ~published_level ~index ->
-    let slot_id =
-      Slot_id.
-        {
-          slot_level = Raw_level.to_int32 published_level;
-          slot_index = Dal.Slot_index.to_int index;
-        }
+  fun dal_cctxt ~published_level ~index ~dal_slot_status_max_fetch_attempts ->
+    let published_level = Raw_level.to_int32 published_level in
+    let index = Dal.Slot_index.to_int index in
+    let slot_id = Slot_id.{slot_level = published_level; slot_index = index} in
+    let may_retry n f res ~reason =
+      let*! () =
+        Event.(emit final_slot_header_attestation_status_failure)
+          (published_level, index, n, reason)
+      in
+      if n <= 0 then Lwt.return res else f (n - 1)
     in
-    match Slot_id_cache.find_opt cache slot_id with
-    | Some pages -> return pages
-    | None ->
-        let+ res = Dal_node_client.get_slot_status dal_cctxt slot_id in
-        (match res with
-        | `Attested _ | `Unattested | `Unpublished ->
-            Slot_id_cache.replace cache slot_id res
-        | `Waiting_attestation -> ()) ;
-        res
+    let rec aux allowed_retries_count =
+      match Slot_id_cache.find_opt cache slot_id with
+      | Some status -> return status
+      | None -> (
+          let*! res = Dal_node_client.get_slot_status dal_cctxt slot_id in
+          match res with
+          | Ok ((`Attested _ | `Unattested | `Unpublished) as final_status) ->
+              Slot_id_cache.replace cache slot_id final_status ;
+              Lwt.return res
+          | Ok `Waiting_attestation ->
+              may_retry
+                allowed_retries_count
+                aux
+                res
+                ~reason:"waiting for attestation"
+          | Error err ->
+              may_retry
+                allowed_retries_count
+                aux
+                res
+                ~reason:(Format.asprintf "%a" Error_monad.pp_print_trace err))
+    in
+    aux dal_slot_status_max_fetch_attempts
 
 let get_page node_ctxt ~inbox_level page_id =
   let open Environment.Error_monad.Lwt_result_syntax in
@@ -296,8 +327,16 @@ let page_content_int
   let* chain_id = Layer1.get_chain_id l1_ctxt in
   let* dal_cctxt = get_dal_node node_ctxt.dal_cctxt in
   let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
+  let dal_slot_status_max_fetch_attempts =
+    node_ctxt.config.dal_slot_status_max_fetch_attempts
+  in
+
   let* status =
-    get_slot_header_attestation_info dal_cctxt ~published_level ~index
+    get_slot_header_attestation_info
+      dal_cctxt
+      ~published_level
+      ~index
+      ~dal_slot_status_max_fetch_attempts
   in
   match status with
   | `Attested attestation_lag ->
