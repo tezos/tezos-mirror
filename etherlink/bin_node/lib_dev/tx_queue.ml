@@ -592,24 +592,25 @@ struct
     let build_sequencer_batch ~(state : Types.state) (seq : queue_request Seq.t)
         =
       let open Lwt_result_syntax in
-      let rec select rev_selected seq =
+      let rec select rev_selected rev_callbacks seq =
         match seq () with
-        | Seq.Nil -> return rev_selected
+        | Seq.Nil -> return (rev_selected, rev_callbacks)
         | Seq.Cons ({hash; payload; queue_callback}, rest) -> (
             let raw_tx = Ethereum_types.hex_to_bytes payload in
             match Transaction_objects.find state.tx_object hash with
             | None ->
                 let*! () = Tx_queue_events.missing_tx_object hash in
                 let*! () = queue_callback `Refused in
-                select rev_selected rest
+                select rev_selected rev_callbacks rest
             | Some tx_object ->
                 select
                   ((raw_tx, Tx.to_transaction_object_t tx_object)
                   :: rev_selected)
+                  ((hash, queue_callback) :: rev_callbacks)
                   rest)
       in
-      let* rev_selected = select [] seq in
-      return @@ List.rev rev_selected
+      let* rev_selected, rev_callbacks = select [] [] seq in
+      return (List.rev rev_selected, rev_callbacks)
 
     let send_transactions_batch ~evm_node_endpoint ~timeout ~keep_alive ~state
         self transactions =
@@ -661,8 +662,21 @@ struct
             in
             check_missed_transactions ~self ~hashes ~responses
         | Block_producer ->
-            let* batch = build_sequencer_batch ~state transactions in
-            Block_producer.preconfirm_transactions ~transactions:batch
+            let* batch, rev_callbacks =
+              build_sequencer_batch ~state transactions
+            in
+            let* hashes =
+              Block_producer.preconfirm_transactions ~transactions:batch
+            in
+            let*! () =
+              List.iter_s
+                (fun (hash, callback) ->
+                  if List.exists (Ethereum_types.equal_hash hash) hashes then
+                    callback `Accepted
+                  else callback `Refused)
+                rev_callbacks
+            in
+            return_unit
 
     (** clear values and keep the allocated space *)
     let clear

@@ -95,7 +95,7 @@ module Request = struct
         -> ([`Block_produced of int | `No_block], tztrace) t
     | Preconfirm_transactions :
         (string * Tx_queue_types.transaction_object_t) list
-        -> (unit, tztrace) t
+        -> (Ethereum_types.hash list, tztrace) t
 
   let name : type a b. (a, b) t -> string = function
     | Produce_block _ -> "Produce_block"
@@ -339,7 +339,8 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
     pool or if [force] is true. *)
 let produce_block_if_needed (type f) ~signer ~force ~timestamp ~delayed_hashes
     ~transactions_and_objects
-    ~(tx_container : f Services_backend_sig.tx_container) head_info =
+    ~(tx_container : f Services_backend_sig.tx_container)
+    ~clear_pending_queue_after head_info =
   let open Lwt_result_syntax in
   let n = List.length transactions_and_objects + List.length delayed_hashes in
   if force || n > 0 then
@@ -356,7 +357,7 @@ let produce_block_if_needed (type f) ~signer ~force ~timestamp ~delayed_hashes
     in
     let* () =
       Tx_container.confirm_transactions
-        ~clear_pending_queue_after:true
+        ~clear_pending_queue_after
         ~confirmed_txs
     in
     return (`Block_produced n)
@@ -558,6 +559,8 @@ let produce_block (state : Types.state) ~force ~(timestamp : Time.Protocol.t)
               ~transactions_and_objects
               ~delayed_hashes
               ~tx_container
+              ~clear_pending_queue_after:
+                (not state.preconfirmation_stream_enabled)
               head_info
           in
           state.next_block_timestamp <- Some (compute_next_block_timestamp ~now) ;
@@ -606,8 +609,9 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
     else return state.validation_state.current_size
   in
   let input_validation_state = {state.validation_state with current_size} in
-  let validate (validation_state, rev_txns) ((raw, tx_object) as entry) =
-    let+ res, wrapped_raw =
+  let validate (validation_state, (rev_txns, rev_accepted_hashes))
+      ((raw, tx_object) as entry) =
+    let+ res, wrapped_raw, hash =
       match tx_object with
       | Tx_queue_types.Evm tx_object ->
           let+ res =
@@ -617,7 +621,7 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
               raw
               tx_object
           in
-          (res, Broadcast.Evm raw)
+          (res, Broadcast.Evm raw, Transaction_object.hash tx_object)
       | Tx_queue_types.Michelson operation ->
           let+ res =
             validate_tezlink_op
@@ -626,21 +630,24 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
               raw
               operation
           in
-          (res, Broadcast.Michelson raw)
+          ( res,
+            Broadcast.Michelson raw,
+            Tezos_types.Operation.hash_operation operation )
     in
     match res with
-    | `Drop -> (validation_state, rev_txns)
+    | `Drop -> (validation_state, (rev_txns, hash :: rev_accepted_hashes))
     | `Keep latest_validation_state ->
         Broadcast.notify_inclusion (Common wrapped_raw) ;
-        (latest_validation_state, entry :: rev_txns)
-    | `Stop -> (validation_state, rev_txns)
+        ( latest_validation_state,
+          (entry :: rev_txns, hash :: rev_accepted_hashes) )
+    | `Stop -> (validation_state, (rev_txns, rev_accepted_hashes))
   in
-  let* validation_state, rev_validated_txns =
-    List.fold_left_es validate (input_validation_state, []) transactions
+  let* validation_state, (rev_validated_txns, rev_accepted_hashes) =
+    List.fold_left_es validate (input_validation_state, ([], [])) transactions
   in
   state.validated_txns <- state.validated_txns @ List.rev rev_validated_txns ;
   state.validation_state <- validation_state ;
-  return_unit
+  return (List.rev rev_accepted_hashes)
 
 module Handlers = struct
   type self = worker
@@ -661,7 +668,7 @@ module Handlers = struct
         match state.next_block_timestamp with
         | Some timestamp ->
             preconfirm_transactions ~state ~transactions ~timestamp
-        | None -> Lwt_result_syntax.return_unit)
+        | None -> Lwt_result_syntax.return [])
 
   type launch_error = error trace
 
