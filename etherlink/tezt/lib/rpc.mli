@@ -135,6 +135,14 @@ val get_logs :
 val block_number :
   ?websocket:Websocket.t -> Evm_node.t -> (int32, error) result Lwt.t
 
+(** [generic_block_number evm_node] calls [tez_blockNumber]. Works for Tezlink/Etherlink. *)
+val generic_block_number :
+  ?websocket:Websocket.t -> Evm_node.t -> (int32, error) result Lwt.t
+
+(** [generic_block_number evm_node] calls [tez_blockNumber]. Works for Tezlink/Etherlink. *)
+val generic_block_number_opt :
+  ?websocket:Websocket.t -> Evm_node.t -> (int32 option, error) result Lwt.t
+
 (** [block_number_opt evm_node] calls [eth_blockNumber]. allows None
     when no block have been produced yet.  *)
 val block_number_opt :
