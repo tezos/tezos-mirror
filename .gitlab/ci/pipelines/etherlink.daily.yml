@@ -621,114 +621,6 @@ etherlink.test_evm_compatibility:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-etherlink.build_evm_node_static_arm64:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp_arm64
-  needs:
-  - oc.docker:ci:arm64
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: rust-targets-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo_targets/_target
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - ./scripts/ci/build_static_binaries.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
-    VERSION_EXECUTABLE: octez-evm-node
-    CARGO_NET_OFFLINE: "false"
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
-    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
-    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
-  artifacts:
-    name: octez-binaries
-    paths:
-    - octez-binaries/$ARCH/*
-    when: on_success
-
-etherlink.build_evm_node_static_x86_64:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp_very_high_cpu
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: rust-targets-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo_targets/_target
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - ./scripts/ci/build_static_binaries.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
-    VERSION_EXECUTABLE: octez-evm-node
-    CARGO_NET_OFFLINE: "false"
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
-    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
-    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
-  artifacts:
-    name: octez-binaries
-    paths:
-    - octez-binaries/$ARCH/*
-    when: on_success
-
 etherlink.tezt-flaky:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
@@ -1089,3 +981,111 @@ etherlink.test_kernel:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+
+etherlink.build_evm_node_static_arm64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_arm64
+  needs:
+  - oc.docker:ci:arm64
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: rust-targets-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo_targets/_target
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: arm64
+    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
+    VERSION_EXECUTABLE: octez-evm-node
+    CARGO_NET_OFFLINE: "false"
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 2G
+  artifacts:
+    name: octez-binaries
+    paths:
+    - octez-binaries/$ARCH/*
+    when: on_success
+
+etherlink.build_evm_node_static_x86_64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_very_high_cpu
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: rust-targets-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo_targets/_target
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: x86_64
+    EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
+    VERSION_EXECUTABLE: octez-evm-node
+    CARGO_NET_OFFLINE: "false"
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 2G
+  artifacts:
+    name: octez-binaries
+    paths:
+    - octez-binaries/$ARCH/*
+    when: on_success
