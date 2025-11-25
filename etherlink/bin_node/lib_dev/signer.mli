@@ -5,9 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t =
-  | Wallet : #Client_context.wallet * Client_keys.sk_uri -> t
-  | Gcp_kms of Gcp_kms.t
+type t
 
 type map
 
