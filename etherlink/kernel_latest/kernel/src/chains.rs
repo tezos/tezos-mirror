@@ -10,6 +10,7 @@ use crate::{
         read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
         EVMBlockHeader, TezBlockHeader,
     },
+    bridge::Deposit,
     delayed_inbox::DelayedInbox,
     error,
     fees::MINIMUM_BASE_FEE_PER_GAS,
@@ -23,13 +24,17 @@ use anyhow::Context;
 use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
-use rlp::{Decodable, Encodable};
+use rlp::{Decodable, DecoderError, Encodable};
 use std::{
     collections::VecDeque,
     fmt::{Debug, Display},
 };
 use tezos_crypto_rs::hash::ChainId;
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
+use tezos_ethereum::{
+    rlp_helpers::{decode_field, decode_tx_hash, next},
+    transaction::TransactionHash,
+};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::{context, mir_ctx::BlockCtx};
@@ -148,6 +153,88 @@ impl TransactionsTrait for crate::transaction::Transactions {
     fn number_of_txs(&self) -> usize {
         let EthTxs(txs) = self;
         txs.len()
+    }
+}
+
+const TEZOS_OP_TAG: u8 = 1;
+const DEPOSIT_OP_TAG: u8 = 2;
+
+#[derive(Debug)]
+pub struct TezlinkOperation {
+    pub tx_hash: TransactionHash,
+    pub content: TezlinkContent,
+}
+
+impl Encodable for TezlinkOperation {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        stream.append_iter(self.tx_hash);
+        stream.append(&self.content);
+    }
+}
+
+impl Decodable for TezlinkOperation {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 2 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+        let mut it = decoder.iter();
+        let tx_hash: TransactionHash = decode_tx_hash(next(&mut it)?)?;
+        let content: TezlinkContent =
+            decode_field(&next(&mut it)?, "Transaction content")?;
+        Ok(TezlinkOperation { tx_hash, content })
+    }
+}
+
+#[derive(Debug)]
+pub enum TezlinkContent {
+    Tezos(Operation),
+    Deposit(Deposit),
+}
+
+impl Encodable for TezlinkContent {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        match &self {
+            Self::Tezos(tez) => {
+                stream.append(&TEZOS_OP_TAG);
+                // We don't want the kernel to panic if there's an error
+                // and we can't print a log as we don't have access to
+                // the host. So we just ignore the result.
+                let _ = tez.rlp_append(stream);
+            }
+            Self::Deposit(dep) => {
+                stream.append(&DEPOSIT_OP_TAG);
+                dep.rlp_append(stream)
+            }
+        }
+    }
+}
+
+impl Decodable for TezlinkContent {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
+        if !decoder.is_list() {
+            return Err(DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 2 {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+        let tag: u8 = decoder.at(0)?.as_val()?;
+        let tx = decoder.at(1)?;
+        match tag {
+            DEPOSIT_OP_TAG => {
+                let deposit = Deposit::decode(&tx)?;
+                Ok(Self::Deposit(deposit))
+            }
+            TEZOS_OP_TAG => {
+                let eth = Operation::decode(&tx)?;
+                Ok(Self::Tezos(eth))
+            }
+            _ => Err(DecoderError::Custom("Unknown operation tag.")),
+        }
     }
 }
 
