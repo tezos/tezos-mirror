@@ -281,7 +281,6 @@ let update_streams_subscriptions state dal_node_rpc_ctxt ~delegate_ids =
   in
   subscribe_to_new_streams state dal_node_rpc_ctxt ~delegate_ids_to_add
 
-(* TODO: Use this functionality in the baker instead of the [dal_attestable_slots] static method. *)
 let get_dal_attestable_slots state ~delegate_id ~attestation_level =
   let open Lwt_syntax in
   match Level_map.find_opt state.cache attestation_level with

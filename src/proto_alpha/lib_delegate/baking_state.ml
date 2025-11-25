@@ -215,10 +215,9 @@ type prepared_block = {
 }
 
 (* The fields {current_level}, {delegate_infos}, {next_level_delegate_infos},
-   {next_level_latest_forge_request}, {dal_attestable_slots},
-   {next_level_dal_attestable_slots} are updated only when we receive a block at
-   a different level than {current_level}.  Note that this means that there is
-   always a {latest_proposal}, which may be our own baked block. *)
+   {next_level_latest_forge_request} are updated only when we receive a block at a different
+   level than {current_level}.  Note that this means that there is always a {latest_proposal},
+   which may be our own baked block. *)
 type level_state = {
   current_level : int32;
   latest_proposal : proposal;
@@ -233,8 +232,6 @@ type level_state = {
   delegate_infos : delegate_infos;
   next_level_delegate_infos : delegate_infos;
   next_level_latest_forge_request : Round.t option;
-  dal_attestable_slots : dal_attestable_slots;
-  next_level_dal_attestable_slots : dal_attestable_slots;
 }
 
 type phase =
@@ -1228,8 +1225,6 @@ let pp_level_state fmt
       delegate_infos;
       next_level_delegate_infos;
       next_level_latest_forge_request;
-      dal_attestable_slots = _;
-      next_level_dal_attestable_slots = _;
     } =
   Format.fprintf
     fmt

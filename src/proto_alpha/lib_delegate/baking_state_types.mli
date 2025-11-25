@@ -163,11 +163,3 @@ type delegate_info = {
   attestation_slot : Slot.t;
   attesting_power : int64;
 }
-
-(** An association list between delegates and promises for their DAL
-    attestations at some level (as obtained through the [get_attestable_slots]
-    RPC). See usage in {!level_state}. *)
-type dal_attestable_slots =
-  (Delegate_id.t
-  * Tezos_dal_node_services.Types.attestable_slots tzresult Lwt.t)
-  list

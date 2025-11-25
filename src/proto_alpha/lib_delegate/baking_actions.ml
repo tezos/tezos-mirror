@@ -148,8 +148,6 @@ and level_update = {
     current_round:Round.t ->
     delegate_infos:delegate_infos ->
     next_level_delegate_infos:delegate_infos ->
-    dal_attestable_slots:dal_attestable_slots ->
-    next_level_dal_attestable_slots:dal_attestable_slots ->
     (state * action) Lwt.t;
 }
 
@@ -491,13 +489,13 @@ let dal_checks_and_warnings state =
   else return_unit
 
 let only_if_dal_feature_enabled state ~default_value f =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let open Constants in
   let Parametric.{dal = {feature_enable; _}; _} =
     state.global_state.constants.parametric
   in
   if feature_enable then
-    let* () = dal_checks_and_warnings state in
+    let*! () = dal_checks_and_warnings state in
     Option.fold
       ~none:(return default_value)
       ~some:f
@@ -507,42 +505,31 @@ let only_if_dal_feature_enabled state ~default_value f =
 let process_dal_rpc_result state delegate level round =
   let open Lwt_result_syntax in
   function
-  | `RPC_timeout ->
-      let*! () =
-        Events.(emit failed_to_get_dal_attestations_in_time (delegate, level))
-      in
+  | None -> return_none
+  | Some Tezos_dal_node_services.Types.Not_in_committee ->
+      let*! () = Events.(emit not_in_dal_committee (delegate, level)) in
       return_none
-  | `RPC_result (Error errs) ->
-      let*! () =
-        Events.(emit failed_to_get_dal_attestations (delegate, errs))
+  | Some (Attestable_slots {slots; published_level}) ->
+      let number_of_slots =
+        state.global_state.constants.parametric.dal.number_of_slots
       in
-      return_none
-  | `RPC_result (Ok res) -> (
-      match res with
-      | Tezos_dal_node_services.Types.Not_in_committee ->
-          let*! () = Events.(emit not_in_dal_committee (delegate, level)) in
-          return_none
-      | Attestable_slots {slots; published_level} ->
-          let number_of_slots =
-            state.global_state.constants.parametric.dal.number_of_slots
-          in
-          let dal_attestation =
-            List.fold_left_i
-              (fun i acc flag ->
-                match Dal.Slot_index.of_int_opt ~number_of_slots i with
-                | Some index when flag -> Dal.Attestation.commit acc index
-                | None | Some _ -> acc)
-              Dal.Attestation.empty
-              slots
-          in
-          let dal_content = {attestation = dal_attestation} in
-          let*! () =
-            Events.(
-              emit
-                attach_dal_attestation
-                (delegate, dal_content, published_level, level, round))
-          in
-          return_some dal_content)
+      let dal_attestation =
+        List.fold_left_i
+          (fun i acc flag ->
+            match Dal.Slot_index.of_int_opt ~number_of_slots i with
+            | Some index when flag -> Dal.Attestation.commit acc index
+            | None | Some _ -> acc)
+          Dal.Attestation.empty
+          slots
+      in
+      let dal_content = {attestation = dal_attestation} in
+      let*! () =
+        Events.(
+          emit
+            attach_dal_attestation
+            (delegate, dal_content, published_level, level, round))
+      in
+      return_some dal_content
 
 let may_get_dal_content state consensus_vote =
   let open Lwt_result_syntax in
@@ -552,30 +539,17 @@ let may_get_dal_content state consensus_vote =
       vote_consensus_content.round )
   in
   let delegate_id = Delegate.delegate_id delegate in
-  let promise_opt =
-    List.assoc_opt
-      ~equal:Delegate_id.equal
-      delegate_id
-      state.level_state.dal_attestable_slots
-  in
-  match promise_opt with
-  | None -> return_none
-  | Some promise ->
-      let*! res =
-        (* Normally we'd just check the state of the promise and return the
-           resolved value or an error if the promise is still pending. However,
-           tests that bake in the past would fail, because there would not be
-           sufficient time to get the answer from the DAL node. Therefore, we
-           wait for a bit for the DAL node to provide an answer. *)
-        Lwt.pick
-          [
-            (let*! () = Lwt_unix.sleep 0.75 in
-             Lwt.return `RPC_timeout);
-            (let*! tz_res = promise in
-             Lwt.return (`RPC_result tz_res));
-          ]
+  only_if_dal_feature_enabled
+    state
+    ~default_value:None
+    (fun _dal_node_rpc_ctxt ->
+      let*! dal_attestable_slots =
+        Dal_attestable_slots_worker.get_dal_attestable_slots
+          state.global_state.dal_attestable_slots_worker
+          ~delegate_id
+          ~attestation_level:level
       in
-      process_dal_rpc_result state delegate_id level round res
+      process_dal_rpc_result state delegate_id level round dal_attestable_slots)
 
 let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   let {delegate; vote_consensus_content; _} = consensus_vote in
@@ -1126,35 +1100,11 @@ let update_to_level state level_update =
        new_level_proposal
        round_durations [@profiler.record_f {verbosity = Debug} "compute round"])
   in
-  let*! dal_attestable_slots, next_level_dal_attestable_slots =
-    only_if_dal_feature_enabled
-      state
-      ~default_value:([], [])
-      (fun dal_node_rpc_ctxt ->
-        let dal_attestable_slots =
-          if Int32.(new_level = succ state.level_state.current_level) then
-            state.level_state.next_level_dal_attestable_slots
-          else
-            Node_rpc.dal_attestable_slots
-              dal_node_rpc_ctxt
-              ~attestation_level:new_level
-              (Delegate_infos.own_delegate_ids delegate_infos)
-        in
-        let next_level_dal_attestable_slots =
-          Node_rpc.dal_attestable_slots
-            dal_node_rpc_ctxt
-            ~attestation_level:(Int32.succ new_level)
-            (Delegate_infos.own_delegate_ids next_level_delegate_infos)
-        in
-        Lwt.return (dal_attestable_slots, next_level_dal_attestable_slots))
-  in
   let*! new_state, new_action =
     (compute_new_state
        ~current_round
        ~delegate_infos
        ~next_level_delegate_infos
-       ~dal_attestable_slots
-       ~next_level_dal_attestable_slots
      [@profiler.record_s {verbosity = Debug} "compute new state"])
   in
   let _promise =
@@ -1169,10 +1119,13 @@ let update_to_level state level_update =
            can change at level boundaries (e.g. migrations, reorganisations, key/profile
            updates). Doing it here makes the streams ready before we build next-level
            attestations. *)
-        Dal_attestable_slots_worker.update_streams_subscriptions
-          state.global_state.dal_attestable_slots_worker
-          dal_node_rpc_ctxt
-          ~delegate_ids:next_level_delegate_ids)
+        let*! () =
+          Dal_attestable_slots_worker.update_streams_subscriptions
+            state.global_state.dal_attestable_slots_worker
+            dal_node_rpc_ctxt
+            ~delegate_ids:next_level_delegate_ids
+        in
+        return_unit)
   in
   return (new_state, new_action)
 

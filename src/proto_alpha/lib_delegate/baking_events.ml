@@ -803,27 +803,6 @@ module Actions = struct
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
-  let failed_to_get_dal_attestations =
-    declare_2
-      ~section
-      ~name:"failed_to_get_attestations"
-      ~level:Error
-      ~msg:"unable to get DAL attestation for {delegate} -- {trace}"
-      ("delegate", Delegate_id.encoding)
-      ~pp2:Error_monad.pp_print_trace
-      ("trace", Error_monad.trace_encoding)
-
-  let failed_to_get_dal_attestations_in_time =
-    declare_2
-      ~section
-      ~name:"failed_to_get_attestations_in_time"
-      ~level:Error
-      ~msg:
-        "unable to get DAL attestation for {delegate} in time for attestation \
-         level {level}"
-      ("delegate", Delegate_id.encoding)
-      ("level", Data_encoding.int32)
-
   let failed_to_inject_consensus_vote =
     declare_2
       ~section

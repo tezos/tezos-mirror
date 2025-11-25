@@ -57,8 +57,6 @@ and level_update = {
     current_round:Round.t ->
     delegate_infos:delegate_infos ->
     next_level_delegate_infos:delegate_infos ->
-    dal_attestable_slots:dal_attestable_slots ->
-    next_level_dal_attestable_slots:dal_attestable_slots ->
     (state * action) Lwt.t;
 }
 
@@ -144,8 +142,8 @@ val update_to_level : state -> level_update -> (state * t) tzresult Lwt.t
 val only_if_dal_feature_enabled :
   state ->
   default_value:'a ->
-  (Tezos_rpc.Context.generic -> 'a Lwt.t) ->
-  'a Lwt.t
+  (Tezos_rpc.Context.generic -> 'a tzresult Lwt.t) ->
+  'a tzresult Lwt.t
 
 (** [may_get_dal_content state unsigned_consensus_vote], if the DAL feature is
     enabled, recovers the attestable slots by calling

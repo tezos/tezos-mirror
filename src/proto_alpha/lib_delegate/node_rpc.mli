@@ -150,16 +150,6 @@ val forge_double_baking_evidence :
   bh2:block_header ->
   (bytes, Error_monad.tztrace) result Lwt.t
 
-(** [dal_attestable_slots ctxt ~attestation_level delegate_ids] calls the DAL
-    node RPC GET /profiles/<pkh>/attested_levels/<level>/attestable_slots/<pkh>
-    for each of the delegates in [delegate_ids] and returns the corresponding
-    promises. *)
-val dal_attestable_slots :
-  Tezos_rpc.Context.generic ->
-  attestation_level:int32 ->
-  Delegate_id.t list ->
-  dal_attestable_slots
-
 (** [monitor_attestable_slots dal_node_rpc_ctxt ~delegate_id] opens a streamed RPC
     to the DAL node for the given [~delegate_id]. Each item emitted on the stream
     contains DAL attestable information for this delegate. *)
