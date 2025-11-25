@@ -391,3 +391,25 @@ module Archiver = struct
             (dft "preendorsements" (list Consensus_ops.block_op_encoding) [])
             (dft "baking_rights" (list baking_right_encoding) [])))
 end
+
+module Dal = struct
+  type shard_assignment = {
+    delegate : Tezos_crypto.Signature.public_key_hash;
+    assigned_shard_indices : int list;
+  }
+
+  type shard_assignments = shard_assignment list
+
+  let shard_assignment_encoding =
+    let open Data_encoding in
+    conv
+      (fun {delegate; assigned_shard_indices} ->
+        (delegate, assigned_shard_indices))
+      (fun (delegate, assigned_shard_indices) ->
+        {delegate; assigned_shard_indices})
+      (obj2
+         (req "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
+         (dft "assigned_shard_indices" (list int16) []))
+
+  let shard_assignments_encoding = Data_encoding.list shard_assignment_encoding
+end

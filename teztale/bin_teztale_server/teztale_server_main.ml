@@ -897,6 +897,20 @@ let import_callback ~logger conf db_pool g data =
                 (level, first_slot, attesting_power, delegate))
             data.Lib_teztale_base.Data.delegate_operations
         in
+        (* DAL shard assignments *)
+        let* () =
+          Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+            (fun Lib_teztale_base.Data.Delegate_operations.
+                   {delegate; assigned_shard_indices; _}
+               ->
+              Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
+                (fun shard_index ->
+                  Db.exec
+                    Sql_requests.insert_dal_shard_assignment
+                    (level, delegate, shard_index))
+                assigned_shard_indices)
+            data.Lib_teztale_base.Data.delegate_operations
+        in
         (* blocks *)
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
@@ -1003,6 +1017,45 @@ let import_callback ~logger conf db_pool g data =
         ~body:"Level imported"
         ())
 
+let dal_shards_callback ~logger conf db_pool g shard_assignments =
+  let level = Int32.of_string (Re.Group.get g 1) in
+  let out =
+    Caqti_lwt_unix.Pool.use
+      (fun (module Db : Caqti_lwt.CONNECTION) ->
+        let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
+        let* () =
+          let delegates =
+            List.map
+              (fun Lib_teztale_base.Data.Dal.{delegate; _} -> delegate)
+              shard_assignments
+          in
+          may_insert_delegates (module Db) conf delegates
+        in
+        let rows =
+          List.concat_map
+            (fun Lib_teztale_base.Data.Dal.{delegate; assigned_shard_indices} ->
+              List.map
+                (fun shard_index -> (level, delegate, shard_index))
+                assigned_shard_indices)
+            shard_assignments
+        in
+        maybe_with_metrics conf "insert_dal_shard_assignments" @@ fun () ->
+        without_cache
+          Sql_requests.Mutex.dal_shard_assignments
+          Sql_requests.insert_dal_shard_assignment
+          (module Db)
+          conf
+          rows)
+      db_pool
+  in
+  with_caqti_error ~logger out (fun () ->
+      Cohttp_lwt_unix.Server.respond_string
+        ~headers:
+          (Cohttp.Header.init_with "content-type" "text/plain; charset=UTF-8")
+        ~status:`OK
+        ~body:"DAL shard assignments"
+        ())
+
 let extract_boundaries g =
   let min = Re.Group.get g 1 in
   let max = Re.Group.get g 2 in
@@ -1016,7 +1069,9 @@ let extract_boundaries g =
   - /<LEVEL>/mempool
       Used by archiver to send data about consensus operations for a given level.
   - /<LEVEL>/import
-      Use by archiver to import past data recorded locally.
+      Used by archiver to import past data recorded locally.
+  - /<LEVEL>/dal_shards
+      Used by archiver to send DAL shard assignments per delegate for a given level.
   - /timestamp/<TIMESTAMP>
       Get the levels (if any) before and after a given timestamp.
   - /ping
@@ -1082,6 +1137,13 @@ let routes :
               Lib_teztale_base.Data.encoding
               body
               (import_callback ~logger conf db_pool g)) );
+    ( Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/dal_shards"],
+      fun g ~logger ~conf ~admins:_ ~users db_pool header meth body ->
+        post_only_endpoint !users header meth (fun _source ->
+            with_data
+              Lib_teztale_base.Data.Dal.shard_assignments_encoding
+              body
+              (dal_shards_callback ~logger conf db_pool g)) );
     ( Re.seq [Re.str "/timestamp/"; Re.group (Re.rep1 Re.digit)],
       fun g ~logger ~conf:_ ~admins:_ ~users:_ db_pool _header meth _body ->
         get_only_endpoint meth (fun () ->

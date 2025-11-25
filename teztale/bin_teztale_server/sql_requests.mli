@@ -122,4 +122,10 @@ val insert_received_block :
     [`Zero] )
   Caqti_request.t
 
+val insert_dal_shard_assignment :
+  ( int32 * Tezos_crypto.Signature.public_key_hash * int,
+    unit,
+    [`Zero] )
+  Caqti_request.t
+
 val maybe_with_metrics : Config.t -> string -> (unit -> 'a Lwt.t) -> 'a Lwt.t

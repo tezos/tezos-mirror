@@ -415,5 +415,21 @@ let insert_received_block =
      COALESCE(blocks_reception.validation_timestamp, \
      excluded.validation_timestamp)"
 
+let insert_dal_shard_assignment =
+  Caqti_request.Infix.(
+    Caqti_type.(
+      t3
+        (* $1 level *) int32
+        (* $2 delegate *) Type.public_key_hash
+        (* $3 shard_index *) int
+      ->. unit))
+    "INSERT INTO dal_shard_assignments (endorsing_right, shard_index)\n\
+     SELECT er.id AS endorsing_right, $3 AS shard_index\n\
+     FROM endorsing_rights er\n\
+     JOIN delegates ON er.delegate = delegates.id\n\
+     WHERE er.level = $1\n\
+     AND delegates.address = $2\n\
+     ON CONFLICT DO NOTHING"
+
 let maybe_with_metrics (c : Config.t) (name : string) (f : unit -> 'a Lwt.t) =
   if c.with_metrics then Metrics.sql name f else f ()
