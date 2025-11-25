@@ -335,24 +335,27 @@ Docker compose files
 ~~~~~~~~~~~~~~~~~~~~
 
 Another way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
-``docker-compose`` files are available for all active
-protocols in directory :src:`scripts/docker`.
-Each compose file is able to launch services for a node, a baker, and an accuser for the given protocol.
+A working example of a simple Docker compose file is available at :src:`scripts/docker/bake.yml`.
+The compose file is able to launch services for an Octez node, a baker, and an accuser.
 
 First, you have to make some choices:
 
-- choose one of the above protocols and download its compose file
-- choose a :doc:`network <../user/multinetwork>` to connect to (a testnet name, ``sandbox``,  or ``mainnet``); that network must currently run your protocol
+- choose a :doc:`network <../user/multinetwork>` to connect to (a testnet name, ``sandbox``,  or ``mainnet``)
 - choosing the desired :doc:`history mode <../user/history_modes>` (``rolling``, ``full``, or ``archive``)
 - specify a vote for the :doc:`liquidity baking <../active/liquidity_baking>` feature (``on``, ``pass``, or ``off``)
 
-For instance, to configure and run the node on the active protocol on Ghostnet, in Rolling history mode::
+For instance, to configure and run the node on the active protocol on Shadownet from a snapshot, in Rolling history mode::
 
-    export PROTO=parisC
-    wget https://gitlab.com/tezos/tezos/-/raw/master/scripts/docker/$PROTO.yml
+    wget https://gitlab.com/tezos/tezos/-/raw/master/scripts/docker/bake.yml
     export LIQUIDITY_BAKING_VOTE=pass
-    docker compose -f $PROTO.yml run --rm -it \
-      octez-node octez-node --network ghostnet --history-mode rolling
+    docker compose -f bake.yml run --rm -it octez-node octez-node config init \
+       --network https://teztnets.com/shadownet --history-mode rolling \
+       --data-dir /var/run/tezos/node/data \
+       --rpc-addr '[::]:8732' --allow-all-rpc '[::]:8732'
+    wget -O $HOME/rolling https://snapshots.tzinit.org/shadownet/rolling
+    docker compose -f bake.yml run --rm -it -v "$HOME/rolling:/snapshot:ro" \
+      octez-node octez-node snapshot import --data-dir /var/run/tezos/node/data /snapshot
+    docker compose -f bake.yml up
 
 (Note in the command above that ``octez-node`` is the name of both the container and executable.)
 
@@ -362,34 +365,19 @@ For instance, to configure and run the node on the active protocol on Ghostnet, 
 
     ::
 
-        docker compose -f $PROTO.yml run --rm \
+        docker compose -f bake.yml run --rm \
           --entrypoint='sh -c "rm /var/run/tezos/node/data/config.json"' \
           octez-node
 
-The node is now configured and started correctly, but may take a very long time to bootstrap.
-In most practical cases, you have to restart it from a :doc:`snapshot file <../user/snapshots>`. For that, you have to stop the node by hitting ^C (or executing in another terminal ``docker compose -f $PROTO.yml stop octez-node``), then clean up its data directory and import a snapshot that you previously downloaded::
-
-    docker compose -f $PROTO.yml run --rm \
-      --entrypoint='sh -c "cd /var/run/tezos/node/data/; \
-        rm -fr lock store context daily_logs"' \
-      octez-node
-    wget -O $HOME/rolling <snapshot-url>
-    docker compose -f $PROTO.yml run --rm -it -v "$HOME/rolling:/snapshot:ro" \
-      octez-node octez-snapshot-import
-
-Now you can start all the services::
-
-    docker compose -f $PROTO.yml up
-
 You may check when your node is bootstrapped by running ``octez-client`` inside the node's container::
 
-    docker compose -f $PROTO.yml exec octez-node octez-client bootstrapped
+    docker compose -f bake.yml exec octez-node octez-client bootstrapped
 
 You may stop and restart the node as needed. For instance if the Octez version you are using requires to upgrade the version of the storage, you can restart the node after upgrading the storage::
 
-    docker compose -f $PROTO.yml stop octez-node
-    docker compose -f $PROTO.yml run octez-node octez-upgrade-storage
-    docker compose -f $PROTO.yml up octez-node
+    docker compose -f bake.yml stop octez-node
+    docker compose -f bake.yml run octez-node octez-upgrade-storage
+    docker compose -f bake.yml up octez-node
 
 
 Building Docker Images Locally
