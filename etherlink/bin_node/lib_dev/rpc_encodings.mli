@@ -73,6 +73,8 @@ module JSONRPC : sig
 
   type value = (Data_encoding.json, error) result
 
+  type return_value = Direct of value | Lazy of value Lwt.t
+
   (** JSON-RPC Response object:
   {@js[
       { "jsonrpc": "2.0",
@@ -85,6 +87,8 @@ module JSONRPC : sig
       Note that `result` and `error` cannot appear at the same time, hence the
       choice of using the result type as representation. *)
   type response = {value : value; id : id}
+
+  type return_response = {return_value : return_value; id : id}
 
   val response_encoding : response Data_encoding.t
 end

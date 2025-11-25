@@ -92,7 +92,11 @@ module JSONRPC = struct
 
   type value = (Data_encoding.json, error) result
 
+  type return_value = Direct of value | Lazy of value Lwt.t
+
   type response = {value : value; id : id}
+
+  type return_response = {return_value : return_value; id : id}
 
   let response_encoding =
     Data_encoding.(
