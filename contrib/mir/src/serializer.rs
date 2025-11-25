@@ -1,9 +1,6 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Serialization to and deserialization from bytes. Used for `PACK` and
 //! `UNPACK` instructions respectively, but can be used for general-purpose
