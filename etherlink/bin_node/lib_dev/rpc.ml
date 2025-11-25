@@ -368,7 +368,9 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
   in
   let* server_public_finalizer =
     Rpc_server.start_public_server
-      ~mode:(Rpc {evm_node_endpoint; websocket = ws_client})
+      ~mode:
+        (Rpc
+           {evm_node_endpoint; evm_node_private_endpoint; websocket = ws_client})
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(evm_services_methods ctxt time_between_blocks)

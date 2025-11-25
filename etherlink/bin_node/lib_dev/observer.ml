@@ -271,7 +271,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
   let* finalizer_public_server =
     Rpc_server.start_public_server
-      ~mode:Observer
+      ~mode:(Observer tx_container)
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
@@ -282,7 +282,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
-      ~mode:Observer
+      ~mode:(Observer tx_container)
       ~rpc_server_family
       config
       tx_container

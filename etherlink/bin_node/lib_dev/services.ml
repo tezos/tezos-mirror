@@ -152,7 +152,7 @@ let configuration_handler config =
 
 let health_check_handler config mode db_liveness_check query =
   match mode with
-  | Mode.Sequencer | Observer | Proxy ->
+  | Mode.Sequencer _ | Observer _ | Proxy _ ->
       let open Lwt_result_syntax in
       let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping
       and* () =
@@ -187,9 +187,9 @@ let health_check_handler config mode db_liveness_check query =
 let evm_mode_handler config evm_mode =
   let open Lwt_result_syntax in
   match evm_mode with
-  | Mode.Sequencer -> return "sequencer"
-  | Observer -> return "observer"
-  | Proxy -> return "proxy"
+  | Mode.Sequencer _ -> return "sequencer"
+  | Observer _ -> return "observer"
+  | Proxy _ -> return "proxy"
   | Rpc {evm_node_endpoint; _} ->
       let+ evm_node_mode =
         Rollup_services.call_service
@@ -559,7 +559,7 @@ let eth_subscribe_rpc_mode ~timeout ~(kind : Ethereum_types.Subscription.kind)
   proxied.subscribers <- proxied.subscribers + 1 ;
   return (stream, unsubscribe)
 
-let eth_subscribe (config : Configuration.t) (mode : Mode.t) ~kind backend =
+let eth_subscribe (config : Configuration.t) (mode : 'f Mode.t) ~kind backend =
   let open Lwt_result_syntax in
   let id = make_id ~id:(generate_id ()) in
   let* stream, stopper =
@@ -834,7 +834,7 @@ let send_raw_transaction (type f)
 
 let dispatch_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) (config : Configuration.t) (mode : Mode.t)
+    (rpc : Configuration.rpc) (config : Configuration.t) (mode : f Mode.t)
     (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) :
@@ -1473,7 +1473,7 @@ let dispatch_request (type f) ~websocket
 
 let dispatch_private_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) (_config : Configuration.t) (_ : Mode.t)
+    (rpc : Configuration.rpc) (_config : Configuration.t) (_ : f Mode.t)
     (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
     ({method_; parameters; id} : JSONRPC.request) :
@@ -1819,7 +1819,7 @@ let generic_dispatch ~service_name (rpc : Configuration.rpc) ctx dir path
       |> Lwt_result.ok)
 
 let dispatch_public (type f) (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) config (mode : Mode.t)
+    (rpc : Configuration.rpc) config (mode : f Mode.t)
     (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_dispatch
     ~service_name:"public_rpc"
@@ -1837,7 +1837,7 @@ let dispatch_public (type f) (rpc_server_family : _ Rpc_types.rpc_server_family)
 
 let dispatch_private (type f)
     (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) ~block_production config (mode : Mode.t)
+    (rpc : Configuration.rpc) ~block_production config (mode : f Mode.t)
     (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_dispatch
     ~service_name:"private_rpc"
