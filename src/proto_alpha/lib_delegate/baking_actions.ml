@@ -298,12 +298,8 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     =
   let open Lwt_result_syntax in
   let {predecessor; round; delegate; kind; force_apply} = block_to_bake in
-  let*! () =
-    Events.(
-      emit
-        prepare_forging_block
-        (Int32.succ predecessor.shell.level, round, delegate))
-  in
+  let level = Int32.succ predecessor.shell.level in
+  let*! () = Events.(emit prepare_forging_block (level, round, delegate)) in
   let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
   let simulation_mode = global_state.validation_mode in
@@ -341,10 +337,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
           payload_round )
   in
   let*! () =
-    Events.(
-      emit
-        forging_block
-        (Int32.succ predecessor.shell.level, round, delegate, force_apply))
+    Events.(emit forging_block (level, round, delegate, force_apply))
   in
   let* injection_level =
     Node_rpc.current_level
@@ -430,24 +423,27 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     |> Period.to_seconds |> Int64.to_float
   in
   let* {unsigned_block_header; operations; manager_operations_infos} =
-    (Block_forge.forge
-       cctxt
-       ~chain_id
-       ~pred_info:predecessor
-       ~pred_live_blocks
-       ~pred_resulting_context_hash
-       ~timestamp
-       ~round
-       ~seed_nonce_hash
-       ~payload_round
-       ~liquidity_baking_toggle_vote:liquidity_baking_vote
-       ~user_activated_upgrades
-       ~force_apply
-       global_state.config.fees
-       simulation_mode
-       simulation_kind
-       global_state.constants.parametric
-     [@profiler.record_s {verbosity = Info} "forge block"])
+    Utils.event_on_stalling_promise
+      ~initial_delay:(round_duration /. 2.)
+      ~event:(fun sum -> Events.(emit stalling_forge_block (level, round, sum)))
+    @@ (Block_forge.forge
+          cctxt
+          ~chain_id
+          ~pred_info:predecessor
+          ~pred_live_blocks
+          ~pred_resulting_context_hash
+          ~timestamp
+          ~round
+          ~seed_nonce_hash
+          ~payload_round
+          ~liquidity_baking_toggle_vote:liquidity_baking_vote
+          ~user_activated_upgrades
+          ~force_apply
+          global_state.config.fees
+          simulation_mode
+          simulation_kind
+          global_state.constants.parametric
+        [@profiler.record_s {verbosity = Info} "forge block"])
   in
   let* signed_block_header =
     (sign_block_header

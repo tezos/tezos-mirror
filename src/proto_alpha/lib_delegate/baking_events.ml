@@ -1095,6 +1095,18 @@ module Actions = struct
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
       ("seconds", Data_encoding.float)
+
+  let stalling_forge_block =
+    declare_3
+      ~section
+      ~name:"stalling_forge_block"
+      ~level:Warning
+      ~msg:
+        "Forge block for level {level} at round {round} has not resolved in \
+         the last {seconds} seconds"
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
+      ("seconds", Data_encoding.float)
 end
 
 module VDF = struct
