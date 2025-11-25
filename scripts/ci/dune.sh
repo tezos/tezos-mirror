@@ -84,5 +84,25 @@ printf "  Cache hit ratio:              %s%%\n" "${HIT_RATIO}"
 echo "---------------------------------------------------------------"
 echo
 
+# Send dune cache metrics to Datadog
+if command -v datadog-ci > /dev/null 2>&1; then
+  echo "Sending dune cache metrics to Datadog"
+
+  # Build measures
+  MEASURE_HITS="--measures dune_cache_hits:${CACHE_HITS}"
+  MEASURE_MISSES="--measures dune_cache_misses:${FS_MISS}"
+  MEASURE_TOTAL="--measures dune_cache_total_ops:${TOTAL_OPS}"
+  MEASURE_RATIO="--measures dune_cache_hit_ratio:${HIT_RATIO}"
+
+  # Concatenate all measures
+  DUNE_CACHE_MEASURES="${MEASURE_HITS} ${MEASURE_MISSES} ${MEASURE_TOTAL} ${MEASURE_RATIO}"
+
+  echo "DUNE_CACHE_MEASURES=$DUNE_CACHE_MEASURES"
+  eval "DATADOG_SITE=datadoghq.eu datadog-ci measure --level job ${DUNE_CACHE_MEASURES}"
+
+else
+  echo "'datadog-ci' not installed. no dune cache metrics sent to Datadog"
+fi
+
 # Exit with the same code as dune build
 exit "$DUNE_BUILD_EXIT_CODE"
