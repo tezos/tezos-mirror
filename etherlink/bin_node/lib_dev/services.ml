@@ -1655,9 +1655,8 @@ let can_process_batch size = function
   | Configuration.Limit l -> size <= l
   | Unlimited -> true
 
-let dispatch_handler ~service_name (rpc : Configuration.rpc) config mode
-    tx_container ctx dispatch_request (input : JSONRPC.request batched_request)
-    =
+let dispatch_handler ~service_name (rpc : Configuration.rpc) ctx
+    dispatch_request (input : JSONRPC.request batched_request) =
   let open Lwt_syntax in
   let wait_for_return_output JSONRPC.{return_value; id} =
     match return_value with
@@ -1668,9 +1667,7 @@ let dispatch_handler ~service_name (rpc : Configuration.rpc) config mode
   in
   match input with
   | Singleton request ->
-      let* return_value =
-        dispatch_request config mode tx_container ctx request
-      in
+      let* return_value = dispatch_request ctx request in
       let* response = wait_for_return_output return_value in
       return (Singleton response)
   | Batch requests ->
@@ -1679,7 +1676,7 @@ let dispatch_handler ~service_name (rpc : Configuration.rpc) config mode
       @@ fun _scope ->
       let process =
         if can_process_batch batch_size rpc.batch_limit then
-          dispatch_request config mode tx_container ctx
+          dispatch_request ctx
         else fun req ->
           let response =
             direct_rpc_value
@@ -1815,18 +1812,10 @@ let dispatch_private_websocket
   in
   websocket_response_of_response response
 
-let generic_dispatch ~service_name (rpc : Configuration.rpc) config mode
-    tx_container ctx dir path dispatch_request =
+let generic_dispatch ~service_name (rpc : Configuration.rpc) ctx dir path
+    dispatch_request =
   Evm_directory.register0 dir (dispatch_batch_service ~path) (fun () input ->
-      dispatch_handler
-        ~service_name
-        rpc
-        config
-        mode
-        tx_container
-        ctx
-        dispatch_request
-        input
+      dispatch_handler ~service_name rpc ctx dispatch_request input
       |> Lwt_result.ok)
 
 let dispatch_public (type f) (rpc_server_family : _ Rpc_types.rpc_server_family)
@@ -1835,13 +1824,16 @@ let dispatch_public (type f) (rpc_server_family : _ Rpc_types.rpc_server_family)
   generic_dispatch
     ~service_name:"public_rpc"
     rpc
-    config
-    mode
-    tx_container
     ctx
     dir
     Path.root
-    (dispatch_request ~websocket:false rpc_server_family rpc)
+    (dispatch_request
+       ~websocket:false
+       rpc_server_family
+       rpc
+       config
+       mode
+       tx_container)
 
 let dispatch_private (type f)
     (rpc_server_family : _ Rpc_types.rpc_server_family)
@@ -1850,17 +1842,17 @@ let dispatch_private (type f)
   generic_dispatch
     ~service_name:"private_rpc"
     rpc
-    config
-    mode
-    tx_container
     ctx
     dir
     Path.(add_suffix root "private")
     (dispatch_private_request
        ~websocket:false
        rpc_server_family
+       ~block_production
        rpc
-       ~block_production)
+       config
+       mode
+       tx_container)
 
 let generic_websocket_dispatch (config : Configuration.t) mode tx_container ctx
     dir path dispatch_websocket =
