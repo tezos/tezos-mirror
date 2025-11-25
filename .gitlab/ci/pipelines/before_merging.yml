@@ -4458,6 +4458,10 @@ etherlink.test_kernel:
   - gcp
   rules:
   - changes:
+    - contrib/mir/**/*.lalrpop
+    - contrib/mir/**/*.rs
+    - contrib/mir/**/*.toml
+    - contrib/mir/**/Cargo.lock
     - etherlink.mk
     - etherlink/**/*.rs
     - images/create_image.sh
