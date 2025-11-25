@@ -9,6 +9,8 @@ garbage collection. (!19744)
 
 Furthermore, this kernel requires the Octez EVM node version 0.48 or higher.
 
+Its storage version is 44.
+
 ### Features
 
 - Optimize computation of receipt and transaction root. Receipt root is now
@@ -18,6 +20,8 @@ Furthermore, this kernel requires the Octez EVM node version 0.48 or higher.
   - [EIP-7939](https://eips.ethereum.org/EIPS/eip-7939) Count leading zeros (CLZ) opcode.
   - [EIP-7883](https://eips.ethereum.org/EIPS/eip-7883) ModExp Gas Cost Increase.
   - [EIP-7823](https://eips.ethereum.org/EIPS/eip-7823) Set upper bounds for ModExp.
+- Bump the capacity of Etherlink to 27MGas/s (meaning a target per second to
+  13.5MGas/s). (!20024)
 
 ### Bug fixes
 
