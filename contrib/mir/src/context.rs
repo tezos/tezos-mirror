@@ -101,7 +101,7 @@ pub trait CtxTrait<'a>: TypecheckingCtx<'a> {
     fn lookup_view_and_storage(
         &self,
         contract: ContractKt1Hash,
-        name: &String,
+        name: &str,
         arena: &'a Arena<Micheline<'a>>,
     ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))>;
 }
@@ -351,7 +351,7 @@ impl<'a> CtxTrait<'a> for Ctx<'a> {
     fn lookup_view_and_storage(
         &self,
         contract: ContractKt1Hash,
-        view_name: &String,
+        view_name: &str,
         arena: &'a Arena<Micheline<'a>>,
     ) -> Option<(MichelineView<Micheline<'a>>, (Micheline<'a>, Vec<u8>))> {
         let addr = AddressHash::Kt1(contract);

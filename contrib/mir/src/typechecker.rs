@@ -286,7 +286,7 @@ pub struct MichelineContractScript<A> {
     pub views: HashMap<String, MichelineView<A>>,
 }
 
-impl<'arena, 'script> MichelineContractScript<&'script Micheline<'arena>> {
+impl<'arena> MichelineContractScript<&'_ Micheline<'arena>> {
     /// Typecheck the contract script. Validates the script's types, then
     /// typechecks the code and checks the result stack is as expected. Returns
     /// typechecked script.
@@ -2329,7 +2329,7 @@ pub(crate) fn typecheck_instruction<'a>(
                     check_view_name(s)?;
                     s.clone()
                 }
-                _ => return Err(TcError::UnexpectedMicheline(format!("{:?}", name))),
+                _ => return Err(TcError::UnexpectedMicheline(format!("{name:?}"))),
             };
             let _arg_type = pop!();
             pop!();

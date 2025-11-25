@@ -199,17 +199,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
         let mut m_source: Option<Micheline> = None;
         let mut m_sender: Option<Micheline> = None;
         let mut m_storages: Option<Vec<(Micheline, Micheline, Micheline)>> = None;
-        let mut m_views: Option<
-            Vec<(
-                micheline::Micheline<'_>,
-                Vec<(
-                    micheline::Micheline<'_>,
-                    micheline::Micheline<'_>,
-                    micheline::Micheline<'_>,
-                    micheline::Micheline<'_>,
-                )>,
-            )>,
-        > = None;
+        let mut m_views: Option<Vec<(micheline::Micheline<'_>, Vec<RawNamedView<'_>>)>> = None;
 
         // This would hold the untypechecked, expected output value. This is because If the self
         // and parameters values are specified, then we need to fetch them and populate the context
@@ -450,21 +440,18 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
             None => None,
         };
 
-        match views.clone() {
-            Some(v) => {
-                if let Some(s) = storages.clone() {
-                    for view_key in v.keys() {
-                        if s.get(view_key).is_none() {
-                            return Err(format!(
-                                "The {view_key:?} appears in `views` but not in `storages`."
-                            ))?;
-                        }
+        if let Some(v) = views.clone() {
+            if let Some(s) = storages.clone() {
+                for view_key in v.keys() {
+                    if !s.contains_key(view_key) {
+                        return Err(format!(
+                            "The {view_key:?} appears in `views` but not in `storages`."
+                        ))?;
                     }
-                } else {
-                    return Err(format!("The `storages` tzt primitive is missing but mandatory when using the `views` tzt primitive."))?;
                 }
+            } else {
+                return Err("The `storages` tzt primitive is missing but mandatory when using the `views` tzt primitive.".to_owned())?;
             }
-            None => (),
         }
 
         Ok(TztTest {
@@ -571,6 +558,8 @@ impl fmt::Display for InterpreterErrorExpectation<'_> {
     }
 }
 
+type RawNamedView<'a> = (Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>);
+
 /// Helper type for use during parsing, represent a single
 /// line from the test file.
 pub(crate) enum TztEntity<'a> {
@@ -588,12 +577,7 @@ pub(crate) enum TztEntity<'a> {
     SenderAddr(Micheline<'a>),
     BigMaps(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
     Storages(Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>)>),
-    Views(
-        Vec<(
-            Micheline<'a>,
-            Vec<(Micheline<'a>, Micheline<'a>, Micheline<'a>, Micheline<'a>)>,
-        )>,
-    ),
+    Views(Vec<(Micheline<'a>, Vec<RawNamedView<'a>>)>),
 }
 
 /// Possible values for the "output" expectation field in a Tzt test. This is a
@@ -661,15 +645,9 @@ pub fn run_tzt_test<'a>(
         test.other_contracts.clone(),
     );
 
-    ctx.storage = match test.storages {
-        Some(v) => v,
-        None => HashMap::new(),
-    };
+    ctx.storage = test.storages.unwrap_or_default();
 
-    ctx.views = match test.views {
-        Some(v) => v,
-        None => HashMap::new(),
-    };
+    ctx.views = test.views.unwrap_or_default();
 
     ctx.set_big_map_storage(test.big_maps.unwrap_or_default());
 
