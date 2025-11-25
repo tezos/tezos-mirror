@@ -237,10 +237,8 @@ module Dal_helpers = struct
   (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
      The current DAL refutation integration is not resilient to DAL parameters
      changes when upgrading the protocol. The code needs to be adapted. *)
-
-  (* REFUTE_TODO: Rename commit_inbox_level after the modification of the semantics *)
   let import_level_is_valid ~dal_activation_level ~dal_attestation_lag
-      ~origination_level ~commit_inbox_level ~published_level
+      ~origination_level ~import_inbox_level ~published_level
       ~dal_attested_slots_validity_lag =
     (* [dal_attestation_lag] is supposed to be positive. *)
     let open Raw_level_repr in
@@ -253,19 +251,19 @@ module Dal_helpers = struct
       published_level > origination_level
     in
     let attested_level = add published_level dal_attestation_lag in
-    let not_too_recent = attested_level <= commit_inbox_level in
+    let not_too_recent = attested_level <= import_inbox_level in
     (* An attested slot is not expired if its attested level (equal to
        [published_level + dal_attestation_lag]) is not further than
        [dal_attested_slots_validity_lag] from the given inbox level. *)
     let ttl_not_expired =
       Raw_level_repr.(
-        add attested_level dal_attested_slots_validity_lag >= commit_inbox_level)
+        add attested_level dal_attested_slots_validity_lag >= import_inbox_level)
     in
     dal_was_activated && slot_published_after_origination && not_too_recent
     && ttl_not_expired
 
   let page_id_is_valid ~dal_number_of_slots ~dal_activation_level
-      ~dal_attestation_lag ~origination_level ~commit_inbox_level
+      ~dal_attestation_lag ~origination_level ~import_inbox_level
       cryptobox_parameters
       Dal_slot_repr.Page.{slot_id = {published_level; index}; page_index}
       ~dal_attested_slots_validity_lag =
@@ -282,12 +280,12 @@ module Dal_helpers = struct
          ~dal_activation_level
          ~dal_attestation_lag
          ~origination_level
-         ~commit_inbox_level
+         ~import_inbox_level
          ~published_level
          ~dal_attested_slots_validity_lag
 
   let verify ~metadata ~dal_activation_level ~dal_number_of_slots
-      ~commit_inbox_level dal_parameters page_id dal_snapshot proof
+      ~import_inbox_level dal_parameters page_id dal_snapshot proof
       ~dal_attested_slots_validity_lag =
     let open Result_syntax in
     let* input_opt =
@@ -302,14 +300,14 @@ module Dal_helpers = struct
              ~dal_activation_level
              ~origination_level:
                metadata.Sc_rollup_metadata_repr.origination_level
-             ~commit_inbox_level
+             ~import_inbox_level
              ~dal_number_of_slots
              ~dal_attested_slots_validity_lag)
     in
     return_some (Sc_rollup_PVM_sig.Reveal (Dal_page input_opt))
 
   let produce ~metadata ~dal_activation_level ~dal_number_of_slots
-      ~commit_inbox_level dal_parameters ~attestation_threshold_percent
+      ~import_inbox_level dal_parameters ~attestation_threshold_percent
       ~restricted_commitments_publishers page_id ~page_info ~get_history
       confirmed_slots_history ~dal_attested_slots_validity_lag =
     let open Lwt_result_syntax in
@@ -329,7 +327,7 @@ module Dal_helpers = struct
              ~dal_activation_level
              ~origination_level:
                metadata.Sc_rollup_metadata_repr.origination_level
-             ~commit_inbox_level
+             ~import_inbox_level
              ~dal_attested_slots_validity_lag)
     in
     return
@@ -417,7 +415,7 @@ let valid (type state proof output)
           ~dal_activation_level
           ~dal_attested_slots_validity_lag
           dal_parameters.cryptobox_parameters
-          ~commit_inbox_level:import_inbox_level
+          ~import_inbox_level
           page_id
           dal_snapshot
           dal_page_proof
@@ -621,7 +619,7 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
           ~metadata
           ~dal_activation_level
           dal_parameters
-          ~commit_inbox_level:import_inbox_level
+          ~import_inbox_level
           ~attestation_threshold_percent:None
           ~restricted_commitments_publishers:None
           page_id
@@ -649,7 +647,7 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
           ~metadata
           ~dal_activation_level
           dal_parameters
-          ~commit_inbox_level:import_inbox_level
+          ~import_inbox_level
           ~attestation_threshold_percent
           ~restricted_commitments_publishers
           page_id

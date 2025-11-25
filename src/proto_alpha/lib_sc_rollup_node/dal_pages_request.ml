@@ -270,14 +270,14 @@ let slot_id_is_valid chain_id ~dal_attestation_lag ~number_of_slots
     (Dal.Slot_index.check_is_in_range ~number_of_slots slot_id.Dal.index)
   &&
   let origination_level_res = Raw_level.of_int32 origination_level in
-  let commit_inbox_level_res = Raw_level.of_int32 inbox_level in
-  match (origination_level_res, commit_inbox_level_res) with
-  | Ok origination_level, Ok commit_inbox_level ->
+  let import_inbox_level_res = Raw_level.of_int32 inbox_level in
+  match (origination_level_res, import_inbox_level_res) with
+  | Ok origination_level, Ok import_inbox_level ->
       Alpha_context.Sc_rollup.Proof.Dal_helpers.import_level_is_valid
         ~dal_activation_level
         ~dal_attestation_lag
         ~origination_level
-        ~commit_inbox_level
+        ~import_inbox_level
         ~dal_attested_slots_validity_lag
         ~published_level:slot_id.published_level
   | _ -> false
