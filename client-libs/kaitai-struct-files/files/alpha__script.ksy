@@ -29,7 +29,7 @@ enums:
     0: michelson
     1: native
   kind_tag:
-    0: accumulator
+    0: clst
 seq:
 - id: alpha__script_tag
   type: u1

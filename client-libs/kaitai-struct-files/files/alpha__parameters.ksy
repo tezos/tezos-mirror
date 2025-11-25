@@ -649,3 +649,6 @@ seq:
 - id: native_contracts_enable
   type: u1
   enum: bool
+- id: swrr_new_baker_lottery_enable
+  type: u1
+  enum: bool

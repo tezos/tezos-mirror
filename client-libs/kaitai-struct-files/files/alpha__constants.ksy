@@ -401,6 +401,9 @@ seq:
 - id: native_contracts_enable
   type: u1
   enum: bool
+- id: swrr_new_baker_lottery_enable
+  type: u1
+  enum: bool
 - id: issuance_modification_delay
   type: u1
 - id: consensus_key_activation_delay
