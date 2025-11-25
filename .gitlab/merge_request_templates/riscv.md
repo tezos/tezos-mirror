@@ -54,7 +54,6 @@ make -C src/riscv all
 ```
 /assign @ole.kruger
 /assign @victor-dumitrescu
-/assign @felix.puscasu1
 /assign @emturner
 /assign @santnr
 /assign @kurtis.charnock
@@ -63,7 +62,6 @@ make -C src/riscv all
 
 /assign_reviewer @ole.kruger
 /assign_reviewer @victor-dumitrescu
-/assign_reviewer @felix.puscasu1
 /assign_reviewer @emturner
 /assign_reviewer @santnr
 /assign_reviewer @jobjo
