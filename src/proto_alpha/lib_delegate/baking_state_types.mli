@@ -13,6 +13,9 @@ module Key_id : sig
   type t
 
   (** Only use at library frontiers *)
+  val of_pkh : Signature.public_key_hash -> t
+
+  (** Only use at library frontiers *)
   val to_pkh : t -> Signature.public_key_hash
 
   val compare : t -> t -> int
