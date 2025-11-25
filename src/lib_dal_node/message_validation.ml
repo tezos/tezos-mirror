@@ -412,7 +412,10 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
     (* [treat_batch] does not invalidate a whole slot when a single shard is
        invalid, otherwise it would be possible for a byzantine actor to craft
        a wrong message with the id of the published slot to prevent the validation
-       of all the valid shards associated to this slot. *)
+       of all the valid shards associated to this slot.
+       Important: this function is in the scope of Eio runtime and prohibits the
+       usage of Lwt. Lwt calls must be wrapped in a proper way. See
+       https://gitlab.com/tezos/tezos/-/issues/8140. *)
     let rec treat_batch = function
       | [] -> ()
       | ({level; slot_index}, batch_list) :: remaining_to_treat -> (
@@ -475,10 +478,11 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
               treat_batch remaining_to_treat
           | Error err ->
               let validation_error = string_of_validation_error err in
-              Event.emit_dont_wait__batch_validation_error
-                ~level
-                ~slot_index
-                ~validation_error ;
+              Tezos_bees.Hive.async_lwt (fun () ->
+                  Event.emit_batch_validation_error
+                    ~level
+                    ~slot_index
+                    ~validation_error) ;
               let batch_size = List.length batch_list in
               if batch_size = 1 then
                 List.iter
@@ -500,10 +504,11 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
           | exception exn ->
               (* Don't crash if crypto raised an exception. *)
               let validation_error = Printexc.to_string exn in
-              Event.emit_dont_wait__batch_validation_error
-                ~level
-                ~slot_index
-                ~validation_error ;
+              Tezos_bees.Hive.async_lwt (fun () ->
+                  Event.emit_batch_validation_error
+                    ~level
+                    ~slot_index
+                    ~validation_error) ;
               let batch_size = List.length batch_list in
               if batch_size = 1 then
                 List.iter

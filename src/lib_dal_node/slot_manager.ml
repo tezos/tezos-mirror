@@ -557,6 +557,9 @@ let get_slot_content ~reconstruct_if_missing ctxt slot_id =
 
 (* Main functions *)
 
+(* Important: this function is in the scope of Eio runtime and prohibits the
+   usage of Lwt. Lwt calls must be wrapped in a proper way. See
+   https://gitlab.com/tezos/tezos/-/issues/8140. *)
 let maybe_register_trap traps_store ~traps_fraction message_id message =
   let delegate = message_id.Types.Message_id.pkh in
   let Types.Message.{share; shard_proof} = message in
@@ -566,11 +569,12 @@ let maybe_register_trap traps_store ~traps_fraction message_id message =
   | Ok true ->
       let slot_id = Types.Slot_id.{slot_index; slot_level = level} in
       let () =
-        Event.emit_dont_wait__register_trap
-          ~delegate
-          ~published_level:slot_id.slot_level
-          ~slot_index:slot_id.slot_index
-          ~shard_index
+        Tezos_bees.Hive.async_lwt (fun () ->
+            Event.emit_register_trap
+              ~delegate
+              ~published_level:slot_id.slot_level
+              ~slot_index:slot_id.slot_index
+              ~shard_index)
       in
       Store.Traps.add
         traps_store
@@ -581,14 +585,12 @@ let maybe_register_trap traps_store ~traps_fraction message_id message =
         ~shard_proof
   | Ok false -> ()
   | Error _ ->
-      Lwt.dont_wait
-        (fun () ->
+      Tezos_bees.Hive.async_lwt (fun () ->
           Event.emit_trap_check_failure
             ~delegate
             ~published_level:level
             ~slot_index
             ~shard_index)
-        (fun exc -> raise exc)
 
 let add_commitment_shards ~shards_proofs_precomputation node_store cryptobox
     commitment slot polynomial =

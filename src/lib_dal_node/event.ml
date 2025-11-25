@@ -1443,11 +1443,8 @@ let emit_dont_wait__message_validation_error ~message_id ~validation_error =
     message_validation_error
     (message_id, validation_error)
 
-let emit_dont_wait__batch_validation_error ~level ~slot_index ~validation_error
-    =
-  emit__dont_wait__use_with_care
-    batch_validation_error
-    (level, slot_index, validation_error)
+let emit_batch_validation_error ~level ~slot_index ~validation_error =
+  emit batch_validation_error (level, slot_index, validation_error)
 
 let emit_dont_wait__batch_validation_stats ~batch_id ~head_level
     ~number_of_shards ~shard_percentage ~duration =
@@ -1605,11 +1602,8 @@ let emit_cannot_attest_slot_because_of_trap ~pkh ~published_level ~slot_index
     cannot_attest_slot_because_of_trap
     (pkh, published_level, slot_index, shard_index)
 
-let emit_dont_wait__register_trap ~delegate ~published_level ~slot_index
-    ~shard_index =
-  emit__dont_wait__use_with_care
-    register_trap
-    (delegate, published_level, slot_index, shard_index)
+let emit_register_trap ~delegate ~published_level ~slot_index ~shard_index =
+  emit register_trap (delegate, published_level, slot_index, shard_index)
 
 let emit_start_catchup ~start_level ~end_level ~levels_to_clean_up =
   emit start_catchup (start_level, end_level, levels_to_clean_up)
