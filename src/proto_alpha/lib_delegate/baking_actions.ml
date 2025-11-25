@@ -544,10 +544,16 @@ let may_get_dal_content state consensus_vote =
     ~default_value:None
     (fun _dal_node_rpc_ctxt ->
       let*! dal_attestable_slots =
-        Dal_attestable_slots_worker.get_dal_attestable_slots
-          state.global_state.dal_attestable_slots_worker
-          ~delegate_id
-          ~attestation_level:level
+        (Dal_attestable_slots_worker.get_dal_attestable_slots
+           state.global_state.dal_attestable_slots_worker
+           ~delegate_id
+           ~attestation_level:level
+         [@profiler.record_s
+           {verbosity = Debug}
+             (Format.asprintf
+                "get_dal_attestable_slots - delegate_id : %a"
+                Delegate_id.pp
+                delegate_id)])
       in
       process_dal_rpc_result state delegate_id level round dal_attestable_slots)
 
