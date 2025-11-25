@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_ci
+
 module Files = struct
   let sdks = ["src/kernel_sdk/**/*"; "sdk/rust/**/*"]
 
@@ -62,17 +64,16 @@ end)
 
 let job_build_evm_node_static =
   Cacio.parameterize @@ fun arch ->
-  let arch_string = Tezos_ci.Runner.Arch.show_easy_to_distinguish arch in
+  let arch_string = Runner.Arch.show_easy_to_distinguish arch in
   CI.job
-    ("build_evm_node_static_"
-    ^ Tezos_ci.Runner.Arch.show_easy_to_distinguish arch)
+    ("build_evm_node_static_" ^ Runner.Arch.show_easy_to_distinguish arch)
     ~__POS__
     ~stage:Test
     ~description:"Build the EVM node (statically linked)."
     ~arch
     ?cpu:(match arch with Amd64 -> Some Very_high | Arm64 -> None)
     ?storage:(match arch with Arm64 -> Some Ramfs | Amd64 -> None)
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Images.CI.build
     ~only_if_changed:Files.(node @ sdks)
     ~artifacts:
       (Gitlab_ci.Util.artifacts
@@ -101,7 +102,7 @@ let job_lint_wasm_runtime =
     ~__POS__
     ~stage:Test
     ~description:"Run the linter on lib_wasm_runtime."
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Images.CI.build
     ~only_if_changed:Files.lib_wasm_runtime_rust
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
@@ -118,11 +119,11 @@ let job_unit_tests =
     ~__POS__
     ~stage:Test
     ~description:"Etherlink unit tests."
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Images.CI.build
     ~only_if_changed:Files.(node @ sdks)
     ~artifacts:
       ((* Note: the [~name] is actually overridden by the one computed
-           by [Tezos_ci.Coverage.enable_output_artifact].
+           by [Coverage.enable_output_artifact].
            We set it anyway for consistency with how the job
            was previously declared using [job_unit_test] in [code_verification.ml]. *)
        Gitlab_ci.Util.artifacts
@@ -146,7 +147,7 @@ let job_test_kernel =
     ~__POS__
     ~stage:Test
     ~description:"Check and test the etherlink kernel."
-    ~image:Tezos_ci.Images.rust_toolchain
+    ~image:Images.rust_toolchain
     ~only_if_changed:Files.(rust_toolchain_image @ kernel @ sdks)
     ~needs_legacy:
       [(Job, Tezos_ci_jobs.Code_verification.job_build_kernels pipeline_type)]
@@ -162,7 +163,7 @@ let job_test_firehose =
     ~__POS__
     ~stage:Test
     ~description:"Check and test etherlink firehose."
-    ~image:Tezos_ci.Images.rust_toolchain
+    ~image:Images.rust_toolchain
     ~only_if_changed:Files.(rust_toolchain_image @ firehose)
     ~needs_legacy:
       [(Job, Tezos_ci_jobs.Code_verification.job_build_kernels pipeline_type)]
@@ -178,7 +179,7 @@ let job_test_evm_compatibility =
     ~__POS__
     ~stage:Test
     ~description:"Check and test EVM compatibility."
-    ~image:Tezos_ci.Images.rust_toolchain
+    ~image:Images.rust_toolchain
     ~only_if_changed:Files.(rust_toolchain_image @ evm_compatibility)
     ~needs_legacy:
       [(Job, Tezos_ci_jobs.Code_verification.job_build_kernels pipeline_type)]
@@ -201,7 +202,7 @@ let job_test_revm_compatibility =
     ~__POS__
     ~stage:Test
     ~description:"Check and test REVM compatibility."
-    ~image:Tezos_ci.Images.rust_toolchain
+    ~image:Images.rust_toolchain
     ~only_if_changed:Files.(rust_toolchain_image @ revm_compatibility)
     ~needs_legacy:
       [(Job, Tezos_ci_jobs.Code_verification.job_build_kernels pipeline_type)]
@@ -221,7 +222,7 @@ let job_mir_unit =
     "mir_unit"
     ~__POS__
     ~description:"Run unit tests for MIR."
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Images.CI.test
     ~stage:Test
     ~only_if_changed:Files.mir
     ~cargo_cache:true
@@ -232,7 +233,7 @@ let job_mir_tzt =
     "mir_tzt"
     ~__POS__
     ~description:"Run MIR's tzt_runner on the tzt reference test suite."
-    ~image:Tezos_ci.Images.CI.test
+    ~image:Images.CI.test
     ~stage:Test
     ~only_if_changed:Files.(mir @ tzt)
     ~cargo_cache:true
@@ -247,7 +248,7 @@ let job_build_tezt =
     ~__POS__
     ~stage:Build
     ~description:"Build the Etherlink Tezt executable."
-    ~image:Tezos_ci.Images.CI.build
+    ~image:Images.CI.build
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~name:"etherlink_tezt_exe"
@@ -278,8 +279,7 @@ let tezt_job ?(retry_tests = 1) =
   CI.tezt_job
     ~tezt_exe:"etherlink/tezt/tests/main.exe"
     ~fetch_records_from:"etherlink.daily"
-    ~only_if_changed:
-      (Tezos_ci.Changeset.encode Tezos_ci_jobs.Changesets.changeset_octez)
+    ~only_if_changed:(Changeset.encode Tezos_ci_jobs.Changesets.changeset_octez)
     ~needs:[(Artifacts, job_build_tezt)]
     ~needs_legacy:
       [
