@@ -1212,7 +1212,7 @@ let dispatch_request (type f) ~websocket
                             (Rpc_errors.transaction_rejected
                                (Format.sprintf
                                   "The transaction was added to the mempool \
-                                   but wasn't processed in %d ms"
+                                   but wasn't processed in %d seconds"
                                   (int_of_float timeout))
                                None)
                       | exn -> Lwt.fail exn)

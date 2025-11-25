@@ -122,7 +122,16 @@ let loop_sequencer (type f) multichain
                 ~force:true
                 ~timestamp:blueprint.blueprint.timestamp
             in
-            return `Continue
+            let*! head = Evm_context.head_info () in
+            let* storage_version = Evm_state.storage_version head.evm_state in
+            let sub_block_latency_disabled =
+              Storage_version.sub_block_latency_entrypoints_disabled
+                ~storage_version
+            in
+            return
+              (`Continue
+                 Blueprints_follower.
+                   {sbl_callbacks_activated = not sub_block_latency_disabled})
           else return (`Restart_from (Ethereum_types.Qty expected_number)))
         ~on_finalized_levels:(fun
             ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ -> return_unit)

@@ -415,7 +415,7 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
             List.iter_es Tx_queue.confirm hashes
         | Error _ -> return_unit
       in
-      return `Continue)
+      return (`Continue Blueprints_follower.{sbl_callbacks_activated = false}))
     ~on_finalized_levels:(fun ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ ->
       return_unit)
     ~on_next_block_info:(fun _ _ -> return_unit)

@@ -7,12 +7,15 @@
 
 open Ethereum_types
 
+type sbl_callbacks_activated = {sbl_callbacks_activated : bool}
+
 (** A [new_blueprint_handler] is a function that is called for
     every blueprint fetched from a remote EVM endpoint. *)
 type new_blueprint_handler =
   quantity ->
   Blueprint_types.with_events ->
-  [`Restart_from of quantity | `Continue] tzresult Lwt.t
+  [`Restart_from of quantity | `Continue of sbl_callbacks_activated] tzresult
+  Lwt.t
 
 (** A [finalized_levels_handler] is a function that is called for
     every finalized l1-l2 levels association fetched from a remote EVM
