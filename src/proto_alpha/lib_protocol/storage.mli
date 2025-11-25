@@ -1110,7 +1110,9 @@ end
 
 module Dal : sig
   module Slot : sig
-    (** This is a temporary storage for slot headers proposed onto the L1. *)
+    (** This is a temporary storage for slot headers proposed onto the L1. The
+        size of the list is at most [number_of_slots] as declared
+        in the DAL parameters of the protocol. *)
     module Headers :
       Non_iterable_indexed_data_storage
         with type t = Raw_context.t
@@ -1125,7 +1127,8 @@ module Dal : sig
 
     (** This single entry stores the cells of the DAL skip list constructed
         during the block under validation. The list is expected to have exactly
-        [number_of_slots] elements. Its cells ordering is not specified (and not
+        [number_of_slots] elements, except at the migration from T to U, where
+        it is a few times longer. Its cells ordering is not specified (and not
         relevant). A cell's binary encoding is bounded (the only part that is
         evolving in size over time is the number of backpointers, which is
         bounded by 64). *)

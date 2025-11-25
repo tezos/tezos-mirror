@@ -2522,8 +2522,6 @@ module Anonymous = struct
         in
         match slot_headers_opt with
         | None ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/7126
-               Can also fail if `attestation_lag` changes. *)
             (* It should not happen if 1) the denunciation age is correct, and 2) \
                the storage is updated correctly *)
             tzfail
@@ -2548,8 +2546,6 @@ module Anonymous = struct
                 in
                 check_consensus_operation_signature vi consensus_key attestation
             | Some (header, _publisher) ->
-                (* TODO: https://gitlab.com/tezos/tezos/-/issues/7126
-                   Can also fail if `attestation_lag` changes. *)
                 (* mismatch between published levels in \
                    storage versus in evidence; it should not happen *)
                 tzfail

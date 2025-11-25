@@ -1352,7 +1352,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  feature_enable;
                  incentives_enable;
                  number_of_slots;
-                 attestation_lag;
+                 attestation_lag = _;
                  attestation_threshold;
                  cryptobox_parameters;
                  minimal_participation_ratio;
@@ -1366,7 +1366,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             Constants_parametric_repr.feature_enable;
             incentives_enable;
             number_of_slots;
-            attestation_lag;
+            attestation_lag = 5;
             attestation_threshold;
             cryptobox_parameters;
             minimal_participation_ratio;

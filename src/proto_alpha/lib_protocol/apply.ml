@@ -2331,14 +2331,28 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
             consensus_key
             Attesting_power.zero (* Fake power. *) )
 
-let record_dal_content ctxt slot ~dal_power = function
-  | None -> Result.return ctxt
+let record_dal_content ctxt level slot ~dal_power dal_content =
+  let open Lwt_result_syntax in
+  match dal_content with
+  | None -> return ctxt
   | Some {attestation} ->
-      Dal_apply.apply_attestation
-        ctxt
-        ~tb_slot:slot
-        attestation
-        ~power:dal_power
+      let* proto_activation_level = Protocol_activation_level.get ctxt in
+      let lag = Constants.dal_attestation_lag ctxt in
+      let attestation =
+        if Raw_level.(level < add proto_activation_level lag) then
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
+             CODE TO BE REVERTED IN PROTOCOL V *)
+          Dal.Attestation.empty
+        else attestation
+      in
+      let*? ctxt =
+        Dal_apply.apply_attestation
+          ctxt
+          ~tb_slot:slot
+          attestation
+          ~power:dal_power
+      in
+      return ctxt
 
 let record_attestation ctxt (mode : mode) (consensus : consensus_content)
     (dal : dal_content option) :
@@ -2372,7 +2386,9 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
           ~initial_slot:consensus.slot
           ~power:attesting_power
       in
-      let*? ctxt = record_dal_content ctxt consensus.slot ~dal_power dal in
+      let* ctxt =
+        record_dal_content ctxt consensus.level consensus.slot ~dal_power dal
+      in
       return (ctxt, mk_attestation_result consensus_key attesting_power)
   | Partial_construction _ ->
       (* In mempool mode, attestations are allowed for various levels
@@ -2402,24 +2418,25 @@ let record_attestations_aggregate ctxt (mode : mode)
   match mode with
   | Application _ | Full_construction _ ->
       let slot_map = Consensus.allowed_attestations ctxt in
-      let*? ctxt, rev_committee, total_consensus_power =
-        let open Result_syntax in
-        List.fold_left_e
+      let* ctxt, rev_committee, total_consensus_power =
+        List.fold_left_es
           (fun (ctxt, consensus_keys, consensus_power) (slot, dal) ->
-            let* {
-                   consensus_key = {delegate; consensus_pkh; _};
-                   attesting_power;
-                   dal_power;
-                 } =
+            let*? {
+                    consensus_key = {delegate; consensus_pkh; _};
+                    attesting_power;
+                    dal_power;
+                  } =
               find_in_slot_map slot slot_map
             in
-            let* ctxt =
+            let*? ctxt =
               Consensus.record_attestation
                 ctxt
                 ~initial_slot:slot
                 ~power:attesting_power
             in
-            let* ctxt = record_dal_content ctxt slot ~dal_power dal in
+            let* ctxt =
+              record_dal_content ctxt content.level slot ~dal_power dal
+            in
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return
               ( ctxt,

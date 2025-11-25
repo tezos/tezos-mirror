@@ -6114,7 +6114,7 @@ module Skip_list_rpcs = struct
           else if new_lag <> lag && level <= migration_level then
             Dal_RPC.Unattested
           else if level <= last_confirmed_published_level then
-            Dal_RPC.Attested lag
+            Dal_RPC.Attested new_lag
           else Dal_RPC.Unpublished
         in
         Check.(
