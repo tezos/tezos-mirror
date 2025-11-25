@@ -117,6 +117,14 @@ let create_missing_blocks =
   \  FOREIGN KEY (baker) REFERENCES delegates(id),\n\
   \  UNIQUE (source, level, round))"
 
+let create_dal_shard_assignments =
+  "CREATE TABLE IF NOT EXISTS dal_shard_assignments(\n\
+  \  id $(PRIMARY_INCREMENTING_INT) PRIMARY KEY,\n\
+  \  endorsing_right $(PRIMARY_INCREMENTING_INT_REF) NOT NULL,\n\
+  \  shard_index INTEGER NOT NULL,\n\
+  \  FOREIGN KEY (endorsing_right) REFERENCES endorsing_rights(id),\n\
+  \  UNIQUE (endorsing_right, shard_index))"
+
 module Mutex = struct
   let delegates = Lwt_mutex.create ()
 
@@ -137,6 +145,8 @@ module Mutex = struct
   let cycles = Lwt_mutex.create ()
 
   let missing_blocks = Lwt_mutex.create ()
+
+  let dal_shard_assignments = Lwt_mutex.create ()
 end
 
 let create_endorsing_rights_level_idx =
@@ -167,6 +177,10 @@ let create_cycles_level_idx =
 let create_missing_blocks_level_idx =
   "CREATE INDEX IF NOT EXISTS missing_blocks_level_idx ON missing_blocks(level)"
 
+let create_dal_shard_assignments_endorsing_right_idx =
+  "CREATE INDEX IF NOT EXISTS dal_shard_assignments_endorsing_right_idx ON \
+   dal_shard_assignments(endorsing_right)"
+
 let create_tables =
   [
     create_delegates;
@@ -179,6 +193,7 @@ let create_tables =
     create_endorsing_rights;
     create_cycles;
     create_missing_blocks;
+    create_dal_shard_assignments;
     create_endorsing_rights_level_idx;
     create_blocks_level_idx;
     create_operations_level_idx;
@@ -187,6 +202,7 @@ let create_tables =
     create_operations_inclusion_operation_idx;
     create_cycles_level_idx;
     create_missing_blocks_level_idx;
+    create_dal_shard_assignments_endorsing_right_idx;
   ]
 
 let alter_blocks =

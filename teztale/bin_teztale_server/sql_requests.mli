@@ -41,6 +41,8 @@ module Mutex : sig
   val cycles : Lwt_mutex.t
 
   val missing_blocks : Lwt_mutex.t
+
+  val dal_shard_assignments : Lwt_mutex.t
 end
 
 val create_tables : string list

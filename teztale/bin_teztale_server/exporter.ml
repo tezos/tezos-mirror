@@ -150,6 +150,20 @@ let select_missing_blocks conf db_pool boundaries =
         Int32Map.empty)
     db_pool
 
+let select_dal_shard_assignments =
+  Caqti_request.Infix.(
+    Caqti_type.(t2 int32 int32)
+    ->* Caqti_type.(t3 int32 Sql_requests.Type.public_key_hash int))
+    "SELECT\n\
+    \  er.level,\n\
+    \  delegates.address,\n\
+    \  dsa.shard_index\n\
+     FROM endorsing_rights er\n\
+     JOIN dal_shard_assignments dsa ON er.id = dsa.endorsing_right\n\
+     JOIN delegates ON delegates.id = er.delegate\n\
+     WHERE er.level >= $1\n\
+     AND er.level <= $2"
+
 let select_blocks conf db_pool boundaries =
   let block_request =
     Caqti_request.Infix.(
@@ -257,7 +271,10 @@ let select_ops conf db_pool boundaries =
     let ops =
       Ops.add
         delegate
-        (first_slot, power, Tezos_crypto.Hashed.Operation_hash.Map.empty)
+        ( first_slot,
+          power,
+          Tezos_crypto.Hashed.Operation_hash.Map.empty,
+          [] (* assigned_shard_indices *) )
         ops
     in
     Int32Map.add level ops info
@@ -272,7 +289,7 @@ let select_ops conf db_pool boundaries =
       Ops.update
         delegate
         (function
-          | Some (first_slot, power, ops) ->
+          | Some (first_slot, power, ops, assigned_shard_indices) ->
               let op =
                 match
                   Tezos_crypto.Hashed.Operation_hash.Map.find_opt op_hash ops
@@ -284,7 +301,7 @@ let select_ops conf db_pool boundaries =
               let ops' =
                 Tezos_crypto.Hashed.Operation_hash.Map.add op_hash op ops
               in
-              Some (first_slot, power, ops')
+              Some (first_slot, power, ops', assigned_shard_indices)
           | None -> None)
         ops
     in
@@ -305,7 +322,7 @@ let select_ops conf db_pool boundaries =
       Ops.update
         delegate
         (function
-          | Some (first_slot, power, ops) ->
+          | Some (first_slot, power, ops, assigned_shard_indices) ->
               let op =
                 match
                   Tezos_crypto.Hashed.Operation_hash.Map.find_opt op_hash ops
@@ -318,8 +335,39 @@ let select_ops conf db_pool boundaries =
               let ops' =
                 Tezos_crypto.Hashed.Operation_hash.Map.add op_hash op ops
               in
-              Some (first_slot, power, ops')
+              Some (first_slot, power, ops', assigned_shard_indices)
           | None -> None)
+        ops
+    in
+    Int32Map.add level ops info
+  in
+  let cb_shards (level, delegate, shard_index) info =
+    let ops =
+      match Int32Map.find_opt level info with Some m -> m | None -> Ops.empty
+    in
+    let ops =
+      Ops.update
+        delegate
+        (function
+          | Some (first_slot, power, op_map, assigned_shard_indices) ->
+              let assigned_shard_indices =
+                if List.mem shard_index assigned_shard_indices then
+                  assigned_shard_indices
+                else shard_index :: assigned_shard_indices
+              in
+              Some (first_slot, power, op_map, assigned_shard_indices)
+          | None ->
+              let logger = Log.logger () in
+              Lib_teztale_base.Log.warning logger (fun () ->
+                  Format.asprintf
+                    "DAL: received shard index %d for delegate %a at level \
+                     %ld, but no rights were recorded for that delegate, level \
+                     pair. Ignoring."
+                    shard_index
+                    Tezos_crypto.Signature.Public_key_hash.pp
+                    delegate
+                    level) ;
+              None)
         ops
     in
     Int32Map.add level ops info
@@ -338,10 +386,17 @@ let select_ops conf db_pool boundaries =
         Db.fold q_included cb_included boundaries out)
       db_pool
   in
+  let* out =
+    Caqti_lwt_unix.Pool.use
+      (fun (module Db : Caqti_lwt.CONNECTION) ->
+        maybe_with_metrics conf "select_operations_reception" @@ fun () ->
+        Db.fold q_received cb_received boundaries out)
+      db_pool
+  in
   Caqti_lwt_unix.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      maybe_with_metrics conf "select_operations_reception" @@ fun () ->
-      Db.fold q_received cb_received boundaries out)
+      maybe_with_metrics conf "select_dal_shard_assignments" @@ fun () ->
+      Db.fold select_dal_shard_assignments cb_shards boundaries out)
     db_pool
 
 let translate_ops info =
@@ -363,14 +418,15 @@ let translate_ops info =
   Int32Map.map
     (fun info ->
       Tezos_crypto.Signature.Public_key_hash.Map.fold
-        (fun pkh (first_slot, power, pkh_ops) acc ->
+        (fun pkh (first_slot, power, pkh_ops, assigned_shard_indices) acc ->
           Lib_teztale_base.Data.Delegate_operations.
             {
               delegate = pkh;
               first_slot;
               attesting_power = power;
               operations = translate pkh_ops;
-              assigned_shard_indices = [];
+              assigned_shard_indices =
+                List.sort_uniq compare assigned_shard_indices;
             }
           :: acc)
         info
