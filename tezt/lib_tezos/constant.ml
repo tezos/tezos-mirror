@@ -173,6 +173,16 @@ module WASM = struct
       ~path:"tezt/tests/kernels/echo_dal_reveal_pages.wasm"
       ()
 
+  (* Same as {!echo_dal_reveal_pages} above, but the publish level is equal to
+     3000. It is used to test the corner case where a rollup is asked to import
+     a slot whose level is very far in the future. *)
+  let echo_dal_reveal_pages_high_target_pub_level =
+    Uses.make
+      ~tag:"echo_dal_reveal_pages"
+      ~path:
+        "tezt/tests/kernels/echo_dal_reveal_pages_high_target_pub_level.wasm"
+      ()
+
   let evm_kernel =
     Uses.make
       ~how_to_build:"make -f etherlink.mk build"
