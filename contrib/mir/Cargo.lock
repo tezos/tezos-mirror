@@ -724,6 +724,7 @@ dependencies = [
  "smallvec",
  "strum 0.26.3",
  "strum_macros 0.26.4",
+ "tezos-protocol",
  "tezos-smart-rollup-host",
  "tezos_crypto_rs",
  "tezos_data_encoding",
@@ -1329,6 +1330,17 @@ checksum = "4df4175de05129f31b80458c6df371a15e7fc3fd367272e6bf938e5c351c7ea0"
 dependencies = [
  "home",
  "windows-sys",
+]
+
+[[package]]
+name = "tezos-protocol"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "nom",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+ "thiserror",
 ]
 
 [[package]]

@@ -7,6 +7,7 @@
 
 use tezos_crypto_rs::base58::FromBase58CheckError;
 use tezos_crypto_rs::hash::FromBytesError;
+use tezos_protocol::entrypoint;
 
 /// Errors that can happen when working with [ByteReprTrait].
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
@@ -39,6 +40,12 @@ impl From<FromBytesError> for ByteReprError {
 impl From<tezos_data_encoding::nom::error::DecodeError<&[u8]>> for ByteReprError {
     fn from(value: tezos_data_encoding::nom::error::DecodeError<&[u8]>) -> Self {
         Self::DecodeError(format!("{value:?}"))
+    }
+}
+
+impl From<entrypoint::ByteReprError> for ByteReprError {
+    fn from(entrypoint::ByteReprError::WrongFormat(err): entrypoint::ByteReprError) -> Self {
+        Self::WrongFormat(err)
     }
 }
 

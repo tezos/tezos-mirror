@@ -21,7 +21,6 @@ use tezos_crypto_rs::{
 use typed_arena::Arena;
 
 use crate::ast::big_map::{dump_big_map_updates, BigMap, LazyStorageError};
-use crate::ast::michelson_address::entrypoint::Direction;
 use crate::ast::*;
 #[cfg(feature = "bls")]
 use crate::bls;
@@ -1945,7 +1944,6 @@ mod interpreter_tests {
     use crate::context::{Ctx, TypecheckingCtx};
     use crate::gas::Gas;
     use chrono::DateTime;
-    use entrypoint::DEFAULT_EP_NAME;
     use num_bigint::BigUint;
     use tezos_crypto_rs::public_key::PublicKey;
     use tezos_data_encoding::nom::NomReader;
@@ -5492,7 +5490,7 @@ mod interpreter_tests {
             instr: Instruction<'a>,
             opt_exp_gas: Option<u32>,
         ) {
-            use crate::ast::michelson_address::entrypoint::Entrypoints;
+            use crate::ast::Entrypoints;
             let mut ctx = Ctx::default();
             if let Some(e) = opt_entrypoints {
                 ctx.set_known_contracts({
@@ -6902,7 +6900,7 @@ mod interpreter_tests {
                 ),
             ),
             (
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                FieldAnnotation::default(),
                 (
                     Vec::new(),
                     Type::new_or(
@@ -7042,7 +7040,7 @@ mod interpreter_tests {
                 ),
             ),
             (
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                FieldAnnotation::default(),
                 (
                     Vec::new(),
                     Type::new_or(
@@ -7191,7 +7189,7 @@ mod interpreter_tests {
                 ),
             ),
             (
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                FieldAnnotation::default(),
                 (
                     Vec::new(),
                     Type::new_or(
@@ -7284,7 +7282,7 @@ mod interpreter_tests {
                 ),
             ),
             (
-                FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                FieldAnnotation::default(),
                 (
                     vec![Direction::Right, Direction::Left, Direction::Left],
                     Type::Nat,

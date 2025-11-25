@@ -1,9 +1,6 @@
-/******************************************************************************/
-/*                                                                            */
-/* SPDX-License-Identifier: MIT                                               */
-/* Copyright (c) [2023] Serokell <hi@serokell.io>                             */
-/*                                                                            */
-/******************************************************************************/
+// SPDX-FileCopyrightText: [2023] Serokell <hi@serokell.io>
+//
+// SPDX-License-Identifier: MIT
 
 //! Structures and utilities for [Tezos
 //! entrypoints](https://docs.tezos.com/smart-contracts/entrypoints).
@@ -216,7 +213,21 @@ impl TryFrom<&[u8]> for Entrypoint {
     }
 }
 
-pub(crate) fn check_ep_name_len(ep: &[u8]) -> Result<(), ByteReprError> {
+impl Entrypoint {
+    /// Converts a String to an Entrypoint without checking it validity.
+    ///
+    /// # Safety
+    ///
+    /// - The string passed in must be at most 31 characters long.
+    /// - The string passed in must respect https://tezos.gitlab.io/alpha/michelson.html#syntax.
+    ///
+    pub fn from_string_unchecked(s: String) -> Entrypoint {
+        Self(s)
+    }
+}
+
+// Exposed only for `mir`.
+pub fn check_ep_name_len(ep: &[u8]) -> Result<(), ByteReprError> {
     if ep.len() > MAX_EP_LEN {
         return Err(ByteReprError::WrongFormat(format!(
             "entrypoint name must be at most {} characters long, but it is {} characters long",

@@ -7,8 +7,8 @@
 #![allow(clippy::type_complexity)]
 use crate::ast::big_map::{BigMapId, InMemoryLazyStorage, LazyStorage, LazyStorageError};
 use crate::ast::micheline::IntoMicheline;
-use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
+use crate::ast::Entrypoints;
 use crate::ast::{Micheline, View};
 use crate::ast::{Type, TypedValue};
 use crate::gas::Gas;

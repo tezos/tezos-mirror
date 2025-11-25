@@ -5,9 +5,7 @@
 //! Michelson typechecker definitions. Most functions defined as associated
 //! functions on [Micheline], see there for more.
 
-use crate::ast::michelson_address::entrypoint::{check_ep_name_len, Direction, Entrypoints};
 use chrono::prelude::DateTime;
-use entrypoint::DEFAULT_EP_NAME;
 use num_bigint::{BigInt, BigUint, TryFromBigIntError};
 use num_traits::{Signed, Zero};
 use regex::Regex;
@@ -16,6 +14,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError, public_key::PublicKey};
 use tezos_data_encoding::nom::{error::convert_error, NomReader};
+use tezos_protocol::entrypoint;
 
 pub mod type_props;
 
@@ -702,7 +701,7 @@ fn parse_parameter_ty_with_entrypoints<'a>(
         .entry(Entrypoint::default())
         .or_insert_with(|| parameter.clone());
     routed_annotations
-        .entry(FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME))
+        .entry(FieldAnnotation::default())
         .or_insert_with(|| (vec![], parameter.clone()));
     Ok((entrypoints, routed_annotations, parameter))
 }
@@ -2249,7 +2248,8 @@ pub(crate) fn typecheck_instruction<'a>(
             emit_val_type.ensure_prop(gas, TypeProperty::Pushable)?;
             let opt_tag = anns.get_single_field_ann()?;
             if let Option::Some(t) = &opt_tag {
-                check_ep_name_len(t.as_str().as_bytes()).map_err(TcError::EntrypointError)?;
+                entrypoint::check_ep_name_len(t.as_str().as_bytes())
+                    .map_err(|e| TcError::EntrypointError(e.into()))?;
             }
             stack.push(Type::Operation);
             I::Emit {
@@ -2262,7 +2262,8 @@ pub(crate) fn typecheck_instruction<'a>(
             emit_val_type.ensure_prop(gas, TypeProperty::Pushable)?;
             let opt_tag = anns.get_single_field_ann()?;
             if let Option::Some(t) = &opt_tag {
-                check_ep_name_len(t.as_str().as_bytes()).map_err(TcError::EntrypointError)?;
+                entrypoint::check_ep_name_len(t.as_str().as_bytes())
+                    .map_err(|e| TcError::EntrypointError(e.into()))?;
             }
             stack.push(Type::Operation);
             I::Emit {
@@ -2983,7 +2984,6 @@ mod typecheck_tests {
     use super::{Lambda, Or};
     use crate::ast::big_map::LazyStorage;
     use crate::ast::michelson_address as addr;
-    use crate::ast::michelson_address::entrypoint::DEFAULT_EP_NAME;
     use crate::ast::or::Or::{Left, Right};
     use crate::context::Ctx;
     use crate::gas::Gas;
@@ -6420,7 +6420,7 @@ mod typecheck_tests {
                 storage: Type::Unit,
                 code: Seq(vec![Car, Nil, Pair]),
                 annotations: HashMap::from([(
-                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    FieldAnnotation::default(),
                     (Vec::new(), Type::Unit)
                 )]),
                 views: HashMap::new(),
@@ -6447,7 +6447,7 @@ mod typecheck_tests {
                 storage: Type::Unit,
                 code: Seq(vec![Car, Nil, Pair]),
                 annotations: HashMap::from([(
-                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    FieldAnnotation::default(),
                     (Vec::new(), Type::Unit)
                 )]),
                 views: HashMap::from_iter([(
@@ -6482,7 +6482,7 @@ mod typecheck_tests {
                 storage: Type::Unit,
                 code: Seq(vec![Car, Nil, Pair]),
                 annotations: HashMap::from([(
-                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    FieldAnnotation::default(),
                     (Vec::new(), Type::Unit)
                 )]),
                 views: HashMap::from_iter([
@@ -6660,7 +6660,7 @@ mod typecheck_tests {
                     Unit,
                     IView { name: "hello_view".into(), return_type: Type::String }, Drop(None)]),
                 annotations: HashMap::from([(
-                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    FieldAnnotation::default(),
                     (Vec::new(), Type::Unit)
                 )]),
                 views: HashMap::new(),
@@ -6691,7 +6691,7 @@ mod typecheck_tests {
                 storage: Type::Unit,
                 code: Seq(vec![Drop(None), Unit, Failwith(Type::Unit)]),
                 annotations: HashMap::from([(
-                    FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                    FieldAnnotation::default(),
                     (Vec::new(), Type::new_contract(Type::Unit))
                 )]),
                 views: HashMap::new(),
@@ -7142,7 +7142,7 @@ mod typecheck_tests {
                 ]),
                 annotations: HashMap::from([
                     (
-                        FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                        FieldAnnotation::default(),
                         (vec![Direction::Right], Type::Unit)
                     ),
                     (
@@ -7205,7 +7205,7 @@ mod typecheck_tests {
                         (vec![Direction::Left], Type::Int)
                     ),
                     (
-                        FieldAnnotation::from_str_unchecked(DEFAULT_EP_NAME),
+                        FieldAnnotation::default(),
                         (vec![Direction::Right], Type::Unit)
                     ),
                 ]),

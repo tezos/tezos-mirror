@@ -5,10 +5,9 @@
 //! Representation for typed Michelson `address` values.
 
 pub mod address_hash;
-pub mod entrypoint;
 
 pub use self::address_hash::AddressHash;
-pub use self::entrypoint::Entrypoint;
+pub use tezos_protocol::entrypoint::Entrypoint;
 
 use address_hash::check_size;
 
