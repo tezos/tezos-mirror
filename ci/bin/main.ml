@@ -308,16 +308,6 @@ let () =
        managers can create this pipeline by pushing a tag to a fork of \
        'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
   register
-    "octez_evm_node_release_tag"
-    If.(push && has_tag_match octez_evm_node_release_tag_re)
-    ~jobs:(Release_tag.octez_evm_node_jobs ())
-    ~description:
-      ("Release tag pipelines for Etherlink.\n\n\
-        Created when the release manager pushes a tag in the format \
-        octez-evm-node-vX.Y(-rcN). Creates and publishes a release on GitLab \
-        with associated etherlink artifacts (static binaries and Docker \
-        image)." ^ release_description) ;
-  register
     "non_release_tag"
     If.(on_tezos_namespace && push && has_non_release_tag)
     ~jobs:(Release_tag.octez_jobs Non_release_tag)
