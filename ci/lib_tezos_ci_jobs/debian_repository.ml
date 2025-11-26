@@ -370,7 +370,6 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_noble_systemd"
-        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
@@ -389,7 +388,6 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_jammy_systemd_test"
-        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
@@ -408,7 +406,6 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_noble_systemd_test"
-        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
@@ -444,7 +441,6 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm_systemd_test"
-        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
@@ -467,7 +463,6 @@ let jobs ?(limit_dune_build_jobs = false) pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.upgrade_bin_debian_bookworm-systemd"
-        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
