@@ -636,6 +636,7 @@ mod tests {
     use tezos_tezlink::block::TezBlock;
     use tezos_tezlink::operation::ManagerOperation;
     use tezos_tezlink::operation::ManagerOperationContent;
+    use tezos_tezlink::operation::ManagerOperationContentConv;
     use tezos_tezlink::operation::Operation;
     use tezos_tezlink::operation::OperationContent;
     use tezos_tezlink::operation::OriginationContent;
@@ -700,7 +701,7 @@ mod tests {
                     gas_limit: gas_limit.into(),
                     storage_limit: storage_limit.into(),
                 }
-                .into()
+                .into_manager_operation_content()
             })
             .collect::<Vec<ManagerOperationContent>>();
 

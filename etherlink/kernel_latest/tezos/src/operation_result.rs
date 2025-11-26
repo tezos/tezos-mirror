@@ -5,10 +5,9 @@
 //! Tezos operations
 
 use crate::lazy_storage_diff::LazyStorageDiffList;
-use crate::operation::OriginationContent;
 use crate::operation::{
-    ManagerOperation, ManagerOperationContent, OperationContent, RevealContent,
-    TransferContent,
+    ManagerOperation, ManagerOperationContent, ManagerOperationContentConv,
+    OperationContent, OriginationContent, RevealContent, TransferContent,
 };
 use mir::gas;
 use mir::gas::interpret_cost::SigCostError;
@@ -683,17 +682,17 @@ pub fn produce_skipped_receipt(
 ) -> OperationWithMetadata {
     match &op.operation {
         OperationContent::Reveal(_) => OperationWithMetadata {
-            content: op.into(),
+            content: op.into_manager_operation_content(),
             receipt: OperationResultSum::Reveal(produce_skipped_result(balance_updates)),
         },
         OperationContent::Transfer(_) => OperationWithMetadata {
-            content: op.into(),
+            content: op.into_manager_operation_content(),
             receipt: OperationResultSum::Transfer(produce_skipped_result(
                 balance_updates,
             )),
         },
         OperationContent::Origination(_) => OperationWithMetadata {
-            content: op.into(),
+            content: op.into_manager_operation_content(),
             receipt: OperationResultSum::Origination(produce_skipped_result(
                 balance_updates,
             )),

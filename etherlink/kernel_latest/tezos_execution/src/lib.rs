@@ -25,7 +25,9 @@ use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_tezlink::enc_wrappers::OperationHash;
 use tezos_tezlink::lazy_storage_diff::LazyStorageDiffList;
-use tezos_tezlink::operation::{Operation, OriginationContent, Script};
+use tezos_tezlink::operation::{
+    ManagerOperationContentConv, Operation, OriginationContent, Script,
+};
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, ApplyOperationError, ContentResult,
     InternalContentWithMetadata, InternalOperationSum, OperationWithMetadata, Originated,
@@ -924,7 +926,7 @@ fn apply_operation<Host: Runtime>(
                 internal_operations_receipts,
             );
             OperationWithMetadata {
-                content: validated_operation.content.into(),
+                content: validated_operation.content.into_manager_operation_content(),
                 receipt: OperationResultSum::Reveal(manager_result),
             }
         }
@@ -965,7 +967,7 @@ fn apply_operation<Host: Runtime>(
                 internal_operations_receipts,
             );
             OperationWithMetadata {
-                content: validated_operation.content.into(),
+                content: validated_operation.content.into_manager_operation_content(),
                 receipt: OperationResultSum::Transfer(manager_result),
             }
         }
@@ -1004,7 +1006,7 @@ fn apply_operation<Host: Runtime>(
                 internal_operations_receipts,
             );
             OperationWithMetadata {
-                content: validated_operation.content.into(),
+                content: validated_operation.content.into_manager_operation_content(),
                 receipt: OperationResultSum::Origination(manager_result),
             }
         }
@@ -1037,9 +1039,9 @@ mod tests {
         block::TezBlock,
         enc_wrappers::OperationHash,
         operation::{
-            sign_operation, ManagerOperation, ManagerOperationContent, Operation,
-            OperationContent, OriginationContent, Parameters, RevealContent, Script,
-            TransferContent,
+            sign_operation, ManagerOperation, ManagerOperationContent,
+            ManagerOperationContentConv, Operation, OperationContent, OriginationContent,
+            Parameters, RevealContent, Script, TransferContent,
         },
         operation_result::{
             ApplyOperationError, ApplyOperationErrors, BacktrackedResult, Balance,
@@ -1245,7 +1247,7 @@ mod tests {
                     gas_limit: gas_limit.into(),
                     storage_limit: storage_limit.into(),
                 }
-                .into()
+                .into_manager_operation_content()
             })
             .collect::<Vec<ManagerOperationContent>>();
 

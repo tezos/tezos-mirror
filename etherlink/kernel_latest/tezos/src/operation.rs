@@ -127,8 +127,13 @@ pub enum ManagerOperationContent {
     Origination(ManagerOperation<OriginationContent>),
 }
 
-impl ManagerOperationContent {
-    pub fn gas_limit(&self) -> &Narith {
+pub trait ManagerOperationField {
+    fn gas_limit(&self) -> &Narith;
+    fn source(&self) -> &PublicKeyHash;
+}
+
+impl ManagerOperationField for ManagerOperationContent {
+    fn gas_limit(&self) -> &Narith {
         match self {
             ManagerOperationContent::Reveal(op) => &op.gas_limit,
             ManagerOperationContent::Transaction(op) => &op.gas_limit,
@@ -136,7 +141,7 @@ impl ManagerOperationContent {
         }
     }
 
-    pub fn source(&self) -> &PublicKeyHash {
+    fn source(&self) -> &PublicKeyHash {
         match self {
             ManagerOperationContent::Reveal(op) => &op.source,
             ManagerOperationContent::Transaction(op) => &op.source,
@@ -145,8 +150,13 @@ impl ManagerOperationContent {
     }
 }
 
-impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
-    fn from(op: ManagerOperation<OperationContent>) -> Self {
+pub trait ManagerOperationContentConv: Sized {
+    fn into_manager_operation_content(self) -> ManagerOperationContent;
+    fn from_manager_operation_content(op: ManagerOperationContent) -> Self;
+}
+
+impl ManagerOperationContentConv for ManagerOperation<OperationContent> {
+    fn into_manager_operation_content(self) -> ManagerOperationContent {
         let ManagerOperation {
             source,
             fee,
@@ -154,7 +164,7 @@ impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
             gas_limit,
             storage_limit,
             operation,
-        } = op;
+        } = self;
         match operation {
             OperationContent::Reveal(c) => {
                 ManagerOperationContent::Reveal(ManagerOperation {
@@ -188,10 +198,8 @@ impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
             }
         }
     }
-}
 
-impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
-    fn from(op: ManagerOperationContent) -> Self {
+    fn from_manager_operation_content(op: ManagerOperationContent) -> Self {
         match op {
             ManagerOperationContent::Reveal(ManagerOperation {
                 source,
@@ -305,7 +313,7 @@ fn make_dummy_operation(
             storage_limit: 45_u64.into(),
             operation,
         }
-        .into()],
+        .into_manager_operation_content()],
         signature,
     }
 }

@@ -13,7 +13,7 @@ use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_tezlink::{
     operation::{
         serialize_unsigned_operation, ManagerOperation, ManagerOperationContent,
-        OperationContent,
+        ManagerOperationContentConv, ManagerOperationField, OperationContent,
     },
     operation_result::{Balance, CounterError, UpdateOrigin, ValidityError},
 };
@@ -282,8 +282,11 @@ pub fn execute_validation<Host: Runtime>(
         }
     }
 
-    let mut unvalidated_operation: Vec<ManagerOperation<OperationContent>> =
-        operation.content.into_iter().map(Into::into).collect();
+    let mut unvalidated_operation: Vec<ManagerOperation<OperationContent>> = operation
+        .content
+        .into_iter()
+        .map(<ManagerOperation<OperationContent>>::from_manager_operation_content)
+        .collect();
 
     let mut source_balance = source_account
         .balance(host)
