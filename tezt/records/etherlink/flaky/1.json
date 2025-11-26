@@ -18,10 +18,10 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "69845448",
+      "total_time": "70356894",
       "count": "1"
     },
-    "peak_memory_usage": 2491622000
+    "peak_memory_usage": 2492785000
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
@@ -42,10 +42,10 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "68489945",
+      "total_time": "71954652",
       "count": "1"
     },
-    "peak_memory_usage": 2483258000
+    "peak_memory_usage": 2537766000
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
@@ -68,10 +68,10 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "86526808",
+      "total_time": "91849523",
       "count": "1"
     },
-    "peak_memory_usage": 3324223000
+    "peak_memory_usage": 3373537000
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
@@ -92,10 +92,10 @@
       "spawn"
     ],
     "successful_runs": {
-      "total_time": "37159967",
+      "total_time": "38456604",
       "count": "1"
     },
-    "peak_memory_usage": 2468870000
+    "peak_memory_usage": 2468063000
   },
   {
     "file": "etherlink/tezt/tests/evm_sequencer.ml",
@@ -116,9 +116,9 @@
       "spawn"
     ],
     "successful_runs": {
-      "total_time": "37255128",
+      "total_time": "38889791",
       "count": "1"
     },
-    "peak_memory_usage": 2452074000
+    "peak_memory_usage": 2522463000
   }
 ]

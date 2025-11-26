@@ -9,10 +9,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "10329136",
+      "total_time": "9713613",
       "count": "1"
     },
-    "peak_memory_usage": 261776000
+    "peak_memory_usage": 253470000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -24,10 +24,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "3889840",
+      "total_time": "3889733",
       "count": "1"
     },
-    "peak_memory_usage": 292350000
+    "peak_memory_usage": 294874000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -39,10 +39,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "1985380",
+      "total_time": "1981275",
       "count": "1"
     },
-    "peak_memory_usage": 308776000
+    "peak_memory_usage": 311372000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -54,10 +54,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "2018297",
+      "total_time": "2020100",
       "count": "1"
     },
-    "peak_memory_usage": 327276000
+    "peak_memory_usage": 328176000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -69,10 +69,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "1982194",
+      "total_time": "1981726",
       "count": "1"
     },
-    "peak_memory_usage": 334492000
+    "peak_memory_usage": 339574000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -84,10 +84,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "5146550",
+      "total_time": "5154958",
       "count": "1"
     },
-    "peak_memory_usage": 354574000
+    "peak_memory_usage": 368100000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -99,10 +99,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "8973582",
+      "total_time": "8969499",
       "count": "1"
     },
-    "peak_memory_usage": 385726000
+    "peak_memory_usage": 397136000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -114,10 +114,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "5443042",
+      "total_time": "5397905",
       "count": "1"
     },
-    "peak_memory_usage": 395358000
+    "peak_memory_usage": 404434000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -129,10 +129,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "15516961",
+      "total_time": "15562093",
       "count": "1"
     },
-    "peak_memory_usage": 398506000
+    "peak_memory_usage": 406304000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -144,10 +144,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "20079435",
+      "total_time": "15081833",
       "count": "1"
     },
-    "peak_memory_usage": 437476000
+    "peak_memory_usage": 441208000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -159,10 +159,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "13004396",
+      "total_time": "13001468",
       "count": "1"
     },
-    "peak_memory_usage": 470444000
+    "peak_memory_usage": 475940000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -174,10 +174,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "27096333",
+      "total_time": "27114125",
       "count": "1"
     },
-    "peak_memory_usage": 480944000
+    "peak_memory_usage": 484624000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -189,10 +189,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "715988",
+      "total_time": "728567",
       "count": "1"
     },
-    "peak_memory_usage": 476636000
+    "peak_memory_usage": 475350000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -204,10 +204,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "3183144",
+      "total_time": "3156120",
       "count": "1"
     },
-    "peak_memory_usage": 499560000
+    "peak_memory_usage": 501802000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -219,10 +219,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "26005414",
+      "total_time": "26009577",
       "count": "1"
     },
-    "peak_memory_usage": 511882000
+    "peak_memory_usage": 514326000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -234,10 +234,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "11001671",
+      "total_time": "10990451",
       "count": "1"
     },
-    "peak_memory_usage": 535652000
+    "peak_memory_usage": 535202000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -249,10 +249,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "22999891",
+      "total_time": "26016028",
       "count": "1"
     },
-    "peak_memory_usage": 544396000
+    "peak_memory_usage": 545026000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -264,10 +264,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "2954772",
+      "total_time": "2938626",
       "count": "1"
     },
-    "peak_memory_usage": 549984000
+    "peak_memory_usage": 556676000
   },
   {
     "file": "src/proto_alpha/lib_delegate/test/test_scenario.ml",
@@ -279,295 +279,295 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "2978498",
+      "total_time": "2986128",
       "count": "1"
     },
-    "peak_memory_usage": 559520000
+    "peak_memory_usage": 562740000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: reaches level 5",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: reaches level 5",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "10023278",
+      "total_time": "10025644",
       "count": "1"
     },
-    "peak_memory_usage": 573356000
+    "peak_memory_usage": 574490000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: cannot progress without new head",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: cannot progress without new head",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "3889970",
+      "total_time": "3877398",
       "count": "1"
     },
-    "peak_memory_usage": 575978000
+    "peak_memory_usage": 577116000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: reset delayed pqc",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: reset delayed pqc",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "1985768",
+      "total_time": "1985911",
       "count": "1"
     },
-    "peak_memory_usage": 577910000
+    "peak_memory_usage": 577264000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario t1",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario t1",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "2018213",
+      "total_time": "2021378",
       "count": "1"
     },
-    "peak_memory_usage": 577522000
+    "peak_memory_usage": 565468000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario t2",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario t2",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "1986234",
+      "total_time": "1988577",
       "count": "1"
     },
-    "peak_memory_usage": 561294000
+    "peak_memory_usage": 562584000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario t3",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario t3",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "5144552",
+      "total_time": "5150263",
       "count": "1"
     },
-    "peak_memory_usage": 581488000
+    "peak_memory_usage": 589220000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario t4",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario t4",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "8972477",
+      "total_time": "8961143",
       "count": "1"
     },
-    "peak_memory_usage": 599360000
+    "peak_memory_usage": 600580000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario f1",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario f1",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "5442077",
+      "total_time": "5425781",
       "count": "1"
     },
-    "peak_memory_usage": 606522000
+    "peak_memory_usage": 608550000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario f2",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario f2",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "15513219",
+      "total_time": "15536389",
       "count": "1"
     },
-    "peak_memory_usage": 609770000
+    "peak_memory_usage": 611568000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario m1",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario m1",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "20083433",
+      "total_time": "15087350",
       "count": "1"
     },
-    "peak_memory_usage": 625398000
+    "peak_memory_usage": 629146000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario m2",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario m2",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "13003081",
+      "total_time": "12996237",
       "count": "1"
     },
-    "peak_memory_usage": 646758000
+    "peak_memory_usage": 645782000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario m3",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario m3",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "27107552",
+      "total_time": "27116714",
       "count": "1"
     },
-    "peak_memory_usage": 647638000
+    "peak_memory_usage": 647696000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario m4",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario m4",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "722634",
+      "total_time": "725229",
       "count": "1"
     },
-    "peak_memory_usage": 664078000
+    "peak_memory_usage": 662500000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario m5",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario m5",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "3166727",
+      "total_time": "3154886",
       "count": "1"
     },
-    "peak_memory_usage": 673582000
+    "peak_memory_usage": 670140000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario m6",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario m6",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "26006950",
+      "total_time": "26005407",
       "count": "1"
     },
-    "peak_memory_usage": 684652000
+    "peak_memory_usage": 680980000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario m7",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario m7",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "10998114",
+      "total_time": "10998643",
       "count": "1"
     },
-    "peak_memory_usage": 713640000
+    "peak_memory_usage": 712612000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario m8",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario m8",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "25996315",
+      "total_time": "22997619",
       "count": "1"
     },
-    "peak_memory_usage": 733096000
+    "peak_memory_usage": 727008000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario m9",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario m9",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "2959288",
+      "total_time": "2957942",
       "count": "1"
     },
-    "peak_memory_usage": 715648000
+    "peak_memory_usage": 710520000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_delegate/test/test_scenario.ml",
-    "title": "024-PsD5wVTJ: scenario m10",
+    "file": "src/proto_024_PtTALLiN/lib_delegate/test/test_scenario.ml",
+    "title": "024-PtTALLiN: scenario m10",
     "tags": [
-      "024_psd5wvtj",
+      "024_pttallin",
       "baker",
       "mockup",
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "2980668",
+      "total_time": "2977699",
       "count": "1"
     },
-    "peak_memory_usage": 719028000
+    "peak_memory_usage": 717432000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -579,10 +579,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "10015868",
+      "total_time": "10022725",
       "count": "1"
     },
-    "peak_memory_usage": 750810000
+    "peak_memory_usage": 746312000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -594,10 +594,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "3888149",
+      "total_time": "3881494",
       "count": "1"
     },
-    "peak_memory_usage": 757150000
+    "peak_memory_usage": 754232000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -609,10 +609,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "1987390",
+      "total_time": "1986824",
       "count": "1"
     },
-    "peak_memory_usage": 761070000
+    "peak_memory_usage": 755772000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -624,10 +624,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "2021136",
+      "total_time": "2016237",
       "count": "1"
     },
-    "peak_memory_usage": 764750000
+    "peak_memory_usage": 759504000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -639,10 +639,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "1979414",
+      "total_time": "1992753",
       "count": "1"
     },
-    "peak_memory_usage": 767234000
+    "peak_memory_usage": 762234000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -654,10 +654,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "5124534",
+      "total_time": "5119609",
       "count": "1"
     },
-    "peak_memory_usage": 772656000
+    "peak_memory_usage": 769138000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -669,10 +669,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "8994094",
+      "total_time": "8990227",
       "count": "1"
     },
-    "peak_memory_usage": 780692000
+    "peak_memory_usage": 775754000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -684,10 +684,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "5440068",
+      "total_time": "5403788",
       "count": "1"
     },
-    "peak_memory_usage": 776868000
+    "peak_memory_usage": 758458000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -699,10 +699,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "15511741",
+      "total_time": "15562515",
       "count": "1"
     },
-    "peak_memory_usage": 765466000
+    "peak_memory_usage": 765666000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -714,10 +714,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "20082930",
+      "total_time": "20069772",
       "count": "1"
     },
-    "peak_memory_usage": 808194000
+    "peak_memory_usage": 804934000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -729,10 +729,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "13002947",
+      "total_time": "13002064",
       "count": "1"
     },
-    "peak_memory_usage": 829418000
+    "peak_memory_usage": 826574000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -744,10 +744,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "27091190",
+      "total_time": "27092949",
       "count": "1"
     },
-    "peak_memory_usage": 831890000
+    "peak_memory_usage": 806614000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -759,10 +759,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "711163",
+      "total_time": "716194",
       "count": "1"
     },
-    "peak_memory_usage": 813750000
+    "peak_memory_usage": 816266000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -774,10 +774,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "3197005",
+      "total_time": "3189960",
       "count": "1"
     },
-    "peak_memory_usage": 843894000
+    "peak_memory_usage": 841222000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -789,10 +789,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "26003279",
+      "total_time": "26012073",
       "count": "1"
     },
-    "peak_memory_usage": 874642000
+    "peak_memory_usage": 873966000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -804,10 +804,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "10999998",
+      "total_time": "10992166",
       "count": "1"
     },
-    "peak_memory_usage": 888034000
+    "peak_memory_usage": 882286000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -819,10 +819,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "25998256",
+      "total_time": "26000482",
       "count": "1"
     },
-    "peak_memory_usage": 886254000
+    "peak_memory_usage": 891658000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -834,10 +834,10 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "2964919",
+      "total_time": "2957086",
       "count": "1"
     },
-    "peak_memory_usage": 910926000
+    "peak_memory_usage": 910098000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_delegate/test/test_scenario.ml",
@@ -849,9 +849,9 @@
       "time_sensitive"
     ],
     "successful_runs": {
-      "total_time": "2978700",
+      "total_time": "2982343",
       "count": "1"
     },
-    "peak_memory_usage": 916614000
+    "peak_memory_usage": 915406000
   }
 ]

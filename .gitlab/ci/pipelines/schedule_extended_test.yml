@@ -2162,6 +2162,7 @@ tezt-flaky:
       junit: $JUNIT
     when: always
   retry: 2
+  parallel: 2
 
 tezt-extra:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -2292,7 +2293,7 @@ tezt-slow:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 14
+  parallel: 12
 
 tezt-riscv-slow-sequential:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -2428,6 +2429,7 @@ tezt-time-sensitive:
       junit: $JUNIT
     when: always
   retry: 2
+  parallel: 2
 
 tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -2498,4 +2500,4 @@ tezt:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 33
+  parallel: 34

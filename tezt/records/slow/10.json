@@ -8,257 +8,459 @@
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "284898",
+      "total_time": "287634",
       "count": "1"
     },
-    "peak_memory_usage": 104810000
+    "peak_memory_usage": 98371000
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
-    "title": "alpha: sc rollup inbox (test to verify a proof with an out of bound index.)",
+    "title": "alpha: sc rollup inbox (negative test of inclusion proof.)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "216564",
+      "total_time": "1652014",
       "count": "1"
     },
-    "peak_memory_usage": 108379000
+    "peak_memory_usage": 330793000
   },
   {
-    "file": "src/proto_alpha/lib_protocol/test/pbt/test_script_roundtrip.ml",
-    "title": "alpha: roundtrip_size_big_map (roundtrip_size_big_map)",
+    "file": "src/proto_alpha/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
+    "title": "alpha: sc rollup inbox (test to verify a proof without the payload.)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "31129",
+      "total_time": "170837",
+      "count": "1"
+    },
+    "peak_memory_usage": 78971000
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
+    "title": "alpha: sc rollup inbox (messages are correctly added in payloads history)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "159172",
+      "count": "1"
+    },
+    "peak_memory_usage": 119880000
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/unit/test_global_constants_storage.ml",
+    "title": "alpha: Global constants storage (expand is idempotent)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "44095",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/pbt/test_tez_repr.ml",
+    "title": "alpha: Tez_repr (Tez.(+?) is coherent w.r.t. Z.(+))",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "688",
       "count": "1"
     }
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/pbt/test_sc_rollup_tick_repr.ml",
-    "title": "alpha: Tick_repr (next x > x)",
+    "title": "alpha: Tick_repr (to_int o of_int = identity)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "308",
+      "total_time": "259",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/pbt/test_sc_rollup_inbox.ml",
+    "title": "alpha: safety (test_add_info_per_level)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "32341",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/pbt/test_sc_rollup_encoding.ml",
+    "title": "alpha: SC rollup encoding: : roundtrip (roundtrip Sc_rollup_commitment.versioned)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "28842",
       "count": "1"
     }
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/pbt/test_refutation_game.ml",
-    "title": "alpha: Refutation_game: Refutation (Perfect against Random)",
+    "title": "alpha: Refutation_game: Refutation (dissection larger than 32 kernel_run)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "102576138",
+      "total_time": "11959053",
       "count": "1"
     },
-    "peak_memory_usage": 474593000
+    "peak_memory_usage": 236624000
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/pbt/test_refutation_game.ml",
-    "title": "alpha: Refutation_game: Dissection (distance < nb_of_sections => (len dissection = succ (dist dissection)))",
+    "title": "alpha: Refutation_game: Dissection (dissection.start_chunk can not change)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "15357",
+      "total_time": "426676",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 221373000
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/pbt/test_carbonated_map.ml",
-    "title": "alpha: Carbonated map (Test that map commutes with mapping over list)",
+    "title": "alpha: Carbonated map (Empty map is left identity for merge)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "1100769",
+      "total_time": "1043774",
       "count": "1"
     },
-    "peak_memory_usage": 295436000
+    "peak_memory_usage": 345561000
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/pbt/test_bytes_conversion.ml",
+    "title": "alpha: bytes and int/nat conversion : bytes_nat_conv (nat_of_bytes)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "464",
+      "count": "1"
+    }
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/pbt/saturation_fuzzing.ml",
-    "title": "alpha: add and sub ((t1 - t2) + t2 >= t1)",
+    "title": "alpha: add (t + 0 = t)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "540",
+      "total_time": "401",
       "count": "1"
     }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/pbt/saturation_fuzzing.ml",
+    "title": "alpha: <= and >= (t >= 0)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "305",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/operations/test_transfer.ml",
+    "title": "alpha: transfer (block with multiple transfer paying fee)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "32308",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_alpha/lib_protocol/test/integration/michelson/test_sapling.ml",
+    "title": "alpha: sapling (bench_phases_legacy)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "alpha"
+    ],
+    "successful_runs": {
+      "total_time": "11312726",
+      "count": "1"
+    },
+    "peak_memory_usage": 496265000
   },
   {
     "file": "src/proto_alpha/lib_protocol/test/integration/michelson/test_lazy_storage_diff.ml",
-    "title": "alpha: lazy storage diff (encoding roundtrip)",
+    "title": "alpha: lazy storage diff (conversion roundtrip)",
     "tags": [
       "alcotezt",
       "slow",
       "alpha"
     ],
     "successful_runs": {
-      "total_time": "387",
+      "total_time": "144",
       "count": "1"
     }
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_sc_rollup_node/test/test_octez_conversions.ml",
-    "title": "024-PsD5wVTJ: Smart rollup types octez conversions: roundtrip (roundtrip state_hash)",
+    "file": "src/proto_alpha/lib_plugin/test/test_consensus_filter.ml",
+    "title": "alpha: pre_filter (same level, different round, acceptable op)",
     "tags": [
       "alcotezt",
       "slow",
-      "t024"
+      "alpha"
     ],
     "successful_runs": {
-      "total_time": "1791",
+      "total_time": "1400",
       "count": "1"
     }
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
-    "title": "024-PsD5wVTJ: sc rollup inbox (negative test of inclusion proof.)",
+    "file": "src/proto_024_PtTALLiN/lib_sc_rollup_node/test/test_octez_conversions.ml",
+    "title": "024-PtTALLiN: Smart rollup types octez conversions: roundtrip (roundtrip address)",
     "tags": [
       "alcotezt",
       "slow",
       "t024"
     ],
     "successful_runs": {
-      "total_time": "1536895",
-      "count": "1"
-    },
-    "peak_memory_usage": 324399000
-  },
-  {
-    "file": "src/proto_024_PsD5wVTJ/lib_protocol/test/unit/test_global_constants_storage.ml",
-    "title": "024-PsD5wVTJ: Global constants storage (register and expand are orthogonal)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "t024"
-    ],
-    "successful_runs": {
-      "total_time": "168613",
-      "count": "1"
-    },
-    "peak_memory_usage": 339662000
-  },
-  {
-    "file": "src/proto_024_PsD5wVTJ/lib_protocol/test/pbt/test_zk_rollup_encoding.ml",
-    "title": "024-PsD5wVTJ: ZK rollup encoding: : roundtrip (roundtrip Zk_rollup_account_repr.t)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "t024"
-    ],
-    "successful_runs": {
-      "total_time": "14314791",
-      "count": "1"
-    },
-    "peak_memory_usage": 520809000
-  },
-  {
-    "file": "src/proto_024_PsD5wVTJ/lib_protocol/test/pbt/test_sc_rollup_encoding.ml",
-    "title": "024-PsD5wVTJ: SC rollup encoding: : roundtrip (roundtrip Sc_rollup_inbox_message_repr.t)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "t024"
-    ],
-    "successful_runs": {
-      "total_time": "10153",
+      "total_time": "1492",
       "count": "1"
     }
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_protocol/test/pbt/test_sampler.ml",
-    "title": "024-PsD5wVTJ: sampling (alias_float)",
+    "file": "src/proto_024_PtTALLiN/lib_sc_rollup_node/test/test_octez_conversions.ml",
+    "title": "024-PtTALLiN: Smart rollup types octez conversions: roundtrip (roundtrip inbox)",
     "tags": [
       "alcotezt",
       "slow",
       "t024"
     ],
     "successful_runs": {
-      "total_time": "79549371",
+      "total_time": "125700",
       "count": "1"
     },
-    "peak_memory_usage": 708303000
+    "peak_memory_usage": 361579000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_protocol/test/pbt/test_refutation_game.ml",
-    "title": "024-PsD5wVTJ: Refutation_game: Refutation (Perfect against EOL hater)",
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
+    "title": "024-PtTALLiN: sc rollup inbox (test to verify a proof with a proof for another payload.)",
     "tags": [
       "alcotezt",
       "slow",
       "t024"
     ],
     "successful_runs": {
-      "total_time": "95091046",
+      "total_time": "175490",
       "count": "1"
     },
-    "peak_memory_usage": 522280000
+    "peak_memory_usage": 365597000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_protocol/test/pbt/test_carbonated_map.ml",
-    "title": "024-PsD5wVTJ: Carbonated map (Test that map commutes with mapping over list)",
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
+    "title": "024-PtTALLiN: sc rollup inbox (messages are correctly added in payloads history)",
     "tags": [
       "alcotezt",
       "slow",
       "t024"
     ],
     "successful_runs": {
-      "total_time": "904412",
+      "total_time": "210041",
       "count": "1"
     },
-    "peak_memory_usage": 716591000
+    "peak_memory_usage": 369776000
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_protocol/test/pbt/test_bytes_conversion.ml",
-    "title": "024-PsD5wVTJ: bytes and int/nat conversion : bytes_nat_conv (nat_of_bytes)",
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/unit/test_round_repr.ml",
+    "title": "024-PtTALLiN: round (round_and_offset is correct)",
     "tags": [
       "alcotezt",
       "slow",
       "t024"
     ],
     "successful_runs": {
-      "total_time": "491",
+      "total_time": "1046",
       "count": "1"
     }
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_protocol/test/pbt/saturation_fuzzing.ml",
-    "title": "024-PsD5wVTJ: mul (t1 * t2 = t2 * t1)",
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/unit/test_global_constants_storage.ml",
+    "title": "024-PtTALLiN: Global constants storage (get always returned the registered constant)",
     "tags": [
       "alcotezt",
       "slow",
       "t024"
     ],
     "successful_runs": {
-      "total_time": "344",
+      "total_time": "73233",
       "count": "1"
     }
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_protocol/test/pbt/saturation_fuzzing.ml",
-    "title": "024-PsD5wVTJ: sub (t - 0 = t)",
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/pbt/test_tez_repr.ml",
+    "title": "024-PtTALLiN: Tez_repr (Tez.(-?) is coherent w.r.t. Z.(-))",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "480",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/pbt/test_sc_rollup_tick_repr.ml",
+    "title": "024-PtTALLiN: Tick_repr (x = initial \\/ x > initial)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "161",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/pbt/test_refutation_game.ml",
+    "title": "024-PtTALLiN: Refutation_game: Refutation (dissection is one kernel_run)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "6919991",
+      "count": "1"
+    },
+    "peak_memory_usage": 373240000
+  },
+  {
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/pbt/test_refutation_game.ml",
+    "title": "024-PtTALLiN: Refutation_game: Refutation (Perfect against EOL hater)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "108507578",
+      "count": "1"
+    },
+    "peak_memory_usage": 511241000
+  },
+  {
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/pbt/test_operation_encoding.ml",
+    "title": "024-PtTALLiN: Operation_encoding: roundtrip (roundtrip Operation.t)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "3877236",
+      "count": "1"
+    },
+    "peak_memory_usage": 370870000
+  },
+  {
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/pbt/test_dal_slot_proof.ml",
+    "title": "024-PtTALLiN: Dal slots refutation game: [024-PtTALLiN: test] Dal slots refutation (Pbt tests: unconfirmed pages)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "1575833",
+      "count": "1"
+    },
+    "peak_memory_usage": 1720563000
+  },
+  {
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/pbt/test_carbonated_map.ml",
+    "title": "024-PtTALLiN: Carbonated map (Empty map is left identity for merge)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "878385",
+      "count": "1"
+    },
+    "peak_memory_usage": 1383500000
+  },
+  {
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/pbt/test_carbonated_map.ml",
+    "title": "024-PtTALLiN: Carbonated map (Size should not change when map is merging with itself)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "879583",
+      "count": "1"
+    },
+    "peak_memory_usage": 1387805000
+  },
+  {
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/pbt/test_bytes_conversion.ml",
+    "title": "024-PtTALLiN: bytes and int/nat conversion : bytes_nat_conv (nat_of_bytes)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "311",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/pbt/saturation_fuzzing.ml",
+    "title": "024-PtTALLiN: add (t + 0 = t)",
     "tags": [
       "alcotezt",
       "slow",
@@ -270,81 +472,152 @@
     }
   },
   {
-    "file": "src/proto_024_PsD5wVTJ/lib_protocol/test/pbt/saturation_fuzzing.ml",
-    "title": "024-PsD5wVTJ: <= and >= (t >= 0)",
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/pbt/saturation_fuzzing.ml",
+    "title": "024-PtTALLiN: sub (t - 0 = t)",
     "tags": [
       "alcotezt",
       "slow",
       "t024"
     ],
     "successful_runs": {
-      "total_time": "380",
+      "total_time": "313",
       "count": "1"
     }
+  },
+  {
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/integration/michelson/test_sapling.ml",
+    "title": "024-PtTALLiN: sapling (bench_phases_legacy)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "11218899",
+      "count": "1"
+    },
+    "peak_memory_usage": 543454000
+  },
+  {
+    "file": "src/proto_024_PtTALLiN/lib_protocol/test/integration/michelson/test_interpretation.ml",
+    "title": "024-PtTALLiN: interpretation (map instr against options)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "1418113",
+      "count": "1"
+    },
+    "peak_memory_usage": 1099449000
+  },
+  {
+    "file": "src/proto_024_PtTALLiN/lib_plugin/test/test_consensus_filter.ml",
+    "title": "024-PtTALLiN: pre_filter (acceptable past op )",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "1796",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_023_PtSeouLo/lib_sc_rollup_node/test/test_octez_conversions.ml",
+    "title": "023-PtSeouLo: Smart rollup types octez conversions: roundtrip (roundtrip dal_slot_header)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "s023"
+    ],
+    "successful_runs": {
+      "total_time": "198796",
+      "count": "1"
+    },
+    "peak_memory_usage": 1103919000
+  },
+  {
+    "file": "src/proto_023_PtSeouLo/lib_sc_rollup_node/test/test_octez_conversions.ml",
+    "title": "023-PtSeouLo: Smart rollup types octez conversions: roundtrip (roundtrip dal_slot_history_cache)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "s023"
+    ],
+    "successful_runs": {
+      "total_time": "53410031",
+      "count": "1"
+    },
+    "peak_memory_usage": 1323383000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
-    "title": "023-PtSeouLo: sc rollup inbox (Produce a merkelized payload hashes proof and verify its validity.)",
+    "title": "023-PtSeouLo: sc rollup inbox (Invalid merkelized payload hashes proof fails.)",
     "tags": [
       "alcotezt",
       "slow",
       "s023"
     ],
     "successful_runs": {
-      "total_time": "91715",
+      "total_time": "479376",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 426070000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
-    "title": "023-PtSeouLo: sc rollup inbox (verify empty inclusion proof fails.)",
+    "title": "023-PtSeouLo: sc rollup inbox (test to verify a proof with another payload.)",
     "tags": [
       "alcotezt",
       "slow",
       "s023"
     ],
     "successful_runs": {
-      "total_time": "87497",
+      "total_time": "187856",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 432322000
   },
   {
-    "file": "src/proto_023_PtSeouLo/lib_protocol/test/unit/test_global_constants_storage.ml",
-    "title": "023-PtSeouLo: Global constants storage (register: fails with unregistered references pbt)",
+    "file": "src/proto_023_PtSeouLo/lib_protocol/test/unit/test_sc_rollup_inbox.ml",
+    "title": "023-PtSeouLo: sc rollup inbox (produce inbox proof and verifies it.)",
     "tags": [
       "alcotezt",
       "slow",
       "s023"
     ],
     "successful_runs": {
-      "total_time": "31095",
+      "total_time": "1353397",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 468048000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_zk_rollup_encoding.ml",
-    "title": "023-PtSeouLo: ZK rollup encoding: : roundtrip (roundtrip Zk_rollup_operation_repr.t)",
+    "title": "023-PtSeouLo: ZK rollup encoding: : to_scalar (to_scalar Zk_rollup_repr.t)",
     "tags": [
       "alcotezt",
       "slow",
       "s023"
     ],
     "successful_runs": {
-      "total_time": "660171",
+      "total_time": "1473",
       "count": "1"
-    },
-    "peak_memory_usage": 763389000
+    }
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_tez_repr.ml",
-    "title": "023-PtSeouLo: Tez_repr (Tez.( /! ) is coherent w.r.t. Z.(/))",
+    "title": "023-PtSeouLo: Tez_repr (Tez.(*?) is coherent w.r.t. Z.(*))",
     "tags": [
       "alcotezt",
       "slow",
       "s023"
     ],
     "successful_runs": {
-      "total_time": "426",
+      "total_time": "327",
       "count": "1"
     }
   },
@@ -357,22 +630,77 @@
       "s023"
     ],
     "successful_runs": {
-      "total_time": "24872",
+      "total_time": "24298",
       "count": "1"
     }
   },
   {
-    "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_sc_rollup_encoding.ml",
-    "title": "023-PtSeouLo: SC rollup encoding: : roundtrip (roundtrip Sc_rollup_refutation_storage.conflict)",
+    "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_sc_rollup_tick_repr.ml",
+    "title": "023-PtSeouLo: Tick_repr (of_int only accepts natural numbers)",
     "tags": [
       "alcotezt",
       "slow",
       "s023"
     ],
     "successful_runs": {
-      "total_time": "86251",
+      "total_time": "225",
       "count": "1"
     }
+  },
+  {
+    "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_sc_rollup_encoding.ml",
+    "title": "023-PtSeouLo: SC rollup encoding: : roundtrip (roundtrip Sc_rollup_commitment.t)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "s023"
+    ],
+    "successful_runs": {
+      "total_time": "30396",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_sampler.ml",
+    "title": "023-PtSeouLo: sampling (alias_float)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "s023"
+    ],
+    "successful_runs": {
+      "total_time": "80835079",
+      "count": "1"
+    },
+    "peak_memory_usage": 765244000
+  },
+  {
+    "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_refutation_game.ml",
+    "title": "023-PtSeouLo: Refutation_game: Refutation (dissection shorter than 32 kernel_run)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "s023"
+    ],
+    "successful_runs": {
+      "total_time": "6590352",
+      "count": "1"
+    },
+    "peak_memory_usage": 1262704000
+  },
+  {
+    "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_refutation_game.ml",
+    "title": "023-PtSeouLo: Refutation_game: Refutation (dissection larger than 32 kernel_run)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "s023"
+    ],
+    "successful_runs": {
+      "total_time": "9037521",
+      "count": "1"
+    },
+    "peak_memory_usage": 1265336000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_refutation_game.ml",
@@ -383,125 +711,191 @@
       "s023"
     ],
     "successful_runs": {
-      "total_time": "63531180",
+      "total_time": "72191575",
       "count": "1"
     },
-    "peak_memory_usage": 771720000
+    "peak_memory_usage": 1267835000
   },
   {
-    "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_merkle_list.ml",
-    "title": "023-PtSeouLo: check_path (check_path)",
+    "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_refutation_game.ml",
+    "title": "023-PtSeouLo: Refutation_game: Dissection (dissection must be well distributed)",
     "tags": [
       "alcotezt",
       "slow",
       "s023"
     ],
     "successful_runs": {
-      "total_time": "3307159",
+      "total_time": "388113",
       "count": "1"
     },
-    "peak_memory_usage": 511968000
-  },
-  {
-    "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_carbonated_map.ml",
-    "title": "023-PtSeouLo: Carbonated map (To-list/of-list roundtrip)",
-    "tags": [
-      "alcotezt",
-      "slow",
-      "s023"
-    ],
-    "successful_runs": {
-      "total_time": "835686",
-      "count": "1"
-    },
-    "peak_memory_usage": 517497000
+    "peak_memory_usage": 770810000
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_carbonated_map.ml",
-    "title": "023-PtSeouLo: Carbonated map (Add a new element increases size by one)",
+    "title": "023-PtSeouLo: Carbonated map (Remove new element decreases size by one)",
     "tags": [
       "alcotezt",
       "slow",
       "s023"
     ],
     "successful_runs": {
-      "total_time": "816174",
+      "total_time": "934628",
       "count": "1"
     },
-    "peak_memory_usage": 524305000
+    "peak_memory_usage": 777329000
+  },
+  {
+    "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_carbonated_map.ml",
+    "title": "023-PtSeouLo: Carbonated map (Should not find non-existing)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "s023"
+    ],
+    "successful_runs": {
+      "total_time": "856279",
+      "count": "1"
+    },
+    "peak_memory_usage": 785067000
+  },
+  {
+    "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/test_bytes_conversion.ml",
+    "title": "023-PtSeouLo: bytes and int/nat conversion : bytes_nat_conv (bytes_of_nat)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "s023"
+    ],
+    "successful_runs": {
+      "total_time": "468",
+      "count": "1"
+    }
   },
   {
     "file": "src/proto_023_PtSeouLo/lib_protocol/test/pbt/saturation_fuzzing.ml",
-    "title": "023-PtSeouLo: mul (t * 1 = t)",
+    "title": "023-PtSeouLo: sub (t1 - t2 <= t1)",
     "tags": [
       "alcotezt",
       "slow",
       "s023"
     ],
     "successful_runs": {
-      "total_time": "302",
+      "total_time": "488",
       "count": "1"
     }
   },
   {
-    "file": "src/lib_stdlib/test/test_tzString.ml",
-    "title": "TzString: chunk_bytes (TzString.chunk_bytes chunks bytes correctly)",
+    "file": "src/proto_023_PtSeouLo/lib_protocol/test/integration/michelson/test_interpretation.ml",
+    "title": "023-PtSeouLo: interpretation (map instr against options)",
     "tags": [
       "alcotezt",
-      "slow"
+      "slow",
+      "s023"
     ],
     "successful_runs": {
-      "total_time": "925",
+      "total_time": "970530",
+      "count": "1"
+    },
+    "peak_memory_usage": 792712000
+  },
+  {
+    "file": "src/proto_023_PtSeouLo/lib_plugin/test/test_consensus_filter.ml",
+    "title": "023-PtSeouLo: pre_filter (next level, acceptable op)",
+    "tags": [
+      "alcotezt",
+      "slow",
+      "s023"
+    ],
+    "successful_runs": {
+      "total_time": "2163",
       "count": "1"
     }
   },
   {
-    "file": "src/lib_stdlib/test/test_bits.ml",
-    "title": "stdlib: numbits (numbits_correct)",
+    "file": "src/proto_023_PtSeouLo/lib_client/test/test_client_proto_context.ml",
+    "title": "023-PtSeouLo: Encodings (test_batch_transfer_operation_encoding_roundtrip)",
     "tags": [
       "alcotezt",
-      "slow"
+      "slow",
+      "s023"
     ],
     "successful_runs": {
-      "total_time": "30787637",
+      "total_time": "9881",
       "count": "1"
-    },
-    "peak_memory_usage": 524684000
+    }
   },
   {
-    "file": "src/lib_shell/test/test_prevalidator_classification_operations.ml",
-    "title": "Prevalidator: recycle_operations ([recycle_operations ~live_blocks:empty] is empty)",
+    "file": "src/lib_stdlib/test-unix/test_circular_buffer_fuzzy.ml",
+    "title": "Stdlib.circular_buffer: Invalid argument (Stdlib.circular_buffer.equivalence-with-reference-implementation-without-invalid-argument)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "4459326",
+      "total_time": "158308",
       "count": "1"
     },
-    "peak_memory_usage": 605164000
+    "peak_memory_usage": 813933000
+  },
+  {
+    "file": "src/lib_shell/test/test_synchronisation_heuristic_fuzzy.ml",
+    "title": "synchronisation heuristic fuzzy: synchronisation heuristic fuzzy (Shell.synchronisation_heuristic.equivalence-with-reference-implementation (threshold 2) (latency 100))",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "2709054",
+      "count": "1"
+    },
+    "peak_memory_usage": 814434000
+  },
+  {
+    "file": "src/lib_shell/test/test_synchronisation_heuristic_fuzzy.ml",
+    "title": "synchronisation heuristic fuzzy: synchronisation heuristic fuzzy (Shell.synchronisation_heuristic.equivalence-with-reference-implementation (threshold 8) (latency 100))",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "2713417",
+      "count": "1"
+    },
+    "peak_memory_usage": 819192000
+  },
+  {
+    "file": "src/lib_shell/test/test_prevalidator_pending_operations.ml",
+    "title": "Prevalidator_pending_operations: fold_es ordering (Ensure that fold_es returns operations in their status and priority ordering)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "63234",
+      "count": "1"
+    }
   },
   {
     "file": "src/lib_shell/test/test_prevalidator_classification.ml",
-    "title": "Prevalidator_classification: flush ([flush ~handle_branch_refused:false] empties everything except [refused], [outdated] and [branch_refused])",
+    "title": "Prevalidator_classification: flush ([flush ~handle_branch_refused:true] empties everything except [refused] and [outdated])",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "8486",
+      "total_time": "11043",
       "count": "1"
     }
   },
   {
     "file": "src/lib_shell/test/test_prevalidator_classification.ml",
-    "title": "Prevalidator_classification: unparsable ([is_known_unparsable oph (add_unparsable oph t)] holds)",
+    "title": "Prevalidator_classification: to_map ([flush] can be emulated by [to_map ~refused:true ..])",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "10674",
+      "total_time": "12872",
       "count": "1"
     }
   },
@@ -513,60 +907,85 @@
       "slow"
     ],
     "successful_runs": {
-      "total_time": "2140",
+      "total_time": "1399",
       "count": "1"
     }
   },
   {
-    "file": "src/lib_scoru_wasm/test/test_output.ml",
-    "title": "test lib scoru wasm: Output (Output buffer)",
+    "file": "src/lib_scoru_wasm/test/test_parser_encoding.ml",
+    "title": "test lib scoru wasm: Parser Encodings (Elem)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "11911324",
+      "total_time": "39186",
       "count": "1"
-    },
-    "peak_memory_usage": 1439482000
+    }
   },
   {
     "file": "src/lib_scoru_wasm/test/test_durable_shapshot.ml",
-    "title": "test lib scoru wasm: Durable snapshot (Stress-test operation set_value_exn. Initial size: 1000, 2000 operations)",
+    "title": "test lib scoru wasm: Durable snapshot (Descending distributed all operations. Initial size: 2000, 3000 operations)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "662694",
+      "total_time": "1344087",
       "count": "1"
     },
-    "peak_memory_usage": 1434267000
+    "peak_memory_usage": 704594000
   },
   {
-    "file": "src/lib_scoru_wasm/fast/test/test_memory_access.ml",
-    "title": "test lib scoru-wasm-fast: Memory access (store_num behaves the same on both memory implementations)",
+    "file": "src/lib_scoru_wasm/test/test_durable_shapshot.ml",
+    "title": "test lib scoru wasm: Durable snapshot (Stress-test operation copy_tree_exn. Initial size: 1000, 2000 operations)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "11819339",
+      "total_time": "627210",
       "count": "1"
     },
-    "peak_memory_usage": 1495359000
+    "peak_memory_usage": 807120000
+  },
+  {
+    "file": "src/lib_scoru_wasm/test/test_durable_shapshot.ml",
+    "title": "test lib scoru wasm: Durable snapshot (Stress-test operation move_tree_exn. Initial size: 1000, 2000 operations)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "687912",
+      "count": "1"
+    },
+    "peak_memory_usage": 939869000
   },
   {
     "file": "src/lib_rpc_http/test/test_rpc_http.ml",
-    "title": "tezos-rpc-http: qcheck (default policy parses and is of correct type)",
+    "title": "tezos-rpc-http: qcheck (Encoding and decoding an ACL is an identity function.)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "571",
+      "total_time": "26674",
       "count": "1"
     }
+  },
+  {
+    "file": "src/lib_proxy/test_helpers/shell_services/test/test_block_services.ml",
+    "title": "Block_services: merkle_proof_eq (merkle_proof_eq is symmetric: forall t1 t2, merkle_proof_eq t1 t2 = merkle_proof_eq t2 t1)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "274391",
+      "count": "1"
+    },
+    "peak_memory_usage": 775834000
   },
   {
     "file": "src/lib_proxy/test/test_fuzzing_light.ml",
@@ -576,35 +995,87 @@
       "slow"
     ],
     "successful_runs": {
-      "total_time": "447915",
+      "total_time": "518527",
       "count": "1"
     },
-    "peak_memory_usage": 521802000
+    "peak_memory_usage": 1063757000
   },
   {
-    "file": "src/lib_lwt_result_stdlib/test/test_list_basic.ml",
-    "title": "list-basic: shuffle (shuffle preserves value sets)",
+    "file": "src/lib_proxy/test/test_fuzzing_light.ml",
+    "title": "Mode Light: Consensus consistency examples (min_agreement=0.010000, honest=0, rogue=100 consensus_expected=false)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "996",
+      "total_time": "12263154",
+      "count": "1"
+    },
+    "peak_memory_usage": 771193000
+  },
+  {
+    "file": "src/lib_protocol_environment/test/test_mem_context_array_theory.ml",
+    "title": "Memory context array theory: set (get (set m k v) k = v )",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "164366",
+      "count": "1"
+    },
+    "peak_memory_usage": 1064443000
+  },
+  {
+    "file": "src/lib_protocol_environment/test/test_cache.ml",
+    "title": "tezos-shell-context: cache (invalid cache indices produce failures)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "2368376",
+      "count": "1"
+    },
+    "peak_memory_usage": 1560917000
+  },
+  {
+    "file": "src/lib_protocol_environment/test/test_cache.ml",
+    "title": "tezos-shell-context: cache (clear preserves layout and removes entries)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "3849550",
+      "count": "1"
+    },
+    "peak_memory_usage": 1354845000
+  },
+  {
+    "file": "src/lib_protocol_environment/test/test_cache.ml",
+    "title": "tezos-shell-context: cache (inserted entries are in the cache (with find))",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "7264914",
+      "count": "1"
+    },
+    "peak_memory_usage": 1060749000
+  },
+  {
+    "file": "src/lib_lwt_result_stdlib/test/test_fuzzing_option_against_stdlib.ml",
+    "title": "FuzzRef: Option (Option.filter_map)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "452",
       "count": "1"
     }
-  },
-  {
-    "file": "src/lib_lwt_result_stdlib/test/test_fuzzing_map_against_stdlib.ml",
-    "title": "FuzzRef: Map (Map.iter)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "174231",
-      "count": "1"
-    },
-    "peak_memory_usage": 515105000
   },
   {
     "file": "src/lib_lwt_result_stdlib/test/test_fuzzing_list_against_stdlib.ml",
@@ -614,145 +1085,227 @@
       "slow"
     ],
     "successful_runs": {
-      "total_time": "69983",
+      "total_time": "109586",
       "count": "1"
     }
   },
   {
     "file": "src/lib_lwt_result_stdlib/test/test_fuzzing_list_against_stdlib.ml",
-    "title": "FuzzRef: List (List.map)",
+    "title": "FuzzRef: List (List.mapi)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "60025",
+      "total_time": "134420",
+      "count": "1"
+    },
+    "peak_memory_usage": 770397000
+  },
+  {
+    "file": "src/lib_lwt_result_stdlib/test/test_fuzzing_list_against_stdlib.ml",
+    "title": "FuzzRef: List (List.rev_map)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "42168",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_lwt_result_stdlib/test/test_fuzzing_list_against_stdlib.ml",
+    "title": "FuzzRef: List (List.exists)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "34797",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_lwt_result_stdlib/test/test_fuzzing_list_against_stdlib.ml",
+    "title": "FuzzRef: List (List.for_all)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "28957",
       "count": "1"
     }
   },
   {
     "file": "src/lib_lazy_containers/test/lazy_vector_tests.ml",
-    "title": "Lazy structs tests: Lazy_vector (drop works)",
+    "title": "Lazy structs tests: Lazy_vector (cons works)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "113024",
-      "count": "1"
-    },
-    "peak_memory_usage": 511725000
-  },
-  {
-    "file": "src/lib_lazy_containers/test/chunked_byte_vector_tests.ml",
-    "title": "Chunked_byte_vector: Chunked_byte_vector (Immutable CBV/load_bytes roundtrip)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "2030",
+      "total_time": "39886",
       "count": "1"
     }
   },
   {
-    "file": "src/lib_crypto_dal/test/test_dal_cryptobox.ml",
-    "title": "DAL cryptobox: PBT (erasure code not enough shards)",
+    "file": "src/lib_lazy_containers/test/chunked_byte_vector_tests.ml",
+    "title": "Chunked_byte_vector: Chunked_byte_vector (Mutable CBV/store_byte and load_byte work)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "284998",
+      "total_time": "53792",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_lazy_containers/test/chunked_byte_vector_tests.ml",
+    "title": "Chunked_byte_vector: Chunked_byte_vector (Immutable CBV/load_bytes without offset)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "19872",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_hacl/test/test_prop_hacl_hash.ml",
+    "title": "tezos-crypto-shaX-props: SHA512_Props (SHA512_incremental_list)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "4158032",
       "count": "1"
     },
-    "peak_memory_usage": 514456000
+    "peak_memory_usage": 1454439000
   },
   {
     "file": "src/lib_crypto_dal/test/test_dal_cryptobox.ml",
-    "title": "DAL cryptobox: PBT (page proofs)",
+    "title": "DAL cryptobox: PBT (erasure code with slot conversion)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "1504561",
+      "total_time": "533568",
       "count": "1"
     },
-    "peak_memory_usage": 523748000
+    "peak_memory_usage": 1078210000
   },
   {
     "file": "src/lib_crypto_dal/test/test_dal_cryptobox.ml",
-    "title": "DAL cryptobox: PBT (shard proofs)",
+    "title": "DAL cryptobox: PBT (shard_length_mismatch)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "6649086",
-      "count": "1"
-    },
-    "peak_memory_usage": 1488845000
-  },
-  {
-    "file": "src/lib_crypto_dal/test/test_dal_cryptobox.ml",
-    "title": "DAL cryptobox: PBT (invalid commitment proof)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "1009510",
-      "count": "1"
-    },
-    "peak_memory_usage": 524376000
-  },
-  {
-    "file": "src/lib_crypto_dal/test/test_dal_cryptobox.ml",
-    "title": "DAL cryptobox: PBT (verify shard out of bound)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "41637",
+      "total_time": "64909",
       "count": "1"
     }
   },
   {
     "file": "src/lib_crypto/test/test_run.ml",
-    "title": "tezos-crypto: crypto_box (Check PoW)",
+    "title": "tezos-crypto: p256-encodings (b58check.invalid)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "278",
+      "total_time": "1579",
       "count": "1"
     }
   },
   {
-    "file": "src/lib_context/test/test_merkle_proof.ml",
-    "title": "test_merkle_proof: random32_v2 (tree_proof_encoding)",
+    "file": "src/lib_crypto/test/test_run.ml",
+    "title": "tezos-crypto: bls12_381-encodings (b58 pkh encodings)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "1247786",
+      "total_time": "790",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_crypto/test/test_prop_signature.ml",
+    "title": "tezos-crypto-prop-signature: Bls (Signature_Bls_sign_check)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "257576",
       "count": "1"
     },
-    "peak_memory_usage": 536596000
+    "peak_memory_usage": 1080425000
+  },
+  {
+    "file": "src/lib_context/test/test_merkle_proof.ml",
+    "title": "test_merkle_proof: random2_v1 (stream_proof_encoding)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "27505",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_bls12_381_polynomial/test/test_main.ml",
+    "title": "PlonK: PBT (add_commutative)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "73998",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_base/test/test_time.ml",
+    "title": "Time: System (System.[to|of]_protocol roundtrip modulo option)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "974",
+      "count": "1"
+    }
   },
   {
     "file": "src/lib_base/test/test_sized.ml",
-    "title": "Sized: SizedSet (filter)",
+    "title": "Sized: SizedSet (inequal)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "846",
+      "total_time": "538",
+      "count": "1"
+    }
+  },
+  {
+    "file": "src/lib_base/test/test_sized.ml",
+    "title": "Sized: SizedMap (union)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "2379",
       "count": "1"
     }
   },
@@ -764,38 +1317,58 @@
       "slow"
     ],
     "successful_runs": {
-      "total_time": "1300",
-      "count": "1"
-    }
-  },
-  {
-    "file": "src/lib_base/test/test_p2p_addr.ml",
-    "title": "Base.P2p: P2p_point (Base.P2p_point.addr_port_id.to-string-from-string)",
-    "tags": [
-      "alcotezt",
-      "slow"
-    ],
-    "successful_runs": {
-      "total_time": "5692",
+      "total_time": "1314",
       "count": "1"
     }
   },
   {
     "file": "irmin/test/irmin/generic-key/test.ml",
-    "title": "irmin/generic-key: SLOW_store_offset (Commit wide node)",
+    "title": "irmin/generic-key: SLOW_store_offset (Wide nodes)",
     "tags": [
       "alcotezt",
       "slow"
     ],
     "successful_runs": {
-      "total_time": "2257201",
+      "total_time": "4814575",
       "count": "1"
     },
-    "peak_memory_usage": 571966000
+    "peak_memory_usage": 1091566000
+  },
+  {
+    "file": "irmin/test/irmin/generic-key/test.ml",
+    "title": "irmin/generic-key: SLOW_inlined_contents (Commit wide node)",
+    "tags": [
+      "alcotezt",
+      "slow"
+    ],
+    "successful_runs": {
+      "total_time": "2770326",
+      "count": "1"
+    },
+    "peak_memory_usage": 1448326000
+  },
+  {
+    "file": "tezt/tests/mockup.ml",
+    "title": "T024-: (Mockup) RPC list",
+    "tags": [
+      "admin_client",
+      "client",
+      "describe",
+      "layer1",
+      "mockup",
+      "rpc",
+      "slow",
+      "t024"
+    ],
+    "successful_runs": {
+      "total_time": "7822473",
+      "count": "1"
+    },
+    "peak_memory_usage": 1784231000
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "T024-: Testing DAL node (garbage collection of shards for producer and attester)",
+    "title": "S023-: Testing DAL node (garbage collection of shards for producer and attester)",
     "tags": [
       "admin_client",
       "attester",
@@ -804,14 +1377,36 @@
       "dal_node",
       "gc",
       "node",
+      "s023",
       "slow",
-      "t024",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "208972970",
+      "total_time": "230867936",
       "count": "1"
     },
-    "peak_memory_usage": 3839451000
+    "peak_memory_usage": 4179525000
+  },
+  {
+    "file": "tezt/tests/dal.ml",
+    "title": "Alpha: Testing DAL node (garbage collection of shards for all profiles)",
+    "tags": [
+      "admin_client",
+      "alpha",
+      "client",
+      "dal",
+      "dal_node",
+      "gc",
+      "memory_hungry",
+      "multi",
+      "node",
+      "slow",
+      "tezos2"
+    ],
+    "successful_runs": {
+      "total_time": "258884845",
+      "count": "1"
+    },
+    "peak_memory_usage": 5104428000
   }
 ]

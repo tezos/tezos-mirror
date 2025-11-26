@@ -82,7 +82,7 @@ let job_tezt =
     ~description:"Run normal Tezt tests."
     ~test_coverage:true
     ~test_selection:(tests_tag_selector [Not (Has_tag "flaky")])
-    ~parallel_jobs:33
+    ~parallel_jobs:34
     ~parallel_tests:6
     ~retry_jobs:2
 
@@ -95,6 +95,7 @@ let job_tezt_time_sensitive =
     ~description:"Run Tezt tests tagged as time_sensitive."
     ~test_coverage:true
     ~test_selection:(tests_tag_selector ~time_sensitive:true [])
+    ~parallel_jobs:2
     ~retry_jobs:2
 
 let job_tezt_riscv_slow_sequential =
@@ -117,7 +118,7 @@ let job_tezt_slow =
     ~description:"Run Tezt tests tagged as slow."
     ~test_selection:(tests_tag_selector ~slow:true [])
     ~test_timeout:No_timeout
-    ~parallel_jobs:14
+    ~parallel_jobs:12
     ~parallel_tests:3
     ~retry_jobs:2
 
@@ -143,6 +144,7 @@ let job_tezt_flaky =
     ~test_coverage:true
     ~allow_failure:Yes
     ~test_selection:(tests_tag_selector [Has_tag "flaky"])
+    ~parallel_jobs:2
     ~retry_jobs:2
     ~retry_tests:3
 

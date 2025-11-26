@@ -304,7 +304,7 @@ let job_tezt =
     ~test_coverage:true
     ~test_selection:
       (Tezos_ci_jobs.Tezt.tests_tag_selector [Not (Has_tag "flaky")])
-    ~parallel_jobs:17
+    ~parallel_jobs:18
     ~parallel_tests:6
     ~retry_jobs:2
 
@@ -317,7 +317,7 @@ let job_tezt_slow =
     ~description:"Run Etherlink Tezt tests tagged as slow."
     ~test_selection:(Tezos_ci_jobs.Tezt.tests_tag_selector ~slow:true [])
     ~test_timeout:No_timeout
-    ~parallel_jobs:6
+    ~parallel_jobs:3
     ~parallel_tests:3
     ~retry_jobs:2
 
@@ -332,7 +332,7 @@ let job_tezt_extra =
       (Tezos_ci_jobs.Tezt.tests_tag_selector
          ~extra:true
          [Not (Has_tag "flaky")])
-    ~parallel_jobs:5
+    ~parallel_jobs:12
     ~parallel_tests:6
     ~retry_jobs:2
 
@@ -346,6 +346,7 @@ let job_tezt_flaky =
     ~test_coverage:true
     ~allow_failure:Yes
     ~test_selection:(Tezos_ci_jobs.Tezt.tests_tag_selector [Has_tag "flaky"])
+    ~parallel_jobs:2
     ~retry_jobs:2
     ~retry_tests:3
 

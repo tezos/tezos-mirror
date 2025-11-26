@@ -8,10 +8,10 @@
       "node"
     ],
     "successful_runs": {
-      "total_time": "11173747",
+      "total_time": "10011993",
       "count": "1"
     },
-    "peak_memory_usage": 1357827000
+    "peak_memory_usage": 1343171000
   },
   {
     "file": "tezt/tests/cli_tezos.ml",
@@ -23,10 +23,10 @@
       "node"
     ],
     "successful_runs": {
-      "total_time": "1683856",
+      "total_time": "1493175",
       "count": "1"
     },
-    "peak_memory_usage": 431320000
+    "peak_memory_usage": 430436000
   },
   {
     "file": "tezt/tests/cli_tezos.ml",
@@ -37,10 +37,10 @@
       "node"
     ],
     "successful_runs": {
-      "total_time": "16114143",
+      "total_time": "14598134",
       "count": "1"
     },
-    "peak_memory_usage": 1740523000
+    "peak_memory_usage": 1725449000
   },
   {
     "file": "tezt/tests/light.ml",
@@ -53,10 +53,10 @@
       "light"
     ],
     "successful_runs": {
-      "total_time": "1601907",
+      "total_time": "1255711",
       "count": "1"
     },
-    "peak_memory_usage": 398851000
+    "peak_memory_usage": 433462000
   },
   {
     "file": "tezt/tests/light.ml",
@@ -70,10 +70,10 @@
       "node"
     ],
     "successful_runs": {
-      "total_time": "1555444",
+      "total_time": "1319455",
       "count": "1"
     },
-    "peak_memory_usage": 402088000
+    "peak_memory_usage": 403422000
   },
   {
     "file": "tezt/tests/p2p.ml",
@@ -86,10 +86,10 @@
       "p2p"
     ],
     "successful_runs": {
-      "total_time": "23041807",
+      "total_time": "24957387",
       "count": "1"
     },
-    "peak_memory_usage": 2569022000
+    "peak_memory_usage": 2527433000
   },
   {
     "file": "tezt/tests/agnostic_baker_test.ml",
@@ -107,10 +107,10 @@
       "t024"
     ],
     "successful_runs": {
-      "total_time": "16416065",
+      "total_time": "14360769",
       "count": "1"
     },
-    "peak_memory_usage": 1683190000
+    "peak_memory_usage": 1660660000
   },
   {
     "file": "tezt/tests/agnostic_baker_test.ml",
@@ -128,10 +128,10 @@
       "sandbox"
     ],
     "successful_runs": {
-      "total_time": "16323477",
+      "total_time": "14077237",
       "count": "1"
     },
-    "peak_memory_usage": 1659039000
+    "peak_memory_usage": 1623520000
   },
   {
     "file": "tezt/tests/agnostic_baker_test.ml",
@@ -149,10 +149,10 @@
       "sandbox"
     ],
     "successful_runs": {
-      "total_time": "16173308",
+      "total_time": "14308954",
       "count": "1"
     },
-    "peak_memory_usage": 1688812000
+    "peak_memory_usage": 1662011000
   },
   {
     "file": "tezt/tests/p2p.ml",
@@ -168,10 +168,10 @@
       "t024"
     ],
     "successful_runs": {
-      "total_time": "23912935",
+      "total_time": "21355823",
       "count": "1"
     },
-    "peak_memory_usage": 2576449000
+    "peak_memory_usage": 2529154000
   },
   {
     "file": "tezt/tests/p2p.ml",
@@ -187,10 +187,10 @@
       "s023"
     ],
     "successful_runs": {
-      "total_time": "23775902",
+      "total_time": "21362349",
       "count": "1"
     },
-    "peak_memory_usage": 2576587000
+    "peak_memory_usage": 2526887000
   },
   {
     "file": "tezt/tests/p2p.ml",
@@ -206,10 +206,10 @@
       "peer"
     ],
     "successful_runs": {
-      "total_time": "23805816",
+      "total_time": "21839440",
       "count": "1"
     },
-    "peak_memory_usage": 2617484000
+    "peak_memory_usage": 2566734000
   },
   {
     "file": "tezt/tests/p2p.ml",
@@ -225,10 +225,10 @@
       "t024"
     ],
     "successful_runs": {
-      "total_time": "24159451",
+      "total_time": "22553601",
       "count": "1"
     },
-    "peak_memory_usage": 2583733000
+    "peak_memory_usage": 2526853000
   },
   {
     "file": "tezt/tests/p2p.ml",
@@ -244,10 +244,10 @@
       "s023"
     ],
     "successful_runs": {
-      "total_time": "24198335",
+      "total_time": "22730872",
       "count": "1"
     },
-    "peak_memory_usage": 2582722000
+    "peak_memory_usage": 2529472000
   },
   {
     "file": "tezt/tests/p2p.ml",
@@ -263,9 +263,9 @@
       "p2p"
     ],
     "successful_runs": {
-      "total_time": "23514811",
+      "total_time": "22073602",
       "count": "1"
     },
-    "peak_memory_usage": 2626007000
+    "peak_memory_usage": 2574104000
   }
 ]
