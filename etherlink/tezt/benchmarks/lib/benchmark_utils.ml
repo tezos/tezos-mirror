@@ -429,9 +429,11 @@ let call ~container infos rpc_node contract sender ?gas_limit ?nonce
   in
   confirmed
 
-type gasometer = {mutable capacities : float list; mutable total_gas : Z.t}
+type gas_info = {level : int; gas : Z.t; gas_per_sec : float}
 
-let empty_gasometer () = {capacities = []; total_gas = Z.zero}
+type gasometer = {mutable datapoints : gas_info list; mutable total_gas : Z.t}
+
+let empty_gasometer () = {datapoints = []; total_gas = Z.zero}
 
 let capacity_mgas_sec ~gas ~time =
   let s = Ptime.Span.to_float_s time in
@@ -480,7 +482,7 @@ let install_gasometer evm_node =
     Evm_node.on_event evm_node @@ fun {name; value; _} ->
     if name = blueprint_application_event then (
       let open JSON in
-      let level = value |-> "level" |> as_string in
+      let level_str = value |-> "level" |> as_string in
       let process_time =
         value |-> "process_time" |> as_float |> Ptime.Span.of_float_s
         |> Option.get
@@ -494,7 +496,7 @@ let install_gasometer evm_node =
       in
       Log.info
         "Level %s: %a gas consumed in %a: %a"
-        level
+        level_str
         Z.pp_print
         execution_gas
         Ptime.Span.pp
@@ -504,9 +506,14 @@ let install_gasometer evm_node =
           else pp_capacity fmt capacity)
         (ignored, block_capacity) ;
       if not ignored then (
-        gasometer.capacities <- block_capacity :: gasometer.capacities ;
+        let level = int_of_string level_str in
+        let info = {level; gas = execution_gas; gas_per_sec = block_capacity} in
+        gasometer.datapoints <- info :: gasometer.datapoints ;
         gasometer.total_gas <- Z.add gasometer.total_gas execution_gas ;
-        let median = get_capacity_percentile 50. gasometer.capacities in
+        let capacities =
+          List.map (fun {gas_per_sec; _} -> gas_per_sec) gasometer.datapoints
+        in
+        let median = get_capacity_percentile 50. capacities in
         let color = capacity_color ~bg:false median in
         Log.info
           ~color
@@ -539,8 +546,11 @@ let monitor_gasometer evm_node f =
   let* () = f () in
   let end_time = Ptime_clock.now () in
   let wall_time = Ptime.diff end_time start_time in
-  let median = get_capacity_percentile 50. gasometer.capacities in
-  let p90 = get_capacity_percentile 10. gasometer.capacities in
+  let capacities =
+    List.map (fun {gas_per_sec; _} -> gas_per_sec) gasometer.datapoints
+  in
+  let median = get_capacity_percentile 50. capacities in
+  let p90 = get_capacity_percentile 90. capacities in
   let wall_clock_capacity =
     capacity_mgas_sec ~gas:gasometer.total_gas ~time:wall_time
   in
@@ -577,6 +587,43 @@ let plot_capacity ~csv_filename ~network ~kernel output_filename =
       network
       kernel
       csv_filename
+  in
+  Process.run "gnuplot" ["-e"; gnuplot_script]
+
+let plot_gas_and_capacity ~gasometer ~output_filename =
+  let data_filename = Temp.file "gas_data.dat" in
+  let oc = open_out data_filename in
+  (* The datapoints are stored in reverse order of arrival. *)
+  let datapoints = List.rev gasometer.datapoints in
+  List.iter
+    (fun {level; gas; gas_per_sec} ->
+      Printf.fprintf
+        oc
+        "%d %.3f %.3f\n"
+        level
+        (Z.to_float gas /. 1_000_000.)
+        gas_per_sec)
+    datapoints ;
+  close_out oc ;
+  let gnuplot_script =
+    Printf.sprintf
+      {|
+      set terminal pngcairo size 1024,768 enhanced font 'Verdana,10';
+      set output '%s';
+      set title 'Gas and Capacity per Block';
+      set xlabel 'Block Number';
+      set ylabel 'Capacity (MGas/s)';
+      set y2label 'Gas/Block (MGas)';
+      set ytics nomirror;
+      set y2tics;
+      set y2range [0:*];
+      set grid;
+      set key top left;
+      plot '%s' using 1:3 with linespoints title 'Capacity' axes x1y1,
+           '' using 1:2 with linespoints title 'Gas/Block' axes x1y2;
+      |}
+      output_filename
+      data_filename
   in
   Process.run "gnuplot" ["-e"; gnuplot_script]
 

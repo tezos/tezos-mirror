@@ -149,7 +149,7 @@ let () =
   parameters.swap_hops <- 2 ;
   ()
 
-let gen_report report_path network kernel {p90; _} =
+let gen_report report_path network kernel {p90; gasometer; _} =
   let network = Option.value network ~default:"sandbox" in
   let kernel =
     match kernel with
@@ -162,6 +162,8 @@ let gen_report report_path network kernel {p90; _} =
   save_capacity ~csv_filename p90 ;
   let* () = plot_capacity ~csv_filename ~network ~kernel png_filename in
   Log.report "Capacity graph generated in %s" png_filename ;
+  let graph_filename = sf "%s/graph_%s_%s.png" report_path network kernel in
+  let* () = plot_gas_and_capacity ~gasometer ~output_filename:graph_filename in
   unit
 
 let register (module Cli : Scenarios_cli.Etherlink) =
