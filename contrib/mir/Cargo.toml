@@ -53,3 +53,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
 [[bin]]
 name = "tzt_runner"
 path = "tzt_runner/main.rs"
+
+[[bin]]
+name = "typecheck_script"
+path = "typecheck_script/main.rs"
