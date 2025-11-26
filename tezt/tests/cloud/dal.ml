@@ -20,6 +20,7 @@ type configuration = {
   bakers : string list; (* unencrypted secret keys *)
   stake_machine_type : string list;
   dal_node_producers : int list; (* slot indices *)
+  publish_slots_regularly : bool;
   observer_slot_indices : int list;
   observers_multi_slot_indices : int list list;
   archivers_slot_indices : int list list;
@@ -954,6 +955,10 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           ~disable_amplification:configuration.disable_amplification
           ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
           ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
+          ?publish_slots_regularly:
+            (if configuration.publish_slots_regularly then
+               Some configuration.producers_delay
+             else None)
           teztale
           account
           i
@@ -1245,6 +1250,7 @@ let rec loop t level =
     if Dal_node_helpers.producers_not_ready ~producers:t.producers then (
       toplog "Producers not ready for level %d" level ;
       Lwt.return_unit)
+    else if t.configuration.publish_slots_regularly then Lwt.return_unit
     else
       Seq.ints 0
       |> Seq.take (List.length t.configuration.dal_node_producers)
@@ -1349,6 +1355,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let number_of_slots = Cli.number_of_slots in
     let attestation_lag = Cli.attestation_lag in
     let traps_fraction = Cli.traps_fraction in
+    let publish_slots_regularly = Cli.publish_slots_regularly in
     let t =
       {
         with_dal;
@@ -1389,6 +1396,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         number_of_slots;
         attestation_lag;
         traps_fraction;
+        publish_slots_regularly;
       }
     in
     (t, etherlink)

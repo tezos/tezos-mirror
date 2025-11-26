@@ -54,6 +54,7 @@ module DAL : sig
     number_of_slots : int option;
     attestation_lag : int option;
     traps_fraction : Q.t option;
+    publish_slots_regularly : bool;
   }
 
   val encoding : t Data_encoding.t
