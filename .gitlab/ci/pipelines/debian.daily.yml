@@ -423,7 +423,6 @@ oc.install_bin_debian_bookworm_systemd_test:
   - oc.docker-systemd_tests_debian
   - apt_repo_debian
   dependencies: []
-  allow_failure: true
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -457,7 +456,6 @@ oc.upgrade_bin_debian_bookworm-systemd:
   - oc.docker-systemd_tests_debian
   - apt_repo_debian
   dependencies: []
-  allow_failure: true
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -561,7 +559,6 @@ oc.install_bin_ubuntu_noble_systemd:
   - oc.docker-systemd_tests_ubuntu
   - apt_repo_ubuntu
   dependencies: []
-  allow_failure: true
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -595,7 +592,6 @@ oc.upgrade_bin_ubuntu_jammy_systemd_test:
   - oc.docker-systemd_tests_ubuntu
   - apt_repo_ubuntu
   dependencies: []
-  allow_failure: true
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -629,7 +625,6 @@ oc.upgrade_bin_ubuntu_noble_systemd_test:
   - oc.docker-systemd_tests_ubuntu
   - apt_repo_ubuntu
   dependencies: []
-  allow_failure: true
   timeout: 60 minutes
   interruptible: false
   before_script:
