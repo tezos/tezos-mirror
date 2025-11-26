@@ -232,27 +232,48 @@ module Worker = struct
   let retrieve_and_set_latest_level_confirmed self rollup_block_lvl =
     let open Lwt_result_syntax in
     let open Rollup_services in
-    let* finalized_current_number =
+    let keep_alive = keep_alive self in
+    let rollup_node_endpoint = rollup_node_endpoint self in
+    let timeout = rollup_node_endpoint_timeout self in
+    let read_from_rollup_node path =
       call_service
-        ~keep_alive:(keep_alive self)
-        ~base:(rollup_node_endpoint self)
-        ~timeout:(rollup_node_endpoint_timeout self)
+        ~keep_alive
+        ~base:rollup_node_endpoint
+        ~timeout
         durable_state_value
         ((), Block_id.Level rollup_block_lvl)
-        {
-          key =
-            Durable_storage_path.Block.current_number
-            (* TODO: Remove etherlink root *)
-              ~root:Durable_storage_path.etherlink_root;
-        }
+        {key = path}
         ()
     in
-    match finalized_current_number with
-    | Some bytes ->
-        let (Qty evm_block_number) = Ethereum_types.decode_number_le bytes in
-        set_latest_level_confirmed self evm_block_number ;
-        return_unit
-    | None -> return_unit
+    let* finalized_current_block_header =
+      read_from_rollup_node Durable_storage_path.BlockHeader.current
+    in
+    match finalized_current_block_header with
+    | Some bytes -> (
+        match Rlp.decode bytes with
+        | Ok (Rlp.List [Value number; Value _timestamp; List _chain_header]) ->
+            let (Qty number) = Ethereum_types.decode_number_le number in
+            set_latest_level_confirmed self number ;
+            return_unit
+        | _ -> return_unit)
+    | None -> (
+        (* If the rollup node has no block header in its durable
+           storage, it may be because it is using a very old (< 27)
+           storage version. In that case we fallback to reading the
+           current number from the Etherlink block storage. *)
+        let* finalized_current_number =
+          read_from_rollup_node
+          @@ Durable_storage_path.Block.current_number
+               ~root:Durable_storage_path.etherlink_root
+        in
+        match finalized_current_number with
+        | Some bytes ->
+            let (Qty evm_block_number) =
+              Ethereum_types.decode_number_le bytes
+            in
+            set_latest_level_confirmed self evm_block_number ;
+            return_unit
+        | None -> return_unit)
 end
 
 type worker = Worker.infinite Worker.queue Worker.t

@@ -190,6 +190,10 @@ module Block = struct
     current_block_parent ~root ^ "/transactions_objects"
 end
 
+module BlockHeader = struct
+  let current = "/evm/current_block_header"
+end
+
 module Indexes = struct
   let indexes ~root = root ^ "/indexes"
 
