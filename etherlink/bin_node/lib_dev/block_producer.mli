@@ -33,7 +33,7 @@ val produce_block :
     preconfirmation pipeline. *)
 val preconfirm_transactions :
   transactions:(string * Tx_queue_types.transaction_object_t) list ->
-  unit tzresult Lwt.t
+  Ethereum_types.hash list tzresult Lwt.t
 
 module Internal_for_tests : sig
   val produce_block :
