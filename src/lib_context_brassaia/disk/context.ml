@@ -747,7 +747,12 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let close index =
     let _interrupted_gc = Store.Gc.cancel index.repo in
-    Store.Repo.close index.repo
+    Lwt.catch
+      (fun () -> Store.Repo.close index.repo)
+      (function
+        | Brassaia_pack_unix.Errors.(Pack_error `Double_close) ->
+            Lwt.return_unit
+        | exn -> Lwt.reraise exn)
 
   let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
