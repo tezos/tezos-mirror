@@ -17,7 +17,6 @@
 
 open Common.Build
 open Common.Docker
-open Gitlab_ci
 open Gitlab_ci.Util
 open Tezos_ci
 open Tezos_ci.Cache
@@ -106,36 +105,6 @@ let jobs =
       ~rules:rules_always
       ()
   in
-  let job_unified_coverage_default : tezos_job =
-    job
-      ~__POS__
-      ~image:Images.CI.test
-      ~name:"oc.unified_coverage"
-      ~stage:Stages.test_coverage
-      ~variables:
-        [
-          ("PROJECT", Predefined_vars.(show ci_project_path));
-          ("DEFAULT_BRANCH", Predefined_vars.(show ci_commit_sha));
-        ]
-      ~allow_failure:Yes
-      ~before_script:
-        ((* sets COVERAGE_OUTPUT *)
-         Common.Helpers.before_script
-           ~source_version:true
-           ~eval_opam:true
-           [])
-      ~rules:rules_always
-      ~coverage:"/Coverage: ([^%]+%)/"
-      [
-        (* On the project default branch, we fetch coverage from the last merged MR *)
-        "mkdir -p _coverage_report";
-        "dune exec scripts/ci/download_coverage/download.exe -- --from \
-         last-merged-pipeline --info --log-file \
-         _coverage_report/download_coverage.log";
-        "./scripts/ci/report_coverage.sh";
-      ]
-    |> Coverage.enable_location |> Coverage.enable_report
-  in
 
   (* Smart Rollup: Kernel SDK
 
@@ -174,8 +143,6 @@ let jobs =
     job_build_arm64_exp;
     (* Stage: sanity *)
     job_datadog_pipeline_trace;
-    (* Stage: test_coverage *)
-    job_unified_coverage_default;
   ]
   (* Jobs to build and update on Docker Hub the Octez Docker image.  *)
   @ octez_distribution_docker_jobs

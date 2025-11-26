@@ -128,11 +128,7 @@ let job_unit_tests =
     ~image:Tezos_ci.Images.CI.build
     ~only_if_changed:Files.(node @ sdks)
     ~artifacts:
-      ((* Note: the [~name] is actually overridden by the one computed
-           by [Tezos_ci.Coverage.enable_output_artifact].
-           We set it anyway for consistency with how the job
-           was previously declared using [job_unit_test] in [code_verification.ml]. *)
-       Gitlab_ci.Util.artifacts
+      (Gitlab_ci.Util.artifacts
          ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-x86_64"
          ["test_results"]
          ~reports:(Gitlab_ci.Util.reports ~junit:"test_results/*.xml" ())

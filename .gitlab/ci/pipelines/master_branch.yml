@@ -5,7 +5,6 @@ stages:
 - start
 - images
 - build
-- test_coverage
 - publish
 - manual
 
@@ -386,51 +385,6 @@ datadog_pipeline_trace:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
-oc.unified_coverage:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: test_coverage
-  tags:
-  - gcp
-  rules:
-  - when: always
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  allow_failure: true
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - mkdir -p _coverage_report
-  - dune exec scripts/ci/download_coverage/download.exe -- --from last-merged-pipeline
-    --info --log-file _coverage_report/download_coverage.log
-  - ./scripts/ci/report_coverage.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  variables:
-    PROJECT: $CI_PROJECT_PATH
-    DEFAULT_BRANCH: $CI_COMMIT_SHA
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
-    SLACK_COVERAGE_CHANNEL: C02PHBE7W73
-  artifacts:
-    expire_in: 15 days
-    paths:
-    - _coverage_report/
-    - $BISECT_FILE
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: _coverage_report/cobertura.xml
-    when: always
-    expose_as: Coverage report
-  coverage: '/Coverage: ([^%]+%)/'
 
 oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
