@@ -68,7 +68,6 @@ let common_needs =
    to Tezt jobs defined in this module / the [Shared] component. *)
 let tezt_job ?(retry_tests = 1) ?(needs_legacy = common_needs) =
   CI.tezt_job
-    ~fetch_records_from:"schedule_extended_test"
     ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
     ~needs_legacy
     ~retry_tests

@@ -303,11 +303,6 @@ module type COMPONENT_API = sig
       - Manifezt is active if, and only if [pipeline] is [`merge_request].
         When active, it causes the job to depend on the [select_tezts] job,
         which is automatically added to the pipeline if necessary.
-      - [fetch_records_from] is the name of a scheduled pipeline to fetch Tezt records from.
-        This allows Tezt to better select test for auto-balancing
-        when using [parallel_jobs > 1]. If specified, it causes the job to depend
-        on a [fetch_tezt_records_from_*] job which is automatically added to the pipeline
-        if necessary.
       - [test_selection] is a TSL expression.
         TSL is the Test Selection Language fo Tezt.
         It allows to select a subset of tests to run.
@@ -322,7 +317,6 @@ module type COMPONENT_API = sig
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
-    ?fetch_records_from:string ->
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->

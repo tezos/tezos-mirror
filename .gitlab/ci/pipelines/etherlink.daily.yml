@@ -503,40 +503,6 @@ etherlink.build_tezt:
     - _build/default/etherlink/tezt/tests/main.exe
     when: on_success
 
-etherlink.teztrec_etherlink.daily:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp
-  needs:
-  - oc.docker:ci:amd64
-  dependencies:
-  - oc.docker:ci:amd64
-  allow_failure: true
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - dune exec scripts/ci/update_records/update.exe -- --info --log-file tezt-fetch-records.log
-    --from last-successful-scheduled:etherlink.daily
-  - ./scripts/ci/filter_corrupted_records.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  artifacts:
-    expire_in: 4 hours
-    paths:
-    - tezt-fetch-records.log
-    - tezt/records/**.json
-    - tezt/records/**.json.broken
-    when: always
-
 etherlink.test_revm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
@@ -739,14 +705,12 @@ etherlink.tezt-flaky:
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_kernels
-  - etherlink.teztrec_etherlink.daily
   - etherlink.build_tezt
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_kernels
-  - etherlink.teztrec_etherlink.daily
   - etherlink.build_tezt
   allow_failure: true
   timeout: 40 minutes
@@ -813,14 +777,12 @@ etherlink.tezt-extra:
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_kernels
-  - etherlink.teztrec_etherlink.daily
   - etherlink.build_tezt
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_kernels
-  - etherlink.teztrec_etherlink.daily
   - etherlink.build_tezt
   timeout: 40 minutes
   interruptible: false
@@ -881,14 +843,12 @@ etherlink.tezt-slow:
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_kernels
-  - etherlink.teztrec_etherlink.daily
   - etherlink.build_tezt
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_kernels
-  - etherlink.teztrec_etherlink.daily
   - etherlink.build_tezt
   timeout: 40 minutes
   interruptible: false
@@ -949,14 +909,12 @@ etherlink.tezt:
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_kernels
-  - etherlink.teztrec_etherlink.daily
   - etherlink.build_tezt
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-exp
   - oc.build_kernels
-  - etherlink.teztrec_etherlink.daily
   - etherlink.build_tezt
   timeout: 40 minutes
   interruptible: false

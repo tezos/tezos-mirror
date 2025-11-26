@@ -277,7 +277,6 @@ let job_build_tezt =
 let tezt_job ?(retry_tests = 1) =
   CI.tezt_job
     ~tezt_exe:"etherlink/tezt/tests/main.exe"
-    ~fetch_records_from:"etherlink.daily"
     ~only_if_changed:
       (Tezos_ci.Changeset.encode Tezos_ci_jobs.Changesets.changeset_octez)
     ~needs:[(Artifacts, job_build_tezt)]
