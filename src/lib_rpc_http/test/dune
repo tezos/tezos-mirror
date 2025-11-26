@@ -14,6 +14,7 @@
   octez-libs.test-helpers
   octez-libs.base-test-helpers
   octez-libs.rpc-http-server
+  octez-libs.resto-cohttp-client
   qcheck-alcotest
   octez-alcotezt)
  (library_flags (:standard -linkall))

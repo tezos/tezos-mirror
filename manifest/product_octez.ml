@@ -4583,7 +4583,7 @@ let octez_rpc_http_server =
       ]
     ~modules:["RPC_server"; "RPC_middleware"]
 
-let _octez_rpc_http_server_tests =
+let _octez_rpc_http_tests =
   tezt
     ["test_rpc_http"]
     ~path:"src/lib_rpc_http/test"
@@ -4597,6 +4597,7 @@ let _octez_rpc_http_server_tests =
         octez_test_helpers |> open_;
         octez_base_test_helpers |> open_;
         octez_rpc_http_server |> open_;
+        resto_cohttp_client;
         qcheck_alcotest;
         alcotezt;
       ]
