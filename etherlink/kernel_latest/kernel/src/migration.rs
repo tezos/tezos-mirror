@@ -669,6 +669,10 @@ fn migrate_to<Host: Runtime>(
             // when run by the EVM node or not
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V44 => {
+            // Dummy migration for the new gas price
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 
