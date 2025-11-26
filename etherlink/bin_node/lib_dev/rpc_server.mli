@@ -36,7 +36,6 @@ val start_private_server :
   rpc_server_family:'f Rpc_types.rpc_server_family ->
   ?block_production:block_production ->
   Configuration.t ->
-  'f Services_backend_sig.tx_container ->
   (module Services_backend_sig.S) * 'a ->
   finalizer tzresult Lwt.t
 
@@ -54,6 +53,5 @@ val start_public_server :
   l2_chain_id:L2_types.chain_id option ->
   ?evm_services:evm_services_methods ->
   Configuration.t ->
-  'f Services_backend_sig.tx_container ->
   (module Services_backend_sig.S) * 'a ->
   finalizer tzresult Lwt.t

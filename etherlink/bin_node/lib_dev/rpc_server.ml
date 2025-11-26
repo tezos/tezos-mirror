@@ -147,8 +147,7 @@ let monitor_performances ~data_dir =
 
 let start_public_server (type f) ~(mode : f Mode.t)
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id
-    ?evm_services (config : Configuration.t)
-    (tx_container : f Services_backend_sig.tx_container) ctxt =
+    ?evm_services (config : Configuration.t) ctxt =
   let open Lwt_result_syntax in
   let can_start_performance_metrics =
     Octez_performance_metrics.Unix.supports_performance_metrics ()
@@ -176,9 +175,22 @@ let start_public_server (type f) ~(mode : f Mode.t)
           | Some l2_chain_id -> return l2_chain_id
           | None -> Backend.chain_id ()
         in
-        let (Services_backend_sig.Michelson_tx_container (module Tx_container))
-            =
-          tx_container
+        let add_transaction ~next_nonce transaction_object ~raw_op =
+          match mode with
+          | Observer (Michelson_tx_container (module Tx_container))
+          | Proxy (Michelson_tx_container (module Tx_container))
+          | Sequencer (Michelson_tx_container (module Tx_container)) ->
+              Tx_container.add
+                ~next_nonce
+                transaction_object
+                ~raw_tx:(Ethereum_types.hex_of_bytes raw_op)
+          | Rpc {evm_node_private_endpoint; _} ->
+              Injector.inject_tezlink_operation
+                ~keep_alive:config.keep_alive
+                ~timeout:config.rpc_timeout
+                ~base:evm_node_private_endpoint
+                ~op:transaction_object
+                ~raw_op
         in
         return @@ Evm_directory.init_from_resto_directory
         @@ Tezlink_directory.register_tezlink_services
@@ -203,10 +215,10 @@ let start_public_server (type f) ~(mode : f Mode.t)
                      err
                | Ok {next_nonce; transaction_object} ->
                    let* hash_res =
-                     Tx_container.add
+                     add_transaction
                        ~next_nonce
                        transaction_object
-                       ~raw_tx:raw_hex
+                       ~raw_op:(Bytes.of_string raw_str)
                    in
                    let* hash =
                      match hash_res with
@@ -226,7 +238,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
 
   let directory =
     register_tezos_services
-    |> Services.directory ~rpc_server_family mode rpc config tx_container ctxt
+    |> Services.directory ~rpc_server_family mode rpc config ctxt
     |> register_evm_services
     |> Evm_directory.register_metrics "/metrics"
     |> Evm_directory.register_describe
@@ -243,7 +255,7 @@ let start_public_server (type f) ~(mode : f Mode.t)
 
 let start_private_server ~mode
     ~(rpc_server_family : _ Rpc_types.rpc_server_family)
-    ?(block_production = `Disabled) config tx_container ctxt =
+    ?(block_production = `Disabled) config ctxt =
   let open Lwt_result_syntax in
   match config.Configuration.private_rpc with
   | Some private_rpc ->
@@ -254,7 +266,6 @@ let start_private_server ~mode
           private_rpc
           ~block_production
           config
-          tx_container
           ctxt
         |> Evm_directory.register_metrics "/metrics"
         |> Evm_directory.register_describe

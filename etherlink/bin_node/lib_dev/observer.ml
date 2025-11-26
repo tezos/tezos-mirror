@@ -259,7 +259,8 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
   Metrics.init
     ~mode:"observer"
     ~tx_pool_size_info:Tx_container.size_info
-    ~smart_rollup_address ;
+    ~smart_rollup_address
+    () ;
 
   let* () =
     Prevalidator.start
@@ -277,7 +278,6 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
       ~rpc_server_family
       config
-      tx_container
       ((module Rpc_backend), smart_rollup_address)
   in
   let* finalizer_private_server =
@@ -285,7 +285,6 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~mode:(Observer tx_container)
       ~rpc_server_family
       config
-      tx_container
       ((module Rpc_backend), smart_rollup_address)
   in
 

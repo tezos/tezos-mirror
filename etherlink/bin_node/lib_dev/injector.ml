@@ -41,6 +41,18 @@ let call_rpc_service ~keep_alive ~timeout ~base ~path request output_encoding =
            "Upstream endpoint returned an inconsistent response (more than one \
             result)")
 
+let call_singleton_request (type input output) ~keep_alive ~timeout ~base
+    (module Method_ : Rpc_encodings.METHOD
+      with type input = input
+       and type output = output) request =
+  call_rpc_service
+    ~keep_alive
+    ~timeout
+    ~base
+    ~path:Resto.Path.root
+    request
+    Method_.output_encoding
+
 let send_raw_transaction_request raw_tx =
   construct_rpc_call
     ~method_:Send_raw_transaction.method_

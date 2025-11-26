@@ -257,7 +257,6 @@ let main
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
       ~l2_chain_id
       config
-      tx_container
       ((module Rollup_node_rpc), smart_rollup_address)
   in
   let (_ : Lwt_exit.clean_up_callback_id) =

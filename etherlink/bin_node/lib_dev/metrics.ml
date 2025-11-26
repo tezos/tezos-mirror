@@ -362,9 +362,9 @@ let metrics =
   in
   {chain; block; simulation; health; l1_level}
 
-let init ~mode ~tx_pool_size_info ~smart_rollup_address =
+let init ~mode ?tx_pool_size_info ~smart_rollup_address () =
   Info.init ~mode ~smart_rollup_address ;
-  Tx_pool.register tx_pool_size_info
+  Option.iter Tx_pool.register tx_pool_size_info
 
 let set_level ~level = Gauge.set metrics.chain.head (Z.to_float level)
 
