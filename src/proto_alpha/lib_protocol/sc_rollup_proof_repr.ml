@@ -399,20 +399,17 @@ let valid (type state proof output)
         return_some (Sc_rollup_PVM_sig.Reveal (Metadata metadata))
     | Some (Reveal_proof (Dal_page_proof {proof = dal_page_proof; page_id})) ->
         let* disputed_level = P.get_proof_state_level proof.pvm_step in
-        let* dal_parameters : Constants_parametric_repr.dal =
-          find_dal_parameters
-            ((* The rationale for [Option.value
+        let import_inbox_level =
+          (* The rationale for [Option.value
                 ~default:metatadata.origination_level] is the first input a
                 Smart Rollup will consume is the [Start_of_level] of
                 origination_level + 1. As the level of a PVM is given by the
                 inputs, if it's none, that means the PVM has never consumed an
                 input and therefore is on the origination level. *)
-             Option.value
-               ~default:metadata.origination_level
-               disputed_level)
+          Option.value ~default:metadata.origination_level disputed_level
         in
-        let import_level =
-          Option.value disputed_level ~default:commit_inbox_level
+        let* dal_parameters : Constants_parametric_repr.dal =
+          find_dal_parameters import_inbox_level
         in
         Dal_helpers.verify
           ~dal_number_of_slots:dal_parameters.number_of_slots
@@ -420,17 +417,17 @@ let valid (type state proof output)
           ~dal_activation_level
           ~dal_attested_slots_validity_lag
           dal_parameters.cryptobox_parameters
-          ~commit_inbox_level:import_level
+          ~commit_inbox_level:import_inbox_level
           page_id
           dal_snapshot
           dal_page_proof
         |> Lwt.return
     | Some (Reveal_proof Dal_parameters_proof) ->
         let* disputed_level = P.get_proof_state_level proof.pvm_step in
-        let* dal_parameters =
-          find_dal_parameters
-            (Option.value ~default:metadata.origination_level disputed_level)
+        let import_inbox_level =
+          Option.value ~default:metadata.origination_level disputed_level
         in
+        let* dal_parameters = find_dal_parameters import_inbox_level in
         return_some
           (Sc_rollup_PVM_sig.Reveal
              (Dal_parameters
@@ -615,16 +612,16 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
             Some Sc_rollup_PVM_sig.(Reveal (Metadata metadata)) )
     | Needs_reveal (Request_dal_page page_id) ->
         let open Dal_with_history in
-        let*! import_level = P.get_current_level P.state in
-        let import_level =
-          Option.value ~default:metadata.origination_level import_level
+        let*! disputed_level = P.get_current_level P.state in
+        let import_inbox_level =
+          Option.value ~default:metadata.origination_level disputed_level
         in
         Dal_helpers.produce
           ~dal_number_of_slots
           ~metadata
           ~dal_activation_level
           dal_parameters
-          ~commit_inbox_level:import_level
+          ~commit_inbox_level:import_inbox_level
           ~attestation_threshold_percent:None
           ~restricted_commitments_publishers:None
           page_id
@@ -643,16 +640,16 @@ let produce ~metadata ~find_dal_parameters pvm_and_state commit_inbox_level
         let attestation_threshold_percent =
           Some attestation_threshold_percent
         in
-        let*! import_level = P.get_current_level P.state in
-        let import_level =
-          Option.value ~default:metadata.origination_level import_level
+        let*! disputed_level = P.get_current_level P.state in
+        let import_inbox_level =
+          Option.value ~default:metadata.origination_level disputed_level
         in
         Dal_helpers.produce
           ~dal_number_of_slots
           ~metadata
           ~dal_activation_level
           dal_parameters
-          ~commit_inbox_level:import_level
+          ~commit_inbox_level:import_inbox_level
           ~attestation_threshold_percent
           ~restricted_commitments_publishers
           page_id
