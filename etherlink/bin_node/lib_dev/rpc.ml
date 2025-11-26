@@ -274,7 +274,7 @@ let container_forward_request (type f) ~(chain_family : f L2_types.chain_family)
                          Tezlink case"
                   end))
 
-let main ~evm_node_endpoint ?evm_node_private_endpoint
+let main ~evm_node_endpoint ~evm_node_private_endpoint
     ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
   let* telemetry_cleanup =
@@ -313,26 +313,13 @@ let main ~evm_node_endpoint ?evm_node_private_endpoint
     Rpc_backend.single_chain_id_and_family ~config ~enable_multichain
   in
 
-  let* tx_container =
-    match evm_node_private_endpoint with
-    | Some private_endpoint ->
-        return
-          (container_forward_request
-             ~chain_family
-             ~keep_alive:config.keep_alive
-             ~timeout:config.rpc_timeout
-             ~public_endpoint:evm_node_endpoint
-             ~private_endpoint)
-    | None ->
-        let start, tx_container = Tx_queue.tx_container ~chain_family in
-        let* () =
-          start
-            ~config:config.tx_queue
-            ~keep_alive:config.keep_alive
-            ~timeout:config.rpc_timeout
-            ()
-        in
-        return tx_container
+  let tx_container =
+    container_forward_request
+      ~chain_family
+      ~keep_alive:config.keep_alive
+      ~timeout:config.rpc_timeout
+      ~public_endpoint:evm_node_endpoint
+      ~private_endpoint:evm_node_private_endpoint
   in
 
   let* () = set_metrics_level ctxt in
