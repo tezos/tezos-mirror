@@ -602,22 +602,29 @@ impl ChainConfigTrait for MichelsonChainConfig {
                             input.to_vec(),
                         )
                         .into(),
-                    )
+                    );
                 }
             }
         };
+
+        let nb_chunks =
+            u16::from_le_bytes(read_inbox_message(host)?.as_ref().try_into()?);
+
+        let mut operation_bytes = vec![];
+        for _chunk in 0..nb_chunks {
+            operation_bytes.extend(read_inbox_message(host)?.as_ref())
+        }
+
         let operation = {
-            let input = read_inbox_message(host)?;
-            Operation::nom_read_exact(input.as_ref())
+            Operation::nom_read_exact(&operation_bytes)
                 .map_err(|_| crate::error::Error::InvalidConversion)?
         };
         let hash = operation.hash()?;
         log!(
             host,
             Debug,
-            "Tezlink simulation starts for operation hash {:?}, skip signature flag: {:?}",
-            hash,
-            skip_signature_check
+            "Tezlink simulation starts for operation hash {hash:?}, skip signature flag: {skip_signature_check:?}, operation length: {:?}, number of chunks: {nb_chunks:?}",
+            operation_bytes.len()
         );
         let context = context::Context::from(&self.storage_root_path())?;
 
