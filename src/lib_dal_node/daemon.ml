@@ -435,6 +435,30 @@ let update_and_register_profiles ctxt =
   let*! () = Node_context.set_profile_ctxt ctxt profile_ctxt in
   return_unit
 
+(* This back-fills the store with slot headers at levels from [from_level] to
+   [from_level - attestation_lag]. *)
+let backfill_slot_statuses cctxt store (module Plugin : Dal_plugin.T)
+    proto_parameters ~from_level =
+  let open Lwt_result_syntax in
+  let number_of_slots = proto_parameters.Types.number_of_slots in
+  List.iter_es
+    (fun i ->
+      let block_level = Int32.(sub from_level (of_int i)) in
+      if block_level > 1l then
+        let* slot_headers =
+          Plugin.get_published_slot_headers ~block_level cctxt
+        in
+        let*! () =
+          Slot_manager.store_slot_headers
+            ~number_of_slots
+            ~block_level
+            slot_headers
+            store
+        in
+        return_unit
+      else return_unit)
+    (Stdlib.List.init proto_parameters.attestation_lag Fun.id)
+
 let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
     ~configuration_override () =
   let open Lwt_result_syntax in
@@ -517,7 +541,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   (* Get the current L1 head and its DAL plugin and parameters. *)
   let* header, proto_plugins = L1_helpers.wait_for_block_with_plugin cctxt in
   let head_level = header.Block_header.shell.level in
-  let*? _plugin, proto_parameters =
+  let*? (module Plugin), proto_parameters =
     Proto_plugins.get_plugin_and_parameters_for_level
       proto_plugins
       ~level:head_level
@@ -773,13 +797,13 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
           ~head_level
           proto_parameters
   in
+  (* We reload the last processed level because [clean_up_store] has likely
+     modified it. *)
+  let* last_notified_level =
+    let last_processed_level_store = Store.last_processed_level store in
+    Store.Last_processed_level.load last_processed_level_store
+  in
   let* crawler =
-    (* We reload the last processed level because [clean_up_store] has likely
-       modified it. *)
-    let* last_notified_level =
-      let last_processed_level_store = Store.last_processed_level store in
-      Store.Last_processed_level.load last_processed_level_store
-    in
     let open Constants in
     let*! crawler =
       Crawler.start
@@ -791,6 +815,16 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
         cctxt
     in
     return crawler
+  in
+  let* () =
+    let from_level = Int32.pred head_level in
+    (backfill_slot_statuses
+       cctxt
+       store
+       (module Plugin)
+       proto_parameters
+       ~from_level
+     [@profiler.record_s {verbosity = Notice} "backfill_slot_statuses"])
   in
   (* Activate the p2p instance. *)
   let shards_store = Store.shards store in

@@ -492,7 +492,7 @@ module Profile_handlers = struct
               attested_level
               (of_int last_known_parameters.Types.attestation_lag))
         in
-        if published_level < 1l then
+        if published_level <= 1l then
           let slots =
             Stdlib.List.init last_known_parameters.number_of_slots (fun _ ->
                 false)

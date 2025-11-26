@@ -1949,23 +1949,27 @@ let check_stored_level_headers ~__LOC__ dal_node ~pub_level ~number_of_slots
     ~error_msg:"Unexpected slot headers length (got = %L, expected = %R)" ;
   unit
 
-let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level slots_info
+let check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level ~slot_index
     =
+  match expected_status with
+  | None -> unit
+  | Some expected_status ->
+      let* status =
+        Dal_RPC.(call dal_node @@ get_level_slot_status ~slot_level ~slot_index)
+      in
+      let prefix =
+        sf "Unexpected slot status at level %d, index %d " slot_level slot_index
+      in
+      Check.(status = expected_status)
+        ~__LOC__
+        Dal.Check.slot_id_status_typ
+        ~error_msg:(prefix ^ "(got = %L, expected = %R)") ;
+      unit
+
+let check_slots_statuses ~__LOC__ ?expected_status dal_node ~slot_level
+    slots_info =
   let test (slot_index, _commitment) =
-    match expected_status with
-    | None -> unit
-    | Some expected_status ->
-        let* status =
-          Dal_RPC.(
-            call dal_node @@ get_level_slot_status ~slot_level ~slot_index)
-        in
-        Check.(status = expected_status)
-          ~__LOC__
-          Dal.Check.slot_id_status_typ
-          ~error_msg:
-            "The value of the fetched status should match the expected one \
-             (current = %L, expected = %R)" ;
-        unit
+    check_slot_status ~__LOC__ ?expected_status dal_node ~slot_level ~slot_index
   in
   Lwt_list.iter_s test slots_info
 
@@ -2011,7 +2015,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   Log.info "Just after injecting slots and before baking, there are no headers" ;
   (* because headers are stored based on information from finalized blocks *)
   let* () =
-    check_slot_status
+    check_slots_statuses
       dal_node
       ~slot_level:level
       ~__LOC__
@@ -2030,7 +2034,7 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
     "After baking one block, there is still no header, because the block is \
      not final" ;
   let* () =
-    check_slot_status
+    check_slots_statuses
       dal_node
       ~slot_level:level
       ~__LOC__
@@ -2051,8 +2055,8 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
        period is not over, so they are not yet present in the skip-list. *)
     check_stored_level_headers ~__LOC__ ~pub_level ~number_of_headers:0
   in
-  let check_slot_status ?expected_status l =
-    check_slot_status ?expected_status dal_node ~slot_level:pub_level l
+  let check_slots_statuses ?expected_status l =
+    check_slots_statuses ?expected_status dal_node ~slot_level:pub_level l
   in
   let check_get_commitment =
     check_get_commitment dal_node ~slot_level:pub_level
@@ -2061,10 +2065,13 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   (* Slots waiting for attestation. *)
   let* () = check_get_commitment get_commitment_not_found ok in
   let* () =
-    check_slot_status ~__LOC__ ~expected_status:Dal_RPC.Waiting_attestation ok
+    check_slots_statuses
+      ~__LOC__
+      ~expected_status:Dal_RPC.Waiting_attestation
+      ok
   in
   (* slot_2_a is not selected. *)
-  let* () = check_slot_status ~__LOC__ [slot2_a] in
+  let* () = check_slots_statuses ~__LOC__ [slot2_a] in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
 
@@ -2098,19 +2105,22 @@ let test_dal_node_slots_headers_tracking protocol parameters _cryptobox node
   let* () = check_get_commitment get_commitment_succeeds attested in
   (* Slots that were waiting for attestation and now attested. *)
   let* () =
-    check_slot_status ~__LOC__ ~expected_status:(Dal_RPC.Attested lag) attested
+    check_slots_statuses
+      ~__LOC__
+      ~expected_status:(Dal_RPC.Attested lag)
+      attested
   in
   (* Slots not published or not included in blocks. *)
   let* () = check_get_commitment get_commitment_not_found ko in
   (* Slots that were waiting for attestation and now unattested. *)
-  let* () = check_slot_status ~__LOC__ unattested in
+  let* () = check_slots_statuses ~__LOC__ unattested in
   (* slot2_a is still not selected. *)
-  let* () = check_slot_status ~__LOC__ [slot2_a] in
+  let* () = check_slots_statuses ~__LOC__ [slot2_a] in
   (* slot3 never finished in an L1 block, so the DAL node did not store a status for it. *)
-  let* () = check_slot_status ~__LOC__ [slot3] in
+  let* () = check_slots_statuses ~__LOC__ [slot3] in
   (* slot4 is never injected in any of the nodes. So, it's not
      known by the Dal node. *)
-  let* () = check_slot_status ~__LOC__ [slot4] in
+  let* () = check_slots_statuses ~__LOC__ [slot4] in
   (* The number of stored slots has not changed. *)
   let* () =
     check_stored_level_headers
@@ -3052,13 +3062,6 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
   let rec check_attestations level =
     if level >= max_level then return ()
     else
-      let* status =
-        Dal_RPC.(
-          call dal_node
-          @@ get_level_slot_status
-               ~slot_level:level
-               ~slot_index:(slot_idx level))
-      in
       (* Before [first_not_attested_published_level], it should be [attested],
          and above (and including) [first_not_attested_published_level], it
          should be [unattested]. *)
@@ -3068,10 +3071,14 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
           Attested parameters.attestation_lag
         else Unattested
       in
-      Check.(
-        (expected_status = status)
-          Dal.Check.slot_id_status_typ
-          ~error_msg:"Expected status %L (got %R)") ;
+      let* () =
+        check_slot_status
+          ~__LOC__
+          dal_node
+          ~expected_status
+          ~slot_level:level
+          ~slot_index:(slot_idx level)
+      in
       check_attestations (level + 1)
   in
   check_attestations first_level
@@ -3171,21 +3178,18 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
   let rec check_attestations level =
     if level > last_checked_level then return ()
     else
-      let* status =
-        Dal_RPC.(
-          call dal_node
-          @@ get_level_slot_status
-               ~slot_level:level
-               ~slot_index:(slot_idx level))
-      in
       let expected_status =
         let open Dal_RPC in
         if level <= intermediary_level then Attested lag else Unattested
       in
-      Check.(
-        (expected_status = status)
-          Dal.Check.slot_id_status_typ
-          ~error_msg:"Expected status %L (got %R)") ;
+      let* () =
+        check_slot_status
+          ~__LOC__
+          dal_node
+          ~expected_status
+          ~slot_level:level
+          ~slot_index:(slot_idx level)
+      in
       check_attestations (level + 1)
   in
   check_attestations first_level
@@ -5779,14 +5783,14 @@ let test_attestation_through_p2p ~batching_time_interval _protocol
       [attester]
   in
 
-  let* status =
-    Dal_RPC.(
-      call attester
-      @@ get_level_slot_status ~slot_level:publication_level ~slot_index:index)
+  let* () =
+    check_slot_status
+      ~__LOC__
+      attester
+      ~expected_status:(Dal_RPC.Attested attestation_lag)
+      ~slot_level:publication_level
+      ~slot_index:index
   in
-  Check.(status = Dal_RPC.Attested attestation_lag)
-    Dal.Check.slot_id_status_typ
-    ~error_msg:"Expected status %R (got %L)" ;
   Log.info "Slot sucessfully attested" ;
   unit
 
@@ -6104,10 +6108,6 @@ module Skip_list_rpcs = struct
          statuses are inserted at L1 head level + 1. *)
       if level >= max_level then unit
       else
-        let* status =
-          Dal_RPC.(
-            call dal_node @@ get_level_slot_status ~slot_level:level ~slot_index)
-        in
         let expected_status =
           if level <= migration_level - lag then Dal_RPC.Attested lag
           else if level == migration_level + 1 - lag then Dal_RPC.Unattested
@@ -6117,13 +6117,14 @@ module Skip_list_rpcs = struct
             Dal_RPC.Attested new_lag
           else Dal_RPC.Unpublished
         in
-        Check.(
-          (status = expected_status)
-            Dal_common.Check.slot_id_status_typ
+        let* () =
+          check_slot_status
             ~__LOC__
-            ~error_msg:
-              (let msg = sf "Unexpected status at level %d: " level in
-               msg ^ "got %L, expected %R")) ;
+            dal_node
+            ~expected_status
+            ~slot_level:level
+            ~slot_index
+        in
         call_get_status (level + 1)
     in
     Log.info "Check fetching statuses from the skip-list store" ;
@@ -12070,6 +12071,39 @@ let test_denunciation_when_all_bakers_attest protocol dal_parameters _cryptobox
   in
   unit
 
+let test_statuses_backfill_at_restart _protocol dal_parameters _cryptobox
+    _l1_node client dal_node =
+  let index = 0 in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let* _ =
+    Helpers.publish_and_store_slot client dal_node Constant.bootstrap1 ~index
+    @@ Helpers.make_slot ~slot_size "Hello world!"
+  in
+  let* lvl_inject = Client.level client in
+  let slot_level = lvl_inject + 1 in
+  Log.info "Bake a few blocks" ;
+  let* () = bake_for ~count:3 client in
+  let* () = Dal_node.terminate dal_node in
+  let* () = bake_for ~count:3 client in
+  let* () = Dal_node.run dal_node in
+  let* () =
+    check_slot_status
+      ~__LOC__
+      dal_node
+      ~expected_status:Waiting_attestation
+      ~slot_level
+      ~slot_index:index
+  in
+  let* () =
+    check_slot_status
+      ~__LOC__
+      dal_node
+      ~expected_status:Unpublished
+      ~slot_level
+      ~slot_index:(index + 1)
+  in
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -12448,6 +12482,12 @@ let register ~protocols =
     ~all_bakers_attest_activation_threshold:Q.(Z.one /// Z.of_int 2)
     "Trap is denounced when all bakers attest"
     test_denunciation_when_all_bakers_attest
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~tags:["restart"; "statuses"]
+    "Status information is backfilled at restart"
+    ~operator_profiles:[0]
+    test_statuses_backfill_at_restart
     protocols ;
 
   (* Tests with all nodes *)
