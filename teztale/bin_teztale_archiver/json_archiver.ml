@@ -529,3 +529,6 @@ let add_block ~level (block, cycle_info, (endos, preendos), baking_rights) =
 
 (* not used *)
 let add_rights ~level:_ _rights = ()
+
+(* not used *)
+let add_dal_shards ~level:_ _shard_assignments = ()

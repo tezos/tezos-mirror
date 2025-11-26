@@ -19,6 +19,7 @@ type chunk =
         * Data.baking_right list)
   | Mempool of Int32.t (* level *) * Consensus_ops.delegate_ops
   | Rights of (Int32.t (* level *) * Consensus_ops.rights)
+  | Dal_shards of Int32.t (* level *) * Data.Dal.shard_assignment list
 
 type ctx = {
   cohttp_ctx : Cohttp_lwt_unix.Net.ctx;
@@ -99,12 +100,25 @@ let send_mempool ctx level ops =
   let path = Int32.to_string level ^ "/mempool" in
   send_something ctx path body
 
+let send_dal_shards ctx level shard_assignments =
+  let body =
+    `String
+      (Ezjsonm.value_to_string
+         (Data_encoding.Json.construct
+            Data.Dal.shard_assignments_encoding
+            shard_assignments))
+  in
+  let path = Int32.to_string level ^ "/dal_shards" in
+  send_something ctx path body
+
 let chunk_stream, chunk_feeder = Lwt_stream.create ()
 
 let send actx = function
   | Block (level, block) -> send_block actx level block
   | Mempool (level, ops) -> send_mempool actx level ops
   | Rights (level, rights) -> send_rights actx level rights
+  | Dal_shards (level, shard_assignments) ->
+      send_dal_shards actx level shard_assignments
 
 let launch actx _source =
   Lwt_stream.iter_p
@@ -120,3 +134,6 @@ let add_mempool ?unaccurate:(_ : bool option) ~level items =
 let add_block ~level block = chunk_feeder (Some (Block (level, block)))
 
 let add_rights ~level rights = chunk_feeder (Some (Rights (level, rights)))
+
+let add_dal_shards ~level shard_assignments =
+  chunk_feeder (Some (Dal_shards (level, shard_assignments)))
