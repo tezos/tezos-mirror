@@ -116,6 +116,42 @@ let bson =
                  exc)
         | exc -> Error (Printexc.to_string exc))
   in
+  let destruct_many enc body =
+    let seq, rest =
+      try
+        let seq, offset_rest =
+          Json_repr_bson.bytes_to_bson_list
+            ~laziness:false
+            ~copy:false
+            (Bytes.of_string body)
+        in
+        ( seq,
+          match offset_rest with
+          | None -> ""
+          | Some ofs -> String.sub body ofs (String.length body - ofs) )
+      with exn ->
+        Format.eprintf
+          "Ignoring unparsable value in BSON stream: %s@."
+          (Printexc.to_string exn) ;
+        ([], "")
+    in
+    ( List.filter_map
+        (fun bson ->
+          try Some (Data_encoding.Bson.destruct enc bson) with
+          | Data_encoding.Json.Cannot_destruct (_, exc) ->
+              Format.eprintf
+                "Ignoring undecodable value in BSON stream: %a@."
+                (Data_encoding.Json.print_error ?print_unknown:None)
+                exc ;
+              None
+          | exn ->
+              Format.eprintf
+                "Ignoring failed decoded value in BSON stream: %s@."
+                (Printexc.to_string exn) ;
+              None)
+        seq,
+      rest )
+  in
   {
     name = Cohttp.Accept.MediaType ("application", "bson");
     q = Some 100;
@@ -129,6 +165,8 @@ let bson =
         with
         | exception Json_repr_bson.Bson_decoding_error (msg, _, _) ->
             Format.fprintf ppf "@[Invalid BSON:@ %s@]" msg
+        | exception e ->
+            Format.fprintf ppf "@[Invalid BSON:@ %s@]" (Printexc.to_string e)
         | bson ->
             let json =
               Json_repr.convert
@@ -143,12 +181,7 @@ let bson =
         let b = construct_bytes enc v in
         Seq.return (b, 0, Bytes.length b));
     destruct;
-    destruct_seq =
-      (fun enc body ->
-        (* TODO: parse multiple bson values in a single string. *)
-        match destruct enc body with
-        | Error _ -> ([], Some body)
-        | Ok v -> ([v], None));
+    destruct_many;
   }
 
 let octet_stream =

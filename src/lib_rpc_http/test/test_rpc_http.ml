@@ -489,7 +489,7 @@ let test_media_types_chunks =
       (* TODO: support bson *)
       Gen.(
         pair
-          (oneofl [`Json; `Octet_stream])
+          (oneofl [`Json; `Octet_stream; `Bson])
           (small_list (pair Generator.gen_value bool)))
   @@ fun (media_type, values) ->
   let media_type =
