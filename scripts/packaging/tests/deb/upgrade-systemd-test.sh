@@ -40,8 +40,34 @@ repository="deb [signed-by=/etc/apt/keyrings/octez-dev.gpg] $REPO/$DISTRO $RELEA
 echo "$repository" | sudo tee /etc/apt/sources.list.d/octez-next.list
 apt-get update
 
+mapfile -t before_upgrade < <(
+  systemctl list-unit-files --type=service |
+    awk '/octez/ && $1 !~ /@\.service$/ {print $1 "|" $2}'
+)
+
+echo "Listing services before upgrade"
+systemctl list-unit-files --type=service | grep "octez"
+
 # [upgrade octez]
 apt-get upgrade -y octez-baker
+
+echo "Listing services after upgrade"
+systemctl list-unit-files --type=service | grep "octez"
+
+mapfile -t after_upgrade < <(
+  systemctl list-unit-files --type=service |
+    awk '/octez/ && $1 !~ /@\.service$/ {print $1 "|" $2}'
+)
+
+diff_output=$(diff <(printf "%s\n" "${before_upgrade[@]}") <(printf "%s\n" "${after_upgrade[@]}") || true)
+
+if [[ -n "$diff_output" ]]; then
+  echo "❌ Services changed after upgrade:"
+  echo "$diff_output"
+  exit 1
+else
+  echo "✅ All services unchanged after upgrade."
+fi
 
 # Compare versions after upgrade
 failed=0

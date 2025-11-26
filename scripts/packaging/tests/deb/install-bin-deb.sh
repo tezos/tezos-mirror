@@ -29,6 +29,8 @@ apt-get install -y \
   octez-baker \
   octez-smart-rollup-node
 
+systemctl list-unit-files --type=service | grep "octez"
+
 octez-node --version
 octez-client --version
 octez-dal-node --version
