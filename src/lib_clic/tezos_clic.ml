@@ -766,9 +766,9 @@ let internal_setup_formatter ppf format verbosity cols =
                    "@[<v 0>\003style\004.cmdline { font-family: monospace; \
                     font-size: 80%%; }.cmddoc { white-space: pre-wrap ; \
                     font-family: monospace; font-size: 80%%; line-height: \
-                    170%%; margin: 0 0 20px 0 }.cmdline { background: #343131; \
+                    170%%; margin: 0 0 2px 0 }.cmdline { background: #343131; \
                     padding: 2px 8px; border-radius:10px; color: white; \
-                    margin: 5px; }.cmdline+.cmddoc { margin: -5px 5px 0 20px; \
+                    margin: 5px; }.cmdline+.cmddoc { margin: -5px 5px 0 2px; \
                     padding: 5px }.opt,.arg { background: #343131; \
                     font-weight: bold;  padding: 2px 4px; border-radius:5px; \
                     }.kwd { font-weight: bold; } .opt { color:#CF0; \
