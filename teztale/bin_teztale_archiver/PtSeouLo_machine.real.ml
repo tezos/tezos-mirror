@@ -188,6 +188,21 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         assert (Int32.of_int round = hd.round) ;
         return (hd.delegate, baking_rights)
 
+  let dal_shards_of cctxt level =
+    let raw_level = Protocol.Alpha_context.Raw_level.of_int32_exn level in
+    let* shard_assignments =
+      Plugin.RPC.Dal.dal_shards
+        cctxt
+        (cctxt#chain, `Level level)
+        ~level:raw_level
+        ()
+    in
+    return
+    @@ List.map
+         (fun Plugin.RPC.Dal.S.{delegate; indexes} ->
+           Data.Dal.{delegate; assigned_shard_indices = indexes})
+         shard_assignments
+
   let raw_block_round shell_header =
     let wrap = Environment.wrap_tzresult in
     let open Result_syntax in

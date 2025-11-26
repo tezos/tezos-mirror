@@ -145,9 +145,9 @@ module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
       (Some cycle_info)
       reception_times
 
-  let dal_shards_of _ctxt _level =
-    (* TODO: call a DAL RPC here and map to [Data.Dal.shard_assignment list]. *)
-    return_nil
+  let dal_shards_of ctxt level =
+    let cctx = Services.wrap_full ctxt in
+    Services.dal_shards_of cctx level
 
   let () =
     Protocol_hash.Table.add

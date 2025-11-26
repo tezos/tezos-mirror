@@ -172,6 +172,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         assert (Int32.of_int priority = hd.round) ;
         return (hd.delegate, baking_rights)
 
+  let dal_shards_of _cctxt _level = return_nil
+
   let block_round header =
     match
       Data_encoding.Binary.of_bytes

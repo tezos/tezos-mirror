@@ -41,6 +41,10 @@ module type PROTOCOL_SERVICES = sig
     (Tezos_crypto.Signature.public_key_hash * Data.baking_right list) tzresult
     Lwt.t
 
+  (* dal_shards_of _ level *)
+  val dal_shards_of :
+    wrap_full -> Int32.t -> Data.Dal.shard_assignment list tzresult Lwt.t
+
   val baker_and_cycle :
     wrap_full ->
     Block_hash.t ->
