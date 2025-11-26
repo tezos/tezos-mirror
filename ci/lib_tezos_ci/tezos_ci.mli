@@ -649,8 +649,20 @@ module Images : sig
   end
 
   module Base_images : sig
+    type version = {major : int; minor : int}
+
+    val version_pp : Format.formatter -> version -> unit
+
     (** The prefix of the path of the base images. *)
     val path_prefix : string
+
+    val debian_version : version
+
+    val rpm_version : version
+
+    val homebrew_version : version
+
+    val rust_toolchain_version : version
 
     val debian_unstable : Image.t
 
