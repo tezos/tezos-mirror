@@ -138,10 +138,10 @@ fn validate_source<Host: Runtime>(
     context: &Context,
     content: &[ManagerOperationContent],
 ) -> Result<(PublicKey, TezlinkImplicitAccount), ValidityError> {
-    let source = &content[0].source();
+    let source = &content[0].source()?;
 
     for c in content {
-        if c.source() != *source {
+        if c.source()? != *source {
             return Err(ValidityError::MultipleSources);
         }
     }
@@ -256,8 +256,9 @@ pub fn execute_validation<Host: Runtime>(
     }
 
     // Initialize the validation gas using the gas limit of the first operation in the batch
-    let mut validation_gas = TezlinkOperationGas::start(operation.content[0].gas_limit())
-        .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
+    let mut validation_gas =
+        TezlinkOperationGas::start(operation.content[0].gas_limit()?)
+            .map_err(|err| ValidityError::GasLimitSetError(err.to_string()))?;
 
     let (pk, source_account) = validate_source(host, context, &operation.content)?;
 
@@ -285,8 +286,8 @@ pub fn execute_validation<Host: Runtime>(
     let mut unvalidated_operation: Vec<ManagerOperation<OperationContent>> = operation
         .content
         .into_iter()
-        .map(<ManagerOperation<OperationContent>>::from_manager_operation_content)
-        .collect();
+        .map(<ManagerOperation<OperationContent>>::try_from_manager_operation_content)
+        .collect::<Result<_, _>>()?;
 
     let mut source_balance = source_account
         .balance(host)

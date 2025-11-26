@@ -5,6 +5,7 @@
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::enc_wrappers::{BlockHash, OperationHash};
+use crate::operation_result::ValidityError;
 use primitive_types::H256;
 use rlp::Decodable;
 use tezos_crypto_rs::blake2b::digest_256;
@@ -92,33 +93,35 @@ impl Decodable for Operation {
 }
 
 pub trait ManagerOperationField {
-    fn gas_limit(&self) -> &Narith;
-    fn source(&self) -> &PublicKeyHash;
+    fn gas_limit(&self) -> Result<&Narith, ValidityError>;
+    fn source(&self) -> Result<&PublicKeyHash, ValidityError>;
 }
 
 impl ManagerOperationField for ManagerOperationContent {
-    fn gas_limit(&self) -> &Narith {
+    fn gas_limit(&self) -> Result<&Narith, ValidityError> {
         match self {
-            ManagerOperationContent::Reveal(op) => &op.gas_limit,
-            ManagerOperationContent::Transaction(op) => &op.gas_limit,
-            ManagerOperationContent::Origination(op) => &op.gas_limit,
-            _ => todo!(),
+            ManagerOperationContent::Reveal(op) => Ok(&op.gas_limit),
+            ManagerOperationContent::Transaction(op) => Ok(&op.gas_limit),
+            ManagerOperationContent::Origination(op) => Ok(&op.gas_limit),
+            _ => Err(ValidityError::UnsupportedOperation),
         }
     }
 
-    fn source(&self) -> &PublicKeyHash {
+    fn source(&self) -> Result<&PublicKeyHash, ValidityError> {
         match self {
-            ManagerOperationContent::Reveal(op) => &op.source,
-            ManagerOperationContent::Transaction(op) => &op.source,
-            ManagerOperationContent::Origination(op) => &op.source,
-            _ => todo!(),
+            ManagerOperationContent::Reveal(op) => Ok(&op.source),
+            ManagerOperationContent::Transaction(op) => Ok(&op.source),
+            ManagerOperationContent::Origination(op) => Ok(&op.source),
+            _ => Err(ValidityError::UnsupportedOperation),
         }
     }
 }
 
 pub trait ManagerOperationContentConv: Sized {
     fn into_manager_operation_content(self) -> ManagerOperationContent;
-    fn from_manager_operation_content(op: ManagerOperationContent) -> Self;
+    fn try_from_manager_operation_content(
+        op: ManagerOperationContent,
+    ) -> Result<Self, ValidityError>;
 }
 
 impl ManagerOperationContentConv for ManagerOperation<OperationContent> {
@@ -165,7 +168,9 @@ impl ManagerOperationContentConv for ManagerOperation<OperationContent> {
         }
     }
 
-    fn from_manager_operation_content(op: ManagerOperationContent) -> Self {
+    fn try_from_manager_operation_content(
+        op: ManagerOperationContent,
+    ) -> Result<Self, ValidityError> {
         match op {
             ManagerOperationContent::Reveal(ManagerOperation {
                 source,
@@ -174,14 +179,14 @@ impl ManagerOperationContentConv for ManagerOperation<OperationContent> {
                 gas_limit,
                 storage_limit,
                 operation: c,
-            }) => ManagerOperation {
+            }) => Ok(ManagerOperation {
                 source,
                 fee,
                 counter,
                 gas_limit,
                 storage_limit,
                 operation: OperationContent::Reveal(c),
-            },
+            }),
             ManagerOperationContent::Transaction(ManagerOperation {
                 source,
                 fee,
@@ -189,14 +194,14 @@ impl ManagerOperationContentConv for ManagerOperation<OperationContent> {
                 gas_limit,
                 storage_limit,
                 operation: c,
-            }) => ManagerOperation {
+            }) => Ok(ManagerOperation {
                 source,
                 fee,
                 counter,
                 gas_limit,
                 storage_limit,
                 operation: OperationContent::Transfer(c),
-            },
+            }),
             ManagerOperationContent::Origination(ManagerOperation {
                 source,
                 fee,
@@ -204,15 +209,15 @@ impl ManagerOperationContentConv for ManagerOperation<OperationContent> {
                 gas_limit,
                 storage_limit,
                 operation: c,
-            }) => ManagerOperation {
+            }) => Ok(ManagerOperation {
                 source,
                 fee,
                 counter,
                 gas_limit,
                 storage_limit,
                 operation: OperationContent::Origination(c),
-            },
-            _ => todo!(),
+            }),
+            _ => Err(ValidityError::UnsupportedOperation),
         }
     }
 }

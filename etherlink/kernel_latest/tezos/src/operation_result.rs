@@ -74,7 +74,10 @@ pub enum ValidityError {
     GasLimitSetError(String),
     #[error("Gas exhaustion")]
     OutOfGas,
+    #[error("Operation not supported")]
+    UnsupportedOperation,
 }
+
 impl From<gas::OutOfGas> for ValidityError {
     fn from(_: gas::OutOfGas) -> Self {
         ValidityError::OutOfGas
@@ -746,7 +749,12 @@ impl NomReader<'_> for OperationWithMetadata {
                     OperationResult::<OriginationContent>::nom_read(input)?;
                 (input, OperationResultSum::Origination(receipt))
             }
-            _ => todo!(),
+            _ => {
+                return Err(nom::Err::Error(tezos_nom::error::DecodeError::invalid_tag(
+                    input,
+                    format!("{content:?}"),
+                )))
+            }
         };
         Ok((input, Self { content, receipt }))
     }
