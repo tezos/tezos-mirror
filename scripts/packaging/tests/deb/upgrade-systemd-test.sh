@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -eu
-set -x
 
 REPO="https://storage.googleapis.com/$GCP_LINUX_PACKAGES_BUCKET/$CI_COMMIT_REF_NAME"
 REPOOLD="https://packages.nomadic-labs.com"
