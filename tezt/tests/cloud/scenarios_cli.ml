@@ -99,6 +99,8 @@ module type Dal = sig
 
   val observers_multi_slot_indices : int list list
 
+  val observer_machine_type : string list
+
   val archivers_slot_indices : int list list
 
   val observer_pkhs : string list
@@ -412,6 +414,28 @@ module Dal () : Dal = struct
           "For each list of slots, an observer will be created to observe them."
         (Clap.list_of_list_of_int "observer_multi_slot_indices")
         []
+
+  let observer_machine_type =
+    let observer_machine_type_typ =
+      Clap.list ~name:"observer_machine_type" ~dummy:["foo"] Fun.id Fun.id
+    in
+    let from_cli =
+      Clap.optional
+        ~section
+        ~long:"observer-machine-type"
+        ~placeholder:"<machine_type>,<machine_type>,<machine_type>, ..."
+        ~description:
+          "Specify the machine type used by an observer. The nth machine type \
+           will be assigned to the nth observer specified with \
+           [--observer_slot_indices] or [--observers_multi_slot_indices]. If \
+           less machine types are specified, the default one (or the one \
+           specified by --machine-type) will be used.\n\
+           Note that observers from [--observer_slot_indices] argument will be \
+           mapped to the machine type first."
+        observer_machine_type_typ
+        ()
+    in
+    Option.fold ~none:config.observer_machine_type ~some:Fun.id from_cli
 
   let archivers_slot_indices =
     config.archivers_slot_indices
