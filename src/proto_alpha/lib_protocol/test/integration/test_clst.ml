@@ -40,3 +40,15 @@ let test_deposit =
   in
   Check.((amount = balance) int64 ~error_msg:"Expected %L, got %R") ;
   return_unit
+
+let test_deposit_zero =
+  register_test ~title:"Test depositing 0 tez amount is forbidden" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, sender = Context.init1 () in
+  let amount = Tez.of_mutez_exn 0L in
+  let* deposit_tx = Op.clst_deposit (Context.B b) sender amount in
+  let*! b = Block.bake ~operation:deposit_tx b in
+  match b with
+  | Ok _ ->
+      Test.fail "Empty deposits on CLST are forbidden and expected to fail"
+  | Error trace -> Error_helpers.expect_clst_empty_deposit ~loc:__LOC__ trace
