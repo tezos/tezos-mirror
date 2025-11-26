@@ -3097,7 +3097,10 @@ etherlink.mir_unit:
   - gcp
   rules:
   - changes:
-    - contrib/mir/**/*
+    - contrib/mir/**/*.lalrpop
+    - contrib/mir/**/*.rs
+    - contrib/mir/**/*.toml
+    - contrib/mir/**/Cargo.lock
     when: on_success
   needs:
   - oc.docker:ci:amd64
@@ -3130,7 +3133,10 @@ etherlink.mir_tzt:
   - gcp
   rules:
   - changes:
-    - contrib/mir/**/*
+    - contrib/mir/**/*.lalrpop
+    - contrib/mir/**/*.rs
+    - contrib/mir/**/*.toml
+    - contrib/mir/**/Cargo.lock
     - tzt_reference_test_suite/**/*
     when: on_success
   needs:

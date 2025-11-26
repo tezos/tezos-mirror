@@ -43,7 +43,14 @@ module Files = struct
       "etherlink/kernel_latest/revm_evaluation/**/*";
     ]
 
-  let mir = ["contrib/mir/**/*"]
+  let mir =
+    [
+      "contrib/mir/**/*.rs";
+      "contrib/mir/**/*.lalrpop";
+      (* Cargo.toml, clippy.toml *)
+      "contrib/mir/**/*.toml";
+      "contrib/mir/**/Cargo.lock";
+    ]
 
   let tzt = ["tzt_reference_test_suite/**/*"]
 
