@@ -31,6 +31,7 @@ type t
 (** [init] creates a [t] value based on the given arguments. *)
 val init :
   Configuration_file.t ->
+  identity:P2p_identity.t ->
   network_name:Distributed_db_version.Name.t ->
   Profile_manager.t ->
   Cryptobox.t ->
@@ -100,6 +101,9 @@ val may_reconstruct :
   Types.slot_id ->
   t ->
   (bytes, Errors.other) result Lwt.t
+
+(** Returns the identity of the node. *)
+val get_identity : t -> P2p_identity.t
 
 (** Returns the status of the L1 crawler currently stored in the node
     context. *)

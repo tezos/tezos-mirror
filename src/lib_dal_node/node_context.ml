@@ -26,6 +26,7 @@
 
 type t = {
   config : Configuration_file.t;
+  identity : P2p_identity.t;
   network_name : Distributed_db_version.Name.t;
   cryptobox : Cryptobox.t;
   shards_proofs_precomputation : Cryptobox.shards_proofs_precomputation option;
@@ -50,12 +51,13 @@ type t = {
   mutable attestable_slots_watcher_table : Attestable_slots_watcher_table.t;
 }
 
-let init config ~network_name profile_ctxt cryptobox
+let init config ~identity ~network_name profile_ctxt cryptobox
     shards_proofs_precomputation proto_plugins store gs_worker transport_layer
     cctxt ~last_finalized_level ?(disable_shard_validation = false) ~ignore_pkhs
     () =
   {
     config;
+    identity;
     network_name;
     cryptobox;
     shards_proofs_precomputation;
@@ -80,6 +82,8 @@ let init config ~network_name profile_ctxt cryptobox
   }
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
+
+let get_identity ctxt = ctxt.identity
 
 let set_l1_crawler_status ctxt status =
   if ctxt.l1_crawler_status <> status then (

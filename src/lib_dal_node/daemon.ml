@@ -560,6 +560,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       profile_ctxt
       ~number_of_slots:proto_parameters.number_of_slots
   in
+  let identity = p2p_config.P2p.identity in
   (* Create and start a GS worker *)
   let gs_worker =
     let rng =
@@ -599,7 +600,6 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
         }
       else limits
     in
-    let identity = p2p_config.P2p.identity in
     (* Initialize the OpenTelemetry profiler only when identity is available, to
        allow discriminating the different services. *)
     ()
@@ -711,6 +711,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   let ctxt =
     Node_context.init
       config
+      ~identity
       profile_ctxt
       cryptobox
       shards_proofs_precomputation

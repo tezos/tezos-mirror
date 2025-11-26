@@ -598,7 +598,12 @@ let process_finalized_block_data ctxt cctxt store ~prev_proto_parameters
             block_level
             slot_index
             secret_key
-            (Format.asprintf "%d:%d" (Int32.to_int block_level) slot_index)
+            (Format.asprintf
+               "%d:%d:%a"
+               (Int32.to_int block_level)
+               slot_index
+               P2p_peer.Id.pp
+               (Node_context.get_identity ctxt).peer_id)
             (module Plugin : Dal_plugin.T)
         else return_unit)
       (Node_context.get_config ctxt).publish_slots_regularly
