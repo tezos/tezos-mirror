@@ -1516,38 +1516,51 @@ module Images = struct
   include Images_external
 
   module Base_images = struct
+    type version = {major : int; minor : int}
+
+    let version_pp ppf v = Format.fprintf ppf "%d.%d" v.major v.minor
+
     let path_prefix = "${GCP_PROTECTED_REGISTRY}/tezos/tezos"
 
-    let make_img distro =
+    let make_img distro _version =
       Image.mk_external ~image_path:(sf "%s/%s" path_prefix distro)
 
-    let debian_bookworm = make_img "debian:bookworm"
+    let debian_version = {major = 1; minor = 0}
 
-    let debian_trixie = make_img "debian:trixie"
+    let debian_bookworm = make_img "debian:bookworm" debian_version
 
-    let debian_unstable = make_img "debian:unstable"
+    let debian_trixie = make_img "debian:trixie" debian_version
 
-    let ubuntu_noble = make_img "ubuntu:noble"
+    let debian_unstable = make_img "debian:unstable" debian_version
 
-    let ubuntu_jammy = make_img "ubuntu:jammy"
+    let ubuntu_noble = make_img "ubuntu:noble" debian_version
 
-    let ubuntu_plucky = make_img "ubuntu:plucky"
+    let ubuntu_jammy = make_img "ubuntu:jammy" debian_version
 
-    let rockylinux_9_3 = make_img "rockylinux:9.3"
+    let ubuntu_plucky = make_img "ubuntu:plucky" debian_version
 
-    let rockylinux_9_6 = make_img "rockylinux:9.6"
+    let rpm_version = {major = 1; minor = 0}
 
-    let rockylinux_10_0 = make_img "rockylinux:10.0"
+    let rockylinux_9_3 = make_img "rockylinux:9.3" rpm_version
 
-    let fedora_39 = make_img "fedora:39"
+    let rockylinux_9_6 = make_img "rockylinux:9.6" rpm_version
 
-    let fedora_41 = make_img "fedora:41"
+    let rockylinux_10_0 = make_img "rockylinux:10.0" rpm_version
 
-    let fedora_42 = make_img "fedora:42"
+    let fedora_39 = make_img "fedora:39" rpm_version
 
-    let homebrew = make_img "debian-homebrew:trixie"
+    let fedora_41 = make_img "fedora:41" rpm_version
 
-    let rust_toolchain_trixie = make_img "debian-rust:trixie"
+    let fedora_42 = make_img "fedora:42" rpm_version
+
+    let homebrew_version = {major = 1; minor = 0}
+
+    let homebrew = make_img "debian-homebrew:trixie" homebrew_version
+
+    let rust_toolchain_version = {major = 1; minor = 0}
+
+    let rust_toolchain_trixie =
+      make_img "debian-rust:trixie" rust_toolchain_version
   end
 
   (* Internal images are built in the stage {!Stages.images}. *)
