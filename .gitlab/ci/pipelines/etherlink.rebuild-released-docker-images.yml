@@ -1,0 +1,77 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+stages:
+- start
+- build
+
+datadog_pipeline_trace:
+  image: datadog/ci:v4.1.0
+  stage: start
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+    --tags mr_number:$CI_MERGE_REQUEST_IID
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+etherlink.republish-docker-image:arm64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp_arm64
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - VERSION=$(etherlink/scripts/get_latest_release_version.sh)
+  - BUILT_IMAGE=$(etherlink/scripts/build_docker_release.sh arm64 $VERSION)
+  - export CI_COMMIT_TAG="octez-evm-node-v$VERSION"
+  - ./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest ./scripts/ci/octez-evm-node-release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+etherlink.republish-docker-image:x86_64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - VERSION=$(etherlink/scripts/get_latest_release_version.sh)
+  - BUILT_IMAGE=$(etherlink/scripts/build_docker_release.sh x86_64 $VERSION)
+  - export CI_COMMIT_TAG="octez-evm-node-v$VERSION"
+  - ./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest ./scripts/ci/octez-evm-node-release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

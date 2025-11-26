@@ -69,6 +69,10 @@ workflow:
     variables:
       PIPELINE_TYPE: etherlink.daily
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "etherlink.rebuild-released-docker-images"
+    variables:
+      PIPELINE_TYPE: etherlink.rebuild-released-docker-images
+    when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "client-libs.daily"
     variables:
       PIPELINE_TYPE: client-libs.daily
@@ -340,6 +344,10 @@ include:
 - local: .gitlab/ci/pipelines/etherlink.daily.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "etherlink.daily"
+    when: always
+- local: .gitlab/ci/pipelines/etherlink.rebuild-released-docker-images.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "etherlink.rebuild-released-docker-images"
     when: always
 - local: .gitlab/ci/pipelines/client-libs.daily.yml
   rules:

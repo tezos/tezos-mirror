@@ -440,6 +440,35 @@ let job_docker_promote_to_latest =
        ./scripts/ci/octez-evm-node-release.sh";
     ]
 
+let job_republish_docker_image =
+  Cacio.parameterize @@ fun arch ->
+  Cacio.parameterize @@ fun test ->
+  CI.job
+    ("republish-docker-image:" ^ Runner.Arch.(show_easy_to_distinguish arch))
+    ~__POS__
+    ~description:
+      ("Republish the latest released docker image for arch "
+      ^ Runner.Arch.(show_easy_to_distinguish arch))
+    ~arch
+    ~stage:Build
+    ~image:Tezos_ci.Images_external.docker
+    ~variables:
+      [
+        ("DOCKER_BUILD_TARGET", "without-evm-artifacts");
+        ("DOCKER_VERSION", "24.0.7");
+        ("CI_DOCKER_HUB", match test with `test -> "false" | `real -> "true");
+      ]
+    [
+      "./scripts/ci/docker_initialize.sh";
+      "VERSION=$(etherlink/scripts/get_latest_release_version.sh)";
+      "BUILT_IMAGE=$(etherlink/scripts/build_docker_release.sh "
+      ^ Runner.Arch.(show_easy_to_distinguish arch)
+      ^ " $VERSION)";
+      "export CI_COMMIT_TAG=\"octez-evm-node-v$VERSION\"";
+      "./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest \
+       ./scripts/ci/octez-evm-node-release.sh";
+    ]
+
 let register () =
   let open Runner.Arch in
   CI.register_before_merging_jobs
@@ -492,5 +521,13 @@ let register () =
       (Auto, job_tezt_flaky `scheduled);
       (Auto, job_mir_unit);
       (Auto, job_mir_tzt);
+    ] ;
+  CI.register_scheduled_pipeline
+    "rebuild-released-docker-images"
+    ~description:
+      "Pipeline to rebuild and republish the latest released Docker images."
+    [
+      (Manual, job_republish_docker_image Amd64 `test);
+      (Manual, job_republish_docker_image Arm64 `test);
     ] ;
   ()
