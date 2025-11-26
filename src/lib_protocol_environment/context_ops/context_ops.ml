@@ -110,6 +110,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
     let*! index =
       Context.init ?patch_context ?readonly ?index_log_size irmin_dir
     in
+    let* () = Context_metadata.write_metadata_file irmin_dir Irmin in
     return index
   in
 
@@ -127,6 +128,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
     let*! index =
       Brassaia.init ?patch_context ?readonly ?index_log_size brassaia_dir
     in
+    let* () = Context_metadata.write_metadata_file brassaia_dir Brassaia in
     return index
   in
 
@@ -142,6 +144,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
         patch_context
     in
     let index = Tezedge.init ?patch_context tezedge_dir in
+    let* () = Context_metadata.write_metadata_file tezedge_dir Tezedge in
     return index
   in
 
@@ -195,10 +198,21 @@ let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
   (* Gather the initialisation profiling otherwise aggregates will behave
      like records and create a section for each call *)
   () [@profiler.record {verbosity = Notice} "Context init"] ;
-  match Sys.getenv backend_variable |> String.lowercase_ascii with
-  | "tezedge" ->
+  let*! existing_backend =
+    let context_dir = context_dir data_dir in
+    let*! context_dir_exists = Lwt_unix.file_exists context_dir in
+    if context_dir_exists then
+      Lwt.map Option.of_result (Context_metadata.read_metadata_file context_dir)
+    else Lwt.return_none
+  in
+  let backend_env_var =
+    Sys.getenv_opt backend_variable |> Option.map String.lowercase_ascii
+  in
+  match (backend_env_var, existing_backend) with
+  | Some "tezedge", None | None, Some Tezedge | Some "tezedge", Some Tezedge ->
       init ~kind:`Tezedge ?patch_context ?readonly ?index_log_size ~data_dir ()
-  | "duo_tezedge" ->
+  (* TODO: handle duo_context mode *)
+  | Some "duo_tezedge", _ ->
       init
         ~kind:`Duo_tezedge
         ?patch_context
@@ -206,7 +220,10 @@ let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
         ?index_log_size
         ~data_dir
         ()
-  | "brassaia" -> (
+  | Some "irmin", None | None, Some Irmin | Some "irmin", Some Irmin ->
+      init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ()
+  | Some "brassaia", None | None, Some Brassaia | Some "brassaia", Some Brassaia
+    -> (
       match kind with
       | `Disk ->
           init
@@ -224,7 +241,7 @@ let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
             ?index_log_size
             ~data_dir
             ())
-  | "duo" -> (
+  | Some "duo", _ -> (
       match kind with
       | `Disk ->
           let*! () = Events.(emit warning_experimental) () in
@@ -244,8 +261,14 @@ let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
             ?index_log_size
             ~data_dir
             ())
-  | _ | (exception Not_found) ->
-      init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ()
+  | Some backend_env_var, Some backend ->
+      failwith
+        "Found %a context backend while %s=%s"
+        Context_metadata.pp
+        backend
+        backend_variable
+        backend_env_var
+  | _, None -> init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ()
 
 let index (context : Environment_context.t) =
   match[@profiler.span_f {verbosity = Notice} ["context_ops"; "index"]]
