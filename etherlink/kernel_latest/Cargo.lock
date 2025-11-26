@@ -1140,28 +1140,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm"
-version = "0.39.1"
-dependencies = [
- "auto_impl",
- "ethereum",
- "evm-core",
- "evm-gasometer",
- "evm-runtime",
- "log",
- "primitive-types",
- "rlp",
- "sha3",
-]
-
-[[package]]
-name = "evm-core"
-version = "0.39.0"
-dependencies = [
- "primitive-types",
-]
-
-[[package]]
 name = "evm-evaluation"
 version = "0.1.0"
 dependencies = [
@@ -1187,25 +1165,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm-gasometer"
-version = "0.39.0"
-dependencies = [
- "evm-core",
- "evm-runtime",
- "primitive-types",
-]
-
-[[package]]
-name = "evm-runtime"
-version = "0.39.0"
-dependencies = [
- "auto_impl",
- "evm-core",
- "primitive-types",
- "sha3",
-]
-
-[[package]]
 name = "evm_kernel"
 version = "0.1.0"
 dependencies = [
@@ -1216,7 +1175,6 @@ dependencies = [
  "bytes",
  "ethbloom",
  "ethereum",
- "evm",
  "getrandom 0.2.15",
  "hex",
  "libsecp256k1",
