@@ -2152,5 +2152,5 @@ let map_command f (Command c) = Command {c with conv = (fun x -> c.conv (f x))}
 
 let setup_formatter ~isatty ppf verbosity =
   let format = if isatty then Ansi else Plain in
-  let cols = if isatty then Terminal.Size.get_columns () else None in
+  let cols = if isatty then Terminal.Size.get_columns () else Some 95 in
   internal_setup_formatter ppf format verbosity cols
