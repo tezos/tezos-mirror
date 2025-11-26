@@ -192,7 +192,8 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
    to select the backend between Memory|Brassaia_memory and Disk|Brassaia.
    [data_dir] stands for the root directory in which the context directory is
    expected to be find. *)
-let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
+let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
+    ~data_dir () =
   let open Lwt_syntax in
   (* Gather the initialisation profiling otherwise aggregates will behave
      like records and create a section for each call *)
@@ -225,8 +226,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
             ?readonly
             ?index_log_size
             ~data_dir
-            ()
-      | _ -> init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ())
+            ())
   | "duo" -> (
       match kind with
       | `Disk ->
@@ -246,8 +246,7 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
             ?readonly
             ?index_log_size
             ~data_dir
-            ()
-      | _ -> init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ())
+            ())
   | _ | (exception Not_found) ->
       init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ()
 

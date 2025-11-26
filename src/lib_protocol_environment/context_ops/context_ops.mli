@@ -47,7 +47,7 @@ val do_not_use__brassaia_dir : string -> string
     `Disk backend between `Shell and `Brassaia. [data_dir] stands for the root
     directory in which the context directory is expected to be find. *)
 val init :
-  kind:[< `Brassaia | `Brassaia_memory | `Disk | `Memory > `Disk `Memory] ->
+  kind:[`Disk | `Memory] ->
   ?patch_context:(t -> (t, tztrace) result Lwt.t) ->
   ?readonly:bool ->
   ?index_log_size:int ->
