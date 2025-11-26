@@ -201,10 +201,6 @@ module type COMPONENT_API = sig
       If [dune_cache] is specified, the resulting job is modified with
       {!Tezos_ci.Cache.enable_dune_cache}.
 
-      If [test_coverage] is specified, the resulting job is modified with
-      {!Tezos_ci.Coverage.enable_instrumentation} and
-      {!Tezos_ci.Coverage.enable_output_artifact}.
-
       [?image_dependencies] is temporary,
       it will be removed once the image feature is implemented in Cacio.
       See the Future work section for more details.
@@ -234,7 +230,6 @@ module type COMPONENT_API = sig
     ?cargo_target_caches:bool ->
     ?sccache:sccache_config ->
     ?dune_cache:dune_cache_config ->
-    ?test_coverage:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     ?timeout:Gitlab_ci.Types.time_interval ->
@@ -312,7 +307,6 @@ module type COMPONENT_API = sig
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
-    ?test_coverage:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?tezt_exe:string ->
     ?global_timeout:tezt_timeout ->

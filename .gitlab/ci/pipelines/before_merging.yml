@@ -2212,12 +2212,6 @@ oc.unified_coverage:
     when: on_success
   dependencies:
   - oc.docker:ci:amd64
-  - etherlink.unit_tests
-  - etherlink.tezt-flaky
-  - etherlink.tezt
-  - tezt-flaky
-  - tezt-time-sensitive
-  - tezt
   - oc.unit:non-proto-x86_64
   - oc.unit:other-x86_64
   - oc.unit:proto-x86_64
@@ -3101,7 +3095,6 @@ etherlink.unit_tests:
   - eval $(opam env)
   - make test-etherlink-unit
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -3119,14 +3112,11 @@ etherlink.unit_tests:
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
-    COVERAGE_OPTIONS: --instrument-with bisect_ppx
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
-    name: coverage-files-$CI_JOB_ID
+    name: $CI_JOB_NAME-$CI_COMMIT_SHA-x86_64
     expire_in: 1 day
     paths:
     - test_results
-    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: test_results/*.xml
     when: always
@@ -3950,7 +3940,6 @@ etherlink.tezt-flaky:
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -3960,10 +3949,7 @@ etherlink.tezt-flaky:
     TEZT_RETRY: "3"
     TEZT_PARALLEL: "1"
     TEZT_NO_NPX: "true"
-    COVERAGE_OPTIONS: --instrument-with bisect_ppx
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
-    name: coverage-files-$CI_JOB_ID
     expire_in: 7 days
     paths:
     - selected_tezts.tsv
@@ -3971,7 +3957,6 @@ etherlink.tezt-flaky:
     - tezt-*.log
     - tezt-results.json
     - $JUNIT
-    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -4244,7 +4229,6 @@ etherlink.tezt:
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -4254,10 +4238,7 @@ etherlink.tezt:
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "6"
     TEZT_NO_NPX: "true"
-    COVERAGE_OPTIONS: --instrument-with bisect_ppx
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
-    name: coverage-files-$CI_JOB_ID
     expire_in: 7 days
     paths:
     - selected_tezts.tsv
@@ -4265,7 +4246,6 @@ etherlink.tezt:
     - tezt-*.log
     - tezt-results.json
     - $JUNIT
-    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -4772,7 +4752,6 @@ tezt-flaky:
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -4782,10 +4761,7 @@ tezt-flaky:
     TEZT_RETRY: "3"
     TEZT_PARALLEL: "1"
     TEZT_NO_NPX: "true"
-    COVERAGE_OPTIONS: --instrument-with bisect_ppx
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
-    name: coverage-files-$CI_JOB_ID
     expire_in: 7 days
     paths:
     - selected_tezts.tsv
@@ -4793,7 +4769,6 @@ tezt-flaky:
     - tezt-*.log
     - tezt-results.json
     - $JUNIT
-    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -5154,7 +5129,6 @@ tezt-time-sensitive:
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -5164,10 +5138,7 @@ tezt-time-sensitive:
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "1"
     TEZT_NO_NPX: "true"
-    COVERAGE_OPTIONS: --instrument-with bisect_ppx
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
-    name: coverage-files-$CI_JOB_ID
     expire_in: 7 days
     paths:
     - selected_tezts.tsv
@@ -5175,7 +5146,6 @@ tezt-time-sensitive:
     - tezt-*.log
     - tezt-results.json
     - $JUNIT
-    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always
@@ -5253,7 +5223,6 @@ tezt:
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  - ./scripts/ci/merge_coverage.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -5263,10 +5232,7 @@ tezt:
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "6"
     TEZT_NO_NPX: "true"
-    COVERAGE_OPTIONS: --instrument-with bisect_ppx
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
-    name: coverage-files-$CI_JOB_ID
     expire_in: 7 days
     paths:
     - selected_tezts.tsv
@@ -5274,7 +5240,6 @@ tezt:
     - tezt-*.log
     - tezt-results.json
     - $JUNIT
-    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
     reports:
       junit: $JUNIT
     when: always

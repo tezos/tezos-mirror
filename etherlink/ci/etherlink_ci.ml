@@ -141,7 +141,6 @@ let job_unit_tests =
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     ~dune_cache:(Cacio.dune_cache ())
-    ~test_coverage:true
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~retry:{max = 2; when_ = []}
     [". ./scripts/version.sh"; "eval $(opam env)"; "make test-etherlink-unit"]
@@ -306,7 +305,6 @@ let job_tezt =
     ~__POS__
     ~pipeline
     ~description:"Run normal Etherlink Tezt tests."
-    ~test_coverage:true
     ~test_selection:
       (Tezos_ci_jobs.Tezt.tests_tag_selector [Not (Has_tag "flaky")])
     ~parallel_jobs:18
@@ -348,7 +346,6 @@ let job_tezt_flaky =
     ~__POS__
     ~pipeline
     ~description:"Run Etherlink Tezt tests tagged as flaky."
-    ~test_coverage:true
     ~allow_failure:Yes
     ~test_selection:(Tezos_ci_jobs.Tezt.tests_tag_selector [Has_tag "flaky"])
     ~parallel_jobs:2
