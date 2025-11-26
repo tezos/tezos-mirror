@@ -31,6 +31,13 @@ module Env = struct
       "yes"
       env
 
+  let allow_publication_regularly_env enable env =
+    may_add
+      enable
+      Dal_node.allow_regular_publication_environment_variable
+      "yes"
+      env
+
   let ignore_topics_env ignore_pkhs env =
     match ignore_pkhs with
     | Some (_ :: _) -> add Dal_node.ignore_topics_environment_variable "yes" env
@@ -70,13 +77,15 @@ module Env = struct
         env |> add "PROFILING" verbosity |> add "PROFILING_BACKENDS" backends
 
   let initialize_env ~memtrace ~memtrace_output_filename
-      ~disable_shard_validation ~prometheus ~otel_endpoint ~service_name
-      ~ignore_pkhs ~(ppx_profiling_verbosity : string option)
+      ~disable_shard_validation ~allow_publication_regularly ~prometheus
+      ~otel_endpoint ~service_name ~ignore_pkhs
+      ~(ppx_profiling_verbosity : string option)
       ~(ppx_profiling_backends : string list) =
     empty
     |> memtrace_env memtrace memtrace_output_filename
     |> otel_env otel_endpoint service_name
     |> disable_shard_validation_env disable_shard_validation
+    |> allow_publication_regularly_env allow_publication_regularly
     |> ignore_topics_env ignore_pkhs
     |> ppx_profiler_env
          ?prometheus
@@ -518,7 +527,7 @@ module Dal_node = struct
     let create_from_endpoint ?(group = "DAL") ?net_port
         ?(path = Uses.path Constant.octez_dal_node) ~name ?rpc_port
         ?disable_shard_validation ?disable_amplification ?ignore_pkhs
-        ~l1_node_endpoint cloud agent =
+        ?publish_slots_regularly ~l1_node_endpoint cloud agent =
       let* path = Agent.copy agent ~source:path in
       let binary_name = Filename.basename path in
       let* () =
@@ -554,6 +563,7 @@ module Dal_node = struct
           ?disable_shard_validation
           ?disable_amplification
           ?ignore_pkhs
+          ?publish_slots_regularly
           ~l1_node_endpoint
           ()
       in
@@ -639,7 +649,8 @@ module Dal_node = struct
       Lwt.return node
 
     let create ?net_port ?path ~name ?disable_shard_validation
-        ?disable_amplification ?ignore_pkhs ~node cloud agent =
+        ?disable_amplification ?ignore_pkhs ?publish_slots_regularly ~node cloud
+        agent =
       let l1_node_endpoint =
         Node.as_rpc_endpoint ~local:(Node.runner node = Agent.runner agent) node
       in
@@ -650,13 +661,15 @@ module Dal_node = struct
         ?disable_shard_validation
         ?disable_amplification
         ?ignore_pkhs
+        ?publish_slots_regularly
         ~l1_node_endpoint
         cloud
         agent
 
     let run ?prometheus ?otel ?(memtrace = false) ?wait_ready ?event_level
         ?(disable_shard_validation = false) ?ignore_pkhs
-        ~ppx_profiling_verbosity ~ppx_profiling_backends dal_node =
+        ?(allow_publication_regularly = false) ~ppx_profiling_verbosity
+        ~ppx_profiling_backends dal_node =
       let service_name = name dal_node in
       let memtrace_output_filename =
         Format.asprintf "%s/%s-trace.ctf" Path.tmp_dir service_name
@@ -666,6 +679,7 @@ module Dal_node = struct
           ~memtrace
           ~memtrace_output_filename
           ~disable_shard_validation
+          ~allow_publication_regularly
           ~prometheus
           ~otel_endpoint:otel
           ~service_name

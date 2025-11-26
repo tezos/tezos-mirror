@@ -73,6 +73,7 @@ val init_producer :
   disable_amplification:bool ->
   node_p2p_endpoint:string ->
   dal_node_p2p_endpoint:string option ->
+  ?publish_slots_regularly:int ->
   Tezos.Teztale.t option ->
   Account.key ->
   int ->
