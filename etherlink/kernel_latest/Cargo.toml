@@ -50,7 +50,6 @@ serde = { version = "1.0", features = ["derive", "rc"] }
 
 # ethereum VM
 revm = { version = "33.1.0", default-features = false, features = [ "optional_eip3607" ] }
-evm = { path = "../sputnikvm", default-features = false }
 aurora-engine-modexp = { version = "1.0", default-features = false }
 bn = { package = "substrate-bn", version = "0.6", default-features = false }
 
