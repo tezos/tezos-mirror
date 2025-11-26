@@ -134,7 +134,7 @@ pub enum ManagerOperationContent {
     #[encoding(tag = 107)]
     Reveal(ManagerOperation<RevealContent>),
     #[encoding(tag = 108)]
-    Transfer(ManagerOperation<TransferContent>),
+    Transaction(ManagerOperation<TransferContent>),
     #[encoding(tag = 109)]
     Origination(ManagerOperation<OriginationContent>),
 }
@@ -143,7 +143,7 @@ impl ManagerOperationContent {
     pub fn gas_limit(&self) -> &Narith {
         match self {
             ManagerOperationContent::Reveal(op) => &op.gas_limit,
-            ManagerOperationContent::Transfer(op) => &op.gas_limit,
+            ManagerOperationContent::Transaction(op) => &op.gas_limit,
             ManagerOperationContent::Origination(op) => &op.gas_limit,
         }
     }
@@ -151,7 +151,7 @@ impl ManagerOperationContent {
     pub fn source(&self) -> &PublicKeyHash {
         match self {
             ManagerOperationContent::Reveal(op) => &op.source,
-            ManagerOperationContent::Transfer(op) => &op.source,
+            ManagerOperationContent::Transaction(op) => &op.source,
             ManagerOperationContent::Origination(op) => &op.source,
         }
     }
@@ -179,7 +179,7 @@ impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
                 })
             }
             OperationContent::Transfer(c) => {
-                ManagerOperationContent::Transfer(ManagerOperation {
+                ManagerOperationContent::Transaction(ManagerOperation {
                     source,
                     fee,
                     counter,
@@ -220,7 +220,7 @@ impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
                 storage_limit,
                 operation: OperationContent::Reveal(c),
             },
-            ManagerOperationContent::Transfer(ManagerOperation {
+            ManagerOperationContent::Transaction(ManagerOperation {
                 source,
                 fee,
                 counter,
@@ -433,7 +433,7 @@ mod tests {
         let signature = UnknownSignature::from_base58_check("sigbQ5ZNvkjvGssJgoAnUAfY4Wvvg3QZqawBYB1j1VDBNTMBAALnCzRHWzer34bnfmzgHg3EvwdzQKdxgSghB897cono6gbQ").unwrap();
         let expected_operation = Operation {
             branch,
-            content: vec![ManagerOperationContent::Transfer(ManagerOperation {
+            content: vec![ManagerOperationContent::Transaction(ManagerOperation {
                 source: PublicKeyHash::from_b58check(
                     "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                 )
@@ -512,7 +512,7 @@ mod tests {
 
         let expected_operation = Operation {
             branch,
-            content: vec![ManagerOperationContent::Transfer(ManagerOperation {
+            content: vec![ManagerOperationContent::Transaction(ManagerOperation {
                 source: PublicKeyHash::from_b58check(
                     "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                 )
@@ -594,7 +594,7 @@ mod tests {
                     gas_limit: 171_u64.into(),
                     storage_limit: 0_u64.into(),
                 }),
-                ManagerOperationContent::Transfer(ManagerOperation {
+                ManagerOperationContent::Transaction(ManagerOperation {
                     source: PublicKeyHash::from_b58check(
                         "tz1cckAZtxYwxAfwQuHnabTWfbp2ScWobxHH",
                     )

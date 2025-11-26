@@ -653,7 +653,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                         op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                             OperationBatchWithMetadata {
                                 operations: vec![OperationWithMetadata {
-                                    content: ManagerOperationContent::Transfer(
+                                    content: ManagerOperationContent::Transaction(
                                         ManagerOperation {
                                             source,
                                             fee: 0.into(),

@@ -733,7 +733,7 @@ impl NomReader<'_> for OperationWithMetadata {
     fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
         let (input, content) = ManagerOperationContent::nom_read(input)?;
         let (input, receipt) = match content {
-            ManagerOperationContent::Transfer(_) => {
+            ManagerOperationContent::Transaction(_) => {
                 let (input, receipt) =
                     OperationResult::<TransferContent>::nom_read(input)?;
                 (input, OperationResultSum::Transfer(receipt))
@@ -774,7 +774,7 @@ mod tests {
         OperationDataAndMetadata::OperationWithMetadata (
                 OperationBatchWithMetadata {
                     operations: vec![OperationWithMetadata {
-                        content: ManagerOperationContent::Transfer(
+                        content: ManagerOperationContent::Transaction(
                             ManagerOperation {
                                 source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
                                 fee: 255.into(),
@@ -826,7 +826,7 @@ mod tests {
         OperationDataAndMetadata::OperationWithMetadata (
                  OperationBatchWithMetadata {
                     operations: vec![OperationWithMetadata {
-                        content: ManagerOperationContent::Transfer(ManagerOperation { source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(), fee: 468.into(), counter: 1.into(), gas_limit: 2169.into(), storage_limit: 0.into(), operation: TransferContent {
+                        content: ManagerOperationContent::Transaction(ManagerOperation { source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(), fee: 468.into(), counter: 1.into(), gas_limit: 2169.into(), storage_limit: 0.into(), operation: TransferContent {
                             amount: 42000000.into(),
                             destination: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
                             parameters: None,
