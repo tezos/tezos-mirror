@@ -638,7 +638,6 @@ module type COMPONENT_API = sig
     ?arch:Tezos_ci.Runner.Arch.t ->
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
-    ?fetch_records_from:string ->
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
@@ -877,39 +876,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       services;
     }
 
-  (* This job is allowed to fail because Tezt can still run without records,
-     or with records that are committed in the repository. *)
-  let job_tezt_fetch_records =
-    parameterize @@ fun from_pipeline ->
-    job
-      ("teztrec_" ^ from_pipeline)
-      ~__POS__
-      ~description:
-        "Fetch Tezt records so that jobs that run Tezt tests can use them for \
-         auto-balancing."
-      ~image:Tezos_ci.Images.CI.build
-      ~stage:Build
-      ~allow_failure:Yes
-      ~artifacts:
-        (Gitlab_ci.Util.artifacts
-           ~expire_in:(Duration (Hours 4))
-           ~when_:Always
-           [
-             "tezt-fetch-records.log";
-             "tezt/records/**.json";
-             (* Keep broken records for debugging *)
-             "tezt/records/**.json.broken";
-           ])
-      [
-        "./scripts/ci/take_ownership.sh";
-        ". ./scripts/version.sh";
-        "eval $(opam env)";
-        "dune exec scripts/ci/update_records/update.exe -- --info --log-file \
-         tezt-fetch-records.log --from last-successful-scheduled:"
-        ^ from_pipeline;
-        "./scripts/ci/filter_corrupted_records.sh";
-      ]
-
   module SH = struct
     (* Mini-module to help craft large shell commands. *)
 
@@ -935,9 +901,9 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   type tezt_timeout = No_timeout | Minutes of int
 
   let tezt_job ~__POS__:source_location ~pipeline ~description ?provider ?arch
-      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?fetch_records_from
-      ?only_if_changed ?(needs = []) ?needs_legacy ?test_coverage ?allow_failure
-      ?tezt_exe ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
+      ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?only_if_changed ?(needs = [])
+      ?needs_legacy ?test_coverage ?allow_failure ?tezt_exe
+      ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
       ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
       ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = []) variant =
     if not (is_a_valid_name variant) then
@@ -1104,12 +1070,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
         | None -> failwith "job_select_tezts has not been initialized"
         | Some job -> (Artifacts, job) :: needs
       else needs
-    in
-    let needs =
-      match fetch_records_from with
-      | None -> needs
-      | Some pipeline_name ->
-          (Artifacts, job_tezt_fetch_records pipeline_name) :: needs
     in
     let tezt_job_info =
       {
