@@ -167,9 +167,9 @@ let start_public_server (type f) ~(mode : f Mode.t)
   in
   let*? () = Rpc_types.check_rpc_server_config rpc_server_family config in
   let* register_tezos_services =
+    let (module Backend : Services_backend_sig.S), _ = ctxt in
     match rpc_server_family with
     | Rpc_types.Single_chain_node_rpc_server Michelson ->
-        let (module Backend : Services_backend_sig.S), _ = ctxt in
         let* l2_chain_id =
           match l2_chain_id with
           | Some l2_chain_id -> return l2_chain_id
@@ -227,6 +227,9 @@ let start_public_server (type f) ~(mode : f Mode.t)
                    in
                    return hash)
     | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server ->
+        let* runtimes = Backend.list_runtimes () in
+        let*! _ = List.map_p Tezosx_events.runtime_activated runtimes in
+
         return @@ Evm_directory.empty config.experimental_features.rpc_server
   in
   (* If spawn_rpc is defined, use it as intermediate *)

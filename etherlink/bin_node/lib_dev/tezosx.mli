@@ -9,6 +9,8 @@
     runtime in Tezos X. *)
 type runtime = Tezos
 
+val runtime_encoding : runtime Data_encoding.t
+
 val runtime_of_string_opt : string -> runtime option
 
 val string_of_runtime : runtime -> string
