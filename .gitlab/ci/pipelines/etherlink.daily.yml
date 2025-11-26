@@ -801,6 +801,7 @@ etherlink.tezt-flaky:
       junit: $JUNIT
     when: always
   retry: 2
+  parallel: 2
 
 etherlink.tezt-extra:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -868,7 +869,7 @@ etherlink.tezt-extra:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 5
+  parallel: 12
 
 etherlink.tezt-slow:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -936,7 +937,7 @@ etherlink.tezt-slow:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 6
+  parallel: 3
 
 etherlink.tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -1009,7 +1010,7 @@ etherlink.tezt:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 17
+  parallel: 18
 
 etherlink.test_firehose:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
