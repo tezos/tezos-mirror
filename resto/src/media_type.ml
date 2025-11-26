@@ -34,6 +34,7 @@ module Make (Encoding : Resto.ENCODING) = struct
     construct : 'a. 'a Encoding.t -> 'a -> string;
     construct_seq : 'a. 'a Encoding.t -> 'a -> (Bytes.t * int * int) Seq.t;
     destruct : 'a. 'a Encoding.t -> string -> ('a, string) result;
+    destruct_many : 'a. 'a Encoding.t -> string -> 'a list * string;
   }
 
   let name_of_media_type = function

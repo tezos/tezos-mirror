@@ -30,6 +30,39 @@ include Resto_cohttp.Media_type.Make (Tezos_rpc.Encoding)
 let chunk_size_hint = 4096
 
 let json =
+  let destruct enc body =
+    try
+      Data_encoding.Json.from_string body
+      |> Result.map (Data_encoding.Json.destruct enc)
+    with
+    | (Stack_overflow | Out_of_memory) as exc -> raise exc
+    | Data_encoding.Json.Cannot_destruct (_, exc) ->
+        Error
+          (Format.asprintf
+             "%a"
+             (fun fmt -> Data_encoding.Json.print_error fmt)
+             exc)
+    | exc -> Error (Printexc.to_string exc)
+  in
+  let destruct_many enc body =
+    match String.split_on_char '\n' body |> List.rev with
+    | [] -> ([], "")
+    | last :: rfirsts ->
+        let firsts =
+          List.rev_filter_map
+            (fun s ->
+              match destruct enc s with
+              | Error e ->
+                  Format.eprintf
+                    "Ignoring unparsable value in JSON stream: %s\nValue: %s@."
+                    e
+                    s ;
+                  None
+              | Ok v -> Some v)
+            rfirsts
+        in
+        (firsts, last)
+  in
   {
     name = Cohttp.Accept.MediaType ("application", "json");
     q = Some 1000;
@@ -55,25 +88,33 @@ let json =
           ~newline:true
           ~buffer
         @@ Data_encoding.Json.construct_seq enc v);
-    destruct =
-      (fun enc body ->
-        match Data_encoding.Json.from_string body with
-        | Error _ as err -> err
-        | Ok json -> (
-            try Ok (Data_encoding.Json.destruct enc json) with
-            | (Stack_overflow | Out_of_memory) as exc -> raise exc
-            | Data_encoding.Json.Cannot_destruct (_, exc) ->
-                Error
-                  (Format.asprintf
-                     "%a"
-                     (fun fmt -> Data_encoding.Json.print_error fmt)
-                     exc)
-            | exc -> Error (Printexc.to_string exc)));
+    destruct;
+    destruct_many;
   }
 
 let bson =
   let construct_bytes enc v =
     Json_repr_bson.bson_to_bytes @@ Data_encoding.Bson.construct enc v
+  in
+  let destruct enc body =
+    match
+      Json_repr_bson.bytes_to_bson
+        ~laziness:false
+        ~copy:false
+        (Bytes.of_string body)
+    with
+    | exception Json_repr_bson.Bson_decoding_error (msg, _, pos) ->
+        Error (Format.asprintf "(at offset: %d) %s" pos msg)
+    | bson -> (
+        try Ok (Data_encoding.Bson.destruct enc bson) with
+        | (Stack_overflow | Out_of_memory) as exc -> raise exc
+        | Data_encoding.Json.Cannot_destruct (_, exc) ->
+            Error
+              (Format.asprintf
+                 "%a"
+                 (fun fmt -> Data_encoding.Json.print_error fmt)
+                 exc)
+        | exc -> Error (Printexc.to_string exc))
   in
   {
     name = Cohttp.Accept.MediaType ("application", "bson");
@@ -101,26 +142,13 @@ let bson =
       (fun enc v ->
         let b = construct_bytes enc v in
         Seq.return (b, 0, Bytes.length b));
-    destruct =
+    destruct;
+    destruct_seq =
       (fun enc body ->
-        match
-          Json_repr_bson.bytes_to_bson
-            ~laziness:false
-            ~copy:false
-            (Bytes.of_string body)
-        with
-        | exception Json_repr_bson.Bson_decoding_error (msg, _, pos) ->
-            Error (Format.asprintf "(at offset: %d) %s" pos msg)
-        | bson -> (
-            try Ok (Data_encoding.Bson.destruct enc bson) with
-            | (Stack_overflow | Out_of_memory) as exc -> raise exc
-            | Data_encoding.Json.Cannot_destruct (_, exc) ->
-                Error
-                  (Format.asprintf
-                     "%a"
-                     (fun fmt -> Data_encoding.Json.print_error fmt)
-                     exc)
-            | exc -> Error (Printexc.to_string exc)));
+        (* TODO: parse multiple bson values in a single string. *)
+        match destruct enc body with
+        | Error _ -> ([], Some body)
+        | Ok v -> ([v], None));
   }
 
 let octet_stream =
@@ -176,6 +204,19 @@ let octet_stream =
                  Data_encoding.Binary.pp_read_error
                  re)
         | Ok data -> Ok data);
+    destruct_many =
+      (fun enc s ->
+        let enc = dynsize enc in
+        let len = String.length s in
+        let rec loop acc ofs =
+          let remaining = len - ofs in
+          if remaining = 0 then (List.rev acc, "")
+          else
+            match Data_encoding.Binary.read_opt enc s ofs remaining with
+            | None -> (List.rev acc, String.sub s ofs remaining)
+            | Some (ofs, elt) -> loop (elt :: acc) ofs
+        in
+        loop [] 0);
   }
 
 let all_media_types = [json; bson; octet_stream]

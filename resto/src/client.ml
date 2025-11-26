@@ -150,6 +150,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
       construct = (fun _ -> assert false);
       construct_seq = (fun _ -> assert false);
       destruct = (fun _ -> assert false);
+      destruct_many = (fun _ -> assert false);
     }
 
   let full_logger ppf =
@@ -497,17 +498,16 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
                 | None ->
                     on_close () ;
                     Lwt.return_unit
-                | Some chunk -> (
+                | Some chunk ->
                     Buffer.add_string buffer chunk ;
                     let data = Buffer.contents buffer in
                     log.log ~media output `OK (lazy (Lwt.return chunk))
                     >>= fun () ->
-                    match media.destruct output data with
-                    | Ok body ->
-                        Buffer.reset buffer ;
-                        on_chunk body ;
-                        loop ()
-                    | Error _msg -> loop ())
+                    let elts, rest = media.destruct_many output data in
+                    List.iter on_chunk elts ;
+                    Buffer.reset buffer ;
+                    Buffer.add_string buffer rest ;
+                    loop ()
               in
               Lwt.dont_wait loop (fun exn ->
                   Format.eprintf
