@@ -1555,47 +1555,37 @@ let dispatch_private_request (type f) ~websocket
                     Transaction.hash (Transaction_object.hash transaction_object);
                   ])) ;
 
-          let* is_valid =
-            let get_nonce () =
-              let* next_nonce =
-                Backend_rpc.Etherlink.nonce
-                  (Transaction_object.sender transaction_object)
-                  (Block_parameter Latest)
-              in
-              let next_nonce =
-                match next_nonce with
-                | None -> Ethereum_types.Qty Z.zero
-                | Some next_nonce -> next_nonce
-              in
-              return @@ Ok Prevalidator.{next_nonce; transaction_object}
+          let* next_nonce =
+            let* next_nonce =
+              Backend_rpc.Etherlink.nonce
+                (Transaction_object.sender transaction_object)
+                (Block_parameter Latest)
             in
-            get_nonce ()
+            return
+            @@
+            match next_nonce with
+            | None -> Ethereum_types.Qty Z.zero
+            | Some next_nonce -> next_nonce
           in
           let transaction = Ethereum_types.hex_encode_string raw_txn in
-          match is_valid with
-          | Error err ->
-              let*! () = Tx_pool_events.invalid_transaction ~transaction in
-              rpc_error (Rpc_errors.transaction_rejected err None)
-          | Ok {next_nonce; transaction_object} -> (
-              let* tx_hash =
-                let* (module Tx_container) =
-                  match tx_container with
-                  | Evm_tx_container m -> return m
-                  | Michelson_tx_container _ ->
-                      failwith
-                        "Unsupported JSONRPC method in Tezlink: \
-                         injectTransaction"
-                in
-                Tx_container.add
-                  ~wait_confirmation
-                  ~next_nonce
-                  transaction_object
-                  ~raw_tx:transaction
-              in
-              match tx_hash with
-              | Ok tx_hash -> rpc_ok tx_hash
-              | Error reason ->
-                  rpc_error (Rpc_errors.transaction_rejected reason None))
+          let* tx_hash =
+            let* (module Tx_container) =
+              match tx_container with
+              | Evm_tx_container m -> return m
+              | Michelson_tx_container _ ->
+                  failwith
+                    "Unsupported JSONRPC method in Tezlink: injectTransaction"
+            in
+            Tx_container.add
+              ~wait_confirmation
+              ~next_nonce
+              transaction_object
+              ~raw_tx:transaction
+          in
+          match tx_hash with
+          | Ok tx_hash -> rpc_ok tx_hash
+          | Error reason ->
+              rpc_error (Rpc_errors.transaction_rejected reason None)
         in
         build_with_input ~f module_ parameters
     | Method (Inject_tezlink_operation.Method, module_) ->
