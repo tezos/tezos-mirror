@@ -93,7 +93,7 @@ let make_contract_info contract_balance counter_z contract_script =
 let tezlink_to_tezos_chain_id ~l2_chain_id _chain =
   let (L2_types.Chain_id l2_chain_id) = l2_chain_id in
   let bytes = Bytes.make 4 '\000' in
-  l2_chain_id |> Z.to_int32 |> Bytes.set_int32_be bytes 0 ;
+  l2_chain_id |> Z.to_int32_unsigned |> Bytes.set_int32_be bytes 0 ;
   Chain_id.of_bytes bytes
 
 let chain_directory_path = Tezos_shell_services.Chain_services.path

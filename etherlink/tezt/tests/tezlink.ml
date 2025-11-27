@@ -30,7 +30,7 @@ let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
     ~l2_setups:
       [
         {
-          (Evm_node.default_l2_setup ~l2_chain_id:12) with
+          (Evm_node.default_l2_setup ~l2_chain_id:2937611481) with
           l2_chain_family = "Michelson";
           tez_bootstrap_accounts = bootstrap_accounts;
           tez_bootstrap_contracts = bootstrap_contracts;
