@@ -230,8 +230,3 @@ let changeset_riscv_kernels_code =
   Changeset.(
     changeset_base
     @ make ["sdk/rust/**/*"; "src/kernel_sdk/**/*"; "src/riscv/**/*"])
-
-let changeset_riscv_kernels =
-  Changeset.(
-    changeset_riscv_kernels_code @ changeset_images_rust_toolchain
-    (* Run if the [rust-toolchain] image is updated *))

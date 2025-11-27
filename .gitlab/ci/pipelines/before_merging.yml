@@ -1589,57 +1589,6 @@ audit_riscv_deps:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-check_riscv_kernels:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
-    - sdk/rust/**/*
-    - src/kernel_sdk/**/*
-    - src/riscv/**/*
-    when: on_success
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features --features ci'
-    check
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-
 ocaml-check:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
@@ -3047,6 +2996,56 @@ oc:scripts:release_script_values:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+check_riscv_kernels:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - images/create_image.sh
+    - images/rust-toolchain/**/*
+    - images/scripts/install_datadog_static.sh
+    - scripts/version.sh
+    - sdk/rust/**/*
+    - src/kernel_sdk/**/*
+    - src/riscv/**/*
+    when: on_success
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - trigger
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features --features ci'
+    check
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
 
 etherlink.lint_wasm_runtime:
   image: ${ci_image_name}/build:${ci_image_tag}

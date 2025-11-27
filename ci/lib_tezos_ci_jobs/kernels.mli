@@ -1,0 +1,9 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2025 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** Register kernel jobs. *)
+val register : unit -> unit

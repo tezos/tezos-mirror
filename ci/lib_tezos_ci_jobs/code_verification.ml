@@ -988,23 +988,7 @@ let jobs pipeline_type =
              the image itself *)
           ["make -C src/riscv audit"]
       in
-      let riscv_ci_flags =
-        (* These flags ensure we don't need Ocaml installed in the check and test jobs *)
-        "--no-default-features --features ci"
-      in
-      let job_check_riscv_kernels : tezos_job =
-        make_job_kernel
-          ~__POS__
-          ~name:"check_riscv_kernels"
-          ~changes:changeset_riscv_kernels
-          ~dependencies:(Dependent [])
-          [
-            Format.asprintf
-              "make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='%s' check"
-              riscv_ci_flags;
-          ]
-      in
-      [job_test_kernels; job_audit_riscv_deps; job_check_riscv_kernels]
+      [job_test_kernels; job_audit_riscv_deps]
     in
 
     let jobs_packaging =
