@@ -47,8 +47,10 @@ module Request = struct
         number : Ethereum_types.quantity;
       }
         -> (unit, tztrace) t
-    | Execute_single_transaction :
-        Broadcast.transaction
+    | Execute_single_transaction : {
+        tx : Broadcast.transaction;
+        hash : Ethereum_types.hash;
+      }
         -> (Transaction_receipt.t option, tztrace) t
 
   let name (type a b) (t : (a, b) t) =
@@ -176,12 +178,14 @@ module Request = struct
         case
           (Tag 8)
           ~title:"Execute_single_transaction"
-          (obj2
+          (obj3
              (req "request" (constant "execute_single_transaction"))
-             (req "tx" Broadcast.transaction_encoding))
+             (req "tx" Broadcast.transaction_encoding)
+             (req "hash" Ethereum_types.hash_encoding))
           (function
-            | View (Execute_single_transaction tx) -> Some ((), tx) | _ -> None)
-          (fun ((), tx) -> View (Execute_single_transaction tx));
+            | View (Execute_single_transaction {tx; hash}) -> Some ((), tx, hash)
+            | _ -> None)
+          (fun ((), tx, hash) -> View (Execute_single_transaction {tx; hash}));
         case
           (Tag 9)
           ~title:"Next_block_info"

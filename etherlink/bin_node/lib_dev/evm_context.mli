@@ -191,9 +191,12 @@ val next_block_info :
 (** [execute_single_transaction evm_state transaction time number tx_index] executes
     a single Ethereum transaction within the current future block state.
     Returns the execution outcome as [Transaction_receipt.t].
-    Can be None if single execution was locked by a divergence or stream startup *)
+    Can be None if single execution was locked by a divergence or stream startup.
+    Hash is exclusively used by OTel tracing, we take it as input to avoid recomputing. *)
 val execute_single_transaction :
-  Broadcast.transaction -> (Transaction_receipt.t option, tztrace) result Lwt.t
+  Broadcast.transaction ->
+  Ethereum_types.hash ->
+  (Transaction_receipt.t option, tztrace) result Lwt.t
 
 (** Watcher that gets notified each time a new block is produced. *)
 val head_watcher :

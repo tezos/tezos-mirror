@@ -123,19 +123,23 @@ let on_next_block_info timestamp number =
 let on_inclusion (txn : Broadcast.transaction) =
   let open Lwt_result_syntax in
   Broadcast.notify_inclusion txn ;
-  let* () =
+  let* hash =
     match txn with
     | Common (Evm txn) ->
         let*? obj = Transaction_object.decode txn in
-        let*! () = Events.inclusion (Transaction_object.hash obj) in
-        return_unit
-    | Common (Michelson _op) -> return_unit
+        let hash = Transaction_object.hash obj in
+        let*! () = Events.inclusion hash in
+        return hash
+    | Common (Michelson op) ->
+        failwith
+          "%a is a Tezos operation, SBL not supported"
+          Hex.pp
+          (Hex.of_string op)
     | Delayed {hash; _} ->
         let*! () = Events.inclusion hash in
-        return_unit
+        return hash
   in
-
-  let* opt_receipt = Evm_context.execute_single_transaction txn in
+  let* opt_receipt = Evm_context.execute_single_transaction txn hash in
   Option.iter Broadcast.notify_preconfirmed_receipt opt_receipt ;
   return_unit
 
