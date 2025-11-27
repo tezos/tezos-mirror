@@ -270,6 +270,17 @@ module RPC : sig
   val get_assigned_shard_indices :
     level:int -> pkh:string -> int list RPC_core.t
 
+  type trap = {delegate : string; slot_index : int}
+
+  (** Call RPC
+    "GET /published_levels/<published_level>/known_traps?delegate=<pkh>&slot_index=<slot_index>"
+    and returns the list of traps recorded by the DAL node at [~published_level]. *)
+  val get_published_level_known_traps :
+    published_level:int ->
+    pkh:commitment_proof ->
+    slot_index:int ->
+    trap list RPC_core.t
+
   type slot_set = bool list
 
   type attestable_slots = Not_in_committee | Attestable_slots of slot_set
