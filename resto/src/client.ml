@@ -509,7 +509,10 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
                         loop ()
                     | Error _msg -> loop ())
               in
-              ignore (loop () : unit Lwt.t) ;
+              Lwt.dont_wait loop (fun exn ->
+                  Format.eprintf
+                    "Warning: Exception in async stream processing: %s@."
+                    (Printexc.to_string exn)) ;
               Lwt.return
                 (`Ok
                    (Some
