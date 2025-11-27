@@ -23,3 +23,19 @@ val export :
   max_published_level:int32 option ->
   string ->
   unit tzresult Lwt.t
+
+(** [import ~data_dir ~config_file ~endpoint ~min_published_level
+    ~max_published_level path ] imports DAL node store data from [path] and
+    merges it into [data_dir].
+    This is equivalent to exporting [data_dir] into [path], and this is
+    basically implemented by the same underlying function with swapped
+    argument positions. *)
+val import :
+  ?check:bool ->
+  data_dir:string ->
+  config_file:string ->
+  endpoint:Uri.t option ->
+  min_published_level:int32 option ->
+  max_published_level:int32 option ->
+  string ->
+  unit tzresult Lwt.t

@@ -210,8 +210,8 @@ module Merge = struct
         let* _ = Key_value_store.close dst_store in
         return_unit)
 
-  let merge ~data_dir:src_data_dir ~config_file ~endpoint ~min_published_level
-      ~max_published_level dst_data_dir =
+  let merge ~frozen_only ~src_root_dir ~config_file ~endpoint
+      ~min_published_level ~max_published_level ~dst_root_dir =
     let open Lwt_result_syntax in
     let* config = Configuration_file.load ~config_file in
     let endpoint = Option.value ~default:config.endpoint endpoint in
@@ -231,21 +231,6 @@ module Merge = struct
     (* Set crypto box share size hook. *)
     Value_size_hooks.set_share_size
       (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
-    let store_path data_dir =
-      (* We only need data_dir field, so we can just use default as base. *)
-      Configuration_file.store_path {Configuration_file.default with data_dir}
-    in
-    let src_root_dir = store_path src_data_dir in
-    let dst_root_dir = store_path dst_data_dir in
-    let*! dst_exists = Lwt_unix.file_exists dst_root_dir in
-    let* () =
-      if dst_exists then
-        failwith
-          "Destination directory %s already exists. Please remove it or choose \
-           a different destination."
-          dst_root_dir
-      else return_unit
-    in
     let* chain_id =
       read_from_store ~root_dir:src_root_dir (module Store.Chain_id)
     in
@@ -267,12 +252,14 @@ module Merge = struct
        max_published_level to this value to avoid exporting stale data. *)
     let max_published_level =
       let latest_frozen_level =
-        Int32.(
-          sub
-            last_processed_level
-            (of_int
-               (Constants.validation_slack + proto_parameters.attestation_lag
-              + 1)))
+        if frozen_only then
+          Int32.(
+            sub
+              last_processed_level
+              (of_int
+                 (Constants.validation_slack + proto_parameters.attestation_lag
+                + 1)))
+        else last_processed_level
       in
       match max_published_level with
       | None -> latest_frozen_level
@@ -348,10 +335,47 @@ end
 
 let export ~data_dir ~config_file ~endpoint ~min_published_level
     ~max_published_level dst =
+  let open Lwt_result_syntax in
+  let store_path data_dir =
+    Configuration_file.store_path {Configuration_file.default with data_dir}
+  in
+  let src_root_dir = store_path data_dir in
+  let dst_root_dir = store_path dst in
+  let*! dst_exists = Lwt_unix.file_exists dst_root_dir in
+  let* () =
+    if dst_exists then
+      failwith
+        "Destination directory %s already exists. Please remove it or choose a \
+         different destination."
+        dst_root_dir
+    else return_unit
+  in
   Merge.merge
-    ~data_dir
+    ~frozen_only:true
+    ~src_root_dir
     ~config_file
     ~endpoint
     ~min_published_level
     ~max_published_level
-    dst
+    ~dst_root_dir
+
+let import ?(check = true) ~data_dir:dst ~config_file ~endpoint
+    ~min_published_level ~max_published_level src =
+  if check then
+    failwith
+      "Import with checks is not yet implemented. Use --no-check if you want \
+       to bypass imported data validation.\n"
+  else
+    let store_path data_dir =
+      Configuration_file.store_path {Configuration_file.default with data_dir}
+    in
+    let src_root_dir = store_path src in
+    let dst_root_dir = store_path dst in
+    Merge.merge
+      ~frozen_only:false
+      ~src_root_dir
+      ~config_file
+      ~endpoint
+      ~min_published_level
+      ~max_published_level
+      ~dst_root_dir

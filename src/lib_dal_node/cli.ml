@@ -1007,47 +1007,33 @@ module Snapshot = struct
       `P "Entrypoint for snapshot management commands.";
     ]
 
+  let min_published_level_arg doc =
+    let open Term in
+    let parse, pp = positive_int_format "min-published-level" in
+    make_arg ~doc ~parse ~placeholder:"INT" ~pp "min-published-level"
+
+  let min_published_level doc =
+    Term.arg_to_cmdliner (min_published_level_arg doc)
+
+  let max_published_level_arg doc =
+    let open Term in
+    let parse, pp = positive_int_format "max-published-level" in
+    make_arg ~doc ~parse ~placeholder:"INT" ~pp "max-published-level"
+
+  let max_published_level doc =
+    Term.arg_to_cmdliner (max_published_level_arg doc)
+
+  let file_path doc =
+    let open Cmdliner in
+    Arg.(required & pos 0 (some string) None & info ~docv:"DIR" ~doc [])
+
   module Export = struct
-    let man = [`S "DESCRIPTION"; `P "Export DAL node data to a snapshot file."]
+    let man =
+      [`S "DESCRIPTION"; `P "Export DAL node data to another data directory."]
 
     let info =
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info ~doc:"Export snapshot" ~man ~version "export"
-
-    let min_published_level_arg =
-      let open Term in
-      let parse, pp = positive_int_format "min-published-level" in
-      make_arg
-        ~doc:"Minimum published level to include in the snapshot."
-        ~parse
-        ~placeholder:"INT"
-        ~pp
-        "min-published-level"
-
-    let min_published_level = Term.arg_to_cmdliner min_published_level_arg
-
-    let max_published_level_arg =
-      let open Term in
-      let parse, pp = positive_int_format "max-published-level" in
-      make_arg
-        ~doc:"Maximum published level to include in the snapshot."
-        ~parse
-        ~placeholder:"INT"
-        ~pp
-        "max-published-level"
-
-    let max_published_level = Term.arg_to_cmdliner max_published_level_arg
-
-    let file_path =
-      let open Cmdliner in
-      Arg.(
-        required
-        & pos 0 (some string) None
-        & info
-            ~docv:"DIR"
-            ~doc:"Path to the snapshot directory where to export."
-            ~docs:"OPTIONS"
-            [])
 
     let action min_published_level max_published_level data_dir endpoint
         config_file file_path =
@@ -1073,8 +1059,58 @@ module Snapshot = struct
       Cmdliner.Term.(
         map
           wrap_action
-          (const action $ min_published_level $ max_published_level
-         $ Term.data_dir $ Term.endpoint $ Term.config_file $ file_path))
+          (const action
+          $ min_published_level "Minimum published level to export."
+          $ max_published_level "Maximum published level to export."
+          $ Term.data_dir $ Term.endpoint $ Term.config_file
+          $ file_path "Path to the destination data directory."))
+
+    let cmd = Cmdliner.Cmd.v info term
+  end
+
+  module Import = struct
+    let man =
+      [`S "DESCRIPTION"; `P "Import DAL node data from another data directory."]
+
+    let no_check =
+      let open Cmdliner in
+      let doc = "Skip validation checks during import." in
+      Arg.(value & flag & info ~doc ["no-check"])
+
+    let info =
+      let version = Tezos_version_value.Bin_version.octez_version_string in
+      Cmdliner.Cmd.info ~doc:"Import snapshot" ~man ~version "import"
+
+    let action min_published_level max_published_level data_dir endpoint
+        config_file no_check file_path =
+      let data_dir =
+        Option.value ~default:Configuration_file.default.data_dir data_dir
+      in
+      let config_file =
+        Option.value
+          ~default:(Configuration_file.default_config_file data_dir)
+          config_file
+      in
+      let min_level = Option.map Int32.of_int min_published_level in
+      let max_level = Option.map Int32.of_int max_published_level in
+      Snapshot.import
+        ~check:(not no_check)
+        ~data_dir
+        ~config_file
+        ~endpoint
+        ~min_published_level:min_level
+        ~max_published_level:max_level
+        file_path
+
+    let term =
+      Cmdliner.Term.(
+        map
+          wrap_action
+          (const action
+          $ min_published_level "Minimum published level to import."
+          $ max_published_level "Maximum published level to import."
+          $ Term.data_dir $ Term.endpoint $ Term.config_file $ no_check
+          $ file_path "Path to the source data directory to import from."))
 
     let cmd = Cmdliner.Cmd.v info term
   end
@@ -1085,7 +1121,7 @@ module Snapshot = struct
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info ~doc:"Snapshot management" ~man ~version "snapshot"
     in
-    Cmdliner.Cmd.group ~default info [Export.cmd]
+    Cmdliner.Cmd.group ~default info [Export.cmd; Import.cmd]
 end
 
 module Debug = struct

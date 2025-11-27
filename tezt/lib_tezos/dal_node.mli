@@ -272,6 +272,21 @@ val snapshot_export :
   string ->
   unit Lwt.t
 
+(** [snapshot_import dal_node ?endpoint ?min_published_level
+    ?max_published_level input_file] imports a snapshot into the DAL node's
+    store from [input_file].
+    If [endpoint] is provided, it overrides the endpoint in the config file.
+    [min_published_level] and [max_published_level] are optional level ranges
+    to import. *)
+val snapshot_import :
+  t ->
+  ?no_check:bool ->
+  ?endpoint:Endpoint.t ->
+  ?min_published_level:int32 ->
+  ?max_published_level:int32 ->
+  string ->
+  unit Lwt.t
+
 (** The Proxy module provides functionality to create a proxy server
     that can intercept and mock responses for DAL node requests. *)
 module Proxy : sig

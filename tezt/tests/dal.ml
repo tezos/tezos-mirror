@@ -2328,8 +2328,8 @@ let test_dal_node_test_get_level_slot_content _protocol parameters _cryptobox
        %L, got = %R)" ;
   unit
 
-let test_dal_node_snapshot_export ~operators _protocol parameters cryptobox node
-    client dal_node =
+let test_dal_node_snapshot ~operators _protocol parameters cryptobox node client
+    dal_node =
   let* start = Node.get_level node in
   let expected_exported_levels = 5 in
   let stop =
@@ -2365,8 +2365,15 @@ let test_dal_node_snapshot_export ~operators _protocol parameters cryptobox node
     else Test.fail "Snapshot export failed: file was not created at %s" file
   in
   (* Create a fresh DAL node using the exported snapshot data. *)
-  let fresh_dal_node = Dal_node.create ~node ~data_dir:file () in
+  let fresh_dal_node = Dal_node.create ~node () in
   let* () = Dal_node.init_config ~operator_profiles:operators fresh_dal_node in
+  let* () =
+    Dal_node.snapshot_import
+      ~no_check:true (* Snapshot data validation is not implemented yet *)
+      ~endpoint:(Node.as_rpc_endpoint node)
+      fresh_dal_node
+      file
+  in
   let* () = Dal_node.run fresh_dal_node in
   (* Compare slot statuses between the original node and the fresh one built from snapshot. *)
   let* () =
@@ -11545,12 +11552,12 @@ let register ~protocols =
     test_dal_node_import_l1_snapshot
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["snapshot"; "export"]
+    ~tags:["snapshot"]
     ~operator_profiles:[0]
     ~l1_history_mode:(Custom Node.Archive)
     ~history_mode:Full
-    "dal node snapshot export"
-    (test_dal_node_snapshot_export ~operators:[0])
+    "dal node snapshot export/import"
+    (test_dal_node_snapshot ~operators:[0])
     protocols ;
 
   (* Tests with layer1 and dal nodes (with p2p/GS) *)
