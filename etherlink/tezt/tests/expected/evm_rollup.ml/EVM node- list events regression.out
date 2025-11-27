@@ -748,7 +748,11 @@ evm_context_request_failed:
                         "transaction":
                           [ "transaction" || "deposit" || "fa_deposit",
                             $unistring,
-                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] } },
+                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] } }
+            || { /* Next_block_info */
+                 "request": "next_block_info",
+                 "timestamp": $timestamp.protocol,
+                 "number": $unistring },
           "errors": any } }
     $Signature.Public_key:
       /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
@@ -2696,7 +2700,11 @@ evm_context_request_failed:
                         "transaction":
                           [ "transaction" || "deposit" || "fa_deposit",
                             $unistring,
-                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] } },
+                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] } }
+            || { /* Next_block_info */
+                 "request": "next_block_info",
+                 "timestamp": $timestamp.protocol,
+                 "number": $unistring },
           "errors": any } }
     $Signature.Public_key:
       /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */

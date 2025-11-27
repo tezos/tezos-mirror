@@ -182,6 +182,19 @@ module Request = struct
           (function
             | View (Execute_single_transaction tx) -> Some ((), tx) | _ -> None)
           (fun ((), tx) -> View (Execute_single_transaction tx));
+        case
+          (Tag 9)
+          ~title:"Next_block_info"
+          (obj3
+             (req "request" (constant "next_block_info"))
+             (req "timestamp" Time.Protocol.encoding)
+             (req "number" Ethereum_types.quantity_encoding))
+          (function
+            | View (Next_block_info {timestamp; number}) ->
+                Some ((), timestamp, number)
+            | _ -> None)
+          (fun ((), timestamp, number) ->
+            View (Next_block_info {timestamp; number}));
       ]
 
   let pp ppf view =
