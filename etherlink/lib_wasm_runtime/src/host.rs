@@ -21,6 +21,7 @@ use runtime_calypso2::internal_runtime::InternalRuntime as Calypso2InternalRunti
 use runtime_dionysus::internal_runtime::InternalRuntime as DionysusInternalRuntime;
 use runtime_dionysus_r1::internal_runtime::InternalRuntime as DionysusR1InternalRuntime;
 use runtime_ebisu::internal_runtime::InternalRuntime as EbisuInternalRuntime;
+use runtime_farfadet::internal_runtime::InternalRuntime as FarfadetInternalRuntime;
 use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 use tezos_smart_rollup_host::{
     input::Message,
@@ -555,6 +556,19 @@ impl DionysusR1InternalRuntime for Host {
 }
 
 impl EbisuInternalRuntime for Hasher {
+    fn __internal_store_get_hash<T: tezos_smart_rollup_host::path::Path>(
+        &mut self,
+        path: &T,
+    ) -> Result<Vec<u8>, tezos_smart_rollup_host::runtime::RuntimeError> {
+        trace!("store_get_hash({path})");
+        let hash = bindings::store_get_hash(&self.0.borrow(), path.as_bytes())
+            .map_err(from_binding_error)?;
+
+        Ok(hash.as_bytes().to_vec())
+    }
+}
+
+impl FarfadetInternalRuntime for Hasher {
     fn __internal_store_get_hash<T: tezos_smart_rollup_host::path::Path>(
         &mut self,
         path: &T,

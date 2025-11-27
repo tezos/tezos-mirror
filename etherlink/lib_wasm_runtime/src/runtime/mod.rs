@@ -20,6 +20,7 @@ pub use env::Env;
 use log::trace;
 use ocaml::Error;
 use runtime_ebisu::internal_runtime::InternalRuntime as EbisuInternalRuntime;
+use runtime_farfadet::internal_runtime::InternalRuntime as FarfadetInternalRuntime;
 use wasmer::{Engine, Function, FunctionEnv, Instance, Store};
 
 pub enum RunStatus {
@@ -120,6 +121,7 @@ enum NativeKernel {
     Dionysus,
     DionysusR1,
     Ebisu,
+    Farfadet,
 }
 
 impl NativeKernel {
@@ -131,6 +133,7 @@ impl NativeKernel {
             Self::Dionysus => RuntimeVersion::V1,
             Self::DionysusR1 => RuntimeVersion::V1,
             Self::Ebisu => RuntimeVersion::V1,
+            Self::Farfadet => RuntimeVersion::V1,
         }
     }
 }
@@ -147,6 +150,8 @@ const DIONYSUS_R1_ROOT_HASH_HEX: &'static str =
     "1f533dbc6404cf6b05c8df6b6b879f96299fb0d6b661d26152ce3297bc22d550";
 const EBISU_ROOT_HASH_HEX: &'static str =
     "8eb91f4b0955a02d394565b31cf806a3d281f1f1d7fed709f0b7af29c7b53996";
+const FARFADET_ROOT_HASH_HEX: &'static str =
+    "002ce9946e42dad48751bf81120f26d44bd86aa2e386e9015a0c2e8b0aefb89c";
 
 impl NativeKernel {
     fn of_root_hash(root_hash: &ContextHash) -> Option<NativeKernel> {
@@ -160,6 +165,7 @@ impl NativeKernel {
             DIONYSUS_ROOT_HASH_HEX => Some(NativeKernel::Dionysus),
             DIONYSUS_R1_ROOT_HASH_HEX => Some(NativeKernel::DionysusR1),
             EBISU_ROOT_HASH_HEX => Some(NativeKernel::Ebisu),
+            FARFADET_ROOT_HASH_HEX => Some(NativeKernel::Farfadet),
             _ => None,
         }
     }
@@ -245,6 +251,36 @@ impl Runtime for NativeRuntime {
                     self.mut_host(),
                     hasher,
                 );
+                Ok(())
+            }
+            ("kernel_run", NativeKernel::Farfadet) => {
+                trace!("farfadet::kernel_loop");
+                let hasher = self.host().hasher();
+                kernel_farfadet::kernel(self.mut_host(), hasher);
+                Ok(())
+            }
+            ("populate_delayed_inbox", NativeKernel::Farfadet) => {
+                trace!("farfadet::populate_delayed_inbox");
+                let hasher = self.host().hasher();
+                kernel_farfadet::evm_node_entrypoint::populate_delayed_inbox_with_durable_storage(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
+            ("single_tx_execution", NativeKernel::Farfadet) => {
+                trace!("farfadet::single_tx_execution");
+                let hasher = self.host().hasher();
+                kernel_farfadet::evm_node_entrypoint::single_tx_execution_fn(
+                    self.mut_host(),
+                    hasher,
+                );
+                Ok(())
+            }
+            ("assemble_block", NativeKernel::Farfadet) => {
+                trace!("farfadet::assemble_block");
+                let hasher = self.host().hasher();
+                kernel_farfadet::evm_node_entrypoint::assemble_block_fn(self.mut_host(), hasher);
                 Ok(())
             }
             (missing_entrypoint, _) => todo!("entrypoint {missing_entrypoint} not covered yet"),
