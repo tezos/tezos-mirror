@@ -6087,13 +6087,17 @@ module Amplification = struct
           List.init number_of_slots (fun i ->
               if i < Array.length v then v.(i) else false)
     in
+    let msg_prefix =
+      sf "Unexpected DAL attestation at attested_level %d: " attested_level
+    in
     Check.(
       (attestation = expected_attestation)
+        ~__LOC__
         (list bool)
-        ~error_msg:"Expected %R, got %L") ;
+        ~error_msg:(msg_prefix ^ "expected %R, got %L")) ;
     unit
 
-  let test_by_ignoring_topics _protocol dal_parameters _cryptobox node client
+  let test_by_ignoring_topics protocol dal_parameters _cryptobox node client
       dal_bootstrap =
     let peer_id dal_node = Dal_node.read_identity dal_node in
 
@@ -6203,12 +6207,33 @@ module Amplification = struct
             Some ())
           else None)
     in
-    let wait_for_promises =
+    let wait_for_reconstruction_promises =
       List.map
         (fun published_level ->
           wait_reconstruction ~published_level ~slot_index:index)
         published_levels
     in
+    let wait_for_shards_promises =
+      List.map
+        (fun pkh ->
+          List.map
+            (fun published_level ->
+              let level = published_level + attestation_lag - 1 in
+              let* assigned_shard_indexes =
+                Dal_RPC.(
+                  call attester @@ get_assigned_shard_indices ~level ~pkh)
+              in
+              wait_for_shards_promises
+                ~dal_node:attester
+                ~storage_profile:`Cache_only
+                ~shards:assigned_shard_indexes
+                ~published_level
+                ~slot_index:index)
+            published_levels)
+        all_pkhs
+      |> List.flatten
+    in
+
     let rec repeat_publish offset =
       if offset >= published_slots then unit
       else (
@@ -6252,12 +6277,14 @@ module Amplification = struct
         in
         repeat_publish (offset + 1))
     in
-    (* We bake two blocks so that the last publish operation becomes final, and
     let* () = repeat_publish 0 in
+    (* We bake one block so that the last publish operation becomes final, and
        therefore all reconstructions have started. *)
-    let* () = bake_for client ~count:2 in
+    let* () = bake_for client in
     Log.info "Waiting for finished reconstruction events" ;
-    let* () = Lwt.join wait_for_promises in
+    let* () = Lwt.join wait_for_reconstruction_promises in
+    Log.info "Waiting for shard receipt events" ;
+    let* () = Lwt.join wait_for_shards_promises in
 
     Log.info
       "Bake [attestation_lag] blocks and check that the slots are attested" ;
@@ -6271,7 +6298,9 @@ module Amplification = struct
          "unable to get DAL attestation for <baker> in time". To be on the safe
          side, we wait a bit before baking the next block. *)
       repeat attestation_lag (fun () ->
-          let* () = Lwt_unix.sleep 0.1 in
+          let* () =
+            if Protocol.number protocol < 025 then Lwt_unix.sleep 0.1 else unit
+          in
           bake_for client ~dal_node_endpoint)
     in
 
@@ -11827,7 +11856,7 @@ let register ~protocols =
     ~wait_ready:true
     "Test amplification by ignoring topics"
     Amplification.test_by_ignoring_topics
-    (List.filter (fun p -> Protocol.number p <= 024) protocols)
+    protocols
 
 let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
   let offsets = [-2; -1; 0; 1; 2] in
