@@ -77,6 +77,9 @@ Baker
    Octez. Please use ``octez-baker`` instead, which automatically
    handles protocol switches. (MR :gl:`!19641`)
 
+- Fix issue when connecting to Octez nodes behind a proxy that can rearrange
+  chunks. (MR :gl:`!20057`)
+
 
 Accuser
 -------
@@ -126,6 +129,9 @@ Smart Rollup node
 
 - The rollup node now properly supports DAL on Shadownet. (MRs :gl:`!19765`,
   :gl:`!19809`)
+
+- Fix issue when connecting to Octez nodes behind a proxy that can rearrange
+  chunks. (MR :gl:`!20057`)
 
 Smart Rollup WASM Debugger
 --------------------------
