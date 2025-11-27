@@ -827,6 +827,27 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
        ~from_level
      [@profiler.record_s {verbosity = Notice} "backfill_slot_statuses"])
   in
+  (* Fetch the committees for the first levels. Note that that committees are
+     fetched on a "regular basis" by {!Block_handler.may_update_topics} with a
+     delta of [additional_levels + lag] wrt to HEAD~1. We fetch here for a few
+     more levels, because the head might have advanced more until
+     [may_update_topics] is first called. *)
+  let () =
+    let additional_levels =
+      let minimal_block_delay =
+        Int64.to_int proto_parameters.Types.minimal_block_delay
+      in
+      Constants.time_to_join_new_topics_in_levels ~minimal_block_delay
+    in
+    List.iter
+      (fun i ->
+        let level = Int32.(add head_level (of_int i)) in
+        let _ = Node_context.fetch_committees ctxt ~level in
+        ())
+      (Stdlib.List.init
+         (additional_levels + proto_parameters.attestation_lag + 2)
+         Fun.id)
+  in
   (* Activate the p2p instance. *)
   let shards_store = Store.shards store in
   let gs =
