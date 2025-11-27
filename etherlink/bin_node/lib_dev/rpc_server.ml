@@ -170,11 +170,6 @@ let start_public_server (type f) ~(mode : f Mode.t)
     let (module Backend : Services_backend_sig.S), _ = ctxt in
     match rpc_server_family with
     | Rpc_types.Single_chain_node_rpc_server Michelson ->
-        let* l2_chain_id =
-          match l2_chain_id with
-          | Some l2_chain_id -> return l2_chain_id
-          | None -> Backend.chain_id ()
-        in
         let add_transaction ~next_nonce transaction_object ~raw_op =
           match mode with
           | Observer (Michelson_tx_container (module Tx_container))
@@ -191,6 +186,11 @@ let start_public_server (type f) ~(mode : f Mode.t)
                 ~base:evm_node_private_endpoint
                 ~op:transaction_object
                 ~raw_op
+        in
+        let* l2_chain_id =
+          match l2_chain_id with
+          | Some l2_chain_id -> return l2_chain_id
+          | None -> Backend.chain_id ()
         in
         return @@ Evm_directory.init_from_resto_directory
         @@ Tezlink_directory.register_tezlink_services
@@ -226,11 +226,39 @@ let start_public_server (type f) ~(mode : f Mode.t)
                      | Error s -> failwith "%s" s
                    in
                    return hash)
-    | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server ->
-        let* runtimes = Backend.list_runtimes () in
-        let*! _ = List.map_p Tezosx_events.runtime_activated runtimes in
+    | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server -> (
+        let*! runtimes = Backend.list_runtimes () in
+        match runtimes with
+        | Ok [] ->
+            return
+            @@ Evm_directory.empty config.experimental_features.rpc_server
+        | Ok runtimes ->
+            let*! _ = List.map_p Tezosx_events.runtime_activated runtimes in
+            let* l2_chain_id =
+              match l2_chain_id with
+              | Some l2_chain_id -> return l2_chain_id
+              | None -> Backend.chain_id ()
+            in
+            let* () =
+              (* we use Resto for some runtimes, so we can _only_ use resto. *)
+              if config.experimental_features.rpc_server = Dream then
+                failwith "Dream RPC server is not supported for TezosX"
+              else return_unit
+            in
+            return @@ Evm_directory.init_from_resto_directory
+            @@ List.fold_left
+                 (Tezosx_rpc.add_rpc_directory (module Backend) ~l2_chain_id)
+                 Tezos_rpc.Directory.empty
+                 runtimes
+        | Error e ->
+            (* FIXME: added during TezosX POC
 
-        return @@ Evm_directory.empty config.experimental_features.rpc_server
+               This branch is taken by the observer on some tests. It's not
+               clear if it's a pb in the test setup or a pb with the observer.
+               To be explored when the POC is a bit more advanced. *)
+            let*! () = Tezosx_events.list_runtime_failed e in
+            return
+            @@ Evm_directory.empty config.experimental_features.rpc_server)
   in
   (* If spawn_rpc is defined, use it as intermediate *)
   let rpc =
