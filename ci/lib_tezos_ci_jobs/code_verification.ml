@@ -975,20 +975,7 @@ let jobs pipeline_type =
           ~dependencies:(Dependent [])
           ["make -f kernels.mk check"; "make -f kernels.mk test"]
       in
-      let job_audit_riscv_deps : tezos_job =
-        make_job_kernel
-          ~stage:Stages.sanity
-          ~image:Images.rust_toolchain_master
-          ~dependencies:(Dependent [])
-          ~__POS__
-          ~name:"audit_riscv_deps"
-          ~changes:changeset_riscv_kernels_code
-          (* since we depend on the Images.rust_toolchain_master,
-             we start the job only if the code is modified, but not
-             the image itself *)
-          ["make -C src/riscv audit"]
-      in
-      [job_test_kernels; job_audit_riscv_deps]
+      [job_test_kernels]
     in
 
     let jobs_packaging =

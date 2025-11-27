@@ -25,6 +25,7 @@ end
 
 module CI = Cacio.Shared
 
+(* Common configuration for kernel jobs. *)
 let job_kernel =
   CI.job
     ~cargo_cache:true
@@ -45,7 +46,21 @@ let job_check_riscv_kernels =
        --features ci' check";
     ]
 
+let job_audit_riscv_deps =
+  job_kernel
+    "audit_riscv_deps"
+    ~__POS__
+    ~stage:Test
+    ~description:"Run 'make audit' in 'src/riscv'."
+    ~only_if_changed:Files.kernels
+      (* Since we depend on the Images.rust_toolchain_master,
+         we start the job only if the code is modified, but not the image itself. *)
+    ~image:Tezos_ci.Images.rust_toolchain_master
+    ["make -C src/riscv audit"]
+
 let register () =
-  CI.register_before_merging_jobs [(Auto, job_check_riscv_kernels)] ;
-  CI.register_schedule_extended_test_jobs [(Auto, job_check_riscv_kernels)] ;
+  CI.register_before_merging_jobs
+    [(Auto, job_check_riscv_kernels); (Immediate, job_audit_riscv_deps)] ;
+  CI.register_schedule_extended_test_jobs
+    [(Auto, job_check_riscv_kernels); (Auto, job_audit_riscv_deps)] ;
   ()
