@@ -11299,6 +11299,233 @@ let test_statuses_backfill_at_restart _protocol dal_parameters _cryptobox
   in
   unit
 
+let test_dal_low_stake_attester_attestable_slots _protocol dal_parameters
+    _cryptobox node client dal_node =
+  let {log_step} = init_logger () in
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_rights_delay =
+    JSON.(proto_params |-> "consensus_rights_delay" |> as_int)
+  in
+  let blocks_per_cycle = JSON.(proto_params |-> "blocks_per_cycle" |> as_int) in
+  let slot_index = 0 in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+
+  let* low_stake =
+    create_low_stake node dal_parameters proto_params blocks_per_cycle
+  in
+  let* new_account = Client.gen_and_show_keys client in
+  let amount = Tez.of_mutez_int (low_stake + 3_000_000) in
+  let* () =
+    Client.transfer
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:new_account.alias
+      ~amount
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = bake_for client in
+  let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
+  let* () = bake_for client in
+  let* _ = Client.register_delegate ~delegate:new_account.alias client in
+  let* () = bake_for client in
+  let* () =
+    Client.stake
+      (Tez.of_mutez_int low_stake)
+      ~staker:new_account.public_key_hash
+      client
+  in
+  let* () = bake_for client in
+  let client = Client.with_dal_node client ~dal_node in
+  log_step "Attester DAL node started (operator + attester)." ;
+
+  let* current_level = Node.get_level node in
+  log_step
+    "Bake (almost) %d cycles to activate the delegate"
+    consensus_rights_delay ;
+  let* () =
+    bake_for
+      ~count:
+        ((blocks_per_cycle * (1 + consensus_rights_delay)) - current_level - 1)
+      client
+  in
+
+  (* Find DAL attestation bitset in the last block for the delegate, if an
+     [attestation_with_dal] exists. *)
+  let get_delegate_dal_attestation_opt () =
+    let* json =
+      Node.RPC.call node
+      @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
+    in
+    let dal_attestation_opt =
+      List.find_map
+        (fun json ->
+          let contents = JSON.(json |-> "contents" |> as_list) |> List.hd in
+          let delegate =
+            JSON.(contents |-> "metadata" |-> "delegate" |> as_string)
+          in
+          let kind = JSON.(contents |-> "kind" |> as_string) in
+          if
+            String.equal delegate new_account.public_key_hash
+            && String.equal kind "attestation_with_dal"
+          then Some JSON.(contents |-> "dal_attestation" |> as_string)
+          else None)
+        (JSON.as_list json)
+    in
+    return dal_attestation_opt
+  in
+
+  (* Check if a bit is set in a decimal bitset string *)
+  let is_bit_set str bit =
+    let n = int_of_string str in
+    n land (1 lsl bit) <> 0
+  in
+
+  let count_not_in_committee = ref 0 in
+  let count_attestable_slots = ref 0 in
+  let count_traps = ref 0 in
+
+  let* first_level = Client.level client in
+
+  let check_one_level () =
+    (* Publish a slot, then bake a block with all delegates. *)
+    let* _ =
+      Helpers.publish_and_store_slot
+        client
+        dal_node
+        Constant.bootstrap2
+        ~index:slot_index
+        (Helpers.make_slot ~slot_size "SLOTDATA")
+    in
+    let* () = bake_for client in
+    let* attested_level = Client.level client in
+    let published_level = attested_level - dal_parameters.attestation_lag in
+
+    let* expected_dal_attestable_slots =
+      Dal_RPC.(
+        call dal_node
+        @@ get_attestable_slots ~attester:new_account ~attested_level)
+    in
+    let* actual_dal_attestable_slots_opt =
+      get_delegate_dal_attestation_opt ()
+    in
+    let expected_bit_opt =
+      match expected_dal_attestable_slots with
+      | Not_in_committee -> None
+      | Attestable_slots slots ->
+          Some
+            (match List.nth_opt slots slot_index with
+            | Some b -> b
+            | None -> false)
+    in
+    (match expected_bit_opt with
+    | None -> incr count_not_in_committee
+    | Some true -> incr count_attestable_slots
+    | _ -> ()) ;
+
+    match (expected_dal_attestable_slots, actual_dal_attestable_slots_opt) with
+    | Not_in_committee, None ->
+        log_step "Level %d: Not_in_committee" attested_level ;
+        unit
+    | Not_in_committee, Some dal_attestation ->
+        Test.fail
+          "Level %d: Not_in_committee expected, but found dal_attestation=%s \
+           for %s"
+          attested_level
+          dal_attestation
+          new_account.public_key_hash
+    | Attestable_slots _slots, None ->
+        if published_level > first_level then
+          Test.fail
+            "Level %d: delegate %s is in the DAL committee (attestable slots \
+             available) but no DAL attestation operation was found in the \
+             block. This is invalid: when in committee, the baker must include \
+             DAL content."
+            attested_level
+            new_account.public_key_hash
+        else unit
+    | Attestable_slots _slots, Some actual_dal_attestable_slots ->
+        let expected_bit =
+          match expected_bit_opt with Some b -> b | None -> false
+        in
+        let actual_bit = is_bit_set actual_dal_attestable_slots slot_index in
+        if actual_bit <> expected_bit then
+          Test.fail
+            "Level %d: DAL node says bit(%d)=%b, but chain dal_attestation=%s \
+             (bit=%b)"
+            attested_level
+            slot_index
+            expected_bit
+            actual_dal_attestable_slots
+            actual_bit
+        else
+          let* has_traps =
+            let* traps =
+              Dal_RPC.(
+                call dal_node
+                @@ get_published_level_known_traps
+                     ~published_level
+                     ~pkh:new_account.public_key_hash
+                     ~slot_index)
+            in
+            return @@ not @@ List.is_empty traps
+          in
+          if has_traps then incr count_traps ;
+          if published_level <= first_level then (
+            let prefix_msg = sf "Level %d" attested_level in
+            Check.(
+              (actual_bit = false)
+                ~__LOC__
+                bool
+                ~error_msg:(prefix_msg ^ "Expected false, got true")) ;
+            unit)
+          else if actual_bit <> not has_traps then
+            Test.fail
+              "Level %d, slot %d: chain dal_attestation bit is [%b], but \
+               has_traps = %b"
+              attested_level
+              slot_index
+              actual_bit
+              has_traps
+          else unit
+  in
+
+  (* Run until we've seen all three cases, or give up after a limit. *)
+  let max_steps = 10 * blocks_per_cycle in
+  log_step
+    "Running measurement for at most %d steps (up to %d cycles)."
+    max_steps
+    (max_steps / blocks_per_cycle) ;
+
+  let rec loop step =
+    if
+      !count_not_in_committee > 0
+      && !count_attestable_slots > 0
+      && !count_traps > 0
+    then unit
+    else if step > max_steps then
+      Test.fail
+        "Reached max_steps=%d without seeing all event kinds. Summary: \
+         Not_in_committee=%d, Attestable_slots=%d, Traps=%d"
+        max_steps
+        !count_not_in_committee
+        !count_attestable_slots
+        !count_traps
+    else
+      let* () = check_one_level () in
+      loop (step + 1)
+  in
+  let* () = loop 1 in
+
+  log_step
+    "Final summary: Not_in_committee = %d, Attestable_slots = %d, Traps = %d"
+    !count_not_in_committee
+    !count_attestable_slots
+    !count_traps ;
+
+  unit
+
 let register ~protocols =
   (* Tests with Layer1 node only *)
   scenario_with_layer1_node
@@ -11632,6 +11859,23 @@ let register ~protocols =
     ~number_of_slots:1
     "new attester attests"
     test_new_attester_attests
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~operator_profiles:[0]
+    ~l1_history_mode:Default_with_refutation
+    ~traps_fraction:(Q.of_float 0.5)
+    ~number_of_slots:1
+    "low stake attester attests (with traps)"
+    test_dal_low_stake_attester_attestable_slots
+    protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~operator_profiles:[0]
+    ~l1_history_mode:Default_with_refutation
+    ~traps_fraction:(Q.of_float 0.5)
+    ~all_bakers_attest_activation_threshold:Q.zero
+    ~number_of_slots:1
+    "low stake attester attests (with traps and ABA activated)"
+    test_dal_low_stake_attester_attestable_slots
     protocols ;
   scenario_with_layer1_and_dal_nodes
     ~bootstrap_profile:true
