@@ -149,9 +149,9 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
     let config = Node_context.get_config node_ctxt in
     config.disable_amplification
   in
-  let shards_out_handler shards =
+  let shards_out_handler shard_store =
     (* Counting potentially emitted message is a good way to count the number of shards validated. *)
-    let save_and_notify = Store.Shards.write_all shards in
+    let save_and_notify = Store.Shards.write_all shard_store in
     fun Types.Message.{share; _}
         Types.Message_id.{commitment; shard_index; level; slot_index; _}
       ->
