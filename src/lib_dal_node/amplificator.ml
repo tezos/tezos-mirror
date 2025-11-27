@@ -399,7 +399,10 @@ let determine_amplification_delays node_ctxt =
   let+ parameters =
     Node_context.get_proto_parameters ~level:`Last_proto node_ctxt
   in
-  (* The propagation window is the attestation lag minus 3 levels, because:
+  (* TODO https://gitlab.com/tezos/tezos/-/issues/8138
+     This comment is valid for protocol S and T bakers, not later ones.
+
+     The propagation window is the attestation lag minus 3 levels, because:
      - the daemon waits 1 level for the head to be finalized
      - attestation operations are included in the block at the next level
      - the baker asks attestation information one level in advance *)
