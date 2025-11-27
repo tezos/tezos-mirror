@@ -954,29 +954,6 @@ let jobs pipeline_type =
       in
       [job_test_sdk_bindings]
     in
-    let jobs_kernels : tezos_job list =
-      let make_job_kernel ?dependencies ?(image = Images.rust_toolchain)
-          ?(stage = Stages.test) ~__POS__ ~name ~changes script =
-        job
-          ?dependencies
-          ~__POS__
-          ~name
-          ~image
-          ~stage
-          ~rules:(make_rules ~dependent:true ~changes ())
-          script
-        |> enable_kernels |> enable_cargo_cache |> enable_sccache
-      in
-      let job_test_kernels : tezos_job =
-        make_job_kernel
-          ~__POS__
-          ~name:"test_kernels"
-          ~changes:changeset_test_kernels
-          ~dependencies:(Dependent [])
-          ["make -f kernels.mk check"; "make -f kernels.mk test"]
-      in
-      [job_test_kernels]
-    in
 
     let jobs_packaging =
       match pipeline_type with
@@ -988,8 +965,8 @@ let jobs pipeline_type =
           ]
       | Schedule_extended_test -> []
     in
-    jobs_packaging @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_kernels
-    @ jobs_unit @ jobs_install_octez
+    jobs_packaging @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_unit
+    @ jobs_install_octez
   in
 
   (* Coverage jobs *)

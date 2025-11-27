@@ -12,7 +12,11 @@
    and are added to the [scheduled_extended_test] pipeline. *)
 
 module Files = struct
-  let kernels = ["sdk/rust/**/*"; "src/kernel_sdk/**/*"; "src/riscv/**/*"]
+  let riscv = ["src/riscv/**/*"; "sdk/rust/**/*"]
+
+  let kernels = "src/kernel_sdk/**/*" :: riscv
+
+  let test_kernels = "kernels.mk" :: "src/kernel_*/**/*" :: riscv
 
   let rust_toolchain =
     [
@@ -58,9 +62,27 @@ let job_audit_riscv_deps =
     ~image:Tezos_ci.Images.rust_toolchain_master
     ["make -C src/riscv audit"]
 
+let job_test_kernels =
+  job_kernel
+    "test_kernels"
+    ~__POS__
+    ~stage:Test
+    ~description:"Run 'make check' and 'make test' for kernels."
+    ~only_if_changed:Files.(test_kernels @ rust_toolchain)
+    ~image:Tezos_ci.Images.rust_toolchain
+    ["make -f kernels.mk check"; "make -f kernels.mk test"]
+
 let register () =
   CI.register_before_merging_jobs
-    [(Auto, job_check_riscv_kernels); (Immediate, job_audit_riscv_deps)] ;
+    [
+      (Auto, job_check_riscv_kernels);
+      (Immediate, job_audit_riscv_deps);
+      (Auto, job_test_kernels);
+    ] ;
   CI.register_schedule_extended_test_jobs
-    [(Auto, job_check_riscv_kernels); (Auto, job_audit_riscv_deps)] ;
+    [
+      (Auto, job_check_riscv_kernels);
+      (Auto, job_audit_riscv_deps);
+      (Auto, job_test_kernels);
+    ] ;
   ()
