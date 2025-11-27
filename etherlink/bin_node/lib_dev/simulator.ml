@@ -299,6 +299,8 @@ module MakeTezlink (SimulationBackend : SimulationBackend) = struct
     let open Lwt_result_syntax in
     let* simulation_state = SimulationBackend.get_state ~block () in
     let skip_signature_tag = if skip_signature then "\000" else "\001" in
+    let*? messages = String.chunk_bytes 4096 (Bytes.of_string input) in
+    let nb_messages = Ethereum_types.u16_to_bytes (List.length messages) in
     let insight_requests =
       [
         Simulation.Encodings.Durable_storage_key ["tezlink"; "simulation_result"];
@@ -309,7 +311,9 @@ module MakeTezlink (SimulationBackend : SimulationBackend) = struct
       simulation_state
       ~input:
         {
-          messages = [Simulation.simulation_tag; skip_signature_tag; input];
+          messages =
+            [Simulation.simulation_tag; skip_signature_tag; nb_messages]
+            @ messages;
           reveal_pages = None;
           insight_requests;
           log_kernel_debug_file = Some "simulate_call";
