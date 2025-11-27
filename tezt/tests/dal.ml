@@ -7070,7 +7070,9 @@ module Amplification = struct
       let dal_node_endpoint =
         Dal_node.as_rpc_endpoint attester |> Endpoint.as_string
       in
-      (* Using [bake_for ~count:attestation_lag], make the test fail, because
+      (* TODO https://gitlab.com/tezos/tezos/-/issues/8138
+         When all bakers use the stream RPC, update this:
+         Using [bake_for ~count:attestation_lag] makes the test fail, because
          "unable to get DAL attestation for <baker> in time". To be on the safe
          side, we wait a bit before baking the next block. *)
       repeat attestation_lag (fun () ->
@@ -12658,7 +12660,7 @@ let register ~protocols =
     ~wait_ready:true
     "Test amplification by ignoring topics"
     Amplification.test_by_ignoring_topics
-    protocols
+    (List.filter (fun p -> Protocol.number p <= 024) protocols)
 
 let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
   let offsets = [-2; -1; 0; 1; 2] in

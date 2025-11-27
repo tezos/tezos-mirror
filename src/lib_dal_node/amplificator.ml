@@ -399,7 +399,10 @@ let determine_amplification_delays node_ctxt =
   let+ parameters =
     Node_context.get_proto_parameters ~level:`Last_proto node_ctxt
   in
-  (* The propagation window is the attestation lag minus 3 levels, because:
+  (* TODO https://gitlab.com/tezos/tezos/-/issues/8138
+     This comment is valid for protocol S and T bakers, not later ones.
+
+     The propagation window is the attestation lag minus 3 levels, because:
      - the daemon waits 1 level for the head to be finalized
      - attestation operations are included in the block at the next level
      - the baker asks attestation information one level in advance *)
@@ -411,7 +414,7 @@ let determine_amplification_delays node_ctxt =
      third for amplification; one third for the second propagation round. Note,
      currently for Mainnet: 4 * 8s = 32s, so roughly 10s; for Ghostnet: 16s, so
      roughly 5s. We round to the lowest integer. *)
-  let amplification_period = float_of_int (propagation_period / 3) in
+  let amplification_period = float_of_int propagation_period /. 3. in
   let amplification_random_delay_min = amplification_period in
   let amplification_random_delay_max = 2. *. amplification_period in
   (amplification_random_delay_min, amplification_random_delay_max)
