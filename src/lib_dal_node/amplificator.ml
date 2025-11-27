@@ -602,10 +602,9 @@ let try_amplification commitment slot_metrics slot_id amplificator =
           ~slot_index:slot_id.slot_index
           ~error)
     @@ fun () ->
-    (* Wait a random delay between 1 and 2 seconds before starting
-       the reconstruction; this is to give some slack to receive
-       all the shards so that the reconstruction is not needed, and
-       also avoids having multiple nodes reconstruct at once. *)
+    (* Wait a random delay before starting the reconstruction; this is to give
+       some slack to receive all the shards so that the reconstruction is not
+       needed, and also avoids having multiple nodes reconstruct at once. *)
     let random_delay =
       amplificator.amplification_random_delay_min
       +. Random.float
