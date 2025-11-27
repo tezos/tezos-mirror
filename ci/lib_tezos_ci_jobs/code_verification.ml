@@ -537,24 +537,6 @@ let jobs pipeline_type =
     @ bin_packages_jobs
   in
 
-  (* Dependencies for jobs that should run immediately after jobs
-     [job_build_x86_64] in [Before_merging] if they are present
-     (otherwise, they run immediately after [job_start]). In
-     [Scheduled_extended_test] we are not in a hurry and we let them
-     be [Staged []]. *)
-  let order_after_build =
-    match pipeline_type with
-    | Before_merging | Merge_train ->
-        Dependent
-          (Job job_start
-          :: [
-               Optional job_build_x86_64_release;
-               Optional job_build_x86_64_extra_dev;
-               Optional job_build_x86_64_extra_exp;
-             ])
-    | Schedule_extended_test -> Staged []
-  in
-
   (* Test jobs*)
   let test =
     let job_ocaml_check : tezos_job =
@@ -618,42 +600,6 @@ let jobs pipeline_type =
         Homebrew.child_pipeline_full_auto
     in
 
-    let job_oc_check_lift_limits_patch =
-      job
-        ~__POS__
-        ~name:"oc.check_lift_limits_patch"
-        ~image:Images.CI.build
-        ~stage:Stages.test
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_lift_limits_patch ())
-        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-        [
-          (* Check that the patch only modifies the
-             src/proto_alpha/lib_protocol. If not, the rules above have to be
-             updated. *)
-          "[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | \
-           cut -f3) = \"src/proto_alpha/lib_protocol/main.ml\" ]";
-          "git apply src/bin_tps_evaluation/lift_limits.patch";
-          "dune build @src/proto_alpha/lib_protocol/check";
-        ]
-      |> enable_cargo_cache |> enable_sccache
-    in
-    let job_oc_python_check : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.python_check"
-        ~image:Images.CI.test
-        ~stage:Stages.test
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_python_files ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~init_python_venv:true
-             [])
-        ["./scripts/ci/lint_misc_python_check.sh"]
-    in
     let jobs_unit : tezos_job list =
       let build_dependencies : Runner.Arch.t -> _ = function
         | Amd64 ->
@@ -869,127 +815,6 @@ let jobs pipeline_type =
         resto_unit Arm64 ~storage:Ramfs ();
       ]
     in
-    let job_oc_integration_compiler_rejections : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.integration:compiler-rejections"
-        ~stage:Stages.test
-        ~image:Images.CI.build
-        ~rules:(make_rules ~changes:changeset_octez ())
-        ~dependencies:
-          (Dependent
-             [
-               Job job_build_x86_64_release;
-               Job job_build_x86_64_extra_dev;
-               Job job_build_x86_64_extra_exp;
-             ])
-        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-        ["dune build @runtest_rejections"]
-      |> enable_cargo_cache |> enable_sccache
-    in
-    let job_oc_script_test_gen_genesis : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.script:test-gen-genesis"
-        ~stage:Stages.test
-        ~image:Images.CI.build
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_octez ())
-        ~before_script:(before_script ~eval_opam:true [])
-        ["dune build scripts/gen-genesis/gen_genesis.exe"]
-    in
-    let job_oc_script_snapshot_alpha_and_link : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.script:snapshot_alpha_and_link"
-        ~stage:Stages.test
-        ~image:Images.CI.build
-        ~cpu:Very_high
-        ~dependencies:order_after_build
-          (* Since the above dependencies are only for ordering, we do not set [dependent] *)
-        ~rules:(make_rules ~changes:changeset_script_snapshot_alpha_and_link ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        ["./scripts/ci/script:snapshot_alpha_and_link.sh"]
-      |> enable_cargo_cache |> enable_sccache
-      |> enable_dune_cache ~key:build_cache_key ~policy:Pull
-    in
-    let job_oc_script_test_release_versions : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.script:test_octez_release_versions"
-        ~stage:Stages.test
-        ~image:Images.CI.build
-        ~dependencies:
-          (Dependent
-             [
-               Job job_build_x86_64_release;
-               Job job_build_x86_64_extra_dev;
-               Job job_build_x86_64_extra_exp;
-             ])
-          (* Since the above dependencies are only for ordering, we do not set [dependent] *)
-        ~rules:(make_rules ~changes:changeset_octez ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        ["./scripts/test_octez_release_version.sh"]
-    in
-    let job_oc_script_b58_prefix =
-      job
-        ~__POS__
-        ~name:"oc.script:b58_prefix"
-        ~stage:Stages.test
-          (* Requires Python. Can be changed to a python image, but using
-             the build docker image to keep in sync with the python
-             version used for the tests *)
-        ~image:Images.CI.test
-        ~rules:(make_rules ~changes:changeset_script_b58_prefix ())
-        ~dependencies:dependencies_needs_start
-        ~before_script:
-          (before_script ~source_version:true ~init_python_venv:true [])
-        [
-          "poetry run pylint scripts/b58_prefix/b58_prefix.py \
-           --disable=missing-docstring --disable=invalid-name";
-          "poetry run pytest scripts/b58_prefix/test_b58_prefix.py";
-        ]
-    in
-    let job_oc_test_liquidity_baking_scripts : tezos_job =
-      job
-        ~__POS__
-        ~name:"oc.test-liquidity-baking-scripts"
-        ~stage:Stages.test
-        ~image:Images.CI.build
-        ~dependencies:
-          (Dependent
-             [
-               Artifacts job_build_x86_64_release;
-               Artifacts job_build_x86_64_extra_exp;
-               Artifacts job_build_x86_64_extra_dev;
-             ])
-        ~rules:
-          (make_rules
-             ~dependent:true
-             ~changes:changeset_test_liquidity_baking_scripts
-             ())
-        ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-        ["./scripts/ci/test_liquidity_baking_scripts.sh"]
-    in
-    let job_test_release_versions =
-      job
-        ~__POS__
-        ~image:Images.CI.prebuild
-        ~stage:Stages.test
-        ~name:"oc:scripts:release_script_values"
-        ~dependencies:dependencies_needs_start
-        ["scripts/ci/test_release_values.sh"]
-    in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
       let compile_octez_rules =
@@ -1181,19 +1006,6 @@ let jobs pipeline_type =
       in
       [job_test_kernels; job_audit_riscv_deps; job_check_riscv_kernels]
     in
-    let jobs_misc =
-      [
-        job_oc_check_lift_limits_patch;
-        job_oc_python_check;
-        job_oc_integration_compiler_rejections;
-        job_oc_script_test_gen_genesis;
-        job_oc_script_snapshot_alpha_and_link;
-        job_oc_script_test_release_versions;
-        job_oc_script_b58_prefix;
-        job_oc_test_liquidity_baking_scripts;
-        job_test_release_versions;
-      ]
-    in
 
     let jobs_packaging =
       match pipeline_type with
@@ -1205,8 +1017,8 @@ let jobs pipeline_type =
           ]
       | Schedule_extended_test -> []
     in
-    jobs_packaging @ jobs_misc @ jobs_sdk_rust @ jobs_sdk_bindings
-    @ jobs_kernels @ jobs_unit @ jobs_install_octez
+    jobs_packaging @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_kernels
+    @ jobs_unit @ jobs_install_octez
   in
 
   (* Coverage jobs *)

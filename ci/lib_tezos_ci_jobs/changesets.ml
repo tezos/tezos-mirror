@@ -172,15 +172,6 @@ let changeset_ocaml_check_files =
     changeset_base
     @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "**/*.ml"; "**/*.mli"])
 
-let changeset_lift_limits_patch =
-  Changeset.(
-    changeset_base
-    @ make
-        [
-          "src/bin_tps_evaluation/lift_limits.patch";
-          "src/proto_alpha/lib_protocol/main.ml";
-        ])
-
 (* The linting job runs over the set of [source_directories]
    defined in [scripts/lint.sh] that must be included here: *)
 let changeset_lint_files =
@@ -198,10 +189,6 @@ let changeset_lint_files =
           "etherlink/**/*";
         ])
 
-(** Set of Python files. *)
-let changeset_python_files =
-  Changeset.(changeset_base @ make ["poetry.lock"; "pyproject.toml"; "**/*.py"])
-
 (** Set of Rust files for formatting ([cargo fmt --check]). *)
 let changeset_rust_fmt_files = Changeset.(changeset_base @ make ["**/*.rs"])
 
@@ -216,38 +203,6 @@ let changeset_semgrep_files =
 
 (** Set of Jsonnet files for formatting ([jsonnetfmt --test]). *)
 let changeset_jsonnet_fmt_files = Changeset.(make ["**/*.jsonnet"])
-
-(* We only need to run the [oc.script:snapshot_alpha_and_link] job if
-   protocol Alpha or if the scripts changed. *)
-let changeset_script_snapshot_alpha_and_link =
-  Changeset.(
-    changeset_base
-    @ make
-        [
-          "src/proto_alpha/**/*";
-          "scripts/snapshot_alpha_and_link.sh";
-          "scripts/snapshot_alpha.sh";
-          "scripts/user_activated_upgrade.sh";
-        ])
-
-let changeset_script_b58_prefix =
-  Changeset.(
-    changeset_base
-    @ make
-        [
-          "scripts/b58_prefix/b58_prefix.py";
-          "scripts/b58_prefix/test_b58_prefix.py";
-        ])
-
-let changeset_test_liquidity_baking_scripts =
-  Changeset.(
-    changeset_base
-    @ make
-        [
-          "src/**/*";
-          "scripts/ci/test_liquidity_baking_scripts.sh";
-          "scripts/check-liquidity-baking-scripts.sh";
-        ])
 
 let changeset_test_sdk_rust =
   Changeset.(
