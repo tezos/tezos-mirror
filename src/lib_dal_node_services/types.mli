@@ -415,6 +415,8 @@ module Attestable_event : sig
   type backfill_payload = {
     slot_ids : slot_id list;
         (** All slots that should be marked attestable for this delegate *)
+    trap_slot_ids : slot_id list;
+        (* All slots that should be marked as traps for this delegate *)
     no_shards_attestation_levels : level list;
         (** All attestation levels where this delegate has no shards *)
   }

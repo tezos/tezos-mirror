@@ -157,7 +157,9 @@ let update_cache_no_shards_assigned state ~delegate_id ~attestation_level =
     merges a DAL [Backfill] event for [~delegate_id] into the in-memory cache. *)
 let update_cache_backfill_payload state ~delegate_id ~backfill_payload =
   let module E = Types.Attestable_event in
-  let E.{slot_ids; no_shards_attestation_levels} = backfill_payload in
+  let E.{slot_ids; trap_slot_ids; no_shards_attestation_levels} =
+    backfill_payload
+  in
   List.iter
     (fun slot_id ->
       (update_cache_with_attestable_slot
@@ -167,6 +169,16 @@ let update_cache_backfill_payload state ~delegate_id ~backfill_payload =
        [@profiler.record_f
          {verbosity = Debug} "update_cache_with_attestable_slot"]))
     slot_ids ;
+  List.iter
+    (fun slot_id ->
+      (update_cache_with_attestable_slot
+         state
+         ~is_trap:true
+         ~delegate_id
+         ~slot_id
+       [@profiler.record_f
+         {verbosity = Debug} "update_cache_with_attestable_slot"]))
+    trap_slot_ids ;
   List.iter
     (fun attestation_level ->
       update_cache_no_shards_assigned state ~delegate_id ~attestation_level)

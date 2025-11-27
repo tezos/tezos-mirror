@@ -864,7 +864,7 @@ end
 module Mockup_for_baker = struct
   type t = Mockup.t
 
-  let json_backfill_event ~slot_ids ~no_shards_levels =
+  let json_backfill_event ~slot_ids =
     let open Ezjsonm in
     let slot_id_to_json (level, index) =
       dict [("slot_level", int level); ("slot_index", int index)]
@@ -877,7 +877,8 @@ module Mockup_for_baker = struct
              dict
                [
                  ("slot_ids", list slot_id_to_json slot_ids);
-                 ("no_shards_attestation_levels", list int no_shards_levels);
+                 ("trap_slot_ids", list slot_id_to_json []);
+                 ("no_shards_attestation_levels", list int []);
                ] );
          ])
 
@@ -896,9 +897,7 @@ module Mockup_for_baker = struct
           | None -> Test.fail "failed to extract pkh from %s" path
         in
         let slot_ids = List.init published_levels (fun i -> (i + 1, 0)) in
-        let body_line =
-          json_backfill_event ~slot_ids ~no_shards_levels:[] ^ "\n"
-        in
+        let body_line = json_backfill_event ~slot_ids ^ "\n" in
         let stream = Lwt_stream.of_list [body_line] in
         Lwt.return_some (`Stream stream))
 
