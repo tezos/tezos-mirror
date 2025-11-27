@@ -10,5 +10,6 @@ mod constants;
 mod host;
 mod reveal;
 mod runtime;
+mod sdk_runtime;
 mod types;
 mod write_debug;
