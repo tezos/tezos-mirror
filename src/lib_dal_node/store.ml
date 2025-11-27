@@ -799,10 +799,10 @@ type t = {
     Commitment_indexed_cache.t;
       (* Cache of not-yet-published slots, shards, and shard proofs. The length
          of the array is the number of shards per slot *)
-  chain_id : Chain_id.t;
+  chain_id : Chain_id.rw Chain_id.t;
   finalized_commitments : Slot_id_cache.t;
-  last_processed_level : Last_processed_level.t;
-  first_seen_level : First_seen_level.t;
+  last_processed_level : Last_processed_level.rw Last_processed_level.t;
+  first_seen_level : First_seen_level.rw First_seen_level.t;
   skip_list_cells_store : Dal_store_sqlite3.Skip_list_cells.t;
 }
 
