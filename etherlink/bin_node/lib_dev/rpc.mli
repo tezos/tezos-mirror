@@ -11,7 +11,7 @@
     are sent forward to the private endpoint of its conjunct node. *)
 val main :
   evm_node_endpoint:Uri.t ->
-  ?evm_node_private_endpoint:Uri.t ->
+  evm_node_private_endpoint:Uri.t ->
   config:Configuration.t ->
   unit ->
   unit tzresult Lwt.t

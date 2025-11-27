@@ -1428,10 +1428,16 @@ let rpc_command =
           ~default:(default_addr read_write_config.public_rpc)
           evm_node_endpoint
       in
-      let evm_node_private_endpoint =
-        match evm_node_private_endpoint with
-        | Some _ as v -> v
-        | None -> Option.map default_addr read_write_config.private_rpc
+      let*? evm_node_private_endpoint =
+        let open Result_syntax in
+        match (evm_node_private_endpoint, read_write_config.private_rpc) with
+        | Some evm_node_private_endpoint, _ -> return evm_node_private_endpoint
+        | None, Some evm_node_private_endpoint ->
+            return (default_addr evm_node_private_endpoint)
+        | None, None ->
+            tzfail
+            @@ error_of_fmt
+                 "RPC mode must have a local private endpoint accessible"
       in
       let config =
         Cli.patch_configuration_from_args
@@ -1465,7 +1471,7 @@ let rpc_command =
       let*! () = Internal_event.Simple.emit Event.event_starting "rpc" in
       Evm_node_lib_dev.Rpc.main
         ~evm_node_endpoint
-        ?evm_node_private_endpoint
+        ~evm_node_private_endpoint
         ~config
         ())
 
