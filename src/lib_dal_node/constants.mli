@@ -23,6 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [number_of_slots] is the default number of DAL slots per level. *)
+val number_of_slots : int
+
+(** [number_of_shards] is the default number of shards per slot. *)
+val number_of_shards : int
+
+(** [attestation_lag] is the number of levels between slot publication and
+    attestation. *)
+val attestation_lag : int
+
 (** [shards_store_lru_size] is the maximum shards store LRU size. See
     {!Key_value_store.init} and {!Store.Shards.init}. *)
 val shards_store_lru_size : int

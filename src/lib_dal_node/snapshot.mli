@@ -8,10 +8,13 @@
 (** [export data_dir ~min_published_level ~max_published_level path]
     exports the DAL node store data for slots published between
     [min_published_level] and [max_published_level] (inclusive) to a snapshot
-    file at the given [path]. *)
+    file at the given [path]. If [min_published_level] is [None], the
+    first_seen_level from the store is used as the default. If
+    [max_published_level] is [None], the last_processed_level from the store
+    is used as the default. *)
 val export :
   data_dir:string ->
-  min_published_level:int32 ->
-  max_published_level:int32 ->
+  min_published_level:int32 option ->
+  max_published_level:int32 option ->
   string ->
   unit tzresult Lwt.t

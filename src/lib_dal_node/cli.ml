@@ -1050,17 +1050,11 @@ module Snapshot = struct
             [])
 
     let action min_published_level max_published_level data_dir file_path =
-      let min_level =
-        Option.value ~default:0l (Option.map Int32.of_int min_published_level)
-      in
-      let max_level =
-        Option.value
-          ~default:Int32.max_int
-          (Option.map Int32.of_int max_published_level)
-      in
       let data_dir =
         Option.value ~default:Configuration_file.default.data_dir data_dir
       in
+      let min_level = Option.map Int32.of_int min_published_level in
+      let max_level = Option.map Int32.of_int max_published_level in
       Snapshot.export
         ~data_dir
         ~min_published_level:min_level
