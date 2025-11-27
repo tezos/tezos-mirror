@@ -6210,7 +6210,7 @@ module Amplification = struct
         published_levels
     in
     let rec repeat_publish offset =
-      if offset > published_slots then unit
+      if offset >= published_slots then unit
       else (
         Log.info
           "Publish a slot at level %d"
@@ -6252,8 +6252,8 @@ module Amplification = struct
         in
         repeat_publish (offset + 1))
     in
-    let* () = repeat_publish 1 in
     (* We bake two blocks so that the last publish operation becomes final, and
+    let* () = repeat_publish 0 in
        therefore all reconstructions have started. *)
     let* () = bake_for client ~count:2 in
     Log.info "Waiting for finished reconstruction events" ;
@@ -6280,10 +6280,10 @@ module Amplification = struct
       List.init number_of_slots (fun i -> i = index)
     in
     let rec check_attestation offset =
-      if offset > published_slots then unit
+      if offset >= published_slots then unit
       else
         let attested_level =
-          before_publication_level + attestation_lag + offset
+          before_publication_level + attestation_lag + offset + 1
         in
         let* () =
           check_slot_attested
@@ -6294,7 +6294,7 @@ module Amplification = struct
         in
         check_attestation (offset + 1)
     in
-    check_attestation 1
+    check_attestation 0
 end
 
 module Garbage_collection = struct
