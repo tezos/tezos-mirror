@@ -27,10 +27,10 @@ override_dh_installdocs:
 	dh_installdocs
 
 override_dh_installsystemd:
-	dh_installsystemd -p octez-node --no-start
-	dh_installsystemd -p octez-dal-node --no-start
-	dh_installsystemd -p octez-smart-rollup-node --no-start
-	dh_installsystemd -p octez-baker --no-start
+	dh_installsystemd -p octez-node --no-enable --no-start
+	dh_installsystemd -p octez-dal-node --no-enable --no-start
+	dh_installsystemd -p octez-smart-rollup-node --no-enable --no-start
+	dh_installsystemd -p octez-baker --no-enable --no-start
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser@
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-agnostic-baker
 	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-agnostic-accuser
@@ -38,6 +38,8 @@ override_dh_installsystemd:
 override_dh_install:
 	dh_install
 	dh_installdebconf
+  # Installs the preset file into the octez-node package
+	dh_install -p octez-node debian/90-octez.preset usr/lib/systemd/system-preset/
 
 override_dh_fixperms:
 		dh_fixperms
