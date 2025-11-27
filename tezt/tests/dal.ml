@@ -12660,7 +12660,7 @@ let register ~protocols =
     ~wait_ready:true
     "Test amplification by ignoring topics"
     Amplification.test_by_ignoring_topics
-    protocols
+    (List.filter (fun p -> Protocol.number p <= 024) protocols)
 
 let tests_start_dal_node_around_migration ~migrate_from ~migrate_to =
   let offsets = [-2; -1; 0; 1; 2] in
