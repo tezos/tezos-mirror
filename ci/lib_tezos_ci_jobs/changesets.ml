@@ -67,11 +67,22 @@ let changeset_octez =
           "tzt_reference_test_suite/**/*";
         ])
 
+(** Only if MIR code has changed. *)
+let changeset_mir =
+  Changeset.make
+    [
+      "contrib/mir/**/*.rs";
+      "contrib/mir/**/*.lalrpop";
+      (* Cargo.toml, clippy.toml *)
+      "contrib/mir/**/*.toml";
+      "contrib/mir/**/Cargo.lock";
+    ]
+
 (** Only if octez source code has changed, if the images has changed or
         if kernels.mk changed. *)
-let changeset_octez_or_kernels =
+let changeset_octez_or_kernels_or_mir =
   Changeset.(
-    changeset_base @ changeset_octez @ changeset_images
+    changeset_base @ changeset_octez @ changeset_images @ changeset_mir
     @ make ["scripts/ci/**/*"; "kernels.mk"; "etherlink.mk"])
 
 (** Only if documentation has changed *)
@@ -111,8 +122,8 @@ let changeset_octez_docs =
    So the build jobs need to be included if the documentation changes. *)
 let changeset_octez_or_doc = Changeset.(changeset_octez @ changeset_octez_docs)
 
-let changeset_octez_or_kernels_or_doc =
-  Changeset.(changeset_octez_or_kernels @ changeset_octez_docs)
+let changeset_octez_or_kernels_or_mir_or_doc =
+  Changeset.(changeset_octez_or_kernels_or_mir @ changeset_octez_docs)
 
 let changeset_docker_files = Changeset.make ["build.Dockerfile"; "Dockerfile"]
 
