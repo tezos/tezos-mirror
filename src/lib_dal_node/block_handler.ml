@@ -264,7 +264,12 @@ let fetch_skip_list_cells ctxt cctxt dal_constants ~attested_level
 
 let store_skip_list_cells ctxt ~attested_level skip_list_cells =
   let store = Node_context.get_store ctxt in
-  Store.Skip_list_cells.insert store ~attested_level skip_list_cells
+  Store.Skip_list_cells.insert
+    store
+    ~attested_level
+    skip_list_cells
+    (fun (hash, cell, slot_index, cell_attestation_lag, _status) ->
+      (hash, cell, slot_index, cell_attestation_lag))
 
 let fetch_and_store_skip_list_cells ctxt cctxt proto_params ~attested_level
     (module Plugin : Dal_plugin.T) =

@@ -261,19 +261,20 @@ module Skip_list_cells : sig
     tzresult
     Lwt.t
 
-  (** [insert ?conn store ~published_level ~attestation_lag values] inserts the
-      given list of [values] associated to the given [published_level] in the
-      [store]. Any existing value is overridden. *)
+  (** [insert ?conn store ~published_level ~attestation_lag values extract]
+      inserts the given list of [values] associated to the given
+      [published_level] in the [store], using [extract] for extracting needed
+      data from [values]. Any existing value is overridden. *)
   val insert :
     ?conn:Dal_store_sqlite3.conn ->
     t ->
     attested_level:int32 ->
-    (Skip_list_hash.t
+    'a list ->
+    ('a ->
+    Skip_list_hash.t
     * Skip_list_cell.t
     * Types.slot_index
-    * Types.attestation_lag
-    * Types.header_status option)
-    list ->
+    * Types.attestation_lag) ->
     unit tzresult Lwt.t
 
   (** [remove ?conn store ~published_level] removes any data related to [published_level]
