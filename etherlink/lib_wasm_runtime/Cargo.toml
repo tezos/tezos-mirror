@@ -46,3 +46,7 @@ runtime-dionysus-r1 = { package = "tezos-evm-runtime-dionysus-r1", path = "../ke
 # Ebisu
 kernel-ebisu = { package = "evm_kernel_ebisu", path = "../kernel_ebisu/kernel", default-features = false }
 runtime-ebisu = { package = "tezos-evm-runtime-ebisu", path = "../kernel_ebisu/runtime", default-features = false }
+
+# Farfadet
+kernel-farfadet = { package = "evm_kernel_farfadet", path = "../kernel_farfadet/kernel", default-features = false }
+runtime-farfadet = { package = "tezos-evm-runtime-farfadet", path = "../kernel_farfadet/runtime", default-features = false }
