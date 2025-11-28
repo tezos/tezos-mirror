@@ -10,10 +10,9 @@ WorkingDirectory=~
 Restart=on-failure
 RestartSec=10s
 KillMode=control-group
-TimeoutStartSec=infinity
+TimeoutStartSec=30s
 TimeoutStopSec=300s
 
-ExecStartPre=/usr/share/octez-node/octez-node-prestart.sh
 ExecStart=/usr/bin/octez-node run --data-dir $DATADIR --log-output /var/log/tezos/node.log $RUNTIME_OPTS
 Slice=octez.slice
 
