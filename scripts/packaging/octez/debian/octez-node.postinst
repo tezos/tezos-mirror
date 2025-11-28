@@ -12,9 +12,6 @@ if [ -e /etc/default/octez-node ]; then
   TEZOS_HOME=$(dirname $DATADIR)
 fi
 
-# work directory to store temporary files associated to this package
-mkdir -p /run/octez-node
-
 # systemctl should not be called directly. use this
 # wrapper script if available
 debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
@@ -46,26 +43,6 @@ configure)
       mkdir -p /var/log/tezos
       chown tezos /var/log/tezos
     fi
-
-    db_get octez-node/configure
-    case "$RET" in
-    false)
-      db_get octez-node/network
-      NETWORK=${RET}
-      db_get octez-node/history-mode
-      HISTORY_MODE=${RET}
-
-      if [ ! -e "$DATADIR/config.json" ]; then
-        su tezos -c "/usr/bin/octez-node config init --data-dir=$DATADIR            --network=\"$NETWORK\" \
-              --history-mode=\"$HISTORY_MODE\" \
-              --net-addr=\"[::]:9732\" \
-              --rpc-addr=\"127.0.0.1:8732\""
-      fi
-      ;;
-    true)
-      echo "Skipping initialization."
-      ;;
-    esac
   else
     echo "Upgrading octez-node from version $2 ( postinst )"
   fi
@@ -75,16 +52,5 @@ configure)
   : noop
   ;;
 esac
-
-# Check if the daemon was running and re-start it in this case
-if [ -f /var/lib/octez-node/daemon_was_running ] &&
-  [ "$(cat /var/lib/octez-node/daemon_was_running)" = "1" ]; then
-  # Start the daemon if it was running
-  $debsystemctl daemon-reload
-  $debsystemctl start octez-node.service
-  rm /var/lib/octez-node/daemon_was_running
-fi
-
-systemctl daemon-reload || true
 
 #DEBHELPER#
