@@ -276,7 +276,7 @@ module type Tx_container = sig
       ('a ->
       string ->
       transaction_object ->
-      [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t) ->
+      [`Keep of 'a | `Drop of string | `Stop] tzresult Lwt.t) ->
     initial_validation_state:'a ->
     (string * transaction_object) list tzresult Lwt.t
 

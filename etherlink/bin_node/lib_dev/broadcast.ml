@@ -70,6 +70,7 @@ type message =
       number : Ethereum_types.quantity;
     }
   | Included_transaction of {tx : transaction; hash : Ethereum_types.hash}
+  | Dropped_transaction of {hash : Ethereum_types.hash; reason : string}
 
 let message_encoding =
   let open Data_encoding in
@@ -129,6 +130,17 @@ let message_encoding =
         (function
           | Included_transaction {tx; hash} -> Some ((), tx, hash) | _ -> None)
         (fun ((), tx, hash) -> Included_transaction {tx; hash});
+      case
+        ~title:"Dropped_transaction"
+        (Tag 5)
+        (obj3
+           (req "kind" (constant "dropped_transaction"))
+           (req "hash" Ethereum_types.hash_encoding)
+           (req "reason" string))
+        (function
+          | Dropped_transaction {hash; reason} -> Some ((), hash, reason)
+          | _ -> None)
+        (fun ((), hash, reason) -> Dropped_transaction {hash; reason});
     ]
 
 (** Stream on which all messages are broadcasted *)
@@ -150,6 +162,9 @@ let notify_next_block_info timestamp number =
 
 let notify_inclusion tx hash =
   Lwt_watcher.notify message_watcher (Included_transaction {tx; hash})
+
+let notify_dropped ~hash ~reason =
+  Lwt_watcher.notify message_watcher (Dropped_transaction {hash; reason})
 
 (** Stream on which only pre-confirmed receipts are streamed  *)
 let receipt_watcher : Transaction_receipt.t Lwt_watcher.input =

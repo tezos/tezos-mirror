@@ -36,6 +36,10 @@ type next_block_info_handler =
 type inclusion_handler =
   Broadcast.transaction -> Ethereum_types.hash -> unit tzresult Lwt.t
 
+(** A [dropped_handler] is a function that is called for
+    every dropped transaction fetched from a remote EVM. *)
+type dropped_handler = Ethereum_types.hash -> string -> unit tzresult Lwt.t
+
 (** [start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
     ~get_next_blueprint_number on_new_blueprint_handler
     on_finalized_levels_handler]
@@ -62,5 +66,6 @@ val start :
   on_finalized_levels:finalized_levels_handler ->
   on_next_block_info:next_block_info_handler ->
   on_inclusion:inclusion_handler ->
+  on_dropped:dropped_handler ->
   unit ->
   'a tzresult Lwt.t

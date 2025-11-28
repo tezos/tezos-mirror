@@ -358,6 +358,9 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
         ~on_next_block_info
         ~on_inclusion
+        ~on_dropped:(fun hash reason ->
+          Broadcast.notify_dropped ~hash ~reason ;
+          return_unit)
         ()
     and* () =
       Drift_monitor.run

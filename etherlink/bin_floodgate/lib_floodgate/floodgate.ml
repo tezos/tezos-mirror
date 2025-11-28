@@ -434,6 +434,7 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
       return_unit)
     ~on_next_block_info:(fun _ _ -> return_unit)
     ~on_inclusion:(fun _ _ -> return_unit)
+    ~on_dropped:(fun _ _ -> return_unit)
     ()
 
 let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint

@@ -33,6 +33,7 @@ type message =
       number : Ethereum_types.quantity;
     }
   | Included_transaction of {tx : transaction; hash : Ethereum_types.hash}
+  | Dropped_transaction of {hash : Ethereum_types.hash; reason : string}
 
 val message_encoding : message Data_encoding.t
 
@@ -61,8 +62,12 @@ val notify_next_block_info : Time.Protocol.t -> Ethereum_types.quantity -> unit
     to the broadcast stream *)
 val notify_inclusion : transaction -> Ethereum_types.hash -> unit
 
+(** [notify_dropped ~hash ~reason] advertizes a dropped transaction with its [hash] and [reason]
+    to the broadcast stream *)
+val notify_dropped : hash:Ethereum_types.hash -> reason:string -> unit
+
 (** [create_receipt_stream ()] returns a new stream that can be used to be
-    notified of pre-confirmed receipts after transactions are executed individualy. *)
+    notified of pre-confirmed receipts after transactions are executed individually. *)
 val create_receipt_stream :
   unit -> Transaction_receipt.t Lwt_stream.t * Lwt_watcher.stopper
 

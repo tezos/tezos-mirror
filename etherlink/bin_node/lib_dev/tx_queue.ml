@@ -316,7 +316,10 @@ struct
       | Pop_transactions : {
           validation_state : 'a;
           validate_tx :
-            'a -> string -> Tx.t -> [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t;
+            'a ->
+            string ->
+            Tx.t ->
+            [`Keep of 'a | `Drop of string | `Stop] tzresult Lwt.t;
         }
           -> ((string * Tx.t) list, tztrace) t
       | Confirm_transactions : {
@@ -732,7 +735,7 @@ struct
                 (* `Stop means that we don't pop transaction anymore. We
                    don't remove the last peek tx because it could be valid
                    for another call. *)
-                | `Drop ->
+                | `Drop _ ->
                     (* `Drop, the current tx was evaluated and was refused
                        by the caller. *)
                     let _ = Queue.take state.queue in
