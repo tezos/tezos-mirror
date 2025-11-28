@@ -432,7 +432,7 @@ pub fn execute_tezlink_deposit<Host: Runtime>(
     let outcome = match to_account.set_balance(host, &Narith(balance.0 + amount)) {
         Ok(()) => true,
         Err(e) => {
-            log!(host, Error, "Deposit failed because of {}", e);
+            log!(host, Error, "Deposit failed because of {e}");
             false
         }
     };
