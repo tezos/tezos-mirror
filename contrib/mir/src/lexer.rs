@@ -204,7 +204,7 @@ pub enum Tok<'a> {
 
     /// An annotation, see [Annotation].
     // regex as per https://tezos.gitlab.io/active/michelson.html#syntax
-    #[regex(r"@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*", lex_annotation)]
+    #[regex(r"@%|@%%|%@|@|:|%|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*", lex_annotation)]
     Annotation(Annotation<'a>),
 
     /// Left parenthesis `(`.

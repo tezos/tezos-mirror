@@ -245,14 +245,14 @@ fn decode_seq<'a>(
 }
 
 fn validate_ann(bytes: &[u8]) -> Result<Annotation<'static>, DecodeError> {
-    // @%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*
+    // @%|@%%|%@|@|:|%|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*
     macro_rules! alpha_num {
       () => {
         b'_' | b'0'..=b'9' | b'a'..=b'z' | b'A'..=b'Z'
       }
     }
     match bytes {
-        b"@%" | b"@%%" | b"%@" => {}
+        b"@%" | b"@%%" | b"%@" | b"@" | b":" | b"%" => {}
         [b'@' | b':' | b'%', alpha_num!(), rest @ ..]
             if rest
                 .iter()
