@@ -66,9 +66,14 @@ packages() {
   EXECUTABLES=$(cat script-inputs/*-executables)
   for ex in $EXECUTABLES; do
     if [ -f "$ex" ]; then
-      cp -f "$ex" "$BINARIES"
+      mv -f "$ex" "$BINARIES"
     fi
   done
+
+  # on the CI cleanup everything before building the packages
+  if [ -z "${CI:-}" ]; then
+    make clean
+  fi
 
   cp -a "$packaging_dir/scripts/packaging/octez/manpages/" "$SPECS_DIR/"
   cp -a "$packaging_dir/scripts/packaging/octez/scripts/" "$SPECS_DIR/"
