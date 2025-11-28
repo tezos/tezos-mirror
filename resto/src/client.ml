@@ -467,6 +467,26 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
           Lwt.return err )
     >>= fun ans -> Lwt.return (meth, uri, ans)
 
+  let parse_stream (media : Media_type.t) output ~log_raw_chunk ~on_chunk
+      ~on_close stream =
+    let buffer = Buffer.create 2048 in
+    let rec loop () =
+      Lwt_stream.get stream >>= function
+      | None ->
+          on_close () ;
+          Lwt.return_unit
+      | Some chunk ->
+          Buffer.add_string buffer chunk ;
+          let data = Buffer.contents buffer in
+          log_raw_chunk chunk >>= fun () ->
+          let elts, rest = media.destruct_many output data in
+          List.iter on_chunk elts ;
+          Buffer.reset buffer ;
+          Buffer.add_string buffer rest ;
+          loop ()
+    in
+    loop ()
+
   let call_streamed_service media_types ?redirect_behaviour ?logger ?headers
       ?base service ~on_chunk ~on_close params query body =
     prepare media_types ?logger ?base service params query body
@@ -491,25 +511,18 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
           | None -> Lwt.return (`Unexpected_content_type (body, media_name))
           | Some media ->
               let stream = Cohttp_lwt.Body.to_stream body in
-              let buffer = Buffer.create 2048 in
               let output = Service.output_encoding service in
-              let rec loop () =
-                Lwt_stream.get stream >>= function
-                | None ->
-                    on_close () ;
-                    Lwt.return_unit
-                | Some chunk ->
-                    Buffer.add_string buffer chunk ;
-                    let data = Buffer.contents buffer in
-                    log.log ~media output `OK (lazy (Lwt.return chunk))
-                    >>= fun () ->
-                    let elts, rest = media.destruct_many output data in
-                    List.iter on_chunk elts ;
-                    Buffer.reset buffer ;
-                    Buffer.add_string buffer rest ;
-                    loop ()
-              in
-              Lwt.dont_wait loop (fun exn ->
+              Lwt.dont_wait
+                (fun () ->
+                  parse_stream
+                    media
+                    output
+                    ~log_raw_chunk:(fun chunk ->
+                      log.log ~media output `OK (lazy (Lwt.return chunk)))
+                    ~on_chunk
+                    ~on_close
+                    stream)
+                (fun exn ->
                   Format.eprintf
                     "Warning: Exception in async stream processing: %s@."
                     (Printexc.to_string exn)) ;
@@ -543,4 +556,8 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
         | `Redirect_without_location _ ) as err ->
           Lwt.return err )
     >>= fun ans -> Lwt.return (meth, uri, ans)
+
+  module Internal_for_tests = struct
+    let parse_stream = parse_stream
+  end
 end
