@@ -5,6 +5,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val call_singleton_request :
+  keep_alive:bool ->
+  timeout:float ->
+  base:Uri.t ->
+  (module Rpc_encodings.METHOD
+     with type input = 'input
+      and type output = 'output) ->
+  Rpc_encodings.JSONRPC.request ->
+  ('output, string) result tzresult Lwt.t
+
 (** [send_raw_transaction ~keep_alive ~base raw_txn] uses the
     [eth_sendRawTransaction] RPC method to inject [raw_txn] to the endpoint
     [base]. It will retry as many time as necessary if [keep_alive] is set to

@@ -26,8 +26,9 @@ end
 
 val init :
   mode:string ->
-  tx_pool_size_info:(unit -> Tx_pool.size_info tzresult Lwt.t) ->
+  ?tx_pool_size_info:(unit -> Tx_pool.size_info tzresult Lwt.t) ->
   smart_rollup_address:Tezos_crypto.Hashed.Smart_rollup_address.t ->
+  unit ->
   unit
 
 val set_level : level:Z.t -> unit

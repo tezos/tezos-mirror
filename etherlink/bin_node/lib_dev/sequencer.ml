@@ -482,7 +482,8 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
   Metrics.init
     ~mode:"sequencer"
     ~tx_pool_size_info:Tx_container.size_info
-    ~smart_rollup_address:smart_rollup_address_typed ;
+    ~smart_rollup_address:smart_rollup_address_typed
+    () ;
   let* () =
     Block_producer.start
       {
@@ -520,7 +521,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
 
   let* finalizer_public_server =
     Rpc_server.start_public_server
-      ~mode:Sequencer
+      ~mode:(Sequencer tx_container)
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(
@@ -529,18 +530,16 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
          else Rpc_types.Single_chain_node_rpc_server chain_family)
       configuration
-      tx_container
       ((module Rpc_backend), smart_rollup_address_typed)
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
-      ~mode:Sequencer
+      ~mode:(Sequencer tx_container)
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
          else Rpc_types.Single_chain_node_rpc_server chain_family)
       ~block_production:`Single_node
       configuration
-      tx_container
       ((module Rpc_backend), smart_rollup_address_typed)
   in
   let*! finalizer_rpc_process =
