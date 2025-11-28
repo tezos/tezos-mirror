@@ -7,8 +7,6 @@ services:
     ports:
       - 9732:9732
       - 8732:8732
-    environment:
-      NODE_HOST: octez-node
     volumes:
       - node_data:/var/run/tezos/node
       - client_data:/var/run/tezos/client
@@ -19,8 +17,6 @@ services:
     image: tezos/tezos-bare:latest
     hostname: octez-baker
     command: octez-baker --base-dir /var/run/tezos/node/data --endpoint http://octez-node:8732 run with local node /var/run/tezos/node/data --liquidity-baking-toggle-vote $LIQUIDITY_BAKING_VOTE --without-dal
-    environment:
-      NODE_HOST: octez-node
     volumes:
       - client_data:/var/run/tezos/client
       - node_data:/var/run/tezos/node
@@ -31,8 +27,6 @@ services:
     image: tezos/tezos-bare:latest
     hostname: octez-accuser
     command: octez-accuser --base-dir /var/run/tezos/node/data --endpoint http://octez-node:8732 run
-    environment:
-      NODE_HOST: octez-node
     volumes:
       - client_data:/var/run/tezos/client
       - node_data:/var/run/tezos/node
