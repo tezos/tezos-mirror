@@ -436,6 +436,22 @@ pub struct TransferSuccess {
     pub lazy_storage_diff: Option<LazyStorageDiffList>,
 }
 
+impl Default for TransferSuccess {
+    fn default() -> Self {
+        Self {
+            storage: None,
+            balance_updates: vec![],
+            ticket_receipt: vec![],
+            originated_contracts: vec![],
+            consumed_milligas: 0.into(),
+            storage_size: 0.into(),
+            paid_storage_size_diff: 0.into(),
+            allocated_destination_contract: false,
+            lazy_storage_diff: None,
+        }
+    }
+}
+
 // An operation error in a Tezos receipt has no specific format
 // It should just be encoded as a JSON, so we can't derive
 // NomReader and BinWriter if we want to be Tezos compatible
