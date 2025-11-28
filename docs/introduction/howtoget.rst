@@ -355,7 +355,7 @@ For instance, to configure and run the node on the active protocol on Shadownet 
     wget -O $HOME/rolling https://snapshots.tzinit.org/shadownet/rolling
     docker compose -f bake.yml run --rm -it -v "$HOME/rolling:/snapshot:ro" \
       octez-node octez-node snapshot import --data-dir /var/run/tezos/node/data /snapshot
-    docker compose -f bake.yml up
+    docker compose -f bake.yml up octez-node
 
 (Note in the command above that ``octez-node`` is the name of both the container and executable.)
 
@@ -379,6 +379,27 @@ You may stop and restart the node as needed. For instance if the Octez version y
     docker compose -f bake.yml run octez-node octez-upgrade-storage
     docker compose -f bake.yml up octez-node
 
+To run the baker, you must configure a baking key (if you have one you may skip this step.
+While the node is running, do (in another window if needed)::
+
+    docker compose -f bake.yml exec octez-node sh
+
+and in the shell do::
+
+    export TEZOS_CLIENT_DIR=/var/run/tezos/client
+    octez-client gen keys mybaker
+    octez-client show address mybaker
+    # Note down the address of mybaker
+    # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+    octez-client register key mybaker as delegate
+    octez-client stake 6000 for mybaker
+
+Once the baking key is configured, stop the node and then run all the services::
+
+    export BAKER_ADDRESS=tz...
+    docker compose -f bake.yml up
+
+Now you should have running together: the node, the DAL node, the baker and the accuser.
 
 Building Docker Images Locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
