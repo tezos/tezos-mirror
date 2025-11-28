@@ -6,12 +6,8 @@ After=network.target octez-node.service
 Type=oneshot
 RemainAfterExit=yes
 
-
 EnvironmentFile=-/etc/default/octez-node
 EnvironmentFile=-/etc/default/octez-baker
-
-# The baker is started only if the node is up and running
-ExecStartPre=/usr/share/octez-baker/wait-for-node-up.sh
 
 ExecStart=/usr/share/octez-baker/systemd-octez-bakers.sh start
 ExecStop=/usr/share/octez-baker/systemd-octez-bakers.sh stop
