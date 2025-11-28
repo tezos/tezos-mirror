@@ -404,7 +404,7 @@ module Term = struct
       let error () =
         Format.kasprintf
           (fun s -> Error s)
-          "Unrecognized profile for %s (expected non-negative integer, got %s)"
+          "Unrecognized value for %s (expected non-negative integer, got %s)"
           name
           string
       in
@@ -1007,6 +1007,18 @@ module Snapshot = struct
       `P "Entrypoint for snapshot management commands.";
     ]
 
+  let slots_format = Term.positive_int_format "slots"
+
+  let slots_arg =
+    Term.make_arg_list
+      ~doc:
+        "The indexes of the slots to handle. If empty, all slots are handled."
+      ~placeholder:"INDEX1,INDEX2,..."
+      ~format:slots_format
+      "slots"
+
+  let slots = Term.arg_to_cmdliner slots_arg
+
   let min_published_level_arg doc =
     let open Term in
     let parse, pp = positive_int_format "min-published-level" in
@@ -1035,7 +1047,7 @@ module Snapshot = struct
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info ~doc:"Export snapshot" ~man ~version "export"
 
-    let action min_published_level max_published_level data_dir endpoint
+    let action min_published_level max_published_level slots data_dir endpoint
         config_file file_path =
       let data_dir =
         Option.value ~default:Configuration_file.default.data_dir data_dir
@@ -1053,6 +1065,7 @@ module Snapshot = struct
         ~endpoint
         ~min_published_level:min_level
         ~max_published_level:max_level
+        ~slots
         file_path
 
     let term =
@@ -1062,7 +1075,7 @@ module Snapshot = struct
           (const action
           $ min_published_level "Minimum published level to export."
           $ max_published_level "Maximum published level to export."
-          $ Term.data_dir $ Term.endpoint $ Term.config_file
+          $ slots $ Term.data_dir $ Term.endpoint $ Term.config_file
           $ file_path "Path to the destination data directory."))
 
     let cmd = Cmdliner.Cmd.v info term
@@ -1081,7 +1094,7 @@ module Snapshot = struct
       let version = Tezos_version_value.Bin_version.octez_version_string in
       Cmdliner.Cmd.info ~doc:"Import snapshot" ~man ~version "import"
 
-    let action min_published_level max_published_level data_dir endpoint
+    let action min_published_level max_published_level slots data_dir endpoint
         config_file no_check file_path =
       let data_dir =
         Option.value ~default:Configuration_file.default.data_dir data_dir
@@ -1100,6 +1113,7 @@ module Snapshot = struct
         ~endpoint
         ~min_published_level:min_level
         ~max_published_level:max_level
+        ~slots
         file_path
 
     let term =
@@ -1109,7 +1123,7 @@ module Snapshot = struct
           (const action
           $ min_published_level "Minimum published level to import."
           $ max_published_level "Maximum published level to import."
-          $ Term.data_dir $ Term.endpoint $ Term.config_file $ no_check
+          $ slots $ Term.data_dir $ Term.endpoint $ Term.config_file $ no_check
           $ file_path "Path to the source data directory to import from."))
 
     let cmd = Cmdliner.Cmd.v info term

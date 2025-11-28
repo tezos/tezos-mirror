@@ -35,19 +35,15 @@ let iterate_levels ~min_published_level ~max_published_level f =
   in
   iterate_levels min_published_level
 
+let all_slots = Stdlib.List.init Constants.number_of_slots Fun.id
+
 (** Iterate through all levels and slot indices in the given range,
     calling [f] for each [{slot_level; slot_index}] slot id. *)
-let iterate_all_slots ~min_published_level ~max_published_level f =
-  let open Lwt_result_syntax in
+let iterate_slots ~min_published_level ~max_published_level ~slots f =
   iterate_levels ~min_published_level ~max_published_level @@ fun level ->
-  let rec iterate_slot_index slot_index =
-    if slot_index >= Constants.number_of_slots then return_unit
-    else
-      let slot_id = Types.Slot_id.{slot_level = level; slot_index} in
-      let* () = f slot_id in
-      iterate_slot_index (slot_index + 1)
-  in
-  iterate_slot_index 0
+  List.iter_es
+    (fun slot_index -> f Types.Slot_id.{slot_level = level; slot_index})
+    slots
 
 (** Copy a value from source KVS to destination KVS.
     Returns [Ok ()] if the value was copied or if src value is not found. *)
@@ -73,7 +69,8 @@ module Merge = struct
   (** Export a filtered subset of the skip_list SQLite database by iterating
       through levels in the range [min_published_level, max_published_level]
       and copying the data using Dal_store_sqlite3 functions. *)
-  let merge_skip_list ~src ~dst ~min_published_level ~max_published_level =
+  let merge_skip_list ~src ~dst ~min_published_level ~max_published_level ~slots
+      =
     let open Lwt_result_syntax in
     let*! () = Lwt_utils_unix.create_dir dst in
     (* Initialize destination database with empty schema *)
@@ -90,6 +87,8 @@ module Merge = struct
         ~perm:Sqlite.(Read_only {pool_size = 1})
         ()
     in
+    let module SlotsSet = Set.Make (Int) in
+    let slots = SlotsSet.of_list slots in
     Lwt.finalize
       (fun () ->
         iterate_levels ~min_published_level ~max_published_level @@ fun level ->
@@ -101,18 +100,24 @@ module Merge = struct
         in
         (* For each slot in this level, get complete info and insert into destination *)
         let* items_with_lag =
-          List.map_es
+          List.filter_map_es
             (fun (_cell, hash, slot_index) ->
-              let slot_id = Types.Slot_id.{slot_level = level; slot_index} in
-              let* result =
-                Dal_store_sqlite3.Skip_list_cells.find_by_slot_id_opt
-                  src_db
-                  slot_id
-              in
-              match result with
-              | Some (cell, attestation_lag) ->
-                  return (hash, cell, slot_index, attestation_lag)
-              | None -> failwith "Cell found by level but not by slot_id")
+              if SlotsSet.mem slot_index slots then
+                let slot_id = Types.Slot_id.{slot_level = level; slot_index} in
+                let* result =
+                  Dal_store_sqlite3.Skip_list_cells.find_by_slot_id_opt
+                    src_db
+                    slot_id
+                in
+                match result with
+                | Some (cell, attestation_lag) ->
+                    return_some (hash, cell, slot_index, attestation_lag)
+                | None ->
+                    failwith
+                      "Cell for slot_id (%ld, %d) not found."
+                      level
+                      slot_index
+              else return_none)
             cells
         in
         match items_with_lag with
@@ -133,7 +138,7 @@ module Merge = struct
   (** Export slots for all published slots in the given level range.
       Copies slot files from source to destination directory. *)
   let merge_slots ~cryptobox ~src ~dst ~min_published_level ~max_published_level
-      =
+      ~slots =
     let open Lwt_result_syntax in
     let*! () = Lwt_utils_unix.create_dir dst in
     let* src_store =
@@ -146,7 +151,7 @@ module Merge = struct
     in
     Lwt.finalize
       (fun () ->
-        iterate_all_slots ~min_published_level ~max_published_level
+        iterate_slots ~min_published_level ~max_published_level ~slots
         @@ fun slot_id ->
         let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
         let file_layout = Store.Slots.file_layout in
@@ -159,7 +164,7 @@ module Merge = struct
 
   (** Export shards for all slots in the given level range.
       Copies shard files from source to destination directory. *)
-  let merge_shards ~src ~dst ~min_published_level ~max_published_level =
+  let merge_shards ~src ~dst ~min_published_level ~max_published_level ~slots =
     let open Lwt_result_syntax in
     let*! () = Lwt_utils_unix.create_dir dst in
     let* src_store =
@@ -175,7 +180,7 @@ module Merge = struct
         (* For each level, we need to check all possible slot indices.
            In practice, we should get this from the skip_list data,
            but for now we'll scan for existing files. *)
-        iterate_all_slots ~min_published_level ~max_published_level
+        iterate_slots ~min_published_level ~max_published_level ~slots
         @@ fun slot_id ->
         let file_layout = Store.Shards_disk.file_layout in
         let*! count_result =
@@ -211,8 +216,9 @@ module Merge = struct
         return_unit)
 
   let merge ~frozen_only ~src_root_dir ~config_file ~endpoint
-      ~min_published_level ~max_published_level ~dst_root_dir =
+      ~min_published_level ~max_published_level ~slots ~dst_root_dir =
     let open Lwt_result_syntax in
+    let slots = Option.value ~default:all_slots slots in
     let* config = Configuration_file.load ~config_file in
     let endpoint = Option.value ~default:config.endpoint endpoint in
     let config = Configuration_file.{config with endpoint} in
@@ -275,6 +281,7 @@ module Merge = struct
         ~dst:dst_slot_dir
         ~min_published_level
         ~max_published_level
+        ~slots
     in
     (* Export shards *)
     let* () =
@@ -285,6 +292,7 @@ module Merge = struct
         ~dst:dst_shard_dir
         ~min_published_level
         ~max_published_level
+        ~slots
     in
     (* Export skip_list *)
     let* () =
@@ -299,6 +307,7 @@ module Merge = struct
         ~dst:dst_skip_list_dir
         ~min_published_level
         ~max_published_level
+        ~slots
     in
     let* chain_id_store = Store.Chain_id.init ~root_dir:dst_root_dir in
     let* () = Store.Chain_id.save chain_id_store chain_id in
@@ -334,7 +343,7 @@ module Merge = struct
 end
 
 let export ~data_dir ~config_file ~endpoint ~min_published_level
-    ~max_published_level dst =
+    ~max_published_level ~slots dst =
   let open Lwt_result_syntax in
   let store_path data_dir =
     Configuration_file.store_path {Configuration_file.default with data_dir}
@@ -357,10 +366,11 @@ let export ~data_dir ~config_file ~endpoint ~min_published_level
     ~endpoint
     ~min_published_level
     ~max_published_level
+    ~slots
     ~dst_root_dir
 
 let import ?(check = true) ~data_dir:dst ~config_file ~endpoint
-    ~min_published_level ~max_published_level src =
+    ~min_published_level ~max_published_level ~slots src =
   if check then
     failwith
       "Import with checks is not yet implemented. Use --no-check if you want \
@@ -378,4 +388,5 @@ let import ?(check = true) ~data_dir:dst ~config_file ~endpoint
       ~endpoint
       ~min_published_level
       ~max_published_level
+      ~slots
       ~dst_root_dir
