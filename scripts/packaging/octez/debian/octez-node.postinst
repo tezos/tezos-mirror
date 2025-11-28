@@ -1,0 +1,90 @@
+#!/bin/sh
+
+set -e
+
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+db_version 2.0
+
+if [ -e /etc/default/octez-node ]; then
+  . /etc/default/octez-node
+  TEZOS_HOME=$(dirname $DATADIR)
+fi
+
+# work directory to store temporary files associated to this package
+mkdir -p /run/octez-node
+
+# systemctl should not be called directly. use this
+# wrapper script if available
+debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
+
+case "${1}" in
+configure)
+  # if $2 is empty, then we're doing a fresh install or
+  # if $DPKG_RUNNING_VERSION" is empty a reconfigure
+  # Otherwise we're upgrading
+  if [ -z "${2:-}" ] || [ -z "$DPKG_RUNNING_VERSION" ]; then
+    # these are the defaults for the package and only used
+    # in the "configure" stage.
+
+    # shellcheck disable=SC2119
+    if ! id "tezos" > /dev/null 2>&1; then
+      adduser --quiet --disabled-password \
+        --home "$TEZOS_HOME" --shell /bin/bash \
+        --gecos "admin user for octez" tezos
+    else
+      # setup data directory in case the tezos user was already present
+      if [ ! -d "$TEZOS_HOME" ]; then
+        mkdir -p "$TEZOS_HOME"
+        chown tezos "$TEZOS_HOME"
+      fi
+    fi
+
+    # setup log directory
+    if [ ! -d /var/log/tezos ]; then
+      mkdir -p /var/log/tezos
+      chown tezos /var/log/tezos
+    fi
+
+    db_get octez-node/configure
+    case "$RET" in
+    false)
+      db_get octez-node/network
+      NETWORK=${RET}
+      db_get octez-node/history-mode
+      HISTORY_MODE=${RET}
+
+      if [ ! -e "$DATADIR/config.json" ]; then
+        su tezos -c "/usr/bin/octez-node config init --data-dir=$DATADIR            --network=\"$NETWORK\" \
+              --history-mode=\"$HISTORY_MODE\" \
+              --net-addr=\"[::]:9732\" \
+              --rpc-addr=\"127.0.0.1:8732\""
+      fi
+      ;;
+    true)
+      echo "Skipping initialization."
+      ;;
+    esac
+  else
+    echo "Upgrading octez-node from version $2 ( postinst )"
+  fi
+
+  ;;
+*)
+  : noop
+  ;;
+esac
+
+# Check if the daemon was running and re-start it in this case
+if [ -f /var/lib/octez-node/daemon_was_running ] &&
+  [ "$(cat /var/lib/octez-node/daemon_was_running)" = "1" ]; then
+  # Start the daemon if it was running
+  $debsystemctl daemon-reload
+  $debsystemctl start octez-node.service
+  rm /var/lib/octez-node/daemon_was_running
+fi
+
+systemctl daemon-reload || true
+
+#DEBHELPER#

@@ -1,0 +1,34 @@
+#!/bin/sh
+
+set -e
+
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+# systemctl should not be called directly. use this
+# wrapper script if available
+debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
+
+case "$1" in
+remove)
+  # display a warning before proceding
+  db_input critical octez-node/purge_warning || true
+  # shellcheck disable=SC2119
+  db_go || true
+  ;;
+upgrade | deconfigure | failed-upgrade) ;;
+*)
+  echo "Unknown argument: $1"
+  exit 1
+  ;;
+esac
+
+# Check if the daemon is active before stopping it
+if $debsystemctl is-active --quiet octez-node.service; then
+  # Set a flag in a temporary file to indicate the daemon was running
+  touch /run/octez-node/daemon_was_running
+  echo "Stopping octez-node"
+  $debsystemctl stop octez-node.service
+fi
+
+#DEBHELPER#
