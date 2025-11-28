@@ -166,11 +166,17 @@ let notify_inclusion tx hash =
 let notify_dropped ~hash ~reason =
   Lwt_watcher.notify message_watcher (Dropped_transaction {hash; reason})
 
-(** Stream on which only pre-confirmed receipts are streamed  *)
-let receipt_watcher : Transaction_receipt.t Lwt_watcher.input =
+type transaction_result = {
+  hash : Ethereum_types.hash;
+  result : (Transaction_receipt.t, string) result;
+}
+
+(** Stream on which only pre-confirmed results are streamed  *)
+let transaction_result_watcher : transaction_result Lwt_watcher.input =
   Lwt_watcher.create_input ()
 
-let create_receipt_stream () = Lwt_watcher.create_stream receipt_watcher
+let create_transaction_result_stream () =
+  Lwt_watcher.create_stream transaction_result_watcher
 
-let notify_preconfirmed_receipt receipt =
-  Lwt_watcher.notify receipt_watcher receipt
+let notify_transaction_result res =
+  Lwt_watcher.notify transaction_result_watcher res

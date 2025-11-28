@@ -125,7 +125,11 @@ let on_inclusion (txn : Broadcast.transaction) hash =
   Broadcast.notify_inclusion txn hash ;
   let*! () = Events.inclusion hash in
   let* opt_receipt = Evm_context.execute_single_transaction txn hash in
-  Option.iter Broadcast.notify_preconfirmed_receipt opt_receipt ;
+  Option.iter
+    (fun (r : Transaction_receipt.t) ->
+      Broadcast.notify_transaction_result
+        {hash = r.transactionHash; result = Ok r})
+    opt_receipt ;
   return_unit
 
 let install_finalizer_observer ~rollup_node_tracking
@@ -359,7 +363,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         ~on_next_block_info
         ~on_inclusion
         ~on_dropped:(fun hash reason ->
-          Broadcast.notify_dropped ~hash ~reason ;
+          Broadcast.notify_transaction_result {hash; result = Error reason} ;
           let* () = Tx_container.dropped_transaction ~dropped_tx:hash ~reason in
           return_unit)
         ()

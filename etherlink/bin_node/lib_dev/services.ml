@@ -357,13 +357,14 @@ let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
         in
         return (stream, stopper)
     | NewPreconfirmedReceipts ->
-        let stream, stopper = Broadcast.create_receipt_stream () in
+        let stream, stopper = Broadcast.create_transaction_result_stream () in
         let stream =
           Lwt_stream.filter_map
             (function
-              | receipt ->
+              | Broadcast.{hash = _; result = Ok receipt} ->
                   Some
-                    (Ethereum_types.Subscription.NewPreconfirmedReceipts receipt))
+                    (Ethereum_types.Subscription.NewPreconfirmedReceipts receipt)
+              | _ -> None)
             stream
         in
         return (stream, stopper)
@@ -1263,12 +1264,15 @@ let dispatch_request (type f) ~websocket
               | Ok tx_hash -> (
                   let* receipt = f tx_hash in
                   match receipt with
-                  | Some receipt -> rpc_ok receipt
+                  | Some (Ok receipt) -> rpc_ok receipt
+                  | Some (Error reason) ->
+                      rpc_error
+                        (Rpc_errors.transaction_rejected reason (Some tx_hash))
                   | None ->
                       rpc_error
                         (Rpc_errors.transaction_rejected
                            "Transaction not found"
-                           None))
+                           (Some tx_hash)))
             in
             let f (raw_tx, timeout, block_parameter) =
               match block_parameter with
@@ -1292,8 +1296,8 @@ let dispatch_request (type f) ~websocket
                             (Rpc_errors.transaction_rejected reason None))
                   | _ ->
                       wait_or_timeout timeout @@ fun () ->
-                      let receipt_stream, stopper =
-                        Broadcast.create_receipt_stream ()
+                      let transaction_result_stream, stopper =
+                        Broadcast.create_transaction_result_stream ()
                       in
                       let* hash =
                         send_raw_transaction
@@ -1305,11 +1309,14 @@ let dispatch_request (type f) ~websocket
                       let receipt_from_stream hash =
                         let*! receipt =
                           Lwt_stream.find
-                            (fun (r : Transaction_receipt.t) ->
-                              r.transactionHash = hash)
-                            receipt_stream
+                            (fun (r : Broadcast.transaction_result) ->
+                              r.hash = hash)
+                            transaction_result_stream
                         in
-                        return receipt
+                        return
+                          (Option.map
+                             (fun Broadcast.{result; _} -> result)
+                             receipt)
                       in
                       let+ receipt =
                         tx_hash_to_receipt receipt_from_stream hash
@@ -1327,7 +1334,13 @@ let dispatch_request (type f) ~websocket
                           ~wait_confirmation:true
                       in
                       tx_hash_to_receipt
-                        Backend_rpc.Etherlink_block_storage.transaction_receipt
+                        (fun tx_hash ->
+                          let* receipt =
+                            Backend_rpc.Etherlink_block_storage
+                            .transaction_receipt
+                              tx_hash
+                          in
+                          return (Option.map (fun r -> Ok r) receipt))
                         hash)
               | _ ->
                   rpc_error
