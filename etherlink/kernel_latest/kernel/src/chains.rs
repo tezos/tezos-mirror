@@ -10,7 +10,7 @@ use crate::{
         read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
         EVMBlockHeader, TezBlockHeader,
     },
-    bridge::{execute_tezlink_deposit, Deposit},
+    bridge::{execute_tezlink_deposit, Deposit, TEZLINK_DEPOSITOR},
     delayed_inbox::DelayedInbox,
     error,
     fees::MINIMUM_BASE_FEE_PER_GAS,
@@ -21,6 +21,7 @@ use crate::{
     CHAIN_ID,
 };
 use anyhow::Context;
+use mir::ast::PublicKeyHash;
 use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
@@ -29,7 +30,7 @@ use std::{
     collections::VecDeque,
     fmt::{Debug, Display},
 };
-use tezos_crypto_rs::hash::ChainId;
+use tezos_crypto_rs::hash::{ChainId, UnknownSignature};
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 use tezos_ethereum::{
     rlp_helpers::{decode_field, decode_tx_hash, next},
@@ -43,9 +44,10 @@ use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
-    operation::Operation,
+    operation::{ManagerOperation, ManagerOperationContent, Operation},
     operation_result::{
         OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
+        OperationResult, OperationResultSum, OperationWithMetadata,
     },
 };
 
@@ -690,8 +692,43 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 }
                 TezlinkContent::Deposit(deposit) => {
                     log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
-                    let _deposit_result =
+
+                    let deposit_result =
                         execute_tezlink_deposit(host, &context, &deposit)?;
+
+                    let source =
+                        PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
+
+                    let applied_operation = AppliedOperation {
+                        hash: H256::from_slice(&operation.tx_hash).into(),
+                        branch: block_in_progress.previous_hash.into(),
+                        op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                            OperationBatchWithMetadata {
+                                operations: vec![OperationWithMetadata {
+                                    content: ManagerOperationContent::Transfer(
+                                        ManagerOperation {
+                                            source,
+                                            fee: 0.into(),
+                                            counter: 0.into(),
+                                            gas_limit: 0.into(),
+                                            storage_limit: 0.into(),
+                                            operation: deposit_result.outcome.1,
+                                        },
+                                    ),
+                                    receipt: OperationResultSum::Transfer(
+                                        OperationResult {
+                                            balance_updates: vec![],
+                                            result: deposit_result.outcome.0,
+                                            internal_operation_results: vec![],
+                                        },
+                                    ),
+                                }],
+                                signature: UnknownSignature::nom_read_exact(&[0u8; 64])
+                                    .unwrap(),
+                            },
+                        ),
+                    };
+                    applied.push(applied_operation);
                     included_delayed_transactions.push(operation.tx_hash);
                 }
             };
