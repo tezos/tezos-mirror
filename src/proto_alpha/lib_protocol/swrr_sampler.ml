@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type credit_info = {pkh : Signature.public_key_hash; credit : Z.t; stake : Z.t}
+
 let select_bakers_at_cycle_end ctxt ~target_cycle =
   let open Lwt_result_syntax in
   let* total_stake = Stake_storage.get_total_active_stake ctxt target_cycle in
@@ -16,66 +18,76 @@ let select_bakers_at_cycle_end ctxt ~target_cycle =
   let blocks_per_cycle = Constants_storage.blocks_per_cycle ctxt in
   let nb_slots = Int32.to_int blocks_per_cycle in
 
-  let rec loop i ctxt acc =
+  let* init_credit_list =
+    List.fold_left_es
+      (fun acc (pkh, stake) ->
+        let* credit_opt =
+          Storage.Contract.SWRR_credit.find ctxt (Contract_repr.Implicit pkh)
+        in
+        let old_credit = Option.value ~default:Z.zero credit_opt in
+        let weight = Stake_repr.staking_weight stake in
+        let acc =
+          {pkh; credit = old_credit; stake = Z.of_int64 weight} :: acc
+        in
+        return acc)
+      []
+      stakes_pkh
+  in
+
+  let rec loop i (credit_list : credit_info list)
+      (acc : Signature.public_key_hash list) :
+      credit_info list * Signature.public_key_hash list =
     if Compare.Int.(i >= nb_slots) then
       let bakers = List.rev acc in
-      let*! raw_ctxt =
-        Storage.Stake.Selected_bakers.add ctxt target_cycle bakers
-      in
-      return raw_ctxt
+      (credit_list, bakers)
     else
-      let* ctxt, best_pkh_opt, updated_rev =
-        List.fold_left_es
-          (fun (ctxt, best_opt, acc) (pkh, stake) ->
-            let* credit_opt =
-              Storage.Contract.SWRR_credit.find
-                ctxt
-                (Contract_repr.Implicit pkh)
-            in
-            let old_credit = Option.value ~default:Z.zero credit_opt in
-            let weight = Stake_repr.staking_weight stake in
-            let new_credit = Z.add old_credit (Z.of_int64 weight) in
-            (* TO DO change from Int64 to Z *)
-
-            let best_opt =
-              match best_opt with
-              | None -> Some (pkh, new_credit)
-              | Some (_best_pkh, best_credit)
-                when Compare.Z.(new_credit > best_credit) ->
-                  Some (pkh, new_credit)
-              | Some _ as x -> x
-            in
-            let acc = (pkh, new_credit) :: acc in
-            return (ctxt, best_opt, acc))
-          (ctxt, None, [])
-          stakes_pkh
+      (* Increase everyone's credit by their stake, and find the max *)
+      let best_credit_info_opt, updated_credit_list =
+        List.fold_left
+          (fun (current_best_credit_opt, updated_credit_list)
+               {pkh; credit; stake}
+             ->
+            let new_credit = Z.add credit stake in
+            let new_credit_info = {pkh; credit = new_credit; stake} in
+            match current_best_credit_opt with
+            (* First iteration, so the first credit is the best *)
+            | None -> (Some new_credit_info, updated_credit_list)
+            (* The new staker has better credit: we add the previous one to the list, and keep going. *)
+            | Some previous_best_credit
+              when Compare.Z.(new_credit > previous_best_credit.credit) ->
+                ( Some new_credit_info,
+                  previous_best_credit :: updated_credit_list )
+            (* The new credit is still less than the best. *)
+            | Some _ as x -> (x, new_credit_info :: updated_credit_list))
+          (None, [])
+          credit_list
       in
-      let best_pkh, best_credit, updated =
-        match best_pkh_opt with
-        | Some (pkh, credit) ->
-            let updated = List.rev updated_rev in
-            (pkh, credit, updated)
-        | None -> assert false
-        (* only happens if stakes_pkh is empty, which shouldn't happen *)
+      (* At this point `updated_credit_list` doesn't contain `best_credit_info_opt`, so we can simply update it and add it to the list. *)
+      let updated_credit_list, acc =
+        match best_credit_info_opt with
+        | None -> (updated_credit_list, acc) (* Should not happen *)
+        | Some ({credit; pkh; _} as best_credit_info) ->
+            ( {best_credit_info with credit = Z.sub credit total_stake}
+              :: updated_credit_list,
+              pkh :: acc )
       in
-      let winner_credit = Z.sub best_credit total_stake in
-
-      let* ctxt =
-        List.fold_left_es
-          (fun ctxt (pkh, credit) ->
-            let credit =
-              if Signature.Public_key_hash.equal pkh best_pkh then winner_credit
-              else credit
-            in
-            Storage.Contract.SWRR_credit.update
-              ctxt
-              (Contract_repr.Implicit pkh)
-              credit)
-          ctxt
-          updated
-      in
-      loop (i + 1) ctxt (best_pkh :: acc)
+      loop (i + 1) updated_credit_list acc
   in
-  loop 0 ctxt []
+  let new_credits, selected_bakers = loop 0 init_credit_list [] in
+  (* update context *)
+  let*! ctxt =
+    Storage.Stake.Selected_bakers.add ctxt target_cycle selected_bakers
+  in
+  let* ctxt =
+    List.fold_left_es
+      (fun ctxt {pkh; credit; _} ->
+        Storage.Contract.SWRR_credit.update
+          ctxt
+          (Contract_repr.Implicit pkh)
+          credit)
+      ctxt
+      new_credits
+  in
+  return ctxt
 
 let get_baker _ _ _ = assert false (* TO DO *)
