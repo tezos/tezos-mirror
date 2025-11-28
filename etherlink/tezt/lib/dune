@@ -5,6 +5,7 @@
  (name tezt_etherlink)
  (package tezt-etherlink)
  (libraries
+  octez-evm-node-libs.evm_node_lib_dev_encoding
   octez-libs.tezt-wrapper
   tezt-tezos.tezt-performance-regression
   octez-libs.crypto

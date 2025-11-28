@@ -590,6 +590,8 @@ mod tests {
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
     use crate::blueprint_storage::store_inbox_blueprint_by_number;
+    use crate::chains::TezlinkContent;
+    use crate::chains::TezlinkOperation;
     use crate::chains::{
         EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig, TezTransactions,
         TEZLINK_SAFE_STORAGE_ROOT_PATH,
@@ -800,6 +802,14 @@ mod tests {
         operations: Vec<Operation>,
         timestamp: Timestamp,
     ) -> Blueprint<TezTransactions> {
+        let operations = operations
+            .into_iter()
+            .map(|op| {
+                let tx_hash = op.hash().unwrap().0 .0;
+                let content = TezlinkContent::Tezos(op);
+                TezlinkOperation { tx_hash, content }
+            })
+            .collect();
         Blueprint {
             transactions: TezTransactions(operations),
             timestamp,

@@ -215,6 +215,16 @@ val wait_for_application :
   (unit -> 'b Lwt.t) ->
   'b Lwt.t
 
+val wait_for_event :
+  ?timeout:float ->
+  ?levels:int ->
+  'a Lwt.t ->
+  sequencer:Evm_node.t ->
+  sc_rollup_node:Sc_rollup_node.t ->
+  client:Client.t ->
+  error_msg:(unit Lwt.t, Format.formatter, unit, 'b) format4 ->
+  'a Lwt.t
+
 (** [batch_n_transactions ~evm_node raw_transactions] batches [raw_transactions]
     to the [evm_node] and returns the requests and transaction hashes. *)
 val batch_n_transactions :
