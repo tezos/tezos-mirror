@@ -629,6 +629,27 @@ module Proxy = struct
     in
     result ^ "\n"
 
+  let json_backfill ~published_level ~number_of_slots =
+    let open Ezjsonm in
+    let slot_id_to_json (level, index) =
+      dict [("slot_level", int level); ("slot_index", int index)]
+    in
+    let slot_ids = List.init number_of_slots (fun i -> (published_level, i)) in
+    let backfill =
+      dict
+        [
+          ("kind", string "backfill");
+          ( "backfill_payload",
+            dict
+              [
+                ("slot_ids", list slot_id_to_json slot_ids);
+                ("trap_slot_ids", list slot_id_to_json []);
+                ("no_shards_attestation_levels", list int []);
+              ] );
+        ]
+    in
+    Ezjsonm.value_to_string backfill ^ "\n"
+
   let routes ~attestation_lag ~number_of_slots ~faulty_delegate
       ~target_attested_level =
     let open Ezjsonm in
@@ -680,8 +701,12 @@ module Proxy = struct
               faulty_delegate
        in
        route ~path ~callback:(fun ~path:_ ~fetch_answer:_ ~fetch_stream ->
-           let* _resp, body = fetch_stream () in
            let published_level = target_attested_level - attestation_lag in
+           let backfill_stream =
+             let line = json_backfill ~published_level ~number_of_slots in
+             Lwt_stream.of_list [line]
+           in
+           let* _resp, body = fetch_stream () in
            let lines = json_lines_of_body body in
            let rewritten_lines =
              Lwt_stream.map
@@ -690,7 +715,10 @@ module Proxy = struct
                   ~published_level)
                lines
            in
-           let rewritten_body = Cohttp_lwt.Body.of_stream rewritten_lines in
+           let rewritten_stream =
+             Lwt_stream.append backfill_stream rewritten_lines
+           in
+           let rewritten_body = Cohttp_lwt.Body.of_stream rewritten_stream in
            return (Some (`Stream rewritten_body))));
       (let path =
          Re.Str.regexp
