@@ -168,6 +168,8 @@ pub enum TransferError {
     EmptyImplicitTransfer,
     #[error("Gas exhaustion")]
     OutOfGas,
+    #[error("Unexpected deposit error: {0}")]
+    DepositError(String),
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader)]

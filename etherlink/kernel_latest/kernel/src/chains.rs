@@ -690,7 +690,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 }
                 TezlinkContent::Deposit(deposit) => {
                     log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
-                    execute_tezlink_deposit(host, &context, &deposit)?;
+                    let _deposit_result =
+                        execute_tezlink_deposit(host, &context, &deposit)?;
                     included_delayed_transactions.push(operation.tx_hash);
                 }
             };
