@@ -750,6 +750,96 @@ let register_chain_services ~l2_chain_id
              ( true,
                Tezos_shell_services.Chain_validator_worker_state.Synchronised
                  {is_chain_stuck = false} ))
+    |> register
+         ~service:Tezos_services.block_list
+         ~impl:(fun chain list_arg () ->
+           let open Lwt_result_syntax in
+           let*? chain = check_chain chain in
+           let length = Option.value list_arg#length ~default:1 in
+
+           let block_fitness (block : L2_types.Tezos_block.t) =
+             let round = Tezlink_imports.Imported_protocol.Round_repr.zero in
+             Tezlink_constants.fitness
+               ~level:block.level
+               ~predecessor_round:round
+               ~round
+           in
+
+           let block_of_hash_opt hash =
+             let open Lwt_syntax in
+             let* res =
+               Backend.block
+                 chain
+                 (`Hash (tezos_to_ethereum_block_hash hash, 0l))
+             in
+             match res with
+             | Ok block -> return (Ok (Some block))
+             | Error _ -> return (Ok None)
+           in
+
+           let* requested_blocks =
+             match list_arg#heads with
+             | [] ->
+                 let* head = Backend.block chain (`Head 0l) in
+                 return [head]
+             | heads ->
+                 let* blocks = List.filter_map_es block_of_hash_opt heads in
+                 let blocks =
+                   match list_arg#min_date with
+                   | None -> blocks
+                   | Some min_date ->
+                       List.filter
+                         (fun (block : L2_types.Tezos_block.t) ->
+                           Time.Protocol.(min_date <= block.timestamp))
+                         blocks
+                 in
+                 let sorted_blocks =
+                   List.sort
+                     (fun b1 b2 ->
+                       ~-(Fitness.compare (block_fitness b1) (block_fitness b2)))
+                     blocks
+                 in
+                 return sorted_blocks
+           in
+
+           let rec predecessors ignored remaining
+               (block : L2_types.Tezos_block.t) acc =
+             if remaining <= 0 then return (List.rev acc)
+             else
+               let*? current_hash = ethereum_to_tezos_block_hash block.hash in
+               if block.parent_hash = L2_types.Tezos_block.genesis_parent_hash
+               then return (List.rev acc)
+               else if Block_hash.Set.mem current_hash ignored then
+                 return (List.rev acc)
+               else
+                 let* parent =
+                   Backend.block chain (`Hash (block.parent_hash, 0l))
+                 in
+                 let*? parent_hash = ethereum_to_tezos_block_hash parent.hash in
+                 predecessors ignored (remaining - 1) parent (parent_hash :: acc)
+           in
+
+           let* _, chains =
+             List.fold_left_es
+               (fun (ignored, acc) (head_block : L2_types.Tezos_block.t) ->
+                 let*? head_hash =
+                   ethereum_to_tezos_block_hash head_block.hash
+                 in
+                 let* chain =
+                   predecessors ignored (length - 1) head_block [head_hash]
+                 in
+                 let ignored =
+                   List.fold_left
+                     (fun acc hash -> Block_hash.Set.add hash acc)
+                     ignored
+                     chain
+                 in
+                 return (ignored, chain :: acc))
+               (Block_hash.Set.empty, [])
+               requested_blocks
+           in
+
+           return (List.rev chains))
     |> Tezos_rpc.Directory.map (fun ((), chain) -> Lwt.return chain)
   in
   Tezos_rpc.Directory.merge
