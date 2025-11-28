@@ -27,8 +27,6 @@ module Assert = Assert
 open Tezos_protocol_alpha
 open Protocol
 open Alpha_context
-open Tezos_context
-open Tezos_shell_context
 
 module Proto_nonce = struct
   module Table = Hashtbl.Make (struct
@@ -589,9 +587,11 @@ let apply pred_resulting_ctxt chain_id ~policy ?(operations = empty_operations)
          validation.max_operations_ttl)
   in
   let validation = {validation with max_operations_ttl} in
-  let context = Shell_context.unwrap_disk_context validation.context in
   let*! resulting_context_hash =
-    Context.commit ~time:shell.timestamp ?message:validation.message context
+    Context_ops.commit
+      ~time:shell.timestamp
+      ?message:validation.message
+      validation.context
   in
   let block_header_metadata =
     Data_encoding.Binary.to_bytes_exn
