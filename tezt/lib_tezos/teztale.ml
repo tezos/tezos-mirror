@@ -52,6 +52,7 @@ module Server = struct
     let pp_interface fmt {address; port} =
       Format.fprintf fmt {|{"address": "%s", "port": %d}|} address port
     in
+    let max_batch_size = Int32.max_int in
     let pp_public_directory fmt public_directory =
       match public_directory with
       | None -> Format.fprintf fmt ""
@@ -67,6 +68,7 @@ module Server = struct
   "interfaces": [%a],
   "users": [%a],
   "admins": [%a],
+  "max_batch_size": %ld,
   "with_transaction": "FULL",
   "verbosity": "INFO"%a
 }|}
@@ -77,6 +79,7 @@ module Server = struct
         conf.users
         pp_login
         conf.admin
+        max_batch_size
         pp_public_directory
         conf.public_directory
     in
