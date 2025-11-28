@@ -70,6 +70,11 @@ packages() {
     fi
   done
 
+  # on the CI cleanup everything before building the packages
+  if [ -z "${CI:-}" ]; then
+    make clean
+  fi
+
   cp -a "$packaging_dir/scripts/packaging/octez/manpages/" "$SPECS_DIR/"
   cp -a "$packaging_dir/scripts/packaging/octez/scripts/" "$SPECS_DIR/"
   "$SPECS_DIR/"binaries/octez-node --help=groff > \
