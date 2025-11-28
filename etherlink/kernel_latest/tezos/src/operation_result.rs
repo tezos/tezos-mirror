@@ -425,10 +425,8 @@ pub struct TransferSuccess {
     pub storage: Option<Vec<u8>>,
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
-    // TODO: Placeholder for ticket receipt issue : #8018
     #[encoding(dynamic, bytes)]
     pub ticket_receipt: Vec<u8>,
-    // TODO: Placeholder for originated contracts issue : #8018
     #[encoding(dynamic, bytes)]
     pub originated_contracts: Vec<u8>,
     pub consumed_milligas: Narith,
@@ -531,7 +529,6 @@ pub struct OperationResult<M: OperationKind> {
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
     pub result: ContentResult<M>,
-    //TODO Placeholder for internal operations : #8018
     #[encoding(dynamic, list)]
     pub internal_operation_results: Vec<InternalOperationSum>,
 }
