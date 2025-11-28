@@ -17,6 +17,17 @@ Environment Version
 Smart Rollups
 -------------
 
+Consensus
+----------
+
+ - Implemented a new algorithm for the baker selection. The current Alias 
+   method is used to determine the validator that should bake a block
+   for a given level and round. After the feature flag ``swrr_new_baker_lottery_enable``
+   is activated, the selection would use SWRR (Smooth Weighted Round Robin), 
+   which is a deterministic method to distribute the round 0 of all the levels 
+   for a given cycle. The higher rounds are then using a shifted version of this list. 
+   This method still remains proportional to the stake of the baker, and aims to 
+   reduce variability of block distribution, especially for small bakers. (MR :gl:`!20084`)
 
 Data Availability Layer
 -----------------------
