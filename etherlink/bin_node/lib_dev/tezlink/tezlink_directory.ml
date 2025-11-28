@@ -526,6 +526,21 @@ let build_block_static_directory ~l2_chain_id
              manager_operation_hashes;
            ])
   |> register
+       ~service:Tezos_services.operation_hashes_in_pass
+       ~impl:(fun ({chain; block}, list_offset) () () ->
+         if list_offset <> Imported_protocol.Operation_repr.manager_pass
+         (* All tezlink operations are manager operations *)
+         then return_nil
+         else
+           let*? chain = check_chain chain in
+           let*? block = check_block block in
+           let* block = Backend.block chain block in
+           let*? operations =
+             Tezos_services.Current_block_services.deserialize_operations_header
+               block.operations
+           in
+           return (List.map (fun (hash, _, _) -> hash) operations))
+  |> register
        ~service:Tezos_services.operations
        ~impl:(fun {chain; block} o () ->
          let*? chain = check_chain chain in
