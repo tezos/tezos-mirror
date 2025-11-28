@@ -66,7 +66,7 @@ packages() {
   EXECUTABLES=$(cat script-inputs/*-executables)
   for ex in $EXECUTABLES; do
     if [ -f "$ex" ]; then
-      cp -f "$ex" "$BINARIES"
+      mv -f "$ex" "$BINARIES"
     fi
   done
 
