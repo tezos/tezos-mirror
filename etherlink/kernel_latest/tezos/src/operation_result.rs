@@ -767,7 +767,9 @@ impl BinWriter for OperationWithMetadata {
 mod tests {
     use super::*;
     use crate::encoding_test_data_helper::test_helpers::fetch_generated_data;
-    use crate::operation::{ManagerOperation, OriginationContent, TransferContent};
+    use crate::operation::{
+        ManagerOperation, OriginationContent, Parameters, TransferContent,
+    };
     use pretty_assertions::assert_eq;
 
     fn dummy_failed_operation() -> OperationDataAndMetadata {
@@ -784,7 +786,7 @@ mod tests {
                                 operation: TransferContent {
                                     amount: 27942405962072064.into(),
                                     destination: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
-                                    parameters: None,
+                                    parameters: Parameters::default(),
                                 }
                             }),
                         receipt: OperationResultSum::Transfer(
@@ -829,7 +831,7 @@ mod tests {
                         content: ManagerOperationContent::Transaction(ManagerOperation { source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(), fee: 468.into(), counter: 1.into(), gas_limit: 2169.into(), storage_limit: 0.into(), operation: TransferContent {
                             amount: 42000000.into(),
                             destination: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
-                            parameters: None,
+                            parameters: Parameters::default(),
                         } }),
                         receipt: OperationResultSum::Transfer(OperationResult { balance_updates: vec![], result: ContentResult::Applied(
                             TransferTarget::ToContrat(
@@ -966,7 +968,7 @@ mod tests {
                     "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
                 )
                 .unwrap(),
-                parameters: None,
+                parameters: Parameters::default(),
             },
             sender: Contract::from_b58check("tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb")
                 .unwrap(),
@@ -1021,7 +1023,7 @@ mod tests {
                     "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
                 )
                 .unwrap(),
-                parameters: None,
+                parameters: Parameters::default(),
             },
             sender: Contract::from_b58check("tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb")
                 .unwrap(),

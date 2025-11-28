@@ -741,7 +741,7 @@ mod tests {
         source: Bootstrap,
         amount: Narith,
         destination: Contract,
-        parameters: Option<Parameters>,
+        parameters: Parameters,
     ) -> Operation {
         make_operation(
             fee,
@@ -1204,7 +1204,7 @@ mod tests {
             boostrap1,
             35_u64.into(),
             bootstrap2_contract,
-            None,
+            Parameters::default(),
         );
 
         // Bootstrap 1 reveals its manager and then
@@ -1321,7 +1321,7 @@ mod tests {
             boostrap1,
             0.into(),
             generated_contract.clone(),
-            None,
+            Parameters::default(),
         );
 
         let timestamp_of_call = 10i64;

@@ -5,7 +5,6 @@
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::enc_wrappers::{BlockHash, OperationHash};
-use mir::ast::michelson_address::Entrypoint;
 use primitive_types::H256;
 use rlp::Decodable;
 use tezos_crypto_rs::blake2b::digest_256;
@@ -15,32 +14,21 @@ use tezos_data_encoding::{
     enc::{BinError, BinWriter},
     nom::NomReader,
 };
-use tezos_protocol::contract::Contract;
+pub use tezos_protocol::operation::{
+    Parameters,
+    // Transfers are often called "transactions" in the protocol, we try
+    // to consistently call them transfers to avoid confusion with the
+    // Ethereum notion of transaction which is more generic as it also
+    // encompasses the case of originations.
+    TransactionContent as TransferContent,
+};
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use thiserror::Error;
-
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct Parameters {
-    pub entrypoint: Entrypoint,
-    #[encoding(dynamic, bytes)]
-    pub value: Vec<u8>,
-}
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct RevealContent {
     pub pk: PublicKey,
     pub proof: Option<BlsSignature>,
-}
-
-/// Transfers are often called "transactions" in the protocol, we try
-/// to consistently call them transfers to avoid confusion with the
-/// Ethereum notion of transaction which is more generic as it also
-/// encompasses the case of originations.
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct TransferContent {
-    pub amount: Narith,
-    pub destination: Contract,
-    pub parameters: Option<Parameters>,
 }
 
 // Original code is from sdk/rust/protocol/src/operation.rs
@@ -344,6 +332,7 @@ mod tests {
         encoding_test_data_helper::test_helpers::fetch_generated_data,
         operation::make_dummy_reveal_operation,
     };
+    use mir::ast::michelson_address::Entrypoint;
     use pretty_assertions::assert_eq;
     use primitive_types::H256;
     use rlp::{Decodable, Rlp, RlpStream};
@@ -446,7 +435,7 @@ mod tests {
                         "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                     )
                     .unwrap(),
-                    parameters: None,
+                    parameters: Parameters::default(),
                 },
                 gas_limit: 9451117u64.into(),
                 storage_limit: 57024931117u64.into(),
@@ -525,10 +514,10 @@ mod tests {
                         "KT1DieU51jzXLerQx5AqMCiLC1SsCeM8yRat",
                     )
                     .unwrap(),
-                    parameters: Some(Parameters {
+                    parameters: Parameters {
                         entrypoint: Entrypoint::try_from("action").unwrap(),
                         value: vec![0x02, 0x00, 0x00, 0x00, 0x02, 0x03, 0x4f],
-                    }),
+                    },
                 },
                 gas_limit: 9451117u64.into(),
                 storage_limit: 57024931117u64.into(),
@@ -607,7 +596,7 @@ mod tests {
                             "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                         )
                         .unwrap(),
-                        parameters: None,
+                        parameters: Parameters::default(),
                     },
                     gas_limit: 2101_u64.into(),
                     storage_limit: 0_u64.into(),
