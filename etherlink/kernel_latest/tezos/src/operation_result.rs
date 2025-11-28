@@ -565,6 +565,25 @@ pub enum InternalOperationSum {
     Origination(InternalContentWithMetadata<OriginationContent>),
 }
 
+impl BalanceUpdate {
+    pub fn transfer(sender: Contract, destination: Contract, amount: u64) -> Vec<Self> {
+        let sender = Balance::Account(sender);
+        let destination = Balance::Account(destination);
+
+        let sender_update = Self {
+            balance: sender,
+            changes: -(amount as i64),
+            update_origin: UpdateOrigin::BlockApplication,
+        };
+        let destination_update = Self {
+            balance: destination,
+            changes: amount as i64,
+            update_origin: UpdateOrigin::BlockApplication,
+        };
+        vec![sender_update, destination_update]
+    }
+}
+
 impl InternalOperationSum {
     pub fn transform_result_backtrack(&mut self) {
         match self {
