@@ -90,4 +90,20 @@ let select_bakers_at_cycle_end ctxt ~target_cycle =
   in
   return ctxt
 
-let get_baker _ _ _ = assert false (* TO DO *)
+let get_baker ctxt level round =
+  let open Lwt_result_syntax in
+  let cycle = level.Level_repr.cycle in
+  let pos = level.Level_repr.cycle_position in
+  let*? round_int = Round_repr.to_int round in
+
+  let* selected_bakers = Storage.Stake.Selected_bakers.get ctxt cycle in
+  let len = List.length selected_bakers in
+  let idx = (Int32.to_int pos + (3 * round_int)) mod len in
+
+  match List.nth_opt selected_bakers idx with
+  | None ->
+      assert
+        false (* should not happen if select_bakers_at_cycle_end is correct *)
+  | Some pkh ->
+      let* pk = Delegate_consensus_key.active_pubkey ctxt pkh in
+      return (ctxt, pk)
