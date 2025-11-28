@@ -11,7 +11,7 @@ use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::{
-    host::ValueType,
+    host::{RuntimeError, ValueType},
     types::{PublicKey, PublicKeyHash},
 };
 use tezos_smart_rollup_host::path::{concat, OwnedPath};
@@ -66,6 +66,25 @@ pub trait TezlinkAccount {
     ) -> Result<(), tezos_storage::error::Error> {
         let path = context::account::balance_path(self)?;
         store_bin(balance, host, &path)
+    }
+
+    /// Add amount (in Mutez) to the **balance** held by the account.
+    fn add_balance(
+        &self,
+        host: &mut impl Runtime,
+        amount: u64,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = context::account::balance_path(self)?;
+        let balance: Narith = match read_nom_value(host, &path) {
+            Ok(balance) => balance,
+            Err(tezos_storage::error::Error::Runtime(RuntimeError::PathNotFound)) => {
+                0.into()
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        };
+        self.set_balance(host, &Narith(balance.0 + amount))
     }
 }
 

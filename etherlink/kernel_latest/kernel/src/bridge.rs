@@ -18,7 +18,6 @@ use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
-use tezos_data_encoding::types::Narith;
 use tezos_ethereum::rlp_helpers::{decode_field_u256_le, decode_option_explicit};
 use tezos_ethereum::wei::mutez_from_wei;
 use tezos_ethereum::{
@@ -424,12 +423,10 @@ pub fn execute_tezlink_deposit<Host: Runtime>(
     let contract = deposit.receiver.to_contract()?;
     let to_account = TezlinkImplicitAccount::from_contract(context, &contract)
         .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-    let balance = to_account
-        .balance(host)
-        .map_err(|_| TransferError::FailedToFetchDestinationBalance)?;
     let amount = mutez_from_wei(deposit.amount)
         .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
-    let outcome = match to_account.set_balance(host, &Narith(balance.0 + amount)) {
+
+    let outcome = match to_account.add_balance(host, amount) {
         Ok(()) => true,
         Err(e) => {
             log!(host, Error, "Deposit failed because of {e}");
