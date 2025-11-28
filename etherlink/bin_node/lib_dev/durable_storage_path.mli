@@ -50,9 +50,14 @@ val sequencer_key : path
 
 val maximum_gas_per_transaction : path
 
-(** Kernel communication canal for individual transaction execution *)
+(** Kernel communication canal for individual transaction execution (instant confirmations) *)
 module Single_tx : sig
   val input_tx : path
+end
+
+(** Kernel communication canal for block assembling (instant confirmations) *)
+module Assemble_block : sig
+  val input : path
 end
 
 (** Paths related to accounts. *)

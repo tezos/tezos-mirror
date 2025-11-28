@@ -121,6 +121,24 @@ val apply_unsigned_chunks :
   Sequencer_blueprint.unsigned_chunked_blueprint ->
   apply_result tzresult Lwt.t
 
+(** [assemble_block ~pool ~data_dir ~chain_family ~config ~timestamp ~number
+    ~native_execution t]
+    builds an L2 block at height [number] and [timestamp] from the transactions
+    previously accumulated in durable storage by the kernel instant-confirmation
+    execution. No blueprint application is (re)performed; the function only
+    assembles the block from already recorded effects and returns the result
+    of this operation. *)
+val assemble_block :
+  pool:Lwt_domain.pool ->
+  data_dir:string ->
+  chain_family:'a L2_types.chain_family ->
+  config:Pvm_types.config ->
+  timestamp:Time.Protocol.t ->
+  number:Ethereum_types.quantity ->
+  native_execution:bool ->
+  t ->
+  apply_result tzresult Lwt.t
+
 (** [flag_local_exec evm_state] adds a flag telling the kernel it is executed
     by an EVM node, not a rollup node. *)
 val flag_local_exec : t -> t Lwt.t

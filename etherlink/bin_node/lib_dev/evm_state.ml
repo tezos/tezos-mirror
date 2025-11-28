@@ -348,6 +348,80 @@ type apply_result =
     }
   | Apply_failure
 
+let retrieve_block ~chain_family evm_state =
+  let open Lwt_result_syntax in
+  let root = Durable_storage_path.root_of_chain_family chain_family in
+  let* storage_version = storage_version evm_state in
+  if not (Storage_version.legacy_storage_compatible ~storage_version) then
+    let*! bytes =
+      inspect evm_state (Durable_storage_path.Block.current_block ~root)
+    in
+    return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
+  else
+    let* current_block_hash = current_block_hash ~chain_family evm_state in
+    let*! bytes =
+      inspect
+        evm_state
+        (Durable_storage_path.Block.by_hash ~root current_block_hash)
+    in
+    return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
+
+let assemble_block (type f) ~pool ~data_dir
+    ~(chain_family : f L2_types.chain_family) ~config ~timestamp ~number
+    ~native_execution evm_state =
+  let open Lwt_result_syntax in
+  let* () =
+    match chain_family with
+    | EVM -> return_unit
+    | Michelson ->
+        failwith "Assemble block is not supported for Michelson chain family"
+  in
+  let rlp =
+    Rlp.List
+      [
+        Value (Ethereum_types.timestamp_to_bytes timestamp);
+        Value (Ethereum_types.encode_u256_le number);
+      ]
+  in
+  let*! evm_state =
+    modify
+      ~key:Durable_storage_path.Assemble_block.input
+      ~value:(Rlp.encode rlp |> Bytes.to_string)
+      evm_state
+  in
+  let* evm_state =
+    execute
+      ~pool
+      ~native_execution
+      ~data_dir
+      ~config
+      ~wasm_entrypoint:"assemble_block"
+      evm_state
+      (`Inbox [])
+  in
+  let (Qty height) = number in
+  let before_height = Z.pred height in
+  let* block = retrieve_block ~chain_family evm_state in
+  match block with
+  | Some block ->
+      let (Qty after_height) = L2_types.block_number block in
+      if Z.(equal (succ before_height) after_height) then
+        return (Apply_success {evm_state; block})
+      else return Apply_failure
+  | None -> return Apply_failure
+
+let export_gas_used ~log_file ~data_dir
+    (block : legacy_transaction_object L2_types.block) =
+  let (Qty gas) =
+    match block with Eth {gasUsed; _} -> gasUsed | _ -> Qty.zero
+  in
+  let filename =
+    Filename.concat (kernel_logs_directory ~data_dir) (log_file ^ "_profile.csv")
+  in
+  let flags = Unix.[O_WRONLY; O_CREAT; O_APPEND] in
+  Lwt_io.with_file ~mode:Lwt_io.Output ~flags filename @@ fun oc ->
+  Lwt_io.fprintf oc "gas_used\n%Ld\n" (Z.to_int64 gas)
+
 let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
     ~chain_family ~config ~native_execution_policy evm_state
     (chunks : Sequencer_blueprint.unsigned_chunked_blueprint) =
@@ -373,44 +447,16 @@ let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
       evm_state
       `Skip_stage_one
   in
-  let root = Durable_storage_path.root_of_chain_family chain_family in
-  let* storage_version = storage_version evm_state in
-  let* block =
-    if not (Storage_version.legacy_storage_compatible ~storage_version) then
-      let*! bytes =
-        inspect evm_state (Durable_storage_path.Block.current_block ~root)
-      in
-      return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
-    else
-      let* current_block_hash = current_block_hash ~chain_family evm_state in
-      let*! bytes =
-        inspect
-          evm_state
-          (Durable_storage_path.Block.by_hash ~root current_block_hash)
-      in
-      return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
-  in
-
-  let export_gas_used (Qty gas) =
-    match (profile, log_file) with
-    | Some Configuration.Minimal, Some log_file ->
-        let filename =
-          Filename.concat
-            (kernel_logs_directory ~data_dir)
-            (log_file ^ "_profile.csv")
-        in
-        let flags = Unix.[O_WRONLY; O_CREAT; O_APPEND] in
-        Lwt_io.with_file ~mode:Lwt_io.Output ~flags filename @@ fun oc ->
-        Lwt_io.fprintf oc "gas_used\n%Ld\n" (Z.to_int64 gas)
-    | _ -> Lwt.return_unit
-  in
+  let* block = retrieve_block ~chain_family evm_state in
   match block with
   | Some block ->
       let (Qty after_height) = L2_types.block_number block in
-      let gas =
-        match block with Eth {gasUsed; _} -> gasUsed | _ -> Qty.zero
+      let*! () =
+        match (profile, log_file) with
+        | Some Configuration.Minimal, Some log_file ->
+            export_gas_used ~log_file ~data_dir block
+        | _ -> Lwt_syntax.return_unit
       in
-      let*! () = export_gas_used gas in
       if Z.(equal (succ before_height) after_height) then
         return (Apply_success {evm_state; block})
       else return Apply_failure
