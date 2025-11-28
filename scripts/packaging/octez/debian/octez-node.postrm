@@ -1,0 +1,66 @@
+#!/bin/sh
+
+set -e
+
+# Load debconf library
+# shellcheck disable=SC1091
+. /usr/share/debconf/confmodule
+
+# systemctl should not be called directly. use this
+# wrapper script if available
+debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
+
+if [ -e /etc/default/octez-node ]; then
+  . /etc/default/octez-node
+fi
+
+case "${1}" in
+remove)
+  # Clean up the temporary directory
+  echo "Octez node removed, the data and octez user are still intact"
+  echo "Purge the package to remove everything"
+  rm -Rf /run/octez-node
+  ;;
+purge)
+  # display a warning before proceding
+  db_get octez-node/purge_warning || true
+  case "$RET" in
+  true)
+    $debsystemctl stop octez-node.service || true
+    echo "Removing data and tezos user"
+    rm -Rf "$DATADIR"
+    deluser --quiet tezos || true
+    delgroup --quiet --only-if-empty tezos || true
+    rm -Rf /var/log/tezos
+    ;;
+  *)
+    $debsystemctl stop octez-node.service || true
+    echo "Keep user and datadir while $1"
+    ;;
+  esac
+  rm -Rf /run/octez-node
+
+  # Purge debconf data for the package in any case
+  # shellcheck disable=SC2119
+  db_purge || true
+  # Clean up the temporary directory
+  rm -f /run/octez-node
+  ;;
+upgrade)
+  # Check if the daemon was running before the upgrade
+  if [ -f /run/octez-node/daemon_was_running ]; then
+    # Start the daemon if it was running
+    $debsystemctl start octez-node.service
+
+    # Clean up the temporary file
+    rm -f /run/octez-node/daemon_was_running
+  fi
+  ;;
+failed-upgrade | abort-install | abort-upgrade | disappear) ;;
+*)
+  echo "postrm called with unknown argument \`$1'" >&2
+  exit 1
+  ;;
+esac
+
+#DEBHELPER#
