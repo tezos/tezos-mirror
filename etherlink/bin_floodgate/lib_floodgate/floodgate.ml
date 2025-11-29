@@ -73,18 +73,16 @@ module State = struct
     transactions_count := 0 ;
     let* () = Lwt_unix.sleep elapsed_time in
     let stop = Time.System.now () in
-    let* () =
-      Floodgate_events.measured_tps !transactions_count (Ptime.diff stop start)
-    in
+    let transactions = !transactions_count in
+    let diff = Ptime.diff stop start in
+    let* () = Floodgate_events.measured_tps transactions diff in
     let* () =
       match !dummy_data_size with
       | None -> Lwt.return_unit
       | Some dummy_data_size ->
-          let dummy_data_size_sent = !transactions_count * dummy_data_size in
+          let dummy_data_size_sent = transactions * dummy_data_size in
           let dummy_data_size_sent_kb = dummy_data_size_sent / 1000 in
-          Floodgate_events.measured_dps
-            dummy_data_size_sent_kb
-            (Ptime.diff stop start)
+          Floodgate_events.measured_dps dummy_data_size_sent_kb diff
     in
     report ~elapsed_time
 end
