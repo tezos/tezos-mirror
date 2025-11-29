@@ -60,18 +60,22 @@ let send_transaction_and_wait ~infos ~gas_limit ~from ~to_ ~value =
   in
   result
 
-let transactions_count = ref 0
+module State = struct
+  let transactions_count = ref 0
 
-let rec report_tps ~elapsed_time =
-  let open Lwt_syntax in
-  let start = Time.System.now () in
-  transactions_count := 0 ;
-  let* () = Lwt_unix.sleep elapsed_time in
-  let stop = Time.System.now () in
-  let* () =
-    Floodgate_events.measured_tps !transactions_count (Ptime.diff stop start)
-  in
-  report_tps ~elapsed_time
+  let incr_transactions_count n = transactions_count := !transactions_count + n
+
+  let rec report_tps ~elapsed_time =
+    let open Lwt_syntax in
+    let start = Time.System.now () in
+    transactions_count := 0 ;
+    let* () = Lwt_unix.sleep elapsed_time in
+    let stop = Time.System.now () in
+    let* () =
+      Floodgate_events.measured_tps !transactions_count (Ptime.diff stop start)
+    in
+    report_tps ~elapsed_time
+end
 
 let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
     ~retry_attempt =
@@ -378,7 +382,7 @@ let start_new_head_monitor ~ws_uri =
       in
       match block.Ethereum_types.transactions with
       | TxHash hashes ->
-          transactions_count := !transactions_count + List.length hashes ;
+          State.incr_transactions_count (List.length hashes) ;
           List.iter_es Tx_queue.confirm hashes
       | TxFull _ -> return_unit)
     heads_subscription.stream
@@ -411,7 +415,7 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
       let* () =
         match Blueprint_decoder.transaction_hashes blueprint with
         | Ok hashes ->
-            transactions_count := !transactions_count + List.length hashes ;
+            State.incr_transactions_count (List.length hashes) ;
             List.iter_es Tx_queue.confirm hashes
         | Error _ -> return_unit
       in
@@ -482,5 +486,5 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
         (Seq.ints 0 |> Stdlib.Seq.take max_active_eoa)
     in
     Lwt_result.ok (Floodgate_events.setup_completed ())
-  and* () = report_tps ~elapsed_time:elapsed_time_between_report in
+  and* () = State.report_tps ~elapsed_time:elapsed_time_between_report in
   return_unit
