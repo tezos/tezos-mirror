@@ -65,7 +65,7 @@ module State = struct
 
   let incr_transactions_count n = transactions_count := !transactions_count + n
 
-  let rec report_tps ~elapsed_time =
+  let rec report ~elapsed_time =
     let open Lwt_syntax in
     let start = Time.System.now () in
     transactions_count := 0 ;
@@ -74,7 +74,7 @@ module State = struct
     let* () =
       Floodgate_events.measured_tps !transactions_count (Ptime.diff stop start)
     in
-    report_tps ~elapsed_time
+    report ~elapsed_time
 end
 
 let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
@@ -486,5 +486,5 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
         (Seq.ints 0 |> Stdlib.Seq.take max_active_eoa)
     in
     Lwt_result.ok (Floodgate_events.setup_completed ())
-  and* () = State.report_tps ~elapsed_time:elapsed_time_between_report in
+  and* () = State.report ~elapsed_time:elapsed_time_between_report in
   return_unit
