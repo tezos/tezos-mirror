@@ -63,6 +63,8 @@ let send_transaction_and_wait ~infos ~gas_limit ~from ~to_ ~value =
 module State = struct
   let transactions_count = ref 0
 
+  let dummy_data_size = ref None
+
   let incr_transactions_count n = transactions_count := !transactions_count + n
 
   let rec report ~elapsed_time =
@@ -73,6 +75,16 @@ module State = struct
     let stop = Time.System.now () in
     let* () =
       Floodgate_events.measured_tps !transactions_count (Ptime.diff stop start)
+    in
+    let* () =
+      match !dummy_data_size with
+      | None -> Lwt.return_unit
+      | Some dummy_data_size ->
+          let dummy_data_size_sent = !transactions_count * dummy_data_size in
+          let dummy_data_size_sent_kb = dummy_data_size_sent / 1000 in
+          Floodgate_events.measured_dps
+            dummy_data_size_sent_kb
+            (Ptime.diff stop start)
     in
     report ~elapsed_time
 end
@@ -431,6 +443,7 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
     ~spawn_interval ~tick_interval ~base_fee_factor ~initial_balance
     ~txs_per_salvo ~elapsed_time_between_report ~dummy_data_size ~retry_attempt
     =
+  State.dummy_data_size := dummy_data_size ;
   let open Lwt_result_syntax in
   let* controller =
     controller_from_signer
