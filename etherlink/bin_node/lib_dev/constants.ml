@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -27,7 +28,14 @@ let network_of_address addr =
   | "sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg" -> Some Shadownet
   | _ -> None
 
-type kernel = Bifrost | Calypso | Calypso2 | Dionysus | DionysusR1 | Ebisu
+type kernel =
+  | Bifrost
+  | Calypso
+  | Calypso2
+  | Dionysus
+  | DionysusR1
+  | Ebisu
+  | Farfadet
 
 let kernel_from_string = function
   | "bifrost" -> Some Bifrost
@@ -36,6 +44,7 @@ let kernel_from_string = function
   | "dionysus" -> Some Dionysus
   | "dionysus-r1" -> Some DionysusR1
   | "ebisu" -> Some Ebisu
+  | "farfadet" -> Some Farfadet
   | _ -> None
 
 let root_hash_from_kernel = function
@@ -51,3 +60,5 @@ let root_hash_from_kernel = function
       `Hex "0001010d789e7cccc25c785cf73a658574ed0995ef36b8416a46ab0ddc6b058b39"
   | Ebisu ->
       `Hex "00fea18ffecd0563f942b8b4c67911302754d7e505b5b5672ff03cb927b79ba830"
+  | Farfadet ->
+      `Hex "0079e0f348b608ce486c9e5e1fdf84b650019922bf3383b562522c2c8f60a098da"
