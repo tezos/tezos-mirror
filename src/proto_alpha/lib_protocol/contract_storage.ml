@@ -582,13 +582,14 @@ let get_script c contract_hash =
   match (code, storage) with
   | None, None -> return (c, None)
   | Some code, Some storage ->
-      return (c, Some (Contract_repr.Script {Script_repr.code; storage}))
+      return (c, Some (Contract_kind_repr.Script {Script_repr.code; storage}))
   | None, Some storage -> (
       let* c, native_kind = Storage.Contract.Native.find c contract in
       match native_kind with
       | None -> return (c, None)
       | Some native_kind ->
-          return (c, Some (Contract_repr.Native {kind = native_kind; storage})))
+          return
+            (c, Some (Contract_kind_repr.Native {kind = native_kind; storage})))
   (* A contract without storage is an illformed contract. *)
   | Some _, None -> failwith "get_script"
 

@@ -374,29 +374,14 @@ module Script = struct
     storage : lazy_expr;
   }
 
-  type t = Contract_repr.originated_kind =
+  type t = Contract_kind_repr.originated_kind =
     | Script of michelson_with_storage
     | Native of native_with_storage
 
-  let michelson_with_storage_encoding = Script_repr.encoding
+  let michelson_with_storage_encoding =
+    Contract_kind_repr.michelson_with_storage_encoding
 
-  let encoding =
-    let open Data_encoding in
-    union
-      [
-        case
-          ~title:"michelson"
-          (Tag 0)
-          michelson_with_storage_encoding
-          (function Script m -> Some m | Native _ -> None)
-          (fun m -> Script m);
-        case
-          ~title:"native"
-          (Tag 1)
-          Script_native_repr.with_storage_encoding
-          (function Native n -> Some n | Script _ -> None)
-          (fun n -> Native n);
-      ]
+  let encoding = Contract_kind_repr.with_storage_encoding
 
   type consume_deserialization_gas = Always | When_needed
 
