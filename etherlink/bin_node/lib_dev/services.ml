@@ -338,18 +338,20 @@ let eth_subscribe_direct ~(kind : Ethereum_types.Subscription.kind)
         let stream =
           Lwt_stream.filter_map
             (function
-              | Broadcast.Included_transaction (Broadcast.Common (Evm raw)) -> (
-                  let res = Transaction_object.decode raw in
-                  match res with
-                  | Ok txn ->
-                      Some
-                        (Ethereum_types.Subscription.NewIncludedTransactions txn)
-                  | Error _ -> None)
-              | Broadcast.Included_transaction
-                  (Broadcast.Common (Michelson _raw)) ->
-                  (* TODO: L2-586
-                     include tezlink transaction in preconfirmation stream *)
-                  None
+              | Broadcast.Included_transaction {tx; hash = _} -> (
+                  match tx with
+                  | Common (Broadcast.Evm raw) -> (
+                      let res = Transaction_object.decode raw in
+                      match res with
+                      | Ok txn ->
+                          Some
+                            (Ethereum_types.Subscription.NewIncludedTransactions
+                               txn)
+                      | Error _ -> None)
+                  | Common (Broadcast.Michelson _raw) ->
+                      (* TODO: L2-586 include tezlink transaction in preconfirmation stream *)
+                      None
+                  | _ -> None)
               | _ -> None)
             stream
         in

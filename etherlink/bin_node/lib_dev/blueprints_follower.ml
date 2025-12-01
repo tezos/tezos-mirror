@@ -24,7 +24,8 @@ type finalized_levels_handler =
 type next_block_info_handler =
   Time.Protocol.t -> Ethereum_types.quantity -> unit tzresult Lwt.t
 
-type inclusion_handler = Broadcast.transaction -> unit tzresult Lwt.t
+type inclusion_handler =
+  Broadcast.transaction -> Ethereum_types.hash -> unit tzresult Lwt.t
 
 type parameters = {
   on_new_blueprint : new_blueprint_handler;
@@ -340,10 +341,10 @@ and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
         (Qty next_blueprint_number)
         params
         monitor
-  | Ok (Some (Included_transaction tx)) ->
+  | Ok (Some (Included_transaction {tx; hash})) ->
       let* () =
         if sbl_callbacks_activated.sbl_callbacks_activated then
-          params.on_inclusion tx
+          params.on_inclusion tx hash
         else
           let*! () = Events.ignored_preconfirmations () in
           return_unit

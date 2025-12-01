@@ -69,7 +69,7 @@ type message =
       timestamp : Time.Protocol.t;
       number : Ethereum_types.quantity;
     }
-  | Included_transaction of transaction
+  | Included_transaction of {tx : transaction; hash : Ethereum_types.hash}
 
 let message_encoding =
   let open Data_encoding in
@@ -122,11 +122,13 @@ let message_encoding =
       case
         ~title:"Included_transaction"
         (Tag 4)
-        (obj2
+        (obj3
            (req "kind" (constant "included_transaction"))
-           (req "transaction" transaction_encoding))
-        (function Included_transaction txn -> Some ((), txn) | _ -> None)
-        (fun ((), txn) -> Included_transaction txn);
+           (req "transaction" transaction_encoding)
+           (req "hash" Ethereum_types.hash_encoding))
+        (function
+          | Included_transaction {tx; hash} -> Some ((), tx, hash) | _ -> None)
+        (fun ((), tx, hash) -> Included_transaction {tx; hash});
     ]
 
 (** Stream on which all messages are broadcasted *)
@@ -146,8 +148,8 @@ let notify_finalized_levels ~l1_level ~start_l2_level ~end_l2_level =
 let notify_next_block_info timestamp number =
   Lwt_watcher.notify message_watcher (Next_block_info {timestamp; number})
 
-let notify_inclusion txn =
-  Lwt_watcher.notify message_watcher (Included_transaction txn)
+let notify_inclusion tx hash =
+  Lwt_watcher.notify message_watcher (Included_transaction {tx; hash})
 
 (** Stream on which only pre-confirmed receipts are streamed  *)
 let receipt_watcher : Transaction_receipt.t Lwt_watcher.input =

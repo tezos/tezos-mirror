@@ -582,7 +582,7 @@ let preconfirm_delayed_transactions ~(state : Types.state)
         let* tx =
           Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash
         in
-        Broadcast.notify_inclusion (Delayed tx) ;
+        Broadcast.notify_inclusion (Delayed tx) delayed_hash ;
         return tx)
       delayed_hashes
   in
@@ -637,7 +637,7 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
     match res with
     | `Drop -> (validation_state, (rev_txns, hash :: rev_accepted_hashes))
     | `Keep latest_validation_state ->
-        Broadcast.notify_inclusion (Common wrapped_raw) ;
+        Broadcast.notify_inclusion (Common wrapped_raw) hash ;
         ( latest_validation_state,
           (entry :: rev_txns, hash :: rev_accepted_hashes) )
     | `Stop -> (validation_state, (rev_txns, rev_accepted_hashes))

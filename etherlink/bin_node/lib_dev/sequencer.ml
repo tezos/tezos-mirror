@@ -136,7 +136,7 @@ let loop_sequencer (type f) multichain
         ~on_finalized_levels:(fun
             ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ -> return_unit)
         ~on_next_block_info:(fun _ _ -> return_unit)
-        ~on_inclusion:(fun _ -> return_unit)
+        ~on_inclusion:(fun _ _ -> return_unit)
         ()
   | _ -> (
       match time_between_blocks with
