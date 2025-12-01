@@ -240,6 +240,14 @@ let cycle_end ctxt last_cycle =
   in
   (* Deactivating delegates which didn't participate to consensus for too long *)
   let* ctxt, deactivated_delegates = update_activity ctxt last_cycle in
+  (* Reset SWRR credits for delegates that have been deactivated *)
+  let* ctxt =
+    if Constants_storage.swrr_new_baker_lottery_enable ctxt then
+      Swrr_sampler.reset_credit_for_deactivated_delegates
+        ctxt
+        deactivated_delegates
+    else return ctxt
+  in
   (* Computing future staking rights *)
   let* ctxt =
     Delegate_sampler.select_new_distribution_at_cycle_end ctxt ~new_cycle

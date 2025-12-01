@@ -107,3 +107,17 @@ let get_baker ctxt level round =
   | Some pkh ->
       let* pk = Delegate_consensus_key.active_pubkey ctxt pkh in
       return (ctxt, pk)
+
+let reset_credit_for_deactivated_delegates ctxt deactivated_delegates =
+  let open Lwt_result_syntax in
+  let*! ctxt =
+    List.fold_left_s
+      (fun ctxt pkh ->
+        Storage.Contract.SWRR_credit.add
+          ctxt
+          (Contract_repr.Implicit pkh)
+          Z.zero)
+      ctxt
+      deactivated_delegates
+  in
+  return ctxt

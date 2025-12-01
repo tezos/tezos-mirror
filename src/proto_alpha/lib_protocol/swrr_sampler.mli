@@ -16,3 +16,8 @@ val get_baker :
   Level_repr.t ->
   Round_repr.round ->
   (Raw_context.t * Delegate_consensus_key.pk) tzresult Lwt.t
+
+val reset_credit_for_deactivated_delegates :
+  Raw_context.t ->
+  Signature.Public_key_hash.t list ->
+  Raw_context.t tzresult Lwt.t
