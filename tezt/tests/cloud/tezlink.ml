@@ -110,6 +110,26 @@ let make_proxy agent ~path ~dns_domain public_port activate_ssl =
           activate_ssl;
         }
 
+type sequencer_endpoint =
+  | Internal of proxy_info
+  | External of string (* the address of the end-point *)
+
+(* The internal end-point if the sequencer node is local to the scenario.
+   Otherwise, i.e. when the scenario relies on an external end-point, return the
+   latter. *)
+let sequencer_internal_endpoint = function
+  | Internal proxy_info ->
+      proxy_internal_endpoint proxy_info |> Client.string_of_endpoint
+  | External endpoint -> endpoint
+
+(* The exposed end-point if the sequencer node is local to the scenario.
+   Otherwise, i.e. when the scenario relies on an external end-point, return the
+   latter. *)
+let sequencer_external_endpoint ~runner = function
+  | Internal proxy_info ->
+      proxy_external_endpoint ~runner proxy_info |> Client.string_of_endpoint
+  | External endpoint -> endpoint
+
 module Tzkt_process = struct
   module Parameters = struct
     type persistent_state = unit
