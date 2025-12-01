@@ -222,8 +222,10 @@ let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
         ()
   | Some "irmin", None | None, Some Irmin | Some "irmin", Some Irmin ->
       init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ()
-  | Some "brassaia", None | None, Some Brassaia | Some "brassaia", Some Brassaia
-    -> (
+  | Some "brassaia", None
+  | None, Some Brassaia
+  | Some "brassaia", Some Brassaia
+  | None, None (* makes Brassaia the default context backend *) -> (
       match kind with
       | `Disk ->
           init
@@ -268,7 +270,11 @@ let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
         backend
         backend_variable
         backend_env_var
-  | _, None -> init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ()
+  | Some backend_env_var, None ->
+      failwith
+        "Unexpected %s value: expected irmin or brassaia, found %s"
+        backend_variable
+        backend_env_var
 
 let index (context : Environment_context.t) =
   match[@profiler.span_f {verbosity = Notice} ["context_ops"; "index"]]
@@ -1046,7 +1052,10 @@ module Upgrade = struct
     - Unifies all context directories ("context", "brassaia_context",
       "tezedge_context") in "context", fails on conflicts.
     - Adds a metadata.json file in the context directory to identify the context
-      backend *)
+    backend
+    - Default backend switch from irmin to brassaia
+    - Irmin nodes migrate to brassaia unless explicitely opted-out by running
+      with TEZOS_CONTEXT_BACKEND=irmin *)
   let v_3_3_upgrade ~data_dir =
     let open Lwt_result_syntax in
     let context_dir = context_dir data_dir in
@@ -1059,8 +1068,20 @@ module Upgrade = struct
     in
     match existing_dirs with
     | [] -> return_unit
-    | [dir] when dir = context_dir ->
-        Context_metadata.write_metadata_file dir Irmin
+    | [dir] when dir = context_dir -> (
+        (* migrate Irmin context to Brassaia unless explicitely opted-out *)
+        let backend_env_var =
+          Sys.getenv_opt backend_variable |> Option.map String.lowercase_ascii
+        in
+        match backend_env_var with
+        | Some "irmin" -> Context_metadata.write_metadata_file dir Irmin
+        | None | Some "brassaia" ->
+            Context_metadata.write_metadata_file dir Brassaia
+        | Some str ->
+            failwith
+              "Unexpected %s value: expected irmin or brassaia, found %s"
+              backend_variable
+              str)
     | [dir] (* when dir <> context_dir *) ->
         let* () =
           if dir = brassaia_dir then

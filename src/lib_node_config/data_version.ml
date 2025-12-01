@@ -83,7 +83,11 @@ end
  *  - 3.0     : change blocks' context hash semantics and introduce
                 context split (upgrade to irmin.3.5) -- v16.0
  *  - 3.1     : change encoding for block store status -- v21.0
- *  - 3.2     : update offset format for cemented files to 64-bit -- v22.0 *)
+ *  - 3.2     : update offset format for cemented files to 64-bit -- v22.0
+ *  - 3.3     : standardize context directories in `context`
+                introduce context metadata file
+                switch default context backend from irmin to brassaia -- v24.0
+ *)
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
    We should enable the semantic versioning instead of applying

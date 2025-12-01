@@ -46,6 +46,17 @@ Node
 - **Breaking change** ``validator.chain.block_info`` level is now ``Debug``
   (previously ``Info``) and is no longer output in daily-logs. (MR :gl:`!19720`)
 
+- Brassaia context backend is no longer experimental. (MR :gl:`!20079`)
+
+- A new store version (v3.3) is introduced. At node startup, an existing
+  ``data_dir`` containing a store with a supported version (v3.1 and v3.2) is
+  automatically upgraded to v3.3. (MR :gl:`!19967`)
+
+- **Breaking change** Brassaia becomes the default context backend. During the
+  v3.3 store upgrade, any store containing an Irmin context will automatically
+  migrate to Brassaia unless the user explicitly opts out using
+  ``TEZOS_CONTEXT_BACKEND=irmin``. (MR :gl:`!20079`)
+
 Client
 ------
 
