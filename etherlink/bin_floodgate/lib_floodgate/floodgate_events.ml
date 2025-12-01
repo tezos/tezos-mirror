@@ -154,6 +154,17 @@ let measured_tps =
     ("tps", Data_encoding.float)
     ("duration", Time.System.Span.encoding)
 
+let measured_dps =
+  declare_2
+    ~alternative_color:Green
+    ~section
+    ~name:"measured_dps"
+    ~msg:"measured {dps}KB dummy data per second over the past {duration}"
+    ~level:Notice
+    ~pp2:Ptime.Span.pp
+    ("dps", Data_encoding.float)
+    ("duration", Time.System.Span.encoding)
+
 let rpc_error =
   declare_2
     ~section
@@ -204,3 +215,7 @@ let rpc_error (error : Rpc_encodings.JSONRPC.error) =
 let measured_tps transactions_count duration =
   let tps = Float.of_int transactions_count /. Ptime.Span.to_float_s duration in
   emit measured_tps (tps, duration)
+
+let measured_dps dummy_data_size_kb duration =
+  let tps = Float.of_int dummy_data_size_kb /. Ptime.Span.to_float_s duration in
+  emit measured_dps (tps, duration)

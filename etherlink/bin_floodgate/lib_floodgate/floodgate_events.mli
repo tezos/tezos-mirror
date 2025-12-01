@@ -73,3 +73,8 @@ val rpc_error : Rpc_encodings.JSONRPC.error -> unit Lwt.t
     been able to inject [transaction_counts] transactions over the given
     [duration]. *)
 val measured_tps : int -> Ptime.span -> unit Lwt.t
+
+(** [measured_dps dummy_data_size duration] advertises that Floodgate
+    has been able to send [data_size]KB of dummy data over the given
+    [duration]. *)
+val measured_dps : int -> Ptime.span -> unit Lwt.t

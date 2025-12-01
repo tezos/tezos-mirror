@@ -60,18 +60,32 @@ let send_transaction_and_wait ~infos ~gas_limit ~from ~to_ ~value =
   in
   result
 
-let transactions_count = ref 0
+module State = struct
+  let transactions_count = ref 0
 
-let rec report_tps ~elapsed_time =
-  let open Lwt_syntax in
-  let start = Time.System.now () in
-  transactions_count := 0 ;
-  let* () = Lwt_unix.sleep elapsed_time in
-  let stop = Time.System.now () in
-  let* () =
-    Floodgate_events.measured_tps !transactions_count (Ptime.diff stop start)
-  in
-  report_tps ~elapsed_time
+  let dummy_data_size = ref None
+
+  let incr_transactions_count n = transactions_count := !transactions_count + n
+
+  let rec report ~elapsed_time =
+    let open Lwt_syntax in
+    let start = Time.System.now () in
+    transactions_count := 0 ;
+    let* () = Lwt_unix.sleep elapsed_time in
+    let stop = Time.System.now () in
+    let transactions = !transactions_count in
+    let diff = Ptime.diff stop start in
+    let* () = Floodgate_events.measured_tps transactions diff in
+    let* () =
+      match !dummy_data_size with
+      | None -> Lwt.return_unit
+      | Some dummy_data_size ->
+          let dummy_data_size_sent = transactions * dummy_data_size in
+          let dummy_data_size_sent_kb = dummy_data_size_sent / 1000 in
+          Floodgate_events.measured_dps dummy_data_size_sent_kb diff
+    in
+    report ~elapsed_time
+end
 
 let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account
     ~retry_attempt =
@@ -378,7 +392,7 @@ let start_new_head_monitor ~ws_uri =
       in
       match block.Ethereum_types.transactions with
       | TxHash hashes ->
-          transactions_count := !transactions_count + List.length hashes ;
+          State.incr_transactions_count (List.length hashes) ;
           List.iter_es Tx_queue.confirm hashes
       | TxFull _ -> return_unit)
     heads_subscription.stream
@@ -411,7 +425,7 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
       let* () =
         match Blueprint_decoder.transaction_hashes blueprint with
         | Ok hashes ->
-            transactions_count := !transactions_count + List.length hashes ;
+            State.incr_transactions_count (List.length hashes) ;
             List.iter_es Tx_queue.confirm hashes
         | Error _ -> return_unit
       in
@@ -427,6 +441,7 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
     ~spawn_interval ~tick_interval ~base_fee_factor ~initial_balance
     ~txs_per_salvo ~elapsed_time_between_report ~dummy_data_size ~retry_attempt
     =
+  State.dummy_data_size := dummy_data_size ;
   let open Lwt_result_syntax in
   let* controller =
     controller_from_signer
@@ -482,5 +497,5 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
         (Seq.ints 0 |> Stdlib.Seq.take max_active_eoa)
     in
     Lwt_result.ok (Floodgate_events.setup_completed ())
-  and* () = report_tps ~elapsed_time:elapsed_time_between_report in
+  and* () = State.report ~elapsed_time:elapsed_time_between_report in
   return_unit
