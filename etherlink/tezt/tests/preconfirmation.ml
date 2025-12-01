@@ -332,6 +332,49 @@ let test_eth_send_raw_transaction_sync_rpc_multiple_transactions_per_block () =
   let* () = scenario 3 in
   unit
 
+let test_eth_send_raw_transaction_sync_rpc_error_propagated () =
+  register_sandbox_with_observer
+    ~tags:["evm"; "delayed_transaction"]
+    ~title:"eth_sendRawTransactionSync error propagation"
+  @@ fun {sandbox; observer} ->
+  let* () = setup_experimental_feature sandbox observer in
+  let* gas_price = Rpc.get_gas_price sandbox in
+  let nonce = 1 in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let receiver = Eth_account.bootstrap_accounts.(1) in
+  let* rpc_observer_node = run_new_rpc_endpoint observer in
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:sender.private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas_price:(Int32.to_int gas_price)
+      ~gas:21_000
+      ~value:(Wei.of_eth_int 10_000_000)
+      ~address:receiver.address
+      ()
+  in
+  let* result =
+    Rpc.eth_send_raw_transaction_sync
+      ~raw_tx
+      ~block:Pending
+      rpc_observer_node
+      ~timeout:0
+  in
+  match result with
+  | Ok _ ->
+      Test.fail
+        "eth_sendRawTransactionSync should have failed due to insufficient \
+         funds, but got a receipt"
+  | Error rpc_err ->
+      Check.(
+        (rpc_err.message = "Transaction nonce is not the expected nonce.")
+          string
+          ~error_msg:
+            "eth_sendRawTransactionSync error message does not match expected \
+             value") ;
+      unit
+
 let test_eth_send_raw_transaction_sync_rpc_timeouts () =
   register_sandbox_with_observer
     ~tags:["evm"; "delayed_transaction"]
@@ -364,5 +407,6 @@ let () =
   test_observer_receives_preconfirmations () ;
   test_eth_send_raw_transaction_sync_rpc () ;
   test_eth_send_raw_transaction_sync_rpc_timeouts () ;
+  test_eth_send_raw_transaction_sync_rpc_error_propagated () ;
   test_multiple_transactions_comparison () ;
   test_eth_send_raw_transaction_sync_rpc_multiple_transactions_per_block ()

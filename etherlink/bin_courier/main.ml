@@ -171,6 +171,7 @@ let start_blueprint_follower ~relay_endpoint =
       return_unit)
     ~on_next_block_info:(fun _ _ -> return_unit)
     ~on_inclusion:(fun _ _ -> return_unit)
+    ~on_dropped:(fun _ _ -> return_unit)
     ()
 
 let withdraw_data receiver =

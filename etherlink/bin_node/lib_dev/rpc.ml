@@ -200,6 +200,9 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
         Broadcast.notify_inclusion tx hash ;
         let*! () = Events.inclusion hash in
         return_unit)
+      ~on_dropped:(fun hash reason ->
+        Broadcast.notify_dropped ~hash ~reason ;
+        return_unit)
       ()
   in
   return_unit

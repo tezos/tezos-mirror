@@ -264,6 +264,15 @@ module type Tx_container = sig
     confirmed_txs:Ethereum_types.hash Seq.t ->
     unit tzresult Lwt.t
 
+  (** The Tx_queue has a table of pending transactions. There are two
+      ways for transactions to be removed from this table; either they
+      are confirmed because they have been seen in a block or they are
+      dropped.
+
+      [dropped_transaction ~dropped_tx] drops [dropped_tx] hash. *)
+  val dropped_transaction :
+    dropped_tx:Ethereum_types.hash -> reason:string -> unit tzresult Lwt.t
+
   (** The Tx_pool pops transactions until the sum of the sizes of the
       popped transactions reaches maximum_cumulative_size; it ignores
       the [validate_tx] and [initial_validation_state] arguments, The
@@ -276,7 +285,7 @@ module type Tx_container = sig
       ('a ->
       string ->
       transaction_object ->
-      [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t) ->
+      [`Keep of 'a | `Drop of string | `Stop] tzresult Lwt.t) ->
     initial_validation_state:'a ->
     (string * transaction_object) list tzresult Lwt.t
 

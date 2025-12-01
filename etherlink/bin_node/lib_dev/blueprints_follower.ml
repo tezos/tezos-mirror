@@ -27,11 +27,14 @@ type next_block_info_handler =
 type inclusion_handler =
   Broadcast.transaction -> Ethereum_types.hash -> unit tzresult Lwt.t
 
+type dropped_handler = Ethereum_types.hash -> string -> unit tzresult Lwt.t
+
 type parameters = {
   on_new_blueprint : new_blueprint_handler;
   on_finalized_levels : finalized_levels_handler;
   on_next_block_info : next_block_info_handler;
   on_inclusion : inclusion_handler;
+  on_dropped : dropped_handler;
   time_between_blocks : Configuration.time_between_blocks;
   evm_node_endpoint : Uri.t;
   rpc_timeout : float;
@@ -355,6 +358,20 @@ and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
         (Qty next_blueprint_number)
         params
         monitor
+  | Ok (Some (Dropped_transaction {hash; reason})) ->
+      let* () =
+        if sbl_callbacks_activated.sbl_callbacks_activated then
+          params.on_dropped hash reason
+        else
+          let*! () = Events.ignored_preconfirmations () in
+          return_unit
+      in
+      (stream_loop [@tailcall])
+        ~multichain
+        ~sbl_callbacks_activated
+        (Qty next_blueprint_number)
+        params
+        monitor
   | Ok None | Error [Timeout] ->
       Evm_services.close_monitor monitor ;
       (catchup [@tailcall])
@@ -369,7 +386,7 @@ and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
 
 let start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
     ~next_blueprint_number ~on_new_blueprint ~on_finalized_levels
-    ~on_next_block_info ~on_inclusion () =
+    ~on_next_block_info ~on_inclusion ~on_dropped () =
   let open Lwt_result_syntax in
   let sbl_callbacks_activated = {sbl_callbacks_activated = false} in
   let*! res =
@@ -386,6 +403,7 @@ let start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
         on_finalized_levels;
         on_next_block_info;
         on_inclusion;
+        on_dropped;
       }
   in
   (* The blueprint follower should never fail. If it does, we better exit with

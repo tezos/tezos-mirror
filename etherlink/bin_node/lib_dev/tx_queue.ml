@@ -316,12 +316,20 @@ struct
       | Pop_transactions : {
           validation_state : 'a;
           validate_tx :
-            'a -> string -> Tx.t -> [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t;
+            'a ->
+            string ->
+            Tx.t ->
+            [`Keep of 'a | `Drop of string | `Stop] tzresult Lwt.t;
         }
           -> ((string * Tx.t) list, tztrace) t
       | Confirm_transactions : {
           confirmed_txs : Ethereum_types.hash Seq.t;
           clear_pending_queue_after : bool;
+        }
+          -> (unit, tztrace) t
+      | Dropped_transaction : {
+          dropped_tx : Ethereum_types.hash;
+          reason : string;
         }
           -> (unit, tztrace) t
 
@@ -340,6 +348,7 @@ struct
       | Size_info -> "Size_info"
       | Pop_transactions _ -> "Pop_transactions"
       | Confirm_transactions _ -> "Confirm_transactions"
+      | Dropped_transaction _ -> "Dropped_transaction"
 
     type view = View : _ t -> view
 
@@ -474,6 +483,18 @@ struct
                   Some ((), List.of_seq confirmed_txs, clear_pending_queue_after)
               | _ -> None)
             (fun _ -> assert false);
+          case
+            Json_only
+            ~title:"Dropped_transaction"
+            (obj3
+               (req "request" (constant "dropped_transaction"))
+               (req "dropped_tx" Ethereum_types.hash_encoding)
+               (req "reason" string))
+            (function
+              | View (Dropped_transaction {dropped_tx; reason}) ->
+                  Some ((), dropped_tx, reason)
+              | _ -> None)
+            (fun _ -> assert false);
         ]
 
     let pp fmt (View r) =
@@ -502,6 +523,7 @@ struct
       | Pop_transactions {validation_state = _; validate_tx = _} ->
           fprintf fmt "Popping transactions with validation function"
       | Confirm_transactions _ -> fprintf fmt "Confirming transactions"
+      | Dropped_transaction _ -> fprintf fmt "Dropping transaction"
   end
 
   module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
@@ -732,7 +754,7 @@ struct
                 (* `Stop means that we don't pop transaction anymore. We
                    don't remove the last peek tx because it could be valid
                    for another call. *)
-                | `Drop ->
+                | `Drop _ ->
                     (* `Drop, the current tx was evaluated and was refused
                        by the caller. *)
                     let _ = Queue.take state.queue in
@@ -1117,6 +1139,15 @@ struct
             Pending_transactions.clear state.pending ;
             return_unit)
           else return_unit
+      | Dropped_transaction {dropped_tx; reason = _} ->
+          protect @@ fun () ->
+          let callback = Pending_transactions.pop state.pending dropped_tx in
+          let*! () =
+            match callback with
+            | Some {pending_callback; _} -> pending_callback `Dropped
+            | None -> Lwt.return_unit
+          in
+          return_unit
 
     type launch_error = tztrace
 
@@ -1306,6 +1337,11 @@ struct
       w
       (Confirm_transactions {confirmed_txs; clear_pending_queue_after})
     |> handle_request_error
+
+  let dropped_transaction ~dropped_tx ~reason =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    push_request w (Dropped_transaction {dropped_tx; reason})
 
   let lock_transactions () =
     bind_worker @@ fun w -> push_request w Lock_transactions

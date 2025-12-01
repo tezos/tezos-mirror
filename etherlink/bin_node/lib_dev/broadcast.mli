@@ -33,6 +33,7 @@ type message =
       number : Ethereum_types.quantity;
     }
   | Included_transaction of {tx : transaction; hash : Ethereum_types.hash}
+  | Dropped_transaction of {hash : Ethereum_types.hash; reason : string}
 
 val message_encoding : message Data_encoding.t
 
@@ -61,11 +62,23 @@ val notify_next_block_info : Time.Protocol.t -> Ethereum_types.quantity -> unit
     to the broadcast stream *)
 val notify_inclusion : transaction -> Ethereum_types.hash -> unit
 
-(** [create_receipt_stream ()] returns a new stream that can be used to be
-    notified of pre-confirmed receipts after transactions are executed individualy. *)
-val create_receipt_stream :
-  unit -> Transaction_receipt.t Lwt_stream.t * Lwt_watcher.stopper
+(** [notify_dropped ~hash ~reason] advertizes a dropped transaction with its [hash] and [reason]
+    to the broadcast stream *)
+val notify_dropped : hash:Ethereum_types.hash -> reason:string -> unit
 
-(** [notify_inclusion tx] advertizes [receipt] as the latest pre-confirmed receipt
-    _only_ to the receipt stream *)
-val notify_preconfirmed_receipt : Transaction_receipt.t -> unit
+(** Type representing the result of a transaction pre-confirmed execution. *)
+type transaction_result = {
+  hash : Ethereum_types.hash;
+  (* If the transaction was successfully executed, [result] contains the corresponding receipt.
+     Otherwise, it contains an error message explaining why the execution failed. *)
+  result : (Transaction_receipt.t, string) result;
+}
+
+(** [create_transaction_result_stream ()] returns a new stream that can be used to be
+    notified of pre-confirmed results after transactions are executed individually. *)
+val create_transaction_result_stream :
+  unit -> transaction_result Lwt_stream.t * Lwt_watcher.stopper
+
+(** [notify_transaction_result tx] advertizes [tx] as the latest pre-confirmed result
+    _only_ to the transaction result stream *)
+val notify_transaction_result : transaction_result -> unit

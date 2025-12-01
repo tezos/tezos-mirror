@@ -244,7 +244,7 @@ let validate_etherlink_tx ~maximum_cumulative_size
     | Error msg ->
         let hash = Transaction_object.hash tx_object in
         let*! () = Block_producer_events.transaction_rejected hash msg in
-        return `Drop
+        return (`Drop msg)
 
 let validate_tezlink_op ~maximum_cumulative_size
     (state : Validation_types.validation_state) raw_op
@@ -261,7 +261,7 @@ let validate_tezlink_op ~maximum_cumulative_size
     | Error msg ->
         let hash = Operation_hash.hash_bytes [operation.raw] in
         let*! () = Block_producer_events.operation_rejected hash msg in
-        return `Drop
+        return (`Drop msg)
 
 let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
     (head_info : Evm_context.head) ~maximum_cumulative_size =
@@ -637,7 +637,9 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
             Tezos_types.Operation.hash_operation operation )
     in
     match res with
-    | `Drop -> return (validation_state, (rev_txns, hash :: rev_accepted_hashes))
+    | `Drop msg ->
+        Broadcast.notify_dropped ~hash ~reason:msg ;
+        return (validation_state, (rev_txns, rev_accepted_hashes))
     | `Keep latest_validation_state ->
         Broadcast.notify_inclusion (Common wrapped_raw) hash ;
         let*! () = Events.inclusion hash in
