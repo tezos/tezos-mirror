@@ -376,10 +376,16 @@ let select_distribution_for_cycle ctxt cycle =
       ([], 0, 0L)
       stakes
   in
-  let state = Sampler.create stakes_pk in
-  let* ctxt = Delegate_sampler_state.init ctxt cycle state in
-  (* pre-allocate the sampler *)
-  let*? ctxt = Raw_context.init_sampler_for_cycle ctxt cycle seed state in
+  let* ctxt =
+    if Constants_storage.swrr_new_baker_lottery_enable ctxt then
+      Swrr_sampler.select_bakers_at_cycle_end ctxt ~target_cycle:cycle
+    else
+      let state = Sampler.create stakes_pk in
+      let* ctxt = Delegate_sampler_state.init ctxt cycle state in
+      (* pre-allocate the sampler *)
+      let*? ctxt = Raw_context.init_sampler_for_cycle ctxt cycle seed state in
+      return ctxt
+  in
   (* Update stake info *)
   (* At the end of the cycle, we store the data used to
      compute the [sampler_state] as [stake_info]. This include the

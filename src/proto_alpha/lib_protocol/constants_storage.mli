@@ -180,6 +180,9 @@ val round_durations : Raw_context.t -> Round_repr.Durations.t
 (** Native contracts feature flag *)
 val native_contracts_enable : Raw_context.t -> bool
 
+(** SWRR new baker lottery feature flag *)
+val swrr_new_baker_lottery_enable : Raw_context.t -> bool
+
 (** Builds a representation of all constants (fixed and parametric)
     from the context. *)
 val all : Raw_context.t -> Constants_repr.t
