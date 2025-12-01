@@ -117,6 +117,51 @@ pub fn set_tezos_account_info(
     Ok(host.store_write_all(&path, value)?)
 }
 
+const TEZOS_SRC_ADDR_TAG: u8 = 1;
+
+#[derive(PartialEq, Debug, Clone, Eq)]
+pub enum ForeignAddress {
+    Tezos(PublicKeyHash),
+}
+
+impl Encodable for ForeignAddress {
+    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
+        stream.begin_list(2);
+        match &self {
+            ForeignAddress::Tezos(pub_key_hash) => {
+                stream.append(&TEZOS_SRC_ADDR_TAG);
+                stream.append(&pub_key_hash.to_b58check().as_bytes());
+            }
+        }
+    }
+}
+
+impl Decodable for ForeignAddress {
+    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        if !decoder.is_list() {
+            return Err(rlp::DecoderError::RlpExpectedToBeList);
+        }
+        if decoder.item_count()? != 2 {
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
+        }
+        let tag: u8 = decoder.at(0)?.as_val()?;
+        let pub_key_hash_decoder = decoder.at(1)?;
+        match tag {
+            TEZOS_SRC_ADDR_TAG => {
+                let vec: Vec<u8> = pub_key_hash_decoder.as_val()?;
+                let s: String = String::from_utf8(vec).map_err(|_| {
+                    rlp::DecoderError::Custom("Invalid public key hash (not a string)")
+                })?;
+                let pub_key_hash = PublicKeyHash::from_b58check(&s).map_err(|_| {
+                    rlp::DecoderError::Custom("Invalid public key hash (b58check)")
+                })?;
+                Ok(Self::Tezos(pub_key_hash))
+            }
+            _ => Err(rlp::DecoderError::Custom("Unknown address mapping tag.")),
+        }
+    }
+}
+
 #[test]
 fn tezos_account_info_encoding() {
     use crate::tezosx::TezosAccountInfo;
@@ -168,4 +213,20 @@ fn tezos_account_storage() {
         .expect("Reading the storage should have worked")
         .expect("The path to the account should exist");
     assert_eq!(account, read_account);
+}
+
+#[test]
+fn foreign_address_encoding() {
+    use rlp::Rlp;
+    use rlp::{Decodable, Encodable};
+    use tezos_smart_rollup::types::PublicKeyHash;
+
+    let pub_key_hash: PublicKeyHash =
+        PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("Public key hash should be a b58 string");
+    let source_address = ForeignAddress::Tezos(pub_key_hash);
+    let bytes = &source_address.rlp_bytes();
+    let decoded_address =
+        ForeignAddress::decode(&Rlp::new(bytes)).expect("Address should be decodable");
+    assert!(decoded_address == source_address);
 }
