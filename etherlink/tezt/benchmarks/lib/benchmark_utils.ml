@@ -429,7 +429,7 @@ let call ~container infos rpc_node contract sender ?gas_limit ?nonce
   in
   confirmed
 
-type gas_info = {level : int; gas : Z.t; gas_per_sec : float}
+type gas_info = {level : int; timestamp : float; gas : Z.t; gas_per_sec : float}
 
 type gasometer = {mutable datapoints : gas_info list; mutable total_gas : Z.t}
 
@@ -479,7 +479,7 @@ let blueprint_application_event = "blueprint_application.v0"
 let install_gasometer evm_node =
   let gasometer = empty_gasometer () in
   let () =
-    Evm_node.on_event evm_node @@ fun {name; value; _} ->
+    Evm_node.on_event evm_node @@ fun {name; value; timestamp; _} ->
     if name = blueprint_application_event then (
       let open JSON in
       let level_str = value |-> "level" |> as_string in
@@ -507,7 +507,9 @@ let install_gasometer evm_node =
         (ignored, block_capacity) ;
       if not ignored then (
         let level = int_of_string level_str in
-        let info = {level; gas = execution_gas; gas_per_sec = block_capacity} in
+        let info =
+          {level; gas = execution_gas; timestamp; gas_per_sec = block_capacity}
+        in
         gasometer.datapoints <- info :: gasometer.datapoints ;
         gasometer.total_gas <- Z.add gasometer.total_gas execution_gas ;
         let capacities =
@@ -596,7 +598,7 @@ let plot_gas_and_capacity ~gasometer ~output_filename =
   (* The datapoints are stored in reverse order of arrival. *)
   let datapoints = List.rev gasometer.datapoints in
   List.iter
-    (fun {level; gas; gas_per_sec} ->
+    (fun {level; gas; gas_per_sec; _} ->
       Printf.fprintf
         oc
         "%d %.3f %.3f\n"

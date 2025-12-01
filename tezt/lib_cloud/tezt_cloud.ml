@@ -315,6 +315,10 @@ module Tezt_cloud_cli = struct
 
   let binaries_path = Cli.binaries_path
 
+  let machine_type = Cli.machine_type
+
+  let disk_type = Cli.disk_type
+
   let teztale_artifacts = Cli.teztale_artifacts
 
   let faketime = Cli.faketime
