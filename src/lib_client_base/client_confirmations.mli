@@ -66,3 +66,11 @@ val wait_for_bootstrapped :
     Lwt.t) ->
   'a ->
   unit tzresult Lwt.t
+
+val really_wait_for_bootstrapped :
+  ?retry:
+    (((#Client_context.full as 'a) -> unit tzresult Lwt.t) ->
+    'a ->
+    unit tzresult Lwt.t) ->
+  'a ->
+  unit tzresult Lwt.t

@@ -35,7 +35,7 @@ let rec retry_on_disconnection (cctxt : #Protocol_client_context.full) f =
       in
       (* Wait forever when the node stops responding... *)
       let* () =
-        Client_confirmations.wait_for_bootstrapped
+        Client_confirmations.really_wait_for_bootstrapped
           ~retry:
             (Baking_scheduling.retry cctxt ~max_delay:10. ~delay:1. ~factor:1.5)
           cctxt
@@ -149,7 +149,7 @@ module Baker = struct
         delegates
     in
     let* () =
-      Client_confirmations.wait_for_bootstrapped
+      Client_confirmations.really_wait_for_bootstrapped
         ~retry:
           (Baking_scheduling.retry
              cctxt
@@ -197,7 +197,7 @@ module Accuser = struct
         valid_blocks_stream
     in
     let* () =
-      Client_confirmations.wait_for_bootstrapped
+      Client_confirmations.really_wait_for_bootstrapped
         ~retry:
           (Baking_scheduling.retry
              cctxt
@@ -237,7 +237,7 @@ module VDF = struct
       Baking_vdf.start_vdf_worker cctxt ~canceler constants chain
     in
     let* () =
-      Client_confirmations.wait_for_bootstrapped
+      Client_confirmations.really_wait_for_bootstrapped
         ~retry:
           (Baking_scheduling.retry
              cctxt
