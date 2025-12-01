@@ -308,3 +308,43 @@ let wait_for_bootstrapped ?(retry = fun f x -> f x)
   display := true ;
   let*! () = ctxt#answer "Node is bootstrapped." in
   return_unit
+
+let really_wait_for_bootstrapped ?(retry = fun f x -> f x)
+    (ctxt : #Client_context.full) =
+  let open Lwt_result_syntax in
+  let display = ref false in
+  Lwt.dont_wait
+    (fun () ->
+      let*! () = ctxt#sleep 0.3 in
+      if not !display then (
+        let*! () = ctxt#answer "Waiting for the node to be bootstrapped..." in
+        display := true ;
+        Lwt.return_unit)
+      else Lwt.return_unit)
+    (fun exc ->
+      let (_ : unit Lwt.t) =
+        let*! () =
+          ctxt#error "Uncaught exception: %s\n%!" (Printexc.to_string exc)
+        in
+        ctxt#error "Progress not monitored anymore\n%!"
+      in
+      ()) ;
+  let* stream, _stop = retry Monitor_services.bootstrapped ctxt in
+  let*! () =
+    Lwt_stream.iter_s
+      (fun (hash, time) ->
+        if !display then
+          ctxt#message
+            "Current head: %a (timestamp: %a, validation: %a)"
+            Block_hash.pp_short
+            hash
+            Time.System.pp_hum
+            (Time.System.of_protocol_exn time)
+            Time.System.pp_hum
+            (ctxt#now ())
+        else Lwt.return_unit)
+      stream
+  in
+  display := true ;
+  let*! () = ctxt#answer "Node is bootstrapped." in
+  return_unit
