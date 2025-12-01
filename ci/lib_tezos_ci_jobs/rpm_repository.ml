@@ -78,7 +78,7 @@ let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
    we test only on Rockylinux. Returns a triplet, the first element is
    the list of all jobs, the second is the job building fedora packages artifats
    and the third rockylinux packages artifacts *)
-let jobs pipeline_type =
+let jobs ?(limit_dune_build_jobs = false) pipeline_type =
   let variables ?(kind = "build") add =
     ("FLAVOUR", kind)
     :: ( "DEP_IMAGE",
@@ -168,7 +168,12 @@ let jobs pipeline_type =
       ~dependencies:(Dependent [Job job_docker_build_rockylinux_dependencies])
       ~script:"./scripts/ci/build-rpm-packages.sh binaries"
       ~matrix:(rockylinux_package_release_matrix ~ramfs:true pipeline_type)
-      ~variables:(variables [("DISTRIBUTION", "rockylinux")])
+      ~variables:
+        (variables
+           (("DISTRIBUTION", "rockylinux")
+           ::
+           (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
+           ))
       ~image:generic_packages_image
   in
   let job_build_fedora_package : tezos_job =
@@ -178,7 +183,12 @@ let jobs pipeline_type =
       ~dependencies:(Dependent [Job job_docker_build_fedora_dependencies])
       ~script:"./scripts/ci/build-rpm-packages.sh binaries"
       ~matrix:(fedora_package_release_matrix ~ramfs:true pipeline_type)
-      ~variables:(variables [("DISTRIBUTION", "fedora")])
+      ~variables:
+        (variables
+           (("DISTRIBUTION", "fedora")
+           ::
+           (if limit_dune_build_jobs then [("DUNE_BUILD_JOBS", "-j 12")] else [])
+           ))
       ~image:generic_packages_image
   in
   let job_build_rockylinux_package_data : tezos_job =
