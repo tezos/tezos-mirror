@@ -4,6 +4,7 @@
 
 use mir::ast::PublicKeyHash;
 use primitive_types::U256;
+use revm::primitives::Address;
 use revm_etherlink::Error;
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_ethereum::rlp_helpers::{
@@ -24,6 +25,11 @@ const TEZOS_ACCOUNTS_PATH: RefPath =
 // Path where all the infos of a Tezos contract are stored under the same key.
 // This path must contains balance, nonce and optionally a revealed public key.
 const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
+
+// Path where is stored the correspondance between an EVM address and the native
+// Tezos account it was derived from.
+const ETHEREUM_ADDRESS_MAPPING_PATH: RefPath =
+    RefPath::assert_from(b"/evm/world_state/eth_accounts/tezosx/native/ethereum");
 
 // Used as a value for the durable storage.
 #[derive(Debug, Default, Eq, PartialEq, Clone)]
@@ -162,6 +168,45 @@ impl Decodable for ForeignAddress {
     }
 }
 
+fn path_to_ethereum_address_mapping(address: Address) -> Result<OwnedPath, Error> {
+    let address = address.to_string().to_lowercase();
+    let address_path: Vec<u8> = format!("/{address}").into();
+    let address_path =
+        OwnedPath::try_from(address_path).map_err(|e| Error::Custom(e.to_string()))?;
+    concat(&ETHEREUM_ADDRESS_MAPPING_PATH, &address_path)
+        .map_err(|e| Error::Custom(e.to_string()))
+}
+
+#[allow(dead_code)]
+pub fn get_ethereum_address_mapping(
+    host: &impl Runtime,
+    address: Address,
+) -> Result<Option<ForeignAddress>, Error> {
+    let path = path_to_ethereum_address_mapping(address)
+        .map_err(|_| RuntimeError::PathNotFound)?;
+    match host.store_read_all(&path) {
+        Ok(bytes) => {
+            let source_address = ForeignAddress::decode(&Rlp::new(&bytes))
+                .map_err(|_| RuntimeError::DecodingError)?;
+            Ok(Some(source_address))
+        }
+        Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(err) => Err(Error::Runtime(err)),
+    }
+}
+
+#[allow(dead_code)]
+pub fn set_ethereum_address_mapping(
+    host: &mut impl Runtime,
+    address: Address,
+    source_address: ForeignAddress,
+) -> Result<(), Error> {
+    let path = path_to_ethereum_address_mapping(address)
+        .map_err(|_| RuntimeError::PathNotFound)?;
+    let value = &source_address.rlp_bytes();
+    Ok(host.store_write_all(&path, value)?)
+}
+
 #[test]
 fn tezos_account_info_encoding() {
     use crate::tezosx::TezosAccountInfo;
@@ -229,4 +274,31 @@ fn foreign_address_encoding() {
     let decoded_address =
         ForeignAddress::decode(&Rlp::new(bytes)).expect("Address should be decodable");
     assert!(decoded_address == source_address);
+}
+
+#[test]
+fn ethereum_address_mapping_storage() {
+    use crate::tezosx::ForeignAddress::Tezos;
+    use revm::primitives::Address;
+    use std::str::FromStr;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup::types::PublicKeyHash;
+
+    let mut host = MockKernelHost::default();
+
+    let address: Address =
+        Address::from_str("0x2E2Ac8699AD02e710951ea0F56b892Ed36916Cd5")
+            .expect("Hex should be an EVM address");
+    let pub_key_hash: PublicKeyHash =
+        PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("Public key hash should be a b58 string");
+    let address_mapping = Tezos(pub_key_hash);
+
+    set_ethereum_address_mapping(&mut host, address, address_mapping.clone())
+        .expect("Writing to the storage should have worked");
+
+    let read_address_mapping = get_ethereum_address_mapping(&host, address)
+        .expect("Reading the storage should have worked")
+        .expect("The path to the account should exist");
+    assert_eq!(address_mapping, read_address_mapping);
 }
