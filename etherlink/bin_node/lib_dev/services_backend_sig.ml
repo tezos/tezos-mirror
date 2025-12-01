@@ -9,6 +9,8 @@ module type S = sig
 
   module Etherlink_block_storage : Block_storage_sig.S
 
+  module Tezos : Tezlink_backend_sig.S
+
   module Tezlink : Tezlink_backend_sig.S
 
   module Etherlink : Etherlink_backend_sig.S
@@ -138,6 +140,7 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   module Tezlink_block_storage =
     Tezlink_durable_storage.Make_block_storage (Backend.Reader)
   module SimulatorBackend = Backend.SimulatorBackend
+  module Tezos = Tezos_backend.Make (Backend.SimulatorBackend)
 
   module Tezlink =
     Tezlink_services_impl.Make
