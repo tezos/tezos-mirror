@@ -118,7 +118,7 @@ val get_counter :
 val get_script_code :
   Raw_context.t ->
   Contract_hash.t ->
-  (Raw_context.t * Script_repr.lazy_expr option) tzresult Lwt.t
+  (Raw_context.t * Contract_kind_repr.implementation_kind option) tzresult Lwt.t
 
 val get_script :
   Raw_context.t ->

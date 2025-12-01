@@ -374,6 +374,10 @@ module Script = struct
     storage : lazy_expr;
   }
 
+  type implementation = Contract_kind_repr.implementation_kind =
+    | Script_code of lazy_expr
+    | Native_kind of native_kind
+
   type t = Contract_kind_repr.originated_kind =
     | Script of michelson_with_storage
     | Native of native_with_storage
@@ -381,7 +385,7 @@ module Script = struct
   let michelson_with_storage_encoding =
     Contract_kind_repr.michelson_with_storage_encoding
 
-  let encoding = Contract_kind_repr.with_storage_encoding
+  let encoding = Contract_kind_repr.encoding
 
   type consume_deserialization_gas = Always | When_needed
 

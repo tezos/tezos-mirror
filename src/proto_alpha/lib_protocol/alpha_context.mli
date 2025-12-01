@@ -760,6 +760,10 @@ module Script : sig
 
   type native_with_storage = {kind : native_kind; storage : lazy_expr}
 
+  type implementation = Contract_kind_repr.implementation_kind =
+    | Script_code of lazy_expr
+    | Native_kind of native_kind
+
   type t = Script of michelson_with_storage | Native of native_with_storage
 
   val location_encoding : location Data_encoding.t
@@ -1839,7 +1843,7 @@ module Contract : sig
   val get_script_code :
     context ->
     Contract_hash.t ->
-    (context * Script.lazy_expr option) tzresult Lwt.t
+    (context * Script.implementation option) tzresult Lwt.t
 
   val get_script :
     context -> Contract_hash.t -> (context * Script.t option) tzresult Lwt.t
