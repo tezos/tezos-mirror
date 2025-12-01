@@ -442,12 +442,12 @@ DIFFICULTY=4
   let runner = Agent.runner agent in
   Faucet_backend_process.run ?runner ~path:faucet_backend_dir ()
 
-let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_proxy ~faucet_pkh
-    ~tzkt_proxy ~faucet_frontend_proxy =
+let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
+    ~faucet_pkh ~tzkt_proxy ~faucet_frontend_proxy =
   let runner = Agent.runner agent in
   let faucet_api = proxy_external_endpoint ~runner faucet_api_proxy in
   let tezlink_sandbox_endpoint =
-    proxy_external_endpoint ~runner sequencer_proxy
+    sequencer_external_endpoint ~runner sequencer_endpoint
   in
   let faucet_frontend_port = proxy_internal_port faucet_frontend_proxy in
   let tzkt_api = proxy_external_endpoint ~runner tzkt_proxy in
@@ -485,7 +485,7 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_proxy ~faucet_pkh
 }
 |}
       (Client.string_of_endpoint faucet_api)
-      (Client.string_of_endpoint tezlink_sandbox_endpoint)
+      tezlink_sandbox_endpoint
       faucet_pkh
       (Client.url_encoded_string_of_endpoint tzkt_api)
   in
@@ -970,7 +970,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               init_faucet_frontend
                 ~agent:tezlink_sequencer_agent
                 ~faucet_api_proxy
-                ~sequencer_proxy
+                ~sequencer_endpoint
                 ~faucet_pkh
                 ~tzkt_proxy
                 ~faucet_frontend_proxy
