@@ -34,6 +34,7 @@ type block_production = [`Single_node | `Disabled]
 val start_private_server :
   mode:'f Mode.t ->
   rpc_server_family:'f Rpc_types.rpc_server_family ->
+  tick:(unit -> unit tzresult Lwt.t) ->
   ?block_production:block_production ->
   Configuration.t ->
   (module Services_backend_sig.S) * 'a ->
@@ -51,6 +52,7 @@ val start_public_server :
   mode:'f Mode.t ->
   rpc_server_family:'f Rpc_types.rpc_server_family ->
   l2_chain_id:L2_types.chain_id option ->
+  tick:(unit -> unit tzresult Lwt.t) ->
   ?evm_services:evm_services_methods ->
   Configuration.t ->
   (module Services_backend_sig.S) * 'a ->

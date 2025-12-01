@@ -519,6 +519,11 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       return_unit
   in
 
+  let tick () =
+    when_ configuration.experimental_features.preconfirmation_stream_enabled
+    @@ fun () -> Tx_container.tx_queue_tick ~evm_node_endpoint:Block_producer
+  in
+
   let* finalizer_public_server =
     Rpc_server.start_public_server
       ~mode:(Sequencer tx_container)
@@ -529,6 +534,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
          else Rpc_types.Single_chain_node_rpc_server chain_family)
+      ~tick
       configuration
       ((module Rpc_backend), smart_rollup_address_typed)
   in
@@ -539,6 +545,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
          else Rpc_types.Single_chain_node_rpc_server chain_family)
       ~block_production:`Single_node
+      ~tick
       configuration
       ((module Rpc_backend), smart_rollup_address_typed)
   in
@@ -581,6 +588,6 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
     @@ fun () ->
     Tx_container.tx_queue_beacon
       ~evm_node_endpoint:Block_producer
-      ~tick_interval:0.01
+      ~tick_interval:(float_of_int configuration.tx_queue.max_lifespan_s)
   in
   return_unit

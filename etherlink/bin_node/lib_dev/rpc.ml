@@ -144,6 +144,7 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
       ~evm_services:
         Evm_ro_context.(evm_services_methods ctxt time_between_blocks)
       ~rpc_server_family
+      ~tick:(fun () -> Lwt_result_syntax.return_unit)
       rpc_config
       ((module Rpc_backend), ctxt.smart_rollup_address)
   in
