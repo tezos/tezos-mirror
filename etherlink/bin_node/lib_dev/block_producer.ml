@@ -637,7 +637,7 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
             Tezos_types.Operation.hash_operation operation )
     in
     match res with
-    | `Drop -> return (validation_state, (rev_txns, hash :: rev_accepted_hashes))
+    | `Drop -> return (validation_state, (rev_txns, rev_accepted_hashes))
     | `Keep latest_validation_state ->
         Broadcast.notify_inclusion (Common wrapped_raw) hash ;
         let*! () = Events.inclusion hash in
