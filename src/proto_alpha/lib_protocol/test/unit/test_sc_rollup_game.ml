@@ -243,7 +243,6 @@ let test_invalid_serialized_inbox_proof () =
   let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
   let dal_snapshot = Dal.Slots_history.genesis in
   let constants = Default_parameters.constants_mainnet in
-  let dal_parameters = constants.dal in
   let dal_activation_level =
     if constants.dal.feature_enable then
       Some constants.sc_rollup.reveal_activation_level.dal_parameters
@@ -283,11 +282,12 @@ let test_invalid_serialized_inbox_proof () =
       snapshot
       Raw_level.root
       dal_snapshot
-      dal_parameters.cryptobox_parameters
       ~dal_activation_level
       ~dal_attested_slots_validity_lag
-      ~dal_attestation_lag:dal_parameters.attestation_lag
-      ~dal_number_of_slots:dal_parameters.number_of_slots
+      ~find_dal_parameters:(fun _ ->
+        (* The proof doesn't include a DAL step so finding the parameters is in
+           practice not used. *)
+        assert false)
       ~is_reveal_enabled
       proof
   in

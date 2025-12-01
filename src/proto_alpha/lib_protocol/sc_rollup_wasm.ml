@@ -170,7 +170,7 @@ module V2_0_0 = struct
   *)
   module Make
       (Make_backend : Make_wasm)
-      (Context : Sc_rollup_PVM_sig.Generic_pvm_context_sig) :
+      (Context : Sc_rollup_PVM_sig.Generic_irmin_pvm_context_sig) :
     S
       with type context = Context.Tree.t
        and type state = Context.tree
@@ -409,8 +409,18 @@ module V2_0_0 = struct
 
     let eval state = state_of eval_step state
 
+    let get_current_level state =
+      let open Lwt_syntax in
+      let+ res = result_of get_last_message_read state in
+      Option.map fst res
+
     let step_transition ~is_reveal_enabled input_given state =
       let open Lwt_syntax in
+      (* Get the current level to include it in the proof. It is needed as the
+       tick's merkle proof is also used to retrieve the level at which the tick
+       was executed. If the proof production gets the the current level, then
+       then proof verification can get it as well. *)
+      let* _current_level = get_current_level state in
       let* request = is_input_state ~is_reveal_enabled state in
       let* state =
         match request with
@@ -421,6 +431,18 @@ module V2_0_0 = struct
             | None -> return state)
       in
       return (state, request)
+
+    let get_proof_state_level proof =
+      let open Lwt_result_syntax in
+      let proof = Context.cast_read_only proof in
+      let*! result =
+        Context.verify_proof proof (fun state ->
+            let*! current_level_opt = get_current_level state in
+            Lwt.return (state, current_level_opt))
+      in
+      match result with
+      | None -> tzfail WASM_proof_verification_failed
+      | Some (_state, current_level_opt) -> return current_level_opt
 
     let verify_proof ~is_reveal_enabled input_given proof =
       let open Lwt_result_syntax in
@@ -635,10 +657,7 @@ module V2_0_0 = struct
              dissection)
           WASM_invalid_dissection_distribution
 
-    let get_current_level state =
-      let open Lwt_syntax in
-      let+ res = result_of get_last_message_read state in
-      Option.map fst res
+    let get_current_level = get_current_level
 
     module Internal_for_tests = struct
       let insert_failure state =
@@ -689,6 +708,9 @@ module V2_0_0 = struct
 
         let proof_after proof =
           kinded_hash_to_state_hash proof.Context.Proof.after
+
+        let cast_read_only proof =
+          Context.Proof.{proof with after = proof.before}
 
         let proof_encoding = Context.Proof_encoding.V2.Tree2.tree_proof_encoding
       end)

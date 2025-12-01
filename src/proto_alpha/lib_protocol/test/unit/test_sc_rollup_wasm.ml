@@ -83,6 +83,8 @@ module Wasm_context = struct
 
   let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
 
+  let cast_read_only proof = Context.Proof.{proof with after = proof.before}
+
   let proof_encoding = Proof_encoding.V2.Tree2.tree_proof_encoding
 end
 

@@ -466,10 +466,8 @@ let game_move ctxt rollup ~player ~opponent ~step ~choice =
       let* move_result =
         Sc_rollup_game_repr.play
           kind
-          dal.cryptobox_parameters
           ~dal_activation_level
-          ~dal_attestation_lag:dal.attestation_lag
-          ~dal_number_of_slots:dal.number_of_slots
+          ~find_dal_parameters:(Dal_storage.parameters ctxt)
           ~stakers
           metadata
           game

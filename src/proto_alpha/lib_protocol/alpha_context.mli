@@ -3823,7 +3823,7 @@ module Sc_rollup : sig
       | Dissection_invalid_successive_states_shape
   end
 
-  module type Generic_pvm_context_sig = sig
+  module type Generic_irmin_pvm_context_sig = sig
     module Tree :
       Context.TREE with type key = string list and type value = bytes
 
@@ -3836,6 +3836,8 @@ module Sc_rollup : sig
     val proof_before : proof -> Sc_rollup_repr.State_hash.t
 
     val proof_after : proof -> Sc_rollup_repr.State_hash.t
+
+    val cast_read_only : proof -> proof
 
     val verify_proof :
       proof -> (tree -> (tree * 'a) Lwt.t) -> (tree * 'a) option Lwt.t
@@ -3881,6 +3883,9 @@ module Sc_rollup : sig
         input option ->
         proof ->
         input_request tzresult Lwt.t
+
+      val get_proof_state_level :
+        proof -> Raw_level_repr.t option tzresult Lwt.t
 
       type output_proof
 
@@ -3960,7 +3965,7 @@ module Sc_rollup : sig
   val genesis_state_hash_of : boot_sector:string -> Kind.t -> State_hash.t Lwt.t
 
   module ArithPVM : sig
-    module Make (C : Generic_pvm_context_sig) : sig
+    module Make (C : Generic_irmin_pvm_context_sig) : sig
       include
         PVM.S
           with type context = C.Tree.t
@@ -4004,7 +4009,9 @@ module Sc_rollup : sig
 
     module type Make_wasm = module type of Wasm_2_0_0.Make
 
-    module Make (Wasm_backend : Make_wasm) (C : Generic_pvm_context_sig) : sig
+    module Make
+        (Wasm_backend : Make_wasm)
+        (C : Generic_irmin_pvm_context_sig) : sig
       include
         PVM.S
           with type context = C.Tree.t
@@ -4194,10 +4201,9 @@ module Sc_rollup : sig
       Inbox.history_proof ->
       Raw_level.t ->
       Dal.Slots_history.t ->
-      Dal.parameters ->
+      find_dal_parameters:
+        (Raw_level.t -> Constants.Parametric.dal tzresult Lwt.t) ->
       dal_activation_level:Raw_level.t option ->
-      dal_attestation_lag:int ->
-      dal_number_of_slots:int ->
       is_reveal_enabled:is_reveal_enabled ->
       dal_attested_slots_validity_lag:int ->
       'proof t ->
@@ -4205,6 +4211,8 @@ module Sc_rollup : sig
 
     val produce :
       metadata:Metadata.t ->
+      find_dal_parameters:
+        (Raw_level.t -> Constants.Parametric.dal tzresult Lwt.t) ->
       (module PVM_with_context_and_state) ->
       Raw_level.t ->
       is_reveal_enabled:is_reveal_enabled ->
@@ -4316,10 +4324,9 @@ module Sc_rollup : sig
 
     val play :
       Kind.t ->
-      Dal.parameters ->
       dal_activation_level:Raw_level.t option ->
-      dal_attestation_lag:int ->
-      dal_number_of_slots:int ->
+      find_dal_parameters:
+        (Raw_level.t -> Constants.Parametric.dal tzresult Lwt.t) ->
       stakers:Index.t ->
       Metadata.t ->
       t ->

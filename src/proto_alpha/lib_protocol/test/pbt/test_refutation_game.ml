@@ -1175,6 +1175,7 @@ let build_proof ~player_client start_tick (game : Game.t) =
   let*! proof =
     Sc_rollup.Proof.produce
       ~metadata
+      ~find_dal_parameters:(fun _ -> assert false)
       pvm_with_context_and_state
       game.inbox_level
       ~is_reveal_enabled:Sc_rollup_helpers.is_reveal_enabled_default
