@@ -394,9 +394,11 @@ let create_config_file ~agent destination format =
     (Format.formatter_of_out_channel ch)
     format
 
-let init_faucet_backend ~agent ~sequencer_proxy ~faucet_private_key
+let init_faucet_backend ~agent ~sequencer_endpoint ~faucet_private_key
     ~faucet_api_proxy =
-  let tezlink_sandbox_endpoint = proxy_internal_endpoint sequencer_proxy in
+  let tezlink_sandbox_endpoint =
+    sequencer_internal_endpoint sequencer_endpoint
+  in
   let faucet_api_port = proxy_internal_port faucet_api_proxy in
   let faucet_backend_dir = "faucet-backend" in
   (* Clone faucet backend from personal fork because upstream depends on a RPC which we don't yet support (forge_operation). *)
@@ -429,7 +431,7 @@ CHALLENGE_SIZE=2048
 DIFFICULTY=4
 |}
       faucet_api_port
-      (Client.string_of_endpoint tezlink_sandbox_endpoint)
+      tezlink_sandbox_endpoint
       faucet_private_key
   in
   let* () =
@@ -960,7 +962,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             let* () =
               init_faucet_backend
                 ~agent:tezlink_sequencer_agent
-                ~sequencer_proxy
+                ~sequencer_endpoint
                 ~faucet_private_key
                 ~faucet_api_proxy
             in
