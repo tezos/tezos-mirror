@@ -582,7 +582,7 @@ let preconfirm_delayed_transactions ~(state : Types.state)
         let* tx =
           Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash
         in
-        Broadcast.notify_inclusion (Delayed tx) ;
+        Broadcast.notify_inclusion (Delayed tx) delayed_hash ;
         return tx)
       delayed_hashes
   in
@@ -599,9 +599,11 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
   let* current_size =
     (* Accumulator empty and at least one transaction = start next future block *)
     if state.validated_txns = [] && transactions <> [] then (
+      let proto_timestamp = Time.System.to_protocol timestamp in
       Broadcast.notify_next_block_info
-        (Time.System.to_protocol timestamp)
+        proto_timestamp
         head_info.next_blueprint_number ;
+      let*! () = Events.next_block_timestamp proto_timestamp in
       let* remaining_cumulative_size =
         preconfirm_delayed_transactions ~state ~head_info
       in
@@ -611,7 +613,7 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
   let input_validation_state = {state.validation_state with current_size} in
   let validate (validation_state, (rev_txns, rev_accepted_hashes))
       ((raw, tx_object) as entry) =
-    let+ res, wrapped_raw, hash =
+    let* res, wrapped_raw, hash =
       match tx_object with
       | Tx_queue_types.Evm tx_object ->
           let+ res =
@@ -635,12 +637,14 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
             Tezos_types.Operation.hash_operation operation )
     in
     match res with
-    | `Drop -> (validation_state, (rev_txns, hash :: rev_accepted_hashes))
+    | `Drop -> return (validation_state, (rev_txns, hash :: rev_accepted_hashes))
     | `Keep latest_validation_state ->
-        Broadcast.notify_inclusion (Common wrapped_raw) ;
-        ( latest_validation_state,
-          (entry :: rev_txns, hash :: rev_accepted_hashes) )
-    | `Stop -> (validation_state, (rev_txns, rev_accepted_hashes))
+        Broadcast.notify_inclusion (Common wrapped_raw) hash ;
+        let*! () = Events.inclusion hash in
+        return
+          ( latest_validation_state,
+            (entry :: rev_txns, hash :: rev_accepted_hashes) )
+    | `Stop -> return (validation_state, (rev_txns, rev_accepted_hashes))
   in
   let* validation_state, (rev_validated_txns, rev_accepted_hashes) =
     List.fold_left_es validate (input_validation_state, ([], [])) transactions

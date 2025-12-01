@@ -33,7 +33,8 @@ type next_block_info_handler =
 
 (** A [next_block_timestamp_handler] is a function that is called for
     every transaction included in the next block fetched from a remote EVM. *)
-type inclusion_handler = Broadcast.transaction -> unit tzresult Lwt.t
+type inclusion_handler =
+  Broadcast.transaction -> Ethereum_types.hash -> unit tzresult Lwt.t
 
 (** [start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
     ~get_next_blueprint_number on_new_blueprint_handler

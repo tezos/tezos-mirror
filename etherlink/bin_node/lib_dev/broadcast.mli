@@ -32,7 +32,7 @@ type message =
       timestamp : Time.Protocol.t;
       number : Ethereum_types.quantity;
     }
-  | Included_transaction of transaction
+  | Included_transaction of {tx : transaction; hash : Ethereum_types.hash}
 
 val message_encoding : message Data_encoding.t
 
@@ -59,7 +59,7 @@ val notify_next_block_info : Time.Protocol.t -> Ethereum_types.quantity -> unit
 
 (** [notify_inclusion tx] advertizes [tx] as the latest transaction to be included in the next block
     to the broadcast stream *)
-val notify_inclusion : transaction -> unit
+val notify_inclusion : transaction -> Ethereum_types.hash -> unit
 
 (** [create_receipt_stream ()] returns a new stream that can be used to be
     notified of pre-confirmed receipts after transactions are executed individualy. *)
