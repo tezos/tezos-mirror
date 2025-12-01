@@ -836,18 +836,19 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           Cli.parent_dns_domain
       in
       let activate_ssl = Cli.activate_ssl in
-      let sequencer_proxy =
-        make_proxy
-          tezlink_sequencer_agent
-          ~path:(Some "/tezlink")
-          ~dns_domain:
-            (Option.map (fun doms -> doms.sequencer_domain) dns_domains)
-          Cli.public_rpc_port
-          activate_ssl
-      in
       let sequencer_endpoint =
         match Cli.external_sequencer_endpoint with
-        | None -> Internal sequencer_proxy
+        | None ->
+            let sequencer_proxy =
+              make_proxy
+                tezlink_sequencer_agent
+                ~path:(Some "/tezlink")
+                ~dns_domain:
+                  (Option.map (fun doms -> doms.sequencer_domain) dns_domains)
+                Cli.public_rpc_port
+                activate_ssl
+            in
+            Internal sequencer_proxy
         | Some endpoint -> External endpoint
       in
       let* tzkt_proxy_opt =
