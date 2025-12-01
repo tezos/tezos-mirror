@@ -896,8 +896,10 @@ module State = struct
         Some {evm_state = ctxt.session.evm_state; timestamp; next_tx_index = 0l}
     else ctxt.session.future_block_state <- None
 
-  let execute_single_transaction ctxt (tx : Broadcast.transaction) =
+  let execute_single_transaction ctxt (tx : Broadcast.transaction) hash =
     let open Lwt_result_syntax in
+    Octez_telemetry.Trace.add_attrs (fun () ->
+        Telemetry.Attributes.[Transaction.hash hash]) ;
     match ctxt.session.future_block_state with
     | Some {evm_state; timestamp; next_tx_index} ->
         let* tx =
@@ -2314,9 +2316,9 @@ module Handlers = struct
         let ctxt = Worker.state self in
         State.next_block_info ctxt timestamp number ;
         return_unit
-    | Execute_single_transaction tx ->
+    | Execute_single_transaction {tx; hash} ->
         let ctxt = Worker.state self in
-        State.execute_single_transaction ctxt tx
+        State.execute_single_transaction ctxt tx hash
 
   let on_completion (type a err) _self (_r : (a, err) Request.t) (_res : a) _st
       =
@@ -2790,8 +2792,8 @@ let potential_observer_reorg evm_node_endpoint blueprint_with_events =
 let next_block_info timestamp number =
   worker_wait_for_request (Next_block_info {timestamp; number})
 
-let execute_single_transaction tx =
-  worker_wait_for_request (Execute_single_transaction tx)
+let execute_single_transaction tx hash =
+  worker_wait_for_request (Execute_single_transaction {tx; hash})
 
 let shutdown () =
   let open Lwt_result_syntax in

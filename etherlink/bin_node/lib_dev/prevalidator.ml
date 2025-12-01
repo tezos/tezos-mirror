@@ -881,6 +881,13 @@ let prevalidate_raw_transaction_tezlink raw_transaction =
 let validate_balance_gas_nonce_with_validation_state validation_state
     (transaction : Transaction_object.t) :
     (validation_state, string) result tzresult Lwt.t =
+  Octez_telemetry.Trace.with_tzresult
+    ~attrs:
+      Telemetry.Attributes.
+        [Transaction.hash (Transaction_object.hash transaction)]
+    ~service_name:"evm_node_worker.prevalidator"
+    "validate_balance_gas_nonce_with_validation_state"
+  @@ fun _ ->
   let open Lwt_result_syntax in
   let caller = Transaction_object.sender transaction in
   let (Address (Hex caller_str)) = caller in

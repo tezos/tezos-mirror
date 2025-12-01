@@ -748,7 +748,8 @@ evm_context_request_failed:
                         "transaction":
                           [ "transaction" || "deposit" || "fa_deposit",
                             $unistring,
-                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] } }
+                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] },
+                 "hash": $unistring }
             || { /* Next_block_info */
                  "request": "next_block_info",
                  "timestamp": $timestamp.protocol,
@@ -2700,7 +2701,8 @@ evm_context_request_failed:
                         "transaction":
                           [ "transaction" || "deposit" || "fa_deposit",
                             $unistring,
-                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] } }
+                            /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] },
+                 "hash": $unistring }
             || { /* Next_block_info */
                  "request": "next_block_info",
                  "timestamp": $timestamp.protocol,
