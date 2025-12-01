@@ -218,3 +218,7 @@ val integrity_check :
   unit Lwt.t
 
 val is_tezedge : t -> bool
+
+module Upgrade : sig
+  val v_3_3_upgrade : data_dir:string -> unit tzresult Lwt.t
+end

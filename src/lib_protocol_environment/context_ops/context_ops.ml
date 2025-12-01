@@ -1040,3 +1040,37 @@ let is_tezedge (context : Environment_context.t) =
   | Context {kind = Duo_irmin_tezedge_context.Context; _} ->
       true
   | _ -> false
+
+module Upgrade = struct
+  (* v_3_3_upgrade:
+    - Unifies all context directories ("context", "brassaia_context",
+      "tezedge_context") in "context", fails on conflicts.
+    - Adds a metadata.json file in the context directory to identify the context
+      backend *)
+  let v_3_3_upgrade ~data_dir =
+    let open Lwt_result_syntax in
+    let context_dir = context_dir data_dir in
+    let brassaia_dir = brassaia_context_dir data_dir in
+    let tezedge_dir = tezedge_context_dir data_dir in
+    let*! existing_dirs =
+      Lwt_list.filter_s
+        Lwt_unix.file_exists
+        [context_dir; brassaia_dir; tezedge_dir]
+    in
+    match existing_dirs with
+    | [] -> return_unit
+    | [dir] when dir = context_dir ->
+        Context_metadata.write_metadata_file dir Irmin
+    | [dir] (* when dir <> context_dir *) ->
+        let* () =
+          if dir = brassaia_dir then
+            Context_metadata.write_metadata_file dir Brassaia
+          else Context_metadata.write_metadata_file dir Tezedge
+        in
+        Lwt_result.ok @@ Lwt_unix.rename dir context_dir
+    | _ ->
+        failwith
+          "Found too many context directories : %a."
+          (Format.pp_print_list Format.pp_print_string)
+          existing_dirs
+end
