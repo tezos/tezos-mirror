@@ -239,3 +239,12 @@ let expect_clst_empty_deposit ~loc errs =
       :: Script_native.CLST_contract.Empty_deposit :: _ ->
         true
     | _ -> false)
+
+let expect_clst_non_implicit_depositer ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter.Runtime_contract_error _
+      :: Script_native.CLST_contract.Non_implicit_contract _ :: _ ->
+        true
+    | _ -> false)
