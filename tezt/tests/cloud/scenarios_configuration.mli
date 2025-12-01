@@ -55,8 +55,11 @@ module DAL : sig
     attestation_lag : int option;
     traps_fraction : Q.t option;
     publish_slots_regularly : bool;
+    stresstest : Stresstest.t option;
   }
 
+  (** If [seed] is omitted from the JSON config, a random seed is chosen
+      at decode time. *)
   val encoding : t Data_encoding.t
 end
 

@@ -55,6 +55,7 @@ module DAL = struct
     attestation_lag : int option;
     traps_fraction : Q.t option;
     publish_slots_regularly : bool;
+    stresstest : Stresstest.t option;
   }
 
   let encoding =
@@ -115,6 +116,7 @@ module DAL = struct
              attestation_lag;
              traps_fraction;
              publish_slots_regularly;
+             stresstest;
            }
          ->
         ( ( ( ( blocks_history,
@@ -161,7 +163,8 @@ module DAL = struct
             number_of_slots,
             attestation_lag,
             traps_fraction,
-            publish_slots_regularly ) ))
+            publish_slots_regularly,
+            stresstest ) ))
       (fun ( ( ( ( blocks_history,
                    producer_key,
                    fundraiser,
@@ -206,7 +209,8 @@ module DAL = struct
                number_of_slots,
                attestation_lag,
                traps_fraction,
-               publish_slots_regularly ) )
+               publish_slots_regularly,
+               stresstest ) )
          ->
         {
           blocks_history;
@@ -257,6 +261,7 @@ module DAL = struct
           attestation_lag;
           traps_fraction;
           publish_slots_regularly;
+          stresstest;
         })
       (merge_objs
          (merge_objs
@@ -312,12 +317,13 @@ module DAL = struct
                      (dft "ppx_profiling_backends" (list string) [])
                      (opt "enable_network_health_monitoring" bool))
                   (obj1 (opt "tezlink" bool)))))
-         (obj5
+         (obj6
             (opt "slot_size" int31)
             (opt "number_of_slots" int31)
             (opt "attestation_lag" int31)
             (opt "traps_fraction" q_encoding)
-            (dft "publish_slots_regularly" bool false)))
+            (dft "publish_slots_regularly" bool false)
+            (opt "stresstest" Stresstest.encoding)))
 end
 
 module LAYER1 = struct
