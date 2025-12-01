@@ -242,7 +242,9 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       ~tag:Gcp_not_interruptible
   in
-  let jobs_dnf_repository = Rpm_repository.jobs Release in
+  let jobs_dnf_repository =
+    Rpm_repository.jobs ~limit_dune_build_jobs:true Release
+  in
   let jobs_debian_repository =
     Debian_repository.jobs ~limit_dune_build_jobs:true Release
   in
