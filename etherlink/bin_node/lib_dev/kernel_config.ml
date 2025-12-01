@@ -256,6 +256,40 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
   in
   Installer_config.to_file (config_instrs @ world_state_instrs) ~output
 
+let make_tezos_bootstrap_instr tez_bootstrap_balance tez_bootstrap_accounts =
+  let balance =
+    Tezos_types.Tez.to_mutez_z tez_bootstrap_balance |> Rlp.encode_z
+  in
+  let nonce = Rlp.encode_int 0 in
+  List.map
+    (fun manager ->
+      let address =
+        Signature.Public_key.hash manager
+        |> Signature.Public_key_hash.to_b58check
+      in
+      let public_key =
+        Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding manager
+      in
+      let (`Hex alias) =
+        let address = Bytes.of_string address in
+        let alias = Tezos_crypto.Hacl.Hash.Keccak_256.digest address in
+        Bytes.sub alias 0 20 |> Hex.of_bytes
+      in
+      let payload =
+        Rlp.(
+          List [Value balance; Value nonce; Value public_key]
+          |> encode |> Bytes.to_string)
+      in
+      make_instr
+        ~path_prefix:["evm"; "world_state"; "eth_accounts"; "tezos"; address]
+        (Some ("info", payload))
+      @ make_instr
+          ~path_prefix:
+            ["evm"; "world_state"; "eth_accounts"; "tezos"; "names"; "ethereum"]
+          (Some (alias, address)))
+    tez_bootstrap_accounts
+  |> List.flatten
+
 let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     ?eth_bootstrap_accounts ?kernel_root_hash ?chain_id ?sequencer
     ?delayed_bridge ?ticketer ?admin ?sequencer_governance ?kernel_governance
@@ -266,7 +300,7 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     ?enable_revm ?enable_dal ?dal_slots ?enable_fast_withdrawal
     ?enable_fast_fa_withdrawal ?enable_multichain ?set_account_code
     ?max_delayed_inbox_blueprint_length ?evm_version ?(with_runtimes = [])
-    ~output () =
+    ?tez_bootstrap_accounts ~tez_bootstrap_balance ~output () =
   let eth_bootstrap_accounts =
     let open Ethereum_types in
     match eth_bootstrap_accounts with
@@ -280,6 +314,12 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
               (Some ("balance", balance)))
           eth_bootstrap_accounts
         |> List.flatten
+  in
+  let tez_bootstrap_accounts =
+    match tez_bootstrap_accounts with
+    | None -> []
+    | Some tez_bootstrap_accounts ->
+        make_tezos_bootstrap_instr tez_bootstrap_balance tez_bootstrap_accounts
   in
 
   let set_account_code =
@@ -367,7 +407,7 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     @ make_instr ~convert:le_int64_bytes maximum_allowed_ticks
     @ make_instr ~convert:le_int64_bytes maximum_gas_per_transaction
     @ make_instr ~convert:le_int64_bytes max_blueprint_lookahead_in_seconds
-    @ eth_bootstrap_accounts @ set_account_code
+    @ eth_bootstrap_accounts @ tez_bootstrap_accounts @ set_account_code
     @ make_instr remove_whitelist
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_fa_bridge
     @ make_instr

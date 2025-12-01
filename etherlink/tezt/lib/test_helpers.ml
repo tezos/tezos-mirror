@@ -507,11 +507,17 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
     ?(eth_bootstrap_accounts =
       List.map
         (fun account -> account.Eth_account.address)
-        (Array.to_list Eth_account.bootstrap_accounts)) ?(sequencer_keys = [])
-    ?with_runtimes () =
+        (Array.to_list Eth_account.bootstrap_accounts))
+    ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
+    ?(sequencer_keys = []) ?with_runtimes () =
   let wallet_dir = Temp.dir "wallet" in
   let output_config = Temp.file "config.yaml" in
   let preimages_dir = Temp.dir "wasm_2_0_0" in
+  let tez_bootstrap_accounts =
+    (* tezos bootstrap accounts only relevant if tezos runtime is activated *)
+    if not Tezosx_runtime.(mem Tezos with_runtimes) then []
+    else tez_bootstrap_accounts
+  in
   let*! () =
     Evm_node.make_kernel_installer_config
       ?maximum_gas_per_transaction
@@ -520,6 +526,7 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
       ?minimum_base_fee_per_gas
       ~output:output_config
       ~eth_bootstrap_accounts
+      ~tez_bootstrap_accounts
       ?evm_version
       ?with_runtimes
       ?sequencer:

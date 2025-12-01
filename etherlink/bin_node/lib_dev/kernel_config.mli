@@ -45,6 +45,8 @@ val make :
   ?max_delayed_inbox_blueprint_length:string * string ->
   ?evm_version:evm_version ->
   ?with_runtimes:Tezosx.runtime list ->
+  ?tez_bootstrap_accounts:Signature.public_key list ->
+  tez_bootstrap_balance:Tezos_types.Tez.t ->
   output:string ->
   unit ->
   unit tzresult Lwt.t

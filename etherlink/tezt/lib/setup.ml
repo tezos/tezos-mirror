@@ -253,12 +253,18 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
 let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
     ~mainnet_compat ?delayed_inbox_timeout ?delayed_inbox_min_levels
     ?(eth_bootstrap_accounts = Evm_node.eth_default_bootstrap_accounts)
+    ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?sequencer_pool_address ?da_fee_per_byte ?minimum_base_fee_per_gas
     ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ~enable_dal ?dal_slots
     ?evm_version ?with_runtimes ~sequencer ~preimages_dir ~kernel () =
   let output_config = Temp.file "config.yaml" in
+  let tez_bootstrap_accounts =
+    (* Tezos bootstrap accounts are only relevant if the runtime is activated *)
+    if not Tezosx_runtime.(mem Tezos with_runtimes) then []
+    else tez_bootstrap_accounts
+  in
   let*! () =
     Evm_node.make_kernel_installer_config
       ?max_delayed_inbox_blueprint_length
@@ -282,6 +288,7 @@ let setup_kernel_singlechain ~l1_contracts ?max_delayed_inbox_blueprint_length
       ~enable_multichain:false
       ?max_blueprint_lookahead_in_seconds
       ~eth_bootstrap_accounts
+      ~tez_bootstrap_accounts
       ~output:output_config
       ?evm_version
       ?enable_fa_bridge
@@ -460,6 +467,7 @@ let setup_kernel ~enable_multichain ~l2_chains ~l1_contracts
       ?dal_slots
       ?max_blueprint_lookahead_in_seconds
       ?eth_bootstrap_accounts:chain_config.Evm_node.eth_bootstrap_accounts
+      ?tez_bootstrap_accounts:chain_config.Evm_node.tez_bootstrap_accounts
       ?enable_fa_bridge
       ?evm_version
       ?with_runtimes

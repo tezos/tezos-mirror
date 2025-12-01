@@ -267,7 +267,8 @@ val find_and_execute_withdrawal :
   int Lwt.t
 
 (** Runs a sequencer in mode sandbox, with no connection needed to a
-    rollup node. *)
+    rollup node. Will setup bootstrap accounts by default, for activated
+    runtimes (EVM is always active). *)
 val init_sequencer_sandbox :
   ?maximum_gas_per_transaction:int64 ->
   ?genesis_timestamp:Client.timestamp ->
@@ -283,6 +284,7 @@ val init_sequencer_sandbox :
   ?kernel:Uses.t ->
   ?evm_version:Evm_version.t ->
   ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer_keys:Account.key list ->
   ?with_runtimes:Tezosx_runtime.t list ->
   unit ->
