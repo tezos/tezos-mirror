@@ -1103,6 +1103,31 @@ module Actions = struct
   let unhealthy_dal_node = Commands.unhealthy_dal_node
 
   let unreachable_dal_node = Commands.unreachable_dal_node
+
+  let stalling_signature =
+    declare_4
+      ~section
+      ~name:"stalling_signature"
+      ~level:Warning
+      ~msg:
+        "Signature call of {kind} for level {level} at round {round} has not \
+         resolved in the last {seconds} seconds"
+      ("kind", Baking_errors.signing_request_encoding)
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
+      ("seconds", Data_encoding.float)
+
+  let stalling_forge_block =
+    declare_3
+      ~section
+      ~name:"stalling_forge_block"
+      ~level:Warning
+      ~msg:
+        "Forge block for level {level} at round {round} has not resolved in \
+         the last {seconds} seconds"
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
+      ("seconds", Data_encoding.float)
 end
 
 module VDF = struct

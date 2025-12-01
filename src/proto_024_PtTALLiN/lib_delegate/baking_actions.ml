@@ -228,7 +228,8 @@ let sign ?timeout ?watermark ~signing_request cctxt secret_key_uri msg =
       Lwt.return (Error errs)
   | `Signature_result (Ok res) -> Lwt.return (Ok res)
 
-let sign_block_header global_state proposer unsigned_block_header =
+let sign_block_header round_duration global_state proposer unsigned_block_header
+    =
   let open Lwt_result_syntax in
   let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
@@ -275,15 +276,23 @@ let sign_block_header global_state proposer unsigned_block_header =
   match result with
   | false -> tzfail (Block_previously_baked {level; round})
   | true ->
+      let delay_between_stall_events =
+        (* round_duration /. 2 is arbitrary and conservative *)
+        round_duration /. 2.
+      in
       let* signature =
-        (sign
-           ?timeout:global_state.config.remote_calls_timeout
-           ~signing_request:`Block_header
-           cctxt
-           proposer.secret_key_uri
-           ~watermark:Block_header.(to_watermark (Block_header chain_id))
-           unsigned_header
-         [@profiler.record_s {verbosity = Debug} "sign : block header"])
+        Utils.event_on_stalling_promise
+          ~initial_delay:delay_between_stall_events
+          ~event:(fun sum ->
+            Events.(emit stalling_signature (`Block_header, level, round, sum)))
+          (sign
+             ?timeout:global_state.config.remote_calls_timeout
+             ~signing_request:`Block_header
+             cctxt
+             proposer.secret_key_uri
+             ~watermark:Block_header.(to_watermark (Block_header chain_id))
+             unsigned_header
+           [@profiler.record_s {verbosity = Debug} "sign : block header"])
       in
       return {Block_header.shell; protocol_data = {contents; signature}}
 
@@ -291,12 +300,8 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     =
   let open Lwt_result_syntax in
   let {predecessor; round; delegate; kind; force_apply} = block_to_bake in
-  let*! () =
-    Events.(
-      emit
-        prepare_forging_block
-        (Int32.succ predecessor.shell.level, round, delegate))
-  in
+  let level = Int32.succ predecessor.shell.level in
+  let*! () = Events.(emit prepare_forging_block (level, round, delegate)) in
   let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
   let simulation_mode = global_state.validation_mode in
@@ -334,10 +339,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
           payload_round )
   in
   let*! () =
-    Events.(
-      emit
-        forging_block
-        (Int32.succ predecessor.shell.level, round, delegate, force_apply))
+    Events.(emit forging_block (level, round, delegate, force_apply))
   in
   let* injection_level =
     Node_rpc.current_level
@@ -418,28 +420,36 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
        ~block:pred_block
        () [@profiler.record_s {verbosity = Info} "live blocks"])
   in
+  let round_duration =
+    Round.round_duration global_state.round_durations round
+    |> Period.to_seconds |> Int64.to_float
+  in
   let* {unsigned_block_header; operations; manager_operations_infos} =
-    (Block_forge.forge
-       cctxt
-       ~chain_id
-       ~pred_info:predecessor
-       ~pred_live_blocks
-       ~pred_resulting_context_hash
-       ~timestamp
-       ~round
-       ~seed_nonce_hash
-       ~payload_round
-       ~liquidity_baking_toggle_vote:liquidity_baking_vote
-       ~user_activated_upgrades
-       ~force_apply
-       global_state.config.fees
-       simulation_mode
-       simulation_kind
-       global_state.constants.parametric
-     [@profiler.record_s {verbosity = Info} "forge block"])
+    Utils.event_on_stalling_promise
+      ~initial_delay:(round_duration /. 2.)
+      ~event:(fun sum -> Events.(emit stalling_forge_block (level, round, sum)))
+    @@ (Block_forge.forge
+          cctxt
+          ~chain_id
+          ~pred_info:predecessor
+          ~pred_live_blocks
+          ~pred_resulting_context_hash
+          ~timestamp
+          ~round
+          ~seed_nonce_hash
+          ~payload_round
+          ~liquidity_baking_toggle_vote:liquidity_baking_vote
+          ~user_activated_upgrades
+          ~force_apply
+          global_state.config.fees
+          simulation_mode
+          simulation_kind
+          global_state.constants.parametric
+        [@profiler.record_s {verbosity = Info} "forge block"])
   in
   let* signed_block_header =
     (sign_block_header
+       round_duration
        global_state
        delegate.consensus_key
        unsigned_block_header
@@ -673,7 +683,12 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
   let open Lwt_result_syntax in
   let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
-  let {vote_kind; vote_consensus_content; delegate; dal_content} =
+  let {
+    vote_kind;
+    vote_consensus_content = {level; round; _} as vote_consensus_content;
+    delegate;
+    dal_content;
+  } =
     unsigned_consensus_vote
   in
   let shell = {Tezos_base.Operation.branch} in
@@ -746,14 +761,29 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     | Attestation -> `Attestation
   in
   let sk_consensus_uri = delegate.consensus_key.secret_key_uri in
+  let delay_between_stall_events =
+    let round_duration =
+      Round.round_duration global_state.round_durations round
+      |> Period.to_seconds |> Int64.to_float
+    in
+    (* round_duration /. 3 is arbitrary and conservative *)
+    round_duration /. 3.
+  in
   let* consensus_sig =
-    sign
-      ?timeout:global_state.config.remote_calls_timeout
-      ~signing_request
-      cctxt
-      ~watermark
-      sk_consensus_uri
-      unsigned_operation_bytes
+    Utils.event_on_stalling_promise
+      ~initial_delay:delay_between_stall_events
+      ~event:(fun sum ->
+        Events.(
+          emit
+            stalling_signature
+            (signing_request, Raw_level.to_int32 level, round, sum)))
+    @@ sign
+         ?timeout:global_state.config.remote_calls_timeout
+         ~signing_request
+         cctxt
+         ~watermark
+         sk_consensus_uri
+         unsigned_operation_bytes
   in
   let* signature =
     match (dal_content, companion_key_opt) with
@@ -768,13 +798,20 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     | Some {attestation = dal_attestation}, Some companion_key -> (
         let sk_companion_uri = companion_key.secret_key_uri in
         let* companion_sig =
-          sign
-            ?timeout:global_state.config.remote_calls_timeout
-            ~signing_request
-            cctxt
-            ~watermark
-            sk_companion_uri
-            unsigned_operation_bytes
+          Utils.event_on_stalling_promise
+            ~initial_delay:delay_between_stall_events
+            ~event:(fun sum ->
+              Events.(
+                emit
+                  stalling_signature
+                  (signing_request, Raw_level.to_int32 level, round, sum)))
+          @@ sign
+               ?timeout:global_state.config.remote_calls_timeout
+               ~signing_request
+               cctxt
+               ~watermark
+               sk_companion_uri
+               unsigned_operation_bytes
         in
         match
           ( consensus_sig,
