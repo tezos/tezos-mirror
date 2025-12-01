@@ -67,6 +67,15 @@ val ignored_periodic_snapshot : unit -> unit Lwt.t
     be ignoring the all the incoming preconfirmation data. *)
 val ignored_preconfirmations : unit -> unit Lwt.t
 
+(** [assemble_block_diverged level] advertises that the assembled block has
+    diverged from the expected one and that the node will re-execute
+    the full blueprint to recover consistency. *)
+val assemble_block_diverged : Z.t -> unit Lwt.t
+
+(** [seq_block_hash_missing level] advertises that the assembled block cannot
+    be validated because the sequencer block hash is missing. *)
+val seq_block_hash_missing : Z.t -> unit Lwt.t
+
 (** [catching_up_evm_event ~from ~to_] advertises that the sequencer
     is catching up on event produced by the evm kernel in the rollup
     node from L1 level [from] to [to_]. *)

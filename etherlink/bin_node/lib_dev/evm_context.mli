@@ -82,14 +82,17 @@ val apply_evm_events :
 val apply_evm_events' :
   ?finalized_level:int32 -> Evm_events.t list -> unit tzresult Lwt.t
 
-(** [apply_blueprint ?events timestamp payload delayed_transactions]
+(** [apply_blueprint ?events ?expected_block_hash timestamp payload
+    delayed_transactions]
     applies [payload] in the freshest EVM state stored under [ctxt] at
-    timestamp [timestamp], forwards the
-    {!Blueprint_types.with_events}, and returns the transaction hashes
-    of the created block. It commits the result if the blueprint
-    produces the expected block. *)
+    timestamp [timestamp], forwards the {!Blueprint_types.with_events},
+    and returns the transaction hashes of the created block.
+    It commits the result if the blueprint produces the expected block.
+    In the case of an assembled block, the resulting block hash is matched
+    against [expected_block_hash], which represents the sequencer resulting hash. *)
 val apply_blueprint :
   ?events:Evm_events.t list ->
+  ?expected_block_hash:Ethereum_types.block_hash ->
   Time.Protocol.t ->
   Blueprint_types.payload ->
   Evm_events.Delayed_transaction.t list ->
