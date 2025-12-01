@@ -300,12 +300,8 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
     =
   let open Lwt_result_syntax in
   let {predecessor; round; delegate; kind; force_apply} = block_to_bake in
-  let*! () =
-    Events.(
-      emit
-        prepare_forging_block
-        (Int32.succ predecessor.shell.level, round, delegate))
-  in
+  let level = Int32.succ predecessor.shell.level in
+  let*! () = Events.(emit prepare_forging_block (level, round, delegate)) in
   let cctxt = global_state.cctxt in
   let chain_id = global_state.chain_id in
   let simulation_mode = global_state.validation_mode in
@@ -343,10 +339,7 @@ let prepare_block (global_state : global_state) (block_to_bake : block_to_bake)
           payload_round )
   in
   let*! () =
-    Events.(
-      emit
-        forging_block
-        (Int32.succ predecessor.shell.level, round, delegate, force_apply))
+    Events.(emit forging_block (level, round, delegate, force_apply))
   in
   let* injection_level =
     Node_rpc.current_level
