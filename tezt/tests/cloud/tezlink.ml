@@ -236,10 +236,12 @@ let git_clone agent ?branch repo_url directory =
     @ (match branch with None -> [] | Some branch -> ["-b"; branch])
     @ [repo_url; directory])
 
-let init_tzkt ~tzkt_proxy ~agent ~sequencer_proxy ~time_between_blocks =
+let init_tzkt ~tzkt_proxy ~agent ~sequencer_endpoint ~time_between_blocks =
   (* Set of functions helpful for Tzkt setup *)
   let run = run agent in
-  let tezlink_sandbox_endpoint = proxy_internal_endpoint sequencer_proxy in
+  let tezlink_sandbox_endpoint =
+    sequencer_internal_endpoint sequencer_endpoint
+  in
   let tzkt_api_port = proxy_internal_port tzkt_proxy in
   (* Run a psql command (a specific database can be set as a target) *)
   let psql ?db command =
@@ -314,9 +316,7 @@ let init_tzkt ~tzkt_proxy ~agent ~sequencer_proxy ~time_between_blocks =
   (* Prepare multiple argument for Tzkt indexer and API start. *)
   (* Set our endpoint for Tzkt instead of the default "https://rpc.tzkt.io/mainnet/".*)
   let endpoint_arg =
-    tzkt_arg
-      ["TezosNode"; "Endpoint"]
-      [Client.string_of_endpoint tezlink_sandbox_endpoint]
+    tzkt_arg ["TezosNode"; "Endpoint"] [tezlink_sandbox_endpoint]
   in
   (* Tell Tzkt that the database is available on localhost at port 5432. *)
   (* We can't set a specific argument in this command so we must set every values. *)
@@ -937,7 +937,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             init_tzkt
               ~tzkt_proxy
               ~agent:tezlink_sequencer_agent
-              ~sequencer_proxy
+              ~sequencer_endpoint
               ~time_between_blocks:Cli.time_between_blocks
       and* () =
         match umami_proxys_opt with
