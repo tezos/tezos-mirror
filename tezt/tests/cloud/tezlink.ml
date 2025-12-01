@@ -726,16 +726,27 @@ let add_proxy_service cloud runner name ?(url = Fun.id) proxy =
   in
   add_service cloud ~name ~url:(url endpoint)
 
-let add_services cloud runner ~sequencer_proxy ~tzkt_proxy_opt
+let add_services cloud runner ~sequencer_endpoint ~tzkt_proxy_opt
     ~faucet_proxys_opt ~umami_proxys_opt =
   let add_proxy_service = add_proxy_service cloud runner in
   let* () =
-    add_proxy_service
-      "Check Tezlink RPC endpoint"
-      ~url:(sf "%s/version")
-      sequencer_proxy
+    let name_check = "Check Tezlink RPC endpoint" in
+    let name_endpoint = "Tezlink RPC endpoint" in
+    match sequencer_endpoint with
+    | Internal sequencer_proxy ->
+        let* () =
+          add_proxy_service name_check ~url:(sf "%s/version") sequencer_proxy
+        in
+        add_proxy_service name_endpoint sequencer_proxy
+    | External sequencer_endpoint ->
+        let* () =
+          add_service
+            cloud
+            ~name:name_check
+            ~url:(sf "%s/version" sequencer_endpoint)
+        in
+        add_service cloud ~name:name_endpoint ~url:sequencer_endpoint
   in
-  let* () = add_proxy_service "Tezlink RPC endpoint" sequencer_proxy in
   let* () =
     match tzkt_proxy_opt with
     | None -> unit
@@ -901,7 +912,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         add_services
           cloud
           runner
-          ~sequencer_proxy
+          ~sequencer_endpoint
           ~tzkt_proxy_opt
           ~faucet_proxys_opt
           ~umami_proxys_opt
