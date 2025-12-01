@@ -80,6 +80,9 @@ let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
 
       let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
         Lwt_result_syntax.return_unit
+
+      let dropped_transaction ~dropped_tx:_ ~reason:_ =
+        Lwt_result_syntax.return_unit
     end : Services_backend_sig.Tx_container
       with type address = Ethereum_types.address
        and type transaction_object = Transaction_object.t)

@@ -360,6 +360,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         ~on_inclusion
         ~on_dropped:(fun hash reason ->
           Broadcast.notify_dropped ~hash ~reason ;
+          let* () = Tx_container.dropped_transaction ~dropped_tx:hash ~reason in
           return_unit)
         ()
     and* () =

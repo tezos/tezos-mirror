@@ -327,6 +327,11 @@ struct
           clear_pending_queue_after : bool;
         }
           -> (unit, tztrace) t
+      | Dropped_transaction : {
+          dropped_tx : Ethereum_types.hash;
+          reason : string;
+        }
+          -> (unit, tztrace) t
 
     let name (type a b) (t : (a, b) t) =
       match t with
@@ -343,6 +348,7 @@ struct
       | Size_info -> "Size_info"
       | Pop_transactions _ -> "Pop_transactions"
       | Confirm_transactions _ -> "Confirm_transactions"
+      | Dropped_transaction _ -> "Dropped_transaction"
 
     type view = View : _ t -> view
 
@@ -477,6 +483,18 @@ struct
                   Some ((), List.of_seq confirmed_txs, clear_pending_queue_after)
               | _ -> None)
             (fun _ -> assert false);
+          case
+            Json_only
+            ~title:"Dropped_transaction"
+            (obj3
+               (req "request" (constant "dropped_transaction"))
+               (req "dropped_tx" Ethereum_types.hash_encoding)
+               (req "reason" string))
+            (function
+              | View (Dropped_transaction {dropped_tx; reason}) ->
+                  Some ((), dropped_tx, reason)
+              | _ -> None)
+            (fun _ -> assert false);
         ]
 
     let pp fmt (View r) =
@@ -505,6 +523,7 @@ struct
       | Pop_transactions {validation_state = _; validate_tx = _} ->
           fprintf fmt "Popping transactions with validation function"
       | Confirm_transactions _ -> fprintf fmt "Confirming transactions"
+      | Dropped_transaction _ -> fprintf fmt "Dropping transaction"
   end
 
   module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
@@ -1120,6 +1139,15 @@ struct
             Pending_transactions.clear state.pending ;
             return_unit)
           else return_unit
+      | Dropped_transaction {dropped_tx; reason = _} ->
+          protect @@ fun () ->
+          let callback = Pending_transactions.pop state.pending dropped_tx in
+          let*! () =
+            match callback with
+            | Some {pending_callback; _} -> pending_callback `Dropped
+            | None -> Lwt.return_unit
+          in
+          return_unit
 
     type launch_error = tztrace
 
@@ -1309,6 +1337,11 @@ struct
       w
       (Confirm_transactions {confirmed_txs; clear_pending_queue_after})
     |> handle_request_error
+
+  let dropped_transaction ~dropped_tx ~reason =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    push_request w (Dropped_transaction {dropped_tx; reason})
 
   let lock_transactions () =
     bind_worker @@ fun w -> push_request w Lock_transactions
