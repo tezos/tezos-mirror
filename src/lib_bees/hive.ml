@@ -15,11 +15,21 @@ type worker =
       -> worker
 
 module WorkerTbl = struct
-  type t = worker String.Hashtbl.t
+  module Htbl = Saturn.Htbl
 
-  let create ~initial_size = String.Hashtbl.create initial_size
+  type t = (string, worker) Htbl.t
 
-  let find_opt tbl ~name = String.Hashtbl.find_opt tbl name
+  let create ~initial_size =
+    let min_buckets = max 1 initial_size in
+    Htbl.create ~hashed_type:(module String) ~min_buckets ()
+
+  let find_opt tbl ~name = Htbl.find_opt tbl name
+
+  let replace tbl ~name worker =
+    if Htbl.try_add tbl name worker then ()
+    else if Htbl.try_set tbl name worker then ()
+    else (* unreachable *)
+      assert false
 end
 
 type t = {
@@ -32,22 +42,6 @@ let hive =
     workers = WorkerTbl.create ~initial_size:64;
     lwt_tasks_stream = Eio.Stream.create max_int;
   }
-
-(* Initialize the [lwt_scheduler_loop] by running it in its own domain in the
-   main Eio switch *)
-let () =
-  let lwt_scheduler_loop () =
-    let rec loop () : [`Stop_daemon] =
-      let lwt_closure = Eio.Stream.take hive.lwt_tasks_stream in
-      (* The loop will run in the [Event_loop] main domain, so [Eio.run_lwt] is
-         fine. *)
-      Lwt_eio.run_lwt lwt_closure ;
-      loop ()
-    in
-    loop ()
-  in
-  Tezos_base_unix.Event_loop.on_main_run (fun _env switch ->
-      Eio.Fiber.fork_daemon ~sw:switch lwt_scheduler_loop)
 
 let async_lwt = Eio.Stream.add hive.lwt_tasks_stream
 
@@ -71,6 +65,8 @@ let launch_worker (type worker) ?switch (worker : worker) ~bee_name ~domains
 
      The Event_loop's main switch is meant to be a switch available during
      the whole life of your main process, so you can use it by default.
+     This accessor must be called from the main domain; callers off-main should
+     schedule via [run_on_main] to avoid blocking on the main switch lookup.
   *)
   let switch =
     match switch with
@@ -81,9 +77,9 @@ let launch_worker (type worker) ?switch (worker : worker) ~bee_name ~domains
     Eio.Fiber.fork_daemon ~sw:switch (fun () ->
         Eio.Domain_manager.run env#domain_mgr (fun () -> worker_loop i worker))
   done ;
-  String.Hashtbl.add
+  WorkerTbl.replace
     workers
-    bee_name
+    ~name:bee_name
     (Worker
        {worker; launched = Time.System.now (); subdomains = domains; switch})
 
