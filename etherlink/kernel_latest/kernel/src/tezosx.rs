@@ -2,12 +2,28 @@
 //
 // SPDX-License-Identifier: MIT
 
+use mir::ast::PublicKeyHash;
 use primitive_types::U256;
+use revm_etherlink::Error;
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_ethereum::rlp_helpers::{
     append_u256_le, append_u64_le, decode_field_u256_le, decode_field_u64_le,
 };
+use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::PublicKey;
+use tezos_smart_rollup_host::path::PathError;
+use tezos_smart_rollup_host::{
+    path::{concat, OwnedPath, RefPath},
+    runtime::RuntimeError,
+};
+
+// Path where Tezos accounts are stored.
+const TEZOS_ACCOUNTS_PATH: RefPath =
+    RefPath::assert_from(b"/evm/world_state/eth_accounts/tezos");
+
+// Path where all the infos of a Tezos contract are stored under the same key.
+// This path must contains balance, nonce and optionally a revealed public key.
+const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
 // Used as a value for the durable storage.
 #[derive(Debug, Default, Eq, PartialEq, Clone)]
@@ -64,6 +80,43 @@ impl Decodable for TezosAccountInfo {
     }
 }
 
+fn path_to_tezos_account(pub_key_hash: PublicKeyHash) -> Result<OwnedPath, PathError> {
+    let address_path: Vec<u8> = format!("/{pub_key_hash}").into();
+    let address_path = OwnedPath::try_from(address_path)?;
+    let prefix = concat(&TEZOS_ACCOUNTS_PATH, &address_path)?;
+    concat(&prefix, &INFO_PATH)
+}
+
+#[allow(dead_code)]
+pub fn get_tezos_account_info(
+    host: &impl Runtime,
+    pub_key_hash: PublicKeyHash,
+) -> Result<Option<TezosAccountInfo>, Error> {
+    let path =
+        path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
+    match host.store_read_all(&path) {
+        Ok(bytes) => {
+            let account_info = TezosAccountInfo::decode(&Rlp::new(&bytes))
+                .map_err(|_| RuntimeError::DecodingError)?;
+            Ok(Some(account_info))
+        }
+        Err(RuntimeError::PathNotFound) => Ok(None),
+        Err(err) => Err(Error::Runtime(err)),
+    }
+}
+
+#[cfg(test)]
+pub fn set_tezos_account_info(
+    host: &mut impl Runtime,
+    pub_key_hash: PublicKeyHash,
+    info: TezosAccountInfo,
+) -> Result<(), Error> {
+    let path =
+        path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
+    let value = &info.rlp_bytes();
+    Ok(host.store_write_all(&path, value)?)
+}
+
 #[test]
 fn tezos_account_info_encoding() {
     use crate::tezosx::TezosAccountInfo;
@@ -84,4 +137,35 @@ fn tezos_account_info_encoding() {
     let decoded_account =
         TezosAccountInfo::decode(&Rlp::new(bytes)).expect("Account should be decodable");
     assert!(decoded_account == account);
+}
+
+#[test]
+fn tezos_account_storage() {
+    use crate::tezosx::TezosAccountInfo;
+    use primitive_types::U256;
+    use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup::types::PublicKey;
+
+    let mut host = MockKernelHost::default();
+
+    let pub_key_hash: PublicKeyHash =
+        PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+            .expect("Public key hash should be a b58 string");
+    let pub_key: PublicKey = PublicKey::from_b58check(
+        "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+    )
+    .expect("Public key should be a b58 string");
+    let account = TezosAccountInfo {
+        balance: U256::from(1234u64),
+        nonce: 18,
+        pub_key: Some(pub_key.clone()),
+    };
+
+    set_tezos_account_info(&mut host, pub_key_hash.clone(), account.clone())
+        .expect("Writing to the storage should have worked");
+
+    let read_account = get_tezos_account_info(&host, pub_key_hash)
+        .expect("Reading the storage should have worked")
+        .expect("The path to the account should exist");
+    assert_eq!(account, read_account);
 }
