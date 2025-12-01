@@ -139,7 +139,10 @@ let test_tezlink_current_level =
       ^ offset_str
     in
     let* res =
-      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        ~args:["-v"]
+        (Evm_node.endpoint sequencer ^ path)
       |> Runnable.run
     in
     return @@ JSON.parse ~origin:"curl_current_level" res
@@ -220,7 +223,10 @@ let test_tezlink_protocols =
   let rpc_protocols () =
     let path = "/tezlink/chains/main/blocks/head/protocols" in
     let* res =
-      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        ~args:["-v"]
+        (Evm_node.endpoint sequencer ^ path)
       |> Runnable.run
     in
     return @@ JSON.parse ~origin:"curl_protocols" res
@@ -245,7 +251,10 @@ let test_tezlink_genesis_block_arg =
       Format.sprintf "/tezlink/chains/main/blocks/%s/protocols" block_arg
     in
     let* res =
-      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        ~args:["-v"]
+        (Evm_node.endpoint sequencer ^ path)
       |> Runnable.run
     in
     return @@ JSON.parse ~origin:"curl_protocols" res
@@ -272,7 +281,10 @@ let test_tezlink_expected_issuance =
       "/tezlink/chains/main/blocks/head/context/issuance/expected_issuance"
     in
     let* res =
-      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        ~args:["-v"]
+        (Evm_node.endpoint sequencer ^ path)
       |> Runnable.run
     in
     return @@ JSON.parse ~origin:"curl" res
@@ -345,7 +357,10 @@ let account_str_rpc sequencer account key =
   in
 
   let* res =
-    Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+    Curl.get_raw
+      ~name:("curl#" ^ Evm_node.name sequencer)
+      ~args:["-v"]
+      (Evm_node.endpoint sequencer ^ path)
     |> Runnable.run
   in
   return @@ JSON.parse ~origin:"curl_protocols" res
@@ -458,7 +473,10 @@ let test_tezlink_contract_info_on_liquidity_baking =
         address
     in
     let* res =
-      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        ~args:["-v"]
+        (Evm_node.endpoint sequencer ^ path)
       |> Runnable.run
     in
     let json = JSON.parse ~origin:"curl_protocols" res in
@@ -487,7 +505,10 @@ let test_tezlink_version =
   let rpc_version () =
     let path = "/tezlink/version" in
     let* res =
-      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        ~args:["-v"]
+        (Evm_node.endpoint sequencer ^ path)
       |> Runnable.run
     in
     return @@ JSON.parse ~origin:"curl_version" res
@@ -668,7 +689,10 @@ let test_tezlink_bootstrapped =
   let* rpc_bootstrapped =
     let path = "/tezlink/monitor/bootstrapped" in
     let* res =
-      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        ~args:["-v"]
+        (Evm_node.endpoint sequencer ^ path)
       |> Runnable.run
     in
     return @@ JSON.parse ~origin:"curl_bootstrapped" res
@@ -781,7 +805,10 @@ let test_tezlink_produceBlock =
   let rpc_current_level_head sequencer =
     let path = "/tezlink/chains/main/blocks/head/helpers/current_level" in
     let* res =
-      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        ~args:["-v"]
+        (Evm_node.endpoint sequencer ^ path)
       |> Runnable.run
     in
     let json = JSON.parse ~origin:"curl_current_level" res in
@@ -802,7 +829,10 @@ let test_tezlink_hash_rpc =
   let path block = sf "/tezlink/chains/main/blocks/%s/hash" block in
   let rpc_hash block =
     let* res =
-      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path block)
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        ~args:["-v"]
+        (Evm_node.endpoint sequencer ^ path block)
       |> Runnable.run
     in
     return @@ JSON.(parse ~origin:"curl_hash" res |> as_string)
@@ -840,6 +870,7 @@ let test_tezlink_raw_json_cycle =
   let rpc_raw_json_cycle () =
     let* res =
       Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
         ~args:["-v"]
         (Evm_node.endpoint sequencer ^ path_head ^ "context/raw/json/cycle/0")
       |> Runnable.run
@@ -1510,7 +1541,10 @@ let test_tezlink_internal_receipts =
   let* operation =
     let path = tezlink_path ^ "/chains/main/blocks/head/operations/3/0" in
     let* res =
-      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      Curl.get_raw
+        ~name:("curl#" ^ Evm_node.name sequencer)
+        ~args:["-v"]
+        (Evm_node.endpoint sequencer ^ path)
       |> Runnable.run
     in
     let json = JSON.parse ~origin:"curl_operation_hashes" res in
@@ -1700,7 +1734,11 @@ let test_tezlink_forge_operations =
   in
   let rpc_forge_operations () =
     let path = "/tezlink/chains/main/blocks/head/helpers/forge/operations" in
-    Curl.post_raw (Evm_node.endpoint sequencer ^ path) json_data |> Runnable.run
+    Curl.post_raw
+      ~name:("curl#" ^ Evm_node.name sequencer)
+      (Evm_node.endpoint sequencer ^ path)
+      json_data
+    |> Runnable.run
   in
   let* binary =
     let name =

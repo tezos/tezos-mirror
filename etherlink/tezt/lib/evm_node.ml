@@ -1479,11 +1479,15 @@ let batch_requests requests =
    function on purpose, to ensure both encoding are supported by the server. *)
 let call_evm_rpc ?(private_ = false) evm_node request =
   let endpoint = endpoint ~private_ evm_node in
-  Curl.post endpoint (build_request request) |> Runnable.run
+  Curl.post ~name:("curl#" ^ evm_node.name) endpoint (build_request request)
+  |> Runnable.run
 
 let batch_evm_rpc ?(private_ = false) evm_node requests =
   let endpoint = endpoint ~private_ evm_node in
-  let* json = Curl.post endpoint (batch_requests requests) |> Runnable.run in
+  let* json =
+    Curl.post ~name:("curl#" ^ evm_node.name) endpoint (batch_requests requests)
+    |> Runnable.run
+  in
   return (JSON.as_list json)
 
 let open_websocket ?(private_ = false) evm_node =
