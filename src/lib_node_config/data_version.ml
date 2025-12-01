@@ -92,7 +92,9 @@ let v_3_1 = Version.make ~major:3 ~minor:1
 
 let v_3_2 = Version.make ~major:3 ~minor:2
 
-let current_version = v_3_2
+let v_3_3 = Version.make ~major:3 ~minor:3
+
+let current_version = v_3_3
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
@@ -110,10 +112,16 @@ let upgradable_data_version =
     let store_dir = store_dir data_dir in
     Store.Upgrade.v_3_2_upgrade ~store_dir genesis
   in
+  let v_3_3_upgrade ~data_dir = Context_ops.Upgrade.v_3_3_upgrade ~data_dir in
   [
     ( v_3_1,
       fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
-        v_3_2_upgrade ~data_dir genesis );
+        let open Lwt_result_syntax in
+        let* () = v_3_2_upgrade ~data_dir genesis in
+        v_3_3_upgrade ~data_dir );
+    ( v_3_2,
+      fun ~data_dir _genesis ~chain_name:_ ~sandbox_parameters:_ ->
+        v_3_3_upgrade ~data_dir );
   ]
 
 type error += Invalid_data_dir_version of Version.t * Version.t
@@ -424,9 +432,8 @@ let ensure_data_dir ?(mode = Is_compatible) genesis data_dir =
   let* o = ensure_data_dir ~mode data_dir in
   match o with
   | None -> return_unit
-  | Some (version, _) when false ->
-      (* Enable automatic upgrade to avoid users to manually upgrade.
-         This is disabled for the current version. *)
+  | Some (version, _) when version = v_3_2 ->
+      (* Enable automatic upgrade to avoid users to manually upgrade. *)
       let* () =
         upgrade_data_dir ~data_dir genesis ~chain_name:() ~sandbox_parameters:()
       in

@@ -73,7 +73,7 @@ let err_impl_mismatch ~got =
     ~expected:"shell, memory, brassaia or brassaia_memory"
     ~got
 
-let irmin_dir = "context"
+let default_dir = "context"
 
 let brassaia_dir = "brassaia_context"
 
@@ -81,22 +81,11 @@ let tezedge_dir = "tezedge_context"
 
 let backend_variable = "TEZOS_CONTEXT_BACKEND"
 
-let irmin_context_dir root = Filename.(concat root irmin_dir)
+let context_dir root = Filename.(concat root default_dir)
 
 let brassaia_context_dir root = Filename.(concat root brassaia_dir)
 
 let tezedge_context_dir root = Filename.(concat root tezedge_dir)
-
-let context_dir root =
-  match Sys.getenv backend_variable |> String.lowercase_ascii with
-  | "tezedge" -> tezedge_context_dir root
-  | "brassaia" -> brassaia_context_dir root
-  | "irmin" | "duo" | (exception Not_found) -> irmin_context_dir root
-  | s ->
-      Fmt.failwith
-        "You tried to initialise the context with %s, this is not a known \
-         context. Try `irmin` or `brassaia`"
-        s
 
 let do_not_use__brassaia_dir root = brassaia_context_dir root
 
@@ -106,10 +95,10 @@ let do_not_use__is_duo () =
   | _ | (exception Not_found) -> false
 
 let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
-  let open Lwt_syntax in
-  let irmin_dir = irmin_context_dir data_dir in
+  let open Lwt_result_syntax in
+  let irmin_dir = context_dir data_dir in
   let init_context () =
-    let* () = Events.(emit initializing_context) ("irmin", irmin_dir) in
+    let*! () = Events.(emit initializing_context) ("irmin", irmin_dir) in
     let patch_context =
       Option.map
         (fun f context ->
@@ -118,12 +107,16 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
           return @@ Shell_context.unwrap_disk_context context)
         patch_context
     in
-    Context.init ?patch_context ?readonly ?index_log_size irmin_dir
+    let*! index =
+      Context.init ?patch_context ?readonly ?index_log_size irmin_dir
+    in
+    let* () = Context_metadata.write_metadata_file irmin_dir Irmin in
+    return index
   in
 
-  let brassaia_dir = brassaia_context_dir data_dir in
+  let brassaia_dir = context_dir data_dir in
   let init_brassaia_context () =
-    let* () = Events.(emit initializing_context) ("brassaia", brassaia_dir) in
+    let*! () = Events.(emit initializing_context) ("brassaia", brassaia_dir) in
     let patch_context =
       Option.map
         (fun f context ->
@@ -132,11 +125,16 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
           return @@ Brassaia_context.unwrap_disk_context context)
         patch_context
     in
-    Brassaia.init ?patch_context ?readonly ?index_log_size brassaia_dir
+    let*! index =
+      Brassaia.init ?patch_context ?readonly ?index_log_size brassaia_dir
+    in
+    let* () = Context_metadata.write_metadata_file brassaia_dir Brassaia in
+    return index
   in
-  let tezedge_dir = tezedge_context_dir data_dir in
+
+  let tezedge_dir = context_dir data_dir in
   let init_tezedge_context () =
-    let* () = Events.(emit initializing_context) ("tezedge", tezedge_dir) in
+    let*! () = Events.(emit initializing_context) ("tezedge", tezedge_dir) in
     let patch_context =
       Option.map
         (fun f context ->
@@ -145,43 +143,45 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
           return @@ Tezedge_context.unwrap_disk_context context)
         patch_context
     in
-    Lwt.return (Tezedge.init ?patch_context tezedge_dir)
+    let index = Tezedge.init ?patch_context tezedge_dir in
+    let* () = Context_metadata.write_metadata_file tezedge_dir Tezedge in
+    return index
   in
 
-  let open Lwt_syntax in
   match kind with
   | `Disk ->
       let+ index = init_context () in
       Disk_index index
   | `Memory ->
-      let+ index =
+      let*! index =
         Tezos_context_memory.Context.init ?readonly ?index_log_size irmin_dir
       in
-      Memory_index index
+      return @@ Memory_index index
   | `Brassaia ->
       let+ index = init_brassaia_context () in
       Brassaia_index index
   | `Brassaia_memory ->
-      let+ index =
+      let*! index =
         Brassaia_memory.init ?readonly ?index_log_size brassaia_dir
       in
-      Brassaia_memory_index index
+      return @@ Brassaia_memory_index index
   | `Duo_index ->
       let* irmin_index = init_context () in
       let+ brassaia_index = init_brassaia_context () in
       Duo_index (Duo_context.make_index irmin_index brassaia_index)
   | `Duo_index_memory ->
-      let* irmin_index =
+      let*! irmin_index =
         Tezos_context_memory.Context.init ?readonly ?index_log_size irmin_dir
       in
-      let+ brassaia_index =
+      let*! brassaia_index =
         Brassaia_memory.init ?readonly ?index_log_size brassaia_dir
       in
-      Duo_memory_index
-        (Duo_memory_context.make_index irmin_index brassaia_index)
+      return
+      @@ Duo_memory_index
+           (Duo_memory_context.make_index irmin_index brassaia_index)
   | `Tezedge ->
-      let* tezedge_index = init_tezedge_context () in
-      return (Tezedge_index tezedge_index)
+      let+ tezedge_index = init_tezedge_context () in
+      Tezedge_index tezedge_index
   | `Duo_tezedge ->
       let* irmin_index = init_context () in
       let+ tezedge_index = init_tezedge_context () in
@@ -194,14 +194,25 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
    expected to be find. *)
 let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
     ~data_dir () =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   (* Gather the initialisation profiling otherwise aggregates will behave
      like records and create a section for each call *)
   () [@profiler.record {verbosity = Notice} "Context init"] ;
-  match Sys.getenv backend_variable |> String.lowercase_ascii with
-  | "tezedge" ->
+  let*! existing_backend =
+    let context_dir = context_dir data_dir in
+    let*! context_dir_exists = Lwt_unix.file_exists context_dir in
+    if context_dir_exists then
+      Lwt.map Option.of_result (Context_metadata.read_metadata_file context_dir)
+    else Lwt.return_none
+  in
+  let backend_env_var =
+    Sys.getenv_opt backend_variable |> Option.map String.lowercase_ascii
+  in
+  match (backend_env_var, existing_backend) with
+  | Some "tezedge", None | None, Some Tezedge | Some "tezedge", Some Tezedge ->
       init ~kind:`Tezedge ?patch_context ?readonly ?index_log_size ~data_dir ()
-  | "duo_tezedge" ->
+  (* TODO: handle duo_context mode *)
+  | Some "duo_tezedge", _ ->
       init
         ~kind:`Duo_tezedge
         ?patch_context
@@ -209,7 +220,10 @@ let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
         ?index_log_size
         ~data_dir
         ()
-  | "brassaia" -> (
+  | Some "irmin", None | None, Some Irmin | Some "irmin", Some Irmin ->
+      init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ()
+  | Some "brassaia", None | None, Some Brassaia | Some "brassaia", Some Brassaia
+    -> (
       match kind with
       | `Disk ->
           init
@@ -227,10 +241,10 @@ let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
             ?index_log_size
             ~data_dir
             ())
-  | "duo" -> (
+  | Some "duo", _ -> (
       match kind with
       | `Disk ->
-          let* () = Events.(emit warning_experimental) () in
+          let*! () = Events.(emit warning_experimental) () in
           init
             ~kind:`Duo_index
             ?patch_context
@@ -239,7 +253,7 @@ let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
             ~data_dir
             ()
       | `Memory ->
-          let* () = Events.(emit warning_experimental) () in
+          let*! () = Events.(emit warning_experimental) () in
           init
             ~kind:`Duo_index_memory
             ?patch_context
@@ -247,8 +261,14 @@ let init ~(kind : [`Disk | `Memory]) ?patch_context ?readonly ?index_log_size
             ?index_log_size
             ~data_dir
             ())
-  | _ | (exception Not_found) ->
-      init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ()
+  | Some backend_env_var, Some backend ->
+      failwith
+        "Found %a context backend while %s=%s"
+        Context_metadata.pp
+        backend
+        backend_variable
+        backend_env_var
+  | _, None -> init ~kind ?patch_context ?readonly ?index_log_size ~data_dir ()
 
 let index (context : Environment_context.t) =
   match[@profiler.span_f {verbosity = Notice} ["context_ops"; "index"]]
@@ -973,7 +993,7 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
   | Disk_index _ ->
       Context.Checks.Pack.Integrity_check.run
         ?ppf
-        ~root:(irmin_context_dir root)
+        ~root:(context_dir root)
         ~auto_repair
         ~always
         ~heads
@@ -984,7 +1004,7 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
   | Brassaia_index _ ->
       Brassaia.Checks.Pack.Integrity_check.run
         ?ppf
-        ~root:(brassaia_context_dir root)
+        ~root:(context_dir root)
         ~auto_repair
         ~always
         ~heads
@@ -997,7 +1017,7 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
       let* () =
         Context.Checks.Pack.Integrity_check.run
           ?ppf
-          ~root:(irmin_context_dir root)
+          ~root:(context_dir root)
           ~auto_repair
           ~always
           ~heads
@@ -1005,7 +1025,7 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
       in
       Brassaia.Checks.Pack.Integrity_check.run
         ?ppf
-        ~root:(brassaia_context_dir root)
+        ~root:(context_dir root)
         ~auto_repair
         ~always
         ~heads
@@ -1020,3 +1040,37 @@ let is_tezedge (context : Environment_context.t) =
   | Context {kind = Duo_irmin_tezedge_context.Context; _} ->
       true
   | _ -> false
+
+module Upgrade = struct
+  (* v_3_3_upgrade:
+    - Unifies all context directories ("context", "brassaia_context",
+      "tezedge_context") in "context", fails on conflicts.
+    - Adds a metadata.json file in the context directory to identify the context
+      backend *)
+  let v_3_3_upgrade ~data_dir =
+    let open Lwt_result_syntax in
+    let context_dir = context_dir data_dir in
+    let brassaia_dir = brassaia_context_dir data_dir in
+    let tezedge_dir = tezedge_context_dir data_dir in
+    let*! existing_dirs =
+      Lwt_list.filter_s
+        Lwt_unix.file_exists
+        [context_dir; brassaia_dir; tezedge_dir]
+    in
+    match existing_dirs with
+    | [] -> return_unit
+    | [dir] when dir = context_dir ->
+        Context_metadata.write_metadata_file dir Irmin
+    | [dir] (* when dir <> context_dir *) ->
+        let* () =
+          if dir = brassaia_dir then
+            Context_metadata.write_metadata_file dir Brassaia
+          else Context_metadata.write_metadata_file dir Tezedge
+        in
+        Lwt_result.ok @@ Lwt_unix.rename dir context_dir
+    | _ ->
+        failwith
+          "Found too many context directories : %a."
+          (Format.pp_print_list Format.pp_print_string)
+          existing_dirs
+end

@@ -53,7 +53,7 @@ val init :
   ?index_log_size:int ->
   data_dir:string ->
   unit ->
-  index Lwt.t
+  index tzresult Lwt.t
 
 val index : t -> index
 
@@ -218,3 +218,7 @@ val integrity_check :
   unit Lwt.t
 
 val is_tezedge : t -> bool
+
+module Upgrade : sig
+  val v_3_3_upgrade : data_dir:string -> unit tzresult Lwt.t
+end
