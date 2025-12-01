@@ -584,13 +584,10 @@ index 1d28850f..fbd54ed7 100644
     rpc_url
     tzkt_api_url
 
-let init_umami agent ~sequencer_proxy ~tzkt_proxy ~umami_proxy =
+let init_umami agent ~sequencer_endpoint ~tzkt_proxy ~umami_proxy =
   let runner = Agent.runner agent in
   let external_tzkt_api_endpoint = proxy_external_endpoint ~runner tzkt_proxy in
-  let tezlink_proxy_endpoint =
-    proxy_external_endpoint ~runner sequencer_proxy
-  in
-  let rpc_url = Client.string_of_endpoint tezlink_proxy_endpoint in
+  let rpc_url = sequencer_external_endpoint ~runner sequencer_endpoint in
   let tzkt_api_url = Client.string_of_endpoint external_tzkt_api_endpoint in
   let patch = umami_patch ~rpc_url ~tzkt_api_url in
   (* Create a local patch file with its contents. *)
@@ -945,7 +942,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | Some {tzkt_proxy; umami_proxy} ->
             init_umami
               tezlink_sequencer_agent
-              ~sequencer_proxy
+              ~sequencer_endpoint
               ~tzkt_proxy
               ~umami_proxy
       and* () =
