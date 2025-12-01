@@ -825,6 +825,11 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           Cli.public_rpc_port
           activate_ssl
       in
+      let sequencer_endpoint =
+        match Cli.external_sequencer_endpoint with
+        | None -> Internal sequencer_proxy
+        | Some endpoint -> External endpoint
+      in
       let* tzkt_proxy_opt =
         if Cli.tzkt then
           let tzkt_proxy =
@@ -893,13 +898,16 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       in
       let () = toplog "Starting Tezlink sequencer" in
       let* () =
-        init_tezlink_sequencer
-          cloud
-          name
-          ~sequencer_proxy
-          Cli.verbose
-          Cli.time_between_blocks
-          tezlink_sequencer_agent
+        match sequencer_endpoint with
+        | Internal sequencer_proxy ->
+            init_tezlink_sequencer
+              cloud
+              name
+              ~sequencer_proxy
+              Cli.verbose
+              Cli.time_between_blocks
+              tezlink_sequencer_agent
+        | External _ -> unit
       and* () =
         match tzkt_proxy_opt with
         | None -> unit
@@ -951,9 +959,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       in
       let* () =
         let* rpc_nginx_config =
-          nginx_reverse_proxy_config
-            ~agent:tezlink_sequencer_agent
-            ~proxy:sequencer_proxy
+          match sequencer_endpoint with
+          | Internal sequencer_proxy ->
+              nginx_reverse_proxy_config
+                ~agent:tezlink_sequencer_agent
+                ~proxy:sequencer_proxy
+          | External _ -> Lwt.return_nil
         in
         let* tzkt_nginx_config =
           nginx_config_of_proxy_opt tezlink_sequencer_agent tzkt_proxy_opt
