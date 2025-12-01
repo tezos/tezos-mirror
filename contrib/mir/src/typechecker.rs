@@ -2350,6 +2350,13 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(CAST, [_], _), []) => no_overload!(CAST, len 1),
         (App(CAST, expect_args!(1), _), _) => unexpected_micheline!(),
 
+        (App(RENAME, [], _), [..]) => {
+            // Stack unchanged
+            // Here `I::Seq(Vec::new())` means that nothing needs to be interpreted.
+            I::Seq(Vec::new())
+        }
+        (App(RENAME, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
             Err(TcError::TodoInstr(*prim))?
         }
@@ -8924,6 +8931,33 @@ mod typecheck_tests {
             typecheck_instruction(&parse("CAST").unwrap(), &mut gas, &mut stack),
             Err(TcError::UnexpectedMicheline(
                 "App(CAST, [], [])".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_rename() {
+        let mut stack = tc_stk![];
+        let mut gas = Gas::default();
+        assert_eq!(
+            typecheck_instruction(&parse("RENAME").unwrap(), &mut gas, &mut stack),
+            Ok(Seq(Vec::new()))
+        );
+        assert_eq!(stack, tc_stk![]);
+        assert_eq!(
+            Gas::default().milligas() - gas.milligas(),
+            tc_cost::INSTR_STEP
+        );
+    }
+
+    #[test]
+    fn test_rename_too_much_arg() {
+        let mut stack = tc_stk![];
+        let mut gas = Gas::default();
+        assert_eq!(
+            typecheck_instruction(&parse("RENAME bool").unwrap(), &mut gas, &mut stack),
+            Err(TcError::UnexpectedMicheline(
+                "App(RENAME, [App(bool, [], [])], [])".to_string()
             ))
         );
     }
