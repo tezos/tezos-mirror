@@ -43,6 +43,7 @@ module Types = struct
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
+module Events = Task_worker_events
 
 type task_worker = Worker.infinite Worker.queue Worker.t
 
@@ -81,19 +82,69 @@ let default_max_domains = max (min (Domain.recommended_domain_count () / 2) 8) 1
 
 let number_of_domains = default_max_domains
 
+let desired_domains = ref default_max_domains
+
+let current_domains = ref default_max_domains
+
+let double_resolution_logged = Atomic.make false
+
+let log_double_resolution_once msg =
+  if not (Atomic.get double_resolution_logged) then
+    if Atomic.compare_and_set double_resolution_logged false true then
+      Hive.async_lwt @@ fun () ->
+      Events.(
+        emit
+          promise_double_resolution_detected
+          (msg, Printexc.raw_backtrace_to_string (Printexc.get_callstack 16)))
+
+let rec is_worker_launch_resource_error = function
+  | Unix.Unix_error (Unix.ENOMEM, _, _) -> true
+  | Invalid_argument msg
+  (* Eio domain launch can sporadically surface an [Invalid_argument] about
+       an already-resolved promise when domain bootstrapping races; treat that
+       as a transient resource-style failure that can succeed on retry. *)
+    when String.starts_with ~prefix:"Can't resolve already-resolved promise" msg
+         || String.starts_with ~prefix:"Double resolve of a promise" msg ->
+      log_double_resolution_once msg ;
+      true
+  | Eio.Exn.Multiple trace ->
+      List.exists (fun (exn, _) -> is_worker_launch_resource_error exn) trace
+  | _ -> false
+
+(* [launch_worker_with_domains] tries to launch with [domains] and, on transient
+   resource errors, retries with [domains/2] until it succeeds or reaches 1. *)
+let rec launch_worker_with_domains table domains =
+  match
+    try
+      Ok
+        (Worker.launch_eio
+           ~domains
+           table
+           ~name:"shared task worker"
+           ()
+           (module Handlers))
+    with exn -> Error exn
+  with
+  | Ok (Ok w) ->
+      current_domains := domains ;
+      if domains <> !desired_domains then
+        Hive.async_lwt (fun () ->
+            Events.(emit worker_launch_degraded (!desired_domains, domains))) ;
+      w
+  | Ok (Error _) -> assert false
+  | Error exn ->
+      Hive.async_lwt (fun () ->
+          Events.(emit worker_launch_failed (Printexc.to_string exn, domains))) ;
+      if domains > 1 && is_worker_launch_resource_error exn then (
+        let next_domains = max 1 (domains / 2) in
+        Hive.async_lwt (fun () -> Events.(emit worker_retrying next_domains)) ;
+        launch_worker_with_domains table next_domains)
+      else raise exn
+
 let make_worker () =
   let table = Worker.create_table Queue in
   Eio.Lazy.from_fun ~cancel:`Protect @@ fun () ->
-  match
-    Worker.launch_eio
-      ~domains:number_of_domains
-      table
-      ~name:"shared task worker"
-      ()
-      (module Handlers)
-  with
-  | Ok w -> w
-  | Error _ -> assert false
+  launch_worker_with_domains table !desired_domains
 
 let worker_lock = Eio.Mutex.create ()
 
