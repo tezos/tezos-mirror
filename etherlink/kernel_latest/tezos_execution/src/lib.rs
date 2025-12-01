@@ -8,7 +8,7 @@ use context::Context;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens, TypedValue};
 use mir::context::TypecheckingCtx;
 use mir::{
-    ast::{IntoMicheline, Micheline},
+    ast::{big_map::BigMapId, IntoMicheline, Micheline},
     context::CtxTrait,
     gas::Gas,
     parser::Parser,
@@ -405,6 +405,8 @@ fn transfer<'a, Host: Runtime>(
             // consumption, i.e. it does not include that of its internal
             // operations.
             let consumed_milligas = ctx.tc_ctx.gas.milligas_consumed_by_operation();
+            let lazy_storage_diff =
+                convert_big_map_diff(std::mem::take(ctx.tc_ctx.big_map_diff));
             execute_internal_operations(
                 ctx.tc_ctx,
                 ctx.operation_ctx,
@@ -417,8 +419,6 @@ fn transfer<'a, Host: Runtime>(
                 TransferError::FailedToExecuteInternalOperation(err.to_string())
             })?;
             log!(ctx.host(), Debug, "Transfer operation succeeded");
-            let lazy_storage_diff =
-                convert_big_map_diff(std::mem::take(ctx.tc_ctx.big_map_diff));
             Ok(TransferSuccess {
                 storage: Some(new_storage),
                 lazy_storage_diff,
@@ -531,7 +531,7 @@ fn handle_storage_with_big_maps<'a, Host: Runtime>(
     storage.view_big_maps_mut(&mut big_maps);
 
     // Dump big_map allocation, starting with empty big_maps
-    mir::ast::big_map::dump_big_map_updates(ctx, &[], &mut big_maps)
+    mir::ast::big_map::dump_big_map_updates(ctx, &[], &mut big_maps, false)
         .map_err(|err| OriginationError::MirBigMapAllocation(err.to_string()))?;
     let storage = storage
         .into_micheline_optimized_legacy(&parser.arena)
@@ -898,6 +898,7 @@ fn apply_operation<Host: Runtime>(
         context,
         gas: &mut gas,
         big_map_diff: &mut BTreeMap::new(),
+        next_temporary_id: BigMapId { value: (-1).into() },
     };
     let parser = Parser::new();
     match &validated_operation.content.operation {

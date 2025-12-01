@@ -376,7 +376,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                     m.into_iter()
                         .map(|(key, val)| V::prim2(arena, Prim::Elt, go(key), go(val))),
                 )),
-                big_map::BigMapContent::FromLazyStorage(m) => {
+                big_map::BigMapContent::FromId(m) => {
                     let id_part = V::Int(m.id.value.into());
                     let overlay_empty = m.overlay.is_empty();
                     let map_part = V::Seq(V::alloc_iter(

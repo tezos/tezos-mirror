@@ -43,6 +43,7 @@ pub struct TcCtx<'operation, Host: Runtime> {
     pub context: &'operation Context,
     pub gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: &'operation mut BTreeMap<Zarith, StorageDiff>,
+    pub next_temporary_id: BigMapId,
 }
 
 pub struct OperationCtx<'operation> {
@@ -329,6 +330,21 @@ impl<Host: Runtime> TcCtx<'_, Host> {
             }),
         );
     }
+
+    fn generate_id(&mut self, temporary: bool) -> Result<BigMapId, LazyStorageError> {
+        if temporary {
+            let new_id = self.next_temporary_id.clone();
+            self.next_temporary_id = new_id.succ();
+            Ok(new_id)
+        } else {
+            let next_id_path = next_id_path(self.context)?;
+            let id: BigMapId =
+                read_nom_value(self.host, &next_id_path).unwrap_or(0.into());
+            store_bin(&id.succ(), self.host, &next_id_path)
+                .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
+            Ok(id)
+        }
+    }
 }
 
 /// Function to retrieve the hash of a TypedValue.
@@ -540,10 +556,10 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
         &mut self,
         key_type: &Type,
         value_type: &Type,
+        temporary: bool,
     ) -> Result<BigMapId, LazyStorageError> {
         let arena = Arena::new();
-        let next_id_path = next_id_path(self.context)?;
-        let id: BigMapId = read_nom_value(self.host, &next_id_path).unwrap_or(0.into());
+        let id = self.generate_id(temporary)?;
         let key_type_path = key_type_path(self.context, &id)?;
         let value_type_path = value_type_path(self.context, &id)?;
         let key_type_encoded = key_type.into_micheline_optimized_legacy(&arena).encode();
@@ -553,18 +569,18 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
             .store_write_all(&value_type_path, &value_type_encoded)?;
         self.host
             .store_write_all(&key_type_path, &key_type_encoded)?;
-        store_bin(&id.succ(), self.host, &next_id_path)
-            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
 
         // Write in the diff that there was an allocation
         self.big_map_diff_alloc(id.value.clone(), key_type_encoded, value_type_encoded);
         Ok(id)
     }
 
-    fn big_map_copy(&mut self, id: &BigMapId) -> Result<BigMapId, LazyStorageError> {
-        let next_id_path = next_id_path(self.context)?;
-        let dest_id: BigMapId = read_nom_value(self.host, &next_id_path)
-            .map_err(|e| LazyStorageError::NomReadError(e.to_string()))?;
+    fn big_map_copy(
+        &mut self,
+        id: &BigMapId,
+        temporary: bool,
+    ) -> Result<BigMapId, LazyStorageError> {
+        let dest_id = self.generate_id(temporary)?;
 
         // Retrieve the path of the key_type
         let src_key_type_path = key_type_path(self.context, id)?;
@@ -585,9 +601,6 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
 
         // Copy the content of the big_map
         BigMapKeys::copy_keys_in_storage(self.host, self.context, id, &dest_id)?;
-
-        store_bin(&dest_id.succ(), self.host, &next_id_path)
-            .map_err(|e| LazyStorageError::BinWriteError(e.to_string()))?;
 
         // Write in the diff that there was a copy
         self.big_map_diff_copy(dest_id.value.clone(), id.value.clone());
@@ -617,7 +630,7 @@ mod tests {
     use super::*;
     use crate::gas::TezlinkOperationGas;
     use mir::ast::big_map::{
-        dump_big_map_updates, BigMap, BigMapContent, BigMapFromLazyStorage,
+        dump_big_map_updates, BigMap, BigMapContent, BigMapFromId, BigMapId,
     };
     use std::collections::BTreeMap;
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -630,6 +643,7 @@ mod tests {
                 context: $context,
                 gas: &mut gas,
                 big_map_diff: &mut BTreeMap::new(),
+                next_temporary_id: BigMapId { value: (-1).into() },
             };
         };
     }
@@ -638,7 +652,7 @@ mod tests {
     fn check_is_dumped_map(map: BigMap, id: BigMapId) {
         match map.content {
             BigMapContent::InMemory(_) => panic!("Big map has not been dumped"),
-            BigMapContent::FromLazyStorage(map) => {
+            BigMapContent::FromId(map) => {
                 assert_eq!((map.id, map.overlay), (id, BTreeMap::new()))
             }
         };
@@ -720,7 +734,7 @@ mod tests {
             key_type: Type::Int,
             value_type: Type::String,
         };
-        dump_big_map_updates(&mut storage, &[], &mut [&mut map]).unwrap();
+        dump_big_map_updates(&mut storage, &[], &mut [&mut map], false).unwrap();
 
         check_is_dumped_map(map, 0.into());
 
@@ -738,7 +752,9 @@ mod tests {
     fn test_map_updates_to_storage() {
         let mut host = MockKernelHost::default();
         make_default_ctx!(storage, &mut host, &Context::init_context());
-        let map_id = storage.big_map_new(&Type::Int, &Type::String).unwrap();
+        let map_id = storage
+            .big_map_new(&Type::Int, &Type::String, false)
+            .unwrap();
         storage
             .big_map_update(
                 &map_id,
@@ -823,12 +839,12 @@ mod tests {
             key_type: Type::Int,
             value_type: Type::String,
         };
-        dump_big_map_updates(&mut storage, &[], &mut [&mut map]).unwrap();
+        dump_big_map_updates(&mut storage, &[], &mut [&mut map], false).unwrap();
 
         check_is_dumped_map(map, 0.into());
 
         let copied_id = storage
-            .big_map_copy(&0.into())
+            .big_map_copy(&0.into(), false)
             .expect("Failed to copy big_map in storage");
 
         assert_eq!(copied_id, 1.into());
@@ -850,7 +866,7 @@ mod tests {
         make_default_ctx!(storage, &mut host, &Context::init_context());
         let key_type = Type::Int;
         let value_type = Type::Int;
-        let map_id = storage.big_map_new(&key_type, &value_type).unwrap();
+        let map_id = storage.big_map_new(&key_type, &value_type, false).unwrap();
         let key = TypedValue::int(0);
         let value = TypedValue::int(0);
         storage
@@ -880,15 +896,15 @@ mod tests {
     fn test_remove_with_dump() {
         let mut host = MockKernelHost::default();
         make_default_ctx!(storage, &mut host, &Context::init_context());
-        let map_id1 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let map_id1 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
             .big_map_update(&map_id1, TypedValue::int(0), Some(TypedValue::int(0)))
             .unwrap();
-        let map_id2 = storage.big_map_new(&Type::Int, &Type::Int).unwrap();
+        let map_id2 = storage.big_map_new(&Type::Int, &Type::Int, false).unwrap();
         storage
             .big_map_update(&map_id2, TypedValue::int(0), Some(TypedValue::int(0)))
             .unwrap();
-        let content_diff = BigMapContent::FromLazyStorage(BigMapFromLazyStorage {
+        let content_diff = BigMapContent::FromId(BigMapFromId {
             id: map_id1.clone(),
             overlay: BTreeMap::from([(TypedValue::int(1), Some(TypedValue::int(1)))]),
         });
@@ -902,6 +918,7 @@ mod tests {
             &mut storage,
             &[map_id1.clone(), map_id2.clone()],
             &mut [&mut map1],
+            false,
         )
         .unwrap();
 
