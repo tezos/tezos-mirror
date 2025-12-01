@@ -48,12 +48,9 @@ val lookup_operation_in_previous_blocks :
   Operation_list_hash.elt ->
   (Block_hash.t * int * int) option tzresult Lwt.t
 
-(** returns when the node consider itself as bootstrapped.
-
-    Function [retry] specifies how to behave in order to connect to
-    the node. The default is the identity which correspond to simply
-    calling the RPC. As an example, the baker tries 5 times with
-    delays in between attempts when the connection fails. *)
+(** We do not recommend using this function, if the connection is lost with
+    the node, it considers that it is bootstrapped. Use
+    {!really_wait_for_bootstrapped} instead. *)
 val wait_for_bootstrapped :
   ?retry:
     (((#Client_context.full as 'a) ->
@@ -67,6 +64,12 @@ val wait_for_bootstrapped :
   'a ->
   unit tzresult Lwt.t
 
+(** Returns when the node consider itself as bootstrapped.
+
+    Function [retry] specifies how to behave in order to connect to
+    the node. The default is the identity which correspond to simply
+    calling the RPC. As an example, the baker tries 5 times with
+    delays in between attempts when the connection fails. *)
 val really_wait_for_bootstrapped :
   ?retry:
     (((#Client_context.full as 'a) -> unit tzresult Lwt.t) ->
