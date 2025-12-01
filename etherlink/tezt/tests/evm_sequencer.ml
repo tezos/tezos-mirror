@@ -31,6 +31,7 @@ module Sequencer_rpc = struct
   let get_blueprint sequencer number =
     Runnable.run
     @@ Curl.get
+         ~name:("curl#" ^ Evm_node.name sequencer)
          ~args:["--fail"]
          (Evm_node.endpoint sequencer
          ^ "/evm/blueprint/" ^ Int64.to_string number)
@@ -39,6 +40,7 @@ module Sequencer_rpc = struct
     let* res =
       Runnable.run
       @@ Curl.get
+           ~name:("curl#" ^ Evm_node.name sequencer)
            ~args:["--fail"]
            (Evm_node.endpoint sequencer ^ "/evm/smart_rollup_address")
     in
