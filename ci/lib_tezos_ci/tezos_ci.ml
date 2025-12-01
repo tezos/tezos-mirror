@@ -169,7 +169,6 @@ module Pipeline = struct
     if_ : Gitlab_ci.If.t;
     variables : Gitlab_ci.Types.variables option;
     auto_cancel : Gitlab_ci.Types.auto_cancel option;
-    default : Gitlab_ci.Types.default option;
     jobs : tezos_job list;
   }
 
@@ -178,7 +177,7 @@ module Pipeline = struct
     description : string;
     auto_cancel : Gitlab_ci.Types.auto_cancel option;
     inherit_ : Gitlab_ci.Types.inherit_ option;
-    default : Gitlab_ci.Types.default option;
+    default : Gitlab_ci.Types.default;
     jobs : tezos_job list;
   }
 
@@ -195,8 +194,19 @@ module Pipeline = struct
     | Child_pipeline {jobs; _} -> jobs
     | Pipeline {jobs; _} -> jobs
 
+  let default_config =
+    Gitlab_ci.Types.
+      {
+        image = None;
+        interruptible = Some true;
+        retry =
+          Some
+            {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]};
+      }
+
   let default = function
-    | Pipeline {default; _} | Child_pipeline {default; _} -> default
+    | Pipeline _ -> default_config
+    | Child_pipeline {default; _} -> default
 
   let set_jobs jobs = function
     | Child_pipeline pl -> Child_pipeline {pl with jobs}
@@ -213,11 +223,12 @@ module Pipeline = struct
         (name pipeline)
     else pipelines := pipeline :: !pipelines
 
-  let register ?variables ?auto_cancel ?default ~description ~jobs name if_ =
+  let register ?variables ?auto_cancel ~description ~jobs name if_ =
     register_raw
-      (Pipeline {variables; if_; name; jobs; auto_cancel; default; description})
+      (Pipeline {variables; if_; name; jobs; auto_cancel; description})
 
-  let register_child ?auto_cancel ?inherit_ ?default ~description ~jobs name =
+  let register_child ?auto_cancel ?inherit_ ?(default = default_config)
+      ~description ~jobs name =
     let child_pipeline =
       {name; inherit_; jobs; auto_cancel; default; description}
     in
@@ -444,7 +455,6 @@ module Pipeline = struct
     let pipeline = add_image_builders pipeline in
     let jobs = jobs pipeline in
     let name = name pipeline in
-    let pipeline_default = default pipeline in
     if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
       precheck pipeline ;
     if jobs = [] then
@@ -464,9 +474,9 @@ module Pipeline = struct
       jobs ;
     let prepend_config =
       templates_to_config (templates pipeline)
-      @ (match pipeline_default with
-        | Some default_config -> [Gitlab_ci.Types.Default default_config]
-        | None -> [])
+      @ (match pipeline with
+        | Pipeline _ -> []
+        | Child_pipeline _ -> [Gitlab_ci.Types.Default (default pipeline)])
       @ (match pipeline with
         | Pipeline _ -> []
         | Child_pipeline _ ->

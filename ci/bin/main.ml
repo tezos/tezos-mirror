@@ -552,7 +552,7 @@ let () =
   match Cli.config.action with
   | Write ->
       Pipeline.write
-        ~default:Common.Helpers.retry_default
+        ~default:Pipeline.default_config
         ~variables
         ~filename:".gitlab-ci.yml"
         () ;
