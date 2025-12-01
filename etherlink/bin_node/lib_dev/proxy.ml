@@ -256,6 +256,7 @@ let main
       ~mode:(Proxy tx_container)
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
       ~l2_chain_id
+      ~tick:(fun () -> Lwt_result_syntax.return_unit)
       config
       ((module Rollup_node_rpc), smart_rollup_address)
   in

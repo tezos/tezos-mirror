@@ -1711,7 +1711,7 @@ let can_process_batch size = function
   | Configuration.Limit l -> size <= l
   | Unlimited -> true
 
-let dispatch_handler ~service_name (rpc : Configuration.rpc) ctx
+let dispatch_handler ~service_name (rpc : Configuration.rpc) ctx ~tick
     dispatch_request (input : JSONRPC.request batched_request) =
   let open Lwt_syntax in
   let wait_for_return_output JSONRPC.{return_value; id} =
@@ -1724,6 +1724,7 @@ let dispatch_handler ~service_name (rpc : Configuration.rpc) ctx
   match input with
   | Singleton request ->
       let* return_value = dispatch_request ctx request in
+      let* _ = tick () in
       let* response = wait_for_return_output return_value in
       return (Singleton response)
   | Batch requests ->
@@ -1741,6 +1742,7 @@ let dispatch_handler ~service_name (rpc : Configuration.rpc) ctx
           return JSONRPC.{return_value = response; id = req.id}
       in
       let* outputs_waiter = List.map_s process requests in
+      let* _ = tick () in
       let* outputs = List.map_p wait_for_return_output outputs_waiter in
       return (Batch outputs)
 
@@ -1864,32 +1866,34 @@ let dispatch_private_websocket
   in
   websocket_response_of_response response
 
-let generic_dispatch ~service_name (rpc : Configuration.rpc) ctx dir path
+let generic_dispatch ~service_name (rpc : Configuration.rpc) ctx dir path ~tick
     dispatch_request =
   Evm_directory.register0 dir (dispatch_batch_service ~path) (fun () input ->
-      dispatch_handler ~service_name rpc ctx dispatch_request input
+      dispatch_handler ~service_name rpc ctx ~tick dispatch_request input
       |> Lwt_result.ok)
 
 let dispatch_public (type f) (rpc_server_family : f Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) config (mode : f Mode.t) ctx dir =
+    (rpc : Configuration.rpc) config (mode : f Mode.t) ctx dir ~tick =
   generic_dispatch
     ~service_name:"public_rpc"
     rpc
     ctx
     dir
     Path.root
+    ~tick
     (dispatch_request ~websocket:false rpc_server_family rpc config mode)
 
 let dispatch_private (type f)
     (rpc_server_family : _ Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) ~block_production config (mode : f Mode.t) ctx dir
-    =
+    ~tick =
   generic_dispatch
     ~service_name:"private_rpc"
     rpc
     ctx
     dir
     Path.(add_suffix root "private")
+    ~tick
     (dispatch_private_request
        ~websocket:false
        rpc_server_family
@@ -1933,7 +1937,7 @@ let dispatch_websocket_private
     (dispatch_private_websocket rpc_server_family ~block_production rpc)
 
 let directory (type f) ~(rpc_server_family : f Rpc_types.rpc_server_family)
-    (mode : f Mode.t) rpc config backend dir =
+    (mode : f Mode.t) rpc config backend dir ~tick =
   let db_liveness_check () =
     let open Lwt_result_syntax in
     let (module Backend : Services_backend_sig.S) = fst backend in
@@ -1953,11 +1957,11 @@ let directory (type f) ~(rpc_server_family : f Rpc_types.rpc_server_family)
 
   dir |> version |> configuration config |> evm_mode config mode
   |> health_check config mode db_liveness_check
-  |> dispatch_public rpc_server_family rpc config mode backend
+  |> dispatch_public rpc_server_family rpc config mode backend ~tick
   |> dispatch_websocket_public rpc_server_family rpc config mode backend
 
 let private_directory ~rpc_server_family mode rpc config backend
-    ~block_production =
+    ~block_production ~tick =
   Evm_directory.empty config.experimental_features.rpc_server
   |> version |> evm_mode config mode
   |> dispatch_private
@@ -1967,6 +1971,7 @@ let private_directory ~rpc_server_family mode rpc config backend
        mode
        backend
        ~block_production
+       ~tick
   |> dispatch_websocket_private
        rpc_server_family
        rpc

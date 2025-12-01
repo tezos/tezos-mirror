@@ -274,6 +274,9 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       (module Rpc_backend)
   in
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
+  let tick () =
+    Tx_container.tx_queue_tick ~evm_node_endpoint:(Rpc evm_node_endpoint)
+  in
   let* finalizer_public_server =
     Rpc_server.start_public_server
       ~mode:(Observer tx_container)
@@ -281,6 +284,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
       ~evm_services:
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
       ~rpc_server_family
+      ~tick
       config
       ((module Rpc_backend), smart_rollup_address)
   in
@@ -288,6 +292,7 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
     Rpc_server.start_private_server
       ~mode:(Observer tx_container)
       ~rpc_server_family
+      ~tick
       config
       ((module Rpc_backend), smart_rollup_address)
   in
@@ -377,6 +382,6 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
     and* () =
       Tx_container.tx_queue_beacon
         ~evm_node_endpoint:(Rpc evm_node_endpoint)
-        ~tick_interval:0.05
+        ~tick_interval:(float_of_int config.tx_queue.max_lifespan_s)
     in
     return_unit
