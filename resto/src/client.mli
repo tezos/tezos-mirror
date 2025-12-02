@@ -206,4 +206,15 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) : sig
     'q ->
     'i ->
     (Resto.meth * Uri.t * (unit -> unit, 'e) service_result) Lwt.t
+
+  module Internal_for_tests : sig
+    val parse_stream :
+      Media_type.Make(Encoding).t ->
+      'a Encoding.t ->
+      log_raw_chunk:(string -> unit Lwt.t) ->
+      on_chunk:('a -> unit) ->
+      on_close:(unit -> unit) ->
+      string Lwt_stream.t ->
+      unit Lwt.t
+  end
 end

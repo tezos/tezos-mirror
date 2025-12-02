@@ -106,3 +106,15 @@ val bytes_to_bson :
   copy:bool ->
   bytes ->
   bson
+
+(** Decodes multiple BSON documents concatenated in a byte sequence. It returns
+    the list of decoded BSON objects and potentially an offset if the last BSON
+    object is unterminated. The offset corresponds to the position of the first
+    bytes of the non decoded part of the input byte sequence. *)
+val bytes_to_bson_list :
+  ?laziness:bool ->
+  ?cache:bool ->
+  ?conforming:bool ->
+  copy:bool ->
+  bytes ->
+  bson list * int option

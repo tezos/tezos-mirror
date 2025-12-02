@@ -45,6 +45,7 @@ module Make (Encoding : Resto.ENCODING) : sig
        text. *)
     construct_seq : 'a. 'a Encoding.t -> 'a -> (Bytes.t * int * int) Seq.t;
     destruct : 'a. 'a Encoding.t -> string -> ('a, string) result;
+    destruct_many : 'a. 'a Encoding.t -> string -> 'a list * string;
   }
 
   val name : t -> string

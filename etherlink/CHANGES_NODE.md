@@ -8,6 +8,9 @@
 
 ### RPCs changes
 
+- Fix issue when connecting to nodes behind a proxy that can rearrange
+  chunks. (!20057)
+
 ### Monitoring changes
 
 ### Command-line interface changes

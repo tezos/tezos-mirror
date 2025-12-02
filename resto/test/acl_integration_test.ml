@@ -30,6 +30,12 @@ module Directory = Resto_directory.Make (Encoding)
 module Media_type = Resto_cohttp.Media_type.Make (Encoding)
 
 let json =
+  let destruct enc body =
+    try
+      let json = Ezjsonm.value_from_string body in
+      Ok (Json_encoding.destruct enc json)
+    with exc -> Error (Printexc.to_string exc)
+  in
   {
     Media_type.name = Cohttp.Accept.MediaType ("application", "json");
     q = Some 1000;
@@ -48,11 +54,10 @@ let json =
           @@ Json_encoding.construct enc v
         in
         Seq.return (Bytes.of_string item, 0, String.length item));
-    destruct =
+    destruct;
+    destruct_many =
       (fun enc body ->
-        let json = Ezjsonm.from_string body in
-        try Ok (Json_encoding.destruct enc json)
-        with exc -> Error (Printexc.to_string exc));
+        match destruct enc body with Ok v -> ([v], "") | Error _ -> ([], body));
   }
 
 let media_types = [json]
