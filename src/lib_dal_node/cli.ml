@@ -61,8 +61,8 @@ let merge_experimental_features _ _configuration = ()
 let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
     ?endpoint ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false)
     ?metrics_addr ?profile ?(peers = []) ?history_mode ?service_name
-    ?service_namespace ?experimental_features ?fetch_trusted_setup
-    ?(verbose = false) ?(ignore_l1_config_peers = false)
+    ?service_namespace ?telemetry_env ?experimental_features
+    ?fetch_trusted_setup ?(verbose = false) ?(ignore_l1_config_peers = false)
     ?(disable_amplification = false) ?batching_configuration
     ?publish_slots_regularly configuration =
   let profile =
@@ -99,6 +99,7 @@ let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
     service_name = Option.value ~default:configuration.service_name service_name;
     service_namespace =
       Option.value ~default:configuration.service_namespace service_namespace;
+    telemetry_env = Option.either telemetry_env configuration.telemetry_env;
     fetch_trusted_setup =
       Option.value
         ~default:configuration.fetch_trusted_setup
@@ -556,6 +557,24 @@ module Term = struct
 
   let service_namespace = arg_to_cmdliner service_namespace_arg
 
+  let telemetry_env_name_env =
+    make_env
+      ~docs:"Opentelemetry"
+      ~doc:"Enable to provide an opentelemetry environement name"
+      "OTEL_ENV_NAME"
+
+  let telemetry_env_name_arg =
+    make_arg
+      ~doc:
+        "A name that describes the environment in which the node is running. \
+         This name can appear in observability data such as traces."
+      ~env:telemetry_env_name_env
+      ~parse:Result.ok
+      ~pp:Format.pp_print_string
+      "telemetry-env"
+
+  let telemetry_env = arg_to_cmdliner telemetry_env_name_arg
+
   let fetch_trusted_setup_arg =
     make_arg
       ~doc:
@@ -717,6 +736,7 @@ module Run = struct
        history_mode
        service_name
        service_namespace
+       telemetry_env
        fetch_trusted_setup
        disable_shard_validation
        verbose
@@ -752,6 +772,7 @@ module Run = struct
         ?history_mode
         ?service_name
         ?service_namespace
+        ?telemetry_env
         ?fetch_trusted_setup
         ~verbose
         ~ignore_l1_config_peers
@@ -820,10 +841,10 @@ module Run = struct
        $ net_addr $ public_addr $ endpoint $ slots_backup_uris
        $ trust_slots_backup_uris $ metrics_addr $ attester_profile
        $ operator_profile $ observer_profile $ bootstrap_profile $ peers
-       $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
-       $ disable_shard_validation $ verbose $ ignore_l1_config_peers
-       $ disable_amplification $ ignore_topics $ batching_configuration
-       $ publish_slots_regularly))
+       $ history_mode $ service_name $ service_namespace $ telemetry_env
+       $ fetch_trusted_setup $ disable_shard_validation $ verbose
+       $ ignore_l1_config_peers $ disable_amplification $ ignore_topics
+       $ batching_configuration $ publish_slots_regularly))
 
   let cmd = Cmdliner.Cmd.v info term
 end
@@ -1057,7 +1078,7 @@ module Action = struct
       ?public_addr ?endpoint ?slots_backup_uris
       ?(trust_slots_backup_uris = false) ?metrics_addr ?attesters ?operators
       ?observers ?(bootstrap = false) ?peers ?history_mode ?service_name
-      ?service_namespace ?fetch_trusted_setup
+      ?service_namespace ?telemetry_env ?fetch_trusted_setup
       ?(disable_shard_validation = false) ?(verbose = false)
       ?(ignore_l1_config_peers = false) ?(disable_amplification = false)
       ?ignore_topics ?batching_configuration ?publish_slots_regularly () =
@@ -1080,6 +1101,7 @@ module Action = struct
       history_mode
       service_name
       service_namespace
+      telemetry_env
       fetch_trusted_setup
       disable_shard_validation
       verbose
