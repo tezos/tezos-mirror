@@ -89,6 +89,8 @@ module Dal = struct
 
   let batching_configuration = arg_to_clic batching_configuration_arg
 
+  let publish_slots_regularly = arg_to_clic publish_slots_regularly_arg
+
   let commands =
     let open Tezos_clic in
     let group = {name = "dal"; title = "Commands related to the DAL daemon."} in
@@ -105,7 +107,7 @@ module Dal = struct
     let run =
       let open Tezos_clic in
       let args =
-        Tezos_clic.args25
+        Tezos_clic.args26
           data_dir
           config_file
           rpc_addr
@@ -131,6 +133,7 @@ module Dal = struct
           disable_amplification
           ignore_topics
           batching_configuration
+          publish_slots_regularly
       in
       command
         ~group
@@ -161,7 +164,8 @@ module Dal = struct
                ignore_l1_config_peers,
                disable_amplification,
                ignore_topics,
-               batching_configuration )
+               batching_configuration,
+               publish_slots_regularly )
              _cctxt
            ->
           Cli.Action.run
@@ -190,6 +194,7 @@ module Dal = struct
             ~disable_amplification
             ?ignore_topics
             ?batching_configuration
+            ?publish_slots_regularly
             ())
     in
     let mk_config_command ~prefix:p ~desc action =

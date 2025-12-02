@@ -115,6 +115,9 @@ module Term : sig
   (** The configuration used for batching verification of received shards
       via GossipSub to save cryptographic computation. *)
   val batching_configuration_arg : Configuration_file.batching_configuration arg
+
+  val publish_slots_regularly_arg :
+    Configuration_file.publish_slots_regularly arg
 end
 
 (** {2 Command-line subcommands} *)
@@ -148,6 +151,7 @@ module Action : sig
     ?disable_amplification:bool ->
     ?ignore_topics:Signature.public_key_hash list ->
     ?batching_configuration:Configuration_file.batching_configuration ->
+    ?publish_slots_regularly:Configuration_file.publish_slots_regularly ->
     unit ->
     (unit, Error_monad.tztrace) result Lwt.t
 

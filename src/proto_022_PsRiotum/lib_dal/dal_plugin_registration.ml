@@ -138,6 +138,29 @@ module Plugin = struct
         let* _op_hash = Shell_services.Injection.operation cctxt ~chain bytes in
         return_unit
 
+  type error += DAL_publication_not_available
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"dal_publications_not_available_rio"
+      ~title:"DAL publication not available on Rio"
+      ~description:
+        "Publication from DAL node is not implemented in protocol Rio"
+      ~pp:(fun fmt () ->
+        Format.fprintf
+          fmt
+          "Publication from DAL node is not implemented in protocol Rio")
+      Data_encoding.unit
+      (function DAL_publication_not_available -> Some () | _ -> None)
+      (fun () -> DAL_publication_not_available)
+
+  let publish _cctxt ~block_level:_ ~source:_ ~slot_index:_ ~commitment:_
+      ~commitment_proof:_ ~src_sk:_ () =
+    let open Lwt_result_syntax in
+    (* This is supposed to be dead code, but we implement a fallback to be defensive. *)
+    fail [DAL_publication_not_available]
+
   let block_info ?chain ?block ~operations_metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol_client_context.Alpha_block_services.info

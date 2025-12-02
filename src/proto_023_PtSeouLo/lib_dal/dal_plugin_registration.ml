@@ -135,6 +135,61 @@ module Plugin = struct
     let* _op_hash = Shell_services.Injection.operation cctxt ~chain bytes in
     return_unit
 
+  let publish cctxt ~block_level ~source ~slot_index ~commitment
+      ~commitment_proof ~src_sk () =
+    let open Lwt_result_syntax in
+    let chain = `Main in
+    let block = `Level block_level in
+    let cpctxt = new Protocol_client_context.wrap_rpc_context cctxt in
+    let* {dal = {number_of_slots; _}; _} =
+      Plugin.Constants_services.parametric cpctxt (chain, block)
+    in
+    let*? slot_index =
+      Dal.Slot_index.of_int ~number_of_slots slot_index
+      |> Environment.wrap_tzresult
+    in
+    let* block_hash =
+      Protocol_client_context.Alpha_block_services.hash cctxt ~chain ~block ()
+    in
+    let* counter =
+      let* pcounter =
+        Plugin.Alpha_services.Contract.counter cpctxt (chain, `Head 0) source
+      in
+      return (Manager_counter.succ pcounter)
+    in
+    let operation =
+      Dal_publish_commitment {slot_index; commitment; commitment_proof}
+    in
+    let operation =
+      (* A dry-run of the "publish dal commitment" command for each tz kinds outputs:
+         - tz1: fees of 513µtz and 1333 gas consumed
+         - tz2: fees of 514µtz and 1318 gas consumed
+         - tz3: fees of 543µtz and 1607 gas consumed
+         - tz4: fees of 700µtz and 2837 gas consumed
+         We added a margin to it.
+         The storage limit value has been selected purely arbitrarily
+         (it worked with this value when I experimented, so I did not change it). *)
+      Alpha_context.(
+        Manager_operation
+          {
+            source;
+            fee = Tez.of_mutez_exn (Int64.of_int 750);
+            counter;
+            operation;
+            gas_limit = Gas.Arith.integral_of_int_exn 3000;
+            storage_limit = Z.of_int 100;
+          })
+    in
+    let bytes =
+      Data_encoding.Binary.to_bytes_exn
+        Operation.unsigned_encoding
+        ({branch = block_hash}, Contents_list (Single operation))
+    in
+    let bytes =
+      Signature.append ~watermark:Signature.Generic_operation src_sk bytes
+    in
+    Shell_services.Injection.operation cctxt ~chain bytes
+
   let block_info ?chain ?block ~operations_metadata ctxt =
     let cpctxt = new Protocol_client_context.wrap_rpc_context ctxt in
     Protocol_client_context.Alpha_block_services.info
