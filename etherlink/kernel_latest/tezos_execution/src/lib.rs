@@ -5106,4 +5106,108 @@ mod tests {
 
         println!("Created_2 OK");
     }
+
+    #[test]
+    fn verify_temp_big_map_content_is_cleaned() {
+        let mut host = MockKernelHost::default();
+        let context = context::Context::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let tz1 = bootstrap1();
+        let parser = Parser::new();
+
+        // A contract that receives a big_map and checks if
+        // there's a "d" key in the big_map received
+        let script_receiver = r#"
+                parameter (big_map string bytes) ;
+                storage bool ;
+                code { CAR; PUSH string "d"; MEM; NIL operation; PAIR }
+            "#;
+        let script_sender = read_script("sender_stored.tz");
+
+        // Transfer the big_map in the storage of the sender ({ Elt "d" 0x })
+        // And the receiver checks if the big_map received contains the key "d"
+        // The storage of the receiver contract should change to 'True' after this
+        // transfer.
+        let result = transfer_big_map(
+            &mut ctx,
+            &tz1,
+            &script_sender,
+            "{Elt \"d\" 0x; }",
+            script_receiver,
+            "False",
+        );
+
+        let receiver = result.receiver;
+
+        for r in result.receipts {
+            assert!(r.receipt.is_applied())
+        }
+
+        // Checks that the storage of the receiver is true
+        let storage = receiver
+            .storage(ctx.host)
+            .expect("Get storage should succeed");
+        let storage = Micheline::decode_raw(&parser.arena, &storage)
+            .expect("Micheline should be decodable");
+        let typed_storage = typecheck_value(&storage, &mut ctx, &Type::Bool)
+            .expect("Typecheck value should succeed");
+        assert_eq!(typed_storage, TypedValue::Bool(true));
+
+        // We redeploy a second contract sender, that will send a different big_map
+        // to the receiver contract ({Elt "a" 0x})
+        let second_sender_contract =
+            ContractKt1Hash::from_base58_check(CONTRACT_3).unwrap();
+
+        let _ = init_contract(
+            ctx.host,
+            &second_sender_contract,
+            &script_sender,
+            &parser
+                .parse("{Elt \"a\" 0x; }")
+                .expect("Failed to parse receiver storage"),
+            &0.into(),
+        );
+
+        let operation = make_transfer_operation(
+            0,
+            2,
+            21040,
+            5,
+            tz1.clone(),
+            0.into(),
+            Contract::Originated(second_sender_contract),
+            Some(Parameter {
+                entrypoint: Entrypoint::default(),
+                value: Micheline::from(receiver.kt1().to_base58_check()).encode(),
+            }),
+        );
+
+        // After that call, the storage of the receiver should be 'False'
+        // as the big_map passed in argument doesn't have the key "d"
+        let receipts = validate_and_apply_operation(
+            ctx.host,
+            ctx.context,
+            OperationHash(H256::zero()),
+            operation,
+            &block_ctx!(),
+            false,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        for r in receipts {
+            assert!(r.receipt.is_applied())
+        }
+
+        // Checks that the storage of the receiver contract is 'False'
+        let storage = receiver
+            .storage(ctx.host)
+            .expect("Get storage should succeed");
+        let storage = Micheline::decode_raw(&parser.arena, &storage)
+            .expect("Micheline should be decodable");
+        let typed_storage = typecheck_value(&storage, &mut ctx, &Type::Bool)
+            .expect("Typecheck value should succeed");
+        assert_eq!(typed_storage, TypedValue::Bool(false));
+    }
 }
