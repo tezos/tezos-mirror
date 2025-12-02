@@ -217,21 +217,3 @@ let changeset_test_sdk_bindings =
     @ changeset_images_rust_sdk_bindings
       (* Run if the [rust-sdk-bindings] image is updated *)
     @ Sdk_bindings_ci.changeset)
-
-let changeset_test_kernels =
-  Changeset.(
-    changeset_base
-    @ changeset_images_rust_toolchain
-      (* Run if the [rust-toolchain] image is updated *)
-    @ make
-        ["kernels.mk"; "src/kernel_*/**/*"; "src/riscv/**/*"; "sdk/rust/**/*"])
-
-let changeset_riscv_kernels_code =
-  Changeset.(
-    changeset_base
-    @ make ["sdk/rust/**/*"; "src/kernel_sdk/**/*"; "src/riscv/**/*"])
-
-let changeset_riscv_kernels =
-  Changeset.(
-    changeset_riscv_kernels_code @ changeset_images_rust_toolchain
-    (* Run if the [rust-toolchain] image is updated *))

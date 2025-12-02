@@ -954,58 +954,6 @@ let jobs pipeline_type =
       in
       [job_test_sdk_bindings]
     in
-    let jobs_kernels : tezos_job list =
-      let make_job_kernel ?dependencies ?(image = Images.rust_toolchain)
-          ?(stage = Stages.test) ~__POS__ ~name ~changes script =
-        job
-          ?dependencies
-          ~__POS__
-          ~name
-          ~image
-          ~stage
-          ~rules:(make_rules ~dependent:true ~changes ())
-          script
-        |> enable_kernels |> enable_cargo_cache |> enable_sccache
-      in
-      let job_test_kernels : tezos_job =
-        make_job_kernel
-          ~__POS__
-          ~name:"test_kernels"
-          ~changes:changeset_test_kernels
-          ~dependencies:(Dependent [])
-          ["make -f kernels.mk check"; "make -f kernels.mk test"]
-      in
-      let job_audit_riscv_deps : tezos_job =
-        make_job_kernel
-          ~stage:Stages.sanity
-          ~image:Images.rust_toolchain_master
-          ~dependencies:(Dependent [])
-          ~__POS__
-          ~name:"audit_riscv_deps"
-          ~changes:changeset_riscv_kernels_code
-          (* since we depend on the Images.rust_toolchain_master,
-             we start the job only if the code is modified, but not
-             the image itself *)
-          ["make -C src/riscv audit"]
-      in
-      let riscv_ci_flags =
-        (* These flags ensure we don't need Ocaml installed in the check and test jobs *)
-        "--no-default-features --features ci"
-      in
-      let job_check_riscv_kernels : tezos_job =
-        make_job_kernel
-          ~__POS__
-          ~name:"check_riscv_kernels"
-          ~changes:changeset_riscv_kernels
-          ~dependencies:(Dependent [])
-          [
-            Format.asprintf
-              "make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='%s' check"
-              riscv_ci_flags;
-          ]
-      in
-      [job_test_kernels; job_audit_riscv_deps; job_check_riscv_kernels]
-    in
 
     let jobs_packaging =
       match pipeline_type with
@@ -1017,8 +965,8 @@ let jobs pipeline_type =
           ]
       | Schedule_extended_test -> []
     in
-    jobs_packaging @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_kernels
-    @ jobs_unit @ jobs_install_octez
+    jobs_packaging @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_unit
+    @ jobs_install_octez
   in
 
   (* Coverage jobs *)

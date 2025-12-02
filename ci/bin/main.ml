@@ -114,6 +114,8 @@ let () = Client_libs_ci.register ()
 
 let () = Tezos_ci_jobs.Misc.register ()
 
+let () = Tezos_ci_jobs.Kernels.register ()
+
 let () = Tezos_ci_jobs.Tezt.register ()
 
 (** {3 General pipelines} *)
