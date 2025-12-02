@@ -70,23 +70,6 @@ let init_logger () : logger =
   in
   {log_step}
 
-let read_dir dir =
-  let* dir = Lwt_unix.opendir dir in
-  let rec read_files acc =
-    Lwt.catch
-      (fun () ->
-        let* entry = Lwt_unix.readdir dir in
-        match entry with
-        | "." | ".." | ".lock" -> read_files acc
-        | file -> read_files (file :: acc))
-      (function
-        | End_of_file ->
-            let* () = Lwt_unix.closedir dir in
-            return acc
-        | exn -> Lwt.reraise exn)
-  in
-  read_files []
-
 (* This function checks that in the skip list store of the given
    [dal_node]:
    (1) the 'hashes' coincides with [expected_levels] (up to ordering)
@@ -218,15 +201,6 @@ let check_in_TB_committee ~__LOC__ ~protocol node ?(inside = true) ?level pkh =
       ~error_msg:"The account is in the TB committee? Expected %R, got %L") ;
   unit
 
-let get_peer_score dal_node peer_id =
-  let* scores = Dal_RPC.(call dal_node @@ get_scores ()) in
-  let peer_score =
-    List.find
-      (fun Dal_RPC.{peer; score = _} -> String.equal peer peer_id)
-      scores
-  in
-  return peer_score.score
-
 let wait_for_cached_slot ~shard_index dal_node ~published_level ~slot_index =
   let check_slot_id e =
     JSON.(e |-> "published_level" |> as_int) = published_level
@@ -291,10 +265,6 @@ let wait_for_shards_promises ~dal_node ~shards ~published_level ~slot_index
           ~slot_index
   in
   Lwt.join (save_on_disk_promise :: promises)
-
-let wait_for_shard_validation_is_disabled dal_node =
-  Dal_node.wait_for dal_node "shard_validation_is_disabled.v0" (fun _json ->
-      Some ())
 
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3173
    The functions below are duplicated from sc_rollup.ml.
@@ -875,33 +845,6 @@ let scenario_with_all_nodes ?custom_constants ?node_arguments
         client
         key)
 
-let update_neighbors dal_node neighbors =
-  let neighbors =
-    `A
-      (List.map
-         (fun dal_node ->
-           `O
-             [
-               ("rpc-addr", `String (Dal_node.rpc_host dal_node));
-               ("rpc-port", `Float (float_of_int (Dal_node.rpc_port dal_node)));
-             ])
-         neighbors)
-  in
-  Dal_node.Config_file.update
-    dal_node
-    (JSON.put ("neighbors", JSON.annotate ~origin:"dal_node_config" neighbors))
-
-let update_known_peers dal_node known_peers =
-  let peers =
-    `A
-      (List.map
-         (fun dal_node -> `String (Dal_node.listen_addr dal_node))
-         known_peers)
-  in
-  Dal_node.Config_file.update
-    dal_node
-    (JSON.put ("peers", JSON.annotate ~origin:"dal_node_config" peers))
-
 (* Return the baker at round 0 at the given level. *)
 let baker_for_round_zero node ~level =
   let* rights =
@@ -1081,25 +1024,6 @@ let inject_dal_attestations_and_bake ~protocol node client ~number_of_slots
       client
   in
   bake_for ~delegates:(`For [baker]) client
-
-let inject_dal_attestation_for_assigned_shards ~protocol ~nb_slots
-    ~attested_level ~attester_account ~attester_dal_node client =
-  let* attestable_slots =
-    Dal_RPC.(
-      call attester_dal_node
-      @@ get_attestable_slots ~attester:attester_account ~attested_level)
-  in
-  match attestable_slots with
-  | Not_in_committee ->
-      Test.fail "attester %s not in committee" attester_account.alias
-  | Attestable_slots slots ->
-      inject_dal_attestation
-        ~protocol
-        ~level:(attested_level - 1)
-        (Bitset (Array.of_list slots))
-        ~signer:attester_account
-        ~nb_slots
-        client
 
 let get_validated_dal_attestations_in_mempool node for_level =
   let* mempool_json =
@@ -2987,91 +2911,6 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
 
 (** End-to-end DAL Tests.  *)
 
-(* This function publishes the DAL slot whose index is [slot_index] for the
-   levels between [from + beforehand_slot_injection] and
-   [into + beforehand_slot_injection] with a payload equal to the slot's
-   publish_level.
-
-   The parameter [beforehand_slot_injection] (whose value should be at least
-   one) allows, for a published level, to inject the slots an amount of blocks
-   ahead. In other terms, we have:
-
-   [published level = injection level + beforehand_slot_injection]
-
-   The publication consists in sending the slot to a DAL node, computing its
-   shards on the DAL node and associating it to a slot index and published
-   level. On the L1 side, a manager operation publish_commitment is also sent.
-
-   Having the ability to inject some blocks ahead (thanks to
-   [beforehand_slot_injection]) allows some pipelining, as shards computation
-   may take an amount of time to complete.
-
-   The function returns the sum of the payloads submitted via DAL.
-*)
-let slot_producer ?(beforehand_slot_injection = 1) ~slot_index ~slot_size ~from
-    ~into dal_node l1_node l1_client =
-  Check.(
-    (beforehand_slot_injection >= 1)
-      int
-      ~error_msg:
-        "Value of beforehand_slot_injection should be at least 1 (got %L)") ;
-  (* We add the successive slots' contents (that is, published_level-s) injected
-     into DAL and L1, and store the result in [!sum]. The final value is then
-     returned by this function. *)
-  let sum = ref 0 in
-  let loop ~from ~into ~task =
-    fold
-      (into - from + 1)
-      ()
-      (fun index () ->
-        let current_level = index + from in
-        task current_level)
-  in
-  let publish_and_store_slot_promises = ref [] in
-  (* This is the account used to sign injected slot headers on L1. *)
-  let source = Constant.bootstrap2 in
-  let* counter = Operation.get_next_counter ~source l1_client in
-  let counter = ref counter in
-  let task current_level =
-    let* level = Node.wait_for_level l1_node current_level in
-    (* We expected to advance level by level, otherwise, the test should fail. *)
-    Check.(
-      (current_level = level) int ~error_msg:"Expected level is %L (got %R)") ;
-    let (publish_level as payload) = level + beforehand_slot_injection in
-    sum := !sum + payload ;
-    Log.info
-      "[e2e.slot_producer] publish slot %d for level %d with payload %d at \
-       level %d"
-      slot_index
-      publish_level
-      payload
-      level ;
-    let promise =
-      Helpers.publish_and_store_slot
-        ~force:true
-        ~counter:!counter
-        l1_client
-        dal_node
-        source
-        ~index:slot_index
-      @@ Helpers.make_slot ~slot_size (sf " %d " payload)
-    in
-    incr counter ;
-    publish_and_store_slot_promises :=
-      promise :: !publish_and_store_slot_promises ;
-    unit
-  in
-  let* () = loop ~from ~into ~task in
-  let l =
-    List.map (fun p ->
-        let* _p = p in
-        unit)
-    @@ List.rev !publish_and_store_slot_promises
-  in
-  let* () = Lwt.join l in
-  Log.info "[e2e.slot_producer] will terminate" ;
-  return !sum
-
 let check_expected expected found = if expected <> found then None else Some ()
 
 let ( let*?? ) a b = Option.bind a b
@@ -3212,75 +3051,6 @@ let check_events_with_message ~event_with_message dal_node ~number_of_shards
             (sf "Shard_index %d already seen. Invariant broken" shard_index)) ;
       seen.(shard_index) <- true ;
       let () = remaining := !remaining - 1 in
-      if !remaining = 0 && all_seen () then Some () else None)
-
-type event_with_message_id = IHave of {pkh : string; slot_index : int} | IWant
-
-let event_with_message_id_to_string = function
-  | IHave _ -> "ihave"
-  | IWant -> "iwant"
-
-(** This function monitors the Gossipsub worker events whose name is given by
-    [event_with_message_id]. It's somehow similar to function
-    {!check_events_with_message}, but for IHave and IWant messages' events. *)
-let check_events_with_message_id ~event_with_message_id dal_node
-    ~number_of_shards ~shard_indexes ~expected_commitment ~expected_level
-    ~expected_pkh ~expected_slot ~expected_peer =
-  let remaining = ref (List.length shard_indexes) in
-  let seen = Array.make number_of_shards false in
-  let get_shard_indices_of_messages event =
-    let*?? () =
-      check_expected expected_peer JSON.(event |-> "peer" |> as_string)
-    in
-    let*?? () =
-      match event_with_message_id with
-      | IWant -> Some ()
-      | IHave {pkh; slot_index} ->
-          let topic = JSON.(event |-> "topic") in
-          let*?? () = check_expected pkh expected_pkh in
-          let*?? () = check_expected pkh JSON.(topic |-> "pkh" |> as_string) in
-          check_expected slot_index JSON.(topic |-> "slot_index" |> as_int)
-    in
-    let message_ids = JSON.(event |-> "message_ids" |> as_list) in
-    Option.some
-    @@ List.map
-         (fun id ->
-           let level = JSON.(id |-> "level" |> as_int) in
-           let slot_index = JSON.(id |-> "slot_index" |> as_int) in
-           let shard_index = JSON.(id |-> "shard_index" |> as_int) in
-           let pkh = JSON.(id |-> "pkh" |> as_string) in
-           let commitment = JSON.(id |-> "commitment" |> as_string) in
-           let*?? () = check_expected expected_pkh pkh in
-           let*?? () = check_expected expected_level level in
-           let*?? () = check_expected expected_slot slot_index in
-           let*?? () = check_expected expected_commitment commitment in
-           Some shard_index)
-         message_ids
-  in
-  let all_seen () =
-    seen |> Array.to_seqi
-    |> Seq.for_all (fun (i, b) -> if List.mem i shard_indexes then b else true)
-  in
-  Dal_common.Helpers.wait_for_gossipsub_worker_event
-    ~name:(event_with_message_id_to_string event_with_message_id)
-    dal_node
-    (fun event ->
-      let*?? shard_indices = get_shard_indices_of_messages event in
-      List.iter
-        (fun shard_index_opt ->
-          match shard_index_opt with
-          | None -> ()
-          | Some shard_index ->
-              Check.(
-                (seen.(shard_index) = false)
-                  bool
-                  ~error_msg:
-                    (sf
-                       "Shard_index %d already seen. Invariant broken"
-                       shard_index)) ;
-              seen.(shard_index) <- true ;
-              decr remaining)
-        shard_indices ;
       if !remaining = 0 && all_seen () then Some () else None)
 
 (** This function is quite similar to those above, except that it checks that a
@@ -7235,19 +7005,6 @@ module Tx_kernel_e2e = struct
     in
     (pk, pkh, sk)
 
-  (** [bake_until cond client sc_rollup_node] bakes until [cond client] retuns [true].
-      After baking each block we wait for the [sc_rollup_node] to catch up to L1. *)
-  let rec bake_until cond client sc_rollup_node =
-    let* stop = cond client in
-    if stop then unit
-    else
-      let* () = bake_for client in
-      let* current_level = Client.level client in
-      let* _ =
-        Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node current_level
-      in
-      bake_until cond client sc_rollup_node
-
   (** [get_ticket_balance  ~pvm_name ~pkh ~ticket_index] returns
       the L2 balance of the account with [pkh] for the ticket with [ticket_index] *)
   let get_ticket_balance sc_rollup_node ~pvm_name ~pkh ~ticket_index =
@@ -10160,14 +9917,6 @@ let test_e2e_trap_faulty_dal_node protocol dal_parameters _cryptobox node client
       "Expected DAL rewards for for the faulty delegate expected to be %R, but \
        got %L" ;
   unit
-
-let get_tb_expected_attesting_rewards l1_node public_key_hash =
-  let* participation =
-    Node.RPC.(
-      call l1_node
-      @@ get_chain_block_context_delegate_participation public_key_hash)
-  in
-  return participation.expected_attesting_rewards
 
 let create_account ?(source = Constant.bootstrap2) ~amount ~alias client =
   Log.info
