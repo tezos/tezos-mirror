@@ -395,6 +395,25 @@ module Dal_RPC = struct
       ]
       (fun json -> JSON.(json |> as_list |> List.map as_int))
 
+  type trap = {delegate : string; slot_index : int}
+
+  let trap_of_json json =
+    JSON.
+      {
+        delegate = json |-> "delegate" |> as_string;
+        slot_index = json |-> "slot_index" |> as_int;
+      }
+
+  let get_published_level_known_traps ~published_level ~pkh ~slot_index =
+    let query_string =
+      [("delegate", pkh); ("slot_index", string_of_int slot_index)]
+    in
+    make
+      GET
+      ["published_levels"; string_of_int published_level; "known_traps"]
+      ~query_string
+      (fun json -> JSON.(json |> as_list |> List.map trap_of_json))
+
   type slot_set = bool list
 
   type attestable_slots = Not_in_committee | Attestable_slots of slot_set

@@ -186,6 +186,7 @@ let may_notify_not_in_committee ctxt committee ~attestation_level =
     The payload can be used to pre-populate a structure that requires information from
     the past of the creation of the stream corresponding to [~pkh] with:
       - all attestable [slot_id]'s observed in a recent window;
+      - all [slot_id]'s with traps;
       - attestation levels where [pkh] has no assigned shards.
 
     The "backfill" window is calculated in the following way:
@@ -195,7 +196,7 @@ let may_notify_not_in_committee ctxt committee ~attestation_level =
       - `stop = L`, as this is the newest level where we did not have time to obtain
       the information about the published slots.
     
-    We include [L+1] in backfill to cover possible races between updating the
+    We include [L + 1] in backfill to cover possible races between updating the
     last-finalized level and stream subscription. This keeps the
     client's cache consistent even if the first slot was published before the stream
     was fully established.
@@ -269,9 +270,9 @@ let get_backfill_payload ctxt ~pkh =
             fetch_assigned_shard_indices ctxt ~pkh ~level:attestation_level
           in
           let number_of_assigned_shards = List.length shard_indices in
-          let* new_slot_ids =
-            List.filter_map_ep
-              (fun slot_index ->
+          let* new_slot_ids, new_trap_slot_ids =
+            List.fold_left_es
+              (fun (slot_ids_acc, trap_slot_ids_acc) slot_index ->
                 let slot_id =
                   Types.Slot_id.{slot_level = published_level; slot_index}
                 in
@@ -285,12 +286,22 @@ let get_backfill_payload ctxt ~pkh =
                     ~number_of_assigned_shards
                 in
                 match is_attestable_slot_or_trap with
-                | Some `Attestable_slot -> return_some slot_id
-                | Some `Trap | None -> return_none)
+                | Some `Attestable_slot ->
+                    return (slot_id :: slot_ids_acc, trap_slot_ids_acc)
+                | Some `Trap ->
+                    return (slot_ids_acc, slot_id :: trap_slot_ids_acc)
+                | None -> return (slot_ids_acc, trap_slot_ids_acc))
+              ([], [])
               candidate_slot_indices
           in
-          return E.{acc with slot_ids = List.append new_slot_ids acc.slot_ids})
-    {slot_ids = []; no_shards_attestation_levels = []}
+          return
+            E.
+              {
+                slot_ids = List.append new_slot_ids acc.slot_ids;
+                trap_slot_ids = List.append new_trap_slot_ids acc.trap_slot_ids;
+                no_shards_attestation_levels = acc.no_shards_attestation_levels;
+              })
+    {slot_ids = []; trap_slot_ids = []; no_shards_attestation_levels = []}
     published_levels
 
 (** [create_new_stream_with_backfill stream backfill_payload_opt] builds a new
