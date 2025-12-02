@@ -32,11 +32,17 @@ const ETHEREUM_ADDRESS_MAPPING_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/eth_accounts/tezosx/native/ethereum");
 
 // Used as a value for the durable storage.
-#[derive(Debug, Default, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TezosAccountInfo {
     pub balance: U256,
     pub nonce: u64,
     pub pub_key: Option<PublicKey>,
+}
+
+impl TezosAccountInfo {
+    // This value is used for optimizing reads in the durable storage.
+    // Don't change it without changing TezosAccountInfo.
+    const RLP_SIZE: usize = 99;
 }
 
 impl Encodable for TezosAccountInfo {
@@ -100,7 +106,7 @@ pub fn get_tezos_account_info(
 ) -> Result<Option<TezosAccountInfo>, Error> {
     let path =
         path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
-    match host.store_read_all(&path) {
+    match host.store_read(&path, 0, TezosAccountInfo::RLP_SIZE) {
         Ok(bytes) => {
             let account_info = TezosAccountInfo::decode(&Rlp::new(&bytes))
                 .map_err(|_| RuntimeError::DecodingError)?;
@@ -120,7 +126,7 @@ pub fn set_tezos_account_info(
     let path =
         path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
     let value = &info.rlp_bytes();
-    Ok(host.store_write_all(&path, value)?)
+    Ok(host.store_write(&path, value, 0)?)
 }
 
 const TEZOS_SRC_ADDR_TAG: u8 = 1;
@@ -227,6 +233,22 @@ fn tezos_account_info_encoding() {
     let decoded_account =
         TezosAccountInfo::decode(&Rlp::new(bytes)).expect("Account should be decodable");
     assert!(decoded_account == account);
+}
+
+#[test]
+fn tezos_account_info_size_constant() {
+    let pub_key: PublicKey = PublicKey::from_b58check(
+        "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+    )
+    .expect("Public key should be a b58 string");
+    let account = TezosAccountInfo {
+        balance: U256::zero(),
+        nonce: 0,
+        pub_key: Some(pub_key),
+    };
+    let rlp_size = account.rlp_bytes().len();
+    assert_eq!(rlp_size, TezosAccountInfo::RLP_SIZE);
+    assert_eq!(rlp_size, 99);
 }
 
 #[test]
