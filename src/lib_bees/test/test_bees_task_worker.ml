@@ -81,10 +81,8 @@ let tests_on_completion_callback =
   in
   ("Run on_completion callback", [test])
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/7938 *)
-(* let () = *)
-(*   Alcotest_lwt.run *)
-(*     ~__FILE__ *)
-(*     "Task worker" *)
-(*     [tests_fibonacci; tests_reuse; tests_on_completion_callback] *)
-(*   |> Lwt_main.run *)
+let () =
+  Alcotezt_process.run
+    ~__FILE__
+    "Task worker"
+    [tests_fibonacci; tests_reuse; tests_on_completion_callback]

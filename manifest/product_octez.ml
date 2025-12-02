@@ -2661,6 +2661,7 @@ let octez_bees =
         octez_stdlib_unix |> open_;
         octez_profiler_backends;
         octez_profiler_complex_backends;
+        saturn;
       ]
 
 let _octez_bees_tests =

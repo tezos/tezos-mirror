@@ -37,3 +37,7 @@ val get_error : string -> exn option
     consequently advised to handle exceptions directly in the closure and return
     a [result]. *)
 val async_lwt : (unit -> unit Lwt.t) -> unit
+
+(** Schedule [f] to run on the Event_loop main switch and return its result.
+    Callers can invoke this from any domain to ensure main-domain execution. *)
+val run_on_main : (unit -> 'a) -> 'a

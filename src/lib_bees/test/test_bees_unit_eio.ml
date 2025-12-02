@@ -326,9 +326,117 @@ let wrap_qcheck test () =
   let _ = QCheck_alcotest.to_alcotest test in
   Result_syntax.return_unit
 
+let test_worker_contention () =
+  let open Result_syntax in
+  (* Scenario: hammer the shared task worker from many fibers at once to ensure
+     contention doesn't break task execution or worker liveness. *)
+  let parallel_fibers =
+    min 16 (max 4 (Tezos_bees.Task_worker.number_of_domains * 2))
+  in
+  let run_job payload =
+    Tezos_bees.Task_worker.launch_task_and_wait
+      "contention"
+      (fun id ->
+        for _ = 1 to 200 do
+          ignore (Sys.opaque_identity ())
+        done ;
+        id)
+      payload
+    |> Eio.Promise.await
+  in
+  let total_jobs = parallel_fibers * 4 in
+  let inputs =
+    let rec aux acc i =
+      if i = total_jobs then List.rev acc else aux (i :: acc) (i + 1)
+    in
+    aux [] 0
+  in
+  Eio.Fiber.List.iter
+    ~max_fibers:parallel_fibers
+    (fun payload ->
+      match run_job payload with
+      | Ok _ -> ()
+      | Error (Closed _) ->
+          Alcotest.fail "worker unexpectedly closed while handling contention"
+      | Error (Request_error _) ->
+          Alcotest.fail "worker request error under contention"
+      | Error (Any exn) -> raise exn)
+    inputs ;
+  return_unit
+
+let test_worker_launch_race () =
+  let open Result_syntax in
+  (* Scenario: spin up multiple domains racing to launch tasks at startup,
+     exercising worker creation path under simultaneous requests. *)
+  let describe_message_error : _ Tezos_bees.Task_worker.message_error -> string
+      = function
+    | Closed _ -> "Closed"
+    | Request_error _ -> "Request_error"
+    | Any exn -> Format.asprintf "Any(%s)" (Printexc.to_string exn)
+  in
+  let fail_on_error err =
+    let msg = describe_message_error err in
+    Alcotest.failf "task worker failure: %s" msg
+  in
+  let env = Tezos_base_unix.Event_loop.env_exn () in
+  let concurrent_domains =
+    max 4 (Tezos_bees.Task_worker.number_of_domains * 4)
+  in
+  let requests_per_domain = 6 in
+  let iterations = 5 in
+  let run_job () =
+    match
+      Tezos_bees.Task_worker.launch_task_and_wait
+        "task-worker-race"
+        (fun () -> ())
+        ()
+      |> Eio.Promise.await
+    with
+    | Ok () -> ()
+    | Error err -> fail_on_error err
+  in
+  let wait_for readiness target =
+    let rec loop () =
+      if Atomic.get readiness < target then (
+        Eio.Time.sleep env#clock 0.00005 ;
+        loop ())
+    in
+    loop ()
+  in
+  let run_iteration iteration =
+    let readiness = Atomic.make 0 in
+    let start_wait, start_signal = Eio.Promise.create () in
+    let main_switch = Tezos_base_unix.Event_loop.main_switch_exn () in
+    let domain_tasks =
+      Array.init concurrent_domains (fun _domain_id ->
+          Eio.Fiber.fork_promise ~sw:main_switch (fun () ->
+              Eio.Domain_manager.run env#domain_mgr (fun () ->
+                  ignore (Atomic.fetch_and_add readiness 1) ;
+                  Eio.Promise.await start_wait ;
+                  for _ = 1 to requests_per_domain do
+                    run_job ()
+                  done)))
+    in
+    wait_for readiness concurrent_domains ;
+    Eio.Promise.resolve start_signal () ;
+    Array.iter
+      (fun promise ->
+        match Eio.Promise.await promise with
+        | Ok () -> ()
+        | Error exn -> raise exn)
+      domain_tasks ;
+    Format.printf "[race] iteration %d/%d complete@\n%!" iteration iterations
+  in
+  Fun.protect ~finally:Tezos_bees.Task_worker.shutdown (fun () ->
+      for iteration = 1 to iterations do
+        run_iteration iteration
+      done) ;
+  return_unit
+
 (** Tests run in fresh processes via [Alcotezt_process] so we do not fork after
     Eio/domains have been initialised within the current Tezt worker. *)
-let tztest label fn = Alcotezt_process.test_case label `Quick fn
+let tztest ?timeout label fn =
+  Alcotezt_process.test_case ?timeout label `Quick fn
 
 let tests_history =
   ( "Queue history",
@@ -351,8 +459,21 @@ let tests_status =
 let tests_buffer =
   ("Buffer handling", [tztest "Dropbox/Async (eio handlers)" test_async_dropbox])
 
+let tests_contention =
+  ( "Task worker contention",
+    [
+      tztest
+        ~timeout:30.
+        "Worker creation under contention (eio handlers)"
+        test_worker_contention;
+      tztest
+        ~timeout:30.
+        "Worker launch race across domains (eio handlers)"
+        test_worker_launch_race;
+    ] )
+
 let () =
   Alcotezt_process.run
     ~__FILE__
     "Bees_workers (eio handlers)"
-    [tests_history; tests_status; tests_buffer]
+    [tests_history; tests_status; tests_buffer; tests_contention]

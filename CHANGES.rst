@@ -25,6 +25,13 @@ be documented here either.
 General
 -------
 
+- Hardened ``lib_bees`` worker lifecycle for OCaml 5.x Eio domains: switched
+  the worker registry to Saturn lock-free tables, serialized worker creation
+  with mutex protection, added retries under resource pressure, ensured worker
+  launch/initialization runs on the Event_loop main switch, and exposed clean
+  shutdown for tests. Improves reliability under domain contention and low
+  resources. (MR :gl:`!19990`)
+
 Node
 ----
 

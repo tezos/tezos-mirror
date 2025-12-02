@@ -53,3 +53,9 @@ val launch_tasks_and_wait :
     request is completed *)
 val launch_task :
   string -> ('a -> 'b) -> ?on_completion:('b -> unit) -> 'a -> bool
+
+(** [shutdown ()] cleanly shuts down the task worker and resets internal state.
+    This function is idempotent and safe to call multiple times. It is primarily
+    intended for test cleanup between iterations. The worker will be recreated
+    lazily on the next task submission. *)
+val shutdown : unit -> unit
