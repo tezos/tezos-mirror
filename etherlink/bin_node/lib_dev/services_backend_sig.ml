@@ -9,6 +9,8 @@ module type S = sig
 
   module Etherlink_block_storage : Block_storage_sig.S
 
+  module Tezos : Tezlink_backend_sig.S
+
   module Tezlink : Tezlink_backend_sig.S
 
   module Etherlink : Etherlink_backend_sig.S
@@ -79,6 +81,10 @@ module type S = sig
 
   val l2_levels_of_l1_level :
     int32 -> Evm_store.L1_l2_finalized_levels.t option tzresult Lwt.t
+
+  (** [list_runtimes ()] returns the list of runtimes activated in the kernel,
+      according to the feature flags set in durable storage. *)
+  val list_runtimes : unit -> Tezosx.runtime list tzresult Lwt.t
 end
 
 module type Backend = sig
@@ -134,6 +140,7 @@ module Make (Backend : Backend) (Executor : Evm_execution.S) : S = struct
   module Tezlink_block_storage =
     Tezlink_durable_storage.Make_block_storage (Backend.Reader)
   module SimulatorBackend = Backend.SimulatorBackend
+  module Tezos = Tezos_backend.Make (Backend.SimulatorBackend)
 
   module Tezlink =
     Tezlink_services_impl.Make

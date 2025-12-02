@@ -1378,6 +1378,14 @@ kernel_log_notice:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+list_runtime_failed:
+  description: runtime flags read failed with error {error}
+  level: warning
+  section: evm_node.dev.tezosx
+  json format:
+    { /* list_runtime_failed version 0 */
+      "list_runtime_failed.v0": any }
+  
 migrations_from_the_future:
   description: store has {applied} migrations applied but the EVM node is only aware of {known}
   level: error
@@ -1904,6 +1912,14 @@ rpc_server_error:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+runtime_activated:
+  description: the runtime {runtime} is activated
+  level: notice
+  section: evm_node.dev.tezosx
+  json format:
+    { /* runtime_activated version 0 */
+      "runtime_activated.v0": "tezos" }
   
 sandbox_started:
   description: starting sandbox mode at level {level}

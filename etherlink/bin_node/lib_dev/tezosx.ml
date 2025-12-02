@@ -18,3 +18,8 @@ let pp_runtime fmt runtime =
   Format.pp_print_string fmt (string_of_runtime runtime)
 
 let feature_flag = function Tezos -> "/evm/feature_flags/enable_tezos_runtime"
+
+let runtime_encoding : runtime Data_encoding.t =
+  let open Data_encoding in
+  (* FIXME: use string_enum instead once we have more than one runtime *)
+  conv (fun _ -> ()) (fun () -> Tezos) (constant "tezos")
