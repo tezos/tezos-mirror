@@ -251,8 +251,12 @@ ifeq (${OCTEZ_EXECUTABLES},)
 endif
 # [dune.sh] is a wrapper around [dune] that does not change the core build logic
 # but enables cache monitoring when DUNE_CACHE_INFO=true.
-# Useful to compute dune cache hit ratio in the CI.
-	@./scripts/ci/dune.sh build --profile=$(PROFILE) $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) \
+# In CI (detected via GITLAB_CI), use dune.sh for cache metrics reporting.
+# For local development, use dune directly.
+# More information about GITLAB_CI detection available at
+# https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+	@DUNE=$${GITLAB_CI:+./scripts/ci/dune.sh}; \
+	$${DUNE:-dune} build --profile=$(PROFILE) $(DUNE_BUILD_JOBS) $(COVERAGE_OPTIONS) \
 		$(foreach b, $(OCTEZ_EXECUTABLES), _build/install/default/bin/${b}) \
 		$(BUILD_EXTRA) \
 		@copy-parameters
