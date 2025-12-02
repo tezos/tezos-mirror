@@ -285,7 +285,6 @@ oc.create-homebrew-formula:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - images/scripts/install-gsutil-apt.sh
   - ./scripts/packaging/homebrew_release.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
@@ -497,8 +496,7 @@ apt_repo_debian:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
-  - images/scripts/install-gsutil-apt.sh
-  - apt install -y apt-utils debsigs jq
+  - apt-get install -y --update apt-utils debsigs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm trixie
@@ -612,8 +610,7 @@ apt_repo_ubuntu:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
-  - images/scripts/install-gsutil-apt.sh
-  - apt install -y apt-utils debsigs jq
+  - apt-get install -y --update apt-utils debsigs
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
