@@ -31,6 +31,16 @@ type proxy_info =
       activate_ssl : bool;
     }
 
+(* There are several dual functions that include either [internal] or [external]
+   in their name, and that are used by services to fetch the end-point of other
+   services. Each service is responsible for understanding when to use which, but
+   here are a general rules.
+   * Referencing a local end-point should be preferred as it's faster.
+   * Sometimes, the end-point is simply not local (for instance when pointing to
+     an external sequencer.
+   * Some exposed services like Umami requires to reference a HTTPS TzKT API
+     node, which means its external end-point. *)
+
 let proxy_internal_info = function
   | No_proxy internal_info | Proxy {internal_info; _} -> internal_info
 
