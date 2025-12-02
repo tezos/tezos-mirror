@@ -42,7 +42,7 @@ of affected parameters with their old and new values can be found
 Unlike other parameters, the value of parameter
 ``smart_rollup_max_active_outbox_levels`` remains unchanged in terms
 of blocks. This means that the actual duration of the maximal allowed
-period of withdrawal has decreased from ~14 days in protocol Seoul to
+:ref:`period of withdrawal <withdrawal_period>` has decreased from ~14 days in protocol Seoul to
 ~10 days in protocol Tallinn.
 
 Consensus changes

@@ -222,7 +222,7 @@ protocol. For example, the challenge window is still two weeks.
 Note that the ``smart_rollup_max_active_outbox_levels`` has not been
 updated, because the current storage implementation of the executed
 outbox message in the Layer 1 does not allow for a safe update. As a
-consequence, the maximal allowed period for withdrawal of assets from
+consequence, the maximal allowed :ref:`period for withdrawal <withdrawal_period>` of assets from
 smart rollups to Layer 1 has been reduced from ~14 days to ~10 days.
 
 

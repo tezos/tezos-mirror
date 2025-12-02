@@ -10,7 +10,8 @@ Welcome to the Octez and Protocol Documentation!
 ================================================
 
 This documentation describes an implementation of the `Tezos blockchain <https://tezos.com>`__ consisting of the **Octez toolsuite** and the **Tezos protocol**, for technical users of various kinds, including Tezos application developers, bakers, and Octez/protocol developers.
-Enjoy reading this website and consider using the feedback button available in any page (:ref:`more details <feedback_doc>`).
+Enjoy reading this website and consider using the feedback button available in any page (:ref:`more details <feedback_doc>`) to improve it.
+If you have questions about Tezos, consider using the ``Ask AI`` button available on the right side of each page (`more details <https://docs.tezos.com/overview/chatbot>`__) before reaching out to the :ref:`Tezos community <tezos_community>`.
 
 .. note::
 

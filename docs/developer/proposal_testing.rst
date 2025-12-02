@@ -16,13 +16,17 @@ To run the protocol tests you must work in a clone of the Octez repository, in w
 You can run the tests for any protocol whose sources are in a subdirectory of the form ``src/proto*/``.
 For example, you can perform the protocol tests on protocol Alpha as follows::
 
-	dune run tezt src/proto_alpha/lib_protocol/test
+	dune runtest src/proto_alpha/lib_protocol/test
 
-You can execute only tests located in a particular subfolder, for example consensus-related tests::
+You can execute only tests located in a particular subfolder, for example consensus-related tests this way::
+
+	dune runtest src/proto_alpha/lib_protocol/test/integration/consensus
+
+or using ``dune exec``::
 
 	dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe
 
-And you may further select tests by providing option such as::
+In the latter form you may further select tests by providing options such as::
 
 	dune exec src/proto_alpha/lib_protocol/test/integration/consensus/main.exe -- \
 		--file test_aggregate.ml
@@ -40,6 +44,8 @@ You may also specify a specific file name (using ``--file``) or a specific test 
 To see all the options available, do::
 
 	dune exec tezt/tests/main.exe -- --help
+
+See the `Dune documentation <https://dune.readthedocs.io/>`__ for more information on using Dune to run tests.
 
 Running the tests within Docker
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
