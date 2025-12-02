@@ -252,8 +252,7 @@ There is no need to synchronize between operators: if two honest
 operators publish the same commitment for a given commitment period,
 the commitment will be published with two stakes on it.
 
-.. _withdrawal_period_t024:
-.. _withdrawal_period:
+.. _withdrawal_period_tallinn:
 
 A commitment is optimistically trusted but it can be refuted until it
 is said to be **cemented** (i.e., final, unchangeable). Indeed, right
@@ -264,8 +263,8 @@ concurrent commitment for the same commitment period to force the
 removal of the invalid commitment. If no one posts such a concurrent
 commitment during the refutation period, the commitment can be
 cemented with a dedicated operation injected in Layer 1, and the
-outbox messages can be executed by the Layer 1 by an explicit Layer 1
-operation (see :doc:`../shell/smart_rollup_node`), typically
+outbox messages can be executed by an explicit Layer 1
+operation (see :ref:`triggering_execution_outbox_message`), typically
 to transfer assets from the rollup to the Layer 1.
 Note that such withdrawals are possible during a limited time after cementation, given by the protocol constant ``smart_rollup_max_active_outbox_levels``, which currently corresponds to about 10 days.
 
