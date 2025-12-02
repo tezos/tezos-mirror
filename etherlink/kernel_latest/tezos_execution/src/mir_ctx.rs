@@ -42,7 +42,7 @@ pub struct TcCtx<'operation, Host: Runtime> {
     pub host: &'operation mut Host,
     pub context: &'operation Context,
     pub gas: &'operation mut crate::gas::TezlinkOperationGas,
-    pub big_map_diff: &'operation mut BTreeMap<Zarith, StorageDiff>,
+    pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
     pub next_temporary_id: BigMapId,
 }
 
@@ -643,7 +643,7 @@ pub mod tests {
                 host: $host,
                 context: $context,
                 gas: &mut gas,
-                big_map_diff: &mut BTreeMap::new(),
+                big_map_diff: BTreeMap::new(),
                 next_temporary_id: BigMapId { value: (-1).into() },
             };
         };

@@ -406,7 +406,7 @@ fn transfer<'a, Host: Runtime>(
             // operations.
             let consumed_milligas = ctx.tc_ctx.gas.milligas_consumed_by_operation();
             let lazy_storage_diff =
-                convert_big_map_diff(std::mem::take(ctx.tc_ctx.big_map_diff));
+                convert_big_map_diff(std::mem::take(&mut ctx.tc_ctx.big_map_diff));
             execute_internal_operations(
                 ctx.tc_ctx,
                 ctx.operation_ctx,
@@ -536,7 +536,7 @@ fn handle_storage_with_big_maps<'a, Host: Runtime>(
     let storage = storage
         .into_micheline_optimized_legacy(&parser.arena)
         .encode();
-    let lazy_storage_diff = convert_big_map_diff(std::mem::take(ctx.big_map_diff));
+    let lazy_storage_diff = convert_big_map_diff(std::mem::take(&mut ctx.big_map_diff));
     Ok((storage, lazy_storage_diff))
 }
 
@@ -897,7 +897,7 @@ fn apply_operation<Host: Runtime>(
         host,
         context,
         gas: &mut gas,
-        big_map_diff: &mut BTreeMap::new(),
+        big_map_diff: BTreeMap::new(),
         next_temporary_id: BigMapId { value: (-1).into() },
     };
     let parser = Parser::new();
