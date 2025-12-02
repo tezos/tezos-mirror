@@ -694,8 +694,6 @@ mod tests {
 
     use crate::{
         block_storage,
-        chains::{ChainFamily, ETHERLINK_SAFE_STORAGE_ROOT_PATH},
-        l2block::L2Block,
         storage::store_chain_id,
         sub_block::{
             assemble_block, get_current_transaction_receipts,
@@ -832,24 +830,15 @@ mod tests {
         assemble_block(&mut mock_host, read_assemble_block_input).unwrap();
 
         // Check that current block is consistent with receipts and objects
-        let current_block = block_storage::read_current(
-            &mut mock_host,
-            &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-            &ChainFamily::Evm,
-        )
-        .unwrap();
+        let eth_block =
+            block_storage::read_current_etherlink_block(&mut mock_host).unwrap();
 
-        match current_block {
-            L2Block::Etherlink(eth_block) => {
-                let nb_txs = eth_block.transactions.len();
-                assert_eq!(nb_txs, receipts.len());
-                assert_eq!(nb_txs, objects.len());
-                let first_tx = eth_block.transactions.first().unwrap();
-                assert_eq!(first_tx, &receipt.hash);
-                assert_eq!(first_tx, &object.hash);
-                assert!(eth_block.gas_used > U256::zero());
-            }
-            L2Block::Tezlink(_) => panic!("Etherlink block was expected"),
-        }
+        let nb_txs = eth_block.transactions.len();
+        assert_eq!(nb_txs, receipts.len());
+        assert_eq!(nb_txs, objects.len());
+        let first_tx = eth_block.transactions.first().unwrap();
+        assert_eq!(first_tx, &receipt.hash);
+        assert_eq!(first_tx, &object.hash);
+        assert!(eth_block.gas_used > U256::zero());
     }
 }

@@ -1025,15 +1025,8 @@ mod tests {
         .expect("The block production failed.");
     }
 
-    fn assert_current_block_reading_validity<Host: Runtime>(
-        host: &mut Host,
-        chain_config: &impl ChainConfigTrait,
-    ) {
-        match block_storage::read_current(
-            host,
-            &chain_config.storage_root_path(),
-            &chain_config.get_chain_family(),
-        ) {
+    fn assert_current_block_reading_validity<Host: Runtime>(host: &mut Host) {
+        match block_storage::read_current_etherlink_block(host) {
             Ok(_) => (),
             Err(e) => {
                 panic!("Block reading failed: {e:?}\n")
@@ -1627,11 +1620,9 @@ mod tests {
     fn test_read_storage_current_block_after_block_production_with_filled_queue() {
         let mut host = MockKernelHost::default();
 
-        let chain_config = dummy_evm_config(SpecId::default());
-
         produce_block_with_several_valid_txs(&mut host);
 
-        assert_current_block_reading_validity(&mut host, &chain_config);
+        assert_current_block_reading_validity(&mut host);
     }
 
     #[test]

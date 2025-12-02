@@ -5,14 +5,17 @@
 
 use primitive_types::{H256, U256};
 use revm_etherlink::storage::block::BLOCKS_STORED;
-use tezos_ethereum::transaction::{TransactionObject, TransactionReceipt};
+use tezos_ethereum::{
+    block::EthBlock,
+    transaction::{TransactionObject, TransactionReceipt},
+};
 use tezos_evm_logging::{log, Level::Info};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::host::RuntimeError;
 use tezos_smart_rollup_host::path::{concat, Path, RefPath};
 use tezos_storage::{read_u256_le, write_h256_be, write_u256_le};
 
-use crate::{chains::ChainFamily, l2block::L2Block};
+use crate::{chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH, l2block::L2Block};
 use rlp::Encodable;
 
 mod path {
@@ -171,14 +174,10 @@ pub fn read_current_transactions_objects<Host: Runtime>(
     Ok(transactions_objects)
 }
 
-pub fn read_current(
-    host: &mut impl Runtime,
-    root: &impl Path,
-    chain_family: &ChainFamily,
-) -> Result<L2Block, crate::Error> {
-    let block_path = path::current_block(root)?;
+pub fn read_current_etherlink_block(host: &mut impl Runtime) -> anyhow::Result<EthBlock> {
+    let block_path = path::current_block(&ETHERLINK_SAFE_STORAGE_ROOT_PATH)?;
     let bytes = &host.store_read_all(&block_path)?;
-    let block_from_bytes = L2Block::try_from_bytes(chain_family, bytes)?;
+    let block_from_bytes = EthBlock::from_bytes(bytes)?;
     Ok(block_from_bytes)
 }
 

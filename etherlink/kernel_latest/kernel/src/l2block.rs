@@ -71,15 +71,6 @@ impl L2Block {
         }
     }
 
-    #[cfg(test)]
-    pub fn base_fee_per_gas(&self) -> U256 {
-        use crate::fees::MINIMUM_BASE_FEE_PER_GAS;
-        match self {
-            Self::Etherlink(block) => block.base_fee_per_gas,
-            Self::Tezlink(_) => MINIMUM_BASE_FEE_PER_GAS.into(),
-        }
-    }
-
     pub fn try_from_bytes(
         chain_family: &ChainFamily,
         bytes: &[u8],

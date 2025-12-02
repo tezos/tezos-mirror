@@ -179,16 +179,9 @@ fn retrieve_base_fee_per_gas<Host: Runtime>(
     host: &mut Host,
     minimum_base_fee_per_gas: U256,
 ) -> U256 {
-    use chains::{ChainConfigTrait, EvmChainConfig};
-
-    let chain_config = EvmChainConfig::default();
-    match block_storage::read_current(
-        host,
-        &chain_config.storage_root_path(),
-        &chain_config.get_chain_family(),
-    ) {
+    match block_storage::read_current_etherlink_block(host) {
         Ok(current_block) => {
-            let current_base_fee_per_gas = current_block.base_fee_per_gas();
+            let current_base_fee_per_gas = current_block.base_fee_per_gas;
             if current_base_fee_per_gas < minimum_base_fee_per_gas {
                 minimum_base_fee_per_gas
             } else {

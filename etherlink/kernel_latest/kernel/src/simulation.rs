@@ -10,11 +10,8 @@
 
 use crate::apply::revm_run_transaction;
 use crate::block_storage;
-use crate::chains::{
-    ChainFamily, ExperimentalFeatures, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-};
+use crate::chains::ExperimentalFeatures;
 use crate::fees::simulation_add_gas_for_fees;
-use crate::l2block::L2Block;
 use crate::storage::{
     read_last_info_per_level_timestamp, read_or_set_maximum_gas_per_transaction,
     read_sequencer_pool_address, read_tracer_input,
@@ -388,12 +385,8 @@ impl Evaluation {
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
         let experimental_features = ExperimentalFeatures::read_from_storage(host);
 
-        let constants = match block_storage::read_current(
-            host,
-            &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
-            &ChainFamily::Evm,
-        ) {
-            Ok(L2Block::Etherlink(block)) => {
+        let constants = match block_storage::read_current_etherlink_block(host) {
+            Ok(block) => {
                 // Timestamp is taken from the simulation caller if provided.
                 // If the timestamp is missing, because of an older evm-node,
                 // default to last block timestamp.
@@ -418,16 +411,6 @@ impl Evaluation {
                     chain_id,
                     prevrandao: None,
                 }
-            }
-            Ok(L2Block::Tezlink(_block)) => {
-                log!(
-                    host,
-                    Fatal,
-                    "Read a tezlink block when expecting an etherlink block"
-                );
-                return Err(Error::Simulation(RevmError::Custom(
-                    "Should not have found a Tezlink block".to_string(),
-                )));
             }
             Err(_) => {
                 // Timestamp is taken from the simulation caller if provided.
