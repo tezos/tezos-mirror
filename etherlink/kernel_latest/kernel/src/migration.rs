@@ -31,6 +31,7 @@ use primitive_types::{H160, H256, U256};
 use revm_etherlink::helpers::legacy::FaDeposit;
 use revm_etherlink::storage::block::BLOCKS_STORED;
 use revm_etherlink::storage::version::{store_evm_version, EVMVersion};
+use tezos_ethereum::block::EthBlock;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::{evm_node_flag, Runtime};
 use tezos_smart_rollup::storage::path::RefPath;
@@ -620,7 +621,7 @@ fn migrate_to<Host: Runtime>(
                     &hash_path,
                 )?)?;
                 let block_from_bytes =
-                    L2Block::try_from_bytes(&crate::chains::ChainFamily::Evm, &block)?;
+                    L2Block::Etherlink(Box::new(EthBlock::from_bytes(&block)?));
                 allow_path_not_found(host.store_delete(&concat(
                     &ETHERLINK_SAFE_STORAGE_ROOT_PATH,
                     &RefPath::assert_from(b"/blocks"),
