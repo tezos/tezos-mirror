@@ -31,6 +31,16 @@ type proxy_info =
       activate_ssl : bool;
     }
 
+(* There are several dual functions that include either [internal] or [external]
+   in their name, and that are used by services to fetch the end-point of other
+   services. Each service is responsible for understanding when to use which, but
+   here are a general rules.
+   * Referencing a local end-point should be preferred as it's faster.
+   * Sometimes, the end-point is simply not local (for instance when pointing to
+     an external sequencer.
+   * Some exposed services like Umami requires to reference a HTTPS TzKT API
+     node, which means its external end-point. *)
+
 let proxy_internal_info = function
   | No_proxy internal_info | Proxy {internal_info; _} -> internal_info
 
@@ -109,6 +119,26 @@ let make_proxy agent ~path ~dns_domain public_port activate_ssl =
           external_port = public_port;
           activate_ssl;
         }
+
+type sequencer_endpoint =
+  | Internal of proxy_info
+  | External of string (* the address of the end-point *)
+
+(* The internal end-point if the sequencer node is local to the scenario.
+   Otherwise, i.e. when the scenario relies on an external end-point, return the
+   latter. *)
+let sequencer_internal_endpoint = function
+  | Internal proxy_info ->
+      proxy_internal_endpoint proxy_info |> Client.string_of_endpoint
+  | External endpoint -> endpoint
+
+(* The exposed end-point if the sequencer node is local to the scenario.
+   Otherwise, i.e. when the scenario relies on an external end-point, return the
+   latter. *)
+let sequencer_external_endpoint ~runner = function
+  | Internal proxy_info ->
+      proxy_external_endpoint ~runner proxy_info |> Client.string_of_endpoint
+  | External endpoint -> endpoint
 
 module Tzkt_process = struct
   module Parameters = struct
@@ -805,6 +835,11 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           Cli.public_rpc_port
           activate_ssl
       in
+      let sequencer_endpoint =
+        match Cli.external_sequencer_endpoint with
+        | None -> Internal sequencer_proxy
+        | Some endpoint -> External endpoint
+      in
       let* tzkt_proxy_opt =
         if Cli.tzkt then
           let tzkt_proxy =
@@ -873,13 +908,16 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       in
       let () = toplog "Starting Tezlink sequencer" in
       let* () =
-        init_tezlink_sequencer
-          cloud
-          name
-          ~sequencer_proxy
-          Cli.verbose
-          Cli.time_between_blocks
-          tezlink_sequencer_agent
+        match sequencer_endpoint with
+        | Internal sequencer_proxy ->
+            init_tezlink_sequencer
+              cloud
+              name
+              ~sequencer_proxy
+              Cli.verbose
+              Cli.time_between_blocks
+              tezlink_sequencer_agent
+        | External _ -> unit
       and* () =
         match tzkt_proxy_opt with
         | None -> unit
@@ -931,9 +969,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
       in
       let* () =
         let* rpc_nginx_config =
-          nginx_reverse_proxy_config
-            ~agent:tezlink_sequencer_agent
-            ~proxy:sequencer_proxy
+          match sequencer_endpoint with
+          | Internal sequencer_proxy ->
+              nginx_reverse_proxy_config
+                ~agent:tezlink_sequencer_agent
+                ~proxy:sequencer_proxy
+          | External _ -> Lwt.return_nil
         in
         let* tzkt_nginx_config =
           nginx_config_of_proxy_opt tezlink_sequencer_agent tzkt_proxy_opt

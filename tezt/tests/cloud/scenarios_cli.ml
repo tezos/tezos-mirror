@@ -1171,6 +1171,8 @@ module type Tezlink = sig
   val activate_ssl : bool
 
   val parent_dns_domain : string option
+
+  val external_sequencer_endpoint : string option
 end
 
 module Tezlink () : Tezlink = struct
@@ -1275,6 +1277,15 @@ module Tezlink () : Tezlink = struct
         "When this option is set, it is used to compute the DNS of all \
          services as subdomains of this parent domain. However, all used \
          domains need to be registered with the dns-domain option."
+      ()
+
+  let external_sequencer_endpoint =
+    Clap.optional_string
+      ~section
+      ~long:"external-sequencer-endpoint"
+      ~description:
+        "Don't run a sequencer and instead have services point to an external \
+         one"
       ()
 end
 
