@@ -128,7 +128,11 @@ DAL node
 Version 23.3
 ============
 
-No changes compared to octez-v23.2
+Baker
+-----
+
+- Improved keep-alive handling during bootstrap. This feature may still exhibit
+  undesirable behavior, but less likely. (MR :gl:`!18717`)
 
 Version 23.2
 ============
