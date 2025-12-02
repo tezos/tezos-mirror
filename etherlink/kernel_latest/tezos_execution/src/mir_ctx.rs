@@ -43,7 +43,7 @@ pub struct TcCtx<'operation, Host: Runtime> {
     pub context: &'operation Context,
     pub gas: &'operation mut crate::gas::TezlinkOperationGas,
     pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
-    pub next_temporary_id: BigMapId,
+    pub next_temporary_id: &'operation mut BigMapId,
 }
 
 pub struct OperationCtx<'operation> {
@@ -334,7 +334,7 @@ impl<Host: Runtime> TcCtx<'_, Host> {
     fn generate_id(&mut self, temporary: bool) -> Result<BigMapId, LazyStorageError> {
         if temporary {
             let new_id = self.next_temporary_id.clone();
-            self.next_temporary_id = new_id.succ();
+            self.next_temporary_id.incr();
             Ok(new_id)
         } else {
             let next_id_path = next_id_path(self.context)?;
@@ -644,7 +644,7 @@ pub mod tests {
                 context: $context,
                 gas: &mut gas,
                 big_map_diff: BTreeMap::new(),
-                next_temporary_id: BigMapId { value: (-1).into() },
+                next_temporary_id: &mut BigMapId { value: (-1).into() },
             };
         };
     }

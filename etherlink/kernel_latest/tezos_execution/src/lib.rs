@@ -838,7 +838,7 @@ fn apply_batch<Host: Runtime>(
     } = validation_info;
     let mut first_failure: Option<usize> = None;
     let mut receipts = Vec::with_capacity(validated_operations.len());
-
+    let mut next_temporary_id = BigMapId { value: (-1).into() };
     for (index, validated_operation) in validated_operations.into_iter().enumerate() {
         log!(
             host,
@@ -863,6 +863,7 @@ fn apply_batch<Host: Runtime>(
                 origination_nonce,
                 &source_account,
                 validated_operation,
+                &mut next_temporary_id,
                 block_ctx,
             )
         };
@@ -889,6 +890,7 @@ fn apply_operation<Host: Runtime>(
     origination_nonce: &mut OriginationNonce,
     source_account: &TezlinkImplicitAccount,
     validated_operation: validate::ValidatedOperation,
+    next_temporary_id: &mut BigMapId,
     block_ctx: &BlockCtx,
 ) -> OperationWithMetadata {
     let mut internal_operations_receipts = Vec::new();
@@ -898,7 +900,7 @@ fn apply_operation<Host: Runtime>(
         context,
         gas: &mut gas,
         big_map_diff: BTreeMap::new(),
-        next_temporary_id: BigMapId { value: (-1).into() },
+        next_temporary_id,
     };
     let parser = Parser::new();
     match &validated_operation.content.operation {
