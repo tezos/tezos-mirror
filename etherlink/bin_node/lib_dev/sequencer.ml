@@ -101,7 +101,7 @@ let loop_sequencer (type f) multichain
         ~rpc_timeout
         ~next_blueprint_number:head.next_blueprint_number
         ~instant_confirmations:false
-        ~on_new_blueprint:(fun (Qty number) blueprint ->
+        ~on_new_blueprint:(fun (Qty number) blueprint ~expected_block_hash:_ ->
           let*! {next_blueprint_number = Qty expected_number; _} =
             Evm_context.head_info ()
           in

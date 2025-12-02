@@ -1354,6 +1354,7 @@ module State = struct
       Some
         (fun () ->
           let open Lwt_syntax in
+          Broadcast.notify_block_hash block_hash ;
           Broadcast.notify_blueprint blueprint_with_events ;
           (* We ignore failure. A failure means the prevalidator is not yet
              started, meaning the call is useless for now. *)

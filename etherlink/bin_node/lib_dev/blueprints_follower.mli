@@ -9,11 +9,17 @@ open Ethereum_types
 
 type sbl_callbacks_activated = {sbl_callbacks_activated : bool}
 
-(** A [new_blueprint_handler] is a function that is called for
-    every blueprint fetched from a remote EVM endpoint. *)
+(** A [new_blueprint_handler level blueprint ~expected_block_hash] is a callback
+    invoked for every blueprint fetched from a remote EVM endpoint.
+
+    - [level] is the blueprint level.
+    - [blueprint] is the blueprint object.
+    - [~expected_block_hash] is an optional block hash used to validate the
+      assembled block in instant-confirmation cases. *)
 type new_blueprint_handler =
   quantity ->
   Blueprint_types.with_events ->
+  expected_block_hash:Ethereum_types.block_hash option ->
   [`Restart_from of quantity | `Continue of sbl_callbacks_activated] tzresult
   Lwt.t
 

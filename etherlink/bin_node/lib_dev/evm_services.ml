@@ -235,7 +235,7 @@ let instant_confirmation ~enable stream =
             {
               data =
                 ( Next_block_info _ | Included_transaction _
-                | Dropped_transaction _ );
+                | Dropped_transaction _ | Block_hash _ );
               _;
             } ->
             false

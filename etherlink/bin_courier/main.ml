@@ -163,7 +163,7 @@ let start_blueprint_follower ~container ~relay_endpoint ~rpc_endpoint =
     ~rpc_timeout:10.
     ~next_blueprint_number
     ~instant_confirmations:false
-    ~on_new_blueprint:(fun number blueprint ->
+    ~on_new_blueprint:(fun number blueprint ~expected_block_hash:_ ->
       let*! () = Floodgate_events.received_blueprint number in
       let* () =
         match Blueprint_decoder.transaction_hashes blueprint with

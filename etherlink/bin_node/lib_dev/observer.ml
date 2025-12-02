@@ -25,7 +25,7 @@ let on_new_blueprint (type f)
     (tx_container : f Services_backend_sig.tx_container) evm_node_endpoint
     next_blueprint_number
     (({delayed_transactions; blueprint; _} : Blueprint_types.with_events) as
-     blueprint_with_events) =
+     blueprint_with_events) ~expected_block_hash =
   let open Lwt_result_syntax in
   let (module Tx_container) =
     Services_backend_sig.tx_container_module tx_container
@@ -40,6 +40,7 @@ let on_new_blueprint (type f)
     let*! res =
       Evm_context.apply_blueprint
         ~events
+        ?expected_block_hash
         blueprint.timestamp
         blueprint.payload
         delayed_transactions

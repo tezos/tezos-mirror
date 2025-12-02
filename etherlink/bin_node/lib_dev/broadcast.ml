@@ -73,6 +73,7 @@ type message =
     }
   | Included_transaction of {tx : transaction; hash : Ethereum_types.hash}
   | Dropped_transaction of {hash : Ethereum_types.hash; reason : string}
+  | Block_hash of Ethereum_types.block_hash
 
 type 'b encoding_wrapper = {
   fn : 'a. 'a Data_encoding.t -> ('b * 'a) Data_encoding.t;
@@ -163,6 +164,15 @@ let message_cases (type extra) ~(wrap_enc : extra encoding_wrapper) ~ofs
           | Dropped_transaction {hash; reason} -> Some ((), hash, reason)
           | _ -> None))
         (from (fun ((), hash, reason) -> Dropped_transaction {hash; reason}));
+      case
+        ~title:"Block_hash"
+        (Tag (ofs + 6))
+        (wrap_enc.fn
+           (obj2
+              (req "kind" (constant "block_hash"))
+              (req "hash" Ethereum_types.block_hash_encoding)))
+        (to_ (function Block_hash hash -> Some ((), hash) | _ -> None))
+        (from (fun ((), hash) -> Block_hash hash));
     ]
 
 let encoding =
@@ -217,6 +227,8 @@ let notify_next_block_info timestamp number =
 let notify_inclusion tx hash = notify (Included_transaction {tx; hash})
 
 let notify_dropped ~hash ~reason = notify (Dropped_transaction {hash; reason})
+
+let notify_block_hash hash = notify (Block_hash hash)
 
 type transaction_result = {
   hash : Ethereum_types.hash;
