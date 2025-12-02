@@ -279,8 +279,6 @@ macro_rules! micheline_unsupported_instructions_common {
             | Prim::CREATE_ACCOUNT
             | Prim::STEPS_TO_QUOTA
             | Prim::TICKET_DEPRECATED
-            | Prim::CAST
-            | Prim::RENAME
             | Prim::INDEX_ADDRESS
             | Prim::GET_ADDRESS_INDEX
     };

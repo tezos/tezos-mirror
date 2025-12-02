@@ -2340,6 +2340,23 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(VIEW, [_, _], _), [] | [_]) => no_overload!(VIEW, len 2),
         (App(VIEW, expect_args!(2), _), _) => unexpected_micheline!(),
 
+        (App(CAST, [cast_ty], _), [.., value]) => {
+            let cast_ty = parse_ty(gas, cast_ty)?;
+            ensure_ty_eq(gas, &cast_ty, value)?;
+            // Stack unchanged
+            // Here `I::Seq(Vec::new())` means that nothing needs to be interpreted.
+            I::Seq(Vec::new())
+        }
+        (App(CAST, [_], _), []) => no_overload!(CAST, len 1),
+        (App(CAST, expect_args!(1), _), _) => unexpected_micheline!(),
+
+        (App(RENAME, [], _), [..]) => {
+            // Stack unchanged
+            // Here `I::Seq(Vec::new())` means that nothing needs to be interpreted.
+            I::Seq(Vec::new())
+        }
+        (App(RENAME, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(prim @ micheline_unsupported_instructions!(), ..), _) => {
             Err(TcError::TodoInstr(*prim))?
         }
@@ -8849,6 +8866,99 @@ mod typecheck_tests {
                 stack: stk![],
                 reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 3 })
             })
+        );
+    }
+
+    #[test]
+    fn test_cast() {
+        let mut stack = tc_stk![Type::Nat];
+        let mut gas = Gas::default();
+        assert_eq!(
+            typecheck_instruction(&parse("CAST nat").unwrap(), &mut gas, &mut stack),
+            Ok(Seq(Vec::new()))
+        );
+        assert_eq!(stack, tc_stk![Type::Nat]);
+        let nat_size = Type::Nat.size_for_gas();
+        assert_eq!(
+            Gas::default().milligas() - gas.milligas(),
+            tc_cost::INSTR_STEP
+                + tc_cost::PARSE_TYPE_STEP
+                + tc_cost::ty_eq(nat_size, nat_size).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_cast_wrong_type() {
+        let mut stack = tc_stk![Type::Int];
+        let mut gas = Gas::default();
+        assert_eq!(
+            typecheck_instruction(&parse("CAST nat").unwrap(), &mut gas, &mut stack),
+            Err(TcError::TypesNotEqual(TypesNotEqual(Type::Nat, Type::Int)))
+        );
+    }
+
+    #[test]
+    fn test_cast_with_stack_to_small() {
+        let mut stack = tc_stk![];
+        let mut gas = Gas::default();
+        assert_eq!(
+            typecheck_instruction(&parse("CAST nat").unwrap(), &mut gas, &mut stack),
+            Err(TcError::NoMatchingOverload {
+                instr: Prim::CAST,
+                stack: stk![],
+                reason: Some(NoMatchingOverloadReason::StackTooShort { expected: 1 })
+            })
+        );
+    }
+
+    #[test]
+    fn test_cast_too_much_arg() {
+        let mut stack = tc_stk![Type::Nat];
+        let mut gas = Gas::default();
+        assert_eq!(
+            typecheck_instruction(&parse("CAST nat nat").unwrap(), &mut gas, &mut stack),
+            Err(TcError::UnexpectedMicheline(
+                "App(CAST, [App(nat, [], []), App(nat, [], [])], [])".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_cast_not_enough_arg() {
+        let mut stack = tc_stk![Type::Nat];
+        let mut gas = Gas::default();
+        assert_eq!(
+            typecheck_instruction(&parse("CAST").unwrap(), &mut gas, &mut stack),
+            Err(TcError::UnexpectedMicheline(
+                "App(CAST, [], [])".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_rename() {
+        let mut stack = tc_stk![];
+        let mut gas = Gas::default();
+        assert_eq!(
+            typecheck_instruction(&parse("RENAME").unwrap(), &mut gas, &mut stack),
+            Ok(Seq(Vec::new()))
+        );
+        assert_eq!(stack, tc_stk![]);
+        assert_eq!(
+            Gas::default().milligas() - gas.milligas(),
+            tc_cost::INSTR_STEP
+        );
+    }
+
+    #[test]
+    fn test_rename_too_much_arg() {
+        let mut stack = tc_stk![];
+        let mut gas = Gas::default();
+        assert_eq!(
+            typecheck_instruction(&parse("RENAME bool").unwrap(), &mut gas, &mut stack),
+            Err(TcError::UnexpectedMicheline(
+                "App(RENAME, [App(bool, [], [])], [])".to_string()
+            ))
         );
     }
 }
