@@ -165,7 +165,7 @@ let job_build_kernels =
     ~rules:
       (make_rules
          ~pipeline_type
-         ~changes:changeset_octez_or_kernels_or_doc
+         ~changes:changeset_octez_or_kernels_or_mir_or_doc
          ~dependent:true
          ())
     ()

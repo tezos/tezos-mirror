@@ -43,7 +43,14 @@ module Files = struct
       "etherlink/kernel_latest/revm_evaluation/**/*";
     ]
 
-  let mir = ["contrib/mir/**/*"]
+  let mir =
+    [
+      "contrib/mir/**/*.rs";
+      "contrib/mir/**/*.lalrpop";
+      (* Cargo.toml, clippy.toml *)
+      "contrib/mir/**/*.toml";
+      "contrib/mir/**/Cargo.lock";
+    ]
 
   let tzt = ["tzt_reference_test_suite/**/*"]
 
@@ -147,7 +154,7 @@ let job_test_kernel =
     ~stage:Test
     ~description:"Check and test the etherlink kernel."
     ~image:Tezos_ci.Images.rust_toolchain
-    ~only_if_changed:Files.(rust_toolchain_image @ kernel @ sdks)
+    ~only_if_changed:Files.(rust_toolchain_image @ kernel @ sdks @ mir)
     ~needs_legacy:
       [(Job, Tezos_ci_jobs.Code_verification.job_build_kernels pipeline_type)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
