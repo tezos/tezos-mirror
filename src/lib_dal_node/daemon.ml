@@ -607,6 +607,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
       {driver_ids = [Opentelemetry]}
         (Opentelemetry_profiler.initialize
            ~unique_identifier:(P2p_peer.Id.to_b58check identity.peer_id)
+           ?env:config.telemetry_env
            config.service_name)] ;
     let self =
       (* What matters is the identity, the reachable point is more like a placeholder here. *)
