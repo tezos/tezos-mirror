@@ -168,6 +168,8 @@ pub enum TransferError {
     EmptyImplicitTransfer,
     #[error("Gas exhaustion")]
     OutOfGas,
+    #[error("Unexpected deposit error: {0}")]
+    DepositError(String),
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader)]
@@ -425,10 +427,8 @@ pub struct TransferSuccess {
     pub storage: Option<Vec<u8>>,
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
-    // TODO: Placeholder for ticket receipt issue : #8018
     #[encoding(dynamic, bytes)]
     pub ticket_receipt: Vec<u8>,
-    // TODO: Placeholder for originated contracts issue : #8018
     #[encoding(dynamic, bytes)]
     pub originated_contracts: Vec<u8>,
     pub consumed_milligas: Narith,
@@ -436,6 +436,22 @@ pub struct TransferSuccess {
     pub paid_storage_size_diff: Zarith,
     pub allocated_destination_contract: bool,
     pub lazy_storage_diff: Option<LazyStorageDiffList>,
+}
+
+impl Default for TransferSuccess {
+    fn default() -> Self {
+        Self {
+            storage: None,
+            balance_updates: vec![],
+            ticket_receipt: vec![],
+            originated_contracts: vec![],
+            consumed_milligas: 0.into(),
+            storage_size: 0.into(),
+            paid_storage_size_diff: 0.into(),
+            allocated_destination_contract: false,
+            lazy_storage_diff: None,
+        }
+    }
 }
 
 // An operation error in a Tezos receipt has no specific format
@@ -531,7 +547,6 @@ pub struct OperationResult<M: OperationKind> {
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
     pub result: ContentResult<M>,
-    //TODO Placeholder for internal operations : #8018
     #[encoding(dynamic, list)]
     pub internal_operation_results: Vec<InternalOperationSum>,
 }
@@ -550,6 +565,25 @@ pub enum InternalOperationSum {
     Transfer(InternalContentWithMetadata<TransferContent>),
     #[encoding(tag = 2)]
     Origination(InternalContentWithMetadata<OriginationContent>),
+}
+
+impl BalanceUpdate {
+    pub fn transfer(sender: Contract, destination: Contract, amount: u64) -> Vec<Self> {
+        let sender = Balance::Account(sender);
+        let destination = Balance::Account(destination);
+
+        let sender_update = Self {
+            balance: sender,
+            changes: -(amount as i64),
+            update_origin: UpdateOrigin::BlockApplication,
+        };
+        let destination_update = Self {
+            balance: destination,
+            changes: amount as i64,
+            update_origin: UpdateOrigin::BlockApplication,
+        };
+        vec![sender_update, destination_update]
+    }
 }
 
 impl InternalOperationSum {

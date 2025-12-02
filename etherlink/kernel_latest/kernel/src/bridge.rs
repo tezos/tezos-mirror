@@ -18,7 +18,6 @@ use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpEncodable};
 use sha3::{Digest, Keccak256};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::nom::NomReader;
-use tezos_data_encoding::types::Narith;
 use tezos_ethereum::rlp_helpers::{decode_field_u256_le, decode_option_explicit};
 use tezos_ethereum::wei::mutez_from_wei;
 use tezos_ethereum::{
@@ -31,7 +30,11 @@ use tezos_execution::account_storage::{TezlinkAccount, TezlinkImplicitAccount};
 use tezos_execution::context::Context;
 use tezos_protocol::contract::Contract;
 use tezos_smart_rollup::michelson::{ticket::FA2_1Ticket, MichelsonBytes};
-use tezos_tezlink::operation_result::TransferError;
+use tezos_tezlink::operation::TransferContent;
+use tezos_tezlink::operation_result::{
+    ApplyOperationErrors, BalanceUpdate, ContentResult, TransferError, TransferSuccess,
+    TransferTarget,
+};
 use tezos_tracing::trace_kernel;
 
 use crate::tick_model::constants::TICKS_FOR_DEPOSIT;
@@ -57,8 +60,8 @@ pub enum BridgeError {
     InvalidDepositReceiver(Vec<u8>),
     #[error("Invalid RLP bytes: {0}")]
     RlpError(DecoderError),
-    #[error("Error when applying the Tezlink deposit: {0}")]
-    TezExecutionError(#[from] TransferError),
+    #[error("Invalid amount for a deposit: {0:?}")]
+    InvalidAmount(U256),
 }
 
 alloy_sol_types::sol! {
@@ -414,33 +417,66 @@ pub fn execute_etherlink_deposit<Host: Runtime>(
     })
 }
 
+pub const TEZLINK_DEPOSITOR: [u8; 22] = [0u8; 22];
+
+fn tezlink_deposit<Host: Runtime>(
+    host: &mut Host,
+    context: &Context,
+    amount: u64,
+    receiver: Contract,
+) -> Result<TransferSuccess, TransferError> {
+    let to_account = TezlinkImplicitAccount::from_contract(context, &receiver)
+        .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+
+    match to_account.add_balance(host, amount) {
+        Ok(()) => {
+            let mut success = TransferSuccess::default();
+            let depositor = Contract::nom_read_exact(&TEZLINK_DEPOSITOR)
+                .map_err(|e| TransferError::DepositError(format!("{e:?}")))?;
+            let balance_updates = BalanceUpdate::transfer(depositor, receiver, amount);
+            success.balance_updates = balance_updates;
+            Ok(success)
+        }
+        Err(e) => {
+            log!(host, Error, "Deposit failed because of {e}");
+            Err(TransferError::DepositError(e.to_string()))
+        }
+    }
+}
+
+type TezlinkOutcome = (ContentResult<TransferContent>, TransferContent);
+
 pub fn execute_tezlink_deposit<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     deposit: &Deposit,
-) -> Result<DepositResult<bool>, BridgeError> {
+) -> Result<DepositResult<TezlinkOutcome>, BridgeError> {
     // We should be able to obtain an account for arbitrary H160 address
     // otherwise it is a fatal error.
-    let contract = deposit.receiver.to_contract()?;
-    let to_account = TezlinkImplicitAccount::from_contract(context, &contract)
-        .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-    let balance = to_account
-        .balance(host)
-        .map_err(|_| TransferError::FailedToFetchDestinationBalance)?;
+    let receiver = deposit.receiver.to_contract()?;
+
     let amount = mutez_from_wei(deposit.amount)
-        .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
-    let outcome = match to_account.set_balance(host, &Narith(balance.0 + amount)) {
-        Ok(()) => true,
-        Err(e) => {
-            log!(host, Error, "Deposit failed because of {}", e);
-            false
-        }
+        .map_err(|_| BridgeError::InvalidAmount(deposit.amount))?;
+
+    let content = TransferContent {
+        amount: amount.into(),
+        destination: receiver.clone(),
+        parameters: None,
     };
 
-    Ok(DepositResult {
-        outcome,
+    let result = match tezlink_deposit(host, context, amount, receiver) {
+        Ok(success) => ContentResult::Applied(TransferTarget::ToContrat(success)),
+        Err(err) => ContentResult::Failed(ApplyOperationErrors {
+            errors: vec![err.into()],
+        }),
+    };
+
+    let result = DepositResult {
+        outcome: (result, content),
         estimated_ticks_used: TICKS_FOR_DEPOSIT,
-    })
+    };
+
+    Ok(result)
 }
 
 #[cfg(test)]
