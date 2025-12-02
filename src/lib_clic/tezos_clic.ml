@@ -763,16 +763,17 @@ let internal_setup_formatter ppf format verbosity cols =
              | Format.String_tag "document" ->
                  Format.fprintf
                    ppf
-                   "@[<v 0>\003style\004.cmdline { font-family: monospace \
-                    }.cmddoc { white-space: pre-wrap ; font-family: monospace; \
-                    line-height: 170%%; margin: 0 0 20px 0 }.cmdline { \
-                    background: #343131; padding: 2px 8px; border-radius:10px; \
-                    color: white; margin: 5px; }.cmdline+.cmddoc { margin: \
-                    -5px 5px 0 20px; padding: 5px }.opt,.arg { background: \
-                    #343131; font-weight: bold;  padding: 2px 4px; \
-                    border-radius:5px; }.kwd { font-weight: bold; } .opt { \
-                    color:#CF0; background: #460; } .arg { color: #CEF; \
-                    background: #369; }\003/style\004@\n"
+                   "@[<v 0>\003style\004.cmdline { font-family: monospace; \
+                    font-size: 80%%; }.cmddoc { white-space: pre-wrap ; \
+                    font-family: monospace; font-size: 80%%; line-height: \
+                    170%%; margin: 0 0 2px 0 }.cmdline { background: #343131; \
+                    padding: 2px 8px; border-radius:10px; color: white; \
+                    margin: 5px; }.cmdline+.cmddoc { margin: -5px 5px 0 2px; \
+                    padding: 5px }.opt,.arg { background: #343131; \
+                    font-weight: bold;  padding: 2px 4px; border-radius:5px; \
+                    }.kwd { font-weight: bold; } .opt { color:#CF0; \
+                    background: #460; } .arg { color: #CEF; background: #369; \
+                    }\003/style\004@\n"
              | other -> push_level_tag other);
            print_close_stag =
              (function
@@ -2151,5 +2152,5 @@ let map_command f (Command c) = Command {c with conv = (fun x -> c.conv (f x))}
 
 let setup_formatter ~isatty ppf verbosity =
   let format = if isatty then Ansi else Plain in
-  let cols = if isatty then Terminal.Size.get_columns () else None in
+  let cols = if isatty then Terminal.Size.get_columns () else Some 95 in
   internal_setup_formatter ppf format verbosity cols
