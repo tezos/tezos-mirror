@@ -10,24 +10,67 @@ open Test_helpers
 open Floodgate_lib
 
 type parameters = {
-  profiling : bool;
-  time_between_blocks : float;
-  iterations : int;
-  accounts : int option;
-  contracts : int option;
-  timeout : float;
-  spp : int;
-  width : int;
-  height : int;
-  swap_hops : int;
+  mutable profiling : bool;
+  mutable time_between_blocks :
+    [ `Manual of float
+      (** [`Manual t] the sandbox node will not produce any block by itself but
+          the tezt benchmark will call [produce_block] every [t] seconds *)
+    | `Auto of float
+      (** [`Auto t] the sandbox node will produce a block every [t] seconds *)
+    ];
+  mutable iterations : int;
+  mutable accounts : int option;
+  mutable contracts : int option;
+  mutable timeout : float;
+  mutable spp : int;
+  mutable width : int;
+  mutable height : int;
+  mutable swap_hops : int;
 }
 
 let parameters =
+  (* default values *)
+  {
+    profiling = false;
+    time_between_blocks = `Manual 0.5;
+    iterations = 5;
+    accounts = None;
+    contracts = None;
+    timeout = 2.0;
+    spp = 2;
+    width = 64;
+    height = 48;
+    swap_hops = 1;
+  }
+
+module type PARAMETERS = sig
+  val profiling : bool
+
+  val time_between_blocks : [`Manual of float | `Auto of float]
+
+  val iterations : int
+
+  val accounts : int option
+
+  val contracts : int option
+
+  val timeout : float
+
+  val spp : int
+
+  val width : int
+
+  val height : int
+
+  val swap_hops : int
+end
+
+module Parameters () : PARAMETERS = struct
   let section =
     Clap.section
       "EVM NODE BENCHMARK"
       ~description:"Parameters for running benchmarks on the EVM node"
-  in
+
   let profiling =
     Clap.flag
       ~section
@@ -36,16 +79,34 @@ let parameters =
       ~description:
         "Report profiling information (needs perf on linux and xctrace on \
          macos)"
-  in
+
+  let tbb =
+    Clap.typ
+      ~name:"time_between_blocks"
+      ~dummy:parameters.time_between_blocks
+      ~parse:(fun s ->
+        match String.split_on_char ':' s with
+        | ["auto"; v] -> Some (`Auto (float_of_string v))
+        | ["manual"; v] -> Some (`Manual (float_of_string v))
+        | _ -> None)
+      ~show:(function
+        | `Auto v -> "auto:" ^ string_of_float v
+        | `Manual v -> "manual:" ^ string_of_float v)
+
   let time_between_blocks =
-    Clap.default_float
+    Clap.default
+      tbb
       ~section
       ~long:"time_between_blocks"
       ~short:'T'
-      ~placeholder:"seconds"
-      ~description:"Number of seconds between blocks"
-      0.5
-  in
+      ~placeholder:"[auto|manual]:seconds"
+      ~description:
+        "Number of seconds between blocks. With auto:t the sequencer will \
+         produce a block every t seconds, while with manual:t the sequencer \
+         will not produce any block by itself but the tezt benchmark will call \
+         produce_block every t seconds."
+      parameters.time_between_blocks
+
   let iterations =
     Clap.default_int
       ~section
@@ -53,8 +114,8 @@ let parameters =
       ~short:'I'
       ~placeholder:"nb"
       ~description:"Number of iterations for the benchmark"
-      5
-  in
+      parameters.iterations
+
   let accounts =
     Clap.optional_int
       ~section
@@ -63,7 +124,7 @@ let parameters =
       ~placeholder:"nb"
       ~description:"Number of accounts that sign transactions for the benchmark"
       ()
-  in
+
   let contracts =
     Clap.optional_int
       ~section
@@ -72,7 +133,7 @@ let parameters =
       ~placeholder:"nb"
       ~description:"Number of ERC20 contracts for the benchmark"
       ()
-  in
+
   let timeout =
     Clap.default_float
       ~section
@@ -81,8 +142,8 @@ let parameters =
       ~description:
         "Number of seconds to wait for inclusion before considering operation \
          dropped"
-      2.0
-  in
+      parameters.timeout
+
   let spp =
     Clap.default_int
       ~section
@@ -91,8 +152,8 @@ let parameters =
       ~description:
         "Samples Per Pixel for SnailTracer benchmark. Higher values will use \
          more gas."
-      2
-  in
+      parameters.spp
+
   let width =
     Clap.default_int
       ~section
@@ -100,8 +161,8 @@ let parameters =
       ~placeholder:"pixels"
       ~description:
         "Width of image for SnailTracer. Higher values will use more gas."
-      64
-  in
+      parameters.width
+
   let height =
     Clap.default_int
       ~section
@@ -110,27 +171,31 @@ let parameters =
       ~description:
         "Height of image for SnailTracer. Higher values will use more gas."
       48
-  in
+
   let swap_hops =
     Clap.default_int
       ~section
       ~long:"swap-hops"
       ~placeholder:"nb"
       ~description:"Number of hops to do in swap path."
-      1
-  in
-  {
-    profiling;
-    time_between_blocks;
-    iterations;
-    accounts;
-    contracts;
-    timeout;
-    spp;
-    width;
-    height;
-    swap_hops;
-  }
+      parameters.swap_hops
+
+  let () =
+    parameters.profiling <- profiling ;
+    parameters.time_between_blocks <- time_between_blocks ;
+    parameters.iterations <- iterations ;
+    parameters.accounts <- accounts ;
+    parameters.contracts <- contracts ;
+    parameters.timeout <- timeout ;
+    parameters.spp <- spp ;
+    parameters.width <- width ;
+    parameters.height <- height ;
+    parameters.swap_hops <- swap_hops
+end
+
+let parse_cli () =
+  let module P = Parameters () in
+  ()
 
 let ( let+? ) x f =
   match x with
@@ -155,14 +220,16 @@ let nb_confirmed = ref 0
 
 let wait_for_application ?(time_between_blocks = parameters.time_between_blocks)
     ?(max_blocks =
-      max 1 (int_of_float ((parameters.timeout /. time_between_blocks) +. 1.)))
-    sequencer f =
+      let (`Auto tbb | `Manual tbb) = time_between_blocks in
+      max 1 (int_of_float ((parameters.timeout /. tbb) +. 1.))) sequencer f =
+  let (`Auto tbb | `Manual tbb) = time_between_blocks in
+  let produce_block =
+    match time_between_blocks with
+    | `Auto _ -> fun () -> Lwt.return_ok 0
+    | `Manual _ -> fun () -> produce_block sequencer
+  in
   let* res =
-    wait_for_application
-      f
-      ~time_between_blocks
-      ~max_blocks
-      ~produce_block:(fun _ -> produce_block sequencer)
+    wait_for_application f ~time_between_blocks:tbb ~max_blocks ~produce_block
   in
   if !nb_dropped <> 0 then
     Log.info ~color:Log.Color.FG.red "%d operations DROPPED" !nb_dropped ;

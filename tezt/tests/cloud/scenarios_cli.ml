@@ -1277,3 +1277,66 @@ module Tezlink () : Tezlink = struct
          domains need to be registered with the dns-domain option."
       ()
 end
+
+module type Etherlink = sig
+  val kernel : [`Mainnet | `Custom of string]
+
+  val network : string option
+
+  val evm_node_version : [`Latest | `V of string]
+
+  include Etherlink_benchmark_lib.Benchmark_utils.PARAMETERS
+end
+
+module Etherlink () : Etherlink = struct
+  let section =
+    Clap.section
+      ~description:
+        "All the options related to running Etherlink scenarios onto the cloud"
+      "Etherlink"
+
+  let kernel =
+    let s =
+      Clap.default_string
+        ~section
+        ~long:"kernel"
+        ~description:
+          "Path to wasm kernel for Etherlink node. (default: mainnet)"
+        ~placeholder:"<mainnet|path>"
+        "mainnet"
+    in
+    if s = "mainnet" then `Mainnet else `Custom s
+
+  let network =
+    let typ =
+      Clap.enum
+        "network"
+        (List.map (fun x -> (x, x)) ["mainnet"; "testnet"; "braeburn"])
+    in
+    Clap.optional
+      typ
+      ~section
+      ~long:"network"
+      ~description:"Start a sandbox with a context from this network"
+      ~placeholder:"<mainnet|testnet|braeburn>"
+      ()
+
+  let evm_node_version =
+    Clap.default
+      (Clap.typ
+         ~name:"EVM node version"
+         ~dummy:`Latest
+         ~parse:(function
+           | "latest" -> Some `Latest
+           | s when String.length s >= 1 && s.[0] = 'v' ->
+               Some (`V (String.sub s 1 (String.length s - 1)))
+           | s -> Some (`V s))
+         ~show:(function `Latest -> "latest" | `V s -> "v" ^ s))
+      ~section
+      ~long:"evm-node-version"
+      ~description:"Choose the EVM node version to use for the benchmark"
+      ~placeholder:"<latest|vX.Y>"
+      `Latest
+
+  include Etherlink_benchmark_lib.Benchmark_utils.Parameters ()
+end

@@ -1,0 +1,215 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>              *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(**
+   This scenario runs an Etherlink sandbox and benchmarks the node capacity
+   using the UniswapV2 contracts.
+
+   To run this tezt-cloud scenario, first setup your gcloud environmenmt
+   {v
+     gcloud auth application-default login
+     gcloud config set project tezlink
+   v}
+
+   If you run Docker on mac os, enable
+   {{!https://docs.docker.com/engine/network/drivers/host/#docker-desktop}host
+   networking} and add the flag [--macosx] to the command below.
+
+   The scenario can then be started with
+   {v
+     dune exec tezt/tests/cloud/main.exe -- ETHERLINK \
+       --tezt-cloud etherlink --destroy \
+       --machine-type c2d-standard-8 \
+       --docker-host-network \
+       --network braeburn -i
+   v}
+
+   You can benchmark different combinations of network context and kernel using
+   the [--network] and [--kernel] options. See the [--help] for more benchmark
+   options to control the number of iterations, swap hops, accounts, etc.
+*)
+
+module Cli = Scenarios_cli
+open Scenarios_helpers
+open Tezt_etherlink
+open Etherlink_benchmark_lib
+open Benchmark_utils
+
+let setup_sequencer_sandbox (cloud : Cloud.t) ~name network kernel
+    (time_between_blocks : Evm_node.time_between_blocks) accounts agent =
+  let rpc_port = Agent.next_available_port agent in
+  let private_rpc_port = Agent.next_available_port agent |> Option.some in
+  let custom_dest = "/kernel/evm_kernel.wasm" in
+  let init_from_snapshot = Option.is_some network in
+  let initial_kernel_source =
+    match (network, kernel) with
+    | Some _, `Mainnet -> None
+    | _, `Mainnet ->
+        Some
+          "etherlink/kernel_latest/kernel/tests/resources/mainnet_kernel.wasm"
+    | _, `Custom k -> Some k
+  in
+  let* initial_kernel =
+    match initial_kernel_source with
+    | None -> return None
+    | Some source ->
+        let* p = Agent.copy ~source ~destination:custom_dest agent in
+        return (Some p)
+  in
+  let wallet_dir = Temp.dir "wallet" in
+  let preimages_dir = Temp.dir "wasm_2_0_0" in
+  let funded_addresses =
+    Array.to_list accounts |> List.map (fun a -> a.Eth_account.address)
+  in
+  let mode =
+    Evm_node.Sandbox
+      {
+        initial_kernel;
+        network;
+        funded_addresses;
+        sequencer_keys = [];
+        preimage_dir = Some preimages_dir;
+        private_rpc_port;
+        time_between_blocks = Some time_between_blocks;
+        genesis_timestamp = None;
+        max_number_of_chunks = None;
+        wallet_dir = Some wallet_dir;
+        tx_queue_max_lifespan = None;
+        tx_queue_max_size = None;
+        tx_queue_tx_per_addr_limit = None;
+      }
+  in
+  let () = toplog "Launching the sandbox L2 node" in
+  let add_cors rpc =
+    JSON.update rpc (fun json ->
+        JSON.update
+          "cors_headers"
+          (fun _ ->
+            JSON.annotate ~origin:"patch-config:cors_headers"
+            @@ `A [`String "*"])
+          json
+        |> JSON.update "cors_origins" (fun _ ->
+               JSON.annotate ~origin:"patch-config:cors_origins"
+               @@ `A [`String "*"]))
+  in
+  let add_telemetry config =
+    match Cloud.open_telemetry_endpoint cloud with
+    | None -> config
+    | Some base ->
+        let j = JSON.annotate ~origin:"patch-config:opentelemetry" in
+        config
+        |> JSON.update "opentelemetry" @@ fun otel_config ->
+           otel_config
+           |> JSON.update "enable" (fun _ -> j (`Bool true))
+           |> JSON.update "url_traces" (fun _ ->
+                  j (`String (base ^ "/v1/traces")))
+           |> JSON.update "url_logs" (fun _ -> j (`String (base ^ "/v1/logs")))
+  in
+  let extra_arguments =
+    Cli_arg.optional_switch "init-from-snapshot" init_from_snapshot
+  in
+  let* evm_node =
+    Tezos.Evm_node.Agent.init
+      ~wait:false
+      ~copy_binary:false
+        (* We use the binary from the EVM release docker image *)
+      ~patch_config:(fun json ->
+        json |> add_cors "public_rpc" |> add_cors "private_rpc" |> add_telemetry
+        |> Evm_node.patch_config_with_experimental_feature
+             ~drop_duplicate_when_injection:true
+             ~blueprints_publisher_order_enabled:true
+             ~rpc_server:Resto
+             ())
+      ~name:"sandboxed-sequencer"
+      ~mode
+      ~rpc_port
+      ~extra_arguments
+      "http://dummy_rollup_endpoint"
+      cloud
+      agent
+  in
+  let* () = Evm_node.wait_for_ready ~timeout:1200. evm_node in
+  let () = toplog "Launching the sandbox L2 node: done" in
+  let* () = add_prometheus_source ~evm_node cloud agent name in
+  let () = toplog "Added prometheus source" in
+  return evm_node
+
+(* Set default values for CLI arguments. *)
+let () =
+  parameters.time_between_blocks <- `Auto 0.5 ;
+  parameters.iterations <- 1000 ;
+  parameters.accounts <- Some 150 ;
+  parameters.contracts <- Some 2 ;
+  parameters.timeout <- 15. ;
+  parameters.swap_hops <- 2 ;
+  ()
+
+let register (module Cli : Scenarios_cli.Etherlink) =
+  let () = toplog "Parsing CLI done" in
+  let name = "etherlink" in
+  let docker_tag =
+    match Cli.evm_node_version with `Latest -> "latest" | `V s -> "v" ^ s
+  in
+  let dockerbuild_args = [("EVM_NODE_VERSION", docker_tag)] in
+  let vms () = return [Agent.Configuration.make ~name ~dockerbuild_args ()] in
+  Cloud.register
+    ~vms
+    ~proxy_files:[]
+    ~proxy_args:[]
+    ~__FILE__
+    ~title:"Etherlink benchmark"
+    ~tags:[]
+    ~dockerbuild_args
+  @@ fun cloud ->
+  Clap.close () ;
+  let () = toplog "Creating the agents" in
+  let agents = Cloud.agents cloud in
+  let sequencer_agent = List.hd agents in
+  let nb_accounts = Option.value parameters.accounts ~default:150 in
+  let accounts = Eth_account.accounts nb_accounts in
+  let nb_tokens = Option.value parameters.contracts ~default:2 in
+  let () = toplog "Starting sequencer" in
+  let time_between_empty_blocks = 6.0 in
+  let time_between_blocks =
+    match Cli.time_between_blocks with
+    | `Auto _ -> Evm_node.Time_between_blocks time_between_empty_blocks
+    | `Manual _ -> Nothing
+  in
+  let* sequencer =
+    setup_sequencer_sandbox
+      cloud
+      ~name
+      Cli.network
+      Cli.kernel
+      time_between_blocks
+      accounts
+      sequencer_agent
+  in
+  let* () =
+    (* The durable storage is patched on startup to pre-fund addresses. If there
+       is already a context, we need to wait for the next block for the patch to
+       be effective. *)
+    match Cli.kernel with
+    | `Custom _ -> unit
+    | `Mainnet -> Lwt_unix.sleep (time_between_empty_blocks *. 4.)
+  in
+  let () = toplog "Setup UniswapV2 benchmark" in
+  let* env, shutdown =
+    Uniswap.setup
+      ~accounts
+      ~nb_tokens
+      ~nb_hops:parameters.swap_hops
+      ~sequencer
+      ~rpc_node:sequencer
+  in
+  let () = toplog "Setup UniswapV2 benchmark complete" in
+  monitor_gasometer sequencer @@ fun () ->
+  let* () =
+    Lwt_list.iter_s (Uniswap.step env) (List.init parameters.iterations succ)
+  in
+  shutdown ()

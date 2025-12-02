@@ -491,7 +491,7 @@ let test_observer_reset =
       ~mode:
         (Evm_node.Observer
            {
-             initial_kernel = invalid_kernel;
+             initial_kernel = Some invalid_kernel;
              preimages_dir = Some preimages_dir;
              private_rpc_port = Some (Port.fresh ());
              rollup_node_endpoint =
@@ -509,7 +509,7 @@ let test_observer_reset =
       ~mode:
         (Evm_node.Observer
            {
-             initial_kernel = invalid_kernel;
+             initial_kernel = Some invalid_kernel;
              preimages_dir = Some preimages_dir;
              private_rpc_port = Some (Port.fresh ());
              rollup_node_endpoint =
@@ -2785,7 +2785,7 @@ let test_get_balance_block_param =
       ~mode:
         (Observer
            {
-             initial_kernel = "evm_kernel.wasm";
+             initial_kernel = Some "evm_kernel.wasm";
              preimages_dir = Some "/tmp";
              private_rpc_port = None;
              rollup_node_endpoint =
@@ -2884,7 +2884,7 @@ let test_get_block_by_number_block_param =
       ~mode:
         (Observer
            {
-             initial_kernel = "evm_kernel.wasm";
+             initial_kernel = Evm_node.initial_kernel observer;
              preimages_dir = Some "/tmp";
              private_rpc_port = None;
              rollup_node_endpoint =
@@ -12664,7 +12664,7 @@ let test_observer_init_from_snapshot =
       ~mode:
         (Observer
            {
-             initial_kernel = "evm_kernel.wasm";
+             initial_kernel = Evm_node.initial_kernel sequencer;
              preimages_dir = Some "/tmp";
              private_rpc_port = None;
              rollup_node_endpoint =

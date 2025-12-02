@@ -544,13 +544,15 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
   let sequencer_mode =
     Evm_node.Sandbox
       {
-        initial_kernel = output;
+        initial_kernel = Some output;
+        network = None;
         preimage_dir = Some preimages_dir;
         private_rpc_port = Some (Port.fresh ());
         time_between_blocks = Some Nothing;
         genesis_timestamp;
         max_number_of_chunks = None;
         wallet_dir = Some wallet_dir;
+        funded_addresses = [];
         tx_queue_max_lifespan;
         tx_queue_max_size;
         tx_queue_tx_per_addr_limit;

@@ -9,6 +9,7 @@
 open Evm_node_lib_dev_encoding
 open Evm_node_lib_dev
 open Setup
+open Etherlink_benchmark_lib
 open Benchmark_utils
 open Floodgate_lib
 
@@ -206,7 +207,7 @@ let encode_parameters width height =
   in
   enc_int width ^ enc_int height
 
-let test_snailtracer =
+let test_snailtracer () =
   let nb_accounts = Option.value parameters.accounts ~default:1 in
   let width = parameters.width in
   let height = parameters.height in
@@ -285,7 +286,7 @@ let test_snailtracer =
   let* () = Evm_node.terminate sequencer in
   stop_profile ()
 
-let test_full_image_raytracing =
+let test_full_image_raytracing () =
   let width = parameters.width in
   let height = parameters.height in
   let accounts = Eth_account.accounts 1 in
@@ -367,6 +368,6 @@ let test_full_image_raytracing =
   stop_profile ()
 
 let register () =
-  test_snailtracer [Protocol.Alpha] ;
-  test_full_image_raytracing [Protocol.Alpha] ;
+  test_snailtracer () [Protocol.Alpha] ;
+  test_full_image_raytracing () [Protocol.Alpha] ;
   ()

@@ -62,7 +62,7 @@ type time_between_blocks =
 (** EVM node mode. *)
 type mode =
   | Observer of {
-      initial_kernel : string;
+      initial_kernel : string option;
       preimages_dir : string option;
       private_rpc_port : int option;  (** Port for private RPC server*)
       rollup_node_endpoint : string option;
@@ -99,7 +99,9 @@ type mode =
       sequencer_sunset_sec : int option;
     }
   | Sandbox of {
-      initial_kernel : string;
+      initial_kernel : string option;
+      network : string option;
+      funded_addresses : string list;
       preimage_dir : string option;
       private_rpc_port : int option;
       time_between_blocks : time_between_blocks option;
@@ -184,7 +186,7 @@ val create :
 
 (** [initial_kernel node] returns the path to the kernel used to initialize the
     EVM state. Fails if [node] is a proxy node. *)
-val initial_kernel : t -> string
+val initial_kernel : t -> string option
 
 (** [run ?wait ?extra_arguments evm_node] launches the EVM node server with
     the arguments given during {!create}, additional arguments can be

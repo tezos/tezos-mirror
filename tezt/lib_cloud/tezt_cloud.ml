@@ -313,6 +313,8 @@ module Tezt_cloud_cli = struct
 
   let artifacts_dir = Cli.artifacts_dir
 
+  let binaries_path = Cli.binaries_path
+
   let teztale_artifacts = Cli.teztale_artifacts
 
   let faketime = Cli.faketime

@@ -7,6 +7,7 @@
 (*****************************************************************************)
 
 open Setup
+open Etherlink_benchmark_lib
 open Benchmark_utils
 open Floodgate_lib
 open Evm_node_lib_dev_encoding
@@ -177,7 +178,7 @@ let step ({sequencer; accounts; _} as env) erc20s iteration =
   in
   wait_for_application sequencer step_f
 
-let test_erc20_capacity =
+let test_erc20_capacity () =
   let nb_accounts = Option.value parameters.accounts ~default:100 in
   let nb_contracts = Option.value parameters.contracts ~default:10 in
   let accounts = Eth_account.accounts nb_accounts in
@@ -256,4 +257,4 @@ let test_erc20_capacity =
   let* () = Evm_node.terminate sequencer in
   stop_profile ()
 
-let register () = test_erc20_capacity [Protocol.Alpha]
+let register () = test_erc20_capacity () [Protocol.Alpha]
