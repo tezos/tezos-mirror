@@ -42,7 +42,10 @@ use tezos_tezlink::{
 
 use crate::address::OriginationNonce;
 use crate::gas::Cost;
-use crate::mir_ctx::{convert_big_map_diff, BlockCtx, Ctx, ExecCtx, OperationCtx, TcCtx};
+use crate::mir_ctx::{
+    clear_temporary_big_maps, convert_big_map_diff, BlockCtx, Ctx, ExecCtx, OperationCtx,
+    TcCtx,
+};
 
 extern crate alloc;
 pub mod account_storage;
@@ -875,12 +878,24 @@ fn apply_batch<Host: Runtime>(
         receipts.push(receipt);
     }
 
+    // Clear all the temporaries big_map after the application of the batch
+    let cleared = clear_temporary_big_maps(host, context, &mut next_temporary_id);
+
+    if let Err(lazy_storage_err) = cleared {
+        log!(
+            host,
+            Error,
+            "Cleaning the temporary big_map in the storage failed: {lazy_storage_err}"
+        )
+    }
+
     if let Some(failure_idx) = first_failure {
         receipts[..failure_idx].iter_mut().for_each(|receipt| {
             OperationResultSum::transform_result_backtrack(&mut receipt.receipt)
         });
         return (receipts, false);
     }
+
     (receipts, true)
 }
 
