@@ -374,7 +374,8 @@ let () =
     "rpm.daily"
     rpm_daily
     ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace :: Rpm_repository.(jobs Full)
+      (Tezos_ci.job_datadog_pipeline_trace
+       :: Rpm_repository.(jobs ~limit_dune_build_jobs:true Full)
       |> List.map (with_interruptible false))
     ~description:
       "Daily pipeline containing all RPM jobs (build and extended tests)." ;
