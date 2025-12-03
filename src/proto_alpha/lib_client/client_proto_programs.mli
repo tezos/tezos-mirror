@@ -196,10 +196,11 @@ val print_typecheck_result :
   print_source_on_error:bool ->
   display_names:bool ->
   name:string ->
+  keep_going:bool ->
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map * Gas.t) tzresult ->
   #Client_context.printer ->
-  unit tzresult Lwt.t
+  bool tzresult Lwt.t
 
 (** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Scripts.script_size} *)
 val script_size :

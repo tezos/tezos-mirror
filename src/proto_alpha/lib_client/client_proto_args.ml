@@ -731,6 +731,14 @@ let no_print_source_flag =
        This option disables this behaviour."
     ()
 
+let keep_going_flag =
+  Tezos_clic.switch
+    ~long:"keep-going"
+    ~doc:
+      "don't stop on errors. This is useful to measure the number of successes \
+       and failures."
+    ()
+
 let no_confirmation =
   Tezos_clic.switch
     ~long:"no-confirmation"
