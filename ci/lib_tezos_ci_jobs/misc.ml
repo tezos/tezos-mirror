@@ -207,6 +207,20 @@ let job_resto_unit =
     ~only_if_changed:["resto/**"]
     ["eval $(opam env)"; "dune runtest resto"]
 
+(* "de" stands for "data-encoding". *)
+let job_de_unit =
+  Cacio.parameterize @@ fun arch ->
+  CI.job
+    ("de.unit:" ^ Tezos_ci.Runner.Arch.show_easy_to_distinguish arch)
+    ~__POS__
+    ~description:"Run unit tests for data-encoding."
+    ~arch
+    ?storage:(match arch with Arm64 -> Some Ramfs | _ -> None)
+    ~image:Tezos_ci.Images.CI.test
+    ~stage:Test
+    ~only_if_changed:["data-encoding/**"]
+    ["eval $(opam env)"; "dune runtest data-encoding"]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -221,6 +235,8 @@ let register () =
       (Auto, job_test_release_versions);
       (Auto, job_resto_unit Amd64);
       (Auto, job_resto_unit Arm64);
+      (Auto, job_de_unit Amd64);
+      (Auto, job_de_unit Arm64);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
@@ -235,5 +251,7 @@ let register () =
       (Auto, job_test_release_versions);
       (Auto, job_resto_unit Amd64);
       (Auto, job_resto_unit Arm64);
+      (Auto, job_de_unit Amd64);
+      (Auto, job_de_unit Arm64);
     ] ;
   ()

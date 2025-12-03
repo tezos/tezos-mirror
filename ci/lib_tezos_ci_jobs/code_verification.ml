@@ -743,27 +743,6 @@ let jobs pipeline_type =
           ["dune build @runtest_compile_protocol"]
         |> enable_cargo_cache |> enable_sccache
       in
-      (* "de" stands for data-encoding, since data-encoding is considered
-         to be a separate product. *)
-      let de_unit arch ?storage () =
-        job
-          ~__POS__
-          ~name:("de.unit:" ^ Runner.Arch.show_easy_to_distinguish arch)
-          ~arch
-          ?storage
-          ~image:Images.CI.test
-          ~stage:Stages.test
-          ~rules:
-            (make_rules
-               ~changes:
-                 (Changeset.union
-                    changeset_base
-                    (Changeset.make ["data-encoding/**"]))
-               ())
-          ~dependencies:(build_dependencies arch)
-          ~before_script:(before_script ~eval_opam:true [])
-          ["dune runtest data-encoding"]
-      in
       [
         job_ocaml_check;
         oc_unit_non_proto_x86_64;
@@ -772,8 +751,6 @@ let jobs pipeline_type =
         oc_unit_non_proto_arm64;
         oc_unit_webassembly_x86_64;
         oc_unit_protocol_compiles;
-        de_unit Amd64 ();
-        de_unit Arm64 ~storage:Ramfs ();
       ]
     in
     (* The set of installation test jobs *)
