@@ -198,6 +198,21 @@ let job_build_x86_64_exp =
     "script-inputs/experimental-executables"
   |> enable_dune_cache ~key:Pipeline ~policy:Push
 
+let build_arm_rules ~pipeline_type =
+  make_rules ~pipeline_type ~label:"ci--arm64" ~manual:Yes ()
+
+let job_build_arm64_release =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_arm64_release ~rules:(build_arm_rules ~pipeline_type) ()
+
+let job_build_arm64_extra_dev =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_arm64_extra_dev ~rules:(build_arm_rules ~pipeline_type) ()
+
+let job_build_arm64_exp =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_arm64_exp ~rules:(build_arm_rules ~pipeline_type) ()
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
@@ -423,16 +438,9 @@ let jobs pipeline_type =
   let job_build_x86_64_extra_dev = job_build_x86_64_extra_dev pipeline_type in
   let job_build_x86_64_exp = job_build_x86_64_exp pipeline_type in
 
-  let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:Yes () in
-  let job_build_arm64_release : Tezos_ci.tezos_job =
-    job_build_arm64_release ~rules:build_arm_rules ()
-  in
-  let job_build_arm64_extra_dev : Tezos_ci.tezos_job =
-    job_build_arm64_extra_dev ~rules:build_arm_rules ()
-  in
-  let job_build_arm64_exp : Tezos_ci.tezos_job =
-    job_build_arm64_exp ~rules:build_arm_rules ()
-  in
+  let job_build_arm64_release = job_build_arm64_release pipeline_type in
+  let job_build_arm64_extra_dev = job_build_arm64_extra_dev pipeline_type in
+  let job_build_arm64_exp = job_build_arm64_exp pipeline_type in
 
   (* Octez static binaries *)
   let job_static_x86_64_experimental =
