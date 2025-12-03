@@ -1,5 +1,5 @@
-Version 24.0~beta1
-==================
+Version 24.0~rc1
+================
 
 Changes
 -------
@@ -80,11 +80,16 @@ From sources
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v24.0-beta1
+  git checkout octez-v24.0-rc1
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v24.0-beta1`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v24.0-rc1`` Docker images of Octez.
+
+Changelog
+---------
+
+- `Version 24.0~rc1 <../CHANGES.html#version-24-0-rc1>`_
