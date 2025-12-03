@@ -282,7 +282,52 @@ let job_oc_unit_non_proto_x86_64 =
     ~dune_cache:(Cacio.dune_cache ~key:Pipeline ~policy:Pull ())
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    [". ./scripts/version.sh"; "eval $(opam env)"; "make test-nonproto-unit"]
+    [
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      (* [test-webassembly] is only tested on arm64. *)
+      "make test-nonproto-unit";
+    ]
+
+(* Note: this job does not depend on build jobs because:
+   - it is not using their artefacts;
+   - it is not using their cache.
+   It only uses the cargo cache and sccache which are keyed on the job name. *)
+let job_oc_unit_non_proto_arm64 =
+  CI.job
+    "oc.unit:non-proto-arm64"
+    ~__POS__
+    ~description:
+      "Run unit tests for the non-protocol parts of Octez (on arm64)."
+    ~stage:Test
+    ~retry:Gitlab_ci.Types.{max = 2; when_ = []}
+    ~parallel:(Vector 2)
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~image:Tezos_ci.Images.CI.test
+      (* use the test image because [lib_benchmark] require Python *)
+    ~arch:Arm64
+    ~storage:Ramfs
+    ~variables:
+      [
+        (* Make sure that [scripts/test_wrapper.sh] partitions
+           the set of @runtest targets to build. *)
+        ("DISTRIBUTE_TESTS_TO_PARALLELS", "true");
+        ("DUNE_ARGS", "-j 12");
+      ]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-arm64"
+         ["test_results"]
+         ~reports:(Gitlab_ci.Util.reports ~junit:"test_results/*.xml" ())
+         ~expire_in:(Duration (Days 1))
+         ~when_:Always)
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    [
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      "make test-nonproto-unit test-webassembly";
+    ]
 
 let register () =
   CI.register_before_merging_jobs
@@ -303,6 +348,7 @@ let register () =
       (Auto, job_oc_unit_protocol_compiles);
       (Auto, job_oc_unit_webassembly_x86_64);
       (Auto, job_oc_unit_non_proto_x86_64);
+      (Auto, job_oc_unit_non_proto_arm64);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
@@ -322,5 +368,6 @@ let register () =
       (Auto, job_oc_unit_protocol_compiles);
       (Auto, job_oc_unit_webassembly_x86_64);
       (Auto, job_oc_unit_non_proto_x86_64);
+      (Auto, job_oc_unit_non_proto_arm64);
     ] ;
   ()

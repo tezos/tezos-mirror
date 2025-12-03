@@ -694,23 +694,7 @@ let jobs pipeline_type =
           ~make_targets:["test-proto-unit"]
           ()
       in
-      let oc_unit_non_proto_arm64 =
-        job_unit_test
-          ~__POS__
-          ~name:"oc.unit:non-proto-arm64"
-          ~storage:Ramfs
-          ~parallel_vector:2
-          ~arch:Arm64 (* The [lib_benchmark] unit tests require Python *)
-          ~image:Images.CI.test
-          ~make_targets:["test-nonproto-unit"; "test-webassembly"]
-          ()
-      in
-      [
-        job_ocaml_check;
-        oc_unit_other_x86_64;
-        oc_unit_proto_x86_64;
-        oc_unit_non_proto_arm64;
-      ]
+      [job_ocaml_check; oc_unit_other_x86_64; oc_unit_proto_x86_64]
     in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
