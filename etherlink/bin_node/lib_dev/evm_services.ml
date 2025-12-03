@@ -99,7 +99,12 @@ let blueprint_watcher_service =
 
 let message_watcher_service =
   let level_query =
-    Query.(query Fun.id |+ field "from_level" Arg.uint63 0L Fun.id |> seal)
+    Query.(
+      query (fun from_level instant_confirmations ->
+          (from_level, instant_confirmations))
+      |+ field "from_level" Arg.uint63 0L fst
+      |+ field "instant_confirmations" Arg.bool false snd
+      |> seal)
   in
 
   Service.get_service
@@ -211,8 +216,25 @@ let register_blueprint_watcher_service find_blueprint get_next_blueprint_number
         level)
 
 let register_broadcast_service find_blueprint get_next_blueprint_number dir =
-  Evm_directory.streamed_register0 dir message_watcher_service (fun level () ->
-      create_broadcast_service get_next_blueprint_number find_blueprint level)
+  let open Lwt_syntax in
+  Evm_directory.streamed_register0
+    dir
+    message_watcher_service
+    (fun (level, instant_confirmations) () ->
+      let* stream, stopper =
+        create_broadcast_service get_next_blueprint_number find_blueprint level
+      in
+      if instant_confirmations then return (stream, stopper)
+      else
+        return
+          ( Lwt_stream.filter
+              (function
+                | Broadcast.Next_block_info _ | Included_transaction _
+                | Dropped_transaction _ ->
+                    false
+                | Blueprint _ | Finalized_levels _ -> true)
+              stream,
+            stopper ))
 
 let register get_next_blueprint_number find_blueprint_legacy find_blueprint
     smart_rollup_address time_between_blocks dir =
@@ -339,7 +361,8 @@ let close_monitor {closefn; _} = closefn ()
 
 let get_from_monitor {stream; _} = Lwt_stream.get stream
 
-let monitor_messages ~evm_node_endpoint ~timeout Ethereum_types.(Qty level) =
+let monitor_messages ~evm_node_endpoint ~timeout ~instant_confirmations
+    Ethereum_types.(Qty level) =
   let open Lwt_result_syntax in
   let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
@@ -350,7 +373,7 @@ let monitor_messages ~evm_node_endpoint ~timeout Ethereum_types.(Qty level) =
       evm_node_endpoint
       message_watcher_service
       ()
-      level
+      (level, instant_confirmations)
     @@ fun () ->
     Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
       [Media_type.octet_stream]
@@ -359,7 +382,7 @@ let monitor_messages ~evm_node_endpoint ~timeout Ethereum_types.(Qty level) =
       ~on_chunk
       ~on_close
       ()
-      level
+      (level, instant_confirmations)
       ()
   in
   return {stream; closefn}

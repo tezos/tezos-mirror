@@ -166,6 +166,8 @@ let main ~evm_node_endpoint ~evm_node_private_endpoint
       ~evm_node_endpoint
       ~rpc_timeout:config.rpc_timeout
       ~next_blueprint_number
+      ~instant_confirmations:
+        config.experimental_features.preconfirmation_stream_enabled
       ~on_new_blueprint:(fun (Qty number) blueprint ->
         let (Qty level) = blueprint.blueprint.number in
         if Z.Compare.(number = level) then (

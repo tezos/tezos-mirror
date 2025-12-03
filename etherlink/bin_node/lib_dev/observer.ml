@@ -358,6 +358,8 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
         ~evm_node_endpoint
         ~rpc_timeout:config.rpc_timeout
         ~next_blueprint_number
+        ~instant_confirmations:
+          config.experimental_features.preconfirmation_stream_enabled
         ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
         ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
         ~on_next_block_info

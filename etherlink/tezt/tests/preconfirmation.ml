@@ -43,10 +43,12 @@ let register_sandbox_with_observer ?tx_queue_tx_per_addr_limit ~title
       ()
   in
   let* observer = Setup.run_new_observer_node ~sc_rollup_node:None sandbox in
+  let* _ = Evm_node.wait_for_ready sandbox in
+  let* _ = Evm_node.wait_for_ready observer in
   body {sandbox; observer}
 
 (* To be removed when this experimental feature is stable *)
-let setup_experimental_feature sandbox observer =
+let setup_experimental_feature ?(patch_observer = true) sandbox observer =
   let patch_config =
     Evm_node.patch_config_with_experimental_feature
       ~preconfirmation_stream_enabled:true
@@ -55,7 +57,10 @@ let setup_experimental_feature sandbox observer =
   let* () = Evm_node.terminate sandbox in
   let* () = Evm_node.terminate observer in
   let* () = Evm_node.Config_file.update sandbox patch_config in
-  let* () = Evm_node.Config_file.update observer patch_config in
+  let* () =
+    if patch_observer then Evm_node.Config_file.update observer patch_config
+    else unit
+  in
   let* () = Evm_node.run sandbox in
   let* _ = Evm_node.wait_for_ready sandbox in
   let* rpc_node = run_new_rpc_endpoint sandbox in
@@ -134,6 +139,39 @@ let test_observer_receives_preconfirmations () =
       ~error_msg:
         "txn hash received through the preconfirmation stream does not match \
          expected value") ;
+  unit
+
+let test_observer_ignores_preconfirmations () =
+  register_sandbox_with_observer
+    ~tags:["evm"; "delayed_transaction"]
+    ~title:"Observer ignores preconfirmations"
+  @@ fun {sandbox; observer; _} ->
+  let* () = setup_experimental_feature sandbox observer ~patch_observer:false in
+  let add = Evm_node.wait_for_tx_queue_add_transaction sandbox in
+  let next_ts_sandbox = Evm_node.wait_for_next_block_timestamp sandbox in
+  let next_ts_observer = Evm_node.wait_for_next_block_timestamp observer in
+  let _ =
+    Eth_cli.transaction_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~to_public_key:Eth_account.bootstrap_accounts.(1).address
+      ~value:(Wei.of_eth_int 10)
+      ~endpoint:(Evm_node.endpoint observer)
+      ()
+  in
+  let* _ = add in
+  let* _ = next_ts_sandbox in
+  let event =
+    let* res = next_ts_observer in
+    return (Some res)
+  in
+  let timeout =
+    let* () = Lwt_unix.sleep 5. in
+    return None
+  in
+  let* timestamp = Lwt.pick [event; timeout] in
+  Check.is_true
+    (Option.is_none timestamp)
+    ~error_msg:"Future block timestamp is supposed to be ignored" ;
   unit
 
 let test_eth_send_raw_transaction_sync_rpc () =
@@ -405,6 +443,7 @@ let test_eth_send_raw_transaction_sync_rpc_timeouts () =
 
 let () =
   test_observer_receives_preconfirmations () ;
+  test_observer_ignores_preconfirmations () ;
   test_eth_send_raw_transaction_sync_rpc () ;
   test_eth_send_raw_transaction_sync_rpc_timeouts () ;
   test_eth_send_raw_transaction_sync_rpc_error_propagated () ;

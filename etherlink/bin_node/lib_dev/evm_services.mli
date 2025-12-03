@@ -73,5 +73,6 @@ val monitor_blueprints :
 val monitor_messages :
   evm_node_endpoint:Uri.t ->
   timeout:float ->
+  instant_confirmations:bool ->
   Ethereum_types.quantity ->
   Broadcast.message monitor tzresult Lwt.t
