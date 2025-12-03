@@ -58,7 +58,7 @@ let () =
       Format.fprintf
         ppf
         "History mode values are: Configuration = %s; Snapshot = %s. Consider \
-         running with `--history-mode`."
+         running with `--history`."
         (Configuration.string_of_history_mode_info config_mode)
         (Configuration.string_of_history_mode_info snapshot_mode))
     Data_encoding.(
