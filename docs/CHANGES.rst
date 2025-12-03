@@ -134,6 +134,9 @@ Baker
 - Improved keep-alive handling during bootstrap. This feature may still exhibit
   undesirable behavior, but less likely. (MR :gl:`!18717`)
 
+- Baker exits with code 111 if the node becomes unreachable via the
+  ``monitor_operations`` RPC for more than 1m15sec. (MR :gl:`!19559`)
+
 Version 23.2
 ============
 
