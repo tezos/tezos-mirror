@@ -88,6 +88,8 @@ val preserved_levels_arg : (int, full) Tezos_clic.arg
 
 val no_print_source_flag : (bool, full) Tezos_clic.arg
 
+val keep_going_flag : (bool, full) Tezos_clic.arg
+
 val no_confirmation : (bool, full) Tezos_clic.arg
 
 val timelock_locked_value_arg : (string option, full) Tezos_clic.arg

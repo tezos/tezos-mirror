@@ -450,7 +450,8 @@ let script_size cctxt ~(chain : Chain_services.chain) ~block ~gas ~legacy
     ~storage:storage.expanded
 
 let print_typecheck_result ~emacs ~show_types ~print_source_on_error
-    ~display_names ~name program res (cctxt : #Client_context.printer) =
+    ~display_names ~name ~keep_going program res
+    (cctxt : #Client_context.printer) =
   let open Lwt_result_syntax in
   if emacs then
     let type_map, errs, _gas =
@@ -471,7 +472,7 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error
         Michelson_v1_emacs.report_errors
         (program, errs)
     in
-    return_unit
+    return_true
   else
     match res with
     | Ok (type_map, gas) ->
@@ -485,8 +486,8 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error
         in
         if show_types then
           let*! () = cctxt#message "%a" Micheline_printer.print_expr program in
-          return_unit
-        else return_unit
+          return_true
+        else return_true
     | Error errs ->
         let*! () =
           cctxt#warning
@@ -497,7 +498,13 @@ let print_typecheck_result ~emacs ~show_types ~print_source_on_error
                ~parsed:(Michelson_v1_parser.unrecognize_prims program))
             errs
         in
-        cctxt#error "script %S is ill-typed" name
+        if keep_going then
+          let*! () =
+            cctxt#warning "@[Ill typed\t%t@]" (fun fmt ->
+                if display_names then Format.pp_print_string fmt name)
+          in
+          return_false
+        else cctxt#error "script %S is ill-typed" name
 
 let entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     (program : Michelson_v1_parser.parsed) ~entrypoint =

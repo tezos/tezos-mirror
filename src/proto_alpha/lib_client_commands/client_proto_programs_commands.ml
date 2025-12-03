@@ -569,13 +569,14 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to typecheck one or several scripts."
-      (args6
+      (args7
          show_types_switch
          emacs_mode_switch
          no_print_source_flag
          run_gas_limit_arg
          legacy_switch
-         display_names_flag)
+         display_names_flag
+         keep_going_flag)
       (prefixes ["typecheck"; "script"]
       @@ seq_of_param
       @@ file_or_literal_with_origin_param ())
@@ -584,7 +585,8 @@ let commands () =
              no_print_source,
              original_gas,
              legacy,
-             display_names )
+             display_names,
+             keep_going )
            expr_strings
            cctxt
          ->
@@ -597,6 +599,7 @@ let commands () =
             in
             return_unit
         | _ :: _ ->
+            let successes = ref 0 in
             let* _number_of_literal_scripts =
               List.fold_left_es
                 (fun i content_with_origin ->
@@ -630,21 +633,34 @@ let commands () =
                         ~show_types
                         program
                     in
-                    print_typecheck_result
-                      ~emacs:emacs_mode
-                      ~show_types
-                      ~print_source_on_error:(not no_print_source)
-                      ~display_names
-                      ~name
-                      program
-                      res
-                      cctxt
+                    let* success =
+                      print_typecheck_result
+                        ~emacs:emacs_mode
+                        ~show_types
+                        ~print_source_on_error:(not no_print_source)
+                        ~display_names
+                        ~name
+                        ~keep_going
+                        program
+                        res
+                        cctxt
+                    in
+                    if success then incr successes ;
+                    return_unit
                   in
                   return i)
                 0
                 expr_strings
             in
-            return_unit);
+            let successes = !successes in
+            let total = List.length expr_strings in
+            if successes = total then return_unit
+            else
+              cctxt#error
+                "%d scripts are ill-typed, %d scripts are well-typed, total: %d"
+                (total - successes)
+                successes
+                total);
     command
       ~group
       ~desc:"Ask the node to typecheck a data expression."
@@ -1205,15 +1221,19 @@ let commands () =
                 in
                 match r with
                 | Error _ as res ->
-                    print_typecheck_result
-                      ~emacs:false
-                      ~show_types:true
-                      ~print_source_on_error:true
-                      ~display_names:false
-                      ~name
-                      program
-                      res
-                      cctxt
+                    let* (_success : bool) =
+                      print_typecheck_result
+                        ~emacs:false
+                        ~show_types:true
+                        ~print_source_on_error:true
+                        ~display_names:false
+                        ~name
+                        ~keep_going:false
+                        program
+                        res
+                        cctxt
+                    in
+                    return_unit
                 | Ok _ -> return_unit
               in
               return program.expanded
