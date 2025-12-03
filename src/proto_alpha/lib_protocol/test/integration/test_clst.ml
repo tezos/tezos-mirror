@@ -333,3 +333,85 @@ let () =
   let amount = Tez.to_mutez amount in
   let* () = Assert.equal_int64 ~loc:__LOC__ amount balance in
   return_unit
+
+let test_total_supply (total_supply_f : Block.t -> int64 tzresult Lwt.t) =
+  let open Lwt_result_wrap_syntax in
+  let* b, funder = Context.init1 ~consensus_threshold_size:0 () in
+  let initial_bal_mutez = 300_000_000L in
+  let* account_a, b =
+    create_funded_account ~funder ~amount_mutez:initial_bal_mutez b
+  in
+  let* account_b, b =
+    create_funded_account ~funder ~amount_mutez:initial_bal_mutez b
+  in
+  let initial_clst_bal_mutez_a = 200_000_000L in
+  let initial_clst_bal_mutez_b = 50_000_000L in
+  let* deposit_a_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      ~fee:Tez.zero
+      (B b)
+      account_a
+      (Tez.of_mutez_exn initial_clst_bal_mutez_a)
+  in
+  let* deposit_b_tx =
+    Op.clst_deposit
+      ~force_reveal:true
+      ~fee:Tez.zero
+      (B b)
+      account_b
+      (Tez.of_mutez_exn initial_clst_bal_mutez_b)
+  in
+  let* b = Block.bake ~operations:[deposit_a_tx; deposit_b_tx] b in
+  let* total_supply = total_supply_f b in
+  let expected_total_supply =
+    Int64.add initial_clst_bal_mutez_a initial_clst_bal_mutez_b
+  in
+  let* () =
+    Assert.equal_int64 ~loc:__LOC__ total_supply expected_total_supply
+  in
+  let withdrawal_amount_mutez = 40_000_000L in
+  let* withdraw_tx =
+    Op.clst_withdraw ~fee:Tez.zero (B b) account_a withdrawal_amount_mutez
+  in
+  let* b = Block.bake ~operation:withdraw_tx b in
+  let* total_supply = total_supply_f b in
+  let expected_total_supply =
+    Int64.sub expected_total_supply withdrawal_amount_mutez
+  in
+  Assert.equal_int64 ~loc:__LOC__ total_supply expected_total_supply
+
+let () =
+  register_test ~title:"Test get_total_supply view" @@ fun () ->
+  test_total_supply (fun b ->
+      let open Lwt_result_wrap_syntax in
+      let* clst_hash = get_clst_hash (B b) in
+      let* total_supply =
+        run_view
+          ~contract:clst_hash
+          ~view_name:"get_total_supply"
+          ~input:
+            Environment.Micheline.(
+              Prim (dummy_location, Script.D_Unit, [], []) |> strip_locations)
+          b
+      in
+      let total_supply =
+        match total_supply |> Environment.Micheline.root with
+        | Environment.Micheline.Int (_, balance_z) -> balance_z |> Z.to_int64
+        | _ -> Test.fail "Unexpected output"
+      in
+      return total_supply)
+
+let () =
+  register_test ~title:"Test total_supply RPC" @@ fun () ->
+  test_total_supply (fun b ->
+      let open Lwt_result_syntax in
+      let* total_supply =
+        Plugin.Contract_services.clst_total_supply Block.rpc_ctxt b
+      in
+      let total_supply =
+        Option.value_f
+          ~default:(fun () -> assert false)
+          (Script_int.to_int64 total_supply)
+      in
+      return total_supply)
