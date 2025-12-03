@@ -137,6 +137,16 @@ module Arg = struct
          is not given there is no limit"
       Parameter.int
 
+  let max_lifespan_s =
+    let default = "2" in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"max-lifespan"
+      ~placeholder:"N"
+      ~doc:
+        "Maximum lifespan of transactions before considered dropped, in second"
+      Parameter.int
+
   let spawn_interval =
     let default = "0.5" in
     Tezos_clic.default_arg
@@ -284,7 +294,7 @@ let run_command =
   command
     ~desc:"Start Floodgate to spam an EVM-compatible network"
     Arg.(
-      args16
+      args17
         verbose
         relay_endpoint
         rpc_endpoint
@@ -292,6 +302,7 @@ let run_command =
         controller
         max_active_eoa
         max_transaction_batch_length
+        max_lifespan_s
         spawn_interval
         tick_interval
         base_fee_factor
@@ -309,6 +320,7 @@ let run_command =
            controller,
            max_active_eoa,
            max_transaction_batch_length,
+           max_lifespan_s,
            spawn_interval,
            tick_interval,
            base_fee_factor,
@@ -339,6 +351,7 @@ let run_command =
         ~controller
         ~max_active_eoa
         ~max_transaction_batch_length
+        ~max_lifespan_s
         ~spawn_interval
         ~tick_interval
         ~base_fee_factor

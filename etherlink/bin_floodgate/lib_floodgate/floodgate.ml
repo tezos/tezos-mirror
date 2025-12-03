@@ -440,10 +440,12 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
 
 let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
     ~ws_endpoint ~controller ~max_active_eoa ~max_transaction_batch_length
-    ~spawn_interval ~tick_interval ~base_fee_factor ~initial_balance
-    ~txs_per_salvo ~elapsed_time_between_report ~dummy_data_size ~retry_attempt
-    =
+    ~max_lifespan_s ~spawn_interval ~tick_interval ~base_fee_factor
+    ~initial_balance ~txs_per_salvo ~elapsed_time_between_report
+    ~dummy_data_size ~retry_attempt =
   State.dummy_data_size := dummy_data_size ;
+  let tx_per_addr_limit = Int64.of_int 999_999 in
+  let max_size = 999_999 in
   let open Lwt_result_syntax in
   let* controller =
     controller_from_signer
@@ -453,6 +455,9 @@ let run ~(scenario : [< `ERC20 | `XTZ]) ~relay_endpoint ~rpc_endpoint
   in
   let* infos = Network_info.fetch ~rpc_endpoint ~base_fee_factor in
   let* () = Tx_queue.start ~relay_endpoint ~max_transaction_batch_length () in
+  let _config : Configuration.tx_queue =
+    {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
+  in
   let*! () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let* () =
     match ws_endpoint with
