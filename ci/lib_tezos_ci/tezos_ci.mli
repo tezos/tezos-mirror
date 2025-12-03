@@ -217,28 +217,13 @@ module Cache : sig
     This function should be applied to jobs that build rust files and
     which has a configured sccache Gitlab CI cache.
 
-    - [key] and [path] configure the key under which the cache is
-    stored, and the path that will be cached. By default, the [key]
-    contains the name of the job, thus scoping the cache to all
-    instances of that job. By default, [path] is the folder
-    ["$CI_PROJECT_DIR/_sccache"], and this function also sets the
-    environment dir [SCCACHE_DIR] such that sccache stores its caches
-    there.
-
-    - [cache_size] sets the environment variable [SCCACHE_CACHE_SIZE]
-    that configures the maximum size of the cache.
-
-    - [error_log], [idle_timeout] and [log] sets the environment
-    variables [SCCACHE_ERROR_LOG], [SCCACHE_IDLE_TIMEOUT] and
-    [SCCACHE_LOG] respectively. See the sccache documentation for more
-    information on these variables. *)
+    - [error_log] and [log] sets the environment
+    variables [SCCACHE_ERROR_LOG] and [SCCACHE_LOG] respectively.
+    See the sccache documentation for more information on these variables. *)
   val enable_sccache :
-    ?key:string ->
     ?error_log:string ->
-    ?idle_timeout:string ->
     ?log:string ->
-    ?path:string ->
-    ?cache_size:string ->
+    ?policy:Gitlab_ci.Types.cache_policy ->
     tezos_job ->
     tezos_job
 

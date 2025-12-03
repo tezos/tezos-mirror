@@ -35,7 +35,7 @@ let job_build =
          ["teztale-binaries/" ^ arch_string ^ "/octez-teztale-*"])
     ~variables:[("PROFILE", "static")]
     ~cargo_cache:true
-    ~sccache:(Cacio.sccache ~cache_size:"2G" ())
+    ~sccache:(Cacio.sccache ())
     [
       "./scripts/ci/take_ownership.sh";
       ". ./scripts/version.sh";
