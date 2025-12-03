@@ -35,6 +35,7 @@ let save_parameters ctxt
     {
       feature_enable;
       incentives_enable;
+      dynamic_lag_enable = false;
       number_of_slots;
       attestation_lag;
       attestation_threshold;

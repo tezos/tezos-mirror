@@ -860,6 +860,7 @@ module Constants : sig
     type dal = {
       feature_enable : bool;
       incentives_enable : bool;
+      dynamic_lag_enable : bool;
       number_of_slots : int;
       attestation_lag : int;
       attestation_threshold : int;
@@ -2905,6 +2906,10 @@ module Dal : sig
   val assert_incentives_enabled : t -> unit tzresult
 
   val only_if_incentives_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
+
+  val assert_dynamic_lag_enabled : t -> unit tzresult
+
+  val only_if_dynamic_lag_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 
   (** This module re-exports definitions from {!Dal_slot_index_repr}. *)
   module Slot_index : sig

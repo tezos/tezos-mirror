@@ -105,6 +105,7 @@ module Plugin = struct
     let {
       Constants.Parametric.feature_enable;
       incentives_enable;
+      dynamic_lag_enable = _;
       number_of_slots;
       attestation_lag;
       attestation_threshold;
