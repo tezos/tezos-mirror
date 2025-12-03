@@ -221,6 +221,26 @@ let job_de_unit =
     ~only_if_changed:["data-encoding/**"]
     ["eval $(opam env)"; "dune runtest data-encoding"]
 
+let job_oc_unit_protocol_compiles =
+  CI.job
+    "oc.unit:protocol_compiles"
+    ~__POS__
+    ~description:
+      "Check that all protocols can still be compiled by \
+       octez-protocol-compiler."
+    ~arch:Amd64
+    ~cpu:Very_high
+    ~image:Tezos_ci.Images.CI.build
+    ~stage:Test
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    [
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      "dune build @runtest_compile_protocol";
+    ]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -237,6 +257,7 @@ let register () =
       (Auto, job_resto_unit Arm64);
       (Auto, job_de_unit Amd64);
       (Auto, job_de_unit Arm64);
+      (Auto, job_oc_unit_protocol_compiles);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
@@ -253,5 +274,6 @@ let register () =
       (Auto, job_resto_unit Arm64);
       (Auto, job_de_unit Amd64);
       (Auto, job_de_unit Arm64);
+      (Auto, job_oc_unit_protocol_compiles);
     ] ;
   ()

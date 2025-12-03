@@ -729,20 +729,6 @@ let jobs pipeline_type =
           ~timeout:(Minutes 20)
           ["make test-webassembly"]
       in
-      let oc_unit_protocol_compiles =
-        job
-          ~__POS__
-          ~name:"oc.unit:protocol_compiles"
-          ~arch:Amd64
-          ~cpu:Very_high
-          ~image:Images.CI.build
-          ~stage:Stages.test
-          ~dependencies:(build_dependencies Amd64)
-          ~rules
-          ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-          ["dune build @runtest_compile_protocol"]
-        |> enable_cargo_cache |> enable_sccache
-      in
       [
         job_ocaml_check;
         oc_unit_non_proto_x86_64;
@@ -750,7 +736,6 @@ let jobs pipeline_type =
         oc_unit_proto_x86_64;
         oc_unit_non_proto_arm64;
         oc_unit_webassembly_x86_64;
-        oc_unit_protocol_compiles;
       ]
     in
     (* The set of installation test jobs *)
