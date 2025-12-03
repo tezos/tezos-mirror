@@ -125,6 +125,15 @@ DAL node
   after the first valid JSON object. Now, any extraneous data will cause the
   function to return an error. (MR :gl:`!18745`)
 
+Version 23.3
+============
+
+Baker
+-----
+
+- Improved keep-alive handling during bootstrap. This feature may still exhibit
+  undesirable behavior, but less likely. (MR :gl:`!18717`)
+
 Version 23.2
 ============
 
