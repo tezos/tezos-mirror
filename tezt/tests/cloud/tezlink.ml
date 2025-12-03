@@ -236,10 +236,12 @@ let git_clone agent ?branch repo_url directory =
     @ (match branch with None -> [] | Some branch -> ["-b"; branch])
     @ [repo_url; directory])
 
-let init_tzkt ~tzkt_proxy ~agent ~sequencer_proxy ~time_between_blocks =
+let init_tzkt ~tzkt_proxy ~agent ~sequencer_endpoint ~time_between_blocks =
   (* Set of functions helpful for Tzkt setup *)
   let run = run agent in
-  let tezlink_sandbox_endpoint = proxy_internal_endpoint sequencer_proxy in
+  let tezlink_sandbox_endpoint =
+    sequencer_internal_endpoint sequencer_endpoint
+  in
   let tzkt_api_port = proxy_internal_port tzkt_proxy in
   (* Run a psql command (a specific database can be set as a target) *)
   let psql ?db command =
@@ -314,9 +316,7 @@ let init_tzkt ~tzkt_proxy ~agent ~sequencer_proxy ~time_between_blocks =
   (* Prepare multiple argument for Tzkt indexer and API start. *)
   (* Set our endpoint for Tzkt instead of the default "https://rpc.tzkt.io/mainnet/".*)
   let endpoint_arg =
-    tzkt_arg
-      ["TezosNode"; "Endpoint"]
-      [Client.string_of_endpoint tezlink_sandbox_endpoint]
+    tzkt_arg ["TezosNode"; "Endpoint"] [tezlink_sandbox_endpoint]
   in
   (* Tell Tzkt that the database is available on localhost at port 5432. *)
   (* We can't set a specific argument in this command so we must set every values. *)
@@ -394,9 +394,11 @@ let create_config_file ~agent destination format =
     (Format.formatter_of_out_channel ch)
     format
 
-let init_faucet_backend ~agent ~sequencer_proxy ~faucet_private_key
+let init_faucet_backend ~agent ~sequencer_endpoint ~faucet_private_key
     ~faucet_api_proxy =
-  let tezlink_sandbox_endpoint = proxy_internal_endpoint sequencer_proxy in
+  let tezlink_sandbox_endpoint =
+    sequencer_internal_endpoint sequencer_endpoint
+  in
   let faucet_api_port = proxy_internal_port faucet_api_proxy in
   let faucet_backend_dir = "faucet-backend" in
   (* Clone faucet backend from personal fork because upstream depends on a RPC which we don't yet support (forge_operation). *)
@@ -429,7 +431,7 @@ CHALLENGE_SIZE=2048
 DIFFICULTY=4
 |}
       faucet_api_port
-      (Client.string_of_endpoint tezlink_sandbox_endpoint)
+      tezlink_sandbox_endpoint
       faucet_private_key
   in
   let* () =
@@ -440,12 +442,12 @@ DIFFICULTY=4
   let runner = Agent.runner agent in
   Faucet_backend_process.run ?runner ~path:faucet_backend_dir ()
 
-let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_proxy ~faucet_pkh
-    ~tzkt_proxy ~faucet_frontend_proxy =
+let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
+    ~faucet_pkh ~tzkt_proxy ~faucet_frontend_proxy =
   let runner = Agent.runner agent in
   let faucet_api = proxy_external_endpoint ~runner faucet_api_proxy in
   let tezlink_sandbox_endpoint =
-    proxy_external_endpoint ~runner sequencer_proxy
+    sequencer_external_endpoint ~runner sequencer_endpoint
   in
   let faucet_frontend_port = proxy_internal_port faucet_frontend_proxy in
   let tzkt_api = proxy_external_endpoint ~runner tzkt_proxy in
@@ -483,7 +485,7 @@ let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_proxy ~faucet_pkh
 }
 |}
       (Client.string_of_endpoint faucet_api)
-      (Client.string_of_endpoint tezlink_sandbox_endpoint)
+      tezlink_sandbox_endpoint
       faucet_pkh
       (Client.url_encoded_string_of_endpoint tzkt_api)
   in
@@ -584,13 +586,10 @@ index 1d28850f..fbd54ed7 100644
     rpc_url
     tzkt_api_url
 
-let init_umami agent ~sequencer_proxy ~tzkt_proxy ~umami_proxy =
+let init_umami agent ~sequencer_endpoint ~tzkt_proxy ~umami_proxy =
   let runner = Agent.runner agent in
   let external_tzkt_api_endpoint = proxy_external_endpoint ~runner tzkt_proxy in
-  let tezlink_proxy_endpoint =
-    proxy_external_endpoint ~runner sequencer_proxy
-  in
-  let rpc_url = Client.string_of_endpoint tezlink_proxy_endpoint in
+  let rpc_url = sequencer_external_endpoint ~runner sequencer_endpoint in
   let tzkt_api_url = Client.string_of_endpoint external_tzkt_api_endpoint in
   let patch = umami_patch ~rpc_url ~tzkt_api_url in
   (* Create a local patch file with its contents. *)
@@ -726,16 +725,27 @@ let add_proxy_service cloud runner name ?(url = Fun.id) proxy =
   in
   add_service cloud ~name ~url:(url endpoint)
 
-let add_services cloud runner ~sequencer_proxy ~tzkt_proxy_opt
+let add_services cloud runner ~sequencer_endpoint ~tzkt_proxy_opt
     ~faucet_proxys_opt ~umami_proxys_opt =
   let add_proxy_service = add_proxy_service cloud runner in
   let* () =
-    add_proxy_service
-      "Check Tezlink RPC endpoint"
-      ~url:(sf "%s/version")
-      sequencer_proxy
+    let name_check = "Check Tezlink RPC endpoint" in
+    let name_endpoint = "Tezlink RPC endpoint" in
+    match sequencer_endpoint with
+    | Internal sequencer_proxy ->
+        let* () =
+          add_proxy_service name_check ~url:(sf "%s/version") sequencer_proxy
+        in
+        add_proxy_service name_endpoint sequencer_proxy
+    | External sequencer_endpoint ->
+        let* () =
+          add_service
+            cloud
+            ~name:name_check
+            ~url:(sf "%s/version" sequencer_endpoint)
+        in
+        add_service cloud ~name:name_endpoint ~url:sequencer_endpoint
   in
-  let* () = add_proxy_service "Tezlink RPC endpoint" sequencer_proxy in
   let* () =
     match tzkt_proxy_opt with
     | None -> unit
@@ -826,18 +836,19 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           Cli.parent_dns_domain
       in
       let activate_ssl = Cli.activate_ssl in
-      let sequencer_proxy =
-        make_proxy
-          tezlink_sequencer_agent
-          ~path:(Some "/tezlink")
-          ~dns_domain:
-            (Option.map (fun doms -> doms.sequencer_domain) dns_domains)
-          Cli.public_rpc_port
-          activate_ssl
-      in
       let sequencer_endpoint =
         match Cli.external_sequencer_endpoint with
-        | None -> Internal sequencer_proxy
+        | None ->
+            let sequencer_proxy =
+              make_proxy
+                tezlink_sequencer_agent
+                ~path:(Some "/tezlink")
+                ~dns_domain:
+                  (Option.map (fun doms -> doms.sequencer_domain) dns_domains)
+                Cli.public_rpc_port
+                activate_ssl
+            in
+            Internal sequencer_proxy
         | Some endpoint -> External endpoint
       in
       let* tzkt_proxy_opt =
@@ -901,7 +912,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         add_services
           cloud
           runner
-          ~sequencer_proxy
+          ~sequencer_endpoint
           ~tzkt_proxy_opt
           ~faucet_proxys_opt
           ~umami_proxys_opt
@@ -926,7 +937,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             init_tzkt
               ~tzkt_proxy
               ~agent:tezlink_sequencer_agent
-              ~sequencer_proxy
+              ~sequencer_endpoint
               ~time_between_blocks:Cli.time_between_blocks
       and* () =
         match umami_proxys_opt with
@@ -934,7 +945,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         | Some {tzkt_proxy; umami_proxy} ->
             init_umami
               tezlink_sequencer_agent
-              ~sequencer_proxy
+              ~sequencer_endpoint
               ~tzkt_proxy
               ~umami_proxy
       and* () =
@@ -952,7 +963,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             let* () =
               init_faucet_backend
                 ~agent:tezlink_sequencer_agent
-                ~sequencer_proxy
+                ~sequencer_endpoint
                 ~faucet_private_key
                 ~faucet_api_proxy
             in
@@ -960,7 +971,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               init_faucet_frontend
                 ~agent:tezlink_sequencer_agent
                 ~faucet_api_proxy
-                ~sequencer_proxy
+                ~sequencer_endpoint
                 ~faucet_pkh
                 ~tzkt_proxy
                 ~faucet_frontend_proxy
