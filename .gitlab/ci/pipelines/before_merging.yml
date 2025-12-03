@@ -580,7 +580,7 @@ oc.build_arm64-extra-dev:
     - etherlink-governance-observer
     when: on_success
 
-oc.build_arm64-extra-exp:
+oc.build_arm64-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -621,8 +621,6 @@ oc.build_arm64-extra-exp:
   variables:
     ARCH: arm64
     EXECUTABLE_FILES: script-inputs/experimental-executables
-    BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
-      tezt/tests/main.exe
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
@@ -997,7 +995,7 @@ oc.build_amd64-extra-dev:
     - etherlink-governance-observer
     when: on_success
 
-oc.build_amd64-extra-exp:
+oc.build_amd64-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -1080,8 +1078,6 @@ oc.build_amd64-extra-exp:
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/experimental-executables
-    BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
-      tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
@@ -1580,7 +1576,7 @@ oc.unit:non-proto-x86_64:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1672,7 +1668,7 @@ oc.unit:other-x86_64:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1764,7 +1760,7 @@ oc.unit:proto-x86_64:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1856,7 +1852,7 @@ oc.unit:non-proto-arm64:
   - oc.docker:ci:arm64
   - oc.build_arm64-released
   - oc.build_arm64-extra-dev
-  - oc.build_arm64-extra-exp
+  - oc.build_arm64-exp
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -1937,7 +1933,7 @@ oc.unit:webassembly-x86_64:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 20 minutes
@@ -1989,7 +1985,7 @@ oc.unit:protocol_compiles:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2036,7 +2032,7 @@ de.unit:x86_64:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2067,7 +2063,7 @@ de.unit:arm64:
   - oc.docker:ci:arm64
   - oc.build_arm64-released
   - oc.build_arm64-extra-dev
-  - oc.build_arm64-extra-exp
+  - oc.build_arm64-exp
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -2098,7 +2094,7 @@ resto.unit:x86_64:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 10 minutes
@@ -2129,7 +2125,7 @@ resto.unit:arm64:
   - oc.docker:ci:arm64
   - oc.build_arm64-released
   - oc.build_arm64-extra-dev
-  - oc.build_arm64-extra-exp
+  - oc.build_arm64-exp
   dependencies:
   - oc.docker:ci:arm64
   timeout: 10 minutes
@@ -2826,12 +2822,12 @@ oc.test-liquidity-baking-scripts:
   - oc.docker:ci:amd64
   - trigger
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   timeout: 60 minutes
   interruptible: true
@@ -3668,13 +3664,13 @@ documentation.manuals:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   timeout: 60 minutes
   interruptible: true
@@ -3940,14 +3936,14 @@ etherlink.tezt-flaky:
   - oc.docker:ci:amd64
   - trigger
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - select_tezts
   - etherlink.build_tezt
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - select_tezts
   - etherlink.build_tezt
@@ -4043,14 +4039,14 @@ etherlink.tezt-extra:
   - oc.docker:ci:amd64
   - trigger
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - select_tezts
   - etherlink.build_tezt
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - select_tezts
   - etherlink.build_tezt
@@ -4140,14 +4136,14 @@ etherlink.tezt-slow:
   - oc.docker:ci:amd64
   - trigger
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - select_tezts
   - etherlink.build_tezt
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - select_tezts
   - etherlink.build_tezt
@@ -4235,14 +4231,14 @@ etherlink.tezt:
   - oc.docker:ci:amd64
   - trigger
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - select_tezts
   - etherlink.build_tezt
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - select_tezts
   - etherlink.build_tezt
@@ -4671,13 +4667,13 @@ tezt-static-binaries:
   - oc.docker:ci:amd64
   - trigger
   - oc.build:static-x86_64-linux-binaries
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - select_tezts
   dependencies:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - select_tezts
   timeout: 40 minutes
@@ -4764,14 +4760,14 @@ tezt-flaky:
   - oc.docker:ci:amd64
   - trigger
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
   - select_tezts
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
   - select_tezts
@@ -4865,14 +4861,14 @@ tezt-extra:
   - oc.docker:ci:amd64
   - trigger
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
   - select_tezts
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
   - select_tezts
@@ -4959,14 +4955,14 @@ tezt-slow:
   - oc.docker:ci:amd64
   - trigger
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
   - select_tezts
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
   - select_tezts
@@ -5054,14 +5050,14 @@ tezt-riscv-slow-sequential:
   - oc.docker:ci:amd64
   - trigger
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
   - select_tezts
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
   - select_tezts
@@ -5147,14 +5143,14 @@ tezt-time-sensitive:
   - oc.docker:ci:amd64
   - trigger
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
   - select_tezts
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
   - select_tezts
@@ -5246,14 +5242,14 @@ tezt:
   - oc.docker:ci:amd64
   - trigger
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
   - select_tezts
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_amd64-extra-dev
   - oc.build_kernels
   - select_tezts

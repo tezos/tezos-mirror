@@ -169,7 +169,7 @@ oc.build_x86_64-released:
     - src/proto_*/parameters/*.json
     when: on_success
 
-oc.build_amd64-extra-exp:
+oc.build_amd64-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -213,8 +213,6 @@ oc.build_amd64-extra-exp:
   variables:
     ARCH: x86_64
     EXECUTABLE_FILES: script-inputs/experimental-executables
-    BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
-      tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
@@ -703,13 +701,13 @@ etherlink.tezt-flaky:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - etherlink.build_tezt
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - etherlink.build_tezt
   allow_failure: true
@@ -775,13 +773,13 @@ etherlink.tezt-extra:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - etherlink.build_tezt
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - etherlink.build_tezt
   timeout: 40 minutes
@@ -841,13 +839,13 @@ etherlink.tezt-slow:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - etherlink.build_tezt
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - etherlink.build_tezt
   timeout: 40 minutes
@@ -907,13 +905,13 @@ etherlink.tezt:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - etherlink.build_tezt
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
+  - oc.build_amd64-exp
   - oc.build_kernels
   - etherlink.build_tezt
   timeout: 40 minutes

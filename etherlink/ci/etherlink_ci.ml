@@ -293,8 +293,7 @@ let tezt_job ?(retry_tests = 1) =
           Tezos_ci_jobs.Code_verification.job_build_x86_64_release
             Before_merging );
         ( Artifacts,
-          Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_exp
-            Before_merging );
+          Tezos_ci_jobs.Code_verification.job_build_x86_64_exp Before_merging );
         ( Artifacts,
           Tezos_ci_jobs.Code_verification.job_build_kernels Before_merging );
       ]
@@ -383,7 +382,7 @@ let register () =
       [
         Tezos_ci_jobs.Code_verification.job_build_x86_64_release
           Schedule_extended_test;
-        Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_exp
+        Tezos_ci_jobs.Code_verification.job_build_x86_64_exp
           Schedule_extended_test;
         Tezos_ci_jobs.Code_verification.job_build_kernels Schedule_extended_test;
       ]

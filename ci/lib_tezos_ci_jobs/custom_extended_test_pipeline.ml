@@ -26,9 +26,9 @@ open Common.Build
 let job_build_x86_64_release =
   job_build_released_binaries ~__POS__ ~arch:Amd64 ()
 
-let job_build_x86_64_extra_exp =
+let job_build_x86_64_exp =
   job_build_dynamic_binaries
-    ~name:"oc.build_amd64-extra-exp"
+    ~name:"oc.build_amd64-exp"
     ~__POS__
     ~arch:Amd64
     "script-inputs/experimental-executables"
@@ -38,6 +38,7 @@ let job_build_x86_64_extra_dev =
     ~name:"oc.build_amd64-extra-dev"
     ~__POS__
     ~arch:Amd64
+    ~extra:true
     "script-inputs/dev-executables"
 
 let jobs () =
@@ -47,7 +48,7 @@ let jobs () =
   @ [
       job_build_x86_64_release;
       job_build_x86_64_extra_dev;
-      job_build_x86_64_extra_exp;
+      job_build_x86_64_exp;
       job_build_kernels ();
       job_datadog_pipeline_trace;
     ]

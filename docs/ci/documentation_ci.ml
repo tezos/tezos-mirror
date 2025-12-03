@@ -133,7 +133,7 @@ let job_manuals =
               Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
                 Before_merging );
             ( Artifacts,
-              Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_exp
+              Tezos_ci_jobs.Code_verification.job_build_x86_64_exp
                 Before_merging );
             ( Artifacts,
               Tezos_ci_jobs.Code_verification.job_build_kernels Before_merging

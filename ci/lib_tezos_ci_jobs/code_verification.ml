@@ -197,13 +197,14 @@ let job_build_x86_64_extra_dev =
     ~cpu:Very_high
     ~dependencies:(dependencies_needs_start pipeline_type)
     ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
+    ~extra:true
     "script-inputs/dev-executables"
   |> enable_dune_cache ~key:build_cache_key ~policy:Push
 
-let job_build_x86_64_extra_exp =
+let job_build_x86_64_exp =
   depending_on_pipeline_type @@ fun pipeline_type ->
   job_build_dynamic_binaries
-    ~name:"oc.build_amd64-extra-exp"
+    ~name:"oc.build_amd64-exp"
     ~__POS__
     ~arch:Amd64
     ~cpu:Very_high
@@ -435,7 +436,7 @@ let jobs pipeline_type =
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
   let job_build_x86_64_release = job_build_x86_64_release pipeline_type in
   let job_build_x86_64_extra_dev = job_build_x86_64_extra_dev pipeline_type in
-  let job_build_x86_64_extra_exp = job_build_x86_64_extra_exp pipeline_type in
+  let job_build_x86_64_exp = job_build_x86_64_exp pipeline_type in
 
   let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:Yes () in
   let job_build_arm64_release : Tezos_ci.tezos_job =
@@ -444,8 +445,8 @@ let jobs pipeline_type =
   let job_build_arm64_extra_dev : Tezos_ci.tezos_job =
     job_build_arm64_extra_dev ~rules:build_arm_rules ()
   in
-  let job_build_arm64_extra_exp : Tezos_ci.tezos_job =
-    job_build_arm64_extra_exp ~rules:build_arm_rules ()
+  let job_build_arm64_exp : Tezos_ci.tezos_job =
+    job_build_arm64_exp ~rules:build_arm_rules ()
   in
 
   let job_build_kernels = job_build_kernels pipeline_type in
@@ -522,12 +523,12 @@ let jobs pipeline_type =
     [
       job_build_arm64_release;
       job_build_arm64_extra_dev;
-      job_build_arm64_extra_exp;
+      job_build_arm64_exp;
       job_static_x86_64_experimental;
       job_static_arm64_experimental;
       job_build_x86_64_release;
       job_build_x86_64_extra_dev;
-      job_build_x86_64_extra_exp;
+      job_build_x86_64_exp;
       job_build_kernels;
       build_octez_source;
       job_build_layer1_profiling
@@ -607,14 +608,14 @@ let jobs pipeline_type =
               [
                 Job job_build_x86_64_release;
                 Job job_build_x86_64_extra_dev;
-                Job job_build_x86_64_extra_exp;
+                Job job_build_x86_64_exp;
               ]
         | Arm64 ->
             Dependent
               [
                 Job job_build_arm64_release;
                 Job job_build_arm64_extra_dev;
-                Job job_build_arm64_extra_exp;
+                Job job_build_arm64_exp;
               ]
       in
       let rules =
