@@ -258,9 +258,10 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
 
 let make_tezos_bootstrap_instr tez_bootstrap_balance tez_bootstrap_accounts =
   let balance =
-    Tezos_types.Tez.to_mutez_z tez_bootstrap_balance |> Rlp.encode_z
+    tez_bootstrap_balance |> Tezos_types.Tez.to_mutez_z
+    |> padded_32_le_int_bytes |> Bytes.of_string
   in
-  let nonce = Rlp.encode_int 0 in
+  let nonce = le_int64_bytes "0" |> Bytes.of_string in
   List.map
     (fun manager ->
       let address =
@@ -268,25 +269,38 @@ let make_tezos_bootstrap_instr tez_bootstrap_balance tez_bootstrap_accounts =
         |> Signature.Public_key_hash.to_b58check
       in
       let public_key =
-        Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding manager
+        Bytes.of_string (Signature.Public_key.to_b58check manager)
       in
       let (`Hex alias) =
         let address = Bytes.of_string address in
         let alias = Tezos_crypto.Hacl.Hash.Keccak_256.digest address in
         Bytes.sub alias 0 20 |> Hex.of_bytes
       in
+      let alias = "0x" ^ alias in
       let payload =
         Rlp.(
           List [Value balance; Value nonce; Value public_key]
           |> encode |> Bytes.to_string)
+      in
+      let rlp_address =
+        let tag = Data_encoding.(Binary.to_bytes_exn int8 1) in
+        let address = Bytes.of_string address in
+        Rlp.(List [Value tag; Value address] |> encode |> Bytes.to_string)
       in
       make_instr
         ~path_prefix:["evm"; "world_state"; "eth_accounts"; "tezos"; address]
         (Some ("info", payload))
       @ make_instr
           ~path_prefix:
-            ["evm"; "world_state"; "eth_accounts"; "tezos"; "names"; "ethereum"]
-          (Some (alias, address)))
+            [
+              "evm";
+              "world_state";
+              "eth_accounts";
+              "tezosx";
+              "native";
+              "ethereum";
+            ]
+          (Some (alias, rlp_address)))
     tez_bootstrap_accounts
   |> List.flatten
 
