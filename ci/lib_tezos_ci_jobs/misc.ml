@@ -81,6 +81,9 @@ let job_script_test_gen_genesis =
     ~only_if_changed:(Changesets.changeset_octez |> Tezos_ci.Changeset.encode)
     ["eval $(opam env)"; "dune build scripts/gen-genesis/gen_genesis.exe"]
 
+let dune_cache_pull_from_pipeline =
+  Cacio.dune_cache ~key:Pipeline ~policy:Pull ()
+
 let job_script_snapshot_alpha_and_link =
   CI.job
     "oc.script:snapshot_alpha_and_link"
@@ -99,7 +102,7 @@ let job_script_snapshot_alpha_and_link =
       ]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    ~dune_cache:(Cacio.dune_cache ~key:Pipeline ~policy:Pull ())
+    ~dune_cache:dune_cache_pull_from_pipeline
     [
       "./scripts/ci/take_ownership.sh";
       ". ./scripts/version.sh";
@@ -284,7 +287,7 @@ let job_oc_unit_non_proto_x86_64 =
       ]
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~artifacts:(artifacts_test_results_xml Amd64)
-    ~dune_cache:(Cacio.dune_cache ~key:Pipeline ~policy:Pull ())
+    ~dune_cache:dune_cache_pull_from_pipeline
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     [
@@ -348,7 +351,7 @@ let job_oc_unit_proto_x86_64 =
       ]
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~artifacts:(artifacts_test_results_xml Amd64)
-    ~dune_cache:(Cacio.dune_cache ~key:Pipeline ~policy:Pull ())
+    ~dune_cache:dune_cache_pull_from_pipeline
     [". ./scripts/version.sh"; "eval $(opam env)"; "make test-proto-unit"]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
@@ -374,7 +377,7 @@ let job_oc_unit_other_x86_64 =
       ]
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~artifacts:(artifacts_test_results_xml Amd64)
-    ~dune_cache:(Cacio.dune_cache ~key:Pipeline ~policy:Pull ())
+    ~dune_cache:dune_cache_pull_from_pipeline
     [". ./scripts/version.sh"; "eval $(opam env)"; "make test-other-unit"]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
