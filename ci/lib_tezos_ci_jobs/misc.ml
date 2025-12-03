@@ -329,6 +329,37 @@ let job_oc_unit_non_proto_arm64 =
       "make test-nonproto-unit test-webassembly";
     ]
 
+let job_oc_unit_proto_x86_64 =
+  CI.job
+    "oc.unit:proto-x86_64"
+    ~__POS__
+    ~description:"Run unit tests for the protocol parts of Octez."
+    ~stage:Test
+    ~retry:Gitlab_ci.Types.{max = 2; when_ = []}
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~image:Tezos_ci.Images.CI.build
+    ~arch:Amd64
+    ~cpu:Very_high
+    ~needs_legacy:
+      [
+        (* We don't need the artifacts, but we do want the cache from the build jobs. *)
+        (Job, Code_verification.job_build_x86_64_release Before_merging);
+        (Job, Code_verification.job_build_x86_64_exp Before_merging);
+        (Job, Code_verification.job_build_x86_64_extra_dev Before_merging);
+      ]
+    ~variables:[("DUNE_ARGS", "-j 12")]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-x86_64"
+         ["test_results"]
+         ~reports:(Gitlab_ci.Util.reports ~junit:"test_results/*.xml" ())
+         ~expire_in:(Duration (Days 1))
+         ~when_:Always)
+    ~dune_cache:(Cacio.dune_cache ~key:Pipeline ~policy:Pull ())
+    [". ./scripts/version.sh"; "eval $(opam env)"; "make test-proto-unit"]
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -349,6 +380,7 @@ let register () =
       (Auto, job_oc_unit_webassembly_x86_64);
       (Auto, job_oc_unit_non_proto_x86_64);
       (Auto, job_oc_unit_non_proto_arm64);
+      (Auto, job_oc_unit_proto_x86_64);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
@@ -369,5 +401,6 @@ let register () =
       (Auto, job_oc_unit_webassembly_x86_64);
       (Auto, job_oc_unit_non_proto_x86_64);
       (Auto, job_oc_unit_non_proto_arm64);
+      (Auto, job_oc_unit_proto_x86_64);
     ] ;
   ()

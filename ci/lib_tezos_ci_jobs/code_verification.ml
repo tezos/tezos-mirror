@@ -684,17 +684,7 @@ let jobs pipeline_type =
           ~make_targets:["test-other-unit"]
           ()
       in
-      let oc_unit_proto_x86_64 =
-        (* Runs unit tests for protocol. *)
-        job_unit_test
-          ~__POS__
-          ~name:"oc.unit:proto-x86_64"
-          ~arch:Amd64
-          ~cpu:Very_high
-          ~make_targets:["test-proto-unit"]
-          ()
-      in
-      [job_ocaml_check; oc_unit_other_x86_64; oc_unit_proto_x86_64]
+      [job_ocaml_check; oc_unit_other_x86_64]
     in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
