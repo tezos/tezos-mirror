@@ -162,6 +162,8 @@ module type Dal = sig
   val config : Scenarios_configuration.DAL.t
 
   val traps_fraction : Q.t option
+
+  val publish_slots_regularly : bool
 end
 
 module Dal () : Dal = struct
@@ -785,6 +787,15 @@ module Dal () : Dal = struct
         ()
     in
     Option.fold ~none:config.traps_fraction ~some:Option.some from_cli
+
+  let publish_slots_regularly =
+    Clap.flag
+      ~section
+      ~set_long:"publish-slots-regularly"
+      ~description:
+        "Let the DAL node handle autonomously (i.e without orchestration) the \
+         publication of slots at a regular frequency"
+      config.publish_slots_regularly
 end
 
 module type Layer1 = sig

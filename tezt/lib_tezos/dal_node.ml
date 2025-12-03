@@ -23,6 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type publish_slots_regularly = {
+  frequency : int;
+  slot_index : int;
+  secret_key : Account.secret_key;
+}
+
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
@@ -35,6 +41,7 @@ module Parameters = struct
     l1_node_endpoint : Endpoint.t;
     disable_shard_validation : bool;
     disable_amplification : bool;
+    publish_slots_regularly : publish_slots_regularly option;
     ignore_pkhs : string list option;
     mutable pending_ready : unit option Lwt.u list;
     runner : Runner.t option;
@@ -57,6 +64,9 @@ let disable_shard_validation_environment_variable =
 
 let ignore_topics_environment_variable =
   "TEZOS_IGNORE_TOPICS_I_KNOW_WHAT_I_AM_DOING"
+
+let allow_regular_publication_environment_variable =
+  "TEZOS_DAL_PUBLISH_REGULARLY_I_KNOW_WHAT_I_AM_DOING"
 
 let check_error ?exit_code ?msg dal_node =
   match dal_node.status with
@@ -335,7 +345,8 @@ let handle_event dal_node {name; value = _; timestamp = _} =
 let create_from_endpoint ?runner ?path ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = Constant.default_host) ?rpc_port ?listen_addr ?public_addr
     ?metrics_addr ?(disable_shard_validation = false)
-    ?(disable_amplification = false) ?ignore_pkhs ~l1_node_endpoint () =
+    ?(disable_amplification = false) ?ignore_pkhs ?publish_slots_regularly
+    ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -381,6 +392,7 @@ let create_from_endpoint ?runner ?path ?name ?color ?data_dir ?event_pipe
         ignore_pkhs;
         l1_node_endpoint;
         runner;
+        publish_slots_regularly;
       }
   in
   on_event dal_node (handle_event dal_node) ;
@@ -390,7 +402,7 @@ let create_from_endpoint ?runner ?path ?name ?color ?data_dir ?event_pipe
 let create ?runner ?path ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = Constant.default_host) ?rpc_port ?listen_addr ?public_addr
     ?metrics_addr ?disable_shard_validation ?disable_amplification ?ignore_pkhs
-    ~node () =
+    ?publish_slots_regularly ~node () =
   let l1_node_endpoint =
     Node.as_rpc_endpoint ~local:(Node.runner node = runner) node
   in
@@ -409,6 +421,7 @@ let create ?runner ?path ?name ?color ?data_dir ?event_pipe
     ?disable_shard_validation
     ?disable_amplification
     ?ignore_pkhs
+    ?publish_slots_regularly
     ~l1_node_endpoint
     ()
 
@@ -441,6 +454,19 @@ let make_arguments node =
       ~none:[]
       ~some:(fun pkhs -> "--ignore-topics" :: [String.concat "," pkhs])
       node.persistent_state.ignore_pkhs
+  @ Option.fold
+      ~none:[]
+      ~some:(fun {frequency; slot_index; secret_key} ->
+        match secret_key with
+        | Unencrypted secret_key ->
+            [
+              "--publish-slots-regularly";
+              Format.sprintf "%d-%d-%s" frequency slot_index secret_key;
+            ]
+        | _ ->
+            failwith
+              "Cannot publish slots regularly without unencrypted secret key")
+      node.persistent_state.publish_slots_regularly
 
 let do_runlike_command ?env ?(event_level = `Info) node arguments =
   if node.status <> Not_running then

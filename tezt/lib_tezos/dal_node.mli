@@ -38,6 +38,14 @@ val disable_shard_validation_environment_variable : string
 
 val ignore_topics_environment_variable : string
 
+val allow_regular_publication_environment_variable : string
+
+type publish_slots_regularly = {
+  frequency : int;
+  slot_index : int;
+  secret_key : Account.secret_key;
+}
+
 (** Creates a DAL node *)
 val create :
   ?runner:Runner.t ->
@@ -54,6 +62,7 @@ val create :
   ?disable_shard_validation:bool ->
   ?disable_amplification:bool ->
   ?ignore_pkhs:string list ->
+  ?publish_slots_regularly:publish_slots_regularly ->
   node:Node.t ->
   unit ->
   t
@@ -73,6 +82,7 @@ val create_from_endpoint :
   ?disable_shard_validation:bool ->
   ?disable_amplification:bool ->
   ?ignore_pkhs:string list ->
+  ?publish_slots_regularly:publish_slots_regularly ->
   l1_node_endpoint:Endpoint.t ->
   unit ->
   t

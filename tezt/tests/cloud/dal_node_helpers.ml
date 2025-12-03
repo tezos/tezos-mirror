@@ -120,8 +120,8 @@ let init_producer_accounts ~client ~producer_key ~dal_node_producers =
 let init_producer cloud ~data_dir ~simulate_network ~external_rpc ~network
     ~snapshot ~memtrace ~ppx_profiling_verbosity ~ppx_profiling_backends
     ~ignore_pkhs ~disable_shard_validation ~disable_amplification
-    ~node_p2p_endpoint ~dal_node_p2p_endpoint teztale account i slot_index agent
-    =
+    ~node_p2p_endpoint ~dal_node_p2p_endpoint ?publish_slots_regularly teztale
+    account i slot_index agent =
   let name = name_of_daemon (Producer_l1_node i) in
   let () = toplog "Initializing the DAL producer %s" name in
   let data_dir = data_dir |> Option.map (fun data_dir -> data_dir // name) in
@@ -165,10 +165,22 @@ let init_producer cloud ~data_dir ~simulate_network ~external_rpc ~network
       ~disable_shard_validation
       ~disable_amplification
       ?ignore_pkhs
+      ?publish_slots_regularly:
+        (Option.map
+           (fun frequency ->
+             Dal_node.
+               {frequency; slot_index; secret_key = account.Account.secret_key})
+           publish_slots_regularly)
       cloud
       agent
   in
-  let () = toplog "Init producer %s: init DAL node config" name in
+  let () =
+    toplog
+      "Init producer %s: init DAL node config (produce slots regularly set to \
+       %b)"
+      name
+      (Option.is_some publish_slots_regularly)
+  in
   let* () =
     Dal_node.init_config
       ~expected_pow:(Network.expected_pow network)
@@ -210,6 +222,7 @@ let init_producer cloud ~data_dir ~simulate_network ~external_rpc ~network
       ~event_level:`Notice
       ~disable_shard_validation
       ?ignore_pkhs
+      ~allow_publication_regularly:(Option.is_some publish_slots_regularly)
       ~ppx_profiling_verbosity
       ~ppx_profiling_backends
       dal_node
