@@ -125,6 +125,11 @@ DAL node
   after the first valid JSON object. Now, any extraneous data will cause the
   function to return an error. (MR :gl:`!18745`)
 
+Version 23.3
+============
+
+No changes compared to octez-v23.2
+
 Version 23.2
 ============
 
