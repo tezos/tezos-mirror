@@ -13,13 +13,15 @@ Version 23 introduces the following changes or new features:
   (3) BLS support (See :ref:`the BLS support section <bls_v23>`)
   (4) New snapshot version (See :ref:`the snapshot version section <snapshot_v23>`)
 
-Octez v23.1 addresses an issue with Ubuntu and Debian packages distribution, where an expired PGP key prevented users from updating to v23.0 using apt.
+**Octez v23.1** addresses an issue with Ubuntu and Debian packages distribution, where an expired PGP key prevented users from updating to v23.0 using apt.
 
-Octez v23.2 fixes an issue affecting ``systemd`` services of Debian and Ubuntu packages that could lead to having two baking binaries running at the same time.
+**Octez v23.2** fixes an issue affecting ``systemd`` services of Debian and Ubuntu packages that could lead to having two baking binaries running at the same time.
 
 In some cases, this issue could cause bakers to lose consensus rewards or, in certain conditions, could result in double-signing. Consequently, v23.0 and v23.1 Ubuntu and Debian packages were made unavailable via ``apt`` and ``dnf``. The release of v23.2 restores the availability of these distribution packages.
 
 **For all other distributions, this version is the same as Octez v23.1**
+
+**Octez v23.3** increases performance of DAL nodes and improves baker stability. It prevents the baker from running in a degraded mode.
 
 An overview of breaking changes and deprecations introduced in Octez
 v23 can be found :ref:`here<v23_breaking_changes>`.
