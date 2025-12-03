@@ -25,7 +25,10 @@ use revm::{
 use std::vec::Vec;
 
 use crate::{
-    database::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges},
+    database::{
+        DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges,
+        EtherlinkDatabaseInteractions,
+    },
     helpers::legacy::FaDepositWithProxy,
     layered_state::LayeredState,
     precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
@@ -64,7 +67,10 @@ pub struct Journal<DB> {
 
 /// The implementation is only calling the underline REVM object which is the same as the REVM journal one.
 /// The only changes are the invocation of `LayeredDB` methods in some functions.
-impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<DB> {
+impl<
+        DB: Database + DatabaseCommitPrecompileStateChanges + EtherlinkDatabaseInteractions,
+    > JournalTr for Journal<DB>
+{
     type Database = DB;
     type State = EvmState;
     type JournalEntry = JournalEntry;
@@ -188,6 +194,9 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         to: Address,
         balance: U256,
     ) -> Result<Option<TransferError>, DB::Error> {
+        if self.database.is_foreign_address(&to) {
+            return Ok(Some(TransferError::CreateCollision));
+        }
         self.inner.transfer(&mut self.database, from, to, balance)
     }
 
@@ -198,6 +207,9 @@ impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<
         to: Address,
         balance: U256,
     ) -> Option<TransferError> {
+        if self.database.is_foreign_address(&to) {
+            return Some(TransferError::CreateCollision);
+        }
         self.inner.transfer_loaded(from, to, balance)
     }
 

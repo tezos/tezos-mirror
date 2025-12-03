@@ -304,6 +304,7 @@ fn get_block_constants(env: &Env, chain_id: primitive_types::U256) -> BlockConst
             primitive_types::U256::zero(),
         ),
         chain_id,
+        tezos_experimental_features: false,
         prevrandao: Some(primitive_types::H256::from(
             env.current_difficulty.to_le_bytes(),
         )),

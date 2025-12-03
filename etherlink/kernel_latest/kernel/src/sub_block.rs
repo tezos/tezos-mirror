@@ -393,6 +393,7 @@ fn block_constants<Host: Runtime>(
         coinbase,
         timestamp: timestamp.as_u64().into(),
         gas_limit: GAS_LIMIT,
+        tezos_experimental_features: config.enable_tezos_runtime(),
         block_fees,
         chain_id: config.get_chain_id(),
         prevrandao: None,

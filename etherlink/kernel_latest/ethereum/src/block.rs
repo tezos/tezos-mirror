@@ -88,6 +88,8 @@ pub struct BlockConstants {
     /// Identifier for the chain. Normally this would identify the chain (Ethereum
     /// main net, or some other net). We can use it to identify rollup EVM kernel.
     pub chain_id: U256,
+    /// Tezos X experimental features enabled for this block
+    pub tezos_experimental_features: bool,
     /// A random number depending on previous block
     /// NB: this field is not relevant for Etherlink but is required to enable other
     /// relevant test from the Ethereum test suit
@@ -112,6 +114,7 @@ impl BlockConstants {
             gas_limit,
             block_fees,
             chain_id,
+            tezos_experimental_features: false,
             prevrandao: None,
         }
     }

@@ -17,6 +17,7 @@ use crate::{
             SEQUENCER_KEY_PATH, WITHDRAWALS_TICKETER_PATH,
         },
     },
+    tezosx::get_ethereum_address_mapping,
     Error,
 };
 use revm::{
@@ -92,6 +93,10 @@ pub trait DatabasePrecompileStateChanges {
 
 pub(crate) trait DatabaseCommitPrecompileStateChanges {
     fn commit(&mut self, etherlink_data: PrecompileStateChanges);
+}
+
+pub(crate) trait EtherlinkDatabaseInteractions {
+    fn is_foreign_address(&mut self, address: &Address) -> bool;
 }
 
 macro_rules! abort_on_error {
@@ -323,6 +328,18 @@ impl<Host: Runtime> DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, H
                     .remove_deposit_from_queue(self.host, &deposit_id),
                 "DatabaseCommitPrecompileStateChanges `remove_deposit_from_queue`"
             );
+        }
+    }
+}
+
+impl<'a, Host: Runtime> EtherlinkDatabaseInteractions for EtherlinkVMDB<'a, Host> {
+    fn is_foreign_address(&mut self, address: &Address) -> bool {
+        if self.block.tezos_experimental_features {
+            get_ethereum_address_mapping(self.host, address)
+                .map(|opt| opt.is_some())
+                .unwrap_or(false)
+        } else {
+            false
         }
     }
 }

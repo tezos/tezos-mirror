@@ -320,6 +320,7 @@ pub fn compute_bip<Host: Runtime>(
     da_fee_per_byte: U256,
     coinbase: H160,
     spec_id: &SpecId,
+    tezos_experimental_features: bool,
 ) -> anyhow::Result<BlockComputationResult> {
     let constants: BlockConstants = block_in_progress.constants(
         chain_id,
@@ -327,6 +328,7 @@ pub fn compute_bip<Host: Runtime>(
         da_fee_per_byte,
         GAS_LIMIT,
         coinbase,
+        tezos_experimental_features,
     );
     let result = compute(
         host,

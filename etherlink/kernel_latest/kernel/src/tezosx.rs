@@ -4,10 +4,11 @@
 
 use mir::ast::PublicKeyHash;
 use primitive_types::U256;
-use revm::primitives::Address;
+use revm_etherlink::tezosx::{
+    ethereum_address_from_tezos, set_ethereum_address_mapping, ForeignAddress,
+};
 use revm_etherlink::Error;
 use rlp::{Decodable, Encodable, Rlp};
-use sha3::{Digest, Keccak256};
 use tezos_ethereum::rlp_helpers::{
     append_u256_le, append_u64_le, decode_field_u256_le, decode_field_u64_le,
 };
@@ -26,11 +27,6 @@ const TEZOS_ACCOUNTS_PATH: RefPath =
 // Path where all the infos of a Tezos contract are stored under the same key.
 // This path must contains balance, nonce and optionally a revealed public key.
 const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
-
-// Path where is stored the correspondance between an EVM address and the native
-// Tezos account it was derived from.
-const ETHEREUM_ADDRESS_MAPPING_PATH: RefPath =
-    RefPath::assert_from(b"/evm/world_state/eth_accounts/tezosx/native/ethereum");
 
 // Used as a value for the durable storage.
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
@@ -133,7 +129,7 @@ pub fn get_tezos_account_info_or_init(
         None => {
             let evm_addr = ethereum_address_from_tezos(pub_key_hash);
             let foreign_addr = ForeignAddress::Tezos(pub_key_hash.clone());
-            set_ethereum_address_mapping(host, evm_addr, foreign_addr)?;
+            set_ethereum_address_mapping(host, &evm_addr, foreign_addr)?;
             Ok(TezosAccountInfo::default())
         }
     }
@@ -150,98 +146,11 @@ pub fn set_tezos_account_info(
     Ok(host.store_write(&path, value, 0)?)
 }
 
-pub fn ethereum_address_from_tezos(pub_key_hash: &PublicKeyHash) -> Address {
-    let hash: [u8; 32] = Keccak256::digest(pub_key_hash.to_b58check().as_bytes()).into();
-    Address::from_slice(&hash[0..20])
-}
-
-const TEZOS_SRC_ADDR_TAG: u8 = 1;
-#[derive(PartialEq, Debug, Clone, Eq)]
-pub enum ForeignAddress {
-    Tezos(PublicKeyHash),
-}
-
-impl Encodable for ForeignAddress {
-    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(2);
-        match &self {
-            ForeignAddress::Tezos(pub_key_hash) => {
-                stream.append(&TEZOS_SRC_ADDR_TAG);
-                stream.append(&pub_key_hash.to_b58check().as_bytes());
-            }
-        }
-    }
-}
-
-impl Decodable for ForeignAddress {
-    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        if !decoder.is_list() {
-            return Err(rlp::DecoderError::RlpExpectedToBeList);
-        }
-        if decoder.item_count()? != 2 {
-            return Err(rlp::DecoderError::RlpIncorrectListLen);
-        }
-        let tag: u8 = decoder.at(0)?.as_val()?;
-        let pub_key_hash_decoder = decoder.at(1)?;
-        match tag {
-            TEZOS_SRC_ADDR_TAG => {
-                let vec: Vec<u8> = pub_key_hash_decoder.as_val()?;
-                let s: String = String::from_utf8(vec).map_err(|_| {
-                    rlp::DecoderError::Custom("Invalid public key hash (not a string)")
-                })?;
-                let pub_key_hash = PublicKeyHash::from_b58check(&s).map_err(|_| {
-                    rlp::DecoderError::Custom("Invalid public key hash (b58check)")
-                })?;
-                Ok(Self::Tezos(pub_key_hash))
-            }
-            _ => Err(rlp::DecoderError::Custom("Unknown address mapping tag.")),
-        }
-    }
-}
-
-fn path_to_ethereum_address_mapping(address: Address) -> Result<OwnedPath, Error> {
-    let address = address.to_string().to_lowercase();
-    let address_path: Vec<u8> = format!("/{address}").into();
-    let address_path =
-        OwnedPath::try_from(address_path).map_err(|e| Error::Custom(e.to_string()))?;
-    concat(&ETHEREUM_ADDRESS_MAPPING_PATH, &address_path)
-        .map_err(|e| Error::Custom(e.to_string()))
-}
-
-#[allow(dead_code)]
-pub fn get_ethereum_address_mapping(
-    host: &impl Runtime,
-    address: Address,
-) -> Result<Option<ForeignAddress>, Error> {
-    let path = path_to_ethereum_address_mapping(address)
-        .map_err(|_| RuntimeError::PathNotFound)?;
-    match host.store_read_all(&path) {
-        Ok(bytes) => {
-            let source_address = ForeignAddress::decode(&Rlp::new(&bytes))
-                .map_err(|_| RuntimeError::DecodingError)?;
-            Ok(Some(source_address))
-        }
-        Err(RuntimeError::PathNotFound) => Ok(None),
-        Err(err) => Err(Error::Runtime(err)),
-    }
-}
-
-#[allow(dead_code)]
-pub fn set_ethereum_address_mapping(
-    host: &mut impl Runtime,
-    address: Address,
-    source_address: ForeignAddress,
-) -> Result<(), Error> {
-    let path = path_to_ethereum_address_mapping(address)
-        .map_err(|_| RuntimeError::PathNotFound)?;
-    let value = &source_address.rlp_bytes();
-    Ok(host.store_write_all(&path, value)?)
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::tezosx::ForeignAddress::Tezos;
     use crate::tezosx::*;
+    use alloy_primitives::Address;
+    use revm_etherlink::tezosx::*;
     use std::str::FromStr;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
@@ -327,12 +236,12 @@ mod tests {
         let pub_key_hash: PublicKeyHash =
             PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
                 .expect("Public key hash should be a b58 string");
-        let address_mapping = Tezos(pub_key_hash);
+        let address_mapping = ForeignAddress::Tezos(pub_key_hash);
 
-        set_ethereum_address_mapping(&mut host, address, address_mapping.clone())
+        set_ethereum_address_mapping(&mut host, &address, address_mapping.clone())
             .expect("Writing to the storage should have worked");
 
-        let read_address_mapping = get_ethereum_address_mapping(&host, address)
+        let read_address_mapping = get_ethereum_address_mapping(&host, &address)
             .expect("Reading the storage should have worked")
             .expect("The path to the account should exist");
         assert_eq!(address_mapping, read_address_mapping);

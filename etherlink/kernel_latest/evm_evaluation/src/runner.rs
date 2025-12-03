@@ -237,6 +237,7 @@ fn execute_transaction(
         timestamp: env.block.timestamp,
         gas_limit: env.block.gas_limit.as_u64(),
         block_fees,
+        tezos_experimental_features: false,
         chain_id: U256::from(1337),
         prevrandao: env.block.prevrandao,
     };

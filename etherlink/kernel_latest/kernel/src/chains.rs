@@ -91,6 +91,10 @@ impl ExperimentalFeatures {
             enable_tezos_runtime,
         }
     }
+
+    pub fn is_tezos_runtime_enabled(&self) -> bool {
+        self.enable_tezos_runtime
+    }
 }
 
 #[derive(Debug)]
@@ -399,6 +403,7 @@ impl ChainConfigTrait for EvmChainConfig {
             da_fee_per_byte,
             coinbase,
             &self.spec_id,
+            self.enable_tezos_runtime(),
         )
     }
 

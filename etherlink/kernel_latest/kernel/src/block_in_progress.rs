@@ -304,6 +304,7 @@ impl EthBlockInProgress {
         da_fee_per_byte: U256,
         gas_limit: u64,
         coinbase: H160,
+        tezos_experimental_features: bool,
     ) -> BlockConstants {
         let timestamp = U256::from(self.timestamp.as_u64());
         let block_fees = BlockFees::new(
@@ -318,6 +319,7 @@ impl EthBlockInProgress {
             gas_limit,
             block_fees,
             chain_id,
+            tezos_experimental_features,
             prevrandao: None,
         }
     }

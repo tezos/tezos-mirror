@@ -10,7 +10,9 @@
 
 use crate::apply::revm_run_transaction;
 use crate::block_storage;
-use crate::chains::{ChainFamily, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
+use crate::chains::{
+    ChainFamily, ExperimentalFeatures, ETHERLINK_SAFE_STORAGE_ROOT_PATH,
+};
 use crate::fees::simulation_add_gas_for_fees;
 use crate::l2block::L2Block;
 use crate::storage::{
@@ -384,6 +386,7 @@ impl Evaluation {
         let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
         let da_fee = crate::retrieve_da_fee(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
+        let experimental_features = ExperimentalFeatures::read_from_storage(host);
 
         let constants = match block_storage::read_current(
             host,
@@ -409,6 +412,8 @@ impl Evaluation {
                     coinbase,
                     timestamp,
                     gas_limit: crate::block::GAS_LIMIT,
+                    tezos_experimental_features: experimental_features
+                        .is_tezos_runtime_enabled(),
                     block_fees,
                     chain_id,
                     prevrandao: None,

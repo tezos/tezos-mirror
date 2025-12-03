@@ -44,6 +44,7 @@ pub mod journal;
 pub mod layered_state;
 pub mod precompiles;
 pub mod storage;
+pub mod tezosx;
 
 mod database;
 
@@ -428,6 +429,7 @@ mod test {
         state::{AccountInfo, Bytecode},
     };
     use rlp::Decodable;
+    use tezos_crypto_rs::public_key_hash::PublicKeyHash;
     use tezos_crypto_rs::{
         hash::{HashTrait, SecretKeyEd25519},
         public_key::PublicKey,
@@ -447,6 +449,7 @@ mod test {
         createAndRevertCall, CreateAndRevertCalls,
     };
     use crate::test::utilities::{FABridge, ITable, RevertCreate};
+    use crate::tezosx::{set_ethereum_address_mapping, ForeignAddress};
     use crate::GasData;
     use crate::{
         helpers::legacy::FaDepositWithProxy,
@@ -575,6 +578,75 @@ mod test {
         );
         let destination_info = destination_account.info(&mut host).unwrap();
         assert_eq!(destination_info.balance, value_sent);
+    }
+
+    #[test]
+    fn test_tezosx_simple_transfer_to_mapped_address() {
+        let mut host = MockKernelHost::default();
+        let mut block_constants = block_constants_with_no_fees();
+        block_constants.tezos_experimental_features = true;
+
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let destination =
+            Address::from_hex("2222222222222222222222222222222222222222").unwrap();
+        set_ethereum_address_mapping(
+            &mut host,
+            &destination,
+            ForeignAddress::Tezos(
+                PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                    .unwrap(),
+            ),
+        )
+        .unwrap();
+
+        let value_sent = U256::from(5);
+
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+
+        let mut caller_account = StorageAccount::from_address(&caller).unwrap();
+
+        let destination_account = StorageAccount::from_address(&destination).unwrap();
+
+        caller_account
+            .set_info_without_code(&mut host, caller_info)
+            .unwrap();
+
+        let caller_info = caller_account.info(&mut host).unwrap();
+        let destination_info = destination_account.info(&mut host).unwrap();
+        // Check balances before executing the transfer
+        assert_eq!(caller_info.balance, U256::MAX);
+        assert_eq!(destination_info.balance, U256::ZERO);
+
+        let execution_result = run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            None,
+            caller,
+            Some(destination),
+            Bytes::new(),
+            GasData::new(GAS_LIMIT, 0, GAS_LIMIT),
+            value_sent,
+            AccessList(vec![]),
+            None,
+            None,
+            false,
+        )
+        .unwrap();
+
+        // Check the outcome of the transaction
+        match execution_result.result {
+            ExecutionResult::Halt { .. } => (),
+            ExecutionResult::Revert { .. } | ExecutionResult::Success { .. } => {
+                panic!("Simple transfer should have halted")
+            }
+        }
     }
 
     #[test]
