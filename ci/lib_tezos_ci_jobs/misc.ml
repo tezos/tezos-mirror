@@ -193,6 +193,20 @@ let job_test_release_versions =
       ]
     ["scripts/ci/test_release_values.sh"]
 
+let job_resto_unit =
+  Cacio.parameterize @@ fun arch ->
+  CI.job
+    ("resto.unit:" ^ Tezos_ci.Runner.Arch.show_easy_to_distinguish arch)
+    ~__POS__
+    ~description:"Run unit tests for resto."
+    ~arch
+    ?storage:(match arch with Arm64 -> Some Ramfs | _ -> None)
+    ~image:Tezos_ci.Images.CI.test
+    ~stage:Test
+    ~timeout:(Minutes 10)
+    ~only_if_changed:["resto/**"]
+    ["eval $(opam env)"; "dune runtest resto"]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -205,6 +219,8 @@ let register () =
       (Auto, job_test_liquidity_baking_scripts);
       (Auto, job_oc_script_test_release_versions);
       (Auto, job_test_release_versions);
+      (Auto, job_resto_unit Amd64);
+      (Auto, job_resto_unit Arm64);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
@@ -217,5 +233,7 @@ let register () =
       (Auto, job_test_liquidity_baking_scripts);
       (Auto, job_oc_script_test_release_versions);
       (Auto, job_test_release_versions);
+      (Auto, job_resto_unit Amd64);
+      (Auto, job_resto_unit Arm64);
     ] ;
   ()
