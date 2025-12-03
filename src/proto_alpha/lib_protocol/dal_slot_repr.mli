@@ -506,13 +506,14 @@ module History : sig
       in particular across protocol migrations that decrease the lag. *)
   val produce_proof :
     parameters ->
+    page_id_is_valid:(dal_attestation_lag:int -> Page.t -> bool) ->
     attestation_threshold_percent:int option ->
     restricted_commitments_publishers:Contract_repr.t list option ->
     Page.t ->
     page_info:(Page.content * Page.proof) option ->
     get_history:(hash -> t option Lwt.t) ->
     t ->
-    (proof * Page.content option * attestation_lag_kind) tzresult Lwt.t
+    (proof * Page.content option) tzresult Lwt.t
 
   (** [verify_proof dal_params page_id snapshot proof] verifies
       that the given [proof] is a valid proof to show that either:
@@ -530,10 +531,11 @@ module History : sig
       list is returned, alongside the page's bytes if the slot is attested. *)
   val verify_proof :
     parameters ->
+    page_id_is_valid:(dal_attestation_lag:int -> Page.t -> bool) ->
     Page.t ->
     t ->
     proof ->
-    (bytes option * attestation_lag_kind) tzresult
+    bytes option tzresult
 
   (** Given a DAL proof, this function returns the values of the fields
       [attestation_threshold_percent] [restricted_commitments_publishers] stored

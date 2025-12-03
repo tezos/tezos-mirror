@@ -204,6 +204,7 @@ struct
     let*!@ res =
       Hist.produce_proof
         params
+        ~page_id_is_valid:(fun ~dal_attestation_lag:_ _page_id -> true)
         ~page_info
         ~attestation_threshold_percent:None
         ~restricted_commitments_publishers:None
@@ -211,16 +212,19 @@ struct
         ~get_history
         skip_list
     in
-    let res =
-      Result.map (fun (proof, input_opt, _lag) -> (proof, input_opt)) res
-    in
     let* () = check_produce res page_info in
     match check_verify with
     | None -> return_unit
     | Some check_verify ->
         let*? proof, _input_opt = res in
-        let@ res = Hist.verify_proof params page_id skip_list proof in
-        let res = Result.map (fun (bytes_opt, _lag) -> bytes_opt) res in
+        let@ res =
+          Hist.verify_proof
+            params
+            page_id
+            skip_list
+            proof
+            ~page_id_is_valid:(fun ~dal_attestation_lag:_ _page_id -> true)
+        in
         check_verify res page_info
 
   (* Some check functions. *)
