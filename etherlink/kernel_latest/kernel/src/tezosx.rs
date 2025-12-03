@@ -213,114 +213,102 @@ pub fn set_ethereum_address_mapping(
     Ok(host.store_write_all(&path, value)?)
 }
 
-#[test]
-fn tezos_account_info_encoding() {
-    use crate::tezosx::TezosAccountInfo;
-    use primitive_types::U256;
-    use rlp::Rlp;
-    use tezos_smart_rollup::types::PublicKey;
-
-    let pub_key: PublicKey = PublicKey::from_b58check(
-        "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
-    )
-    .expect("Public key should be a b58 string");
-    let account = TezosAccountInfo {
-        balance: U256::from(1234u64),
-        nonce: 18,
-        pub_key: Some(pub_key),
-    };
-    let bytes = &account.rlp_bytes();
-    let decoded_account =
-        TezosAccountInfo::decode(&Rlp::new(bytes)).expect("Account should be decodable");
-    assert!(decoded_account == account);
-}
-
-#[test]
-fn tezos_account_info_size_constant() {
-    let pub_key: PublicKey = PublicKey::from_b58check(
-        "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
-    )
-    .expect("Public key should be a b58 string");
-    let account = TezosAccountInfo {
-        balance: U256::zero(),
-        nonce: 0,
-        pub_key: Some(pub_key),
-    };
-    let rlp_size = account.rlp_bytes().len();
-    assert_eq!(rlp_size, TezosAccountInfo::RLP_SIZE);
-    assert_eq!(rlp_size, 99);
-}
-
-#[test]
-fn tezos_account_storage() {
-    use crate::tezosx::TezosAccountInfo;
-    use primitive_types::U256;
-    use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_smart_rollup::types::PublicKey;
-
-    let mut host = MockKernelHost::default();
-
-    let pub_key_hash: PublicKeyHash =
-        PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
-            .expect("Public key hash should be a b58 string");
-    let pub_key: PublicKey = PublicKey::from_b58check(
-        "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
-    )
-    .expect("Public key should be a b58 string");
-    let account = TezosAccountInfo {
-        balance: U256::from(1234u64),
-        nonce: 18,
-        pub_key: Some(pub_key.clone()),
-    };
-
-    set_tezos_account_info(&mut host, pub_key_hash.clone(), account.clone())
-        .expect("Writing to the storage should have worked");
-
-    let read_account = get_tezos_account_info(&host, pub_key_hash)
-        .expect("Reading the storage should have worked")
-        .expect("The path to the account should exist");
-    assert_eq!(account, read_account);
-}
-
-#[test]
-fn foreign_address_encoding() {
-    use rlp::Rlp;
-    use rlp::{Decodable, Encodable};
-    use tezos_smart_rollup::types::PublicKeyHash;
-
-    let pub_key_hash: PublicKeyHash =
-        PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
-            .expect("Public key hash should be a b58 string");
-    let source_address = ForeignAddress::Tezos(pub_key_hash);
-    let bytes = &source_address.rlp_bytes();
-    let decoded_address =
-        ForeignAddress::decode(&Rlp::new(bytes)).expect("Address should be decodable");
-    assert!(decoded_address == source_address);
-}
-
-#[test]
-fn ethereum_address_mapping_storage() {
+#[cfg(test)]
+mod tests {
     use crate::tezosx::ForeignAddress::Tezos;
-    use revm::primitives::Address;
+    use crate::tezosx::*;
     use std::str::FromStr;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use tezos_smart_rollup::types::PublicKeyHash;
 
-    let mut host = MockKernelHost::default();
+    #[test]
+    fn tezos_account_info_size_constant() {
+        let pub_key: PublicKey = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .expect("Public key should be a b58 string");
+        let account = TezosAccountInfo {
+            balance: U256::zero(),
+            nonce: 0,
+            pub_key: Some(pub_key),
+        };
+        let rlp_size = account.rlp_bytes().len();
+        assert_eq!(rlp_size, TezosAccountInfo::RLP_SIZE);
+        assert_eq!(rlp_size, 99);
+    }
 
-    let address: Address =
-        Address::from_str("0x2E2Ac8699AD02e710951ea0F56b892Ed36916Cd5")
-            .expect("Hex should be an EVM address");
-    let pub_key_hash: PublicKeyHash =
-        PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
-            .expect("Public key hash should be a b58 string");
-    let address_mapping = Tezos(pub_key_hash);
+    #[test]
+    fn tezos_account_info_encoding() {
+        let pub_key: PublicKey = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .expect("Public key should be a b58 string");
+        let account = TezosAccountInfo {
+            balance: U256::from(1234u64),
+            nonce: 18,
+            pub_key: Some(pub_key),
+        };
+        let bytes = &account.rlp_bytes();
+        let decoded_account = TezosAccountInfo::decode(&Rlp::new(bytes))
+            .expect("Account should be decodable");
+        assert!(decoded_account == account);
+    }
 
-    set_ethereum_address_mapping(&mut host, address, address_mapping.clone())
-        .expect("Writing to the storage should have worked");
+    #[test]
+    fn tezos_account_storage() {
+        let mut host = MockKernelHost::default();
 
-    let read_address_mapping = get_ethereum_address_mapping(&host, address)
-        .expect("Reading the storage should have worked")
-        .expect("The path to the account should exist");
-    assert_eq!(address_mapping, read_address_mapping);
+        let pub_key_hash: PublicKeyHash =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                .expect("Public key hash should be a b58 string");
+        let pub_key: PublicKey = PublicKey::from_b58check(
+            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        )
+        .expect("Public key should be a b58 string");
+        let account = TezosAccountInfo {
+            balance: U256::from(1234u64),
+            nonce: 18,
+            pub_key: Some(pub_key.clone()),
+        };
+
+        set_tezos_account_info(&mut host, pub_key_hash.clone(), account.clone())
+            .expect("Writing to the storage should have worked");
+
+        let read_account = get_tezos_account_info(&host, pub_key_hash)
+            .expect("Reading the storage should have worked")
+            .expect("The path to the account should exist");
+        assert_eq!(account, read_account);
+    }
+
+    #[test]
+    fn foreign_address_encoding() {
+        let pub_key_hash: PublicKeyHash =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                .expect("Public key hash should be a b58 string");
+        let source_address = ForeignAddress::Tezos(pub_key_hash);
+        let bytes = &source_address.rlp_bytes();
+        let decoded_address = ForeignAddress::decode(&Rlp::new(bytes))
+            .expect("Address should be decodable");
+        assert!(decoded_address == source_address);
+    }
+
+    #[test]
+    fn ethereum_address_mapping_storage() {
+        let mut host = MockKernelHost::default();
+
+        let address: Address =
+            Address::from_str("0x2E2Ac8699AD02e710951ea0F56b892Ed36916Cd5")
+                .expect("Hex should be an EVM address");
+        let pub_key_hash: PublicKeyHash =
+            PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                .expect("Public key hash should be a b58 string");
+        let address_mapping = Tezos(pub_key_hash);
+
+        set_ethereum_address_mapping(&mut host, address, address_mapping.clone())
+            .expect("Writing to the storage should have worked");
+
+        let read_address_mapping = get_ethereum_address_mapping(&host, address)
+            .expect("Reading the storage should have worked")
+            .expect("The path to the account should exist");
+        assert_eq!(address_mapping, read_address_mapping);
+    }
 }
