@@ -241,6 +241,23 @@ let job_oc_unit_protocol_compiles =
       "dune build @runtest_compile_protocol";
     ]
 
+let job_oc_unit_webassembly_x86_64 =
+  CI.job
+    "oc.unit:webassembly-x86_64"
+    ~__POS__
+    ~description:"Run the tests for WASM."
+    ~arch:Amd64 (* The wasm tests are written in Python *)
+    ~image:Tezos_ci.Images.CI.test
+    ~stage:Test
+    ~only_if_changed:(Tezos_ci.Changeset.encode Changesets.changeset_octez)
+    ~timeout:(Minutes 20)
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4663
+         This test takes around 2 to 4min to complete, but it sometimes
+         hangs. We use a timeout to retry the test in this case. The
+         underlying issue should be fixed eventually, turning this timeout
+         unnecessary. *)
+    [". ./scripts/version.sh"; "eval $(opam env)"; "make test-webassembly"]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -258,6 +275,7 @@ let register () =
       (Auto, job_de_unit Amd64);
       (Auto, job_de_unit Arm64);
       (Auto, job_oc_unit_protocol_compiles);
+      (Auto, job_oc_unit_webassembly_x86_64);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
@@ -275,5 +293,6 @@ let register () =
       (Auto, job_de_unit Amd64);
       (Auto, job_de_unit Arm64);
       (Auto, job_oc_unit_protocol_compiles);
+      (Auto, job_oc_unit_webassembly_x86_64);
     ] ;
   ()

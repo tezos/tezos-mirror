@@ -711,31 +711,12 @@ let jobs pipeline_type =
           ~make_targets:["test-nonproto-unit"; "test-webassembly"]
           ()
       in
-      let oc_unit_webassembly_x86_64 =
-        job
-          ~__POS__
-          ~name:"oc.unit:webassembly-x86_64"
-          ~arch:Amd64 (* The wasm tests are written in Python *)
-          ~image:Images.CI.test
-          ~stage:Stages.test
-          ~dependencies:(build_dependencies Amd64)
-          ~rules
-          ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/4663
-               This test takes around 2 to 4min to complete, but it sometimes
-               hangs. We use a timeout to retry the test in this case. The
-               underlying issue should be fixed eventually, turning this timeout
-               unnecessary. *)
-          ~timeout:(Minutes 20)
-          ["make test-webassembly"]
-      in
       [
         job_ocaml_check;
         oc_unit_non_proto_x86_64;
         oc_unit_other_x86_64;
         oc_unit_proto_x86_64;
         oc_unit_non_proto_arm64;
-        oc_unit_webassembly_x86_64;
       ]
     in
     (* The set of installation test jobs *)
