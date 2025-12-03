@@ -674,15 +674,6 @@ let jobs pipeline_type =
         if arch = Amd64 then enable_dune_cache ~key:Pipeline ~policy:Pull job
         else job
       in
-      let oc_unit_non_proto_x86_64 =
-        job_unit_test
-          ~__POS__
-          ~name:"oc.unit:non-proto-x86_64"
-          ~arch:Amd64 (* The [lib_benchmark] unit tests require Python *)
-          ~image:Images.CI.test
-          ~make_targets:["test-nonproto-unit"]
-          ()
-      in
       let oc_unit_other_x86_64 =
         (* Runs unit tests for contrib. *)
         job_unit_test
@@ -716,7 +707,6 @@ let jobs pipeline_type =
       in
       [
         job_ocaml_check;
-        oc_unit_non_proto_x86_64;
         oc_unit_other_x86_64;
         oc_unit_proto_x86_64;
         oc_unit_non_proto_arm64;

@@ -1,0 +1,8 @@
+oc.unit:proto-x86_64
+oc.unit:other-x86_64
+tezt
+tezt-time-sensitive
+tezt-flaky
+etherlink.tezt
+etherlink.tezt-flaky
+etherlink.unit_tests
