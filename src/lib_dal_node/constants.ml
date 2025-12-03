@@ -112,7 +112,9 @@ let traps_cache_size =
   @@ traps_fraction
   |> to_int
 
-(* The expected time, in seconds, sufficient to subscribe and connect to new
+(* The expected time, in level, sufficient to subscribe and connect to new
    peers on a (new) topic. This was not measured and the value is meant to be a
    gross over-approximation. *)
-let time_to_join_new_topics = 5
+let time_to_join_new_topics_in_levels ~minimal_block_delay =
+  let time_to_join_new_topics = 5 in
+  1 + (time_to_join_new_topics / minimal_block_delay)

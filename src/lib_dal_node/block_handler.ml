@@ -204,9 +204,10 @@ let may_update_topics ctxt proto_parameters ~block_level =
      attestation_lag - 1], because the node does not unsubscribe, and message
      validation does not depend on the subscribed topics. *)
   let additional_levels =
-    1
-    + Constants.time_to_join_new_topics
-      / Int64.to_int proto_parameters.Types.minimal_block_delay
+    let minimal_block_delay =
+      Int64.to_int proto_parameters.Types.minimal_block_delay
+    in
+    Constants.time_to_join_new_topics_in_levels ~minimal_block_delay
   in
   let+ committee =
     let level =

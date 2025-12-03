@@ -77,6 +77,6 @@ val bootstrap_dns_refresh_delay : float
 (** The size of the node store's traps cache. *)
 val traps_cache_size : int
 
-(** The expected time, in seconds, sufficient to subscribe and connect to new
+(** The expected time, in levels, sufficient to subscribe and connect to new
     peers on a (new) topic. *)
-val time_to_join_new_topics : int
+val time_to_join_new_topics_in_levels : minimal_block_delay:int -> int
