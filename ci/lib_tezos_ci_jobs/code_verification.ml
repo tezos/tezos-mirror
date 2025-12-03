@@ -530,27 +530,6 @@ let jobs pipeline_type =
 
   (* Test jobs*)
   let test =
-    let job_ocaml_check : tezos_job =
-      job
-        ~__POS__
-        ~name:"ocaml-check"
-        ~cpu:Very_high
-        ~image:Images.CI.build
-        ~stage:Stages.test
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_ocaml_check_files ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        (* Stops on first error for easier detection of problems in
-           the log and to reduce time to merge of other MRs further
-           down the merge train. *)
-        ["scripts/ci/dune.sh build @check --stop-on-first-error"]
-      |> enable_dune_cache |> enable_networked_cargo
-    in
     (* This job triggers the debian child pipeline automatically if any
        files in the changeset is modified. It's the same as
        job_debian_repository_trigger that can be run manually.
@@ -590,7 +569,6 @@ let jobs pipeline_type =
         Homebrew.child_pipeline_full_auto
     in
 
-    let jobs_unit : tezos_job list = [job_ocaml_check] in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
       let compile_octez_rules =
@@ -746,8 +724,7 @@ let jobs pipeline_type =
           ]
       | Schedule_extended_test -> []
     in
-    jobs_packaging @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_unit
-    @ jobs_install_octez
+    jobs_packaging @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_install_octez
   in
 
   (* Manual jobs *)

@@ -154,12 +154,6 @@ let changeset_homebrew =
         "manifest/**/*.ml*";
       ])
 
-(** Set of OCaml files for type checking ([dune build @check]). *)
-let changeset_ocaml_check_files =
-  Changeset.(
-    changeset_base
-    @ make ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "**/*.ml"; "**/*.mli"])
-
 (* The linting job runs over the set of [source_directories]
    defined in [scripts/lint.sh] that must be included here: *)
 let changeset_lint_files =

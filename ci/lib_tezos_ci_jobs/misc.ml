@@ -374,6 +374,28 @@ let job_oc_unit_other_x86_64 =
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
 
+let job_ocaml_check =
+  CI.job
+    "ocaml-check"
+    ~__POS__
+    ~description:"Typecheck all OCaml code with 'dune build @check'."
+    ~cpu:Very_high
+    ~image:Tezos_ci.Images.CI.build
+    ~stage:Test
+    ~only_if_changed:
+      ["src/**/*"; "tezt/**/*"; "devtools/**/*"; "**/*.ml"; "**/*.mli"]
+    ~variables:[("CARGO_NET_OFFLINE", "false")]
+    ~dune_cache:(Cacio.dune_cache ())
+    [
+      "./scripts/ci/take_ownership.sh";
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      (* Stops on first error for easier detection of problems in
+         the log and to reduce time to merge of other MRs further
+         down the merge train. *)
+      "scripts/ci/dune.sh build @check --stop-on-first-error";
+    ]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -396,6 +418,7 @@ let register () =
       (Auto, job_oc_unit_non_proto_arm64);
       (Auto, job_oc_unit_proto_x86_64);
       (Auto, job_oc_unit_other_x86_64);
+      (Auto, job_ocaml_check);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
@@ -418,5 +441,6 @@ let register () =
       (Auto, job_oc_unit_non_proto_arm64);
       (Auto, job_oc_unit_proto_x86_64);
       (Auto, job_oc_unit_other_x86_64);
+      (Auto, job_ocaml_check);
     ] ;
   ()
