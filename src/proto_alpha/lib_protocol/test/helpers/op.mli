@@ -904,3 +904,16 @@ val get_op_signature : t -> signature option
 val set_op_signature : t -> signature option -> t
 
 val copy_op_signature : src:t -> dst:t -> t
+
+(** [clst_deposit ctxt src amount] returns a deposit operation of [amount] tez
+    on the CLST contract. *)
+val clst_deposit :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Tez.t ->
+  Operation.packed tzresult Lwt.t

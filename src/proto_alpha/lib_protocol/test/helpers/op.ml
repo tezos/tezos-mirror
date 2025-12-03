@@ -1566,3 +1566,20 @@ let set_op_signature op new_signature =
 let copy_op_signature ~src ~dst =
   let signature = get_op_signature src in
   set_op_signature dst signature
+
+let clst_deposit ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    (ctxt : Context.t) (src : Contract.t) (amount : Tez.t) =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ clst_hash = Contract.get_clst_contract_hash alpha_ctxt in
+  unsafe_transaction
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~entrypoint:(Entrypoint.of_string_strict_exn "deposit")
+    ctxt
+    src
+    (Contract.Originated clst_hash)
+    amount

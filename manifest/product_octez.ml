@@ -6449,6 +6449,7 @@ end = struct
             ("test_storage", true);
             ("test_token", true);
             ("test_native_contracts", N.(number >= 025));
+            ("test_clst", N.(number >= 025));
           ]
           |> conditional_list
         in

@@ -9,6 +9,10 @@ open Alpha_context
 open Script_native_types
 open Script_typed_ir
 
+module CLST_contract : sig
+  type error += Empty_deposit
+end
+
 (* [execute ctxt kind arg storage] executes the given native contract [kind]
    with [arg] and [storage], and returns the list of operations, the new storage
    and the context. *)

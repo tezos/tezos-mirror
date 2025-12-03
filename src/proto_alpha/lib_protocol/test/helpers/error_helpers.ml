@@ -230,3 +230,12 @@ let wrong_slot_used_for_attestation = function
 let missing_companion_key_for_bls_dal = function
   | Validate_errors.Consensus.Missing_companion_key_for_bls_dal _ -> true
   | _ -> false
+
+let expect_clst_empty_deposit ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter.Runtime_contract_error _
+      :: Script_native.CLST_contract.Empty_deposit :: _ ->
+        true
+    | _ -> false)

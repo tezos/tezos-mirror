@@ -188,6 +188,12 @@ val single_sapling_get_diff :
   unit ->
   (Sapling.root * Sapling.diff) shell_tzresult Lwt.t
 
+val clst_balance :
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  Script_int.n Script_int.num shell_tzresult Lwt.t
+
 val register : unit -> unit
 
 (** Functions used in the implementation of this file's RPCs, but also

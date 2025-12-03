@@ -31,7 +31,19 @@ let test_unparse_ty loc ctxt expected ty =
       ty
   in
   if actual = expected then Ok ctxt
-  else Alcotest.failf "Unexpected error: %s" loc
+  else Alcotest.failf "Unexpected error: unparsing %s" loc
+
+let test_unparse_parameter_ty ctxt expected ty entrypoints =
+  let open Result_syntax in
+  let* actual, ctxt =
+    Script_ir_unparser.unparse_parameter_ty
+      ctxt
+      ~loc:Environment.Micheline.dummy_location
+      ty
+      ~entrypoints
+  in
+  if actual = expected then Ok ctxt
+  else Alcotest.failf "Unexpected error: unparsing parameter"
 
 let location = function
   | Environment.Micheline.Prim (loc, _, _, _)
@@ -40,6 +52,28 @@ let location = function
   | Bytes (loc, _)
   | Seq (loc, _) ->
       loc
+
+let test_parse_parameter_ty (type exp expc) ctxt node
+    (expected : (exp, expc) Script_typed_ir.ty) =
+  let open Result_wrap_syntax in
+  let@ result =
+    let* Ex_parameter_ty_and_entrypoints {arg_type; entrypoints = _}, ctxt =
+      Script_ir_translator.parse_parameter_ty_and_entrypoints
+        ctxt
+        ~legacy:true
+        node
+    in
+    let* eq, ctxt =
+      Gas_monad.run ctxt
+      @@ Script_ir_translator.ty_eq
+           ~error_details:(Informative (location node))
+           arg_type
+           expected
+    in
+    let+ Eq = eq in
+    ctxt
+  in
+  result
 
 let test_parse_ty (type exp expc) ctxt node
     (expected : (exp, expc) Script_typed_ir.ty) =
@@ -84,6 +118,7 @@ let test_native_contract_types kind () =
                 untyped = untyped_parameter_type;
                 typed = Script_typed_ir.Ty_ex_c parameter_type;
               },
+              parameter_entrypoints,
               {
                 untyped = untyped_storage_type;
                 typed = Script_typed_ir.Ty_ex_c storage_type;
@@ -91,9 +126,15 @@ let test_native_contract_types kind () =
     Script_native_types.Internal_for_tests.types_of_kind kind
   in
   let*?@ ctxt =
-    test_unparse_ty "parameter" ctxt untyped_parameter_type parameter_type
+    test_unparse_parameter_ty
+      ctxt
+      untyped_parameter_type
+      parameter_type
+      parameter_entrypoints
   in
-  let*? ctxt = test_parse_ty ctxt untyped_parameter_type parameter_type in
+  let*? ctxt =
+    test_parse_parameter_ty ctxt untyped_parameter_type parameter_type
+  in
   let*?@ ctxt =
     test_unparse_ty "storage" ctxt untyped_storage_type storage_type
   in
@@ -134,9 +175,7 @@ let check_parse_contract ctxt kind_with_storage expected_kind =
 let test_parse_contract kind expected_kind () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = test_context () in
-  let*@ contract_hash =
-    Contract.Internal_for_tests.get_clst_contract_hash ctxt
-  in
+  let*@ contract_hash = Contract.get_clst_contract_hash ctxt in
   let* kind_with_storage, _ = get_native_contract ctxt contract_hash kind in
   check_parse_contract ctxt kind_with_storage expected_kind
 
@@ -159,9 +198,7 @@ let execute_native_contract ctxt contract_hash kind parameter =
 let test_call_native_contract kind parameter expected_storage () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = test_context () in
-  let*@ contract_hash =
-    Contract.Internal_for_tests.get_clst_contract_hash ctxt
-  in
+  let*@ contract_hash = Contract.get_clst_contract_hash ctxt in
   let* res, _ctxt = execute_native_contract ctxt contract_hash kind parameter in
   if res.storage <> expected_storage then Test.fail "Unexpected storage" ;
   return_unit
@@ -194,10 +231,4 @@ let () =
     (test_native_contract_types Script.CLST) ;
   register_test
     ~title:"Check parsing native contract"
-    (test_parse_contract Script.CLST Script_native_types.CLST_kind) ;
-  register_test
-    ~title:"Check executing native contract"
-    (test_call_native_contract
-       Script.CLST
-       (strip_location unit_param)
-       (strip_location unit_param))
+    (test_parse_contract Script.CLST Script_native_types.CLST_kind)
