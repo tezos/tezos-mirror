@@ -1,6 +1,6 @@
 // Copyright (c) SimpleStaking, Viable Systems, Nomadic Labs and Tezedge Contributors
 // SPDX-CopyrightText: 2022-2024 TriliTech <contact@trili.tech>
-//
+// SPDX-CopyrightText: 2025 Functori <contact@functori.com>
 // SPDX-License-Identifier: MIT
 
 use bitvec::slice::BitSlice;
@@ -328,10 +328,9 @@ where
 pub fn optional_field<'a, O, F>(parser: F) -> impl FnMut(NomInput<'a>) -> NomResult<'a, Option<O>>
 where
     F: FnMut(NomInput<'a>) -> NomResult<'a, O>,
-    O: Clone,
 {
     alt((
-        preceded(tag(0x00u8.to_be_bytes()), success(None)),
+        map(tag(0x00u8.to_be_bytes()), |_| None),
         preceded(tag(0xffu8.to_be_bytes()), map(parser, Some)),
     ))
 }

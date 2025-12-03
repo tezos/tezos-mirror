@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   *NB* The internally wrapped type is changed from `BigInt` to `BigUint` as a result.
 - Add `#[encoding]` attribute support for enum fields, in addition to struct fields.
 - `tezos_data_encoding_derive`: derivations of `NomReader` and `BinWriter` require those same constraints on their fields. If such a field doesn't meet the constraint, the implementation will not be available for use, however compilation will still succeed.
+- `nom::optional_field` no longer requires inner type to be `Clone`.
 
 ### Fixed
 
