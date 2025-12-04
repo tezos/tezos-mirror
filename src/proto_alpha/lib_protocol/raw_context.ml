@@ -1052,6 +1052,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           let ({
                  feature_enable;
                  incentives_enable;
+                 dynamic_lag_enable;
                  number_of_slots;
                  attestation_lag;
                  attestation_threshold;
@@ -1066,6 +1067,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           {
             Constants_parametric_repr.feature_enable;
             incentives_enable;
+            dynamic_lag_enable;
             number_of_slots;
             attestation_lag;
             attestation_threshold;
@@ -1365,6 +1367,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           {
             Constants_parametric_repr.feature_enable;
             incentives_enable;
+            dynamic_lag_enable = false;
             number_of_slots;
             attestation_lag = 5;
             attestation_threshold;
@@ -2287,6 +2290,16 @@ module Dal = struct
   let only_if_incentives_enabled ctxt ~default f =
     let constants = constants ctxt in
     if constants.dal.incentives_enable then f ctxt else default ctxt
+
+  let assert_dynamic_lag_enabled ctxt =
+    let constants = constants ctxt in
+    error_unless
+      Compare.Bool.(constants.dal.dynamic_lag_enable = true)
+      Dal_errors_repr.Dal_dynamic_lag_disabled
+
+  let only_if_dynamic_lag_enabled ctxt ~default f =
+    let constants = constants ctxt in
+    if constants.dal.dynamic_lag_enable then f ctxt else default ctxt
 end
 
 module Address_registry = struct

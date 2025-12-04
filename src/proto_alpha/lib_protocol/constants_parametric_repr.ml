@@ -48,6 +48,7 @@ let between_zero_and_excluding_one_q_encoding =
 type dal = {
   feature_enable : bool;
   incentives_enable : bool;
+  dynamic_lag_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
   attestation_threshold : int;
@@ -82,6 +83,7 @@ let dal_encoding =
     (fun {
            feature_enable;
            incentives_enable;
+           dynamic_lag_enable;
            number_of_slots;
            attestation_lag;
            attestation_threshold;
@@ -93,6 +95,7 @@ let dal_encoding =
        ->
       ( ( feature_enable,
           incentives_enable,
+          dynamic_lag_enable,
           number_of_slots,
           attestation_lag,
           attestation_threshold,
@@ -102,6 +105,7 @@ let dal_encoding =
         cryptobox_parameters ))
     (fun ( ( feature_enable,
              incentives_enable,
+             dynamic_lag_enable,
              number_of_slots,
              attestation_lag,
              attestation_threshold,
@@ -113,6 +117,7 @@ let dal_encoding =
       {
         feature_enable;
         incentives_enable;
+        dynamic_lag_enable;
         number_of_slots;
         attestation_lag;
         attestation_threshold;
@@ -122,9 +127,10 @@ let dal_encoding =
         traps_fraction;
       })
     (merge_objs
-       (obj8
+       (obj9
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
+          (req "dynamic_lag_enable" bool)
           (req "number_of_slots" uint16)
           (req "attestation_lag" uint8)
           (req "attestation_threshold" uint8)

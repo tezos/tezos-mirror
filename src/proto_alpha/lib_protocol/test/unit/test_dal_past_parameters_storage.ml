@@ -69,6 +69,7 @@ let parameters_for_a_level () =
       {
         feature_enable;
         incentives_enable;
+        dynamic_lag_enable = false;
         number_of_slots;
         attestation_lag;
         attestation_threshold;

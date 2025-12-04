@@ -545,6 +545,14 @@ module Dal : sig
   (* [only_if_dal_incentives_enabled ctxt ~default f] executes [f ctxt] if the
      DAL incentives flag is enabled and otherwise [default ctxt]. *)
   val only_if_incentives_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
+
+  (* Check whether the DAL dynamic lag flag is set and return the error
+     {!Dal_dynamic_lag_disabled} if not. *)
+  val assert_dynamic_lag_enabled : t -> unit tzresult
+
+  (* [only_if_dal_dynamic_lag_enabled ctxt ~default f] executes [f ctxt] if the
+     DAL dynamic flag is enabled and otherwise [default ctxt]. *)
+  val only_if_dynamic_lag_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 end
 
 module Address_registry : sig
