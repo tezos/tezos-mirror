@@ -3281,6 +3281,26 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
         Nonce.record_hash ctxt {nonce_hash; delegate = block_producer.delegate}
   in
   let* ctxt, dal_slot_availability = Dal_apply.finalisation ctxt in
+  (* Emit [Dal_attested_slots] internal messages to smart rollup inbox. *)
+  let* ctxt =
+    let* cells_opt = Dal.Slots_storage.find_level_histories ctxt in
+    match cells_opt with
+    | None -> return ctxt
+    | Some cells ->
+        let* msgs =
+          Sc_rollup.Inbox_message.dal_attested_slots_messages_of_cells
+            (fun ~published_level ->
+              let* dal_params =
+                Dal.Past_parameters.parameters ctxt published_level
+              in
+              return
+                ( dal_params.number_of_slots,
+                  dal_params.cryptobox_parameters.slot_size,
+                  dal_params.cryptobox_parameters.page_size ))
+            cells
+        in
+        List.fold_left_es Sc_rollup.Inbox.add_internal_message ctxt msgs
+  in
   let* ctxt, reward_bonus, attestation_result =
     let* required_attestations =
       are_attestations_required ctxt ~level:current_level.level
