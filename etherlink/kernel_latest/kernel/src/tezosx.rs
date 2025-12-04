@@ -7,6 +7,7 @@ use primitive_types::U256;
 use revm::primitives::Address;
 use revm_etherlink::Error;
 use rlp::{Decodable, Encodable, Rlp};
+use sha3::{Digest, Keccak256};
 use tezos_ethereum::rlp_helpers::{
     append_u256_le, append_u64_le, decode_field_u256_le, decode_field_u64_le,
 };
@@ -98,7 +99,7 @@ pub fn add_balance(
     pub_key_hash: &PublicKeyHash,
     amount: U256,
 ) -> Result<(), Error> {
-    let mut info = get_tezos_account_info(host, pub_key_hash)?.unwrap_or_default();
+    let mut info = get_tezos_account_info_or_init(host, pub_key_hash)?;
     info.balance = info
         .balance
         .checked_add(amount)
@@ -106,7 +107,6 @@ pub fn add_balance(
     set_tezos_account_info(host, pub_key_hash, info)
 }
 
-#[allow(dead_code)]
 pub fn get_tezos_account_info(
     host: &impl Runtime,
     pub_key_hash: &PublicKeyHash,
@@ -124,6 +124,21 @@ pub fn get_tezos_account_info(
     }
 }
 
+pub fn get_tezos_account_info_or_init(
+    host: &mut impl Runtime,
+    pub_key_hash: &PublicKeyHash,
+) -> Result<TezosAccountInfo, Error> {
+    match get_tezos_account_info(host, pub_key_hash)? {
+        Some(info) => Ok(info),
+        None => {
+            let evm_addr = ethereum_address_from_tezos(pub_key_hash);
+            let foreign_addr = ForeignAddress::Tezos(pub_key_hash.clone());
+            set_ethereum_address_mapping(host, evm_addr, foreign_addr)?;
+            Ok(TezosAccountInfo::default())
+        }
+    }
+}
+
 pub fn set_tezos_account_info(
     host: &mut impl Runtime,
     pub_key_hash: &PublicKeyHash,
@@ -135,8 +150,12 @@ pub fn set_tezos_account_info(
     Ok(host.store_write(&path, value, 0)?)
 }
 
-const TEZOS_SRC_ADDR_TAG: u8 = 1;
+pub fn ethereum_address_from_tezos(pub_key_hash: &PublicKeyHash) -> Address {
+    let hash: [u8; 32] = Keccak256::digest(pub_key_hash.to_b58check().as_bytes()).into();
+    Address::from_slice(&hash[0..20])
+}
 
+const TEZOS_SRC_ADDR_TAG: u8 = 1;
 #[derive(PartialEq, Debug, Clone, Eq)]
 pub enum ForeignAddress {
     Tezos(PublicKeyHash),
