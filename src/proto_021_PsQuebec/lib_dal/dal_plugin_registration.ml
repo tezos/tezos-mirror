@@ -65,6 +65,7 @@ module Plugin = struct
         dynamic_lag_enable = false;
         number_of_slots;
         attestation_lag;
+        attestation_lags = [attestation_lag];
         attestation_threshold;
         traps_fraction = Q.(1 // 1000);
         (* not used in proto_021 *)
