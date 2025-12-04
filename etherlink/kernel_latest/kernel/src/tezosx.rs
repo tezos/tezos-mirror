@@ -86,7 +86,7 @@ impl Decodable for TezosAccountInfo {
     }
 }
 
-fn path_to_tezos_account(pub_key_hash: PublicKeyHash) -> Result<OwnedPath, PathError> {
+fn path_to_tezos_account(pub_key_hash: &PublicKeyHash) -> Result<OwnedPath, PathError> {
     let address_path: Vec<u8> = format!("/{pub_key_hash}").into();
     let address_path = OwnedPath::try_from(address_path)?;
     let prefix = concat(&TEZOS_ACCOUNTS_PATH, &address_path)?;
@@ -96,7 +96,7 @@ fn path_to_tezos_account(pub_key_hash: PublicKeyHash) -> Result<OwnedPath, PathE
 #[allow(dead_code)]
 pub fn get_tezos_account_info(
     host: &impl Runtime,
-    pub_key_hash: PublicKeyHash,
+    pub_key_hash: &PublicKeyHash,
 ) -> Result<Option<TezosAccountInfo>, Error> {
     let path =
         path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
@@ -114,7 +114,7 @@ pub fn get_tezos_account_info(
 #[cfg(test)]
 pub fn set_tezos_account_info(
     host: &mut impl Runtime,
-    pub_key_hash: PublicKeyHash,
+    pub_key_hash: &PublicKeyHash,
     info: TezosAccountInfo,
 ) -> Result<(), Error> {
     let path =
@@ -265,10 +265,10 @@ mod tests {
             pub_key: Some(pub_key.clone()),
         };
 
-        set_tezos_account_info(&mut host, pub_key_hash.clone(), account.clone())
+        set_tezos_account_info(&mut host, &pub_key_hash, account.clone())
             .expect("Writing to the storage should have worked");
 
-        let read_account = get_tezos_account_info(&host, pub_key_hash)
+        let read_account = get_tezos_account_info(&host, &pub_key_hash)
             .expect("Reading the storage should have worked")
             .expect("The path to the account should exist");
         assert_eq!(account, read_account);
