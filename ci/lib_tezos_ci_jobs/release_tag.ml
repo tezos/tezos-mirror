@@ -310,7 +310,10 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~name:"dispatch-call"
       ~dependencies:
         (Dependent [Job job_release_page; Job job_gitlab_release_or_publish])
-      ["./scripts/releases/dispatch-call.sh"]
+      [
+        "export CI_COMMIT_TAG='octez-v24.0-rc1'";
+        "./scripts/releases/dispatch-call.sh";
+      ]
   in
   let job_trigger_monitoring =
     trigger_job
@@ -360,6 +363,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
         job_promote_to_latest_test;
         job_opam_release ~dry_run:true ();
         job_release_page;
+        job_dispatch_call;
       ]
   | false, Beta_release_tag -> [job_release_page; job_dispatch_call]
   | true, Beta_release_tag -> [job_release_page]

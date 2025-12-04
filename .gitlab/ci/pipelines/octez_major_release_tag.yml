@@ -1525,6 +1525,7 @@ dispatch-call:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - export CI_COMMIT_TAG='octez-v24.0-rc1'
   - ./scripts/releases/dispatch-call.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
