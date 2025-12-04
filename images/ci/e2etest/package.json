@@ -11,6 +11,6 @@
   "license": "ISC",
   "dependencies": {
     "eth-cli": "^2.0.2",
-    "solc": "^0.8.28"
+    "solc": "^0.8.31"
   }
 }
