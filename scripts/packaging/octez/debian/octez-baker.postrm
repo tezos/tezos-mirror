@@ -6,38 +6,23 @@ set -e
 # shellcheck disable=SC1091
 . /usr/share/debconf/confmodule
 
-# systemctl should not be called directly. use this
-# wrapper script if available
-debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
-
 case "${1}" in
-remove)
-  rm -Rf /run/octez-baker
-  ;;
+remove) ;;
 purge)
-  rm -Rf /run/octez-baker
   # Purge debconf data for the package in any case
   # shellcheck disable=SC2119
-  db_purge || true
-  rm -f "/var/tezos/.tezos-client/*_highwatermarks"
-  rm -f "/var/tezos/.tezos-client/*_stateful_nonces"
-  rm -Rf "/var/tezos/.tezos-client/logs"
+  rm -f /var/tezos/.tezos-client/*_highwatermarks
+  rm -f /var/tezos/.tezos-client/*_stateful_nonces
+  rm -Rf /var/tezos/.tezos-client/logs
   rm -f /var/log/tezos/accuser*.log
   rm -f /var/log/tezos/baker*.log
   echo "Octez baker purged"
   ;;
-upgrade)
-  echo "Restarting Octez baker daemon: octez-baker"
-  $debsystemctl "start octez-baker.service"
-  ;;
-failed-upgrade | abort-install | abort-upgrade | disappear) ;;
+upgrade | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
 *)
   echo "postrm called with unknown argument \`$1'" >&2
   exit 1
   ;;
 esac
-
-# Clean up the temporary file
-rm -f /run/octez-baker/*daemon_was_running
 
 #DEBHELPER#
