@@ -9,7 +9,7 @@
    -------
    Component:    EVM Node garbage collector
    Requirement:  make -f etherlink.mk build
-                 npm install eth-cli solc@0.8.26
+                 npm install eth-cli solc@0.8.31
                  # Install cast or foundry (see: https://book.getfoundry.sh/getting-started/installation)
                  curl -L https://foundry.paradigm.xyz | bash
                  foundryup
