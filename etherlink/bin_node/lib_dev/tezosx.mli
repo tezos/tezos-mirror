@@ -24,3 +24,26 @@ val known_runtimes : runtime list
     Creating a file at this path in the durable storage of the kernel will
     enable the feature. *)
 val feature_flag : runtime -> string
+
+module Tezos_runtime : sig
+  type address = Signature.public_key_hash
+
+  type account_info = {
+    balance : Tezos_types.Tez.t;
+    nonce : int64;
+    public_key : Signature.public_key option;
+  }
+
+  val decode_account_info : bytes -> account_info tzresult
+
+  val encode_account_info : account_info -> bytes
+
+  val ethereum_alias : Signature.public_key_hash -> Ethereum_types.address
+end
+
+module Foreign_address : sig
+  type t =
+    [`Tezos of Tezos_runtime.address | `Ethereum of Ethereum_types.address]
+
+  val encode : t -> bytes
+end

@@ -257,39 +257,34 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
   Installer_config.to_file (config_instrs @ world_state_instrs) ~output
 
 let make_tezos_bootstrap_instr tez_bootstrap_balance tez_bootstrap_accounts =
-  let balance =
-    tez_bootstrap_balance |> Tezos_types.Tez.to_mutez_z
-    |> padded_32_le_int_bytes |> Bytes.of_string
-  in
-  let nonce = le_int64_bytes "0" |> Bytes.of_string in
   List.map
     (fun manager ->
-      let address =
-        Signature.Public_key.hash manager
-        |> Signature.Public_key_hash.to_b58check
+      let tezos_account_info =
+        Tezosx.Tezos_runtime.
+          {
+            balance = tez_bootstrap_balance;
+            nonce = 0L;
+            public_key = Some manager;
+          }
       in
-      let public_key =
-        Bytes.of_string (Signature.Public_key.to_b58check manager)
-      in
-      let (`Hex alias) =
-        let address = Bytes.of_string address in
-        let alias = Tezos_crypto.Hacl.Hash.Keccak_256.digest address in
-        Bytes.sub alias 0 20 |> Hex.of_bytes
-      in
-      let alias = "0x" ^ alias in
+      let address = Signature.Public_key.hash manager in
+      let (Address (Hex alias)) = Tezosx.Tezos_runtime.ethereum_alias address in
       let payload =
-        Rlp.(
-          List [Value balance; Value nonce; Value public_key]
-          |> encode |> Bytes.to_string)
+        Tezosx.Tezos_runtime.encode_account_info tezos_account_info
       in
       let rlp_address =
-        let tag = Data_encoding.(Binary.to_bytes_exn int8 1) in
-        let address = Bytes.of_string address in
-        Rlp.(List [Value tag; Value address] |> encode |> Bytes.to_string)
+        Bytes.to_string (Tezosx.Foreign_address.encode (`Tezos address))
       in
       make_instr
-        ~path_prefix:["evm"; "world_state"; "eth_accounts"; "tezos"; address]
-        (Some ("info", payload))
+        ~path_prefix:
+          [
+            "evm";
+            "world_state";
+            "eth_accounts";
+            "tezos";
+            Signature.Public_key_hash.to_b58check address;
+          ]
+        (Some ("info", Bytes.to_string payload))
       @ make_instr
           ~path_prefix:
             [
@@ -300,7 +295,7 @@ let make_tezos_bootstrap_instr tez_bootstrap_balance tez_bootstrap_accounts =
               "native";
               "ethereum";
             ]
-          (Some (alias, rlp_address)))
+          (Some ("0x" ^ alias, rlp_address)))
     tez_bootstrap_accounts
   |> List.flatten
 
