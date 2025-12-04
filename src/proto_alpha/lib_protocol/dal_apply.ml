@@ -61,7 +61,7 @@ let validate_attestation ctxt level slot consensus_key attestation =
     (let attester = pkh_of_consensus_key consensus_key in
      Dal_data_availibility_attester_not_in_committee {attester; level; slot})
 
-let apply_attestation ctxt attestation ~tb_slot ~power =
+let apply_attestation ctxt ~delegate attestation ~tb_slot ~power =
   let open Result_syntax in
   let* () = Dal.assert_feature_enabled ctxt in
   let ctxt =
@@ -71,7 +71,11 @@ let apply_attestation ctxt attestation ~tb_slot ~power =
       (fun ctxt -> Dal.Attestation.record_attestation ctxt ~tb_slot attestation)
   in
   return
-    (Dal.Attestation.record_number_of_attested_shards ctxt attestation power)
+    (Dal.Attestation.record_number_of_attested_shards
+       ctxt
+       ~delegate
+       attestation
+       power)
 
 (* This function should fail if we don't want the operation to be
    propagated over the L1 gossip network. Because this is a manager

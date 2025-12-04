@@ -2215,11 +2215,12 @@ module Dal = struct
         | Error (`Fail explanation) ->
             tzfail (Dal_errors_repr.Dal_cryptobox_error {explanation}))
 
-  let record_number_of_attested_shards ctxt attestation number =
+  let record_number_of_attested_shards ctxt attestation ~delegate number =
     let dal = dal ctxt in
     let slot_accountability =
       Dal_attestation_repr.Accountability.record_number_of_attested_shards
         dal.slot_accountability
+        ~delegate
         attestation
         number
     in

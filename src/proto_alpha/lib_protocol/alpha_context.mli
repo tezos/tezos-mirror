@@ -2961,6 +2961,7 @@ module Dal : sig
     type attestation_status = {
       total_shards : int;
       attested_shards : int;
+      attesters : Signature.Public_key_hash.Set.t;
       is_proto_attested : bool;
     }
 
@@ -2980,7 +2981,8 @@ module Dal : sig
 
     val number_of_attested_slots : t -> int
 
-    val record_number_of_attested_shards : context -> t -> int -> context
+    val record_number_of_attested_shards :
+      context -> t -> delegate:Signature.public_key_hash -> int -> context
 
     val record_attestation : context -> tb_slot:Slot.t -> t -> context
 

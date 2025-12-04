@@ -492,10 +492,15 @@ module Dal : sig
 
   val make : t -> (t * cryptobox) tzresult
 
-  (** [record_number_of_attested_shards ctxt attestation number_of_shards]
-      records that the [number_of_shards] shards were attested (declared
-      available by some attester). *)
-  val record_number_of_attested_shards : t -> Dal_attestation_repr.t -> int -> t
+  (** [record_number_of_attested_shards ctxt attestation ~delegate
+      number_of_shards] records that the [number_of_shards] shards were attested
+      (declared available) by [delegate]. *)
+  val record_number_of_attested_shards :
+    t ->
+    Dal_attestation_repr.t ->
+    delegate:Signature.public_key_hash ->
+    int ->
+    t
 
   (** [register_slot_header ctxt slot_header ~source] returns a new context
       where the new candidate [slot] published by [source] has been taken into

@@ -45,12 +45,16 @@ val validate_attestation :
   Dal.Attestation.t ->
   unit tzresult Lwt.t
 
-(** [apply_attestation ctxt attestation ~tb_slot ~power] records in the context
-    that the given [attestation] was issued by the delegate with initial
-    Tenderbake slot [tb_slot] and the corresponding attester has the given
-    [power]. *)
+(** [apply_attestation ctxt attestation ~delegate ~tb_slot ~power] records in
+    the context that the given [attestation] was issued by [delegate] with
+    initial Tenderbake slot [tb_slot] and the given [power]. *)
 val apply_attestation :
-  t -> Dal.Attestation.t -> tb_slot:Slot.t -> power:int -> t tzresult
+  t ->
+  delegate:Signature.public_key_hash ->
+  Dal.Attestation.t ->
+  tb_slot:Slot.t ->
+  power:int ->
+  t tzresult
 
 (** [validate_publish_commitment ctxt slot] ensures that [slot_header] is
    valid and prevents an operation containing [slot_header] to be

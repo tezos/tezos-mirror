@@ -80,11 +80,16 @@ module Accountability = struct
 
   module SlotMap = Map.Make (Compare.Int)
 
-  type t = {number_of_attested_shards : int SlotMap.t; number_of_slots : int}
+  type t = {
+    number_of_attested_shards :
+      (Signature.Public_key_hash.Set.t * int) SlotMap.t;
+    number_of_slots : int;
+  }
 
   type attestation_status = {
     total_shards : int;
     attested_shards : int;
+    attesters : Signature.Public_key_hash.Set.t;
     is_proto_attested : bool;
   }
 
@@ -93,7 +98,7 @@ module Accountability = struct
 
   (* This function must be called at most once for a given attester; otherwise
      the count will be flawed. *)
-  let record_number_of_attested_shards t baker_attested_slots
+  let record_number_of_attested_shards t baker_attested_slots ~delegate
       number_of_baker_shards =
     let rec iter slot_index map =
       if Compare.Int.(slot_index >= t.number_of_slots) then map
@@ -108,10 +113,15 @@ module Accountability = struct
               SlotMap.update
                 slot_index
                 (function
-                  | None -> Some number_of_baker_shards
-                  | Some old_number_of_attested_shards ->
+                  | None ->
                       Some
-                        (old_number_of_attested_shards + number_of_baker_shards))
+                        ( Signature.Public_key_hash.Set.singleton delegate,
+                          number_of_baker_shards )
+                  | Some (delegate_set, old_number_of_attested_shards) ->
+                      Some
+                        ( Signature.Public_key_hash.Set.add delegate delegate_set,
+                          old_number_of_attested_shards + number_of_baker_shards
+                        ))
                 map
           | Ok false ->
               (* slot is not attested by baker, nothing to update *)
@@ -143,9 +153,9 @@ module Accountability = struct
 
   let is_slot_attested t ~threshold ~number_of_shards slot_index =
     let index = Dal_slot_index_repr.to_int slot_index in
-    let number_of_attested_shards =
+    let attesters, number_of_attested_shards =
       match SlotMap.find index t.number_of_attested_shards with
-      | None -> 0
+      | None -> (Signature.Public_key_hash.Set.empty, 0)
       | Some v -> v
     in
     let is_proto_attested =
@@ -158,6 +168,7 @@ module Accountability = struct
       is_proto_attested;
       attested_shards = number_of_attested_shards;
       total_shards = number_of_shards;
+      attesters;
     }
 end
 

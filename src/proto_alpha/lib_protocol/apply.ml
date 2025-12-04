@@ -2340,7 +2340,7 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
             consensus_key
             Attesting_power.zero (* Fake power. *) )
 
-let record_dal_content ctxt level slot ~dal_power dal_content_opt =
+let record_dal_content ctxt ~delegate level slot ~dal_power dal_content_opt =
   let open Lwt_result_syntax in
   match dal_content_opt with
   | None -> return ctxt
@@ -2350,13 +2350,14 @@ let record_dal_content ctxt level slot ~dal_power dal_content_opt =
       let attestation =
         if Raw_level.(level < add proto_activation_level lag) then
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/8065
-             CODE TO BE REVERTED IN PROTOCOL V *)
+           CODE TO BE REVERTED IN PROTOCOL V *)
           Dal.Attestation.empty
         else attestation
       in
       let*? ctxt =
         Dal_apply.apply_attestation
           ctxt
+          ~delegate
           ~tb_slot:slot
           attestation
           ~power:dal_power
@@ -2398,6 +2399,7 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
       let* ctxt =
         record_dal_content
           ctxt
+          ~delegate:consensus_key.delegate
           consensus.level
           consensus.slot
           ~dal_power
@@ -2449,7 +2451,13 @@ let record_attestations_aggregate ctxt (mode : mode)
                 ~power:attesting_power
             in
             let* ctxt =
-              record_dal_content ctxt content.level slot ~dal_power dal
+              record_dal_content
+                ctxt
+                ~delegate
+                content.level
+                slot
+                ~dal_power
+                dal
             in
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return

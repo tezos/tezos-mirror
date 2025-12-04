@@ -53,7 +53,12 @@ struct
 
   let mk_attested =
     Dal_attestation_repr.Accountability.
-      {total_shards = 1; attested_shards = 1; is_proto_attested = true}
+      {
+        total_shards = 1;
+        attested_shards = 1;
+        attesters = Environment.Signature.Public_key_hash.Set.empty;
+        is_proto_attested = true;
+      }
 
   (* Tests to check insertion of slots in a dal skip list. *)
 

@@ -109,6 +109,7 @@ struct
                   attested_shards = (if skip_slot then 0 else 1);
                   total_shards = 1;
                   is_proto_attested = not skip_slot;
+                  attesters = Environment.Signature.Public_key_hash.Set.empty;
                 }
             in
             if skip_slot then None
