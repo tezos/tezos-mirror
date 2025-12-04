@@ -4715,6 +4715,19 @@ module S = struct
     let open RPC_query in
     query Fun.id |+ opt_field "cycle" Cycle.rpc_arg Fun.id |> seal
 
+  let swrr_selected_bakers =
+    RPC_service.get_service
+      ~description:
+        "Returns the selected bakers for the round 0 of the cycle, selected \
+         via the SWRR algorithm. If the 'cycle' parameter is not provided, \
+         defaults to the current cycle. Returns 'null' if the baking rights \
+         for this cycle have not been computed yet or have already been \
+         cleaned from the context, or if the 'swrr_new_baker_lottery_enable' \
+         feature flag is not enabled."
+      ~query:cycle_query
+      ~output:Data_encoding.(option (list Signature.Public_key_hash.encoding))
+      RPC_path.(path / "swrr_selected_bakers")
+
   let tz4_baker_number_ratio =
     RPC_service.get_service
       ~description:"Returns the ratio of active bakers using a tz4."
@@ -4807,6 +4820,13 @@ let register () =
           stake_info_list
       in
       return (total_stake_weight, stake_info_list)) ;
+  Registration.register0 ~chunked:false S.swrr_selected_bakers (fun ctxt q () ->
+      let cycle =
+        Option.value ~default:(Cycle.current ctxt) q
+        |> Cycle.to_int32 |> Cycle_repr.of_int32_exn
+      in
+      let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
+      Storage.Stake.Selected_bakers.find ctxt cycle) ;
   Registration.register0
     ~chunked:false
     S.tz4_baker_number_ratio
