@@ -271,6 +271,7 @@ type with_proof = {with_proof : bool}
 type proto_parameters = {
   feature_enable : bool;
   incentives_enable : bool;
+  dynamic_lag_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
   attestation_threshold : int;

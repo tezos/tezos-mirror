@@ -368,6 +368,7 @@ type with_proof = {with_proof : bool}
 type proto_parameters = {
   feature_enable : bool;
   incentives_enable : bool;
+  dynamic_lag_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
   attestation_threshold : int;
@@ -525,6 +526,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
     (fun {
            feature_enable;
            incentives_enable;
+           dynamic_lag_enable;
            number_of_slots;
            attestation_lag;
            attestation_threshold;
@@ -539,6 +541,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
        ->
       ( ( feature_enable,
           incentives_enable,
+          dynamic_lag_enable,
           number_of_slots,
           attestation_lag,
           attestation_threshold,
@@ -551,6 +554,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
           minimal_block_delay ) ))
     (fun ( ( feature_enable,
              incentives_enable,
+             dynamic_lag_enable,
              number_of_slots,
              attestation_lag,
              attestation_threshold,
@@ -565,6 +569,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
       {
         feature_enable;
         incentives_enable;
+        dynamic_lag_enable;
         number_of_slots;
         attestation_lag;
         attestation_threshold;
@@ -577,9 +582,10 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
         minimal_block_delay;
       })
     (merge_objs
-       (obj6
+       (obj7
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
+          (req "dynamic_lag_enable" bool)
           (req "number_of_slots" int31)
           (req "attestation_lag" int31)
           (req "attestation_threshold" int31)
