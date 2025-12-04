@@ -54,6 +54,23 @@ pub struct RevealContent {
     pub proof: Option<BlsSignature>,
 }
 
+mod internal {
+    use super::*;
+
+    /// Encoded representation of the `TransactionContent` type used for binary
+    /// serialization and deserialization via the `NomReader` and `BinWriter` traits.
+    ///
+    /// The `parameters` field is an `Option` to optimize encoding: `None` represents
+    /// the default `Parameters` value. During decoding, `None` is restored as the
+    /// default value.
+    #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+    pub struct EncodedTransactionContent<Amount, Destination, Param> {
+        amount: Amount,
+        destination: Destination,
+        parameters: Option<Param>,
+    }
+}
+
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct TransactionContent {
     pub amount: Narith,
