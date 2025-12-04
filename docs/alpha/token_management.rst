@@ -244,6 +244,7 @@ For example, for an amount of ``100`` mutez in rewards not distributed due to in
      "change": "100", ...} ]
 
 DAL attesting rewards are analogous to attesting rewards, except that the source account used is ``DAL attesting rewards``.
+If a baker had no attestable shards in a whole cycle (so no shards of a slot which was protocol attested), then the baker gets the DAL attesting rewards "by vacuity".
 
 Depending on the staking parameters set by the delegate, some portion of the (DAL) attesting rewards
 will go to the freezer container, as for baking rewards and bonuses.
