@@ -32,7 +32,7 @@ const ETHEREUM_ADDRESS_MAPPING_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/eth_accounts/tezosx/native/ethereum");
 
 // Used as a value for the durable storage.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct TezosAccountInfo {
     pub balance: U256,
     pub nonce: u64,
@@ -93,6 +93,19 @@ fn path_to_tezos_account(pub_key_hash: &PublicKeyHash) -> Result<OwnedPath, Path
     concat(&prefix, &INFO_PATH)
 }
 
+pub fn add_balance(
+    host: &mut impl Runtime,
+    pub_key_hash: &PublicKeyHash,
+    amount: U256,
+) -> Result<(), Error> {
+    let mut info = get_tezos_account_info(host, pub_key_hash)?.unwrap_or_default();
+    info.balance = info
+        .balance
+        .checked_add(amount)
+        .ok_or(Error::Custom("Balance overflow".to_string()))?;
+    set_tezos_account_info(host, pub_key_hash, info)
+}
+
 #[allow(dead_code)]
 pub fn get_tezos_account_info(
     host: &impl Runtime,
@@ -111,7 +124,6 @@ pub fn get_tezos_account_info(
     }
 }
 
-#[cfg(test)]
 pub fn set_tezos_account_info(
     host: &mut impl Runtime,
     pub_key_hash: &PublicKeyHash,
