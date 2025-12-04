@@ -1027,6 +1027,7 @@ mod tests {
     };
     use mir::ast::big_map::BigMapId;
     use mir::ast::{Address, Entrypoint, IntoMicheline, Micheline, Type, TypedValue};
+    use mir::context::TypecheckingCtx;
     use mir::parser::Parser;
     use mir::typechecker::typecheck_value;
     use num_traits::ops::checked::CheckedSub;
@@ -4580,25 +4581,33 @@ mod tests {
             .unwrap_or_else(|_| panic!("Contract source code not found for {file}"))
     }
 
-    fn transfer_big_map<'a>(
-        script_receiver: &str,
-        init_receiver: &str,
+    fn big_map_was_removed<Host: Runtime>(ctx: &mut TcCtx<'_, Host>, id: BigMapId) {
+        let types = ctx
+            .big_map_get_type(&id)
+            .expect("Get big_map type should not panic");
+        assert_eq!(types, None, "Temporary big_map was not correctly removed");
+    }
+
+    struct BigMapTransfer {
+        sender: TezlinkOriginatedAccount,
+        receiver: TezlinkOriginatedAccount,
+        receipts: Vec<OperationWithMetadata>,
+    }
+
+    fn transfer_big_map(
+        ctx: &mut TcCtx<'_, impl Runtime>,
+        tz1: &Bootstrap,
         script_sender: &str,
         init_sender: &str,
-        expected_sender_big_map: Option<BTreeMap<TypedValue<'a>, TypedValue<'a>>>,
-        expected_receiver_big_map: Option<BTreeMap<TypedValue<'a>, TypedValue<'a>>>,
-    ) {
-        let mut host = MockKernelHost::default();
-        let context = context::Context::init_context();
-        make_default_ctx!(ctx, &mut host, &context);
-        let tz1 = bootstrap1();
-
+        script_receiver: &str,
+        init_receiver: &str,
+    ) -> BigMapTransfer {
         let sender_addr = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         let receiver_addr = ContractKt1Hash::from_base58_check(CONTRACT_2)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
         init_account(ctx.host, &tz1.pkh, 1000);
-        reveal_account(ctx.host, &tz1);
+        reveal_account(ctx.host, tz1);
 
         let parser = Parser::new();
 
@@ -4638,7 +4647,7 @@ mod tests {
 
         let receipts = validate_and_apply_operation(
             ctx.host,
-            &context,
+            ctx.context,
             OperationHash(H256::zero()),
             operation,
             &block_ctx!(),
@@ -4648,9 +4657,44 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        for r in receipts {
+        BigMapTransfer {
+            sender: sender_contract,
+            receiver: receiver_contract,
+            receipts,
+        }
+    }
+
+    fn test_transfer_big_map<'a>(
+        script_receiver: &str,
+        init_receiver: &str,
+        script_sender: &str,
+        init_sender: &str,
+        expected_sender_big_map: Option<BTreeMap<TypedValue<'a>, TypedValue<'a>>>,
+        expected_receiver_big_map: Option<BTreeMap<TypedValue<'a>, TypedValue<'a>>>,
+    ) {
+        let mut host = MockKernelHost::default();
+        let context = context::Context::init_context();
+        make_default_ctx!(ctx, &mut host, &context);
+        let tz1 = bootstrap1();
+
+        let result = transfer_big_map(
+            &mut ctx,
+            &tz1,
+            script_sender,
+            init_sender,
+            script_receiver,
+            init_receiver,
+        );
+
+        big_map_was_removed(&mut ctx, (-1).into());
+
+        for r in result.receipts {
             assert!(r.receipt.is_applied())
         }
+
+        let parser = Parser::new();
+        let sender_contract = result.sender;
+        let receiver_contract = result.receiver;
 
         if let Some(expected_sender_big_map) = expected_sender_big_map {
             let storage = sender_contract.storage(ctx.host).unwrap();
@@ -4694,14 +4738,21 @@ mod tests {
     fn big_map_transfer_receiver_drop_sender_fresh() {
         let script_receiver = read_script("receiver_drop.tz");
         let script_sender = read_script("sender_fresh.tz");
-        transfer_big_map(&script_receiver, "Unit", &script_sender, "Unit", None, None);
+        test_transfer_big_map(
+            &script_receiver,
+            "Unit",
+            &script_sender,
+            "Unit",
+            None,
+            None,
+        );
     }
 
     #[test]
     fn big_map_transfer_receiver_drop_sender_stored() {
         let script_receiver = read_script("receiver_drop.tz");
         let script_sender = read_script("sender_stored.tz");
-        transfer_big_map(
+        test_transfer_big_map(
             &script_receiver,
             "Unit",
             &script_sender,
@@ -4718,7 +4769,7 @@ mod tests {
     fn big_map_transfer_receiver_drop_sender_stored_updated() {
         let script_receiver = read_script("receiver_drop.tz");
         let script_sender = read_script("sender_stored_updated.tz");
-        transfer_big_map(
+        test_transfer_big_map(
             &script_receiver,
             "Unit",
             &script_sender,
@@ -4735,7 +4786,7 @@ mod tests {
     fn big_map_transfer_receiver_store_sender_fresh() {
         let script_receiver = read_script("receiver_store.tz");
         let script_sender = read_script("sender_fresh.tz");
-        transfer_big_map(
+        test_transfer_big_map(
             &script_receiver,
             "{}",
             &script_sender,
@@ -4752,7 +4803,7 @@ mod tests {
     fn big_map_transfer_receiver_store_sender_stored() {
         let script_receiver = read_script("receiver_store.tz");
         let script_sender = read_script("sender_stored.tz");
-        transfer_big_map(
+        test_transfer_big_map(
             &script_receiver,
             "{}",
             &script_sender,
@@ -4772,7 +4823,7 @@ mod tests {
     fn big_map_transfer_receiver_store_sender_stored_updated() {
         let script_receiver = read_script("receiver_store.tz");
         let script_sender = read_script("sender_stored_updated.tz");
-        transfer_big_map(
+        test_transfer_big_map(
             &script_receiver,
             "{}",
             &script_sender,
@@ -4795,7 +4846,7 @@ mod tests {
     fn big_map_transfer_receiver_store_updated_sender_fresh() {
         let script_receiver = read_script("receiver_store_updated.tz");
         let script_sender = read_script("sender_fresh.tz");
-        transfer_big_map(
+        test_transfer_big_map(
             &script_receiver,
             "{}",
             &script_sender,
@@ -4812,7 +4863,7 @@ mod tests {
     fn big_map_transfer_receiver_store_updated_sender_stored() {
         let script_receiver = read_script("receiver_store_updated.tz");
         let script_sender = read_script("sender_stored.tz");
-        transfer_big_map(
+        test_transfer_big_map(
             &script_receiver,
             "{}",
             &script_sender,
@@ -4832,7 +4883,7 @@ mod tests {
     fn big_map_transfer_receiver_store_updated_sender_stored_updated() {
         let script_receiver = read_script("receiver_store_updated.tz");
         let script_sender = read_script("sender_stored_updated.tz");
-        transfer_big_map(
+        test_transfer_big_map(
             &script_receiver,
             "{}",
             &script_sender,
