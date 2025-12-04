@@ -311,6 +311,8 @@ impl ChainHeaderTrait for crate::blueprint_storage::TezBlockHeader {
 }
 
 pub trait ChainConfigTrait: Debug {
+    type Transaction: Encodable + Decodable + Debug;
+
     type Transactions: TransactionsTrait + Encodable + Decodable + Debug;
 
     type BlockInProgress: BlockInProgressTrait;
@@ -369,6 +371,8 @@ pub trait ChainConfigTrait: Debug {
 }
 
 impl ChainConfigTrait for EvmChainConfig {
+    type Transaction = crate::transaction::Transaction;
+
     type Transactions = crate::transaction::Transactions;
 
     type BlockInProgress = crate::block_in_progress::EthBlockInProgress;
@@ -500,6 +504,7 @@ const TEZLINK_SIMULATION_RESULT_PATH: RefPath =
     RefPath::assert_from(b"/tezlink/simulation_result");
 
 impl ChainConfigTrait for MichelsonChainConfig {
+    type Transaction = TezlinkOperation;
     type Transactions = TezTransactions;
     type BlockInProgress = TezBlockInProgress;
     type ChainHeader = TezBlockHeader;
