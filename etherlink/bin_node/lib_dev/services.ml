@@ -826,9 +826,59 @@ let process_based_on_mode (type f) (mode : f Mode.t) ~on_rpc ~on_stateful_evm
   | Observer (Michelson_tx_container tx_container) ->
       on_stateful_michelson tx_container
 
+let wait_confirmation_callback wait_confirmation_wakener =
+ fun status ->
+  let () =
+    let open Result_syntax in
+    match status with
+    | `Accepted -> ()
+    | `Confirmed -> Lwt.wakeup wait_confirmation_wakener (return return_unit)
+    | `Dropped ->
+        Lwt.wakeup wait_confirmation_wakener
+        @@ return
+        @@ fail (Format.asprintf "Transaction was dropped before confirmed.")
+    | `Refused ->
+        Lwt.wakeup wait_confirmation_wakener
+        @@ return
+        @@ fail (Format.asprintf "Transaction refused")
+  in
+  Lwt.return_unit
+
 let send_raw_transaction (type f) (config : Configuration.t) (mode : f Mode.t)
-    ~wait_confirmation =
+    ?wait_confirmation_wakener =
   let open Lwt_result_syntax in
+  let on_rpc raw_tx transaction_object Mode.{evm_node_private_endpoint; _} =
+    let* res =
+      Injector.inject_transaction
+        ~wait_confirmation:false
+        ~keep_alive:config.keep_alive
+        ~timeout:config.rpc_timeout
+        ~base:evm_node_private_endpoint
+        ~tx_object:transaction_object
+        ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
+    in
+    let on_wait_confirmation hash wait_confirmation_wakener =
+      let tx_confirmed =
+        Injector.inject_wait_transaction_confirmation
+          ~keep_alive:config.keep_alive
+          ~timeout:config.rpc_timeout
+          ~base:evm_node_private_endpoint
+          ~hash
+      in
+      Lwt.dont_wait
+        (fun () ->
+          let*! tx_confirmed in
+          Lwt.wakeup wait_confirmation_wakener tx_confirmed ;
+          Lwt.return_unit)
+        (fun exn ->
+          Lwt.wakeup wait_confirmation_wakener Result_syntax.(fail [Exn exn]))
+    in
+    match res with
+    | Ok hash ->
+        Option.iter (on_wait_confirmation hash) wait_confirmation_wakener ;
+        rpc_ok hash
+    | Error reason -> rpc_error (Rpc_errors.internal_error reason)
+  in
   let f raw_tx =
     let txn = Ethereum_types.hex_to_bytes raw_tx in
     let* is_valid = Prevalidator.prevalidate_raw_transaction txn in
@@ -843,26 +893,20 @@ let send_raw_transaction (type f) (config : Configuration.t) (mode : f Mode.t)
                 [Transaction.hash @@ Transaction_object.hash transaction_object])) ;
         process_based_on_mode
           mode
-          ~on_rpc:(fun {evm_node_private_endpoint; _} ->
-            let* res =
-              Injector.inject_transaction
-                ~wait_confirmation
-                ~keep_alive:config.keep_alive
-                ~timeout:config.rpc_timeout
-                ~base:evm_node_private_endpoint
-                ~tx_object:transaction_object
-                ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
-            in
-            match res with
-            | Ok output -> rpc_ok output
-            | Error reason -> rpc_error (Rpc_errors.internal_error reason))
+          ~on_rpc:(on_rpc raw_tx transaction_object)
           ~on_stateful_evm:(fun (module Tx_container) ->
             let* tx_hash =
-              Tx_container.add
-                ~next_nonce
-                transaction_object
-                ~raw_tx
-                ~wait_confirmation
+              match wait_confirmation_wakener with
+              | None -> Tx_container.add ~next_nonce transaction_object ~raw_tx
+              | Some wait_confirmation_wakener ->
+                  let callback =
+                    wait_confirmation_callback wait_confirmation_wakener
+                  in
+                  Tx_container.add
+                    ~next_nonce
+                    transaction_object
+                    ~raw_tx
+                    ~callback
             in
             match tx_hash with
             | Ok tx_hash -> rpc_ok tx_hash
@@ -1233,9 +1277,7 @@ let dispatch_request (type f) ~websocket
                     transactions"
                    None
             else
-              let f raw_tx =
-                send_raw_transaction config mode ~wait_confirmation:false raw_tx
-              in
+              let f raw_tx = send_raw_transaction config mode raw_tx in
               build_with_input ~f module_ parameters
         | Send_raw_transaction_sync.Method ->
             let wait_or_timeout timeout f =
@@ -1249,30 +1291,15 @@ let dispatch_request (type f) ~websocket
                     (fun () -> Lwt_unix.with_timeout timeout f)
                     (function
                       | Lwt_unix.Timeout ->
-                          rpc_error
-                            (Rpc_errors.transaction_rejected
-                               (Format.sprintf
-                                  "The transaction was added to the mempool \
-                                   but wasn't processed in %d seconds"
-                                  (int_of_float timeout))
-                               None)
+                          return
+                          @@ rpc_error
+                               (Rpc_errors.transaction_rejected
+                                  (Format.sprintf
+                                     "The transaction was added to the mempool \
+                                      but wasn't processed in %d seconds"
+                                     (int_of_float timeout))
+                                  None)
                       | exn -> Lwt.fail exn)
-            in
-            let tx_hash_to_receipt f tx_hash =
-              match tx_hash with
-              | Error reason -> rpc_error reason
-              | Ok tx_hash -> (
-                  let* receipt = f tx_hash in
-                  match receipt with
-                  | Some (Ok receipt) -> rpc_ok receipt
-                  | Some (Error reason) ->
-                      rpc_error
-                        (Rpc_errors.transaction_rejected reason (Some tx_hash))
-                  | None ->
-                      rpc_error
-                        (Rpc_errors.transaction_rejected
-                           "Transaction not found"
-                           (Some tx_hash)))
             in
             let f (raw_tx, timeout, block_parameter) =
               match block_parameter with
@@ -1289,23 +1316,19 @@ let dispatch_request (type f) ~websocket
                           module_
                           request
                       in
+                      return
+                      @@
                       match res with
                       | Ok output -> rpc_ok output
                       | Error reason ->
                           rpc_error
                             (Rpc_errors.transaction_rejected reason None))
-                  | _ ->
+                  | _ -> (
                       wait_or_timeout timeout @@ fun () ->
                       let transaction_result_stream, stopper =
                         Broadcast.create_transaction_result_stream ()
                       in
-                      let* hash =
-                        send_raw_transaction
-                          config
-                          mode
-                          raw_tx
-                          ~wait_confirmation:false
-                      in
+                      let* hash = send_raw_transaction config mode raw_tx in
                       let receipt_from_stream hash =
                         let*! receipt =
                           Lwt_stream.find
@@ -1318,37 +1341,71 @@ let dispatch_request (type f) ~websocket
                              (fun Broadcast.{result; _} -> result)
                              receipt)
                       in
-                      let+ receipt =
-                        tx_hash_to_receipt receipt_from_stream hash
-                      in
-                      Lwt_watcher.shutdown stopper ;
-                      receipt)
-              | Ethereum_types.Block_parameter.Latest ->
+                      return
+                      @@
+                      match hash with
+                      | Error reason -> rpc_error reason
+                      | Ok hash -> (
+                          let* receipt = receipt_from_stream hash in
+                          Lwt_watcher.shutdown stopper ;
+                          match receipt with
+                          | Some (Ok receipt) -> rpc_ok receipt
+                          | Some (Error reason) ->
+                              rpc_error
+                                (Rpc_errors.transaction_rejected
+                                   reason
+                                   (Some hash))
+                          | None ->
+                              rpc_error
+                                (Rpc_errors.transaction_rejected
+                                   "Transaction receipt not found"
+                                   (Some hash)))))
+              | Ethereum_types.Block_parameter.Latest -> (
+                  wait_or_timeout timeout @@ fun () ->
                   (* Use normal execution infos *)
-                  wait_or_timeout timeout (fun () ->
-                      let* hash =
-                        send_raw_transaction
-                          config
-                          mode
-                          raw_tx
-                          ~wait_confirmation:true
-                      in
-                      tx_hash_to_receipt
-                        (fun tx_hash ->
-                          let* receipt =
-                            Backend_rpc.Etherlink_block_storage
-                            .transaction_receipt
-                              tx_hash
-                          in
-                          return (Option.map (fun r -> Ok r) receipt))
-                        hash)
+                  let wait_confirmation, wait_confirmation_wakener =
+                    Lwt.wait ()
+                  in
+                  let* hash_res =
+                    send_raw_transaction
+                      config
+                      mode
+                      raw_tx
+                      ~wait_confirmation_wakener
+                  in
+                  let receipt_from_backend hash =
+                    let* receipt =
+                      Backend_rpc.Etherlink_block_storage.transaction_receipt
+                        hash
+                    in
+                    match receipt with
+                    | Some receipt -> rpc_ok receipt
+                    | None ->
+                        rpc_error
+                          (Rpc_errors.transaction_rejected
+                             "Transaction receipt not found"
+                             (Some hash))
+                  in
+                  let wait_confirmation_and_get_receipt hash =
+                    let* wait_confirmation in
+                    match wait_confirmation with
+                    | Ok () -> receipt_from_backend hash
+                    | Error reason ->
+                        rpc_error
+                        @@ Rpc_errors.transaction_rejected reason (Some hash)
+                  in
+                  return
+                  @@
+                  match hash_res with
+                  | Error reason -> rpc_error reason
+                  | Ok hash -> wait_confirmation_and_get_receipt hash)
               | _ ->
-                  rpc_error
-                    (Rpc_errors.invalid_params
+                  return @@ rpc_error
+                  @@ Rpc_errors.invalid_params
                        "The block parameter for sendRawTransactionSync must be \
-                        'latest' or 'pending'")
+                        'latest' or 'pending'"
             in
-            build_with_input ~f module_ parameters
+            build_with_input_and_lazy_output ~f module_ parameters
         | Eth_call.Method ->
             let f (call, block_param, state_override) =
               let* call_result =
@@ -1438,7 +1495,7 @@ let dispatch_request (type f) ~websocket
               rpc_ok logs
             in
             build_with_input ~f module_ parameters
-            (* Internal RPC methods *)
+        (* Internal RPC methods *)
         | Kernel_version.Method ->
             let f (_ : unit option) =
               let* kernel_version = Backend_rpc.kernel_version () in
@@ -1598,12 +1655,65 @@ let dispatch_private_request (type f) ~websocket
                    (Format.sprintf "Block production failed"))
         in
         build ~f module_ parameters
+    | Method (Wait_transaction_confirmation.Method, module_) ->
+        let open Lwt_result_syntax in
+        let f hash =
+          Octez_telemetry.Trace.(
+            add_attrs (fun () -> Telemetry.Attributes.[Transaction.hash hash])) ;
+          process_based_on_mode
+            mode
+            ~on_stateful_evm:(fun (module Tx_container) ->
+              let wait_confirmation, wait_confirmation_wakener = Lwt.wait () in
+              let callback = function
+                | `Missing ->
+                    let*! receipt =
+                      Backend_rpc.Etherlink_block_storage.transaction_receipt
+                        hash
+                    in
+                    let wakup_value =
+                      Result.map
+                        (function
+                          | Some _ -> Ok ()
+                          | None ->
+                              Result.error
+                                (Format.asprintf "Transaction was not found."))
+                        receipt
+                    in
+                    Lwt.wakeup wait_confirmation_wakener wakup_value ;
+                    Lwt.return_unit
+                | (`Dropped | `Confirmed) as status ->
+                    wait_confirmation_callback wait_confirmation_wakener status
+              in
+              let* () = Tx_container.add_pending_callback hash ~callback in
+              let wait_on_confirmation () =
+                let* wait_confirmation in
+                match wait_confirmation with
+                | Ok () -> rpc_ok ()
+                | Error reason ->
+                    rpc_error
+                      (Rpc_errors.transaction_rejected reason (Some hash))
+              in
+              return (wait_on_confirmation ()))
+            ~on_stateful_michelson:(fun _ ->
+              return
+              @@ failwith
+                   "Unsupported JSONRPC method in Tezlink: \
+                    Wait_transaction_confirmation")
+            ~on_rpc:(fun _ ->
+              return
+              @@ failwith
+                   "Unsupported JSONRPC method in Rpc: \
+                    Wait_transaction_confirmation")
+        in
+        build_with_input_and_lazy_output ~f module_ parameters
     | Method (Inject_transaction.Method, module_) ->
         let open Lwt_result_syntax in
         let f
             ( (transaction_object : Transaction_object.t),
               raw_txn,
-              wait_confirmation ) =
+              wait_confirmation ) :
+            (Ethereum_types.hash, JSONRPC.error) result tzresult Lwt.t tzresult
+            Lwt.t =
           Octez_telemetry.Trace.(
             add_attrs (fun () ->
                 Telemetry.Attributes.
@@ -1624,31 +1734,59 @@ let dispatch_private_request (type f) ~websocket
             | Some next_nonce -> next_nonce
           in
           let transaction = Ethereum_types.hex_encode_string raw_txn in
-          let* tx_hash =
-            match mode with
-            | Observer (Evm_tx_container (module Tx_container))
-            | Sequencer (Evm_tx_container (module Tx_container)) ->
-                Tx_container.add
-                  ~wait_confirmation
-                  ~next_nonce
-                  transaction_object
-                  ~raw_tx:transaction
-            | Observer (Michelson_tx_container _m)
-            | Sequencer (Michelson_tx_container _m) ->
-                failwith
-                  "Unsupported JSONRPC method in Tezlink: injectTransaction"
-            | Proxy _ ->
-                failwith
-                  "Unsupported JSONRPC method in proxy: injectTransaction"
-            | Rpc _ ->
-                failwith "Unsupported JSONRPC method in Rpc: injectTransaction"
-          in
-          match tx_hash with
-          | Ok tx_hash -> rpc_ok tx_hash
-          | Error reason ->
-              rpc_error (Rpc_errors.transaction_rejected reason None)
+          process_based_on_mode
+            mode
+            ~on_stateful_evm:(fun (module Tx_container) ->
+              if wait_confirmation then
+                let wait_confirmation, wait_confirmation_wakener =
+                  Lwt.wait ()
+                in
+                let callback =
+                  wait_confirmation_callback wait_confirmation_wakener
+                in
+                let* tx_hash_res =
+                  Tx_container.add
+                    ~next_nonce
+                    transaction_object
+                    ~raw_tx:transaction
+                    ~callback
+                in
+                let wait_on_confirmation hash =
+                  let* wait_confirmation in
+                  match wait_confirmation with
+                  | Ok () -> rpc_ok hash
+                  | Error reason ->
+                      rpc_error
+                      @@ Rpc_errors.transaction_rejected reason (Some hash)
+                in
+                return
+                @@
+                match tx_hash_res with
+                | Error reason ->
+                    rpc_error (Rpc_errors.transaction_rejected reason None)
+                | Ok hash -> wait_on_confirmation hash
+              else
+                let* tx_hash_res =
+                  Tx_container.add
+                    ~next_nonce
+                    transaction_object
+                    ~raw_tx:transaction
+                in
+                return
+                @@
+                match tx_hash_res with
+                | Error reason ->
+                    rpc_error (Rpc_errors.transaction_rejected reason None)
+                | Ok hash -> rpc_ok hash)
+            ~on_rpc:(fun _ ->
+              return
+              @@ failwith "Unsupported JSONRPC method in Rpc: injectTransaction")
+            ~on_stateful_michelson:(fun _ ->
+              return
+              @@ failwith
+                   "Unsupported JSONRPC method in Tezlink: injectTransaction")
         in
-        build_with_input ~f module_ parameters
+        build_with_input_and_lazy_output ~f module_ parameters
     | Method (Inject_tezlink_operation.Method, module_) ->
         let open Lwt_result_syntax in
         let f ((op : Tezos_types.Operation.t), raw_op) =

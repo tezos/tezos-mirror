@@ -888,6 +888,20 @@ module Inject_transaction = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Wait_transaction_confirmation = struct
+  type input = Ethereum_types.hash
+
+  type output = unit
+
+  let input_encoding = Ethereum_types.hash_encoding
+
+  let output_encoding = Data_encoding.unit
+
+  let method_ = "waitTransactionConfirmation"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Inject_tezlink_operation = struct
   type input = Tezos_types.Operation.t * bytes
 
@@ -1173,6 +1187,7 @@ let evm_supported_methods : (module METHOD) list =
     (module Produce_block);
     (module Produce_proposal);
     (module Inject_transaction);
+    (module Wait_transaction_confirmation);
     (module Eth_max_priority_fee_per_gas);
     (module Replay_block);
     (module Trace_transaction);
@@ -1242,6 +1257,7 @@ let multichain_sequencer_supported_methods : (module METHOD) list =
     (* Private RPCs *)
     (module Produce_block);
     (module Inject_transaction);
+    (module Wait_transaction_confirmation);
     (module Inject_tezlink_operation);
     (module Durable_state_value);
     (module Durable_state_subkeys);

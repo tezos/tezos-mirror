@@ -117,12 +117,14 @@ module Request = struct
   let eth_sendRawTransaction ~raw_tx =
     {method_ = "eth_sendRawTransaction"; parameters = `A [`String raw_tx]}
 
-  let eth_sendRawTransactionSync ~raw_tx ~timeout ~block =
-    {
-      method_ = "eth_sendRawTransactionSync";
-      parameters =
-        `A [`String raw_tx; `String timeout; block_param_to_json block];
-    }
+  let eth_sendRawTransactionSync ~raw_tx ?timeout ~block () =
+    let parameters =
+      `A
+        ([`String raw_tx]
+        @ Option.(to_list (map Ezjsonm.string timeout))
+        @ [block_param_to_json block])
+    in
+    {method_ = "eth_sendRawTransactionSync"; parameters}
 
   let eth_getTransactionReceipt ~tx_hash =
     {method_ = "eth_getTransactionReceipt"; parameters = `A [`String tx_hash]}
@@ -585,7 +587,8 @@ let eth_send_raw_transaction_sync ?websocket ~raw_tx ?(timeout = 0)
       (Request.eth_sendRawTransactionSync
          ~raw_tx
          ~timeout:(string_of_int timeout)
-         ~block)
+         ~block
+         ())
   in
   return
   @@ decode_or_error

@@ -16,9 +16,11 @@ type queue_variant = [`Accepted | `Refused]
 
 type pending_variant = [`Confirmed | `Dropped]
 
-type all_variant = [queue_variant | pending_variant]
+type all_variant = Services_backend_sig.callback_status
 
-type 'a variant_callback = 'a -> unit Lwt.t
+type 'a variant_callback = 'a Services_backend_sig.variant_callback
+
+type callback = all_variant variant_callback
 
 (** tx is in the queue and wait to be injected into the upstream
     node. *)
@@ -37,8 +39,6 @@ type pending_request = {
   pending_callback : pending_variant variant_callback;
       (** callback to call when the pending transaction have been confirmed or is dropped. *)
 }
-
-type callback = all_variant variant_callback
 
 module Address_nonce = struct
   module S = String.Hashtbl
@@ -162,6 +162,8 @@ struct
          call `remove` as many times as the transaction was added. *)
       S.add htbl hash tx_object
 
+    let mem htbl (Hash (Hex hash)) = S.mem htbl hash
+
     let find htbl (Hash (Hex hash)) = S.find htbl hash
 
     let remove htbl (Hash (Hex hash)) = S.remove htbl hash
@@ -177,11 +179,56 @@ struct
 
     let empty ~start_size = S.create start_size
 
+    let combine_callback callback1 callback2 reason =
+      let open Lwt_syntax in
+      let* () = callback1 reason in
+      callback2 reason
+
     let add htbl (Hash (Hex hash)) pending_callback =
-      S.replace
-        htbl
-        hash
-        ({pending_callback; since = Time.System.now ()} : pending_request)
+      let pending = S.find htbl hash in
+      match pending with
+      | Some {pending_callback = current_callback; since = _} ->
+          S.replace
+            htbl
+            hash
+            ({
+               pending_callback =
+                 combine_callback pending_callback current_callback;
+               since = Time.System.now ();
+               (* replace to put the real time of adding tx *)
+             }
+              : pending_request)
+      | None ->
+          S.replace
+            htbl
+            hash
+            ({pending_callback; since = Time.System.now ()} : pending_request)
+
+    let add_or_update_callback ~max_lifespan htbl (Hash (Hex hash))
+        pending_callback =
+      let pending = S.find htbl hash in
+      match pending with
+      | None ->
+          let since =
+            let now =
+              (* starting in the future to let time to the tx to be
+                added as pending, else the added callback could be
+                removed before the associated tx is added. *)
+              Ptime.add_span (Time.System.now ()) max_lifespan
+            in
+            match now with Some s -> s | None -> assert false
+          in
+          S.replace htbl hash ({pending_callback; since} : pending_request)
+      | Some {pending_callback = current_callback; since} ->
+          S.replace
+            htbl
+            hash
+            ({
+               pending_callback =
+                 combine_callback current_callback pending_callback;
+               since;
+             }
+              : pending_request)
 
     let pop htbl (Hash (Hex hash)) =
       match S.find htbl hash with
@@ -292,6 +339,9 @@ struct
 
     type ('a, 'b) t =
       | Inject : request -> ((unit, string) result, tztrace) t
+      | Add_pending_callback :
+          Ethereum_types.hash * [pending_variant | `Missing] variant_callback
+          -> (unit, tztrace) t
       | Find : {txn_hash : Ethereum_types.hash} -> (Tx.t option, tztrace) t
       | Nonce : {
           next_nonce : Ethereum_types.quantity;
@@ -336,6 +386,7 @@ struct
     let name (type a b) (t : (a, b) t) =
       match t with
       | Inject _ -> "Inject"
+      | Add_pending_callback _ -> "Add_pending_callback"
       | Find _ -> "Find"
       | Nonce _ -> "Nonce"
       | Tick _ -> "Tick"
@@ -377,6 +428,16 @@ struct
                (req "payload" Ethereum_types.hex_encoding))
             (function
               | View (Inject {payload; _}) -> Some ((), payload) | _ -> None)
+            (fun _ -> assert false);
+          case
+            Json_only
+            ~title:"Add_pending_callback"
+            (obj2
+               (req "request" (constant "add_pending_callback"))
+               (req "hash" Ethereum_types.hex_encoding))
+            (function
+              | View (Add_pending_callback (Hash hash, _)) -> Some ((), hash)
+              | _ -> None)
             (fun _ -> assert false);
           case
             Json_only
@@ -501,6 +562,8 @@ struct
       let open Format in
       match r with
       | Inject {payload = Hex txn; _} -> fprintf fmt "Inject %s" txn
+      | Add_pending_callback (Hash (Hex hash), _) ->
+          fprintf fmt "Add_pending_callback %s" hash
       | Find {txn_hash = Hash (Hex txn_hash)} -> fprintf fmt "Find %s" txn_hash
       | Tick _ -> fprintf fmt "Tick"
       | Injection_confirmation {txn_hash; status} ->
@@ -938,6 +1001,37 @@ struct
       let state = Worker.state self in
       match request with
       | Inject tx_info -> protect @@ fun () -> inject state tx_info
+      | Add_pending_callback (hash, callback) ->
+          protect @@ fun () ->
+          if Transaction_objects.mem state.tx_object hash then
+            (* it's ok to add pending callbacks for a transaction in
+               `state.pending` that is not yet considered pending by
+               the tx_queue i.e. not yet in `state.pending`. This is
+               because that state is going to be cleaned regularly by
+               the tick.
+
+               The existing queue callback for `hash` existing in
+               either `state.queue` or `state.inflight_transactions`
+               will be either called with:
+
+                - `Refused: in that case the added callback will be
+                   later called by `Dropped by the cleaning logic of the
+                   tick.
+
+                - `Accepted: in that case the added callback is
+                   combined with the existing pending callback associated
+                   to hash.
+
+*)
+            return
+            @@ Pending_transactions.add_or_update_callback
+                 ~max_lifespan:(Ptime.Span.of_int_s state.config.max_lifespan_s)
+                 state.pending
+                 hash
+                 (callback :> pending_variant variant_callback)
+          else
+            let*! () = callback `Missing in
+            return_unit
       | Find {txn_hash} ->
           protect @@ fun () ->
           return @@ Transaction_objects.find state.tx_object txn_hash
@@ -1254,41 +1348,20 @@ struct
       (Inject {next_nonce; payload = txn; tx_object; callback})
     |> handle_request_error
 
-  let add ?(wait_confirmation = false) ~next_nonce tx_object ~raw_tx =
+  let add ?callback ~next_nonce tx_object ~raw_tx =
     let open Lwt_result_syntax in
-    let callback, return_hash =
-      let return_hash = function
-        | Ok () -> return (Ok (Tx.hash_of_tx_object tx_object))
-        | Error errs -> return (Error errs)
-      in
-      if wait_confirmation then
-        let wait_confirmation, wait_confirmation_wakener = Lwt.wait () in
-        let callback =
-         fun status ->
-          match status with
-          | `Accepted -> Lwt.return_unit
-          | `Confirmed ->
-              Lwt.wakeup wait_confirmation_wakener (Ok ()) ;
-              Lwt.return_unit
-          | `Dropped ->
-              Lwt.wakeup wait_confirmation_wakener (Error "Transaction dropped") ;
-              Lwt.return_unit
-          | `Refused ->
-              Lwt.wakeup wait_confirmation_wakener (Error "Transaction refused") ;
-              Lwt.return_unit
-        in
-        let wait_confirmation injection_res =
-          match injection_res with
-          | Ok () ->
-              let*! res = wait_confirmation in
-              return_hash res
-          | Error errs -> return (Error errs)
-        in
-        (Some callback, wait_confirmation)
-      else (None, return_hash)
+    let* res = inject ?callback ~next_nonce tx_object raw_tx in
+    match res with
+    | Ok () -> return (Ok (Tx.hash_of_tx_object tx_object))
+    | Error errs -> return (Error errs)
+
+  let add_pending_callback hash ~callback =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    let*! (pushed : bool) =
+      Worker.Queue.push_request w (Add_pending_callback (hash, callback))
     in
-    let* injection_res = inject ?callback ~next_nonce tx_object raw_tx in
-    return_hash injection_res
+    if pushed then return_unit else failwith "Failed to ad request in tx_queuea"
 
   let find txn_hash =
     let open Lwt_result_syntax in
