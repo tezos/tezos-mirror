@@ -27,10 +27,10 @@ COPY .cargo/config.toml /root/.cargo/
 # Foundry releases nightly build. We pick the commit of the day (at the time
 # of proposing the change)
 RUN cargo install \
- --git https://github.com/foundry-rs/foundry/ foundry-cast \
+ --git https://github.com/foundry-rs/foundry/ cast \
  --profile release \
  --force --locked \
- --tag nightly-07a1f67114565968b188d1abf42fe2c5c57bfca5 \
+ --tag nightly-efdf0ff81807fa8dc426cbf1316503945aa5544e \
  && cp /root/.cargo/bin/cast /bin
 
 # runtime + end-to-end test dependencies
