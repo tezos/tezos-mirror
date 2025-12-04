@@ -10499,6 +10499,109 @@ let test_relay_restricted_rpcs =
   let*@? _ = Rpc.tez_kernelVersion sequencer in
   unit
 
+let test_batch_eth_send_raw_transaction_sync_rpc () =
+  register_sandbox_with_observer
+    ~patch_config:
+      (Evm_node.patch_config_with_experimental_feature
+         ~preconfirmation_stream_enabled:true
+         ())
+    ~__FILE__
+    ~tags:["evm"; "delayed_transaction"; "batch"]
+    ~title:"batch eth_sendRawTransactionSync waits for receipt"
+  @@ fun {sandbox; observer} ->
+  let* gas_price = Rpc.get_gas_price sandbox in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  let receiver = Eth_account.bootstrap_accounts.(1) in
+  let batch_tx_size = 10 in
+  let raw_tx nonce =
+    Cast.craft_tx
+      ~source_private_key:sender.private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas_price:(Int32.to_int gas_price)
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 2)
+      ~address:receiver.address
+      ()
+  in
+  let compute_tx_hash raw_tx =
+    `Hex raw_tx |> Hex.to_bytes |> Tezos_crypto.Hacl.Hash.Keccak_256.digest
+    |> Hex.of_bytes |> Hex.show |> Format.sprintf "0x%s"
+  in
+  let wait_txs_injected tx_hashes evm_node =
+    List.map
+      (fun hash -> Evm_node.wait_for_tx_queue_add_transaction ~hash evm_node)
+      tx_hashes
+    |> Lwt.all
+  in
+  let wait_txs_included tx_hashes evm_node =
+    List.map (fun hash -> Evm_node.wait_for_inclusion ~hash evm_node) tx_hashes
+    |> Lwt.all
+  in
+  let aux ~start_nonce ~receiver ~sequencer =
+    let* raw_txs =
+      List.init batch_tx_size (fun i -> raw_tx (start_nonce + i)) |> Lwt.all
+    in
+    let batch =
+      List.map
+        (fun raw_tx ->
+          Rpc.Request.eth_sendRawTransactionSync ~block:Rpc.Latest ~raw_tx ())
+        raw_txs
+    in
+    let tx_hashes = List.map compute_tx_hash raw_txs in
+    let txs_added_promise evm_node = wait_txs_injected tx_hashes evm_node in
+    let txs_added_to_sequencer = txs_added_promise sequencer in
+    let txs_included evm_node = wait_txs_included tx_hashes evm_node in
+    let txs_included_to_receiver = txs_included receiver in
+    let receipts_promise = Evm_node.batch_evm_rpc receiver batch in
+    Check.((Lwt.is_sleeping receipts_promise = true) bool)
+      ~error_msg:"eth_sendRawTransactionSync should wait for inclusion" ;
+    let* _ = txs_added_to_sequencer and* _ = txs_included_to_receiver in
+    let*@ nb_txs = produce_block sequencer in
+    Check.(
+      (nb_txs = batch_tx_size)
+        int
+        ~error_msg:"Block should contains %R but got %L") ;
+    let* receipts = receipts_promise in
+    List.iter
+      (fun response ->
+        let receipt =
+          Evm_node.extract_result response
+          |> Transaction.transaction_receipt_of_json
+        in
+        Check.(
+          (receipt.status = true)
+            bool
+            ~error_msg:"Transaction should have been included and successful"))
+      receipts ;
+    unit
+  in
+  let*@ _nb_txs = produce_block sandbox in
+  let* _ = Evm_node.wait_for_blueprint_applied observer 1 in
+  let* () = aux ~start_nonce:0 ~sequencer:sandbox ~receiver:sandbox in
+  let* () =
+    aux ~start_nonce:batch_tx_size ~sequencer:sandbox ~receiver:observer
+  in
+  let* rpc_sequencer = run_new_rpc_endpoint sandbox in
+  let*@ _nb_txs = produce_block sandbox in
+  let* _ = Evm_node.wait_for_blueprint_applied sandbox 4 in
+  let* () =
+    aux
+      ~start_nonce:(2 * batch_tx_size)
+      ~sequencer:sandbox
+      ~receiver:rpc_sequencer
+  in
+  let* rpc_observer = run_new_rpc_endpoint observer in
+  let*@ _nb_txs = produce_block sandbox in
+  let* _ = Evm_node.wait_for_blueprint_applied observer 6 in
+  let* () =
+    aux
+      ~start_nonce:(3 * batch_tx_size)
+      ~sequencer:sandbox
+      ~receiver:rpc_observer
+  in
+  unit
+
 let test_tx_pool_pending_nonce () =
   register_sandbox
     ~__FILE__
@@ -14495,6 +14598,7 @@ let () =
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
   test_proxy_node_can_forward_to_evm_endpoint protocols ;
+  test_batch_eth_send_raw_transaction_sync_rpc () ;
   test_tx_pool_pending_nonce () ;
   test_da_fees_after_execution protocols ;
   test_trace_transaction_calltracer_failed_create protocols ;

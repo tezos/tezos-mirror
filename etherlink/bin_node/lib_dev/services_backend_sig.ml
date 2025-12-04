@@ -195,6 +195,24 @@ type endpoint =
     (* Use an active websocket client to push transactions in real time *)
   | Block_producer (* Inject transactions directly into the block producer. *)
 
+type callback_status = [`Accepted | `Confirmed | `Dropped | `Refused]
+
+type 'a variant_callback = 'a -> unit Lwt.t
+
+(** A [callback] is called by the [Tx_queue] at various stages of a
+    submitted transaction's life.
+
+    The next tick after its insertion in the queue, a transaction is submitted
+    to the relay node within a batch of [eth_sendRawTransaction] requests.
+
+    {ul
+      {li Depending on the result of the RPC, its [callback] is called with
+          either [`Accepted] or [`Refused]).}
+      {li As soon as the transaction appears in a blueprint, its callback is
+          called with [`Confirmed]. If this does not happen before 2s, the
+          [callback] is called with [`Dropped].}} *)
+type callback = callback_status variant_callback
+
 (** [Tx_container] is the signature of the module that deals with
     storing and forwarding transactions. the module type is used by
     {!Services.dispatch_request} to request informations about pending
@@ -215,7 +233,7 @@ module type Tx_container = sig
       available based on the pending transaction of the tx_container.
       [next_nonce] is the next expected nonce found in the backend. *)
   val add :
-    ?wait_confirmation:bool ->
+    ?callback:callback ->
     next_nonce:Ethereum_types.quantity ->
     transaction_object ->
     raw_tx:Ethereum_types.hex ->
@@ -279,6 +297,16 @@ module type Tx_container = sig
       [dropped_transaction ~dropped_tx] drops [dropped_tx] hash. *)
   val dropped_transaction :
     dropped_tx:Ethereum_types.hash -> reason:string -> unit tzresult Lwt.t
+
+  (** [add_pending_callback hash ~callback] registers [callback] for the
+      transaction associated with [hash].
+      If the transaction is not found, [callback] is called
+      immediately with [`Missing]. Otherwise, [callback] will be
+      called when the transaction is either confirmed or dropped. *)
+  val add_pending_callback :
+    Ethereum_types.hash ->
+    callback:[`Confirmed | `Dropped | `Missing] variant_callback ->
+    unit tzresult Lwt.t
 
   (** The Tx_pool pops transactions until the sum of the sizes of the
       popped transactions reaches maximum_cumulative_size; it ignores

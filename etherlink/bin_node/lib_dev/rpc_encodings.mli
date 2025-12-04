@@ -320,6 +320,9 @@ module Inject_transaction :
     with type input = Transaction_object.t * string * bool
      and type output = Ethereum_types.hash
 
+module Wait_transaction_confirmation :
+  METHOD with type input = Ethereum_types.hash and type output = unit
+
 module Inject_tezlink_operation :
   METHOD
     with type input = Tezos_types.Operation.t * bytes

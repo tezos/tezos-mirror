@@ -38,7 +38,11 @@ module Request : sig
   val eth_sendRawTransaction : raw_tx:string -> Evm_node.request
 
   val eth_sendRawTransactionSync :
-    raw_tx:string -> timeout:string -> block:block_param -> Evm_node.request
+    raw_tx:string ->
+    ?timeout:string ->
+    block:block_param ->
+    unit ->
+    Evm_node.request
 
   val eth_getTransactionReceipt : tx_hash:string -> Evm_node.request
 

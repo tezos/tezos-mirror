@@ -716,5 +716,7 @@ let register_sandbox_with_observer ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit
       ~sequencer_keys
       ()
   in
-  let* observer = Setup.run_new_observer_node ~sc_rollup_node:None sandbox in
+  let* observer =
+    Setup.run_new_observer_node ?patch_config ~sc_rollup_node:None sandbox
+  in
   body {sandbox; observer}

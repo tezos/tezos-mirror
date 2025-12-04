@@ -11,6 +11,9 @@
 - Fix issue when connecting to nodes behind a proxy that can rearrange
   chunks. (!20057)
 
+- Enable concurrent waiting for transaction confirmation in batched
+`eth_sendRawTransactionSync` calls for improved throughput. (!20064)
+
 ### Monitoring changes
 
 ### Command-line interface changes

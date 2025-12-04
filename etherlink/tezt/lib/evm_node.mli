@@ -292,7 +292,7 @@ val wait_for_blueprint_injection_failure :
 
 val wait_for_next_block_timestamp : ?timeout:float -> t -> string Lwt.t
 
-val wait_for_inclusion : ?timeout:float -> t -> string Lwt.t
+val wait_for_inclusion : ?timeout:float -> ?hash:string -> t -> string Lwt.t
 
 module Config_file : sig
   (** Node configuration files. *)
@@ -441,10 +441,11 @@ val wait_for_missing_blueprint : t -> (int * string) Lwt.t
     missing blueprint level. *)
 val wait_for_rollup_node_ahead : t -> int Lwt.t
 
-(** [wait_for_tx_queue_add_transaction ?timeout evm_node] waits for the event
+(** [wait_for_tx_queue_add_transaction ?timeout ?hash evm_node] waits for the event
     [tx_queue_add_transaction.v0] using {!wait_for} and returns the transaction
     hash. *)
-val wait_for_tx_queue_add_transaction : ?timeout:float -> t -> string Lwt.t
+val wait_for_tx_queue_add_transaction :
+  ?timeout:float -> ?hash:string -> t -> string Lwt.t
 
 (** [wait_for_tx_queue_transaction_confirmed ?timeout ?hash evm_node]
     waits for the event [tx_queue_transaction_confirmed.v0] using

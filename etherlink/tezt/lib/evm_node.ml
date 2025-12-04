@@ -616,9 +616,13 @@ let wait_for_rollup_node_ahead evm_node =
   let level = json |> as_int in
   Some level
 
-let wait_for_tx_queue_add_transaction ?timeout evm_node =
+let wait_for_tx_queue_add_transaction ?timeout ?hash evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_queue_add_transaction.v0"
-  @@ fun json -> JSON.(json |> as_string |> Option.some)
+  @@ fun json ->
+  let found_hash = JSON.(json |> as_string) in
+  match hash with
+  | Some hash -> if found_hash = hash then Some found_hash else None
+  | None -> Some found_hash
 
 let wait_for_tx_queue_transaction_confirmed ?timeout ?hash evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_queue_transaction_confirmed.v0"
@@ -718,9 +722,13 @@ let wait_for_next_block_timestamp ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"next_block_timestamp.v0"
   @@ fun json -> Some (JSON.as_string json)
 
-let wait_for_inclusion ?timeout evm_node =
+let wait_for_inclusion ?timeout ?hash evm_node =
   wait_for_event ?timeout evm_node ~event:"inclusion.v0" @@ fun json ->
-  Some (JSON.as_string json)
+  let found_hash = JSON.as_string json in
+  match hash with
+  | Some expected_hash ->
+      if String.equal expected_hash found_hash then Some found_hash else None
+  | None -> Some found_hash
 
 let mode_with_new_private_rpc (mode : mode) =
   match mode with

@@ -65,6 +65,12 @@ let send_raw_transaction_sync_request raw_tx timeout block_parameter =
     ~input_encoding:Send_raw_transaction_sync.input_encoding
     (raw_tx, timeout, block_parameter)
 
+let inject_wait_transaction_confirmation_request hash =
+  construct_rpc_call
+    ~method_:Wait_transaction_confirmation.method_
+    ~input_encoding:Wait_transaction_confirmation.input_encoding
+    hash
+
 let inject_transaction_request tx_object raw_tx wait_confirmation =
   construct_rpc_call
     ~method_:Inject_transaction.method_
@@ -95,6 +101,15 @@ let send_raw_transaction_sync ~keep_alive ~timeout ~base ~raw_tx
     ~path:Resto.Path.root
     (send_raw_transaction_sync_request raw_tx internal_timeout block_parameter)
     Send_raw_transaction_sync.output_encoding
+
+let inject_wait_transaction_confirmation ~keep_alive ~timeout ~base ~hash =
+  call_rpc_service
+    ~keep_alive
+    ~timeout
+    ~base
+    ~path:Resto.Path.(root / "private")
+    (inject_wait_transaction_confirmation_request hash)
+    Wait_transaction_confirmation.output_encoding
 
 let inject_transaction ~keep_alive ~timeout ~base ~tx_object ~raw_tx
     ~wait_confirmation =
