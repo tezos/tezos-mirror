@@ -117,3 +117,14 @@ val end_of_level_serialized : serialized
 (** {!info_per_level_serialized ~predecessor_timestamp ~predecessor} is the serialized representation of the internal message for {!Info_per_level}. *)
 val info_per_level_serialized :
   predecessor_timestamp:Time.t -> predecessor:Block_hash.t -> serialized
+
+(** [dal_attested_slots_serialized ~published_level ~number_of_slots ~slot_size
+    ~page_size ~slots_by_publisher] is the serialized representation of the
+    internal message for {!Dal_attested_slots}. *)
+val dal_attested_slots_serialized :
+  published_level:Raw_level_repr.t ->
+  number_of_slots:int ->
+  slot_size:int ->
+  page_size:int ->
+  slots_by_publisher:Dal_slot_index_repr.t list Signature.Public_key_hash.Map.t ->
+  serialized

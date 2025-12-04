@@ -300,3 +300,33 @@ let (_dummy_serialized_info_per_level_serialized : serialized) =
   info_per_level_serialized
     ~predecessor_timestamp:(Time.of_seconds Int64.min_int)
     ~predecessor:Block_hash.zero
+
+let dal_attested_slots_serialized ~published_level ~number_of_slots ~slot_size
+    ~page_size ~slots_by_publisher =
+  match
+    serialize
+      (Internal
+         (Dal_attested_slots
+            {
+              published_level;
+              number_of_slots;
+              slot_size;
+              page_size;
+              slots_by_publisher;
+            }))
+  with
+  | Error _ ->
+      (* The dal attested slots should always be serializable as the encoding
+         functions for this case do not fail. *)
+      assert false
+  | Ok msg -> msg
+
+let (_dummy_serialized_dal_attested_slots : serialized) =
+  (* This allows to detect an error, at startup, we might have introduced in the
+     encoding of serialization of dal attested slots messages. *)
+  dal_attested_slots_serialized
+    ~published_level:Raw_level_repr.root
+    ~number_of_slots:32
+    ~slot_size:126944
+    ~page_size:3967
+    ~slots_by_publisher:Signature.Public_key_hash.Map.empty
