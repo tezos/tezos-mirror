@@ -278,6 +278,21 @@ module Build = struct
     |> enable_cargo_cache
 
   let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
+    let profiled_binaries =
+      ["octez-node"; "octez-dal-node"; "octez-baker"; "octez-client"]
+    in
+    let binaries =
+      List.map
+        (Filename.concat "./octez-binaries/x86_64/profiler/")
+        profiled_binaries
+      @ List.map
+          (Filename.concat "./octez-binaries/x86_64/telemetry/")
+          profiled_binaries
+    in
+    let profiled_binaries_string = String.concat " " profiled_binaries in
+    let octez_executables =
+      "OCTEZ_EXECUTABLES?=\"" ^ profiled_binaries_string ^ "\""
+    in
     job
       ~__POS__
       ~stage:Stages.build
@@ -285,13 +300,7 @@ module Build = struct
       ?rules
       ~name:"build-layer1-profiling"
       ~cpu:Very_high
-      ~artifacts:
-        (artifacts
-           ~expire_in
-           [
-             "./octez-binaries/x86_64/octez-node";
-             "./octez-binaries/x86_64/octez-client";
-           ])
+      ~artifacts:(artifacts ~expire_in binaries)
       ~before_script:
         (Helpers.before_script
            ~take_ownership:true
@@ -304,14 +313,13 @@ module Build = struct
         (* turn on -opaque for all subsequent builds *)
         "scripts/custom-flags.sh set -opaque";
         (* 1) compile with PPX profiling *)
-        "TEZOS_PPX_PROFILER=profiling make build \
-         OCTEZ_EXECUTABLES?=\"octez-node octez-client\"";
+        "TEZOS_PPX_PROFILER=profiling make build " ^ octez_executables;
+        "mkdir -p octez-binaries/x86_64/profiler";
+        "mv " ^ profiled_binaries_string ^ " octez-binaries/x86_64/profiler";
         (* 2) compile with OpenTelemetry PPX (overwrites binaries) *)
-        "TEZOS_PPX_PROFILER=opentelemetry make build \
-         OCTEZ_EXECUTABLES?=\"octez-node octez-client\"";
-        "mkdir -p octez-binaries/x86_64/";
-        "mv octez-node octez-binaries/x86_64/";
-        "mv octez-client octez-binaries/x86_64/";
+        "TEZOS_PPX_PROFILER=opentelemetry make build " ^ octez_executables;
+        "mkdir -p octez-binaries/x86_64/telemetry";
+        "mv " ^ profiled_binaries_string ^ " octez-binaries/x86_64/telemetry";
       ]
     |> enable_cargo_cache |> enable_sccache
 end
