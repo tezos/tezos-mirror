@@ -8,6 +8,9 @@ default:
     when:
     - stuck_or_timeout_failure
     - runner_system_failure
+    - api_failure
+    - unknown_failure
+    - scheduler_failure
 
 workflow:
   rules:
