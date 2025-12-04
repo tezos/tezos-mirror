@@ -2762,23 +2762,82 @@ let patch_sequencer_key ?block_number pk =
        })
 
 let provision_balance ?block_number address value =
-  worker_wait_for_request
-    (Patch_state
-       {
-         commit = false;
-         key = Durable_storage_path.Accounts.balance address;
-         patch =
-           (let open Ethereum_types in
-            function
-            | Some old_balance ->
-                let (Qty v) =
-                  decode_number_le (Bytes.unsafe_of_string old_balance)
-                in
-                let (Qty u) = value in
-                Some (String.of_bytes (encode_u256_le (Qty Z.(u + v))))
-            | None -> Some (String.of_bytes (encode_u256_le value)));
-         block_number;
-       })
+  let new_info u =
+    String.of_bytes
+      (Tezosx.Tezos_runtime.encode_account_info
+         {
+           balance = Tezos_types.Tez.of_mutez_exn u;
+           nonce = 0L;
+           public_key = None;
+         })
+  in
+  let patch_requests =
+    let open Request in
+    let (Ethereum_types.Qty u) = value in
+    match address with
+    | Tezosx.Ethereum_address address ->
+        [
+          Patch_state
+            {
+              commit = false;
+              key = Durable_storage_path.Accounts.balance address;
+              patch =
+                (let open Ethereum_types in
+                 function
+                 | Some old_balance ->
+                     let (Qty v) =
+                       decode_number_le (Bytes.unsafe_of_string old_balance)
+                     in
+                     Some (String.of_bytes (encode_u256_le (Qty Z.(u + v))))
+                 | None -> Some (String.of_bytes (encode_u256_le value)));
+              block_number;
+            };
+        ]
+    | Tezos_address address ->
+        (* Mutez precision is 10^-6 while eth is 10^-18. *)
+        let u = Z.(to_int64 @@ (u / pow (of_int 10) 12)) in
+        [
+          Patch_state
+            {
+              commit = false;
+              key = Tezosx.Durable_storage_path.Accounts.Tezos.info address;
+              patch =
+                (function
+                | Some old_info -> (
+                    match
+                      Tezosx.Tezos_runtime.decode_account_info
+                        (Bytes.unsafe_of_string old_info)
+                    with
+                    | Ok old_info ->
+                        let balance =
+                          Tezos_types.Tez.(
+                            of_mutez_exn
+                            @@ Int64.add (to_mutez old_info.balance) u)
+                        in
+                        let info = {old_info with balance} in
+                        Some
+                          (String.of_bytes
+                             (Tezosx.Tezos_runtime.encode_account_info info))
+                    | Error _ -> Some (new_info u))
+                | None -> Some (new_info u));
+              block_number;
+            };
+          Patch_state
+            {
+              commit = false;
+              key =
+                Tezosx.Durable_storage_path.Accounts.Tezos.ethereum_alias
+                  address;
+              patch =
+                (fun _ ->
+                  Some
+                    (Bytes.to_string
+                       (Tezosx.Foreign_address.encode (`Tezos address))));
+              block_number;
+            };
+        ]
+  in
+  List.iter_es worker_wait_for_request patch_requests
 
 let patch_state ?block_number ~key ~value () =
   worker_wait_for_request

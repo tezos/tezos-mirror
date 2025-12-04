@@ -14,7 +14,7 @@ type tezlink_sandbox = {
 type sandbox_config = {
   init_from_snapshot : string option;
   network : Configuration.supported_network option;
-  funded_addresses : Ethereum_types.address list;
+  funded_addresses : Tezosx.address list;
   parent_chain : Uri.t option;
   disable_da_fees : bool;
   kernel_verbosity : Events.kernel_log_level option;

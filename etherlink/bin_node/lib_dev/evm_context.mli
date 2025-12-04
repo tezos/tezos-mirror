@@ -151,7 +151,7 @@ val patch_kernel :
     [block_number] can be provided to modify another block. *)
 val provision_balance :
   ?block_number:Ethereum_types.quantity ->
-  Ethereum_types.address ->
+  Tezosx.address ->
   Ethereum_types.quantity ->
   unit tzresult Lwt.t
 
