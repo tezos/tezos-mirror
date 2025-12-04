@@ -37,6 +37,7 @@ use tezos_tezlink::operation_result::{
 };
 use tezos_tracing::trace_kernel;
 
+use crate::tezosx;
 use crate::tick_model::constants::TICKS_FOR_DEPOSIT;
 
 /// Keccak256 of Deposit(uint256,address,uint256,uint256)
@@ -383,13 +384,29 @@ pub fn execute_etherlink_deposit<Host: Runtime>(
     host: &mut Host,
     deposit: &Deposit,
 ) -> Result<DepositResult<ExecutionOutcome>, BridgeError> {
-    // We should be able to obtain an account for arbitrary H160 address
-    // otherwise it is a fatal error.
-    let receiver = deposit.receiver.to_h160()?;
-    let mut to_account = StorageAccount::from_address(&h160_to_alloy(&receiver))
-        .map_err(|_| BridgeError::InvalidDepositReceiver(receiver.as_bytes().to_vec()))?;
+    let deposit_result = match &deposit.receiver {
+        DepositReceiver::Ethereum(receiver) => {
+            // We should be able to obtain an account for arbitrary H160 address
+            // otherwise it is a fatal error.
+            let mut to_account = StorageAccount::from_address(&h160_to_alloy(receiver))
+                .map_err(|_| {
+                BridgeError::InvalidDepositReceiver(receiver.as_bytes().to_vec())
+            })?;
+            to_account.add_balance(host, u256_to_alloy(&deposit.amount))
+        }
+        DepositReceiver::Tezos(Contract::Implicit(pkh)) => {
+            let amount = mutez_from_wei(deposit.amount)
+                .map_err(|_| BridgeError::InvalidAmount(deposit.amount))?;
+            tezosx::add_balance(host, pkh, amount.into())
+        }
+        DepositReceiver::Tezos(Contract::Originated(kt1)) => {
+            return Err(BridgeError::InvalidDepositReceiver(
+                kt1.to_string().as_bytes().to_vec(),
+            ))
+        }
+    };
 
-    let result = match to_account.add_balance(host, u256_to_alloy(&deposit.amount)) {
+    let deposit_receipt = match deposit_result {
         Ok(()) => ExecutionResult::Success {
             reason: SuccessReason::Return,
             gas_used: DEPOSIT_EXECUTION_GAS_COST,
@@ -407,7 +424,7 @@ pub fn execute_etherlink_deposit<Host: Runtime>(
     };
 
     let outcome = ExecutionOutcome {
-        result,
+        result: deposit_receipt,
         withdrawals: vec![],
     };
 
