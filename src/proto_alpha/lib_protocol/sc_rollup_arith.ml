@@ -1181,6 +1181,9 @@ module Make (Context : Sc_rollup_PVM_sig.Generic_irmin_pvm_context_sig) :
       | Ok (Internal (Info_per_level _)) ->
           let* () = incr_internal_message_counter in
           return None
+      | Ok (Internal (Dal_attested_slots _)) ->
+          let* () = incr_internal_message_counter in
+          return None
     in
     match payload with
     | Some payload ->

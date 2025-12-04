@@ -68,6 +68,14 @@ type internal_inbox_message =
       predecessor : Block_hash.t;
     }
   | Protocol_migration of string
+  | Dal_attested_slots of {
+      published_level : Raw_level_repr.t;
+      number_of_slots : int;
+      slot_size : int;
+      page_size : int;
+      slots_by_publisher :
+        Dal_slot_index_repr.t list Signature.Public_key_hash.Map.t;
+    }
 
 let internal_inbox_message_encoding =
   let open Data_encoding in
@@ -120,6 +128,77 @@ let internal_inbox_message_encoding =
         (obj2 (kind "protocol_migration") (req "protocol" (string Hex)))
         (function Protocol_migration proto -> Some ((), proto) | _ -> None)
         (fun ((), proto) -> Protocol_migration proto);
+      case
+        (Tag 5)
+        ~title:"Dal_attested_slots"
+        (obj6
+           (kind "dal_attested_slots")
+           (req "published_level" Raw_level_repr.encoding)
+           (req "number_of_slots" uint16)
+           (req "slot_size" int31)
+           (req "page_size" uint16)
+           (req
+              "slots_by_publisher"
+              (Signature.Public_key_hash.Map.encoding
+                 Dal_attestation_repr.encoding)))
+        (function
+          | Dal_attested_slots
+              {
+                published_level;
+                number_of_slots;
+                slot_size;
+                page_size;
+                slots_by_publisher;
+              } ->
+              (* Convert list to bitset for compact encoding *)
+              let slots_by_publisher =
+                Signature.Public_key_hash.Map.map
+                  (List.fold_left
+                     Dal_attestation_repr.commit
+                     Dal_attestation_repr.empty)
+                  slots_by_publisher
+              in
+              Some
+                ( (),
+                  published_level,
+                  number_of_slots,
+                  slot_size,
+                  page_size,
+                  slots_by_publisher )
+          | _ -> None)
+        (fun ( (),
+               published_level,
+               number_of_slots,
+               slot_size,
+               page_size,
+               slots_by_publisher )
+           ->
+          (* Convert bitset back to list for internal representation *)
+          let slots_by_publisher =
+            Signature.Public_key_hash.Map.map
+              (fun bitset ->
+                (* Iterate through possible slot indices and collect attested ones *)
+                let rec collect acc i =
+                  if Compare.Int.(i >= number_of_slots) then List.rev acc
+                  else
+                    match Dal_slot_index_repr.of_int_opt ~number_of_slots i with
+                    | None -> List.rev acc
+                    | Some idx ->
+                        if Dal_attestation_repr.is_attested bitset idx then
+                          collect (idx :: acc) (i + 1)
+                        else collect acc (i + 1)
+                in
+                collect [] 0)
+              slots_by_publisher
+          in
+          Dal_attested_slots
+            {
+              published_level;
+              number_of_slots;
+              slot_size;
+              page_size;
+              slots_by_publisher;
+            });
     ]
 
 type t = Internal of internal_inbox_message | External of string

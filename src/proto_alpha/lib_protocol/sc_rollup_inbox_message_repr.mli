@@ -69,6 +69,18 @@ type internal_inbox_message =
           (** Predecessor of the block this message is pushed. *)
     }
   | Protocol_migration of string
+  | Dal_attested_slots of {
+      published_level : Raw_level_repr.t;
+      number_of_slots : int;
+      slot_size : int;
+      page_size : int;
+      slots_by_publisher :
+        Dal_slot_index_repr.t list Signature.Public_key_hash.Map.t;
+    }
+      (** Internal message communicating the attested slots for the given
+          [published_level]. Attested slots are grouped by
+          [slots_by_publisher]. A slot is attested if and only if it appears in
+          the map's codomain. *)
 
 (** A type representing messages from Layer 1 to Layer 2. Internal ones are
     originated from Layer 1 smart-contracts and external ones are messages from

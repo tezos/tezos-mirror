@@ -3463,6 +3463,14 @@ module Sc_rollup : sig
           predecessor : Block_hash.t;
         }
       | Protocol_migration of string
+      | Dal_attested_slots of {
+          published_level : Raw_level.t;
+          number_of_slots : int;
+          slot_size : int;
+          page_size : int;
+          slots_by_publisher :
+            Dal.Slot_index.t list Signature.Public_key_hash.Map.t;
+        }
 
     val protocol_migration_internal_message : internal_inbox_message
 
