@@ -144,6 +144,7 @@ module Action : sig
     ?history_mode:Configuration_file.history_mode ->
     ?service_name:string ->
     ?service_namespace:string ->
+    ?telemetry_env:string ->
     ?fetch_trusted_setup:bool ->
     ?disable_shard_validation:bool ->
     ?verbose:bool ->

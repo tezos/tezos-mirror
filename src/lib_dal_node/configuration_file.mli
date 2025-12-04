@@ -79,6 +79,7 @@ type t = {
   version : int;  (** The version of the configuration. *)
   service_name : string;  (** Name of the service provided by this node. *)
   service_namespace : string;  (** Namespace for the service. *)
+  telemetry_env : string option; (* Running environment name for telemetry *)
   experimental_features : experimental_features;  (** Experimental features.  *)
   fetch_trusted_setup : bool;
       (** Should the trusted setup be downloaded if not found or has invalid hash. *)

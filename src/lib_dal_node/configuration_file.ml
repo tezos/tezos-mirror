@@ -121,6 +121,7 @@ type t = {
   version : int;
   service_name : string;
   service_namespace : string;
+  telemetry_env : string option;
   experimental_features : experimental_features;
   fetch_trusted_setup : bool;
   verbose : bool;
@@ -200,6 +201,7 @@ let default =
     version = current_version;
     service_name = default_service_name;
     service_namespace = default_service_namespace;
+    telemetry_env = None;
     experimental_features = default_experimental_features;
     fetch_trusted_setup = default_fetch_trusted_setup;
     verbose = false;
@@ -245,6 +247,7 @@ let encoding : t Data_encoding.t =
            version;
            service_name;
            service_namespace;
+           telemetry_env;
            experimental_features;
            fetch_trusted_setup;
            verbose;
@@ -264,16 +267,15 @@ let encoding : t Data_encoding.t =
             slots_backup_uris,
             trust_slots_backup_uris,
             metrics_addr ),
-          ( history_mode,
-            profile,
-            version,
-            service_name,
-            service_namespace,
-            experimental_features,
-            fetch_trusted_setup,
-            verbose,
-            ignore_l1_config_peers,
-            disable_amplification ) ),
+          ( (history_mode, profile, version),
+            ( service_name,
+              service_namespace,
+              telemetry_env,
+              experimental_features,
+              fetch_trusted_setup,
+              verbose,
+              ignore_l1_config_peers,
+              disable_amplification ) ) ),
         (batching_configuration, publish_slots_regularly) ))
     (fun ( ( ( data_dir,
                rpc_addr,
@@ -285,16 +287,15 @@ let encoding : t Data_encoding.t =
                slots_backup_uris,
                trust_slots_backup_uris,
                metrics_addr ),
-             ( history_mode,
-               profile,
-               version,
-               service_name,
-               service_namespace,
-               experimental_features,
-               fetch_trusted_setup,
-               verbose,
-               ignore_l1_config_peers,
-               disable_amplification ) ),
+             ( (history_mode, profile, version),
+               ( service_name,
+                 service_namespace,
+                 telemetry_env,
+                 experimental_features,
+                 fetch_trusted_setup,
+                 verbose,
+                 ignore_l1_config_peers,
+                 disable_amplification ) ) ),
            (batching_configuration, publish_slots_regularly) )
        ->
       {
@@ -313,6 +314,7 @@ let encoding : t Data_encoding.t =
         version;
         service_name;
         service_namespace;
+        telemetry_env;
         experimental_features;
         fetch_trusted_setup;
         verbose;
@@ -377,54 +379,63 @@ let encoding : t Data_encoding.t =
                 ~description:"The point for the DAL node metrics server"
                 (Encoding.option P2p_point.Id.encoding)
                 None))
-          (obj10
-             (dft
-                "history_mode"
-                ~description:"The history mode for the DAL node"
-                history_mode_encoding
-                default_history_mode)
-             (dft
-                "profiles"
-                ~description:"The Octez DAL node profiles"
-                Profile_manager.unresolved_encoding
-                Profile_manager.Empty)
-             (req "version" ~description:"The configuration file version" int31)
-             (dft
-                "service_name"
-                ~description:"Name of the service"
-                Data_encoding.string
-                default.service_name)
-             (dft
-                "service_namespace"
-                ~description:"Namespace for the service"
-                Data_encoding.string
-                default.service_namespace)
-             (dft
-                "experimental_features"
-                ~description:"Experimental features"
-                experimental_features_encoding
-                default_experimental_features)
-             (dft
-                "fetch_trusted_setup"
-                ~description:"Install trusted setup"
-                bool
-                true)
-             (dft
-                "verbose"
-                ~description:
-                  "Whether to emit details about frequent logging events"
-                bool
-                default.verbose)
-             (dft
-                "ignore_l1_config_peers"
-                ~description:"Ignore the boot(strap) peers provided by L1"
-                bool
-                default.ignore_l1_config_peers)
-             (dft
-                "disable_amplification"
-                ~description:"Disable amplification"
-                bool
-                default.disable_amplification)))
+          (merge_objs
+             (obj3
+                (dft
+                   "history_mode"
+                   ~description:"The history mode for the DAL node"
+                   history_mode_encoding
+                   default_history_mode)
+                (dft
+                   "profiles"
+                   ~description:"The Octez DAL node profiles"
+                   Profile_manager.unresolved_encoding
+                   Profile_manager.Empty)
+                (req
+                   "version"
+                   ~description:"The configuration file version"
+                   int31))
+             (obj8
+                (dft
+                   "service_name"
+                   ~description:"Name of the service"
+                   Data_encoding.string
+                   default.service_name)
+                (dft
+                   "service_namespace"
+                   ~description:"Namespace for the service"
+                   Data_encoding.string
+                   default.service_namespace)
+                (opt
+                   "telemetry_environment"
+                   ~description:"Environment name for telemetry"
+                   Data_encoding.string)
+                (dft
+                   "experimental_features"
+                   ~description:"Experimental features"
+                   experimental_features_encoding
+                   default_experimental_features)
+                (dft
+                   "fetch_trusted_setup"
+                   ~description:"Install trusted setup"
+                   bool
+                   true)
+                (dft
+                   "verbose"
+                   ~description:
+                     "Whether to emit details about frequent logging events"
+                   bool
+                   default.verbose)
+                (dft
+                   "ignore_l1_config_peers"
+                   ~description:"Ignore the boot(strap) peers provided by L1"
+                   bool
+                   default.ignore_l1_config_peers)
+                (dft
+                   "disable_amplification"
+                   ~description:"Disable amplification"
+                   bool
+                   default.disable_amplification))))
        (obj2
           (dft
              "batching_configuration"
