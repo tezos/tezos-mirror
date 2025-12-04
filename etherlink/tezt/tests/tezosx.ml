@@ -34,9 +34,10 @@ module Setup = struct
       ~tags:(["tezosx"] @ runtime_tags with_runtimes @ tags)
       ~with_runtimes
 
-  let _register_fullstack_test ~title ~tags ~with_runtimes =
+  let register_fullstack_test ~title ~tags ~with_runtimes =
     Setup.register_test
       ~__FILE__
+      ~rpc_server:Evm_node.Resto
       ~title
       ~tags:(["tezosx"] @ runtime_tags with_runtimes @ tags)
       ~kernel:Latest
@@ -92,6 +93,74 @@ let test_bootstrap_kernel_config () =
   @@ fun sandbox ->
   Lwt_list.iter_p (check_account sandbox) tez_bootstrap_accounts
 
+let test_deposit =
+  Setup.register_fullstack_test
+    ~time_between_blocks:Nothing
+    ~title:"Deposit on tezos native account"
+    ~tags:["deposit"]
+    ~with_runtimes:[Tezos]
+  @@
+  fun {
+        client;
+        l1_contracts;
+        sc_rollup_address;
+        sc_rollup_node;
+        sequencer;
+        proxy;
+        _;
+      }
+      _protocol
+    ->
+  let amount = Tez.of_int 1000 in
+  let depositor = Constant.bootstrap5 in
+  let* receiver_account = Client.gen_and_show_keys client in
+
+  let receiver =
+    Result.get_ok
+    @@ Tezos_protocol_alpha.Protocol.Contract_repr.of_b58check
+         receiver_account.public_key_hash
+  in
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Tezos_protocol_alpha.Protocol.Contract_repr.encoding
+      receiver
+  in
+  let (`Hex receiver) = Hex.of_bytes bytes in
+  let deposit_info =
+    Delayed_inbox.{receiver = TezosAddr receiver; chain_id = None}
+  in
+  let* () =
+    Delayed_inbox.send_deposit_to_delayed_inbox
+      ~rlp:true
+      ~amount
+      ~bridge:l1_contracts.bridge
+      ~depositor
+      ~deposit_info
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  let* () =
+    Delayed_inbox.wait_for_delayed_inbox_add_tx_and_injected
+      ~sequencer
+      ~sc_rollup_node
+      ~client
+  in
+  let* () =
+    Test_helpers.bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client ()
+  in
+  let* () = Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node) in
+  let* client = tezos_client sequencer in
+  let* balance =
+    Client.get_balance_for ~account:receiver_account.public_key_hash client
+  in
+  Check.(
+    (Tez.to_mutez balance = 1_000_000_000)
+      int
+      ~error_msg:"Expected %R mutez but got %L") ;
+  unit
+
 let () =
   test_bootstrap_kernel_config () ;
+  test_deposit [Alpha] ;
   test_runtime_feature_flag ~runtime:Tezos ()
