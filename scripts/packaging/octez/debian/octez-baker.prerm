@@ -1,16 +1,2 @@
 #!/bin/sh
-
-set -e
-
-# shellcheck disable=SC1091
-. /usr/share/debconf/confmodule
-
-# systemctl should not be called directly. use this
-# wrapper script if available
-debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
-
-# Check if the old daemon is active before stopping it
-if systemctl is-active --quiet "octez-baker.service"; then
-  echo "Stopping old octez-baker"
-  $debsystemctl stop "octez-baker.service"
-fi
+exit 0
