@@ -159,6 +159,7 @@ let start_blueprint_follower ~relay_endpoint =
     ~evm_node_endpoint:relay_endpoint
     ~rpc_timeout:10.
     ~next_blueprint_number
+    ~instant_confirmations:false
     ~on_new_blueprint:(fun number blueprint ->
       let*! () = Floodgate_events.received_blueprint number in
       let* () =

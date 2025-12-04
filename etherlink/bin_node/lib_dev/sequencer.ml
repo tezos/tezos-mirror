@@ -89,7 +89,7 @@ let validate_and_add_tx (type f)
 
 let loop_sequencer (type f) multichain
     ~(tx_container : f Services_backend_sig.tx_container) ?sandbox_config
-    ~rpc_timeout time_between_blocks =
+    ~rpc_timeout ~instant_confirmations time_between_blocks =
   let open Lwt_result_syntax in
   match sandbox_config with
   | Some {parent_chain = Some evm_node_endpoint; _} ->
@@ -100,6 +100,7 @@ let loop_sequencer (type f) multichain
         ~evm_node_endpoint
         ~rpc_timeout
         ~next_blueprint_number:head.next_blueprint_number
+        ~instant_confirmations
         ~on_new_blueprint:(fun (Qty number) blueprint ->
           let*! {next_blueprint_number = Qty expected_number; _} =
             Evm_context.head_info ()
@@ -582,6 +583,8 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       enable_multichain
       ~tx_container
       ~rpc_timeout:configuration.rpc_timeout
+      ~instant_confirmations:
+        configuration.experimental_features.preconfirmation_stream_enabled
       ?sandbox_config
       sequencer_config.time_between_blocks
   and* () =

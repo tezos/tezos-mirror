@@ -41,16 +41,19 @@ type inclusion_handler =
 type dropped_handler = Ethereum_types.hash -> string -> unit tzresult Lwt.t
 
 (** [start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
-    ~get_next_blueprint_number on_new_blueprint_handler
-    on_finalized_levels_handler]
+    ~get_next_blueprint_number on_new_blueprint on_finalized_levels on_next_block_info
+    on_inclusion on_dropped]
     is a never-returning function that continuously streams blueprints from
     the given [evm_node_endpoint] and dispatches them to the appropriate handlers.
 
     - [on_new_blueprint] is called for each new blueprint received, in order.
     - [on_finalized_levels] is called when the remote EVM notifies finalized levels.
-    - [on_next_block_info] is called whenever the remote EVM provides
-      the informations of an upcoming block.
-    - [on_inclusion] is called for each transaction included in the next block.
+    - [on_next_block_info] is called whenever the remote node provides the
+      information of a future block (instant confirmations).
+    - [on_inclusion] is called for each transaction that is preconfirmed for
+      inclusion in the next block (instant confirmations).
+    - [on_dropped] is called for each transaction that did not pass the inclusion
+      preconfirmation validation step (instant confirmations).
 
     [next_blueprint_number] is the height of the current local head, while
     [time_between_blocks] is used to detect when a connection to
@@ -62,6 +65,7 @@ val start :
   evm_node_endpoint:Uri.t ->
   rpc_timeout:float ->
   next_blueprint_number:quantity ->
+  instant_confirmations:bool ->
   on_new_blueprint:new_blueprint_handler ->
   on_finalized_levels:finalized_levels_handler ->
   on_next_block_info:next_block_info_handler ->

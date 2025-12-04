@@ -219,7 +219,8 @@ module Blueprints_sequence = struct
 end
 
 let rec catchup ~multichain ~next_blueprint_number ~first_connection
-    ~sbl_callbacks_activated params : Empty.t tzresult Lwt.t =
+    ~sbl_callbacks_activated ~instant_confirmations params :
+    Empty.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   Metrics.start_bootstrapping () ;
 
@@ -261,11 +262,13 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection
         ~first_connection
         params
         ~sbl_callbacks_activated
+        ~instant_confirmations
   | `Completed next_blueprint_number -> (
       let*! call_result =
         Evm_services.monitor_messages
           ~evm_node_endpoint:params.evm_node_endpoint
           ~timeout:params.rpc_timeout
+          ~instant_confirmations
           next_blueprint_number
       in
 
@@ -274,6 +277,7 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection
           (stream_loop [@tailcall])
             ~multichain
             ~sbl_callbacks_activated
+            ~instant_confirmations
             next_blueprint_number
             params
             monitor
@@ -283,10 +287,11 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection
             ~next_blueprint_number
             ~first_connection:false
             ~sbl_callbacks_activated
+            ~instant_confirmations
             params)
 
-and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
-    params monitor =
+and stream_loop ~multichain ~sbl_callbacks_activated ~instant_confirmations
+    (Qty next_blueprint_number) params monitor =
   let open Lwt_result_syntax in
   Metrics.stop_bootstrapping () ;
   let*! candidate =
@@ -305,6 +310,7 @@ and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
       (stream_loop [@tailcall])
         ~multichain
         ~sbl_callbacks_activated
+        ~instant_confirmations
         (Qty next_blueprint_number)
         params
         monitor
@@ -315,6 +321,7 @@ and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
           (stream_loop [@tailcall])
             ~multichain
             ~sbl_callbacks_activated:is_sub_block_activated
+            ~instant_confirmations
             (Qty (Z.succ next_blueprint_number))
             params
             monitor
@@ -323,6 +330,7 @@ and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
           (catchup [@tailcall])
             ~multichain
             ~sbl_callbacks_activated
+            ~instant_confirmations
             ~next_blueprint_number:level
             ~first_connection:
               (* The connection was not interrupted, but we decided to restart
@@ -341,6 +349,7 @@ and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
       (stream_loop [@tailcall])
         ~multichain
         ~sbl_callbacks_activated
+        ~instant_confirmations
         (Qty next_blueprint_number)
         params
         monitor
@@ -355,6 +364,7 @@ and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
       (stream_loop [@tailcall])
         ~multichain
         ~sbl_callbacks_activated
+        ~instant_confirmations
         (Qty next_blueprint_number)
         params
         monitor
@@ -369,6 +379,7 @@ and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
       (stream_loop [@tailcall])
         ~multichain
         ~sbl_callbacks_activated
+        ~instant_confirmations
         (Qty next_blueprint_number)
         params
         monitor
@@ -377,6 +388,7 @@ and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
       (catchup [@tailcall])
         ~multichain
         ~sbl_callbacks_activated
+        ~instant_confirmations
         ~next_blueprint_number:(Qty next_blueprint_number)
         ~first_connection:false
         params
@@ -385,8 +397,8 @@ and stream_loop ~multichain ~sbl_callbacks_activated (Qty next_blueprint_number)
       fail err
 
 let start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
-    ~next_blueprint_number ~on_new_blueprint ~on_finalized_levels
-    ~on_next_block_info ~on_inclusion ~on_dropped () =
+    ~next_blueprint_number ~instant_confirmations ~on_new_blueprint
+    ~on_finalized_levels ~on_next_block_info ~on_inclusion ~on_dropped () =
   let open Lwt_result_syntax in
   let sbl_callbacks_activated = {sbl_callbacks_activated = false} in
   let*! res =
@@ -395,6 +407,7 @@ let start ~multichain ~time_between_blocks ~evm_node_endpoint ~rpc_timeout
       ~next_blueprint_number
       ~first_connection:true
       ~sbl_callbacks_activated
+      ~instant_confirmations
       {
         time_between_blocks;
         evm_node_endpoint;
