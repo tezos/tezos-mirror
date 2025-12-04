@@ -8,19 +8,11 @@
 
 ### RPCs changes
 
-- Fix issue when connecting to nodes behind a proxy that can rearrange
-  chunks. (!20057)
-
-- Enable concurrent waiting for transaction confirmation in batched
-`eth_sendRawTransactionSync` calls for improved throughput. (!20064)
-
 ### Monitoring changes
 
 ### Command-line interface changes
 
 ### Execution changes
-
-- Supports executing Farfadet natively. (!20065)
 
 ### Storage changes
 
@@ -32,6 +24,30 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.49 (2025-12-04)
+
+This release of the EVM node makes it ready for the instant confirmation feature
+(also known as sub-block latency) which is not activated by default. It also
+improves performance of `eth_sendRawTransactionSync` and adds support for
+executing the Farfadet kernel (Etherlink 6.0) natively.
+
+### RPCs changes
+
+- Fix issue when connecting to nodes behind a proxy that can rearrange
+  chunks. (!20057)
+
+- Enable concurrent waiting for transaction confirmation in batched
+  `eth_sendRawTransactionSync` calls for improved throughput. (!20064)
+
+### Command-line interface changes
+
+- The `download kernel` command now allows to download the upcoming kernel
+  Farfadet by its alias `farfadet`. (!20065)
+
+### Execution changes
+
+- Supports executing Farfadet natively. (!20065)
 
 ## Version 0.48 (2025-11-24)
 
