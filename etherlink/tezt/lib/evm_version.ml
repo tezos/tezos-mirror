@@ -18,11 +18,7 @@ let to_solidity_evm_version = function
   | Shanghai -> "shanghai"
   | Cancun -> "cancun"
   | Prague -> "prague"
-  | Osaka ->
-      (* TODO: L2-562
-         Replace by "osaka" once the solidity compiler
-         supports this evm version (pending 0.8.31 release). *)
-      "prague"
+  | Osaka -> "osaka"
 
 let number = function Shanghai -> 0 | Cancun -> 1 | Prague -> 2 | Osaka -> 3
 
