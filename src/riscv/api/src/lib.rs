@@ -26,21 +26,19 @@ use octez_riscv::pvm::hooks::StdoutDebugHooks;
 use octez_riscv::pvm::node_pvm::NodePvm;
 use octez_riscv::pvm::node_pvm::PvmStorage;
 use octez_riscv::pvm::node_pvm::PvmStorageError;
-use octez_riscv::state_backend::owned_backend::Owned;
-use octez_riscv::state_backend::proof_backend::proof::MerkleProof;
 use octez_riscv::state_backend::proof_backend::proof::Proof as PvmProof;
 use octez_riscv::state_backend::proof_backend::proof::deserialise_proof;
 use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
-use octez_riscv::state_backend::verify_backend::Verifier;
-use octez_riscv::storage;
 use octez_riscv::storage::StorageError;
+use octez_riscv_data::hash;
+use octez_riscv_data::merkle_proof::proof_tree::MerkleProof;
+use octez_riscv_data::mode::Normal;
+use octez_riscv_data::mode::Verify;
 use pointer_apply::ApplyReadOnly;
 use pointer_apply::apply_imm;
 use pointer_apply::apply_mut;
 use sha2::Digest;
 use sha2::Sha256;
-
-use crate::storage::Hash;
 
 type OcamlFallible<T> = Result<T, ocaml::Error>;
 
@@ -48,13 +46,13 @@ type OcamlFallible<T> = Result<T, ocaml::Error>;
 pub struct Repo(PvmStorage);
 
 #[ocaml::sig]
-pub type State = ImmutableState<NodePvm<Owned>>;
+pub type State = ImmutableState<NodePvm<Normal>>;
 
 #[ocaml::sig]
-pub type MutState = MutableState<NodePvm<Owned>>;
+pub type MutState = MutableState<NodePvm<Normal>>;
 
 #[ocaml::sig]
-pub struct Id(storage::Hash);
+pub struct Id(hash::Hash);
 
 ocaml::custom!(Repo);
 ocaml::custom!(State);
@@ -270,9 +268,9 @@ pub fn octez_riscv_to_imm(state: Pointer<MutState>) -> Pointer<State> {
 
 #[ocaml::func]
 #[ocaml::sig("bytes -> id")]
-pub fn octez_riscv_id_unsafe_of_raw_bytes(s: &[u8]) -> Pointer<Id> {
-    assert!(s.len() == storage::DIGEST_SIZE);
-    let hash: storage::Hash = s.try_into().unwrap();
+pub fn octez_riscv_id_unsafe_of_raw_bytes(bytes: &[u8]) -> Pointer<Id> {
+    let digest: [u8; hash::DIGEST_SIZE] = bytes.try_into().expect("Invalid hash length");
+    let hash = hash::Hash::from(digest);
     Id(hash).into()
 }
 
@@ -542,17 +540,17 @@ pub unsafe fn octez_riscv_storage_export_snapshot(
 /// Proof type used by both the protocol and the rollup node.
 #[ocaml::sig]
 struct Proof {
-    final_state_hash: Hash,
+    final_state_hash: hash::Hash,
     serialised_proof: Box<[u8]>,
     /// When deserialising a proof in the protocol, a verifier backend and its [`MerkleProof`] are needed for the rest of the API.
-    verifier: Option<(NodePvm<Verifier>, MerkleProof)>,
+    verifier: Option<(NodePvm<Verify>, MerkleProof)>,
 }
 
 impl From<PvmProof> for Proof {
     fn from(proof: PvmProof) -> Self {
         Proof {
             final_state_hash: proof.final_state_hash(),
-            serialised_proof: serialise_proof(&proof).collect(),
+            serialised_proof: serialise_proof(&proof).into_boxed_slice(),
             verifier: None,
         }
     }
@@ -562,7 +560,7 @@ impl Proof {
     /// Obtain the [`NodePvm`] and [`MerkleProof`] for this proof.
     ///
     /// Create them from the raw proof bytes if they do not exist yet.
-    fn get_or_create_verifier(&mut self) -> Result<(&NodePvm<Verifier>, &MerkleProof), String> {
+    fn get_or_create_verifier(&mut self) -> Result<(&NodePvm<Verify>, &MerkleProof), String> {
         match &mut self.verifier {
             Some((node_pvm, merkle_tree)) => Ok((node_pvm, merkle_tree)),
 
@@ -593,14 +591,7 @@ pub fn octez_riscv_proof_start_state(mut proof: Pointer<Proof>) -> OcamlFallible
         }
     };
 
-    match merkle_proof.root_hash() {
-        Ok(hash) => Ok(hash.into()),
-        Err(e) => {
-            return Err(ocaml::Error::Error(
-                format!("Error getting start state hash from proof: {e}").into(),
-            ));
-        }
-    }
+    Ok(<[u8; hash::DIGEST_SIZE]>::from(merkle_proof.root_hash()))
 }
 
 #[ocaml::func]

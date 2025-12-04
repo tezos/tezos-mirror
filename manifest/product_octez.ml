@@ -5200,7 +5200,7 @@ let _octez_riscv_pvm_test =
       [
         "../../../riscv/assets/riscv-dummy.elf";
         "../../../riscv/assets/riscv-dummy.elf.checksum";
-        "../../../riscv/lib/tests/expected/jstz/proof_initial";
+        "../../../riscv/assets/jstz_proof_initial";
       ]
     ~deps:
       [
@@ -5446,6 +5446,7 @@ let _octez_dal_node_lib_test =
     ~path:"src/lib_dal_node/test/"
     ~opam:"tezos-dal-node-lib"
     ~preprocess:(ppses [ppx_hash])
+    ~with_macos_security_framework:true
     ~deps:
       [
         octez_stdlib |> open_;

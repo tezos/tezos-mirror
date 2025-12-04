@@ -13,6 +13,7 @@ sha2.workspace = true
 strum.workspace = true
 ocaml.workspace = true
 octez-riscv.workspace = true
+octez-riscv-data.workspace = true
 ocaml-sys.workspace = true
 ocaml-boxroot-sys.workspace = true
 

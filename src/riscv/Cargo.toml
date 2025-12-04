@@ -17,10 +17,14 @@ ocaml-build = "1.0.0"
 sha2 = "0.10.9"
 
 [workspace.dependencies.strum]
-version = "0.26.1"
+version = "0.27"
 features = ["derive"]
 
 [workspace.dependencies.octez-riscv]
+# The locked version can be updated via `make update-riscv-pvm`
+git = "https://github.com/tezos/riscv-pvm.git"
+
+[workspace.dependencies.octez-riscv-data]
 # The locked version can be updated via `make update-riscv-pvm`
 git = "https://github.com/tezos/riscv-pvm.git"
 

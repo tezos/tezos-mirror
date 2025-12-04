@@ -43,13 +43,13 @@ update-riscv-pvm: update-assets
 
 # Update the compiled dummy kernel used in CI tests
 assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
-	@curl -L -o $@ $(RISCV_PVM_REPO)/src/riscv/assets/riscv-dummy.elf
-	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/src/riscv/assets/riscv-dummy.elf.checksum
+	@curl -L -o $@ $(RISCV_PVM_REPO)/assets/riscv-dummy.elf
+	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/assets/riscv-dummy.elf.checksum
 
 # Update the compiled jstz kernel used in CI tests
 assets/jstz assets/jstz.checksum::
-	@curl -L -o $@ $(RISCV_PVM_REPO)/src/riscv/assets/jstz
-	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/src/riscv/assets/jstz.checksum
+	@curl -L -o $@ $(RISCV_PVM_REPO)/assets/jstz
+	@curl -L -o $@.checksum $(RISCV_PVM_REPO)/assets/jstz.checksum
 
 # Update the serialised proof for the initial tick of jstz used in the CI tests
 assets/jstz_proof_initial:
