@@ -347,16 +347,19 @@ type tezos_job_graph = Tezos_ci.tezos_job UID_map.t
 
    By default, [Publish] jobs are non-interruptible and other jobs are interruptible.
    Setting [interruptible_pipeline] to [false] makes all jobs non-interruptible.
+   Setting [interruptible_publish] to [true] makes publish jobs interruptible.
 
-   [Publish] jobs use non-interruptible runners.
+   Non-interruptible [Publish] jobs use non-interruptible runners.
    Other jobs may use any runner (interruptible or not).
    [interruptible_pipeline] has no impact on the choice of runners.
+   Setting [interruptible_publish] to [true] allows publish jobs to use interruptible runners.
 
    If [with_condition] is [true], the job [rules] will include its conditions.
    If it is [false], its conditions are ignored.
    Conditions are typically only used in merge request pipelines such as [before_merging]. *)
-let convert_graph ?(interruptible_pipeline = true) ~with_condition
-    (graph : fixed_job_graph) : tezos_job_graph =
+let convert_graph ?(interruptible_pipeline = true)
+    ?(interruptible_publish = false) ~with_condition (graph : fixed_job_graph) :
+    tezos_job_graph =
   (* To build the graph, we take all jobs from [graph], convert them,
      and add them to [result].
      But before we convert a job, we need the converted version of its dependencies.
@@ -465,7 +468,9 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                   | Manual -> Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
               in
               let interruptible_stage =
-                match stage with Build | Test -> true | Publish -> false
+                match stage with
+                | Build | Test -> true
+                | Publish -> interruptible_publish
               in
               let retry : Gitlab_ci.Types.retry option =
                 match retry with
@@ -551,10 +556,13 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
 
 (* Convert user-specified jobs into [Tezos_ci] jobs.
    See GRAPH TRANSFORMATIONS. *)
-let convert_jobs ?interruptible_pipeline ~with_condition
+let convert_jobs ?interruptible_pipeline ?interruptible_publish ~with_condition
     (jobs : (trigger * job) list) : Tezos_ci.tezos_job list =
   jobs |> make_graph |> fix_graph
-  |> convert_graph ?interruptible_pipeline ~with_condition
+  |> convert_graph
+       ?interruptible_pipeline
+       ?interruptible_publish
+       ~with_condition
   |> UID_map.bindings |> List.map snd
 
 let parameterize make =
@@ -685,7 +693,8 @@ let get_custom_extended_test_jobs () =
 
 let master_jobs = ref []
 
-let get_master_jobs () = convert_jobs ~with_condition:false !master_jobs
+let get_master_jobs () =
+  convert_jobs ~interruptible_publish:true ~with_condition:false !master_jobs
 
 let global_release_jobs = ref []
 
