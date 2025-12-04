@@ -3695,6 +3695,101 @@ let test_refutation_with_dal_page_import protocols =
         ~with_dal)
     all_cases
 
+let test_refutation_with_dal_page_import_id_far_in_the_future protocols =
+  (* This is the published level for which the toy kernel
+     [Constant.WASM.echo_dal_reveal_pages_high_target_pub_level] asks to import
+     page 2 of slot 1. *)
+  let published_level = 3000 in
+  (* This is the test's attestation lag (checked in the scenario). *)
+  let dal_lag = 5 in
+  (* This is the slot index at which we'll possibly publish a slot. *)
+  let slot_index = 1 in
+  (* Once a slot is attested, its import is valid for this number of
+     blocks. After that, any import is considered invalid. *)
+  let dal_ttl = 50 in
+
+  (* This inbox level is too small w.r.t. to target published level to import.
+     The rollup node should be able to progress even without knowing the status
+     of that slot whose id is far in the future.   *)
+  let inbox_level = 5 in
+
+  (* Which player will start the game. This will have an impact on which one
+     will provide the final proof. *)
+  let dimension_player_priority = [`Priority_loser; `Priority_honest] in
+
+  (* The list of tests, as a cartesian product of 3 dimensions above. *)
+  let all_cases =
+    List.fold_left
+      (fun accu player_priority ->
+        {inbox_level; player_priority; attestation_status = `Unattested} :: accu)
+      []
+      dimension_player_priority
+  in
+
+  List.iter
+    (fun {inbox_level; attestation_status; player_priority} ->
+      (* One test name for each dimensions combination. *)
+      let variant =
+        Format.sprintf
+          "dal_page_with_id_far_in_the_future_flipped_at_inbox_level_%d_%s_%s"
+          inbox_level
+          (player_priority_to_string player_priority)
+          (attestation_status_to_string attestation_status)
+      in
+      (* The behaviour of the loser mode is parameterized by the inbox level at
+         which the payload of imported page is flipped. *)
+      let loser_modes =
+        (* See src/lib_smart_rollup_node/loser_mode.mli for the semantics of this
+            loser mode. *)
+        [
+          Format.sprintf
+            "reveal_dal_page published_level:%d slot_index:1 page_index:2 \
+             strategy:flip inbox_level:%d"
+            published_level
+            inbox_level;
+        ]
+      in
+      let may_publish_and_attest_slot =
+        if attestation_status = `Unattested then None
+        else Some (published_level, slot_index)
+      in
+      let with_dal =
+        with_dal_ready_for_echo_dal_reveal_pages
+          ~operator_profiles:[slot_index]
+          ~kernel_imported_publish_level:inbox_level
+            (* We'll not progress until published_level on purpose. *)
+          ~expected_attestation_lag:dal_lag
+          ~may_publish_and_attest_slot
+      in
+      let priority =
+        (player_priority :> [`No_priority | `Priority_honest | `Priority_loser])
+      in
+      test_refutation_scenario
+        ~uses:(fun _protocol ->
+          [Constant.WASM.echo_dal_reveal_pages; Constant.octez_dal_node])
+        ~kind:"wasm_2_0_0"
+        ~mode:Operator
+        ~challenge_window:150
+        ~timeout:120
+        ~commitment_period:10
+        ~dal_attested_slots_validity_lag:dal_ttl
+        ~variant
+        ~boot_sector:
+          (read_kernel
+             ~base:""
+             ~suffix:""
+             (Uses.path
+                Constant.WASM.echo_dal_reveal_pages_high_target_pub_level))
+        (refutation_scenario_parameters
+           ~loser_modes
+           (inputs_for 10)
+           ~final_level:100
+           ~priority)
+        protocols
+        ~regression:false
+        ~with_dal)
+    all_cases
+
 (** Run one of the refutation tests with an accuser instead of a full operator. *)
 let test_accuser protocols =
   test_refutation_scenario
@@ -7677,6 +7772,7 @@ let register_protocol_independent () =
   test_accuser protocols ;
   test_invalid_dal_parameters protocols ;
   test_refutation_with_dal_page_import protocols ;
+  test_refutation_with_dal_page_import_id_far_in_the_future protocols ;
   test_bailout_refutation protocols ;
   test_multiple_batcher_key ~kind protocols ;
   test_batcher_order_msgs ~kind protocols ;

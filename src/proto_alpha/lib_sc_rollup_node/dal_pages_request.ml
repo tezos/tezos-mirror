@@ -316,6 +316,46 @@ let get_dal_node cctxt_opt =
       let*! err = tzfail No_dal_node_provided in
       Environment.wrap_tzresult err |> Lwt.return
 
+(* Check whether [page_id] could be valid for at least one admissible DAL
+   attestation lag.
+
+   This function mirrors the pre-check done in DAL refutations'
+   [produce_proof_repr]. At this point we do not know the exact DAL
+   attestation lag, so we over-approximate the admissible range by the whole
+   interval [0, legacy_attestation_lag] and reuse [page_id_is_valid] on both
+   extremal values:
+
+     - If [page_id_is_valid] is [false] for both lags (0 and
+       [legacy_attestation_lag]), then [page_id] is definitely invalid for any
+       admissible lag. In that case, any import of the corresponding slot/page
+       is known to be invalid and we can reject it immediately, without ever
+       querying the DAL node.
+
+     - Otherwise, there exists at least one admissible lag for which
+       [page_id] may still be valid, and the DAL node must be consulted to
+       decide.
+
+   This early check protects the rollup node from pathological situations
+   where the DAL node cannot answer about a slot/page whose published level is
+   very far in the past or future: when the result is [false], we already know
+   that no import could be valid.  *)
+let may_be_valid_in_our_range_of_lags chain_id ~number_of_slots ~number_of_pages
+    ~dal_activation_level ~origination_level ~inbox_level page_id
+    ~dal_attested_slots_validity_lag =
+  let f =
+    page_id_is_valid
+      chain_id
+      ~number_of_slots
+      ~number_of_pages
+      ~dal_activation_level
+      ~origination_level
+      ~inbox_level
+      ~dal_attested_slots_validity_lag
+      page_id
+  in
+  f ~dal_attestation_lag:0
+  || f ~dal_attestation_lag:Dal.Slots_history.legacy_attestation_lag
+
 let page_content_int
     (dal_constants : Octez_smart_rollup.Rollup_constants.dal_constants)
     ~dal_activation_level ~inbox_level node_ctxt page_id
@@ -325,38 +365,52 @@ let page_content_int
     node_ctxt
   in
   let* chain_id = Layer1.get_chain_id l1_ctxt in
-  let* dal_cctxt = get_dal_node node_ctxt.dal_cctxt in
-  let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
-  let dal_slot_status_max_fetch_attempts =
-    node_ctxt.config.dal_slot_status_max_fetch_attempts
+  let may_be_valid_id =
+    may_be_valid_in_our_range_of_lags
+      chain_id
+      ~number_of_slots:dal_constants.number_of_slots
+      ~number_of_pages:
+        (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
+      ~dal_activation_level
+      ~origination_level
+      ~inbox_level
+      page_id
+      ~dal_attested_slots_validity_lag
   in
+  if not may_be_valid_id then return_none
+  else
+    let* dal_cctxt = get_dal_node node_ctxt.dal_cctxt in
+    let Dal.Slot.Header.{published_level; index} = page_id.Dal.Page.slot_id in
+    let dal_slot_status_max_fetch_attempts =
+      node_ctxt.config.dal_slot_status_max_fetch_attempts
+    in
 
-  let* status =
-    get_slot_header_attestation_info
-      dal_cctxt
-      ~published_level
-      ~index
-      ~dal_slot_status_max_fetch_attempts
-  in
-  match status with
-  | `Attested attestation_lag ->
-      if
-        not
-        @@ page_id_is_valid
-             chain_id
-             ~dal_attestation_lag:attestation_lag
-             ~number_of_slots:dal_constants.number_of_slots
-             ~number_of_pages:
-               (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
-             ~dal_activation_level
-             ~origination_level
-             ~inbox_level
-             ~dal_attested_slots_validity_lag
-             page_id
-      then return_none
-      else get_page dal_cctxt ~inbox_level page_id
-  | `Unattested | `Unpublished -> return_none
-  | `Waiting_attestation -> attestation_status_not_final published_level index
+    let* status =
+      get_slot_header_attestation_info
+        dal_cctxt
+        ~published_level
+        ~index
+        ~dal_slot_status_max_fetch_attempts
+    in
+    match status with
+    | `Attested attestation_lag ->
+        if
+          not
+          @@ page_id_is_valid
+               chain_id
+               ~dal_attestation_lag:attestation_lag
+               ~number_of_slots:dal_constants.number_of_slots
+               ~number_of_pages:
+                 (Dal.Page.pages_per_slot dal_constants.cryptobox_parameters)
+               ~dal_activation_level
+               ~origination_level
+               ~inbox_level
+               ~dal_attested_slots_validity_lag
+               page_id
+        then return_none
+        else get_page dal_cctxt ~inbox_level page_id
+    | `Unattested | `Unpublished -> return_none
+    | `Waiting_attestation -> attestation_status_not_final published_level index
 
 let with_errors_logging ~inbox_level slot_id f =
   let open Lwt_syntax in
