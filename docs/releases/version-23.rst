@@ -109,6 +109,8 @@ Ubuntu and Debian packages
       sudo apt-get update
       sudo apt-get upgrade octez-baker
 
+then restart the services (see :ref:`services_upgrade`).
+
 See the :ref:`install instructions for Ubuntu and Debian packages <installing_deb>` for details, or if you are installing Ubuntu and Debian packages from scratch.
 
 .. warning::
