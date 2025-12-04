@@ -356,6 +356,33 @@ let check_constants constants =
   let* () =
     error_unless
       Compare.Int.(
+        List.compare_length_with constants.dal.attestation_lags 1 >= 0)
+      (Invalid_protocol_constants
+         "The attestation_lags must contain at least one element.")
+  in
+  let* () =
+    let last_lag =
+      Option.value ~default:0 @@ List.hd
+      @@ List.rev constants.dal.attestation_lags
+    in
+    error_unless
+      Compare.Int.(last_lag = constants.dal.attestation_lag)
+      (Invalid_protocol_constants
+         "The last element of attestation_lags must equal attestation_lag.")
+  in
+  let* () =
+    let rec is_sorted = function
+      | [] | [_] -> true
+      | h1 :: h2 :: tl -> Compare.Int.(h1 < h2) && is_sorted (h2 :: tl)
+    in
+    error_unless
+      (is_sorted constants.dal.attestation_lags)
+      (Invalid_protocol_constants
+         "The attestation_lags list must be ordered increasingly.")
+  in
+  let* () =
+    error_unless
+      Compare.Int.(
         constants.dal.cryptobox_parameters.number_of_shards
         <= constants.consensus_committee_size)
       (Invalid_protocol_constants
