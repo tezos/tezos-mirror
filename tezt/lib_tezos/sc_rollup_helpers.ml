@@ -330,7 +330,8 @@ let make_string_parameter name = function
 let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
     ?commitment_period ?challenge_window ?timeout ?whitelist_enable
     ?rpc_external ?(riscv_pvm_enable = false) ?minimal_block_delay
-    ?dal_incentives ?dal_rewards_weight protocol =
+    ?dal_incentives ?dal_rewards_weight ?dal_attested_slots_validity_lag
+    protocol =
   let parameters =
     make_parameter "smart_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "smart_rollup_challenge_window_in_blocks" challenge_window
@@ -351,6 +352,12 @@ let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
     @ make_int_parameter
         ["issuance_weights"; "dal_rewards_weight"]
         dal_rewards_weight
+    @ make_int_parameter
+        [
+          "smart_rollup_reveal_activation_level";
+          "dal_attested_slots_validity_lag";
+        ]
+        dal_attested_slots_validity_lag
     @
     if riscv_pvm_enable then [(["smart_rollup_riscv_pvm_enable"], `Bool true)]
     else []
@@ -1009,7 +1016,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind ?with_dal
   let* dal_node =
     match with_dal with
     | None -> Lwt.return_none
-    | Some init_dal_node -> init_dal_node node client
+    | Some init_dal_node -> init_dal_node protocol node client
   in
 
   let run_honest_node sc_rollup_node =

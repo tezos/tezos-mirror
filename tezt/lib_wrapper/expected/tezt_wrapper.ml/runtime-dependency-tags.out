@@ -42,6 +42,7 @@ riscv: src/riscv/assets/jstz.checksum
 riscv: src/riscv/assets/preimages
 riscv: src/riscv/assets/riscv-dummy.elf
 riscv: src/riscv/assets/riscv-dummy.elf.checksum
+echo_dal_reveal_pages: tezt/tests/kernels/echo_dal_reveal_pages.wasm
 echo_dal_reveal_parameters: tezt/tests/kernels/echo_dal_reveal_parameters.wasm
 riscv: tezt/tests/riscv-tests/jstz-inbox.json
 alpha_json: tezt/tests/weeklynet_configs/alpha.json

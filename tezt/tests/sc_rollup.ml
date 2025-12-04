@@ -176,7 +176,8 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
     ?timestamp ?rollup_node_name ?whitelist_enable ?whitelist ?operator
     ?operators ?(uses = fun _protocol -> []) ?rpc_external ?allow_degraded
-    ?kernel_debug_log ?preimages_dir {variant; tags; description} scenario =
+    ?kernel_debug_log ?preimages_dir ?dal_attested_slots_validity_lag
+    {variant; tags; description} scenario =
   let uses protocol =
     (Constant.octez_smart_rollup_node :: Option.to_list preimages_dir)
     @ uses protocol
@@ -201,6 +202,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       ?timestamp
       ?whitelist_enable
       ~riscv_pvm_enable
+      ?dal_attested_slots_validity_lag
       protocol
   in
   let operator =
@@ -3178,14 +3180,16 @@ let test_can_stake ~kind =
   let* _ = Sc_rollup_node.wait_sync rollup_node ~timeout:20. in
   unit
 
-let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
-    ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp ?boot_sector
-    ?(extra_tags = []) ?with_dal ({allow_degraded; _} as scenario) =
+let test_refutation_scenario ?regression ?commitment_period ?challenge_window
+    ~variant ~mode ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp
+    ?boot_sector ?(extra_tags = []) ?with_dal ?dal_attested_slots_validity_lag
+    ({allow_degraded; _} as scenario) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
        flakyness. *)
-    List.compare_length_with scenario.loser_modes 1 <= 0
+    if Option.is_some regression then regression
+    else Some (List.compare_length_with scenario.loser_modes 1 <= 0)
   in
   let tags =
     ["refutation"] @ if mode = Sc_rollup_node.Accuser then ["accuser"] else []
@@ -3193,7 +3197,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   let tags = if ci_disabled then Tag.ci_disabled :: tags else tags in
   let variant = variant ^ if mode = Accuser then "+accuser" else "" in
   test_full_scenario
-    ~regression
+    ?regression
     ?hooks:None (* We only want to capture dissections manually *)
     ?commitment_period
     ~kind
@@ -3205,6 +3209,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ?challenge_window
     ~rollup_node_name:"honest"
     ~allow_degraded
+    ?dal_attested_slots_validity_lag
     {
       tags = tags @ extra_tags;
       variant = Some variant;
@@ -3447,6 +3452,248 @@ let test_invalid_dal_parameters protocols =
        ~final_level:160
        ~priority:`Priority_honest)
     protocols
+
+(* kernel_imported_publish_level is the imported published level hardcoded in
+   the [Constant.WASM.echo_dal_reveal_pages] kernel. *)
+let with_dal_ready_for_echo_dal_reveal_pages ~operator_profiles
+    ~kernel_imported_publish_level ~may_publish_and_attest_slot
+    ~expected_attestation_lag =
+ fun protocol tezos_node tezos_client ->
+  (* We create and start a DAL node with the given producer profile. *)
+  let dal_node = Dal_node.create ~node:tezos_node () in
+  let* () = Dal_node.init_config ~operator_profiles dal_node in
+  let* () = Dal_node.run dal_node ~wait_ready:true in
+  let* () =
+    match may_publish_and_attest_slot with
+    | None ->
+        (* No slot to publish and atest *)
+        unit
+    | Some (published_level, slot_index) ->
+        (* We want to publish a slot at the given level and index, and then attest it. *)
+        let* curr_level = Node.get_level tezos_node in
+        if curr_level > published_level then
+          Test.fail
+            "publish level (%d) smaller than current level (%d)@."
+            published_level
+            curr_level ;
+        (* Advance the L1 chain until [published_level - 1]. *)
+        let* () =
+          Client.bake_for ~count:(published_level - curr_level - 1) tezos_client
+        in
+        let* _lvl = Node.wait_for_level tezos_node (published_level - 1) in
+        let* dal_parameters = Dal_common.Parameters.from_client tezos_client in
+        let attestation_lag = dal_parameters.attestation_lag in
+        let slot_size = dal_parameters.cryptobox.slot_size in
+        if expected_attestation_lag <> attestation_lag then
+          Test.fail
+            "Expected attestation_lag %d, got %d@."
+            expected_attestation_lag
+            attestation_lag ;
+        Dal.publish_store_and_attest_slot
+          ~protocol
+          tezos_client
+          tezos_node
+          dal_node
+          Constant.bootstrap1
+          ~index:slot_index
+          ~content:
+            (Dal_common.Helpers.make_slot
+               ~slot_size
+               (String.make slot_size 'T'))
+          ~attestation_lag
+          ~number_of_slots:dal_parameters.number_of_slots
+  in
+  (* Whether we published and attested a slot or not, we advance the L1 chain
+     until [kernel_imported_publish_level + expected_attestation_lag] is
+     finalized to ensure that the DAL node can answer the rollup's requests
+     about the slot 1 published at level [kernel_imported_publish_level]. *)
+  let target_final_l1_level =
+    kernel_imported_publish_level + expected_attestation_lag
+  in
+  let* curr_level = Node.get_level tezos_node in
+  let block_finality = 2 in
+  let num_blocks_to_bake =
+    target_final_l1_level + block_finality - curr_level
+  in
+  let* () =
+    if num_blocks_to_bake <= 0 then unit
+    else
+      let wait_for_target_final_l1_level =
+        Dal_node.wait_for dal_node "dal_new_L1_final_block.v0" (fun e ->
+            if JSON.(e |-> "level" |> as_int) = target_final_l1_level then
+              Some ()
+            else None)
+      in
+      let* () =
+        (* [Client.bake_for ~count] doesn't work here / is flaky. *)
+        repeat num_blocks_to_bake (fun () -> Client.bake_for tezos_client)
+      in
+      wait_for_target_final_l1_level
+  in
+  (* Ensure that in case we wanted an attested slot, it's indeed attested
+     (otherwise, we'd not test the desired configuration). *)
+  let* () =
+    match may_publish_and_attest_slot with
+    | None -> unit
+    | Some (published_level, slot_index) ->
+        let open Dal_common.RPC in
+        let open Dal_common.RPC.Local in
+        let* slot_status =
+          call dal_node
+          @@ get_level_slot_status ~slot_level:published_level ~slot_index
+        in
+        Check.(slot_status = Attested expected_attestation_lag)
+          ~__LOC__
+          Dal_common.Check.slot_id_status_typ
+          ~error_msg:
+            "The value of the fetched status should match the expected one \
+             (current = %L, expected = %R)" ;
+        Log.info
+          "Slot published at level %d and index %d is attested as expected@."
+          published_level
+          slot_index ;
+        unit
+  in
+  Lwt.return_some dal_node
+
+type case = {
+  inbox_level : int;
+  player_priority : [`Priority_loser | `Priority_honest];
+  attestation_status : [`Attested | `Unattested];
+      (* TODO: We might want to distinguish "Published | Unpublished" for the
+         Unattested case in the future. *)
+}
+
+let player_priority_to_string = function
+  | `Priority_loser -> "Priority_loser"
+  | `Priority_honest -> "Priority_honest"
+
+let attestation_status_to_string = function
+  | `Attested -> "Attested"
+  | `Unattested -> "Unattested"
+
+let test_refutation_with_dal_page_import protocols =
+  (* This is the published level for which the toy kernel
+     [Constant.WASM.echo_dal_reveal_pages] asks to import page 2 of slot 1. *)
+  let published_level = 15 in
+  (* This is the test's attestation lag (checked in the scenario). *)
+  let dal_lag = 5 in
+  (* This is the slot index at which we'll possibly publish a slot. *)
+  let slot_index = 1 in
+  (* Once a slot is attested, its import is valid for this number of
+     blocks. After that, any import is considered invalid. *)
+  let dal_ttl = 50 in
+
+  (* First dimension of the tests: we vary inbox_level at which the divergence
+     between the honest and loser rollups will happen. This stress-tests various
+     corner cases regarding the level at which the import request is sent
+     w.r.t. published level.  *)
+  let dimension_inbox_level =
+    [
+      (* Test import around published_level. Nothing should be imported *)
+      published_level - 1;
+      published_level + 0;
+      published_level + 1;
+      (* Test import around attested_level. Nothing should be imported for the
+         first level below. For the two others, the page should be imported if
+         the slot is attested. *)
+      published_level + dal_lag - 1;
+      published_level + dal_lag + 0;
+      published_level + dal_lag + 1;
+      (* Test import attested_level + TLL. The slot's page should not be
+         imported for the third case below, even if it is attested, because its
+         TTL expired.  *)
+      published_level + dal_ttl + dal_lag - 1;
+      published_level + dal_ttl + dal_lag + 0;
+      published_level + dal_ttl + dal_lag + 1;
+    ]
+  in
+
+  (* Second dimension of the tests: Which player will start the game. This will
+     have an impact on which one will provide the final proof. *)
+  let dimension_player_priority = [`Priority_loser; `Priority_honest] in
+
+  (* Third dimension of the tests: We will test both with attested an unattested
+     slots. *)
+  let dimension_attested = [`Attested; `Unattested] in
+
+  (* The list of tests, as a cartesian product of 3 dimensions above. *)
+  let all_cases =
+    List.fold_left
+      (fun accu inbox_level ->
+        List.fold_left
+          (fun accu player_priority ->
+            List.fold_left
+              (fun accu attestation_status ->
+                {inbox_level; player_priority; attestation_status} :: accu)
+              accu
+              dimension_attested)
+          accu
+          dimension_player_priority)
+      []
+      dimension_inbox_level
+  in
+
+  List.iter
+    (fun {inbox_level; attestation_status; player_priority} ->
+      (* One test name for each dimensions combination. *)
+      let variant =
+        Format.sprintf
+          "dal_page_flipped_at_inbox_level_%d_%s_%s"
+          inbox_level
+          (player_priority_to_string player_priority)
+          (attestation_status_to_string attestation_status)
+      in
+      (* The behaviour of the loser mode is parameterized by the inbox level at
+         which the payload of imported page is flipped. *)
+      let loser_modes =
+        (* See src/lib_smart_rollup_node/loser_mode.mli for the semantics of this
+            loser mode. *)
+        [
+          Format.sprintf
+            "reveal_dal_page published_level:15 slot_index:1 page_index:2 \
+             strategy:flip inbox_level:%d"
+            inbox_level;
+        ]
+      in
+      let may_publish_and_attest_slot =
+        if attestation_status = `Unattested then None
+        else Some (published_level, slot_index)
+      in
+      let with_dal =
+        with_dal_ready_for_echo_dal_reveal_pages
+          ~operator_profiles:[slot_index]
+          ~kernel_imported_publish_level:published_level
+          ~expected_attestation_lag:dal_lag
+          ~may_publish_and_attest_slot
+      in
+      let priority =
+        (player_priority :> [`No_priority | `Priority_honest | `Priority_loser])
+      in
+      test_refutation_scenario
+        ~uses:(fun _protocol ->
+          [Constant.WASM.echo_dal_reveal_pages; Constant.octez_dal_node])
+        ~kind:"wasm_2_0_0"
+        ~mode:Operator
+        ~challenge_window:150
+        ~timeout:120
+        ~commitment_period:10
+        ~dal_attested_slots_validity_lag:dal_ttl
+        ~variant
+        ~boot_sector:
+          (read_kernel
+             ~base:""
+             ~suffix:""
+             (Uses.path Constant.WASM.echo_dal_reveal_pages))
+        (refutation_scenario_parameters
+           ~loser_modes
+           (inputs_for 10)
+           ~final_level:100
+           ~priority)
+        protocols
+        ~regression:false
+        ~with_dal)
+    all_cases
 
 (** Run one of the refutation tests with an accuser instead of a full operator. *)
 let test_accuser protocols =
@@ -7429,6 +7676,7 @@ let register_protocol_independent () =
   test_injector_auto_discard protocols ;
   test_accuser protocols ;
   test_invalid_dal_parameters protocols ;
+  test_refutation_with_dal_page_import protocols ;
   test_bailout_refutation protocols ;
   test_multiple_batcher_key ~kind protocols ;
   test_batcher_order_msgs ~kind protocols ;
