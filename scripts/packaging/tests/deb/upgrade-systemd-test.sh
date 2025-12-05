@@ -78,7 +78,7 @@ systemctl list-unit-files --type=service | grep "octez"
 
 # [upgrade octez]
 sudo rm -f /usr/sbin/policy-rc.d
-apt-get upgrade -y octez-baker
+apt-get upgrade -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -y octez-node octez-dal-node octez-baker
 
 sudo systemctl status octez-node
 version_after_upgrade=$(get_node_version)
