@@ -93,6 +93,16 @@ module Node_metrics = struct
       ~subsystem
       name
 
+  let slots_unattested =
+    let name = "slots_unattested" in
+    Prometheus.Counter.v_label
+      ~label_name:"slot_index"
+      ~help:
+        "Count of published but unattested slot at index <i> since node started"
+      ~namespace
+      ~subsystem
+      name
+
   let attested_slots_for_baker_per_level_ratio =
     let name = "attested_slot_for_baker_per_level_ratio" in
     Prometheus.Gauge.v_label
@@ -615,6 +625,9 @@ let slot_waiting_for_attestation ~set i =
 let slot_attested ~set i =
   let v = float_of_int @@ if set then 1 else 0 in
   Prometheus.Gauge.set (Node_metrics.slots_attested (string_of_int i)) v
+
+let slot_unattested i =
+  Prometheus.Counter.inc_one (Node_metrics.slots_unattested (string_of_int i))
 
 let attested_slots_for_baker_per_level_ratio ~delegate ratio =
   let attester = Format.asprintf "%a@." Signature.Public_key_hash.pp delegate in
