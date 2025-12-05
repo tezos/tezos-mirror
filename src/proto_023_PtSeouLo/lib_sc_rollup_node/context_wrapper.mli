@@ -9,7 +9,7 @@
 val err_implementation_mismatch : got:string -> 'a
 
 (** Context wrappers translate from/to node-context and node-pvmstate
-    PVMs internal representation to those used in the PVM. 
+    PVMs internal representation to those used in the PVM.
     Also provides conversion functions from/to mutable and immutable PVM types.
     Each different PVM context will imply a dedicated wrapper.*)
 module type S = sig
@@ -20,9 +20,9 @@ module type S = sig
   (** Type used by the mutable API for PVMs *)
   type mut_state
 
-  val of_node_context : 'a Context.t -> ('a, repo, tree) Context_sigs.t
+  val of_node_context : 'a Context.index -> ('a, repo) Context_sigs.index
 
-  val to_node_context : ('a, repo, tree) Context_sigs.t -> 'a Context.t
+  val to_node_context : ('a, repo) Context_sigs.index -> 'a Context.index
 
   val of_node_pvmstate : Context.pvmstate -> tree
 
