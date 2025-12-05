@@ -48,6 +48,7 @@ and env_version =
   | V13
   | V14
   | V15
+  | V16
 
 val component_encoding : component Data_encoding.t
 
