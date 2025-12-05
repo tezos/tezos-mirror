@@ -87,7 +87,6 @@ let job_build_evm_node_static =
          ~when_:On_success
          ["octez-binaries/$ARCH/*"])
     ~cargo_cache:true
-    ~cargo_target_caches:true
     ~sccache:(Cacio.sccache ~cache_size:"2G" ())
     ~variables:
       [
@@ -269,7 +268,6 @@ let job_build_tezt =
          ())
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    ~cargo_target_caches:true
     [
       "./scripts/ci/take_ownership.sh";
       ". ./scripts/version.sh";

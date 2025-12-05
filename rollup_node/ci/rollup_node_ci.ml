@@ -67,7 +67,6 @@ let job_build_static_binaries =
       ]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ~cache_size:"2G" ())
-    ~cargo_target_caches:true
     ~artifacts:
       ((* Extend the lifespan to prevent failure for external tools using artifacts. *)
        artifacts
