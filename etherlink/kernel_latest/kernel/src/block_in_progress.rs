@@ -364,6 +364,14 @@ impl<Tx: TransactionTrait, Receipt> BlockInProgress<Tx, Receipt> {
     pub fn account_for_invalid_transaction(&mut self, tx_data_size: u64) {
         self.add_ticks(tick_model::ticks_of_invalid_transaction(tx_data_size));
     }
+
+    pub fn pop_tx(&mut self) -> Option<Tx> {
+        self.tx_queue.pop_front()
+    }
+
+    pub fn has_tx(&self) -> bool {
+        !self.tx_queue.is_empty()
+    }
 }
 
 impl BlockInProgress<Transaction, TransactionReceipt> {
@@ -495,16 +503,8 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
         Ok(new_block)
     }
 
-    pub fn pop_tx(&mut self) -> Option<Transaction> {
-        self.tx_queue.pop_front()
-    }
-
     pub fn repush_tx(&mut self, tx: Transaction) {
         self.tx_queue.push_front(tx)
-    }
-
-    pub fn has_tx(&self) -> bool {
-        !self.tx_queue.is_empty()
     }
 
     pub fn make_receipt(

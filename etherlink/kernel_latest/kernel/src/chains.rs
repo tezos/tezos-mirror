@@ -26,10 +26,7 @@ use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
 use rlp::{Decodable, DecoderError, Encodable};
-use std::{
-    collections::VecDeque,
-    fmt::{Debug, Display},
-};
+use std::fmt::{Debug, Display};
 use tezos_crypto_rs::hash::{ChainId, UnknownSignature};
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader};
 use tezos_ethereum::{
@@ -39,11 +36,10 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::{context, mir_ctx::BlockCtx};
-use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
+use tezos_smart_rollup::outbox::OutboxQueue;
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
-    enc_wrappers::BlockNumber,
     operation::{ManagerOperation, ManagerOperationContent, Operation},
     operation_result::{
         OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
@@ -114,30 +110,6 @@ impl EvmChainConfig {
 #[derive(Debug)]
 pub struct MichelsonChainConfig {
     chain_id: ChainId,
-}
-
-pub trait BlockInProgressTrait {
-    fn number(&self) -> U256;
-}
-
-impl<Tx, Receipt> BlockInProgressTrait for BlockInProgress<Tx, Receipt> {
-    fn number(&self) -> U256 {
-        self.number
-    }
-}
-
-pub struct TezBlockInProgress {
-    number: BlockNumber,
-    timestamp: Timestamp,
-    previous_hash: H256,
-    applied: Vec<AppliedOperation>,
-    operations: VecDeque<TezlinkOperation>,
-}
-
-impl BlockInProgressTrait for TezBlockInProgress {
-    fn number(&self) -> U256 {
-        self.number.into()
-    }
 }
 
 pub enum ChainConfig {
@@ -245,7 +217,10 @@ impl TransactionTrait for crate::transaction::Transaction {
 
 impl TransactionTrait for TezlinkOperation {
     fn is_delayed(&self) -> bool {
-        false
+        match self.content {
+            TezlinkContent::Tezos(_) => false,
+            TezlinkContent::Deposit(_) => true,
+        }
     }
 
     fn tx_hash(&self) -> TransactionHash {
@@ -287,7 +262,7 @@ impl ChainHeaderTrait for crate::blueprint_storage::TezBlockHeader {
 pub trait ChainConfigTrait: Debug {
     type Transaction: Encodable + Decodable + Debug;
 
-    type BlockInProgress: BlockInProgressTrait;
+    type TransactionReceipt: Debug;
 
     type ChainHeader: ChainHeaderTrait + Decodable;
 
@@ -320,18 +295,20 @@ pub trait ChainConfigTrait: Debug {
         current_block_number: U256,
         previous_chain_header: Self::ChainHeader,
         blueprint: Blueprint<Self::Transaction>,
-    ) -> anyhow::Result<Self::BlockInProgress>;
+    ) -> anyhow::Result<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>;
 
     fn read_block_in_progress(
         host: &impl Runtime,
-    ) -> anyhow::Result<Option<Self::BlockInProgress>>;
+    ) -> anyhow::Result<
+        Option<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>,
+    >;
 
     #[allow(clippy::too_many_arguments)]
     fn compute_bip<Host: Runtime>(
         &self,
         host: &mut Host,
         outbox_queue: &OutboxQueue<'_, impl Path>,
-        block_in_progress: Self::BlockInProgress,
+        block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
         tick_counter: &mut TickCounter,
         sequencer_pool_address: Option<H160>,
         maximum_allowed_ticks: u64,
@@ -346,10 +323,7 @@ pub trait ChainConfigTrait: Debug {
 impl ChainConfigTrait for EvmChainConfig {
     type Transaction = crate::transaction::Transaction;
 
-    type BlockInProgress = crate::block_in_progress::BlockInProgress<
-        Self::Transaction,
-        tezos_ethereum::transaction::TransactionReceipt,
-    >;
+    type TransactionReceipt = tezos_ethereum::transaction::TransactionReceipt;
 
     type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
 
@@ -368,7 +342,8 @@ impl ChainConfigTrait for EvmChainConfig {
         current_block_number: U256,
         header: Self::ChainHeader,
         blueprint: Blueprint<Self::Transaction>,
-    ) -> anyhow::Result<Self::BlockInProgress> {
+    ) -> anyhow::Result<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>
+    {
         Ok(eth_bip_from_blueprint(
             host,
             self,
@@ -402,7 +377,9 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn read_block_in_progress(
         host: &impl Runtime,
-    ) -> anyhow::Result<Option<Self::BlockInProgress>> {
+    ) -> anyhow::Result<
+        Option<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>,
+    > {
         crate::storage::read_block_in_progress(host)
     }
 
@@ -410,7 +387,7 @@ impl ChainConfigTrait for EvmChainConfig {
         &self,
         host: &mut Host,
         outbox_queue: &OutboxQueue<'_, impl Path>,
-        block_in_progress: Self::BlockInProgress,
+        block_in_progress: BlockInProgress<Self::Transaction, Self::TransactionReceipt>,
         tick_counter: &mut TickCounter,
         sequencer_pool_address: Option<H160>,
         _maximum_allowed_ticks: u64,
@@ -478,7 +455,7 @@ const TEZLINK_SIMULATION_RESULT_PATH: RefPath =
 
 impl ChainConfigTrait for MichelsonChainConfig {
     type Transaction = TezlinkOperation;
-    type BlockInProgress = TezBlockInProgress;
+    type TransactionReceipt = AppliedOperation;
     type ChainHeader = TezBlockHeader;
 
     fn get_chain_id(&self) -> U256 {
@@ -492,20 +469,20 @@ impl ChainConfigTrait for MichelsonChainConfig {
     fn block_in_progress_from_blueprint(
         &self,
         _host: &impl Runtime,
-        _tick_counter: &crate::block::TickCounter,
+        tick_counter: &crate::block::TickCounter,
         current_block_number: U256,
         header: Self::ChainHeader,
         blueprint: Blueprint<Self::Transaction>,
-    ) -> anyhow::Result<Self::BlockInProgress> {
-        let operations = blueprint.transactions;
-        let current_block_number: BlockNumber = current_block_number.try_into()?;
-        Ok(TezBlockInProgress {
-            number: current_block_number,
-            timestamp: blueprint.timestamp,
-            previous_hash: header.hash,
-            applied: vec![],
-            operations: VecDeque::from(operations),
-        })
+    ) -> anyhow::Result<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>
+    {
+        let base_fee_per_gas = U256::zero();
+        Ok(BlockInProgress::from_blueprint(
+            blueprint,
+            current_block_number,
+            header.hash,
+            tick_counter.c,
+            base_fee_per_gas,
+        ))
     }
 
     fn fetch_hashes_from_delayed_inbox(
@@ -574,7 +551,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn read_block_in_progress(
         _host: &impl Runtime,
-    ) -> anyhow::Result<Option<Self::BlockInProgress>> {
+    ) -> anyhow::Result<
+        Option<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>,
+    > {
         Ok(None)
     }
 
@@ -582,7 +561,10 @@ impl ChainConfigTrait for MichelsonChainConfig {
         &self,
         host: &mut Host,
         _outbox_queue: &OutboxQueue<'_, impl Path>,
-        block_in_progress: Self::BlockInProgress,
+        mut block_in_progress: BlockInProgress<
+            Self::Transaction,
+            Self::TransactionReceipt,
+        >,
         _tick_counter: &mut TickCounter,
         _sequencer_pool_address: Option<H160>,
         _maximum_allowed_ticks: u64,
@@ -590,33 +572,27 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _da_fee_per_byte: U256,
         _coinbase: H160,
     ) -> anyhow::Result<BlockComputationResult> {
-        let TezBlockInProgress {
-            number,
-            timestamp,
-            previous_hash,
-            mut applied,
-            mut operations,
-        } = block_in_progress;
         log!(
             host,
             Debug,
             "Computing the BlockInProgress for Tezlink at level {}",
-            number
+            block_in_progress.number
         );
 
         let context = context::Context::from(&self.storage_root_path())?;
 
+        let level = block_in_progress.number.try_into()?;
+        let now = block_in_progress.timestamp;
         let block_ctx = BlockCtx {
-            level: &number,
-            now: &timestamp,
+            level: &level,
+            now: &now,
             chain_id: &self.chain_id,
         };
 
         let mut included_delayed_transactions = vec![];
         // Compute operations that are in the block in progress
-        while !operations.is_empty() {
-            // Retrieve the next operation in the VecDequeue
-            let operation = operations.pop_front().ok_or(error::Error::Reboot)?;
+        while block_in_progress.has_tx() {
+            let operation = block_in_progress.pop_tx().ok_or(error::Error::Reboot)?;
 
             match operation.content {
                 TezlinkContent::Tezos(operation) => {
@@ -665,7 +641,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
                             },
                         ),
                     };
-                    applied.push(applied_operation);
+                    block_in_progress
+                        .cumulative_receipts
+                        .push(applied_operation);
                 }
                 TezlinkContent::Deposit(deposit) => {
                     log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
@@ -678,7 +656,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
                     let applied_operation = AppliedOperation {
                         hash: H256::from_slice(&operation.tx_hash).into(),
-                        branch: block_in_progress.previous_hash.into(),
+                        branch: block_in_progress.parent_hash.into(),
                         op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                             OperationBatchWithMetadata {
                                 operations: vec![OperationWithMetadata {
@@ -705,14 +683,21 @@ impl ChainConfigTrait for MichelsonChainConfig {
                             },
                         ),
                     };
-                    applied.push(applied_operation);
+                    block_in_progress
+                        .cumulative_receipts
+                        .push(applied_operation);
                     included_delayed_transactions.push(operation.tx_hash);
                 }
             };
         }
 
         // Create a Tezos block from the block in progress
-        let tezblock = TezBlock::new(number, timestamp, previous_hash, applied)?;
+        let tezblock = TezBlock::new(
+            level,
+            block_in_progress.timestamp,
+            block_in_progress.parent_hash,
+            block_in_progress.cumulative_receipts,
+        )?;
         let new_block = L2Block::Tezlink(tezblock);
         let root = self.storage_root_path();
         crate::block_storage::store_current(host, &root, &new_block)
