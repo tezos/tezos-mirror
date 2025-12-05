@@ -55,7 +55,7 @@ let shutdown ?exn t =
   in
   (* Shutdown the service managers before alert_manager *)
   let* () =
-    Lwt_list.iter_s
+    Lwt_list.iter_p
       (fun agent ->
         match Agent.service_manager agent with
         | None -> Lwt.return_unit
