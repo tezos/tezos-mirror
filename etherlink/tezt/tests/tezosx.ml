@@ -23,9 +23,12 @@ let runtime_tags = List.map Tezosx_runtime.tag
    finalized block) is it useful to use [_register_fullstack_test]. *)
 
 module Setup = struct
-  let register_sandbox_test ~title ~tags ~with_runtimes =
+  let register_sandbox_test ?uses_client ~title ~tags ~with_runtimes
+      ?tez_bootstrap_accounts =
     Test_helpers.register_sandbox
       ~__FILE__
+      ?uses_client
+      ?tez_bootstrap_accounts
       ~kernel:Latest
       ~title
       ~tags:(["tezosx"] @ runtime_tags with_runtimes @ tags)
@@ -63,77 +66,31 @@ let test_runtime_feature_flag ~runtime () =
         (Tezosx_runtime.feature_flag runtime)
         err.message
 
+let tezos_client node =
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.{(Evm_node.rpc_endpoint_record node) with path = "/tezlink"})
+  in
+  Client.init ~endpoint ()
+
 let check_account sandbox (account : Account.key) =
-  let open Rpc.Syntax in
-  let open Evm_node_lib_dev_encoding in
-  let get_res message = function
-    | Ok v -> v
-    | Error _ -> Test.fail ~__LOC__ "%s" message
+  let* client = tezos_client sandbox in
+  let* _balance =
+    Client.get_balance_for ~account:account.public_key_hash client
   in
-  let get_decoded type_ decode bytes =
-    get_res
-      (Format.asprintf
-         "Should have decoded a %s but got %a"
-         type_
-         Rlp.pp
-         (Value bytes))
-      (decode bytes)
-  in
-  (* get RLP value in durable storage *)
-  let path =
-    sf "/evm/world_state/eth_accounts/tezos/%s/info" account.public_key_hash
-  in
-  let*@! value = Rpc.state_value sandbox path in
-  let state =
-    match Rlp.decode (`Hex value |> Hex.to_bytes) with
-    | Ok v -> v
-    | _ ->
-        Test.fail
-          ~__LOC__
-          "Failed to decode value at path %s in durable storage"
-          path
-  in
-  (* Check RLP value *)
-  match state with
-  | List [Value balance; Value nonce; Value public_key] ->
-      let balance = get_decoded "z" Rlp.decode_z balance in
-      let nonce = get_decoded "int" Rlp.decode_int nonce in
-      let public_key =
-        get_res "Should have decoded the public key"
-        @@ Data_encoding.Binary.of_bytes
-             Tezos_crypto.Signature.Public_key.encoding
-             public_key
-      in
-      Check.((nonce = 0) int ~error_msg:"Expected nonce %R but got %L") ;
-      Check.(
-        (Z.to_int64 balance = 3_800_000_000_000L)
-          int64
-          ~error_msg:"Expected balance %R but got %L") ;
-      Check.(
-        (Tezos_crypto.Signature.Public_key.to_b58check public_key
-        = account.public_key)
-          string
-          ~error_msg:"Expected public key %R but got %L") ;
-      unit
-  | _ ->
-      Test.fail
-        ~__LOC__
-        "Unexpected value decoded at path %s in durable storage: value = %s, \
-         original data = %s"
-        path
-        (Format.asprintf "%a" Rlp.pp state)
-        value
+  unit
 
 let test_bootstrap_kernel_config () =
+  let tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts in
   Setup.register_sandbox_test
+    ~tez_bootstrap_accounts
     ~title:"Set tezos bootstrap accounts"
+    ~uses_client:true
     ~tags:["bootstrap"]
     ~with_runtimes:[Tezos]
   @@ fun sandbox ->
-  let _ =
-    List.map (check_account sandbox) Evm_node.tez_default_bootstrap_accounts
-  in
-  unit
+  Lwt_list.iter_p (check_account sandbox) tez_bootstrap_accounts
 
 let () =
   test_bootstrap_kernel_config () ;

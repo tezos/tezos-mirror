@@ -337,9 +337,11 @@ val produce_block_and_wait_for : sequencer:Evm_node.t -> int -> unit Lwt.t
 
 val register_sandbox :
   __FILE__:string ->
+  ?uses_client:bool ->
   ?kernel:Kernel.t ->
   ?tx_queue_tx_per_addr_limit:int ->
   title:string ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?set_account_code:(string * string) list ->
   ?da_fee_per_byte:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->
