@@ -5,7 +5,7 @@
 //! `big_map` typed representation and utilities for working with `big_map`s.
 
 use num_bigint::{BigInt, Sign};
-use num_traits::One;
+use num_traits::{One, Zero};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     fmt::Display,
@@ -61,6 +61,34 @@ impl BigMapId {
         BigMapId {
             value: Zarith(result),
         }
+    }
+
+    /// Increment the mutable id
+    pub fn incr(&mut self) {
+        let Zarith(ref int_value) = self.value;
+        let result = if self.is_temporary() {
+            int_value - BigInt::one()
+        } else {
+            int_value + BigInt::one()
+        };
+        self.value = Zarith(result);
+    }
+
+    /// Decrement the id
+    ///
+    /// If there's no predecessor return false, otherwise true
+    pub fn dec(&mut self) -> bool {
+        let Zarith(ref int_value) = self.value;
+        let result = if self.is_temporary() {
+            int_value + BigInt::one()
+        } else {
+            int_value - BigInt::one()
+        };
+        let has_pred = !result.eq(&BigInt::zero());
+        if has_pred {
+            self.value = Zarith(result);
+        }
+        has_pred
     }
 
     /// Tells if a big_map id is temporary

@@ -42,8 +42,8 @@ pub struct TcCtx<'operation, Host: Runtime> {
     pub host: &'operation mut Host,
     pub context: &'operation Context,
     pub gas: &'operation mut crate::gas::TezlinkOperationGas,
-    pub big_map_diff: &'operation mut BTreeMap<Zarith, StorageDiff>,
-    pub next_temporary_id: BigMapId,
+    pub big_map_diff: BTreeMap<Zarith, StorageDiff>,
+    pub next_temporary_id: &'operation mut BigMapId,
 }
 
 pub struct OperationCtx<'operation> {
@@ -334,7 +334,7 @@ impl<Host: Runtime> TcCtx<'_, Host> {
     fn generate_id(&mut self, temporary: bool) -> Result<BigMapId, LazyStorageError> {
         if temporary {
             let new_id = self.next_temporary_id.clone();
-            self.next_temporary_id = new_id.succ();
+            self.next_temporary_id.incr();
             Ok(new_id)
         } else {
             let next_id_path = next_id_path(self.context)?;
@@ -345,6 +345,39 @@ impl<Host: Runtime> TcCtx<'_, Host> {
             Ok(id)
         }
     }
+}
+
+fn remove_big_map<Host: Runtime>(
+    host: &mut Host,
+    context: &Context,
+    id: &BigMapId,
+) -> Result<(), LazyStorageError> {
+    // Remove the key type of the big_map
+    let key_type_path = key_type_path(context, id)?;
+    host.store_delete(&key_type_path)?;
+
+    // Remove the value type of the big_map
+    let value_type_path = value_type_path(context, id)?;
+    host.store_delete(&value_type_path)?;
+
+    // Removing the content of the big_map
+    BigMapKeys::remove_keys_in_storage(host, context, id)?;
+
+    Ok(())
+}
+
+/// Function to clear temporary big_maps create for an operation
+///
+/// This function also reset the next temporary id to minus one
+pub fn clear_temporary_big_maps<Host: Runtime>(
+    host: &mut Host,
+    context: &Context,
+    next_temp_id: &mut BigMapId,
+) -> Result<(), LazyStorageError> {
+    while next_temp_id.dec() {
+        remove_big_map(host, context, next_temp_id)?;
+    }
+    Ok(())
 }
 
 /// Function to retrieve the hash of a TypedValue.
@@ -608,19 +641,11 @@ impl<'a, Host: Runtime> LazyStorage<'a> for TcCtx<'a, Host> {
     }
 
     fn big_map_remove(&mut self, id: &BigMapId) -> Result<(), LazyStorageError> {
-        // Remove the key type of the big_map
-        let key_type_path = key_type_path(self.context, id)?;
-        self.host.store_delete(&key_type_path)?;
-
-        // Remove the value type of the big_map
-        let value_type_path = value_type_path(self.context, id)?;
-        self.host.store_delete(&value_type_path)?;
-
-        // Removing the content of the big_map
-        BigMapKeys::remove_keys_in_storage(self.host, self.context, id)?;
+        remove_big_map(self.host, self.context, id)?;
 
         // Write in the diff that there was a remove
         self.big_map_diff_remove(id.value.clone());
+
         Ok(())
     }
 }
@@ -643,8 +668,8 @@ pub mod tests {
                 host: $host,
                 context: $context,
                 gas: &mut gas,
-                big_map_diff: &mut BTreeMap::new(),
-                next_temporary_id: BigMapId { value: (-1).into() },
+                big_map_diff: BTreeMap::new(),
+                next_temporary_id: &mut BigMapId { value: (-1).into() },
             };
         };
     }
