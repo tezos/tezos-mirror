@@ -1,5 +1,6 @@
 // Copyright (c) SimpleStaking, Nomadic Labs and Tezedge Contributors
 // SPDX-CopyrightText: 2022-2023 TriliTech <contact@trili.tech>
+// SPDX-CopyrightText: 2025 Functori <contact@functori.com>
 // SPDX-License-Identifier: MIT
 
 use std::convert::TryFrom;
@@ -175,6 +176,15 @@ pub trait BinWriter {
         let mut output = Vec::new();
         self.bin_write(&mut output)?;
         Ok(output)
+    }
+}
+
+impl<T> BinWriter for &T
+where
+    T: BinWriter,
+{
+    fn bin_write(&self, output: &mut Vec<u8>) -> BinResult {
+        T::bin_write(self, output)
     }
 }
 

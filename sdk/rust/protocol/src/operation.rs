@@ -11,7 +11,7 @@ use tezos_crypto_rs::{
     public_key::PublicKey,
     public_key_hash::PublicKeyHash,
 };
-use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith, types::WithDefaultValue};
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct UnsignedOperation {
@@ -54,11 +54,81 @@ pub struct RevealContent {
     pub proof: Option<BlsSignature>,
 }
 
-#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+mod internal {
+    use super::*;
+
+    /// Encoded representation of the `TransactionContent` type used for binary
+    /// serialization and deserialization via the `NomReader` and `BinWriter` traits.
+    ///
+    /// The `parameters` field is an `Option` to optimize encoding: `None` represents
+    /// the default `Parameters` value. During decoding, `None` is restored as the
+    /// default value.
+    #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+    pub struct EncodedTransactionContent<Amount, Destination, Param> {
+        amount: Amount,
+        destination: Destination,
+        parameters: Option<Param>,
+    }
+
+    impl<'a> From<&'a TransactionContent>
+        for EncodedTransactionContent<&'a Narith, &'a Contract, &'a Parameters>
+    {
+        fn from(c: &'a TransactionContent) -> Self {
+            let TransactionContent {
+                amount,
+                destination,
+                parameters,
+            } = c;
+            let parameters = if parameters == &Parameters::default() {
+                None
+            } else {
+                Some(parameters)
+            };
+            Self {
+                amount,
+                destination,
+                parameters,
+            }
+        }
+    }
+
+    impl From<EncodedTransactionContent<Narith, Contract, Parameters>> for TransactionContent {
+        fn from(c: EncodedTransactionContent<Narith, Contract, Parameters>) -> Self {
+            let EncodedTransactionContent {
+                amount,
+                destination,
+                parameters,
+            } = c;
+            let parameters = parameters.unwrap_or_default();
+            Self {
+                amount,
+                destination,
+                parameters,
+            }
+        }
+    }
+
+    impl NomReader<'_> for TransactionContent {
+        fn nom_read(input: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+            nom::combinator::map(
+                EncodedTransactionContent::nom_read,
+                TransactionContent::from,
+            )(input)
+        }
+    }
+
+    impl BinWriter for TransactionContent {
+        fn bin_write(&self, out: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
+            EncodedTransactionContent::from(self).bin_write(out)
+        }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
 pub struct TransactionContent {
     pub amount: Narith,
     pub destination: Contract,
-    pub parameters: WithDefaultValue<Parameters>,
+    pub parameters: Parameters,
 }
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
@@ -222,8 +292,7 @@ mod tests {
                     entrypoint: Entrypoint::try_from("B").unwrap(),
                     // octez-client convert data '"Hello"' from Michelson to binary
                     value: hex::decode("010000000548656c6c6f").unwrap(),
-                }
-                .into(),
+                },
             },
             gas_limit: 1380_u64.into(),
             storage_limit: 0_u64.into(),
@@ -261,7 +330,7 @@ mod tests {
                 amount: 10.into(),
                 destination: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
                     .unwrap(),
-                parameters: Parameters::default().into(),
+                parameters: Parameters::default(),
             },
             gas_limit: 0.into(),
             storage_limit: 1405.into(),
@@ -305,7 +374,7 @@ mod tests {
                 amount: 10.into(),
                 destination: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
                     .unwrap(),
-                parameters: Parameters::default().into(),
+                parameters: Parameters::default(),
             },
             gas_limit: 0.into(),
             storage_limit: 1405.into(),
@@ -353,8 +422,7 @@ mod tests {
                     entrypoint: Entrypoint::try_from("remove_delegate").unwrap(),
                     // octez-client convert data "Unit" from Michelson to binary
                     value: hex::decode("030b").unwrap(),
-                }
-                .into(),
+                },
             },
             gas_limit: 0.into(),
             storage_limit: 0.into(),
@@ -638,7 +706,7 @@ mod tests {
                 amount: 20000.into(),
                 destination: Contract::from_b58check("tz1Rc6wtS349fFTyuUhDXTXoBUZ9j7XiN61o")
                     .unwrap(),
-                parameters: Parameters::default().into(),
+                parameters: Parameters::default(),
             },
         });
 
@@ -757,8 +825,7 @@ mod tests {
                     entrypoint: Entrypoint::try_from("balance_of").unwrap(),
                     // octez-client convert data '"tz3j873xGK219DrCKYL4usxM8EQgHUmDdbJB"' from Michelson to binary
                     value: hex::decode("0100000024747a336a38373378474b3231394472434b594c347573784d3845516748556d4464624a42").unwrap(),
-                }
-                .into(),
+                },
             },
         });
 
