@@ -40,6 +40,20 @@ applied_upgrade:
          byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+background_task_error:
+  description: background task {name} failed with error {error}
+  level: fatal
+  section: evm_node.dev
+  json format:
+    { /* background_task_error version 0 */
+      "background_task_error.v0": { "name": $unistring,
+                                    "error": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 block_producer_locked:
   description: transaction pool and block production are locked
   level: error
@@ -2422,6 +2436,20 @@ websocket_unsubscribe:
   
 
 ./octez-evm-node list events --level error --json
+background_task_error:
+  description: background task {name} failed with error {error}
+  level: fatal
+  section: evm_node.dev
+  json format:
+    { /* background_task_error version 0 */
+      "background_task_error.v0": { "name": $unistring,
+                                    "error": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid
+         byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 block_producer_locked:
   description: transaction pool and block production are locked
   level: error
