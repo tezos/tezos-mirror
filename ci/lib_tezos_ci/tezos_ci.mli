@@ -259,13 +259,6 @@ module Cache : sig
     More precisely, we only cache the non-SCM dependencies in the
     sub-directory [registry/cache]. *)
   val enable_cargo_cache : tezos_job -> tezos_job
-
-  (** Enable caching of Cargo's target folder which stores files which
-    can speed up subsequent compilation passes.
-
-    All folders are stored in a single cacheable directory to work
-    around GitLab's restriction on the number caches a job may have. *)
-  val enable_cargo_target_caches : ?key:string -> tezos_job -> tezos_job
 end
 
 (** A facility for registering images for [image:] keywords.
