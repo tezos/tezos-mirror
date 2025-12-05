@@ -25,7 +25,6 @@
 (*****************************************************************************)
 
 open Node_context
-open Context_sigs
 
 let get_state_of_lcc node_ctxt =
   let open Lwt_result_syntax in
@@ -50,7 +49,7 @@ let proof_of_output node_ctxt output =
       let open (val Pvm.of_kind node_ctxt.kind) in
       let*! proof =
         produce_output_proof
-          (Ctxt_wrapper.of_node_context node_ctxt.context).index
+          (Ctxt_wrapper.of_node_context node_ctxt.context)
           (Ctxt_wrapper.of_node_pvmstate state)
           output
       in
