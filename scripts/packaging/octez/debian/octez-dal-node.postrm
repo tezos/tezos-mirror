@@ -6,36 +6,17 @@ set -e
 # shellcheck disable=SC1091
 . /usr/share/debconf/confmodule
 
-# systemctl should not be called directly. use this
-# wrapper script if available
-debsystemctl=$(command -v deb-systemd-invoke || echo systemctl)
-
-# temp file to make sure we remember to restart the
-# daemon when we upgrade
-DAEMON_RUNNING=/run/octez-dal-node/daemon_was_running
-
 case "${1}" in
 purge)
-  rm -Rf /run/octez-dal-node
   # Purge debconf data for the package in any case
   # shellcheck disable=SC2119
   db_purge || true
   ;;
-upgrade)
-  # Check if the daemon was running before the upgrade
-  if [ -f "$DAEMON_RUNNING" ]; then
-    # Start the daemon if it was running
-    $debsystemctl "start octez-dal-node.service"
-  fi
-  ;;
-remove | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
+upgrade | remove | failed-upgrade | abort-install | abort-upgrade | disappear) ;;
 *)
   echo "postrm called with unknown argument \`$1'" >&2
   exit 1
   ;;
 esac
-
-# Clean up the temporary file
-rm -f "$DAEMON_RUNNING"
 
 #DEBHELPER#
