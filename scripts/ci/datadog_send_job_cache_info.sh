@@ -24,6 +24,9 @@ if [ "$1" != "before" ] && [ "$1" != "after" ]; then
 fi
 
 CARGO_CACHE_DIR=$CI_PROJECT_DIR/.cargo/registry/cache
+CARGO_CACHE_INDEX=$CI_PROJECT_DIR/.cargo/registry/index
+CARGO_CACHE_SRC=$CI_PROJECT_DIR/.cargo/registry/src
+CARGO_CACHE_GITDB=$CI_PROJECT_DIR/.cargo/git/db
 DUNE_CACHE_ROOT=$CI_PROJECT_DIR/_dune_cache
 
 CACHE_MEASURES=""
@@ -57,6 +60,9 @@ get_cache_size() {
 
 # Get cache sizes and set environment variables
 get_cache_size "$DUNE_CACHE_ROOT" "CACHE_DUNE"
+get_cache_size "$CARGO_CACHE_GITDB" "CACHE_CARGO_GIT"
+get_cache_size "$CARGO_CACHE_SRC" "CACHE_CARGO_SRC"
+get_cache_size "$CARGO_CACHE_INDEX" "CACHE_CARGO_INDEX"
 get_cache_size "$CARGO_CACHE_DIR" "CACHE_CARGO"
 
 if command -v sccache > /dev/null 2>&1 &&
