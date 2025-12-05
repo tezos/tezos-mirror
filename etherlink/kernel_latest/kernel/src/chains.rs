@@ -223,32 +223,6 @@ impl Decodable for TezlinkContent {
     }
 }
 
-#[derive(Debug)]
-pub struct TezTransactions(pub Vec<TezlinkOperation>);
-
-impl Encodable for TezTransactions {
-    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        let Self(operations) = self;
-        stream.begin_list(operations.len());
-        for op in operations {
-            op.rlp_append(stream);
-        }
-    }
-}
-
-impl Decodable for TezTransactions {
-    fn decode(decoder: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        if !decoder.is_list() {
-            return Err(rlp::DecoderError::RlpExpectedToBeList);
-        }
-        let operations = decoder
-            .iter()
-            .map(|rlp| TezlinkOperation::decode(&rlp))
-            .collect::<Result<Vec<TezlinkOperation>, rlp::DecoderError>>()?;
-        Ok(TezTransactions(operations))
-    }
-}
-
 pub trait ChainHeaderTrait {
     fn hash(&self) -> H256;
 
