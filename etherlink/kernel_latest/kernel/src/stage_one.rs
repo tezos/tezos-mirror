@@ -17,7 +17,6 @@ use crate::event::Event;
 use crate::inbox::{read_proxy_inbox, read_sequencer_inbox};
 use crate::inbox::{ProxyInboxContent, StageOneStatus};
 use crate::storage::read_last_info_per_level_timestamp;
-use crate::transaction::Transactions::EthTxs;
 use anyhow::Ok;
 use std::ops::Add;
 use tezos_crypto_rs::hash::ContractKt1Hash;
@@ -103,7 +102,7 @@ fn fetch_delayed_transactions<Host: Runtime>(
 
         // Create a new blueprint with the timed out transactions
         let blueprint = Blueprint {
-            transactions: EthTxs(timed_out),
+            transactions: timed_out,
             timestamp,
         };
         // Store the blueprint.
@@ -229,9 +228,7 @@ pub fn fetch_blueprints<Host: Runtime>(
 mod tests {
     use crate::{
         blueprint_storage::EVMBlockHeader,
-        chains::{
-            test_chain_config, test_evm_chain_config, ChainHeaderTrait, TransactionsTrait,
-        },
+        chains::{test_chain_config, test_evm_chain_config, ChainHeaderTrait},
         dal_slot_import_signal::{
             DalSlotImportSignals, DalSlotIndicesList, DalSlotIndicesOfLevel,
             UnsignedDalSlotSignals,
@@ -445,7 +442,7 @@ mod tests {
             .0
         {
             Some(Blueprint { transactions, .. }) => {
-                assert!(transactions.number_of_txs() == 1)
+                assert!(transactions.len() == 1)
             }
             _ => panic!("There should be a blueprint"),
         }
@@ -474,7 +471,7 @@ mod tests {
             .0
         {
             Some(Blueprint { transactions, .. }) => {
-                assert!(transactions.number_of_txs() == 1)
+                assert!(transactions.len() == 1)
             }
             _ => panic!("There should be a blueprint"),
         }
@@ -641,7 +638,7 @@ mod tests {
             None => panic!("There should be an InboxContent"),
             Some(ProxyInboxContent { transactions, .. }) => assert_eq!(
                 transactions,
-                EthTxs(vec![]),
+                vec![],
                 "The proxy shouldn't have read any transaction"
             ),
         };
@@ -774,7 +771,7 @@ mod tests {
         {
             None => panic!("There should be a blueprint"),
             Some(Blueprint { transactions, .. }) =>
-                assert_eq!(transactions.number_of_txs(), 0,
+                assert_eq!(transactions.len(), 0,
                            "The transaction from the delayed bridge entrypoint should have been rejected in proxy mode"),
         }
     }
@@ -805,7 +802,7 @@ mod tests {
         {
             None => panic!("There should be a blueprint"),
             Some(Blueprint { transactions, .. }) => assert_eq!(
-                transactions.number_of_txs(),
+                transactions.len(),
                 1,
                 "The deposit should have been picked in the blueprint"
             ),
@@ -840,7 +837,7 @@ mod tests {
         {
             None => panic!("There should be a blueprint"),
             Some(Blueprint { transactions, .. }) => assert_eq!(
-                transactions.number_of_txs(),
+                transactions.len(),
                 0,
                 "The deposit shouldn't have been picked in the blueprint as it is invalid"
             ),

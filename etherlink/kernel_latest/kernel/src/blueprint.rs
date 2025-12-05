@@ -6,28 +6,26 @@
 // SPDX-License-Identifier: MIT
 
 use rlp::{Decodable, DecoderError, Encodable};
-use tezos_ethereum::rlp_helpers::{
-    self, append_timestamp, decode_field, decode_timestamp,
-};
+use tezos_ethereum::rlp_helpers::{self, append_timestamp, decode_timestamp};
 
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
 /// The blueprint of a block is a list of transactions.
 #[derive(PartialEq, Debug, Clone)]
-pub struct Blueprint<Txs> {
-    pub transactions: Txs,
+pub struct Blueprint<Tx> {
+    pub transactions: Vec<Tx>,
     pub timestamp: Timestamp,
 }
 
-impl<Txs: Encodable> Encodable for Blueprint<Txs> {
+impl<Tx: Encodable> Encodable for Blueprint<Tx> {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         stream.begin_list(2);
-        stream.append(&self.transactions);
+        stream.append_list(&self.transactions);
         append_timestamp(stream, self.timestamp);
     }
 }
 
-impl<Txs: Decodable> Decodable for Blueprint<Txs> {
+impl<Tx: Decodable> Decodable for Blueprint<Tx> {
     fn decode(decoder: &rlp::Rlp) -> Result<Self, DecoderError> {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
@@ -37,7 +35,8 @@ impl<Txs: Decodable> Decodable for Blueprint<Txs> {
         }
 
         let mut it = decoder.iter();
-        let transactions = decode_field(&rlp_helpers::next(&mut it)?, "transactions")?;
+        let transactions =
+            rlp_helpers::decode_list(&rlp_helpers::next(&mut it)?, "transactions")?;
         let timestamp = decode_timestamp(&rlp_helpers::next(&mut it)?)?;
 
         Ok(Blueprint {
@@ -51,9 +50,7 @@ impl<Txs: Decodable> Decodable for Blueprint<Txs> {
 mod tests {
 
     use super::*;
-    use crate::transaction::{
-        Transaction, TransactionContent::Ethereum, Transactions::EthTxs,
-    };
+    use crate::transaction::{Transaction, TransactionContent::Ethereum};
     use primitive_types::{H160, U256};
     use rlp::Rlp;
     use tezos_ethereum::{
@@ -91,7 +88,7 @@ mod tests {
     #[test]
     fn test_encode_blueprint() {
         let proposal = Blueprint {
-            transactions: EthTxs(vec![dummy_transaction(0), dummy_transaction(1)]),
+            transactions: vec![dummy_transaction(0), dummy_transaction(1)],
             timestamp: Timestamp::from(0i64),
         };
         let encoded = proposal.rlp_bytes();

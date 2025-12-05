@@ -97,14 +97,6 @@ pub enum Transactions {
     EthTxs(Vec<Transaction>),
 }
 
-impl Transactions {
-    pub fn push(&mut self, tx: Transaction) {
-        match self {
-            Self::EthTxs(transactions) => transactions.push(tx),
-        }
-    }
-}
-
 impl Encodable for Transactions {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         match self {

@@ -17,7 +17,7 @@ use crate::{
     l2block::L2Block,
     simulation::start_simulation_mode,
     tick_model::constants::MAXIMUM_GAS_LIMIT,
-    transaction::{TransactionContent, Transactions::EthTxs},
+    transaction::TransactionContent,
     CHAIN_ID,
 };
 use anyhow::Context;
@@ -141,23 +141,6 @@ pub enum ChainConfig {
     Michelson(MichelsonChainConfig),
 }
 
-pub trait TransactionsTrait {
-    fn extend(&mut self, other: Self);
-    fn number_of_txs(&self) -> usize;
-}
-
-impl TransactionsTrait for crate::transaction::Transactions {
-    fn extend(&mut self, other: Self) {
-        let EthTxs(ref mut txs) = self;
-        let EthTxs(other) = other;
-        txs.extend(other)
-    }
-    fn number_of_txs(&self) -> usize {
-        let EthTxs(txs) = self;
-        txs.len()
-    }
-}
-
 const TEZOS_OP_TAG: u8 = 1;
 const DEPOSIT_OP_TAG: u8 = 2;
 
@@ -243,19 +226,6 @@ impl Decodable for TezlinkContent {
 #[derive(Debug)]
 pub struct TezTransactions(pub Vec<TezlinkOperation>);
 
-impl TransactionsTrait for TezTransactions {
-    fn extend(&mut self, other: Self) {
-        let TezTransactions(ref mut ops) = self;
-        let TezTransactions(other) = other;
-        ops.extend(other)
-    }
-
-    fn number_of_txs(&self) -> usize {
-        let TezTransactions(operations) = self;
-        operations.len()
-    }
-}
-
 impl Encodable for TezTransactions {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
         let Self(operations) = self;
@@ -313,8 +283,6 @@ impl ChainHeaderTrait for crate::blueprint_storage::TezBlockHeader {
 pub trait ChainConfigTrait: Debug {
     type Transaction: Encodable + Decodable + Debug;
 
-    type Transactions: TransactionsTrait + Encodable + Decodable + Debug;
-
     type BlockInProgress: BlockInProgressTrait;
 
     type ChainHeader: ChainHeaderTrait + Decodable;
@@ -335,10 +303,14 @@ pub trait ChainConfigTrait: Debug {
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
-    ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transactions>, usize)>;
+    ) -> anyhow::Result<(
+        DelayedTransactionFetchingResult<Vec<Self::Transaction>>,
+        usize,
+    )>;
 
-    fn transactions_from_bytes(bytes: Vec<Vec<u8>>)
-        -> anyhow::Result<Self::Transactions>;
+    fn transactions_from_bytes(
+        bytes: Vec<Vec<u8>>,
+    ) -> anyhow::Result<Vec<Self::Transaction>>;
 
     fn block_in_progress_from_blueprint(
         &self,
@@ -346,7 +318,7 @@ pub trait ChainConfigTrait: Debug {
         tick_counter: &crate::block::TickCounter,
         current_block_number: U256,
         previous_chain_header: Self::ChainHeader,
-        blueprint: Blueprint<Self::Transactions>,
+        blueprint: Blueprint<Self::Transaction>,
     ) -> anyhow::Result<Self::BlockInProgress>;
 
     fn read_block_in_progress(
@@ -373,8 +345,6 @@ pub trait ChainConfigTrait: Debug {
 impl ChainConfigTrait for EvmChainConfig {
     type Transaction = crate::transaction::Transaction;
 
-    type Transactions = crate::transaction::Transactions;
-
     type BlockInProgress = crate::block_in_progress::EthBlockInProgress;
 
     type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
@@ -393,7 +363,7 @@ impl ChainConfigTrait for EvmChainConfig {
         tick_counter: &crate::block::TickCounter,
         current_block_number: U256,
         header: Self::ChainHeader,
-        blueprint: Blueprint<Self::Transactions>,
+        blueprint: Blueprint<Self::Transaction>,
     ) -> anyhow::Result<Self::BlockInProgress> {
         Ok(eth_bip_from_blueprint(
             host,
@@ -407,10 +377,8 @@ impl ChainConfigTrait for EvmChainConfig {
 
     fn transactions_from_bytes(
         bytes: Vec<Vec<u8>>,
-    ) -> anyhow::Result<Self::Transactions> {
-        Ok(EthTxs(crate::blueprint_storage::transactions_from_bytes(
-            bytes,
-        )?))
+    ) -> anyhow::Result<Vec<Self::Transaction>> {
+        crate::blueprint_storage::transactions_from_bytes(bytes)
     }
 
     fn fetch_hashes_from_delayed_inbox(
@@ -418,8 +386,10 @@ impl ChainConfigTrait for EvmChainConfig {
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
-    ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transactions>, usize)>
-    {
+    ) -> anyhow::Result<(
+        DelayedTransactionFetchingResult<Vec<Self::Transaction>>,
+        usize,
+    )> {
         crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
             host,
             delayed_hashes,
@@ -505,7 +475,6 @@ const TEZLINK_SIMULATION_RESULT_PATH: RefPath =
 
 impl ChainConfigTrait for MichelsonChainConfig {
     type Transaction = TezlinkOperation;
-    type Transactions = TezTransactions;
     type BlockInProgress = TezBlockInProgress;
     type ChainHeader = TezBlockHeader;
 
@@ -523,9 +492,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
         _tick_counter: &crate::block::TickCounter,
         current_block_number: U256,
         header: Self::ChainHeader,
-        blueprint: Blueprint<Self::Transactions>,
+        blueprint: Blueprint<Self::Transaction>,
     ) -> anyhow::Result<Self::BlockInProgress> {
-        let TezTransactions(operations) = blueprint.transactions;
+        let operations = blueprint.transactions;
         let current_block_number: BlockNumber = current_block_number.try_into()?;
         Ok(TezBlockInProgress {
             number: current_block_number,
@@ -541,8 +510,10 @@ impl ChainConfigTrait for MichelsonChainConfig {
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
-    ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transactions>, usize)>
-    {
+    ) -> anyhow::Result<(
+        DelayedTransactionFetchingResult<Vec<Self::Transaction>>,
+        usize,
+    )> {
         // By reusing 'fetch_hashes_from_delayed_inbox', Tezlink don't have to implement
         // the logic to retrieve delayed_inbox items.
         //
@@ -556,7 +527,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             )?;
         Ok((
             match delayed {
-                DelayedTransactionFetchingResult::Ok(EthTxs(txs)) => {
+                DelayedTransactionFetchingResult::Ok(txs) => {
                     let mut ops = vec![];
                     for tx in txs.into_iter() {
                         if let TransactionContent::Deposit(deposit) = tx.content {
@@ -567,7 +538,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                             ops.push(operation)
                         }
                     }
-                    DelayedTransactionFetchingResult::Ok(TezTransactions(ops))
+                    DelayedTransactionFetchingResult::Ok(ops)
                 }
                 DelayedTransactionFetchingResult::BlueprintTooLarge => {
                     DelayedTransactionFetchingResult::BlueprintTooLarge
@@ -582,7 +553,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
     fn transactions_from_bytes(
         bytes: Vec<Vec<u8>>,
-    ) -> anyhow::Result<Self::Transactions> {
+    ) -> anyhow::Result<Vec<Self::Transaction>> {
         let operations = bytes
             .iter()
             .map(|bytes| {
@@ -597,7 +568,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                 })
             })
             .collect::<Result<Vec<TezlinkOperation>, error::Error>>()?;
-        Ok(TezTransactions(operations))
+        Ok(operations)
     }
 
     fn read_block_in_progress(

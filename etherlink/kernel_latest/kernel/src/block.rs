@@ -22,7 +22,7 @@ use crate::error::Error;
 use crate::event::Event;
 use crate::l2block::L2Block;
 use crate::storage;
-use crate::transaction::{Transaction, Transactions};
+use crate::transaction::Transaction;
 use crate::upgrade;
 use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
@@ -230,7 +230,7 @@ pub fn eth_bip_from_blueprint<Host: Runtime>(
     tick_counter: &TickCounter,
     next_bip_number: U256,
     header: EVMBlockHeader,
-    blueprint: Blueprint<Transactions>,
+    blueprint: Blueprint<Transaction>,
 ) -> EthBlockInProgress {
     let gas_price = crate::gas_price::base_fee_per_gas(
         host,
@@ -593,7 +593,7 @@ mod tests {
     use crate::chains::TezlinkContent;
     use crate::chains::TezlinkOperation;
     use crate::chains::{
-        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig, TezTransactions,
+        EvmChainConfig, ExperimentalFeatures, MichelsonChainConfig,
         TEZLINK_SAFE_STORAGE_ROOT_PATH,
     };
     use crate::fees::DA_FEE_PER_BYTE;
@@ -604,7 +604,6 @@ mod tests {
     use crate::transaction::TransactionContent;
     use crate::transaction::TransactionContent::Ethereum;
     use crate::transaction::TransactionContent::EthereumDelayed;
-    use crate::transaction::Transactions;
     use crate::{retrieve_block_fees, retrieve_chain_id};
     use primitive_types::{H160, U256};
     use revm_etherlink::helpers::legacy::{alloy_to_u256, h160_to_alloy, u256_to_alloy};
@@ -791,9 +790,9 @@ mod tests {
         )
     }
 
-    fn blueprint(transactions: Vec<Transaction>) -> Blueprint<Transactions> {
+    fn blueprint(transactions: Vec<Transaction>) -> Blueprint<Transaction> {
         Blueprint {
-            transactions: Transactions::EthTxs(transactions),
+            transactions,
             timestamp: Timestamp::from(0i64),
         }
     }
@@ -801,7 +800,7 @@ mod tests {
     fn tezlink_blueprint(
         operations: Vec<Operation>,
         timestamp: Timestamp,
-    ) -> Blueprint<TezTransactions> {
+    ) -> Blueprint<TezlinkOperation> {
         let operations = operations
             .into_iter()
             .map(|op| {
@@ -811,7 +810,7 @@ mod tests {
             })
             .collect();
         Blueprint {
-            transactions: TezTransactions(operations),
+            transactions: operations,
             timestamp,
         }
     }
@@ -981,7 +980,7 @@ mod tests {
 
     fn store_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
         host: &mut Host,
-        blueprints: Vec<Blueprint<ChainConfig::Transactions>>,
+        blueprints: Vec<Blueprint<ChainConfig::Transaction>>,
     ) {
         for (i, blueprint) in blueprints.into_iter().enumerate() {
             store_inbox_blueprint_by_number(host, blueprint, U256::from(i))
@@ -1830,7 +1829,7 @@ mod tests {
     }
 
     /// A blueprint that should produce 1 block with an invalid transaction
-    fn almost_empty_blueprint() -> Blueprint<Transactions> {
+    fn almost_empty_blueprint() -> Blueprint<Transaction> {
         let tx_hash = [0; TRANSACTION_HASH_SIZE];
 
         // transaction should be invalid
