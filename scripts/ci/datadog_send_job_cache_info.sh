@@ -25,10 +25,6 @@ fi
 
 CARGO_CACHE_DIR=$CI_PROJECT_DIR/.cargo/registry/cache
 DUNE_CACHE_ROOT=$CI_PROJECT_DIR/_dune_cache
-SCCACHE_DIR=$CI_PROJECT_DIR/_sccache
-RUST_DEPS_TARGET_DIR=$CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
-RUSTZCASH_DEPS_TARGET_DIR=$CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
-ETHERLINK_WASM_RUNTIME_TARGET_DIR=$CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
 
 CACHE_MEASURES=""
 
@@ -62,10 +58,6 @@ get_cache_size() {
 # Get cache sizes and set environment variables
 get_cache_size "$DUNE_CACHE_ROOT" "CACHE_DUNE"
 get_cache_size "$CARGO_CACHE_DIR" "CACHE_CARGO"
-get_cache_size "$SCCACHE_DIR" "CACHE_SCCACHE"
-get_cache_size "$RUST_DEPS_TARGET_DIR" "CACHE_RUST_DEPS"
-get_cache_size "$RUSTZCASH_DEPS_TARGET_DIR" "CACHE_RUSTZCASH_DEPS"
-get_cache_size "$ETHERLINK_WASM_RUNTIME_TARGET_DIR" "CACHE_ETHERLINK_WASM_RUNTIME"
 
 # Send info to Datadog
 if command -v datadog-ci > /dev/null 2>&1; then
