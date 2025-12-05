@@ -107,6 +107,8 @@ oc.build:static-x86_64-linux-binaries:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -152,6 +154,8 @@ oc.build:static-arm64-linux-binaries:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -198,6 +202,8 @@ oc.build_arm64-released:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -248,6 +254,8 @@ oc.build_arm64-extra-dev:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -306,6 +314,8 @@ oc.build_arm64-exp:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
+    - $CI_PROJECT_DIR/.cargo/registry/index
+    - $CI_PROJECT_DIR/.cargo/registry/src
     policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
