@@ -104,6 +104,9 @@ val with_modify_data_dir :
   data_dir:string ->
   apply_unsafe_patches:bool ->
   ?skip_condition:
-    (Store.rw -> Context.rw -> head:Sc_rollup_block.t -> bool tzresult Lwt.t) ->
+    (Store.rw ->
+    Context.rw_index ->
+    head:Sc_rollup_block.t ->
+    bool tzresult Lwt.t) ->
   (Node_context.rw -> head:Sc_rollup_block.t -> unit tzresult Lwt.t) ->
   unit tzresult Lwt.t

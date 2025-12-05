@@ -63,7 +63,7 @@ module For_snapshots : sig
     #Client_context.full ->
     current_protocol ->
     'store Store.t ->
-    'context Context.t ->
+    'context Context.index ->
     data_dir:string ->
     apply_unsafe_patches:bool ->
     < store : 'store ; context : 'context > t tzresult Lwt.t

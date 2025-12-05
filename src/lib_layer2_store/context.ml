@@ -41,57 +41,61 @@ module Hash = Smart_rollup_context_hash
 
 type hash = Hash.t
 
-type 'a t =
-  | Context : {
-      index : ('a, 'repo) index;
-      pvm_context_impl : ('repo, 'tree) pvm_context_impl;
-      impl_name : string;
-      tree : 'tree;
-      equality_witness : ('repo, 'tree) equality_witness;
-    }
-      -> 'a t
+type ('a, 'repo, 'tree, 'loaded_tree) container = {
+  index : ('a, 'repo) index;
+  pvm_context_impl : ('repo, 'tree) pvm_context_impl;
+  impl_name : string;
+  tree : 'loaded_tree;
+  equality_witness : ('repo, 'tree) equality_witness;
+}
+
+type 'a index = Index : ('a, 'repo, 'tree, unit) container -> 'a index
+
+type 'a t = Context : ('a, 'repo, 'tree, 'tree) container -> 'a t
 
 type ro = [`Read] t
 
 type rw = [`Read | `Write] t
 
-let make ~index ~tree ~pvm_context_impl ~equality_witness ~impl_name =
-  Context {index; tree; pvm_context_impl; equality_witness; impl_name}
+type ro_index = [`Read] index
+
+type rw_index = [`Read | `Write] index
+
+let make_index ~index ~pvm_context_impl ~equality_witness ~impl_name =
+  Index {index; tree = (); pvm_context_impl; equality_witness; impl_name}
 
 let load : type tree repo.
     (repo, tree) pvm_context_impl ->
     cache_size:int ->
     'a Access_mode.t ->
     string ->
-    'a t tzresult Lwt.t =
+    'a index tzresult Lwt.t =
  fun (module Pvm_Context_Impl) ~cache_size mode path ->
   let open Lwt_result_syntax in
-  let* index = Pvm_Context_Impl.load ~cache_size mode path in
+  let+ index = Pvm_Context_Impl.load ~cache_size mode path in
   let equality_witness = Pvm_Context_Impl.equality_witness in
   let impl_name = Pvm_Context_Impl.impl_name in
-  return
-  @@ make
-       ~index
-       ~tree:(Pvm_Context_Impl.PVMState.empty ())
-       ~pvm_context_impl:(module Pvm_Context_Impl)
-       ~equality_witness
-       ~impl_name
+  make_index
+    ~index
+    ~pvm_context_impl:(module Pvm_Context_Impl)
+    ~impl_name
+    ~equality_witness
 
-let index c = c
+let index (type a) (Context o : a t) : a index = Index {o with tree = ()}
 
 let close (type a)
-    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a t) :
+    (Index {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a index) :
     unit Lwt.t =
   Pvm_Context_Impl.close index
 
 let readonly (type a)
-    (Context ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
-      a t) : ro =
-  Context {o with index = Pvm_Context_Impl.readonly index}
+    (Index ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
+      a index) : ro_index =
+  Index {o with index = Pvm_Context_Impl.readonly index}
 
 let checkout (type a)
-    (Context ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
-      a t) hash : a t option Lwt.t =
+    (Index ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
+      a index) hash : a t option Lwt.t =
   let open Lwt_syntax in
   let+ ctx =
     Pvm_Context_Impl.checkout index (Pvm_Context_Impl.hash_of_context_hash hash)
@@ -101,9 +105,9 @@ let checkout (type a)
   | Some {index; tree} -> Some (Context {o with index; tree})
 
 let empty (type a)
-    (Context ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
-      a t) : a t =
-  let {index; tree} = Pvm_Context_Impl.empty index in
+    (Index ({pvm_context_impl = (module Pvm_Context_Impl); index; _} as o) :
+      a index) : a t =
+  let {Context_sigs.index; tree} = Pvm_Context_Impl.empty index in
   Context {o with index; tree}
 
 let commit ?message
@@ -114,34 +118,34 @@ let commit ?message
   Pvm_Context_Impl.context_hash_of_hash hash
 
 let is_gc_finished
-    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
-      [> `Write] t) =
+    (Index {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
+      [> `Write] index) =
   Pvm_Context_Impl.is_gc_finished index
 
 let cancel_gc
-    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
-      [> `Write] t) =
+    (Index {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
+      [> `Write] index) =
   Pvm_Context_Impl.cancel_gc index
 
 let split (type a)
-    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a t) =
+    (Index {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a index) =
   Pvm_Context_Impl.split index
 
 let gc
-    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
-      [> `Write] t) ?callback hash =
+    (Index {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
+      [> `Write] index) ?callback hash =
   Pvm_Context_Impl.gc
     index
     ?callback
     (Pvm_Context_Impl.hash_of_context_hash hash)
 
 let wait_gc_completion
-    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
-      [> `Write] t) =
+    (Index {pvm_context_impl = (module Pvm_Context_Impl); index; _} :
+      [> `Write] index) =
   Pvm_Context_Impl.wait_gc_completion index
 
 let export_snapshot (type a)
-    (Context {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a t)
+    (Index {pvm_context_impl = (module Pvm_Context_Impl); index; _} : a index)
     hash =
   Pvm_Context_Impl.export_snapshot
     index
@@ -163,8 +167,8 @@ let make_pvmstate ~pvm_context_impl ~equality_witness ~impl_name ~pvmstate =
 module PVMState = struct
   type value = pvmstate
 
-  let empty : type a. a t -> value =
-   fun (Context
+  let empty : type a. a index -> value =
+   fun (Index
           {
             pvm_context_impl = (module Pvm_Context_Impl);
             equality_witness;

@@ -19,18 +19,17 @@ let get_wasm_pvm_state context block_hash context_hash =
   let open Lwt_result_syntax in
   (* Now, we can checkout the state of the rollup of the given block hash *)
   let*! ctxt = Context.checkout context context_hash in
-  let* ctxt =
-    match ctxt with
-    | None ->
-        tzfail
-          (Rollup_node_errors.Cannot_checkout_context
-             (block_hash, Some context_hash))
-    | Some ctxt -> return ctxt
-  in
-  let*! state = Context.PVMState.find ctxt in
-  match state with
-  | Some s -> return s
-  | None -> failwith "No PVM state found for block %a" Block_hash.pp block_hash
+  match ctxt with
+  | None ->
+      tzfail
+        (Rollup_node_errors.Cannot_checkout_context
+           (block_hash, Some context_hash))
+  | Some ctxt -> (
+      let*! state = Context.PVMState.find ctxt in
+      match state with
+      | Some s -> return (ctxt, s)
+      | None ->
+          failwith "No PVM state found for block %a" Block_hash.pp block_hash)
 
 (** [decode_value tree] decodes a durable storage value from the given tree. *)
 let decode_value ~(pvm : (module Pvm_plugin_sig.S)) tree =
@@ -143,14 +142,14 @@ let dump_durable_storage ~block ~data_dir ~file =
     | Some c -> return c
   in
   let* context = load_context ~data_dir plugin Access_mode.Read_only in
-  let* state = get_wasm_pvm_state context block_hash context_hash in
+  let* _ctxt, state = get_wasm_pvm_state context block_hash context_hash in
   let* instrs = generate_durable_storage ~plugin state in
   let* () = Installer_config.to_file instrs ~output:file in
   return_unit
 
 let preload_kernel (node_ctxt : _ Node_context.t) header =
   let open Lwt_result_syntax in
-  let* pvm_state =
+  let* _ctxt, pvm_state =
     get_wasm_pvm_state
       node_ctxt.context
       header.Sc_rollup_block.block_hash
@@ -191,8 +190,10 @@ let patch_durable_storage ~data_dir ~key ~value =
       (Option.is_some l2_block.header.commitment_hash)
       (Rollup_node_errors.Patch_durable_storage_on_commitment block_level)
   in
-  let* context = load_context ~data_dir plugin Access_mode.Read_write in
-  let* state = get_wasm_pvm_state context block_hash l2_block.header.context in
+  let* index = load_context ~data_dir plugin Access_mode.Read_write in
+  let* context, state =
+    get_wasm_pvm_state index block_hash l2_block.header.context
+  in
 
   (* Patches the state via an unsafe patch. *)
   let* patched_state =
