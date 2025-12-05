@@ -180,7 +180,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
   let module P = struct
     include PVM
 
-    let context : context = (Ctxt_wrapper.of_node_context context).index
+    let context : context = Ctxt_wrapper.of_node_context context
 
     let state = state
 
