@@ -154,7 +154,7 @@ let generate_proof (node_ctxt : _ Node_context.t)
   let module P = struct
     include PVM
 
-    let context : context = (of_node_context context).index
+    let context : context = of_node_context context
 
     let state = of_node_pvmstate start_state
 
