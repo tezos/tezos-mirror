@@ -164,6 +164,8 @@ module type Dal = sig
   val traps_fraction : Q.t option
 
   val publish_slots_regularly : bool
+
+  val stresstest : Stresstest.t option
 end
 
 module Dal () : Dal = struct
@@ -796,6 +798,19 @@ module Dal () : Dal = struct
         "Let the DAL node handle autonomously (i.e without orchestration) the \
          publication of slots at a regular frequency"
       config.publish_slots_regularly
+
+  let stresstest =
+    let from_cli =
+      Clap.optional
+        ~section
+        ~long:"stresstest"
+        ~description:
+          "Stresstest the L1 network with TPS operations (transfers) per \
+           second. One can also provide a seed with the syntax TPS/SEED"
+        Stresstest.typ
+        ()
+    in
+    Option.fold ~none:config.stresstest ~some:Option.some from_cli
 end
 
 module type Layer1 = sig

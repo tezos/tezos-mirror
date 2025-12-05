@@ -42,19 +42,6 @@ let wait_next_level ?(offset = 1) node =
     (Network.get_level (Node.as_rpc_endpoint node))
     (fun level -> Node.wait_for_level node (level + offset))
 
-(** Max number of TPS one stresstest node is expected to reach *)
-let stresstest_max_tps_pre_node = 50
-
-(** Max number of pkh handled by one stresstest node *)
-let stresstest_max_pkh_pre_node = 100
-
-(** For a given [network], returns the number of stesstest node to spawn
-    in order to achieve [tps] tps. *)
-let nb_stresstester network tps =
-  let n1 = tps / stresstest_max_tps_pre_node in
-  let n2 = tps * Network.block_time network / stresstest_max_pkh_pre_node in
-  max 1 (max n1 n2)
-
 let extract_agent_index (r : rex) agent =
   match Agent.name agent =~* r with
   | None ->
@@ -894,7 +881,7 @@ let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
            the yes wallet"
     | ( Some {tps; seed},
         Some ({public_key = pk; public_key_hash = pkh; _} : Account.key) ) ->
-        let tps = tps / nb_stresstester configuration.network tps in
+        let tps = tps / Stresstest.nb_stresstester configuration.network tps in
         let* stresstesters =
           (* init stresstest: init node and create accounts *)
           Lwt_list.mapi_p
@@ -1251,7 +1238,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
             match configuration.stresstest with
             | None -> []
             | Some {tps; _} ->
-                let n = nb_stresstester configuration.network tps in
+                let n = Stresstest.nb_stresstester configuration.network tps in
                 List.init n (fun i -> Stresstest i))
     in
     Lwt.return

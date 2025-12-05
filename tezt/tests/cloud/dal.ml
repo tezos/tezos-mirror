@@ -56,6 +56,7 @@ type configuration = {
   number_of_slots : int option;
   attestation_lag : int option;
   traps_fraction : Q.t option;
+  stresstest : Stresstest.t option;
 }
 
 type bootstrap = {
@@ -82,6 +83,7 @@ type t = {
   observers : Dal_node_helpers.observer list;
   archivers : Dal_node_helpers.archiver list;
   etherlink : Etherlink_helpers.etherlink option;
+  stresstesters : Stresstest.stresstester list;
   echo_rollups : Echo_rollup.operator list;
   time_between_blocks : int;
   parameters : Dal_common.Parameters.t;
@@ -411,6 +413,12 @@ let init_public_network cloud (configuration : configuration)
       configuration.echo_rollups
       bootstrap.client
   in
+  let* stresstesters =
+    Stresstest.create_stresstest_accounts
+      ?stresstest_config:configuration.stresstest
+      configuration.network
+      bootstrap.client
+  in
   let accounts_to_fund =
     (if configuration.producer_key = None then
        List.map (fun producer -> (producer, 10 * 1_000_000)) producer_accounts
@@ -424,6 +432,10 @@ let init_public_network cloud (configuration : configuration)
         (fun batcher -> (batcher, 10 * 1_000_000))
         etherlink_batching_operator_keys
     @ List.map (fun operator -> (operator, 11_000 * 1_000_000)) echo_rollup_keys
+    @ List.flatten
+        (List.map
+           (List.map (fun stresstester -> (stresstester, 10_000 * 1_000_000)))
+           stresstesters)
   in
   let* () =
     Dal_node_helpers.fund_producers_accounts
@@ -440,7 +452,8 @@ let init_public_network cloud (configuration : configuration)
       producer_accounts,
       etherlink_rollup_operator_key,
       etherlink_batching_operator_keys,
-      echo_rollup_keys )
+      echo_rollup_keys,
+      stresstesters )
 
 let round_robin_split m lst =
   assert (m > 0) ;
@@ -678,6 +691,12 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           (List.length configuration.dal_node_producers)
           client
   in
+  let* stresstesters =
+    Stresstest.create_stresstest_accounts
+      ?stresstest_config:configuration.stresstest
+      configuration.network
+      client
+  in
   let* etherlink_rollup_operator_key, etherlink_batching_operator_keys =
     Etherlink_helpers.init_etherlink_operators ~client etherlink_configuration
   in
@@ -718,7 +737,8 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
                   },
                 false ))
             (producer_accounts @ etherlink_rollup_operator_key
-           @ etherlink_batching_operator_keys @ echo_rollup_keys)
+           @ etherlink_batching_operator_keys @ echo_rollup_keys
+           @ List.flatten stresstesters)
         in
         let overrides =
           (match configuration.slot_size with
@@ -816,7 +836,8 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       producer_accounts,
       etherlink_rollup_operator_key,
       etherlink_batching_operator_keys,
-      echo_rollup_keys )
+      echo_rollup_keys,
+      stresstesters )
 
 let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
     (bakers : Baker_helpers.baker list)
@@ -896,7 +917,8 @@ let init ~(configuration : configuration) etherlink_configuration cloud
          producer_accounts,
          etherlink_rollup_operator_key,
          etherlink_batching_operator_keys,
-         echo_rollup_keys ) =
+         echo_rollup_keys,
+         stresstesters ) =
     match configuration.network with
     | `Sandbox ->
         let bootstrap_agent = Option.get bootstrap_agent in
@@ -1051,6 +1073,22 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       etherlink_batching_operator_keys
       etherlink_configuration
   in
+  let* stresstesters =
+    Stresstest.init_stresstesters
+      ?seed:
+        (Option.map (fun Stresstest.{seed; _} -> seed) configuration.stresstest)
+      ~network:configuration.network
+      ~external_rpc:configuration.external_rpc
+      ~simulate_network:configuration.simulate_network
+      ~snapshot:configuration.snapshot
+      ~data_dir:configuration.data_dir
+      ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
+      ~accounts:stresstesters
+      cloud
+      next_agent
+  in
   let some_node_rpc_endpoint =
     obtain_some_node_rpc_endpoint
       bootstrap_agent
@@ -1115,6 +1153,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       archivers;
       echo_rollups;
       etherlink;
+      stresstesters;
       time_between_blocks;
       parameters;
       infos;
@@ -1356,6 +1395,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let attestation_lag = Cli.attestation_lag in
     let traps_fraction = Cli.traps_fraction in
     let publish_slots_regularly = Cli.publish_slots_regularly in
+    let stresstest = Cli.stresstest in
     let t =
       {
         with_dal;
@@ -1397,6 +1437,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         attestation_lag;
         traps_fraction;
         publish_slots_regularly;
+        stresstest;
       }
     in
     (t, etherlink)
@@ -1454,6 +1495,11 @@ let register (module Cli : Scenarios_cli.Dal) =
                                Echo_rollup_dal_observer {operator; slot_index})
                              configuration.dal_node_producers))
             else []);
+           (match configuration.stresstest with
+           | None -> []
+           | Some Stresstest.{tps; _} ->
+               let n = Stresstest.nb_stresstester configuration.network tps in
+               List.init n (fun i -> Stresstest i));
          ]
   in
   let docker_image =

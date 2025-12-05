@@ -87,6 +87,7 @@ let block_time : t -> int = function
   | `Ghostnet -> 4
   | `Seoulnet -> 4
   | `Tallinnnet -> 4
+  | `Sandbox -> 6
   | network ->
       failwith
         (Format.sprintf
