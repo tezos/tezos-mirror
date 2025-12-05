@@ -539,6 +539,15 @@ let patched_sequencer_key =
     ("pk", Signature.Public_key.encoding)
     ("pkh", Signature.Public_key_hash.encoding)
 
+let background_task_error =
+  Internal_event.Simple.declare_2
+    ~section
+    ~name:"background_task_error"
+    ~msg:"background task {name} failed with error {error}"
+    ~level:Fatal
+    ("name", Data_encoding.string)
+    ("error", Data_encoding.string)
+
 let received_upgrade payload = emit received_upgrade payload
 
 let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
@@ -583,6 +592,11 @@ let private_server_is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
 
 let rpc_server_error exn =
   emit__dont_wait__use_with_care event_rpc_server_error (Printexc.to_string exn)
+
+let background_task_error ~name exn =
+  emit__dont_wait__use_with_care
+    background_task_error
+    (name, Printexc.to_string exn)
 
 let shutdown_rpc_server ~private_ =
   emit (event_shutdown_rpc_server ~private_) ()

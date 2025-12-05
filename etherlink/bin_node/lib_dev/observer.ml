@@ -350,33 +350,30 @@ let main ?network ?kernel_path ~(config : Configuration.t) ~no_sync
     let task, _resolver = Lwt.task () in
     let*! () = task in
     return_unit
-  else
-    let* () =
-      Blueprints_follower.start
-        ~multichain:enable_multichain
-        ~time_between_blocks
-        ~evm_node_endpoint
-        ~rpc_timeout:config.rpc_timeout
-        ~next_blueprint_number
-        ~instant_confirmations:
-          config.experimental_features.preconfirmation_stream_enabled
-        ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
-        ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
-        ~on_next_block_info
-        ~on_inclusion
-        ~on_dropped:(fun hash reason ->
-          Broadcast.notify_transaction_result {hash; result = Error reason} ;
-          let* () = Tx_container.dropped_transaction ~dropped_tx:hash ~reason in
-          return_unit)
-        ()
-    and* () =
-      Drift_monitor.run
-        ~evm_node_endpoint
-        ~timeout:config.rpc_timeout
-        Evm_context.next_blueprint_number
-    and* () =
-      Tx_container.tx_queue_beacon
-        ~evm_node_endpoint:(Rpc evm_node_endpoint)
-        ~tick_interval:(float_of_int config.tx_queue.max_lifespan_s)
-    in
-    return_unit
+  else (
+    Misc.background_task ~name:"drift_monitor" (fun () ->
+        Drift_monitor.run
+          ~evm_node_endpoint
+          ~timeout:config.rpc_timeout
+          Evm_context.next_blueprint_number) ;
+    Misc.background_task ~name:"tx_queue_beacon" (fun () ->
+        Tx_container.tx_queue_beacon
+          ~evm_node_endpoint:(Rpc evm_node_endpoint)
+          ~tick_interval:(float_of_int config.tx_queue.max_lifespan_s)) ;
+    Blueprints_follower.start
+      ~multichain:enable_multichain
+      ~time_between_blocks
+      ~evm_node_endpoint
+      ~rpc_timeout:config.rpc_timeout
+      ~next_blueprint_number
+      ~instant_confirmations:
+        config.experimental_features.preconfirmation_stream_enabled
+      ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
+      ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
+      ~on_next_block_info
+      ~on_inclusion
+      ~on_dropped:(fun hash reason ->
+        Broadcast.notify_transaction_result {hash; result = Error reason} ;
+        let* () = Tx_container.dropped_transaction ~dropped_tx:hash ~reason in
+        return_unit)
+      ())

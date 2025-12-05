@@ -511,13 +511,11 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
             filter_event = (fun _ -> true);
           }
       in
-      let () =
-        Rollup_node_follower.start
-          ~keep_alive
-          ~rollup_node_endpoint
-          ~rollup_node_endpoint_timeout:rpc_timeout
-          ()
-      in
+      Rollup_node_follower.start
+        ~keep_alive
+        ~rollup_node_endpoint
+        ~rollup_node_endpoint_timeout:rpc_timeout
+        () ;
       return_unit
   in
 
@@ -578,20 +576,17 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
       telemetry_cleanup
       ~tx_container
   in
-  let* () =
-    loop_sequencer
-      enable_multichain
-      ~tx_container
-      ~rpc_timeout:configuration.rpc_timeout
-      ~instant_confirmations:
-        configuration.experimental_features.preconfirmation_stream_enabled
-      ?sandbox_config
-      sequencer_config.time_between_blocks
-  and* () =
-    when_ configuration.experimental_features.preconfirmation_stream_enabled
-    @@ fun () ->
-    Tx_container.tx_queue_beacon
-      ~evm_node_endpoint:Block_producer
-      ~tick_interval:(float_of_int configuration.tx_queue.max_lifespan_s)
-  in
-  return_unit
+  Misc.background_task ~name:"tx_queue_beacon" (fun () ->
+      when_ configuration.experimental_features.preconfirmation_stream_enabled
+      @@ fun () ->
+      Tx_container.tx_queue_beacon
+        ~evm_node_endpoint:Block_producer
+        ~tick_interval:(float_of_int configuration.tx_queue.max_lifespan_s)) ;
+  loop_sequencer
+    enable_multichain
+    ~tx_container
+    ~rpc_timeout:configuration.rpc_timeout
+    ~instant_confirmations:
+      configuration.experimental_features.preconfirmation_stream_enabled
+    ?sandbox_config
+    sequencer_config.time_between_blocks

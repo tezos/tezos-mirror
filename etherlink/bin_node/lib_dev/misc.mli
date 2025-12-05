@@ -48,3 +48,5 @@ val domain_count_cap : unit -> int
 exception Timeout
 
 val with_timeout : int -> (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
+
+val background_task : name:string -> (unit -> unit tzresult Lwt.t) -> unit

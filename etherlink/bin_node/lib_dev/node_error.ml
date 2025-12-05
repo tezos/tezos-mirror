@@ -15,6 +15,8 @@ let exit_code_when_error_blueprints_follower = 103
 
 let exit_code_when_gcp_kms_auth_error = 104
 
+let exit_code_when_background_task_fails = 105
+
 type error_source = [`Node | `Kernel]
 
 let error_source_encoding =
