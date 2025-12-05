@@ -49,6 +49,8 @@ apt-get install -y octez-baker
 
 sudo su tezos -c "octez-node config init --rpc-addr 127.0.0.1:8732"
 sudo systemctl start octez-node
+sudo systemctl start octez-dal-node
+sudo systemctl start octez-baker
 
 sudo systemctl status octez-node
 version_before_upgrade=$(get_node_version)
@@ -79,6 +81,14 @@ systemctl list-unit-files --type=service | grep "octez"
 # [upgrade octez]
 sudo rm -f /usr/sbin/policy-rc.d
 apt-get upgrade -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -y octez-node octez-dal-node octez-baker
+
+# It has to be started automatically because v23* packages are broken
+sudo systemctl start octez-dal-node
+sudo systemctl start octez-baker
+
+systemctl is-active octez-node
+systemctl is-active octez-baker
+systemctl is-active octez-dal-node
 
 sudo systemctl status octez-node
 version_after_upgrade=$(get_node_version)
