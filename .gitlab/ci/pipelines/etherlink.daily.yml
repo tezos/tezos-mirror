@@ -125,13 +125,9 @@ oc.build_x86_64-released:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: rust-targets-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo_targets/_target
     policy: pull-push
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -157,9 +153,6 @@ oc.build_x86_64-released:
     SCCACHE_GCS_KEY_PREFIX: sccache
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
-    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
-    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -449,10 +442,6 @@ etherlink.build_tezt:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
-  - key: rust-targets-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo_targets/_target
-    policy: pull-push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -476,9 +465,6 @@ etherlink.build_tezt:
   - dune cache trim --size=5GB
   variables:
     CARGO_NET_OFFLINE: "false"
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
-    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
-    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_RW_MODE: READ_ONLY
@@ -590,13 +576,9 @@ etherlink.build_evm_node_static_arm64:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: rust-targets-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo_targets/_target
     policy: pull-push
   interruptible: false
   before_script:
@@ -618,9 +600,6 @@ etherlink.build_evm_node_static_arm64:
     EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
     VERSION_EXECUTABLE: octez-evm-node
     CARGO_NET_OFFLINE: "false"
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
-    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
-    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_RW_MODE: READ_ONLY
@@ -644,13 +623,9 @@ etherlink.build_evm_node_static_x86_64:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
+    key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: rust-targets-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo_targets/_target
     policy: pull-push
   interruptible: false
   before_script:
@@ -672,9 +647,6 @@ etherlink.build_evm_node_static_x86_64:
     EXECUTABLE_FILES: script-inputs/etherlink-experimental-executables
     VERSION_EXECUTABLE: octez-evm-node
     CARGO_NET_OFFLINE: "false"
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rust_deps
-    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/rustzcash_deps
-    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/.cargo_targets/_target/etherlink_wasm_runtime
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_RW_MODE: READ_ONLY
