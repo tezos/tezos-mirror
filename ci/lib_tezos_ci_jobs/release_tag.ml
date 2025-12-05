@@ -310,14 +310,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~name:"dispatch-call"
       ~dependencies:
         (Dependent [Job job_release_page; Job job_gitlab_release_or_publish])
-      [
-        "curl -L -X POST -H \"Accept: application/vnd.github+json\" -H \
-         \"Authorization: Bearer ${TEZCAPITAL_GITHUB_TOKEN}\" -H \
-         \"X-GitHub-Api-Version: 2022-11-28\" \
-         https://api.github.com/repos/tez-capital/tezos-macos-pipeline/actions/workflows/macos.yml/dispatches \
-         -d '{\"ref\":\"main\",\"inputs\":{\"version\": \
-         \"${CI_COMMIT_TAG}\"}}'";
-      ]
+      ["./scripts/releases/dispatch-call.sh"]
   in
   let job_trigger_monitoring =
     trigger_job
