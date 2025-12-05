@@ -4,7 +4,7 @@
 
 use crate::{
     block::{eth_bip_from_blueprint, BlockComputationResult, TickCounter},
-    block_in_progress::EthBlockInProgress,
+    block_in_progress::BlockInProgress,
     blueprint::Blueprint,
     blueprint_storage::{
         read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
@@ -120,7 +120,7 @@ pub trait BlockInProgressTrait {
     fn number(&self) -> U256;
 }
 
-impl BlockInProgressTrait for EthBlockInProgress {
+impl<Tx, Receipt> BlockInProgressTrait for BlockInProgress<Tx, Receipt> {
     fn number(&self) -> U256 {
         self.number
     }
@@ -227,6 +227,32 @@ impl Decodable for TezlinkContent {
     }
 }
 
+pub trait TransactionTrait {
+    fn is_delayed(&self) -> bool;
+
+    fn tx_hash(&self) -> TransactionHash;
+}
+
+impl TransactionTrait for crate::transaction::Transaction {
+    fn is_delayed(&self) -> bool {
+        self.is_delayed()
+    }
+
+    fn tx_hash(&self) -> TransactionHash {
+        self.tx_hash
+    }
+}
+
+impl TransactionTrait for TezlinkOperation {
+    fn is_delayed(&self) -> bool {
+        false
+    }
+
+    fn tx_hash(&self) -> TransactionHash {
+        self.tx_hash
+    }
+}
+
 pub trait ChainHeaderTrait {
     fn hash(&self) -> H256;
 
@@ -320,7 +346,10 @@ pub trait ChainConfigTrait: Debug {
 impl ChainConfigTrait for EvmChainConfig {
     type Transaction = crate::transaction::Transaction;
 
-    type BlockInProgress = crate::block_in_progress::EthBlockInProgress;
+    type BlockInProgress = crate::block_in_progress::BlockInProgress<
+        Self::Transaction,
+        tezos_ethereum::transaction::TransactionReceipt,
+    >;
 
     type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
 

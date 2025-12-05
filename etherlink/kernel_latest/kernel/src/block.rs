@@ -13,6 +13,7 @@ use crate::blueprint_storage::{
 };
 use crate::chains::{
     BlockInProgressTrait, ChainConfigTrait, ChainHeaderTrait, EvmChainConfig, EvmLimits,
+    TransactionTrait,
 };
 use crate::configuration::ConfigurationMode;
 use crate::delayed_inbox::DelayedInbox;
@@ -26,12 +27,12 @@ use crate::upgrade::KernelUpgrade;
 use crate::Configuration;
 use crate::{block_in_progress, tick_model};
 use anyhow::Context;
-use block_in_progress::EthBlockInProgress;
+use block_in_progress::BlockInProgress;
 use primitive_types::{H160, H256, U256};
 use revm::primitives::hardfork::SpecId;
 use revm_etherlink::inspectors::TracerInput;
 use tezos_ethereum::block::BlockConstants;
-use tezos_ethereum::transaction::TransactionHash;
+use tezos_ethereum::transaction::{TransactionHash, TransactionReceipt};
 use tezos_evm_logging::{__trace_kernel, log, Level::*, Verbosity};
 use tezos_evm_runtime::runtime::{IsEvmNode, Runtime};
 use tezos_evm_runtime::safe_storage::SafeStorage;
@@ -90,14 +91,14 @@ enum BlockInProgressProvenance {
     Blueprint,
 }
 
-fn on_invalid_transaction<Host: Runtime>(
+fn on_invalid_transaction<Host: Runtime, Tx: TransactionTrait, Receipt>(
     host: &mut Host,
-    transaction: &Transaction,
-    block_in_progress: &mut EthBlockInProgress,
+    transaction: &Tx,
+    block_in_progress: &mut BlockInProgress<Tx, Receipt>,
     data_size: u64,
 ) {
     if transaction.is_delayed() {
-        block_in_progress.register_delayed_transaction(transaction.tx_hash);
+        block_in_progress.register_delayed_transaction(transaction.tx_hash());
     }
 
     block_in_progress.account_for_invalid_transaction(data_size);
@@ -129,7 +130,7 @@ fn can_fit_in_reboot(
 fn compute<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    block_in_progress: &mut EthBlockInProgress,
+    block_in_progress: &mut BlockInProgress<Transaction, TransactionReceipt>,
     block_constants: &BlockConstants,
     sequencer_pool_address: Option<H160>,
     limits: &EvmLimits,
@@ -221,14 +222,14 @@ pub fn eth_bip_from_blueprint<Host: Runtime>(
     next_bip_number: U256,
     header: EVMBlockHeader,
     blueprint: Blueprint<Transaction>,
-) -> EthBlockInProgress {
+) -> BlockInProgress<Transaction, TransactionReceipt> {
     let gas_price = crate::gas_price::base_fee_per_gas(
         host,
         blueprint.timestamp,
         chain_config.get_limits().minimum_base_fee_per_gas,
     );
 
-    let bip = EthBlockInProgress::from_blueprint(
+    let bip = BlockInProgress::from_blueprint(
         blueprint,
         next_bip_number,
         header.hash,
@@ -247,7 +248,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
     chain_config: &ChainConfig,
     config: &mut Configuration,
     kernel_upgrade: &Option<KernelUpgrade>,
-) -> Result<BlueprintParsing<ChainConfig::BlockInProgress>, anyhow::Error> {
+) -> anyhow::Result<BlueprintParsing<ChainConfig::BlockInProgress>> {
     let (next_bip_number, timestamp, chain_header) = match read_current_block_header(host)
     {
         Err(_) => (
@@ -301,7 +302,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
 pub fn compute_bip<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
-    mut block_in_progress: EthBlockInProgress,
+    mut block_in_progress: BlockInProgress<Transaction, TransactionReceipt>,
     tick_counter: &mut TickCounter,
     sequencer_pool_address: Option<H160>,
     limits: &EvmLimits,
@@ -1713,7 +1714,7 @@ mod tests {
         let transactions = vec![valid_tx].into();
 
         // init block in progress
-        let mut block_in_progress = EthBlockInProgress::new(
+        let mut block_in_progress = BlockInProgress::new(
             U256::from(1),
             transactions,
             block_constants.block_fees.base_fee_per_gas(),

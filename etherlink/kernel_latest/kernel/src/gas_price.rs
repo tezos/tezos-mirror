@@ -4,10 +4,11 @@
 
 //! Adjustments of the gas price (a.k.a `base_fee_per_gas`), in response to load.
 
-use crate::block_in_progress::EthBlockInProgress;
-
+use crate::block_in_progress::BlockInProgress;
+use crate::transaction::Transaction;
 use primitive_types::U256;
 use softfloat::F64;
+use tezos_ethereum::transaction::TransactionReceipt;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
@@ -22,7 +23,7 @@ const ALPHA: F64 = softfloat::f64!(0.000_000_000_99);
 /// Register a completed block into the tick backlog
 pub fn register_block(
     host: &mut impl Runtime,
-    bip: &EthBlockInProgress,
+    bip: &BlockInProgress<Transaction, TransactionReceipt>,
 ) -> anyhow::Result<()> {
     if bip.queue_length() > 0 {
         anyhow::bail!("update_gas_price on non-empty block");
@@ -205,7 +206,7 @@ mod test {
             H160::zero(),
         );
 
-        let mut bip = EthBlockInProgress::new_with_ticks(
+        let mut bip = BlockInProgress::new_with_ticks(
             U256::zero(),
             Default::default(),
             VecDeque::new(),

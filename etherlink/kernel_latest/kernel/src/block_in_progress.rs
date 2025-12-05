@@ -7,7 +7,7 @@
 
 use crate::apply::{ExecutionInfo, TransactionObjectInfo, TransactionReceiptInfo};
 use crate::block_storage;
-use crate::chains::ETHERLINK_SAFE_STORAGE_ROOT_PATH;
+use crate::chains::{TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
 use crate::error::Error;
 use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
@@ -37,7 +37,7 @@ use tezos_smart_rollup_host::path::RefPath;
 
 #[derive(Debug, PartialEq, Clone)]
 /// Container for all data needed during block computation
-pub struct EthBlockInProgress {
+pub struct BlockInProgress<Transaction, TransactionReceipt> {
     /// block number
     pub number: U256,
     /// queue containing the transactions to execute
@@ -72,9 +72,9 @@ pub struct EthBlockInProgress {
     pub cumulative_tx_objects: Vec<TransactionObject>,
 }
 
-impl Encodable for EthBlockInProgress {
+impl<Tx: Encodable, Receipt: Encodable> Encodable for BlockInProgress<Tx, Receipt> {
     fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        let EthBlockInProgress {
+        let BlockInProgress {
             number,
             tx_queue,
             valid_txs,
@@ -111,7 +111,7 @@ impl Encodable for EthBlockInProgress {
     }
 }
 
-fn append_queue(stream: &mut rlp::RlpStream, queue: &VecDeque<Transaction>) {
+fn append_queue<Tx: Encodable>(stream: &mut rlp::RlpStream, queue: &VecDeque<Tx>) {
     stream.begin_list(queue.len());
     for transaction in queue {
         stream.append(transaction);
@@ -125,7 +125,10 @@ fn append_txs(stream: &mut rlp::RlpStream, valid_txs: &[[u8; TRANSACTION_HASH_SI
     })
 }
 
-fn append_receipts(stream: &mut rlp::RlpStream, receipts: &[TransactionReceipt]) {
+fn append_receipts<Receipt: Encodable>(
+    stream: &mut rlp::RlpStream,
+    receipts: &[Receipt],
+) {
     stream.begin_list(receipts.len());
     receipts.iter().for_each(|receipt| {
         stream.append(receipt);
@@ -139,8 +142,8 @@ fn append_tx_objects(stream: &mut rlp::RlpStream, objects: &[TransactionObject])
     })
 }
 
-impl Decodable for EthBlockInProgress {
-    fn decode(decoder: &rlp::Rlp<'_>) -> Result<EthBlockInProgress, rlp::DecoderError> {
+impl<Tx: Decodable, Receipt: Decodable> Decodable for BlockInProgress<Tx, Receipt> {
+    fn decode(decoder: &rlp::Rlp<'_>) -> Result<Self, rlp::DecoderError> {
         if !decoder.is_list() {
             return Err(DecoderError::RlpExpectedToBeList);
         }
@@ -150,7 +153,7 @@ impl Decodable for EthBlockInProgress {
 
         let mut it = decoder.iter();
         let number: U256 = decode_field(&next(&mut it)?, "number")?;
-        let tx_queue: VecDeque<Transaction> = decode_queue(&next(&mut it)?)?;
+        let tx_queue: VecDeque<Tx> = decode_queue(&next(&mut it)?)?;
         let valid_txs: Vec<TransactionHash> = decode_valid_txs(&next(&mut it)?)?;
         let delayed_txs: Vec<TransactionHash> = decode_valid_txs(&next(&mut it)?)?;
         let cumulative_gas: U256 = decode_field(&next(&mut it)?, "cumulative_gas")?;
@@ -164,8 +167,7 @@ impl Decodable for EthBlockInProgress {
         let base_fee_per_gas = decode_field(&next(&mut it)?, "base_fee_per_gas")?;
         let cumulative_execution_gas: U256 =
             decode_field(&next(&mut it)?, "cumulative_execution_gas")?;
-        let cumulative_receipts: Vec<TransactionReceipt> =
-            decode_receipts(&next(&mut it)?)?;
+        let cumulative_receipts: Vec<Receipt> = decode_receipts(&next(&mut it)?)?;
         let cumulative_tx_objects: Vec<TransactionObject> =
             decode_tx_objects(&next(&mut it)?)?;
 
@@ -205,27 +207,29 @@ fn decode_valid_txs(
     Ok(valid_txs)
 }
 
-fn decode_queue(decoder: &rlp::Rlp<'_>) -> Result<VecDeque<Transaction>, DecoderError> {
+fn decode_queue<Tx: Decodable>(
+    decoder: &rlp::Rlp<'_>,
+) -> Result<VecDeque<Tx>, DecoderError> {
     if !decoder.is_list() {
         return Err(DecoderError::RlpExpectedToBeList);
     }
     let mut queue = VecDeque::with_capacity(decoder.item_count()?);
     for item in decoder.iter() {
-        let tx: Transaction = item.as_val()?;
+        let tx: Tx = item.as_val()?;
         queue.push_back(tx);
     }
     Ok(queue)
 }
 
-fn decode_receipts(
+fn decode_receipts<Receipt: Decodable>(
     decoder: &rlp::Rlp<'_>,
-) -> Result<Vec<TransactionReceipt>, DecoderError> {
+) -> Result<Vec<Receipt>, DecoderError> {
     if !decoder.is_list() {
         return Err(DecoderError::RlpExpectedToBeList);
     }
     let mut receipts = Vec::with_capacity(decoder.item_count()?);
     for item in decoder.iter() {
-        let receipt: TransactionReceipt = item.as_val()?;
+        let receipt: Receipt = item.as_val()?;
         receipts.push(receipt);
     }
     Ok(receipts)
@@ -245,7 +249,7 @@ fn decode_tx_objects(
     Ok(objects)
 }
 
-impl EthBlockInProgress {
+impl<Tx: TransactionTrait, Receipt> BlockInProgress<Tx, Receipt> {
     pub fn queue_length(&self) -> usize {
         self.tx_queue.len()
     }
@@ -254,7 +258,7 @@ impl EthBlockInProgress {
     pub fn new_with_ticks(
         number: U256,
         parent_hash: H256,
-        transactions: VecDeque<Transaction>,
+        transactions: VecDeque<Tx>,
         estimated_ticks_in_run: u64,
         timestamp: Timestamp,
         base_fee_per_gas: U256,
@@ -281,11 +285,7 @@ impl EthBlockInProgress {
 
     // constructor of raw structure, used in tests
     #[cfg(test)]
-    pub fn new(
-        number: U256,
-        transactions: VecDeque<Transaction>,
-        base_fee_per_gas: U256,
-    ) -> EthBlockInProgress {
+    pub fn new(number: U256, transactions: VecDeque<Tx>, base_fee_per_gas: U256) -> Self {
         Self::new_with_ticks(
             number,
             H256::zero(),
@@ -326,15 +326,15 @@ impl EthBlockInProgress {
     }
 
     pub fn from_blueprint(
-        blueprint: crate::blueprint::Blueprint<Transaction>,
+        blueprint: crate::blueprint::Blueprint<Tx>,
         number: U256,
         parent_hash: H256,
         tick_counter: u64,
         base_fee_per_gas: U256,
-    ) -> EthBlockInProgress {
+    ) -> Self {
         // blueprint is turn into a ring to allow popping from the front
         let ring = blueprint.transactions.into();
-        EthBlockInProgress::new_with_ticks(
+        Self::new_with_ticks(
             number,
             parent_hash,
             ring,
@@ -361,6 +361,12 @@ impl EthBlockInProgress {
         self.delayed_txs.push(hash);
     }
 
+    pub fn account_for_invalid_transaction(&mut self, tx_data_size: u64) {
+        self.add_ticks(tick_model::ticks_of_invalid_transaction(tx_data_size));
+    }
+}
+
+impl BlockInProgress<Transaction, TransactionReceipt> {
     #[instrument(skip_all)]
     pub fn register_valid_transaction<Host: Runtime>(
         &mut self,
@@ -408,10 +414,6 @@ impl EthBlockInProgress {
             TezosXRuntime::Tezos => (),
         };
         Ok(())
-    }
-
-    pub fn account_for_invalid_transaction(&mut self, tx_data_size: u64) {
-        self.add_ticks(tick_model::ticks_of_invalid_transaction(tx_data_size));
     }
 
     fn safe_store_get_hash<Host: Runtime>(
@@ -587,7 +589,7 @@ impl EthBlockInProgress {
 #[cfg(test)]
 mod tests {
 
-    use super::EthBlockInProgress;
+    use super::BlockInProgress;
     use crate::bridge::Deposit;
     use crate::transaction::{Transaction, TransactionContent};
     use primitive_types::{H160, H256, U256};
@@ -599,6 +601,9 @@ mod tests {
         Bloom,
     };
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
+
+    type EthBlockInProgress =
+        BlockInProgress<Transaction, tezos_ethereum::transaction::TransactionReceipt>;
 
     fn new_sig_unsafe(v: u64, r: H256, s: H256) -> TxSignature {
         TxSignature::new(U256::from(v), r, s).unwrap()
