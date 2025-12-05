@@ -345,6 +345,17 @@ module Loops (Archiver : Archiver.S) = struct
         in
         Lwt.return_unit
 
+  let maybe_register_rights_and_dal_shards ~rights_of ~dal_shards_of cctx ~level
+      ops =
+    if List.is_empty ops then return_unit
+    else
+      let* rights = rights_of cctx (Int32.pred level) in
+      let pred_level = Int32.pred level in
+      let () = maybe_add_rights (module Archiver) pred_level rights in
+      let* dal_shards = dal_shards_of cctx pred_level in
+      let () = maybe_add_dal_shards (module Archiver) pred_level dal_shards in
+      return_unit
+
   let reception_blocks_loop cctx =
     let logger = Log.logger () in
     let*! block_stream =
@@ -408,50 +419,23 @@ module Loops (Archiver : Archiver.S) = struct
                                     reception_time
                                 in
                                 let* () =
-                                  if List.is_empty attestations then return_unit
-                                  else
-                                    let* rights =
-                                      rights_of cctx (Int32.pred level)
-                                    in
-                                    let pred_level = Int32.pred level in
-                                    let () =
-                                      maybe_add_rights
-                                        (module Archiver)
-                                        pred_level
-                                        rights
-                                    in
-                                    let* dal_shards =
-                                      dal_shards_of cctx pred_level
-                                    in
-                                    let () =
-                                      maybe_add_dal_shards
-                                        (module Archiver)
-                                        pred_level
-                                        dal_shards
-                                    in
-                                    return_unit
+                                  maybe_register_rights_and_dal_shards
+                                    ~rights_of
+                                    ~dal_shards_of
+                                    cctx
+                                    ~level:(Int32.pred level)
+                                    attestations
                                 in
                                 let* () =
                                   if List.is_empty preattestations then
                                     return_unit
                                   else
-                                    let* rights = rights_of cctx level in
-                                    let () =
-                                      maybe_add_rights
-                                        (module Archiver)
-                                        level
-                                        rights
-                                    in
-                                    let* dal_shards =
-                                      dal_shards_of cctx level
-                                    in
-                                    let () =
-                                      maybe_add_dal_shards
-                                        (module Archiver)
-                                        level
-                                        dal_shards
-                                    in
-                                    return_unit
+                                    maybe_register_rights_and_dal_shards
+                                      ~rights_of
+                                      ~dal_shards_of
+                                      cctx
+                                      ~level
+                                      preattestations
                                 in
                                 let () = Archiver.add_block ~level block_data in
                                 return_unit
