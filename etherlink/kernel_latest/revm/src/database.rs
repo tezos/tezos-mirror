@@ -5,7 +5,7 @@
 
 use crate::{
     custom,
-    helpers::legacy::FaDepositWithProxy,
+    helpers::legacy::{alloy_to_u256, FaDepositWithProxy},
     journal::PrecompileStateChanges,
     precompiles::{error::CustomPrecompileError, send_outbox_message::Withdrawal},
     storage::{
@@ -27,6 +27,7 @@ use revm::{
 use tezos_crypto_rs::{
     hash::{ContractKt1Hash, HashTrait},
     public_key::PublicKey,
+    public_key_hash::PublicKeyHash,
 };
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, tracing::instrument, Level};
@@ -88,6 +89,12 @@ pub trait DatabasePrecompileStateChanges {
         deposit_id: &U256,
     ) -> Result<FaDepositWithProxy, CustomPrecompileError>;
     fn ticketer(&self) -> Result<ContractKt1Hash, CustomPrecompileError>;
+    fn tezosx_transfer_tez(
+        &mut self,
+        source: Address,
+        destination: &str,
+        amount: U256,
+    ) -> Result<(), CustomPrecompileError>;
 }
 
 pub(crate) trait DatabaseCommitPrecompileStateChanges {
@@ -239,6 +246,56 @@ impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
             Err(RuntimeError::PathNotFound) => Ok(false),
             Err(e) => Err(CustomPrecompileError::from(e)),
         }
+    }
+
+    fn tezosx_transfer_tez(
+        &mut self,
+        source: Address,
+        destination: &str,
+        amount: U256,
+    ) -> Result<(), CustomPrecompileError> {
+        let mut source_account = StorageAccount::from_address(&source)?;
+        let mut source_info = source_account.info(self.host)?;
+        let new_source_balance =
+            source_info.balance.checked_sub(amount).ok_or_else(|| {
+                CustomPrecompileError::Revert(
+                    "insufficient balance for transfer to runtime".to_string(),
+                )
+            })?;
+        let tezos_pub_key_hash = PublicKeyHash::from_b58check(destination).unwrap();
+        let mut tezos_destination_account =
+            crate::tezosx::get_tezos_account_info(self.host, &tezos_pub_key_hash)
+                .map_err(|e| {
+                    CustomPrecompileError::Revert(format!(
+                        "failed to read destination Tezos account: {e:?}"
+                    ))
+                })?
+                .ok_or_else(|| {
+                    CustomPrecompileError::Revert(
+                        "destination Tezos account not found".to_string(),
+                    )
+                })?;
+        tezos_destination_account.balance = tezos_destination_account
+            .balance
+            .checked_add(alloy_to_u256(&amount))
+            .ok_or_else(|| {
+                CustomPrecompileError::Revert(
+                    "overflow in destination balance calculation".to_string(),
+                )
+            })?;
+        crate::tezosx::set_tezos_account_info(
+            self.host,
+            &tezos_pub_key_hash,
+            tezos_destination_account,
+        )
+        .map_err(|e| {
+            CustomPrecompileError::Revert(format!(
+                "failed to update destination Tezos account: {e:?}"
+            ))
+        })?;
+        source_info.balance = new_source_balance;
+        source_account.set_info(self.host, source_info)?;
+        Ok(())
     }
 }
 

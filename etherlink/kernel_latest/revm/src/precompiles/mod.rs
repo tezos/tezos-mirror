@@ -7,6 +7,7 @@ pub mod constants;
 pub mod error;
 pub mod initializer;
 pub mod provider;
+pub mod runtime_gateway;
 pub mod send_outbox_message;
 
 mod global_counter;

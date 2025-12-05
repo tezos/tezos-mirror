@@ -17,12 +17,13 @@ use crate::{
         change_sequencer_key::change_sequencer_key_precompile,
         constants::{
             CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS, CUSTOMS,
-            GLOBAL_COUNTER_PRECOMPILE_ADDRESS, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
-            TABLE_PRECOMPILE_ADDRESS,
+            GLOBAL_COUNTER_PRECOMPILE_ADDRESS, RUNTIME_GATEWAY_PRECOMPILE_ADDRESS,
+            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
         },
         error::CustomPrecompileError,
         global_counter::global_counter_precompile,
         guard::revert,
+        runtime_gateway::runtime_gateway_precompile,
         send_outbox_message::send_outbox_message_precompile,
         table::table_precompile,
     },
@@ -83,6 +84,9 @@ impl EtherlinkPrecompiles {
             }
             CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS => {
                 change_sequencer_key_precompile(&calldata, context, inputs)
+            }
+            RUNTIME_GATEWAY_PRECOMPILE_ADDRESS => {
+                runtime_gateway_precompile(&calldata, context, inputs)
             }
             _ => return Ok(None),
         };
