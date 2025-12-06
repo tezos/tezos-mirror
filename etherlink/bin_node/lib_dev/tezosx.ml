@@ -24,8 +24,25 @@ let runtime_encoding : runtime Data_encoding.t =
   (* FIXME: use string_enum instead once we have more than one runtime *)
   conv (fun _ -> ()) (fun () -> Tezos) (constant "tezos")
 
+module Ethereum_runtime = struct
+  type address = Ethereum_types.address
+
+  let address_from_string address =
+    let open Result_syntax in
+    if String.has_prefix ~prefix:"0x" address && String.length address = 42 then
+      let+ (`Hex hex) = Misc.normalize_hex address in
+      Ethereum_types.Address (Hex hex)
+    else tzfail (error_of_fmt "%s is not a valid Ethereum address" address)
+end
+
 module Tezos_runtime = struct
   type address = Signature.public_key_hash
+
+  let address_of_string address =
+    let open Result_syntax in
+    match Tezos_crypto.Signature.Public_key_hash.of_b58check address with
+    | Ok tezos_kh -> return tezos_kh
+    | Error _ -> tzfail (error_of_fmt "%s is not a valid Tezos address" address)
 
   type account_info = {
     balance : Tezos_types.Tez.t;
@@ -45,11 +62,11 @@ module Tezos_runtime = struct
           let nonce = Z.to_int64 nonce in
           let* public_key =
             match public_key with
+            | Value b when b = Bytes.empty -> return_none
             | Value value ->
                 return_some
                   (Signature.Public_key.of_b58check_exn
                      (Bytes.unsafe_to_string value))
-            | List [] -> return_none
             | _ -> fail ()
           in
           return {balance; nonce; public_key}
@@ -75,7 +92,7 @@ module Tezos_runtime = struct
       | Some public_key ->
           Rlp.Value
             (Bytes.of_string (Signature.Public_key.to_b58check public_key))
-      | None -> List []
+      | None -> Value Bytes.empty
     in
     Rlp.encode Rlp.(List [Value balance; Value nonce; public_key])
 
@@ -113,3 +130,31 @@ module Foreign_address = struct
                  (Bytes.of_string (Signature.Public_key_hash.to_b58check pkh));
              ])
 end
+
+module Durable_storage_path = struct
+  module Accounts = struct
+    module Tezos = struct
+      let info pkh =
+        "/evm/world_state/eth_accounts/tezos/"
+        ^ Signature.Public_key_hash.to_b58check pkh
+        ^ "/info"
+
+      let ethereum_alias pkh =
+        let (Address (Hex alias)) = Tezos_runtime.ethereum_alias pkh in
+        "/evm/world_state/eth_accounts/tezos/native/ethereum/0x" ^ alias
+    end
+  end
+end
+
+type address =
+  | Ethereum_address of Ethereum_runtime.address
+  | Tezos_address of Tezos_runtime.address
+
+let address_of_string address =
+  let open Result_syntax in
+  match Ethereum_runtime.address_from_string address with
+  | Ok address -> return (Ethereum_address address)
+  | Error _ -> (
+      match Tezos_runtime.address_of_string address with
+      | Ok tezos_kh -> return (Tezos_address tezos_kh)
+      | Error _ -> tzfail (error_of_fmt "%s is not a valid address" address))

@@ -39,12 +39,6 @@ pub struct TezosAccountInfo {
     pub pub_key: Option<PublicKey>,
 }
 
-impl TezosAccountInfo {
-    // This value is used for optimizing reads in the durable storage.
-    // Don't change it without changing TezosAccountInfo.
-    const RLP_SIZE: usize = 99;
-}
-
 impl Encodable for TezosAccountInfo {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(3);
@@ -106,7 +100,7 @@ pub fn get_tezos_account_info(
 ) -> Result<Option<TezosAccountInfo>, Error> {
     let path =
         path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
-    match host.store_read(&path, 0, TezosAccountInfo::RLP_SIZE) {
+    match host.store_read_all(&path) {
         Ok(bytes) => {
             let account_info = TezosAccountInfo::decode(&Rlp::new(&bytes))
                 .map_err(|_| RuntimeError::DecodingError)?;
@@ -219,6 +213,7 @@ mod tests {
     use crate::tezosx::*;
     use std::str::FromStr;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_core::MAX_FILE_CHUNK_SIZE;
 
     #[test]
     fn tezos_account_info_size_constant() {
@@ -232,8 +227,8 @@ mod tests {
             pub_key: Some(pub_key),
         };
         let rlp_size = account.rlp_bytes().len();
-        assert_eq!(rlp_size, TezosAccountInfo::RLP_SIZE);
-        assert_eq!(rlp_size, 99);
+        // Reading an account info in one go is safe
+        assert!(rlp_size < MAX_FILE_CHUNK_SIZE);
     }
 
     #[test]

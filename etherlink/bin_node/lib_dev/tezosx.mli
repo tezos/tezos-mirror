@@ -25,6 +25,10 @@ val known_runtimes : runtime list
     enable the feature. *)
 val feature_flag : runtime -> string
 
+module Ethereum_runtime : sig
+  type address = Ethereum_types.address
+end
+
 module Tezos_runtime : sig
   type address = Signature.public_key_hash
 
@@ -47,3 +51,19 @@ module Foreign_address : sig
 
   val encode : t -> bytes
 end
+
+module Durable_storage_path : sig
+  module Accounts : sig
+    module Tezos : sig
+      val info : Tezos_runtime.address -> Durable_storage_path.path
+
+      val ethereum_alias : Tezos_runtime.address -> Durable_storage_path.path
+    end
+  end
+end
+
+type address =
+  | Ethereum_address of Ethereum_runtime.address
+  | Tezos_address of Tezos_runtime.address
+
+val address_of_string : string -> address tzresult

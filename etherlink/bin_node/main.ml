@@ -219,6 +219,10 @@ module Params = struct
     Tezos_clic.parameter (fun _ public_key ->
         Lwt.return (Signature.Public_key.of_b58check public_key))
 
+  let tezosx_account =
+    Tezos_clic.parameter @@ fun _ address ->
+    Lwt.return (Evm_node_lib_dev.Tezosx.address_of_string address)
+
   let l2_level =
     Tezos_clic.parameter (fun () s ->
         Lwt.return_ok
@@ -2658,7 +2662,11 @@ let fund_arg =
     "The address of an account to provide with funds in the sandbox (can be \
      repeated to fund multiple accounts)."
   in
-  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.eth_address
+  Tezos_clic.multiple_arg
+    ~long
+    ~doc
+    ~placeholder:"0x...|tz..."
+    Params.tezosx_account
 
 let sandbox_config_args =
   Tezos_clic.args13
