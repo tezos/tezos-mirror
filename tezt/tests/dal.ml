@@ -511,6 +511,15 @@ let with_layer1 ?custom_constants ?additional_bootstrap_accounts
     ?all_bakers_attest_activation_threshold f ~protocol =
   let parameter_overrides =
     make_int_parameter ["dal_parametric"; "attestation_lag"] attestation_lag
+    @ (match attestation_lag with
+      | None -> []
+      | Some lag ->
+          if Protocol.number protocol < 025 then []
+          else
+            [
+              ( ["dal_parametric"; "attestation_lags"],
+                `A [`Float (float_of_int lag)] );
+            ])
     @ make_int_parameter ["dal_parametric"; "number_of_shards"] number_of_shards
     @ make_int_parameter
         ["dal_parametric"; "redundancy_factor"]
