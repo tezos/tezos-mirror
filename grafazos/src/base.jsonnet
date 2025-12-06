@@ -36,13 +36,13 @@ local logs = panel.logs;
 
   node_instance_query: '{' + self.node_instance + '="$node_instance"}',
 
-  slot_index_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index"}',
+  slot_index_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index=~"$slot_index"}',
 
-  pkh_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", pkh="$pkh"}',
+  pkh_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", pkh=~"$pkh"}',
 
-  topic_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index="$slot_index", pkh="$pkh"}',
+  topic_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", slot_index=~"$slot_index", pkh=~"$pkh"}',
 
-  peer_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", peer="$peer"}',
+  peer_instance_query: '{' + std.extVar('node_instance_label') + '="$node_instance", peer=~"$peer"}',
 
   // Prometheus query
   prometheus(q, legendFormat='', namespace=self.namespace):
@@ -208,6 +208,9 @@ local logs = panel.logs;
       query='label_values(dal_gs_count_peers_per_topic, slot_index)',
     )
     + variableQuery.generalOptions.withLabel('Slot index')
+    + variableQuery.selectionOptions.withIncludeAll(true)
+    + { allValue: '.*' }
+    + variableQuery.selectionOptions.withMulti(true)
     + variableQuery.refresh.onLoad()
     + variableQuery.withDatasource('prometheus', 'Prometheus'),
 
@@ -217,6 +220,9 @@ local logs = panel.logs;
       query='label_values(dal_gs_count_peers_per_topic, pkh)',
     )
     + variableQuery.generalOptions.withLabel('Pkh')
+    + variableQuery.selectionOptions.withIncludeAll(true)
+    + { allValue: '.*' }
+    + variableQuery.selectionOptions.withMulti(true)
     + variableQuery.refresh.onLoad()
     + variableQuery.withDatasource('prometheus', 'Prometheus'),
 
@@ -226,6 +232,9 @@ local logs = panel.logs;
       query='label_values(dal_gs_scores_of_peers, peer)',
     )
     + variableQuery.generalOptions.withLabel('Peer')
+    + variableQuery.selectionOptions.withIncludeAll(true)
+    + { allValue: '.*' }
+    + variableQuery.selectionOptions.withMulti(true)
     + variableQuery.refresh.onLoad()
     + variableQuery.withDatasource('prometheus', 'Prometheus'),
 
