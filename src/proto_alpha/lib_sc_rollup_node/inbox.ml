@@ -101,8 +101,8 @@ let same_as_layer_1 node_ctxt level inbox =
     (Octez_smart_rollup.Inbox.equal layer1_inbox inbox)
     (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
 
-let add_messages ~is_first_block ~predecessor_timestamp ~predecessor inbox
-    messages =
+let add_messages ~is_first_block ~dal_attested_slots_messages
+    ~predecessor_timestamp ~predecessor inbox messages =
   let open Lwt_result_syntax in
   let no_history = Sc_rollup.Inbox.History.empty ~capacity:0L in
   lift
@@ -113,7 +113,7 @@ let add_messages ~is_first_block ~predecessor_timestamp ~predecessor inbox
              messages_with_protocol_internal_messages ) =
        Sc_rollup.Inbox.add_all_messages
          ~first_block:is_first_block
-         ~dal_attested_slots_messages:[] (* updated in the next commit *)
+         ~dal_attested_slots_messages
          ~predecessor_timestamp
          ~predecessor
          no_history
@@ -130,7 +130,7 @@ let add_messages ~is_first_block ~predecessor_timestamp ~predecessor inbox
          messages_with_protocol_internal_messages )
 
 let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
-    ~(predecessor : Layer1.header) messages =
+    ~(predecessor : Layer1.header) ~dal_attested_slots_messages messages =
   let open Lwt_result_syntax in
   let* inbox =
     Node_context.inbox_of_head node_ctxt (Layer1.head_of_header predecessor)
@@ -150,6 +150,7 @@ let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
          messages_with_protocol_internal_messages ) =
     add_messages
       ~is_first_block
+      ~dal_attested_slots_messages
       ~predecessor_timestamp
       ~predecessor:predecessor.hash
       inbox
@@ -196,7 +197,36 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
     in
     let* head_proto = Node_context.protocol_of_level node_ctxt head.level in
     let is_first_block = head_proto.first_level_of_protocol in
-    process_messages node_ctxt ~is_first_block ~predecessor collected_messages
+    (* Get the DAL attested slots messages from L1, if any. *)
+    let* dal_attested_slots_messages =
+      let fetch_dal_params ~published_level =
+        let level = Raw_level.to_int32 published_level in
+        let* params = Protocol_plugins.get_constants_of_level node_ctxt level in
+        return
+          ( params.dal.number_of_slots,
+            params.dal.cryptobox_parameters.slot_size,
+            params.dal.cryptobox_parameters.page_size )
+      in
+      let*! result =
+        Layer1_helpers.get_dal_attested_slots_messages
+          fetch_dal_params
+          node_ctxt.cctxt
+          head.hash
+      in
+      match result with
+      | Ok messages -> return messages
+      | Error err ->
+          let*! () =
+            Inbox_event.get_dal_attested_slots_messages_failed head.hash err
+          in
+          return []
+    in
+    process_messages
+      node_ctxt
+      ~is_first_block
+      ~predecessor
+      ~dal_attested_slots_messages
+      collected_messages
   else
     let* inbox =
       Layer1_helpers.genesis_inbox
@@ -213,7 +243,7 @@ let process_head (node_ctxt : _ Node_context.t) ~(predecessor : Layer1.header)
     return (inbox_hash, inbox, witness, [])
 
 let payloads_history_of_messages ~is_first_block ~predecessor
-    ~predecessor_timestamp messages =
+    ~predecessor_timestamp ~dal_attested_slots_messages messages =
   let open Result_syntax in
   let dummy_inbox =
     (* The inbox is not necessary to compute the payloads *)
@@ -237,7 +267,7 @@ let payloads_history_of_messages ~is_first_block ~predecessor
     Environment.wrap_tzresult
     @@ Sc_rollup.Inbox.add_all_messages
          ~first_block:is_first_block
-         ~dal_attested_slots_messages:[] (* updated in the next commit *)
+         ~dal_attested_slots_messages
          ~predecessor_timestamp
          ~predecessor
          (Sc_rollup.Inbox.History.empty ~capacity:0L)
@@ -288,5 +318,13 @@ let init ~predecessor_timestamp ~predecessor ~level =
   |> Sc_rollup_proto_types.Inbox.to_octez
 
 module Internal_for_tests = struct
-  let process_messages = process_messages
+  (* For tests, we don't fetch DAL attested slots info from L1 *)
+  let process_messages (node_ctxt : _ Node_context.t) ~is_first_block
+      ~(predecessor : Layer1.header) messages =
+    process_messages
+      node_ctxt
+      ~is_first_block
+      ~predecessor
+      ~dal_attested_slots_messages:[]
+      messages
 end

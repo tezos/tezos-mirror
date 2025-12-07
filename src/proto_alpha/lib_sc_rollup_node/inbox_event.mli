@@ -26,3 +26,9 @@
 (** [get_messages hash level n] emits the event that [n] messages are being
     fetched from the block of the given [hash] at the given [level]. *)
 val get_messages : Block_hash.t -> int32 -> int -> unit Lwt.t
+
+(** [get_dal_attested_slots_messages_failed hash error] emits a warning event
+    when the {!Layer1_helpers.get_dal_attested_slots_messages} fails for the
+    given block [hash]. *)
+val get_dal_attested_slots_messages_failed :
+  Block_hash.t -> tztrace -> unit Lwt.t
