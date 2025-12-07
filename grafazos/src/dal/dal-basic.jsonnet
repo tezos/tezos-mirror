@@ -62,6 +62,9 @@ dashboard.new('Octez DAL Node Dashboard' + if !uid && uid_ext != '' then ' (' + 
     dalNode.slotsWaitingAttestations(h=8, w=8, x=8, y=node_y + 8),
     dalNode.slotsAttested(h=8, w=8, x=16, y=node_y + 8),
 
+    dalNode.slotsUnattested(h=8, w=24, x=0, y=node_y + 16),
+
+
     // ## Third line of pannels
     dalNode.L1BlockProcessingTime(h=8, w=8, x=0, y=node_y + 16),
   ]

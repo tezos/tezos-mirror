@@ -79,6 +79,11 @@ local graph = base.graph;
               + query.prometheus.withLegendFormat('Slot index: {{ slot_index }}');
     graph.new('Indexes of attested slots', [q], h, w, x, y),
 
+  slotsUnattested(h, w, x, y):
+    local q = grafonnet.query.prometheus.new('Prometheus', namespace + '_slots_unattested' + base.slot_index_instance_query)
+              + query.prometheus.withLegendFormat('Slot index: {{ slot_index }}');
+    graph.new('Indexes of unattested slots', [q], h, w, x, y),
+
   L1BlockProcessingTime(h, w, x, y):
     local head = 'Processing time per level';
     local query = prometheus('per_level_processing_time', legendFormat=head, namespace=namespace);
