@@ -596,6 +596,7 @@ module Node_inbox = struct
           let*@ payloads_history, history, inbox, witness, _messages =
             Sc_rollup.Inbox.add_all_messages
               ~first_block:Raw_level.(equal (succ inbox_creation_level) level)
+              ~dal_attested_slots_messages:[]
               ~predecessor_timestamp
               ~predecessor
               history
@@ -700,6 +701,7 @@ module Protocol_inbox = struct
           let*@ _, _, inbox, _, _ =
             Sc_rollup.Inbox.add_all_messages
               ~first_block:Raw_level.(equal (succ inbox_creation_level) level)
+              ~dal_attested_slots_messages:[]
               ~predecessor_timestamp
               ~predecessor
               (Sc_rollup.Inbox.History.empty ~capacity:1000L)

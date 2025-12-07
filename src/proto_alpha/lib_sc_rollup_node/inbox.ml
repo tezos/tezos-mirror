@@ -113,6 +113,7 @@ let add_messages ~is_first_block ~predecessor_timestamp ~predecessor inbox
              messages_with_protocol_internal_messages ) =
        Sc_rollup.Inbox.add_all_messages
          ~first_block:is_first_block
+         ~dal_attested_slots_messages:[] (* updated in the next commit *)
          ~predecessor_timestamp
          ~predecessor
          no_history
@@ -236,6 +237,7 @@ let payloads_history_of_messages ~is_first_block ~predecessor
     Environment.wrap_tzresult
     @@ Sc_rollup.Inbox.add_all_messages
          ~first_block:is_first_block
+         ~dal_attested_slots_messages:[] (* updated in the next commit *)
          ~predecessor_timestamp
          ~predecessor
          (Sc_rollup.Inbox.History.empty ~capacity:0L)

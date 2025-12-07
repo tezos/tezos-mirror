@@ -3665,6 +3665,7 @@ module Sc_rollup : sig
 
     val add_all_messages :
       first_block:bool ->
+      dal_attested_slots_messages:Inbox_message.internal_inbox_message list ->
       predecessor_timestamp:Time.t ->
       predecessor:Block_hash.t ->
       History.t ->

@@ -795,6 +795,7 @@ let test_messages_are_correctly_added_in_history
   let*?@ payloads_history, _history, _inbox, witness, messages =
     Inbox.add_all_messages
       ~first_block:false
+      ~dal_attested_slots_messages:[]
       ~predecessor_timestamp
       ~predecessor
       (Inbox.History.empty ~capacity:0L)
