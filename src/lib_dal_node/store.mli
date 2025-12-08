@@ -158,7 +158,7 @@ val not_yet_published_cache :
 
 (** [first_seen_level t] returns the first seen level store associated
     with the store [t]. *)
-val first_seen_level : t -> First_seen_level.t
+val first_seen_level : t -> First_seen_level.rw First_seen_level.t
 
 (** [finalized_commitments t] returns the cache of commitments indexed
     by level and then by slot id associated with the store [t]. The
@@ -167,11 +167,11 @@ val first_seen_level : t -> First_seen_level.t
 val finalized_commitments : t -> Slot_id_cache.t
 
 (** [chain_id t] returns the chain_id store associated with the store [t]. *)
-val chain_id : t -> Chain_id.t
+val chain_id : t -> Chain_id.rw Chain_id.t
 
 (** [last_processed_level t] returns the last processed level store
     associated with the store [t]. *)
-val last_processed_level : t -> Last_processed_level.t
+val last_processed_level : t -> Last_processed_level.rw Last_processed_level.t
 
 (** [shards t] returns the shards store associated with the store
     [t]. *)
