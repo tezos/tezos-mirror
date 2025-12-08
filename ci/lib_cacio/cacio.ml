@@ -33,9 +33,13 @@ let show_stage = function
 
 type need = Job | Artifacts
 
-type sccache_config = {error_log : string option; log : string option}
+type sccache_config = {
+  error_log : string option;
+  log : string option;
+  policy : Gitlab_ci.Types.cache_policy option;
+}
 
-let sccache ?error_log ?log () = {error_log; log}
+let sccache ?error_log ?log ?policy () = {error_log; log; policy}
 
 type dune_cache_config = {
   key : string option;
@@ -490,8 +494,8 @@ let convert_graph ?(interruptible_pipeline = true)
               let maybe_enable_sccache job =
                 match sccache with
                 | None -> job
-                | Some {error_log; log} ->
-                    Tezos_ci.Cache.enable_sccache ?error_log ?log job
+                | Some {error_log; log; policy} ->
+                    Tezos_ci.Cache.enable_sccache ?error_log ?log ?policy job
               in
               let maybe_enable_dune_cache job =
                 match dune_cache with
