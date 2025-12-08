@@ -120,7 +120,7 @@ module Build = struct
         @ version_executable)
       ~artifacts
       ["./scripts/ci/build_static_binaries.sh"]
-    |> enable_cargo_cache |> enable_sccache |> enable_cargo_target_caches
+    |> enable_cargo_cache |> enable_sccache
 
   let job_build_released_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
       ?dependencies () =
@@ -159,7 +159,6 @@ module Build = struct
       ["./scripts/ci/build_full_unreleased.sh"]
     |> enable_cargo_cache
     |> enable_sccache ~policy:Pull_push
-    |> enable_cargo_target_caches
 
   let job_build_dynamic_binaries ?(extra = false) ?rules ~__POS__ ~arch ?retry
       ?cpu ?storage ?dependencies ~name executable_files =

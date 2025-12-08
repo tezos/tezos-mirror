@@ -192,9 +192,6 @@ module type COMPONENT_API = sig
       If [cargo_cache] is [true], the resulting job is modified with
       {!Tezos_ci.Cache.enable_cargo_cache}. Default is [false].
 
-      If [cargo_target_caches] is [true], the resulting job is modified with
-      {!Tezos_ci.Cache.enable_cargo_target_caches}. Default is [false].
-
       If [sccache] is specified, the resulting job is modified with
       {!Tezos_ci.Cache.enable_sccache}.
 
@@ -227,7 +224,6 @@ module type COMPONENT_API = sig
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cargo_cache:bool ->
-    ?cargo_target_caches:bool ->
     ?sccache:sccache_config ->
     ?dune_cache:dune_cache_config ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
