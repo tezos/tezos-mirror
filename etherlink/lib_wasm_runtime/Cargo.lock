@@ -2729,7 +2729,7 @@ dependencies = [
  "num-traits",
  "primitive-types 0.12.2",
  "revm 33.1.0",
- "revm-etherlink",
+ "revm-etherlink-farfadet",
  "rlp",
  "sha3",
  "softfloat",
@@ -5463,7 +5463,31 @@ dependencies = [
 ]
 
 [[package]]
-name = "revm-etherlink"
+name = "revm-etherlink-ebisu"
+version = "0.1.0"
+dependencies = [
+ "alloy-sol-types 1.3.1",
+ "format_no_std",
+ "hex",
+ "nom 7.1.3",
+ "num-bigint",
+ "primitive-types 0.12.2",
+ "revm 29.0.1",
+ "rlp",
+ "tezos-evm-logging-ebisu",
+ "tezos-evm-runtime-ebisu",
+ "tezos-indexable-storage-ebisu",
+ "tezos-smart-rollup-encoding 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=bf6400411c8e74fbd75e2e9500df99993aa124b2)",
+ "tezos-smart-rollup-host 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=bf6400411c8e74fbd75e2e9500df99993aa124b2)",
+ "tezos-smart-rollup-storage 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=bf6400411c8e74fbd75e2e9500df99993aa124b2)",
+ "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=bf6400411c8e74fbd75e2e9500df99993aa124b2)",
+ "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=bf6400411c8e74fbd75e2e9500df99993aa124b2)",
+ "tezos_ethereum_ebisu",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "revm-etherlink-farfadet"
 version = "0.1.0"
 dependencies = [
  "alloy-sol-types 1.3.1",
@@ -5485,30 +5509,6 @@ dependencies = [
  "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
  "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=c0e4170342cc7c62ced920ecc25af36745447f22)",
  "tezos_ethereum_farfadet",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "revm-etherlink-ebisu"
-version = "0.1.0"
-dependencies = [
- "alloy-sol-types 1.3.1",
- "format_no_std",
- "hex",
- "nom 7.1.3",
- "num-bigint",
- "primitive-types 0.12.2",
- "revm 29.0.1",
- "rlp",
- "tezos-evm-logging-ebisu",
- "tezos-evm-runtime-ebisu",
- "tezos-indexable-storage-ebisu",
- "tezos-smart-rollup-encoding 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=bf6400411c8e74fbd75e2e9500df99993aa124b2)",
- "tezos-smart-rollup-host 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=bf6400411c8e74fbd75e2e9500df99993aa124b2)",
- "tezos-smart-rollup-storage 0.2.2 (git+https://gitlab.com/tezos/tezos.git?rev=bf6400411c8e74fbd75e2e9500df99993aa124b2)",
- "tezos_crypto_rs 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=bf6400411c8e74fbd75e2e9500df99993aa124b2)",
- "tezos_data_encoding 0.6.0 (git+https://gitlab.com/tezos/tezos.git?rev=bf6400411c8e74fbd75e2e9500df99993aa124b2)",
- "tezos_ethereum_ebisu",
  "thiserror 1.0.69",
 ]
 

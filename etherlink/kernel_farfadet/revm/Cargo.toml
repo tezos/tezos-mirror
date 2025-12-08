@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 [package]
-name = 'revm-etherlink'
+name = 'revm-etherlink-farfadet'
 version = '0.1.0'
 edition = '2021'
 license = "MIT"
