@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Profiler =
+  (val Tezos_profiler.Profiler.wrap Gossipsub.Profiler.gossipsub_profiler)
+
 let string_of_validation_error = function
   | `Invalid_degree_strictly_less_than_expected Cryptobox.{given; expected} ->
       Format.sprintf
@@ -402,7 +405,11 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
     let batch_size = List.length batch in
     let result = Array.init batch_size (fun _ -> `Unknown) in
     let {to_check_in_batch; not_valid} =
-      triage ctxt head_level proto_parameters batch
+      (triage
+         ctxt
+         head_level
+         proto_parameters
+         batch [@profiler.record_f {verbosity = Notice} "triage"])
     in
     List.iter (fun (index, error) -> result.(index) <- error) not_valid ;
 
