@@ -184,27 +184,26 @@ module Pipeline : sig
 end
 
 module Cache : sig
+  (* Possible values for [~key] arguments.
+
+     - [Job]: share the cache between all instances of the job, across all pipelines.
+     - [Pipeline]: share the cache between all jobs of each pipeline, but not across pipelines. *)
+  type cache_key = Job | Pipeline
+
   (** Add variable enabling dune cache.
 
     This function can be applied to jobs that run dune.
 
-    - [key] and [path] configure the key under which the cache is
-    stored, and the path that will be cached. By default, the [key]
-    contains the name of the job, thus scoping the cache to all
-    instances of that job. By default, [path] is the folder
-    ["$CI_PROJECT_DIR/_dune_cache"], and this function also sets the
-    environment dir [DUNE_CACHE_ROOT] such that dune stores its caches
-    there.
+    - [key] specifies which jobs the cache should be shared with.
+      See {!cache_key}.
 
-    - [cache_size] sets the maximum size of the cache.
+    - [policy] specifies whether to pull the cache when the job starts,
+      and whether to push the cache when the job finishes.
 
-   - [copy_mode], if [true] (default is [false]) sets
-    {{:https://dune.readthedocs.io/en/stable/caching.html#cache-storage-mode}Dune
-    Cache Storage Mode} to [copy]. If [false], [hardlink] mode is
-    used, which is typically more performant but requires that the
-    build and cache folder be on the same volume. *)
+    *)
+
   val enable_dune_cache :
-    ?key:string ->
+    ?key:cache_key ->
     ?policy:Gitlab_ci.Types.cache_policy ->
     tezos_job ->
     tezos_job

@@ -42,7 +42,7 @@ type sccache_config = {
 let sccache ?error_log ?log ?policy () = {error_log; log; policy}
 
 type dune_cache_config = {
-  key : string option;
+  key : Tezos_ci.Cache.cache_key option;
   policy : Gitlab_ci.Types.cache_policy option;
 }
 

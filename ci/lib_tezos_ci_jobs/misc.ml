@@ -99,13 +99,7 @@ let job_script_snapshot_alpha_and_link =
       ]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
-    ~dune_cache:
-      (Cacio.dune_cache
-         ~key:
-           ("dune-build-cache-"
-           ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id))
-         ~policy:Pull
-         ())
+    ~dune_cache:(Cacio.dune_cache ~key:Pipeline ~policy:Pull ())
     [
       "./scripts/ci/take_ownership.sh";
       ". ./scripts/version.sh";

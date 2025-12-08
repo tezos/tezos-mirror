@@ -66,7 +66,7 @@ type dune_cache_config
 
     See {!Tezos_ci.Cache.enable_dune_cache}. *)
 val dune_cache :
-  ?key:string ->
+  ?key:Tezos_ci.Cache.cache_key ->
   ?policy:Gitlab_ci.Types.cache_policy ->
   unit ->
   dune_cache_config

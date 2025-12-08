@@ -156,9 +156,6 @@ let depending_on_pipeline_type :
      We just specialize its type to make it more clear what we are doing. *)
   Cacio.parameterize
 
-let build_cache_key =
-  "dune-build-cache-" ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id)
-
 (* The build_x86_64 jobs are split in two to keep the artifact size
    under the 1GB hard limit set by GitLab. *)
 (* [job_build_x86_64_release] builds the released executables. *)
@@ -187,7 +184,7 @@ let job_build_x86_64_extra_dev =
     ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
     ~extra:true
     "script-inputs/dev-executables"
-  |> enable_dune_cache ~key:build_cache_key ~policy:Push
+  |> enable_dune_cache ~key:Pipeline ~policy:Push
 
 let job_build_x86_64_exp =
   depending_on_pipeline_type @@ fun pipeline_type ->
@@ -199,7 +196,7 @@ let job_build_x86_64_exp =
     ~dependencies:(dependencies_needs_start pipeline_type)
     ~rules:(make_rules ~pipeline_type ~changes:changeset_octez_or_doc ())
     "script-inputs/experimental-executables"
-  |> enable_dune_cache ~key:build_cache_key ~policy:Push
+  |> enable_dune_cache ~key:Pipeline ~policy:Push
 
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
@@ -666,8 +663,7 @@ let jobs pipeline_type =
             script
           |> enable_cargo_cache |> enable_sccache
         in
-        if arch = Amd64 then
-          enable_dune_cache ~key:build_cache_key ~policy:Pull job
+        if arch = Amd64 then enable_dune_cache ~key:Pipeline ~policy:Pull job
         else job
       in
       let oc_unit_non_proto_x86_64 =
