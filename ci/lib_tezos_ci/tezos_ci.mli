@@ -206,7 +206,6 @@ module Cache : sig
   val enable_dune_cache :
     ?key:string ->
     ?cache_size:string ->
-    ?copy_mode:bool ->
     ?policy:Gitlab_ci.Types.cache_policy ->
     tezos_job ->
     tezos_job

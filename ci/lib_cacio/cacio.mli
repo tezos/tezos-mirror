@@ -68,7 +68,6 @@ type dune_cache_config
 val dune_cache :
   ?key:string ->
   ?cache_size:string ->
-  ?copy_mode:bool ->
   ?policy:Gitlab_ci.Types.cache_policy ->
   unit ->
   dune_cache_config

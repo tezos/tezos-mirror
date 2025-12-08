@@ -44,12 +44,10 @@ let sccache ?error_log ?log ?policy () = {error_log; log; policy}
 type dune_cache_config = {
   key : string option;
   cache_size : string option;
-  copy_mode : bool option;
   policy : Gitlab_ci.Types.cache_policy option;
 }
 
-let dune_cache ?key ?cache_size ?copy_mode ?policy () =
-  {key; cache_size; copy_mode; policy}
+let dune_cache ?key ?cache_size ?policy () = {key; cache_size; policy}
 
 (* Conditions are disjunctions: the job is included in the pipeline if
    ANY file in [changed] changed, or if the merge request has ANY of the [label]s. *)
@@ -499,11 +497,10 @@ let convert_graph ?(interruptible_pipeline = true)
               let maybe_enable_dune_cache job =
                 match dune_cache with
                 | None -> job
-                | Some {key; cache_size; copy_mode; policy} ->
+                | Some {key; cache_size; policy} ->
                     Tezos_ci.Cache.enable_dune_cache
                       ?key
                       ?cache_size
-                      ?copy_mode
                       ?policy
                       job
               in
