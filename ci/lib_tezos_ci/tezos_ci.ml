@@ -1472,7 +1472,7 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
 
 (** {2 Caches} *)
 module Cache = struct
-  let enable_dune_cache ?key ?(cache_size = "5GB") ?policy job =
+  let enable_dune_cache ?key ?policy job =
     let path = "$CI_PROJECT_DIR/_dune_cache" in
     let key =
       Option.value
@@ -1488,8 +1488,7 @@ module Cache = struct
            ("DUNE_CACHE_ROOT", path);
          ]
     |> append_cache (cache ?policy ~key [path])
-    |> append_after_script
-         ["eval $(opam env)"; "dune cache trim --size=" ^ cache_size]
+    |> append_after_script ["eval $(opam env)"; "dune cache trim --size=5GB"]
 
   let enable_sccache ?error_log ?log ?(policy = Gitlab_ci.Types.Pull) job =
     let rw_mode =

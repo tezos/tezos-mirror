@@ -205,7 +205,6 @@ module Cache : sig
     build and cache folder be on the same volume. *)
   val enable_dune_cache :
     ?key:string ->
-    ?cache_size:string ->
     ?policy:Gitlab_ci.Types.cache_policy ->
     tezos_job ->
     tezos_job
