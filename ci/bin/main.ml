@@ -175,6 +175,9 @@ let () =
   let octez_evm_node_release_tag_re =
     "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
   in
+  let tezlink_node_release_tag_re =
+    "/^tezlink-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
+  in
   (* Matches smart rollup node release tags,
      e.g. [octez-smart-rollup-node-v1.2], [octez-smart-rollup-node-v20250625] or
      [octez-smart-rollup-node-v1.2-rc4]. *)
@@ -205,6 +208,8 @@ let () =
       octez_release_tags
       @ [
           octez_evm_node_release_tag_re;
+          (* To be removed after Tezlink testnet sunset *)
+          tezlink_node_release_tag_re;
           octez_smart_rollup_node_release_tag_re;
           Sdk_bindings_ci.Release.tag_re;
         ]
