@@ -647,9 +647,10 @@ let produce_block_and_wait_for ~sequencer n =
   and* () = Evm_node.wait_for_blueprint_applied sequencer n in
   return ()
 
-let register_sandbox ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit ~title
-    ?set_account_code ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags
-    ?patch_config ?websockets ?sequencer_keys ?with_runtimes body =
+let register_sandbox ~__FILE__ ?(uses_client = false) ?kernel
+    ?tx_queue_tx_per_addr_limit ~title ?tez_bootstrap_accounts ?set_account_code
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
+    ?sequencer_keys ?with_runtimes body =
   Test.register
     ~__FILE__
     ~title
@@ -657,8 +658,10 @@ let register_sandbox ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit ~title
       (tags
       @ (Option.map (fun k -> Kernel.to_uses_and_tags k |> fst) kernel
         |> Option.to_list))
-    ~uses_admin_client:false
-    ~uses_client:false
+    ~uses_admin_client:
+      (* using the client requires to use the admin client *)
+      uses_client
+    ~uses_client
     ~uses_node:false
     ~uses:
       [
@@ -677,6 +680,7 @@ let register_sandbox ~__FILE__ ?kernel ?tx_queue_tx_per_addr_limit ~title
       ?patch_config
       ?websockets
       ?sequencer_keys
+      ?tez_bootstrap_accounts
       ?with_runtimes
       ()
   in

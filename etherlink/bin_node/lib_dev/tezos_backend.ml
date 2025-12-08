@@ -12,12 +12,36 @@ struct
     | `Level of int32
     | `Hash of Ethereum_types.block_hash * int32 ]
 
+  let on_head_block (block : block_param) k =
+    let open Lwt_result_syntax in
+    match block with
+    | `Head 0l ->
+        let* state = Backend.get_state ~block:(Block_parameter Latest) () in
+        k state
+    | _ -> failwith "Only `head` is supported"
+
+  let on_implicit_account (c : Tezos_types.Contract.t) k =
+    match c with
+    | Implicit pkh -> k pkh
+    | Originated _ -> failwith "Only implicit account are supported"
+
   let constants _chain (_block : block_param) =
     failwith "Not Implemented Yet (%s)" __LOC__
 
   let current_level _ _ ~offset:_ = failwith "Not Implemented Yet (%s)" __LOC__
 
-  let balance _chain _block _c = failwith "Not Implemented Yet (%s)" __LOC__
+  let balance _chain block contract =
+    let open Lwt_result_syntax in
+    on_head_block block @@ fun state ->
+    on_implicit_account contract @@ fun pkh ->
+    let* read_result =
+      Backend.read state (Tezosx.Durable_storage_path.Accounts.Tezos.info pkh)
+    in
+    match read_result with
+    | Some bytes ->
+        let*? info = Tezosx.Tezos_runtime.decode_account_info bytes in
+        return info.balance
+    | None -> return Tezos_types.Tez.zero
 
   let bootstrap_accounts () = failwith "Not Implemented Yet (%s)" __LOC__
 
