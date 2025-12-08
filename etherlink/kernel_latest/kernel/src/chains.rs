@@ -3,9 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    block::{eth_bip_from_blueprint, BlockComputationResult, TickCounter},
+    block::{BlockComputationResult, TickCounter},
     block_in_progress::BlockInProgress,
-    blueprint::Blueprint,
     blueprint_storage::{
         read_current_blueprint_header, BlueprintHeader, DelayedTransactionFetchingResult,
         EVMBlockHeader, TezBlockHeader,
@@ -36,7 +35,7 @@ use tezos_ethereum::{
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::{context, mir_ctx::BlockCtx};
-use tezos_smart_rollup::outbox::OutboxQueue;
+use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
@@ -260,7 +259,7 @@ impl ChainHeaderTrait for crate::blueprint_storage::TezBlockHeader {
 }
 
 pub trait ChainConfigTrait: Debug {
-    type Transaction: Encodable + Decodable + Debug;
+    type Transaction: TransactionTrait + Encodable + Decodable + Debug;
 
     type TransactionReceipt: Debug;
 
@@ -288,14 +287,7 @@ pub trait ChainConfigTrait: Debug {
         bytes: Vec<Vec<u8>>,
     ) -> anyhow::Result<Vec<Self::Transaction>>;
 
-    fn block_in_progress_from_blueprint(
-        &self,
-        host: &impl Runtime,
-        tick_counter: &crate::block::TickCounter,
-        current_block_number: U256,
-        previous_chain_header: Self::ChainHeader,
-        blueprint: Blueprint<Self::Transaction>,
-    ) -> anyhow::Result<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>;
+    fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256;
 
     fn read_block_in_progress(
         host: &impl Runtime,
@@ -335,23 +327,12 @@ impl ChainConfigTrait for EvmChainConfig {
         ChainFamily::Evm
     }
 
-    fn block_in_progress_from_blueprint(
-        &self,
-        host: &impl Runtime,
-        tick_counter: &crate::block::TickCounter,
-        current_block_number: U256,
-        header: Self::ChainHeader,
-        blueprint: Blueprint<Self::Transaction>,
-    ) -> anyhow::Result<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>
-    {
-        Ok(eth_bip_from_blueprint(
+    fn base_fee_per_gas(&self, host: &impl Runtime, timestamp: Timestamp) -> U256 {
+        crate::gas_price::base_fee_per_gas(
             host,
-            self,
-            tick_counter,
-            current_block_number,
-            header,
-            blueprint,
-        ))
+            timestamp,
+            self.get_limits().minimum_base_fee_per_gas,
+        )
     }
 
     fn transactions_from_bytes(
@@ -466,23 +447,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
         ChainFamily::Michelson
     }
 
-    fn block_in_progress_from_blueprint(
-        &self,
-        _host: &impl Runtime,
-        tick_counter: &crate::block::TickCounter,
-        current_block_number: U256,
-        header: Self::ChainHeader,
-        blueprint: Blueprint<Self::Transaction>,
-    ) -> anyhow::Result<BlockInProgress<Self::Transaction, Self::TransactionReceipt>>
-    {
-        let base_fee_per_gas = U256::zero();
-        Ok(BlockInProgress::from_blueprint(
-            blueprint,
-            current_block_number,
-            header.hash,
-            tick_counter.c,
-            base_fee_per_gas,
-        ))
+    fn base_fee_per_gas(&self, _host: &impl Runtime, _timestamp: Timestamp) -> U256 {
+        U256::zero()
     }
 
     fn fetch_hashes_from_delayed_inbox(

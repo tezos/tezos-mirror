@@ -9,11 +9,9 @@ use crate::apply::{apply_transaction, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE};
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
-    store_current_block_header, BlockHeader, ChainHeader, EVMBlockHeader,
+    store_current_block_header, BlockHeader, ChainHeader,
 };
-use crate::chains::{
-    ChainConfigTrait, ChainHeaderTrait, EvmChainConfig, EvmLimits, TransactionTrait,
-};
+use crate::chains::{ChainConfigTrait, ChainHeaderTrait, EvmLimits, TransactionTrait};
 use crate::configuration::ConfigurationMode;
 use crate::delayed_inbox::DelayedInbox;
 use crate::error::Error;
@@ -214,24 +212,20 @@ enum BlueprintParsing<BIP> {
     None,
 }
 
-pub fn eth_bip_from_blueprint<Host: Runtime>(
+pub fn bip_from_blueprint<Host: Runtime, ChainConfig: ChainConfigTrait>(
     host: &Host,
-    chain_config: &EvmChainConfig,
+    chain_config: &ChainConfig,
     tick_counter: &TickCounter,
     next_bip_number: U256,
-    header: EVMBlockHeader,
-    blueprint: Blueprint<Transaction>,
-) -> BlockInProgress<Transaction, TransactionReceipt> {
-    let gas_price = crate::gas_price::base_fee_per_gas(
-        host,
-        blueprint.timestamp,
-        chain_config.get_limits().minimum_base_fee_per_gas,
-    );
+    hash: H256,
+    blueprint: Blueprint<ChainConfig::Transaction>,
+) -> BlockInProgress<ChainConfig::Transaction, ChainConfig::TransactionReceipt> {
+    let gas_price = chain_config.base_fee_per_gas(host, blueprint.timestamp);
 
     let bip = BlockInProgress::from_blueprint(
         blueprint,
         next_bip_number,
-        header.hash,
+        hash,
         tick_counter.c,
         gas_price,
     );
@@ -290,13 +284,14 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
             let bip: BlockInProgress<
                 ChainConfig::Transaction,
                 ChainConfig::TransactionReceipt,
-            > = chain_config.block_in_progress_from_blueprint(
+            > = bip_from_blueprint(
                 host,
+                chain_config,
                 tick_counter,
                 next_bip_number,
-                chain_header,
+                chain_header.hash(),
                 blueprint,
-            )?;
+            );
             Ok(BlueprintParsing::Next(Box::new(bip)))
         }
         None => Ok(BlueprintParsing::None),
