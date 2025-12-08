@@ -139,6 +139,7 @@ module Durable_state = Make_durable_state (Wasm_2_0_0_proof_format.Wrapped_tree)
 type unsafe_patch =
   | Increase_max_nb_ticks of int64
   | Patch_durable_storage of {key : string; value : string}
+  | Patch_PVM_version of {version : Tezos_scoru_wasm.Wasm_pvm_state.version}
 
 module Wasm_fast_pvm_machine :
   Tezos_scoru_wasm.Wasm_pvm_sig.S
@@ -189,6 +190,17 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
           Ok (Increase_max_nb_ticks max_nb_ticks)
       | Patch_durable_storage {key; value} ->
           Ok (Patch_durable_storage {key; value})
+      | Patch_PVM_version {version} -> (
+          let version_opt =
+            Tezos_scoru_wasm.Wasm_pvm_state.version_of_string version
+          in
+          match version_opt with
+          | Some version -> Ok (Patch_PVM_version {version})
+          | None ->
+              invalid_arg
+                (Format.sprintf
+                   "Unsafe patch: unknown WASM PVM version %s"
+                   version))
 
     let apply state unsafe_patch =
       let open Lwt_syntax in
@@ -207,6 +219,8 @@ module Impl : Pvm_sig.S with type Unsafe_patches.t = unsafe_patch = struct
           Wasm_fast_pvm_machine.Unsafe.set_max_nb_ticks max_nb_ticks state
       | Patch_durable_storage {key; value} ->
           Wasm_fast_pvm_machine.Unsafe.durable_set ~key ~value state
+      | Patch_PVM_version {version} ->
+          Wasm_fast_pvm_machine.Unsafe.set_pvm_version ~version state
   end
 
   let string_of_status : status -> string = function

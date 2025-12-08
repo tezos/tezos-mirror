@@ -38,6 +38,9 @@ let versions =
     ("2.0.0-experimental", VExperimental);
   ]
 
+let version_of_string version_str =
+  List.assoc ~equal:String.equal version_str versions
+
 let versions_flip = List.map (fun (x, y) -> (y, x)) versions
 
 let version_encoding =

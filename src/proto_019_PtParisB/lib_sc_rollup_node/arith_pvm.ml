@@ -71,6 +71,7 @@ module Impl : Pvm_sig.S = struct
       match p with
       | Increase_max_nb_ticks _ -> assert false
       | Patch_durable_storage _ -> assert false
+      | Patch_PVM_version _ -> assert false
 
     let apply _state (x : t) = match x with _ -> .
   end

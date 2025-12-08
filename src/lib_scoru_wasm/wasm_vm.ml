@@ -797,3 +797,7 @@ let get_info ({current_tick; last_input_info; _} as pvm_state) =
   return
   @@ Wasm_pvm_state.
        {current_tick; last_input_read = last_input_info; input_request}
+
+module Unsafe = struct
+  let apply_migration = apply_migration
+end

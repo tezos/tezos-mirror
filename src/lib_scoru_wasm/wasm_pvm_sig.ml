@@ -39,6 +39,12 @@ module type Unsafe = sig
   (** Set a value to a given key in the durable storage of [state].
       If there is an existing value, it is overwritten. *)
   val durable_set : key:string -> value:string -> state -> state Lwt.t
+
+  (** [set_pvm_version ~version state] sets the PVM version of [state] to
+      [version], applying any necessary migrations. This is used by the rollup
+      node's unsafe patch mechanism to activate specific versions (including
+      experimental ones) at origination. *)
+  val set_pvm_version : version:Wasm_pvm_state.version -> state -> state Lwt.t
 end
 
 module type Internal_for_tests = sig
