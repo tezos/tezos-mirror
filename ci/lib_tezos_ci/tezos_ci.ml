@@ -713,8 +713,31 @@ module Changeset = struct
 
   let make = String_set.of_list
 
+  (* Remove paths that are implied by other paths.
+     For instance, [a/b/c] is implied by [a/**/*]. *)
+  let remove_implied changeset =
+    let implies a b =
+      if String.ends_with ~suffix:"/**/*" a then
+        let a_without_suffix =
+          (* Remove "**/*" (do NOT remove the first "/"). *)
+          String.sub a 0 (String.length a - 4)
+        in
+        String.starts_with ~prefix:a_without_suffix b
+      else false
+    in
+    let add acc path =
+      if String_set.exists (fun previous -> implies previous path) acc then acc
+      else String_set.add path acc
+    in
+    (* Add all paths one by one, starting from the smallest ones so that
+       the next ones can see if they are implied by smaller prefixes before them. *)
+    changeset |> String_set.to_list
+    |> List.sort (fun a b -> Int.compare (String.length a) (String.length b))
+    |> List.fold_left add String_set.empty
+
   let encode changeset =
-    changeset |> String_set.elements |> List.sort String.compare
+    changeset |> remove_implied |> String_set.elements
+    |> List.sort String.compare
 
   let union = String_set.union
 
