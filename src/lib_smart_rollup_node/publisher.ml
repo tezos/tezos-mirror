@@ -147,8 +147,12 @@ let genesis_pvm_state (module Plugin : Protocol_plugin_sig.S)
       (* If there are unsafe patches that were applied to the genesis PVM state,
          we instead recompute the unpatched version to derive the commitment as
          all the following ones will need to be chained to it. *)
-      let+ _, Original state =
-        Interpreter.genesis_state (module Plugin) node_ctxt
+      let+ (Unpatched state) =
+        Interpreter.genesis_state
+          Unpatched
+          (module Plugin)
+          node_ctxt
+          (Context.PVMState.empty node_ctxt.context)
       in
       state
 

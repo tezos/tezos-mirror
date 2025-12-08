@@ -138,7 +138,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       ]) ;
   let* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up state head in
-  let* rollup_ctxt = previous_context node_ctxt ~predecessor in
+  let* ctxt = previous_context node_ctxt ~predecessor in
   let module Plugin = (val state.plugin) in
   let start_timestamp = Time.System.now () in
   let* inbox_hash, inbox, inbox_witness, messages =
@@ -159,11 +159,11 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   (* Avoid storing and publishing commitments if the head is not final. *)
   (* Avoid triggering the pvm execution if this has been done before for
      this head. *)
-  let* ctxt, _num_messages, num_ticks, initial_tick =
+  let* _num_messages, num_ticks, initial_tick =
     Interpreter.process_head
       (module Plugin)
       node_ctxt
-      rollup_ctxt
+      ctxt
       ~predecessor:(Layer1.head_of_header predecessor)
       (Layer1.head_of_header head)
       (inbox, messages)
@@ -792,7 +792,7 @@ module Internal_for_tests = struct
         ~predecessor
         messages
     in
-    let* ctxt, _num_messages, num_ticks, initial_tick =
+    let* _num_messages, num_ticks, initial_tick =
       Interpreter.process_head
         (module Plugin)
         node_ctxt
@@ -1120,17 +1120,17 @@ module Replay = struct
         level
         Block_hash.pp
         hash ;
-    let* rollup_ctxt =
+    let* ctxt =
       Node_context.checkout_context node_ctxt block.header.predecessor
     in
     let* (module Plugin) =
       Protocol_plugins.proto_plugin_for_level node_ctxt block.header.level
     in
-    let* ctxt, _num_messages, num_ticks, initial_tick =
+    let* _num_messages, num_ticks, initial_tick =
       Interpreter.process_head
         (module Plugin)
         node_ctxt
-        rollup_ctxt
+        ctxt
         ~predecessor:
           Layer1.
             {

@@ -58,21 +58,24 @@ end = struct
    fun (module A) (module B) -> match A.Eq with B.Eq -> Some Refl | _ -> None
 end
 
-type ('a, 'b) equality_witness = 'a Equality_witness.t * 'b Equality_witness.t
+type ('a, 'b, 'c) equality_witness =
+  'a Equality_witness.t * 'b Equality_witness.t * 'c Equality_witness.t
 
 type ('a, 'repo) raw_index = {path : string; repo : 'repo}
 
 type ('a, 'repo) index = ('a, 'repo) raw_index
   constraint 'a = [< `Read | `Write > `Read]
 
-type ('a, 'repo, 'tree) t = {
+type ('a, 'repo, 'state) t = {
   index : ('a, 'repo) index;
-  tree : 'tree;
+  state : 'state;
 }
   constraint 'a = [< `Read | `Write > `Read]
 
 module type S = sig
-  type tree
+  type state
+
+  type mut_state
 
   type repo
 
@@ -82,9 +85,9 @@ module type S = sig
 
   val impl_name : string
 
-  val equality_witness : (repo, tree) equality_witness
+  val equality_witness : (repo, state, mut_state) equality_witness
 
-  type nonrec 'a t = ('a, repo, tree) t
+  type nonrec 'a t = ('a, repo, mut_state) t
 
   (** [load cache_size path] initializes from disk a context from
     [path]. [cache_size] allows to change size of the Context Backend
@@ -110,6 +113,10 @@ module type S = sig
 
   (** [empty ctxt] is the context with an empty content for the repository [ctxt]. *)
   val empty : 'a index -> 'a t
+
+  val to_imm : mut_state -> state
+
+  val from_imm : state -> mut_state
 
   (** [commit ?message context] commits content of the context [context] on disk,
     and return the commit hash. *)
@@ -149,7 +156,7 @@ module type S = sig
   (** State of the PVM that this rollup node deals with *)
   module PVMState : sig
     (** The value of a PVM state *)
-    type value = tree
+    type value = mut_state
 
     (** [empty ()] is the empty PVM state. *)
     val empty : unit -> value
@@ -161,15 +168,15 @@ module type S = sig
       state [state].  *)
     val lookup : value -> string list -> bytes option Lwt.t
 
-    (** [set context state] saves the PVM state [state] in the context and returns
-      the updated context. Note: [set] does not perform any write on disk, this
-      information must be committed using {!val:commit}. *)
-    val set : 'a t -> value -> 'a t Lwt.t
+    (** [set context state] saves the PVM state [state] in the context. Note:
+        [set] does not perform any write on disk, this information must be
+        committed using {!val:commit}. *)
+    val set : 'a t -> value -> unit Lwt.t
   end
 
   module Internal_for_tests : sig
     (** [get_a_tree key] provides a value of internal type [tree] which can be
       used as a state to be set in the context directly. *)
-    val get_a_tree : string -> tree Lwt.t
+    val get_a_tree : string -> state Lwt.t
   end
 end

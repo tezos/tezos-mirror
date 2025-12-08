@@ -139,9 +139,9 @@ let simulate_messages_no_checks
   let* Pvm_plugin_sig.{state = {state; _}; num_ticks; num_messages; _} =
     Pvm.Fueled.Free.eval_messages ?reveal_map node_ctxt eval_state
   in
-  let*! ctxt = Context.PVMState.set ctxt state in
+  let*! () = Context.PVMState.set ctxt state in
   let nb_messages_inbox = nb_messages_inbox + num_messages in
-  return ({sim with ctxt; state; nb_messages_inbox}, num_ticks)
+  return ({sim with state; nb_messages_inbox}, num_ticks)
 
 let simulate_messages sim messages =
   let open Lwt_result_syntax in

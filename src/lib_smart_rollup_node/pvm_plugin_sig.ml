@@ -92,12 +92,11 @@ module type S = sig
 
   val state_hash : Kind.t -> Context.pvmstate -> State_hash.t Lwt.t
 
-  val initial_state : Kind.t -> Context.pvmstate Lwt.t
+  val set_initial_state : Kind.t -> empty:Context.pvmstate -> unit Lwt.t
 
   val parse_boot_sector : Kind.t -> string -> string option
 
-  val install_boot_sector :
-    Kind.t -> Context.pvmstate -> string -> Context.pvmstate Lwt.t
+  val install_boot_sector : Kind.t -> Context.pvmstate -> string -> unit Lwt.t
 
   val get_status : _ Node_context.t -> Context.pvmstate -> string tzresult Lwt.t
 
@@ -136,7 +135,7 @@ module type S = sig
       Kind.t ->
       Context.pvmstate ->
       Pvm_patches.unsafe_patch ->
-      Context.pvmstate tzresult Lwt.t
+      unit tzresult Lwt.t
   end
 
   module Wasm_2_0_0 : sig
