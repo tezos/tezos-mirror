@@ -205,7 +205,6 @@ module Cache : sig
     build and cache folder be on the same volume. *)
   val enable_dune_cache :
     ?key:string ->
-    ?path:string ->
     ?cache_size:string ->
     ?copy_mode:bool ->
     ?policy:Gitlab_ci.Types.cache_policy ->

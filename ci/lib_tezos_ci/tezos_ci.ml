@@ -1472,8 +1472,9 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
 
 (** {2 Caches} *)
 module Cache = struct
-  let enable_dune_cache ?key ?(path = "$CI_PROJECT_DIR/_dune_cache")
-      ?(cache_size = "5GB") ?(copy_mode = false) ?policy job =
+  let enable_dune_cache ?key ?(cache_size = "5GB") ?(copy_mode = false) ?policy
+      job =
+    let path = "$CI_PROJECT_DIR/_dune_cache" in
     let key =
       Option.value
         ~default:
