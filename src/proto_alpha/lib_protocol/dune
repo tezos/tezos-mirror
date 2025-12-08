@@ -187,6 +187,7 @@
   Adaptive_issuance_costs
   Contract_delegate_storage
   Stake_storage
+  Clst_storage
   Unstaked_frozen_deposits_storage
   Pending_denunciations_storage
   Unstake_requests_storage
@@ -493,6 +494,7 @@
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
+  clst_storage.ml clst_storage.mli
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
   pending_denunciations_storage.ml pending_denunciations_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
@@ -801,6 +803,7 @@
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
+  clst_storage.ml clst_storage.mli
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
   pending_denunciations_storage.ml pending_denunciations_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli
@@ -1093,6 +1096,7 @@
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
+  clst_storage.ml clst_storage.mli
   unstaked_frozen_deposits_storage.ml unstaked_frozen_deposits_storage.mli
   pending_denunciations_storage.ml pending_denunciations_storage.mli
   unstake_requests_storage.ml unstake_requests_storage.mli

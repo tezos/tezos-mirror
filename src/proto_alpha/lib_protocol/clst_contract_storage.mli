@@ -5,6 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Abstraction to handle high level interactions of the CLST enshrined contract.
+
+    This module is responsible for maintaining the contract's storage, and
+    handling the token transfers between the different containers via {!Token}
+    and {!Clst_storage} (via the {!Alpha_context} abstraction).
+*)
+
 open Alpha_context
 open Script_native_types
 open Script_typed_ir
