@@ -9,6 +9,7 @@ use crate::{
         append_address, append_option_address, append_option_canonical,
         append_option_u64_le, append_u16_le, append_u256_le, append_u64_le,
     },
+    inspectors::EtherlinkInspector,
     precompiles::provider::EtherlinkPrecompiles,
 };
 
@@ -115,6 +116,16 @@ impl Encodable for CallTrace {
         });
         append_option_canonical(stream, &logs, |s, logs| s.append_list(logs));
         append_u16_le(stream, &self.depth);
+    }
+}
+
+impl<'a, Host: Runtime + 'a> EtherlinkInspector<'a, Host> for CallTracer {
+    fn is_struct_logger(&self) -> bool {
+        false
+    }
+
+    fn get_transaction_hash(&self) -> Option<B256> {
+        self.transaction_hash
     }
 }
 

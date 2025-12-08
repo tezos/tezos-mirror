@@ -4,7 +4,8 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    journal::Journal, precompiles::send_outbox_message::Withdrawal,
+    inspectors::EtherlinkInspector, journal::Journal,
+    precompiles::send_outbox_message::Withdrawal,
     storage::world_state_handler::StorageAccount,
 };
 use database::EtherlinkVMDB;
@@ -13,7 +14,7 @@ use inspectors::{
     call_tracer::{CallTracer, CallTracerInput},
     noop::NoInspector,
     struct_logger::{StructLogger, StructLoggerInput},
-    EtherlinkInspector, EvmInspection, TracerInput,
+    EvmInspection, TracerInput,
 };
 use precompiles::provider::EtherlinkPrecompiles;
 use revm::{
@@ -198,35 +199,35 @@ fn tx_env<Host: Runtime>(
 }
 
 #[instrument(skip_all)]
-fn get_inspector_from(
+fn get_inspector_from<'a, Host: Runtime + 'a>(
     tracer_input: TracerInput,
     precompiles: EtherlinkPrecompiles,
     spec_id: SpecId,
-) -> EtherlinkInspector {
+) -> Box<dyn EtherlinkInspector<'a, Host>> {
     match tracer_input {
         TracerInput::CallTracer(CallTracerInput {
             config,
             transaction_hash,
-        }) => EtherlinkInspector::CallTracer(Box::new(CallTracer::new(
+        }) => Box::new(CallTracer::new(
             config,
             precompiles,
             spec_id,
             transaction_hash,
-        ))),
+        )) as Box<dyn EtherlinkInspector<'a, Host>>,
         TracerInput::StructLogger(StructLoggerInput {
             config,
             transaction_hash,
-        }) => EtherlinkInspector::StructLogger(Box::new(StructLogger::new(
-            config,
-            transaction_hash,
-        ))),
-        TracerInput::NoOp => EtherlinkInspector::NoOp(NoInspector),
+        }) => Box::new(StructLogger::new(config, transaction_hash))
+            as Box<dyn EtherlinkInspector<'a, Host>>,
+        TracerInput::NoOp => {
+            Box::new(NoInspector) as Box<dyn EtherlinkInspector<'a, Host>>
+        }
     }
 }
 
 #[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
-fn evm_inspect<'a, Host: Runtime>(
+fn evm_inspect<'a, Host: Runtime, INSP: EtherlinkInspector<'a, Host>>(
     db: EtherlinkVMDB<'a, Host>,
     block: &'a BlockEnv,
     tx: &'a TxEnv,
@@ -234,9 +235,9 @@ fn evm_inspect<'a, Host: Runtime>(
     precompiles: EtherlinkPrecompiles,
     chain_id: u64,
     spec_id: SpecId,
-    inspector: EtherlinkInspector,
+    inspector: INSP,
     is_simulation: bool,
-) -> EvmInspection<'a, Host> {
+) -> EvmInspection<'a, Host, INSP> {
     let mut cfg = CfgEnv::new().with_chain_id(chain_id).with_spec(spec_id);
     cfg.disable_eip3607 = is_simulation;
     cfg.tx_gas_limit_cap = Some(maximum_gas_per_transaction);
@@ -344,9 +345,6 @@ pub fn run_transaction<'a, Host: Runtime>(
     let db = EtherlinkVMDB::new(host, block_constants)?;
 
     if let Some(tracer_input) = tracer_input {
-        let inspector =
-            get_inspector_from(tracer_input, EtherlinkPrecompiles::new(), spec_id);
-
         let mut evm = evm_inspect(
             db,
             &block_env,
@@ -355,7 +353,11 @@ pub fn run_transaction<'a, Host: Runtime>(
             EtherlinkPrecompiles::new(),
             block_constants.chain_id.as_u64(),
             spec_id,
-            inspector,
+            get_inspector_from::<Host>(
+                tracer_input,
+                EtherlinkPrecompiles::new(),
+                spec_id,
+            ),
             is_simulation,
         );
 
