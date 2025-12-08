@@ -477,36 +477,73 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
     Process.spawn ?runner "screen" ["-S"; "tezt-cloud"; "-d"; "-m"]
     |> Process.check
   in
-  let process =
-    let args =
-      (* remove "--ssh-host host" from the commande line *)
-      let rec filter_ssh acc args =
-        match args with
-        | [] -> List.rev acc
-        (* We need to remove the private key argument. This permanent key
-           is only used to connect to the proxy. The key that is generated
-           and uploaded to the proxy allow to connect to the containers. *)
-        | "--ssh-private-key" :: _priv :: args -> filter_ssh acc args
-        (* FIXME: remove proxy-localhost when agent name bug is fixed *)
-        | "--ssh-host" :: _host :: args ->
-            filter_ssh ("--proxy-localhost" :: "--proxy" :: acc) args
-        | arg :: args -> filter_ssh (arg :: acc) args
-      in
-      let args = Sys.argv |> Array.to_list |> List.tl in
-      let args = filter_ssh [] args in
-      args @ ["--localhost"; "--tezt-cloud"; Env.tezt_cloud]
-      (* [--localhost] will be combined with [--proxy], this enables to detect we
-         want to run in [`Remote_orchestrator_local_agents] mode.
-
-         [--tezt-cloud] is used so that the [`Remote_orchestrator_local_agents]
-         mode knows this value. *)
+  let args =
+    (* remove "--ssh-host host" from the commande line *)
+    let rec filter_ssh acc args =
+      match args with
+      | [] -> List.rev acc
+      (* We need to remove the private key argument. This permanent key
+         is only used to connect to the proxy. The key that is generated
+         and uploaded to the proxy allow to connect to the containers. *)
+      | "--ssh-private-key" :: _priv :: args -> filter_ssh acc args
+      (* FIXME: remove proxy-localhost when agent name bug is fixed *)
+      | "--ssh-host" :: _host :: args ->
+          filter_ssh ("--proxy-localhost" :: "--proxy" :: acc) args
+      | arg :: args -> filter_ssh (arg :: acc) args
     in
+    let args = Sys.argv |> Array.to_list |> List.tl in
+    let args = filter_ssh [] args in
+    args @ ["--localhost"; "--tezt-cloud"; Env.tezt_cloud]
+    (* [--localhost] will be combined with [--proxy], this enables to detect we
+       want to run in [`Remote_orchestrator_local_agents] mode.
+
+       [--tezt-cloud] is used so that the [`Remote_orchestrator_local_agents]
+       mode knows this value. *)
+  in
+
+  (* Create a small shell script on the proxy that will execute [self args proxy_args].
+     This is a workaround to an error we previously had where screen stopped working
+     due to a long input. *)
+  let quote_arg s =
+    (* single-quote safe: ' -> '\'' *)
+    let parts = String.split_on_char '\'' s in
+    "'" ^ String.concat "'\\''" parts ^ "'"
+  in
+
+  let cmd_line =
+    (self :: args) @ proxy_args |> List.map quote_arg |> String.concat " "
+  in
+  let script_contents =
+    Printf.sprintf
+      {|
+        #!/bin/sh
+        set -e
+        exec %s "$@"
+      |}
+      cmd_line
+  in
+
+  let script_local = Filename.temp_file "tezt-cloud-orchestrator" ".sh" in
+  Base.write_file script_local ~contents:script_contents ;
+
+  let remote_dir = Filename.dirname self in
+  let remote_script_dest = remote_dir // "tezt-cloud-orchestrator.sh" in
+  let* remote_script =
+    Agent.copy ~destination:remote_script_dest proxy_agent ~source:script_local
+  in
+
+  let* () =
+    Process.spawn ?runner "chmod" ["+x"; remote_script] |> Process.check
+  in
+
+  let process =
     (* We execute a command in a screen session that will start the orchestrator. *)
     Agent.docker_run_command
       proxy_agent
       "screen"
-      (["-S"; "tezt-cloud"; "-X"; "exec"] @ (self :: args) @ proxy_args)
+      ["-S"; "tezt-cloud"; "-X"; "exec"; remote_script]
   in
+
   let* () =
     Agent.docker_run_command
       proxy_agent
