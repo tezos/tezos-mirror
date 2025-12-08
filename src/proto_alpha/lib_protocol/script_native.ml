@@ -37,7 +37,7 @@ module CLST_contract = struct
       {destination = step_constants.sender; entrypoint = Entrypoint.default}
     in
     let* amount, ctxt =
-      Clst_storage.get_balance_from_storage ctxt storage address
+      Clst_contract_storage.get_balance_from_storage ctxt storage address
     in
     let added_amount =
       Tez.to_mutez step_constants.amount
@@ -45,7 +45,11 @@ module CLST_contract = struct
     in
     let new_amount = Script_int.(add_n added_amount amount) in
     let* new_storage, ctxt =
-      Clst_storage.set_balance_from_storage ctxt storage address new_amount
+      Clst_contract_storage.set_balance_from_storage
+        ctxt
+        storage
+        address
+        new_amount
     in
     let new_ledger, total_supply = new_storage in
     let total_supply = Script_int.add_n total_supply added_amount in
@@ -80,7 +84,7 @@ module CLST_contract = struct
       {destination = step_constants.sender; entrypoint = Entrypoint.default}
     in
     let* current_amount, ctxt =
-      Clst_storage.get_balance_from_storage ctxt storage address
+      Clst_contract_storage.get_balance_from_storage ctxt storage address
     in
     let* removed_amount =
       if Compare.Int.(Script_int.compare current_amount amount < 0) then
@@ -89,7 +93,11 @@ module CLST_contract = struct
     in
     let new_amount = Script_int.(abs (sub current_amount removed_amount)) in
     let* new_storage, ctxt =
-      Clst_storage.set_balance_from_storage ctxt storage address new_amount
+      Clst_contract_storage.set_balance_from_storage
+        ctxt
+        storage
+        address
+        new_amount
     in
     let amount_tez =
       Tez.of_mutez_exn
@@ -126,8 +134,10 @@ module CLST_contract = struct
       let implementation (ctxt, _step_constants) ((address : address), token_id)
           (storage : storage) =
         let open Lwt_result_syntax in
-        if Compare.Int.(Script_int.compare token_id Clst_storage.token_id = 0)
-        then Clst_storage.get_balance_from_storage ctxt storage address
+        if
+          Compare.Int.(
+            Script_int.compare token_id Clst_contract_storage.token_id = 0)
+        then Clst_contract_storage.get_balance_from_storage ctxt storage address
         else return (Script_int.zero_n, ctxt)
       in
       return (Ex_view {name; ty; implementation})
@@ -150,7 +160,8 @@ module CLST_contract = struct
           (_storage : storage) =
         let open Lwt_result_syntax in
         let is_token =
-          Compare.Int.(Script_int.compare token_id Clst_storage.token_id = 0)
+          Compare.Int.(
+            Script_int.compare token_id Clst_contract_storage.token_id = 0)
         in
         return (is_token, ctxt)
       in

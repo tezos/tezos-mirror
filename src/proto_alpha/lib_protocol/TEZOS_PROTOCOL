@@ -277,7 +277,7 @@
         "Ticket_accounting",
         "Ticket_transfer",
 
-        "Clst_storage",
+        "Clst_contract_storage",
         "Script_interpreter_defs",
         "Script_native",
         "Script_interpreter",

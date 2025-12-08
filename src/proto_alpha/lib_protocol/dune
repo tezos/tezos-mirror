@@ -283,7 +283,7 @@
   Ticket_operations_diff
   Ticket_accounting
   Ticket_transfer
-  Clst_storage
+  Clst_contract_storage
   Script_interpreter_defs
   Script_native
   Script_interpreter
@@ -590,7 +590,7 @@
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
-  clst_storage.ml clst_storage.mli
+  clst_contract_storage.ml clst_contract_storage.mli
   script_interpreter_defs.ml
   script_native.ml script_native.mli
   script_interpreter.ml script_interpreter.mli
@@ -898,7 +898,7 @@
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
-  clst_storage.ml clst_storage.mli
+  clst_contract_storage.ml clst_contract_storage.mli
   script_interpreter_defs.ml
   script_native.ml script_native.mli
   script_interpreter.ml script_interpreter.mli
@@ -1190,7 +1190,7 @@
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
-  clst_storage.ml clst_storage.mli
+  clst_contract_storage.ml clst_contract_storage.mli
   script_interpreter_defs.ml
   script_native.ml script_native.mli
   script_interpreter.ml script_interpreter.mli
