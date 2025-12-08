@@ -1,0 +1,24 @@
+Optimizing Octez Node Setup:
+
+By default, the Octez node installation from this package connects
+to the Tezos mainnet chain. It commences a bootstrap from scratch in archive
+mode, offering full functionality but potentially demanding a substantial amount of
+time and resources (currently < 100GB).
+
+For an expedited synchronization phase, it is recommended to accelerate the
+process by downloading a fresh snapshot and initiating the node in
+rolling mode. Refer to the "man octez-node" for detailed instructions or
+consult the Octez documentation for guidance on configuring the node in rolling
+mode.
+
+Execute the following command to obtain a new data directory:
+
+
+    curl -L -o snapshot.file <SNAPSHOT_URL>
+
+    octez-node snapshot import snapshot.file --block <BLOCK_HASH> --data-dir /var/tezos/.tezos-node
+
+Check here the full documentation on how to import a snapshot: https://tezos.gitlab.io/user/snapshots.html#importing-a-snapshot
+
+The node is managed using systemd, with logs rotated daily through logrotate
+and stored in /var/logs/tezos.
