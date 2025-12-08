@@ -69,10 +69,19 @@ module CI = Cacio.Make (struct
   let paths = Files.all
 end)
 
+(* To be removed *)
+module Temp_tezlink_ci = Cacio.Make (struct
+  let name = "tezlink"
+
+  let paths = Files.all
+end)
+
 type purpose = Release | Test
 
 let octez_evm_node_release_tag_re =
   "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
+
+let tezlink_node_release_tag_re = "/^tezlink-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
 
 (** Creates a Docker build job of the given [arch]. *)
 let job_docker_build =
@@ -398,9 +407,11 @@ let job_tezt_flaky =
     ~retry_tests:3
 
 let job_gitlab_release =
+ fun (module CI : Cacio.COMPONENT_API) ->
+  Cacio.parameterize @@ fun name ->
   CI.job
     ~__POS__
-    "gitlab:octez-evm-node-release"
+    (sf "gitlab:%s-release" name)
     ~image:Images.ci_release
     ~stage:Publish
     ~needs:
@@ -480,10 +491,23 @@ let register () =
     ] ;
   CI.register_dedicated_release_pipeline
     ~tag_rex:octez_evm_node_release_tag_re
-    [(Auto, job_docker_promote_to_latest `real); (Auto, job_gitlab_release)] ;
+    [
+      (Auto, job_docker_promote_to_latest `real);
+      (Auto, job_gitlab_release (module CI) "octez-evm-node");
+    ] ;
   CI.register_dedicated_test_release_pipeline
     ~tag_rex:octez_evm_node_release_tag_re
-    [(Auto, job_docker_promote_to_latest `test); (Auto, job_gitlab_release)] ;
+    [
+      (Auto, job_docker_promote_to_latest `test);
+      (Auto, job_gitlab_release (module CI) "octez-evm-node");
+    ] ;
+  (* Temporary release process specific to Tezlink needs *)
+  Temp_tezlink_ci.register_dedicated_release_pipeline
+    ~tag_rex:tezlink_node_release_tag_re
+    [(Auto, job_gitlab_release (module Temp_tezlink_ci) "tezlink-node")] ;
+  Temp_tezlink_ci.register_dedicated_test_release_pipeline
+    ~tag_rex:tezlink_node_release_tag_re
+    [(Auto, job_gitlab_release (module Temp_tezlink_ci) "tezlink-node")] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for Etherlink."
