@@ -105,6 +105,7 @@ let job_docker_merge_manifests =
 
 let job_release_page =
   Cacio.parameterize @@ fun pipeline_type ->
+  Cacio.parameterize @@ fun needs ->
   CI.job
     "release-page"
     ~__POS__
@@ -121,10 +122,13 @@ let job_release_page =
          ~expire_in:(Duration (Days 1))
          ["index.md"; "index.html"])
     ~needs:
-      [
-        (Artifacts, job_build_static_binaries Amd64);
-        (Artifacts, job_build_static_binaries Arm64);
-      ]
+      (match needs with
+      | `build_dependencies ->
+          [
+            (Artifacts, job_build_static_binaries Amd64);
+            (Artifacts, job_build_static_binaries Arm64);
+          ]
+      | `no_build_dependencies -> [])
     ~variables:
       (match pipeline_type with
       | `test ->
@@ -174,7 +178,7 @@ let register () =
       (Auto, job_build_static_binaries Amd64);
       (Auto, job_docker_merge_manifests `test);
       (Auto, job_gitlab_release);
-      (Manual, job_release_page `test);
+      (Manual, job_release_page `test `build_dependencies);
     ] ;
   CI.register_dedicated_release_pipeline
     ~tag_rex:octez_smart_rollup_node_release_tag_re
@@ -183,19 +187,33 @@ let register () =
       (Auto, job_build_static_binaries Amd64);
       (Auto, job_docker_merge_manifests `real);
       (Auto, job_gitlab_release);
-      (Manual, job_release_page `real);
+      (Manual, job_release_page `real `build_dependencies);
     ] ;
   CI.register_global_release_jobs
     [
       (Auto, job_build_static_binaries Arm64);
       (Auto, job_build_static_binaries Amd64);
       (Auto, job_docker_merge_manifests `real);
-      (Manual, job_release_page `real);
+      (Manual, job_release_page `real `build_dependencies);
     ] ;
   CI.register_global_test_release_jobs
     [
       (Auto, job_build_static_binaries Arm64);
       (Auto, job_build_static_binaries Amd64);
       (Auto, job_docker_merge_manifests `test);
-      (Manual, job_release_page `test);
+      (Manual, job_release_page `test `build_dependencies);
+    ] ;
+  CI.register_global_publish_release_page_jobs
+    [
+      ( Manual,
+        (* [no_build_dependencies] because we don't want the build job to run
+           as their artifacts are not needed to update the release page. *)
+        job_release_page `real `no_build_dependencies );
+    ] ;
+  CI.register_global_test_publish_release_page_jobs
+    [
+      ( Manual,
+        (* [no_build_dependencies] because we don't want the build job to run
+           as their artifacts are not needed to update the release page. *)
+        job_release_page `test `no_build_dependencies );
     ]
