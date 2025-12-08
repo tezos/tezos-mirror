@@ -60,3 +60,13 @@ let transfer_exn ?nonce ?to_ ?data ~value ~gas_limit ~infos ~from () =
   | Error err ->
       Stdlib.failwith
         (Format.asprintf "Could not craft the transfer: %a" pp_print_trace err)
+
+let transfer_with_obj_exn ?nonce ?to_ ?data ~value ~gas_limit ~infos ~from () =
+  let open Lwt_result_syntax in
+  let*! raw_tx =
+    transfer_exn ?nonce ~infos ~from ?to_ ~gas_limit ~value ?data ()
+  in
+  let*? transaction_object =
+    Transaction_object.decode @@ Ethereum_types.hex_to_bytes raw_tx
+  in
+  return (raw_tx, transaction_object)
