@@ -128,11 +128,7 @@ let job_unit_tests =
     ~image:Tezos_ci.Images.CI.build
     ~only_if_changed:Files.(node @ sdks)
     ~artifacts:
-      ((* Note: the [~name] is actually overridden by the one computed
-           by [Tezos_ci.Coverage.enable_output_artifact].
-           We set it anyway for consistency with how the job
-           was previously declared using [job_unit_test] in [code_verification.ml]. *)
-       Gitlab_ci.Util.artifacts
+      (Gitlab_ci.Util.artifacts
          ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-x86_64"
          ["test_results"]
          ~reports:(Gitlab_ci.Util.reports ~junit:"test_results/*.xml" ())
@@ -141,7 +137,6 @@ let job_unit_tests =
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     ~dune_cache:(Cacio.dune_cache ())
-    ~test_coverage:true
     ~variables:[("DUNE_ARGS", "-j 12")]
     ~retry:{max = 2; when_ = []}
     [". ./scripts/version.sh"; "eval $(opam env)"; "make test-etherlink-unit"]
@@ -306,7 +301,6 @@ let job_tezt =
     ~__POS__
     ~pipeline
     ~description:"Run normal Etherlink Tezt tests."
-    ~test_coverage:true
     ~test_selection:
       (Tezos_ci_jobs.Tezt.tests_tag_selector [Not (Has_tag "flaky")])
     ~parallel_jobs:18
@@ -348,7 +342,6 @@ let job_tezt_flaky =
     ~__POS__
     ~pipeline
     ~description:"Run Etherlink Tezt tests tagged as flaky."
-    ~test_coverage:true
     ~allow_failure:Yes
     ~test_selection:(Tezos_ci_jobs.Tezt.tests_tag_selector [Has_tag "flaky"])
     ~parallel_jobs:2

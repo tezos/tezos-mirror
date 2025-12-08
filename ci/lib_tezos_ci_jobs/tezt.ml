@@ -79,7 +79,6 @@ let job_tezt =
     ~__POS__
     ~pipeline
     ~description:"Run normal Tezt tests."
-    ~test_coverage:true
     ~test_selection:(tests_tag_selector [Not (Has_tag "flaky")])
     ~parallel_jobs:34
     ~parallel_tests:6
@@ -92,7 +91,6 @@ let job_tezt_time_sensitive =
     ~__POS__
     ~pipeline
     ~description:"Run Tezt tests tagged as time_sensitive."
-    ~test_coverage:true
     ~test_selection:(tests_tag_selector ~time_sensitive:true [])
     ~parallel_jobs:2
     ~retry_jobs:2
@@ -140,7 +138,6 @@ let job_tezt_flaky =
     ~__POS__
     ~pipeline
     ~description:"Run Tezt tests tagged as flaky."
-    ~test_coverage:true
     ~allow_failure:Yes
     ~test_selection:(tests_tag_selector [Has_tag "flaky"])
     ~parallel_jobs:2

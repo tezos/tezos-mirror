@@ -84,7 +84,6 @@ type job = {
   cargo_target_caches : bool;
   sccache : sccache_config option;
   dune_cache : dune_cache_config option;
-  test_coverage : bool;
   allow_failure : Gitlab_ci.Types.allow_failure_job option;
   retry : Gitlab_ci.Types.retry option;
   timeout : Gitlab_ci.Types.time_interval option;
@@ -401,7 +400,6 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                     cargo_target_caches;
                     sccache;
                     dune_cache;
-                    test_coverage;
                     allow_failure;
                     retry;
                     timeout;
@@ -509,12 +507,6 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                       ?policy
                       job
               in
-              let maybe_enable_test_coverage job =
-                if test_coverage then
-                  job |> Tezos_ci.Coverage.enable_instrumentation
-                  |> Tezos_ci.Coverage.enable_output_artifact
-                else job
-              in
               Tezos_ci.job
                 ~__POS__:source_location
                 ~name
@@ -545,7 +537,6 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 script
               |> maybe_enable_cargo_cache |> maybe_enable_cargo_target_caches
               |> maybe_enable_sccache |> maybe_enable_dune_cache
-              |> maybe_enable_test_coverage
         in
         result := UID_map.add uid result_node !result ;
         result_node
@@ -603,7 +594,6 @@ module type COMPONENT_API = sig
     ?cargo_target_caches:bool ->
     ?sccache:sccache_config ->
     ?dune_cache:dune_cache_config ->
-    ?test_coverage:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     ?timeout:Gitlab_ci.Types.time_interval ->
@@ -626,7 +616,6 @@ module type COMPONENT_API = sig
     ?only_if_changed:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
-    ?test_coverage:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?tezt_exe:string ->
     ?global_timeout:tezt_timeout ->
@@ -809,8 +798,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
       ?(needs_legacy = []) ?parallel ?variables ?artifacts
       ?(cargo_cache = false) ?(cargo_target_caches = false) ?sccache ?dune_cache
-      ?(test_coverage = false) ?allow_failure ?retry ?timeout
-      ?(image_dependencies = []) ?services name script =
+      ?allow_failure ?retry ?timeout ?(image_dependencies = []) ?services name
+      script =
     incr number_of_declared_jobs ;
     let name = make_name name in
     (* Check that no dependency is in an ulterior stage. *)
@@ -853,7 +842,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       cargo_target_caches;
       sccache;
       dune_cache;
-      test_coverage;
       allow_failure;
       retry;
       timeout;
@@ -887,10 +875,10 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
 
   let tezt_job ~__POS__:source_location ~pipeline ~description ?provider ?arch
       ?(cpu = Tezos_ci.Runner.CPU.Tezt) ?storage ?only_if_changed ?(needs = [])
-      ?needs_legacy ?test_coverage ?allow_failure ?tezt_exe
-      ?(global_timeout = Minutes 30) ?(test_timeout = Minutes 9)
-      ?(parallel_jobs = 1) ?(parallel_tests = 1) ?retry_jobs ?(retry_tests = 0)
-      ?(test_selection = Tezt_core.TSL_AST.True) ?(before_script = []) variant =
+      ?needs_legacy ?allow_failure ?tezt_exe ?(global_timeout = Minutes 30)
+      ?(test_timeout = Minutes 9) ?(parallel_jobs = 1) ?(parallel_tests = 1)
+      ?retry_jobs ?(retry_tests = 0) ?(test_selection = Tezt_core.TSL_AST.True)
+      ?(before_script = []) variant =
     if not (is_a_valid_name variant) then
       failwith @@ sf "Cacio.tezt_job: invalid variant name: %S" variant ;
     let select_tezts =
@@ -1094,7 +1082,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
            ]
            ~expire_in:(Duration (Days 7))
            ~when_:Always)
-      ?test_coverage
       ?allow_failure
       ?retry:
         (match retry_jobs with

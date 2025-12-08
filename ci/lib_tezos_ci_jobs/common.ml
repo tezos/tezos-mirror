@@ -137,33 +137,29 @@ module Build = struct
         ~expire_in:(Duration (Days 1))
         ["octez-*"; "src/proto_*/parameters/*.json"]
     in
-    let job =
-      job
-        ?rules
-        ?dependencies
-        ~__POS__
-        ~stage:Stages.build
-        ~arch
-        ?retry
-        ?cpu
-        ?storage
-        ~name
-        ~image:Images.CI.build
-        ~before_script:
-          (Helpers.before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        ~variables
-        ~artifacts
-        ["./scripts/ci/build_full_unreleased.sh"]
-      |> enable_cargo_cache
-      |> enable_sccache ~policy:Pull_push
-      |> enable_cargo_target_caches
-    in
-    (* Disable coverage for arm64 *)
-    if arch = Amd64 then Coverage.enable_instrumentation job else job
+    job
+      ?rules
+      ?dependencies
+      ~__POS__
+      ~stage:Stages.build
+      ~arch
+      ?retry
+      ?cpu
+      ?storage
+      ~name
+      ~image:Images.CI.build
+      ~before_script:
+        (Helpers.before_script
+           ~take_ownership:true
+           ~source_version:true
+           ~eval_opam:true
+           [])
+      ~variables
+      ~artifacts
+      ["./scripts/ci/build_full_unreleased.sh"]
+    |> enable_cargo_cache
+    |> enable_sccache ~policy:Pull_push
+    |> enable_cargo_target_caches
 
   let job_build_dynamic_binaries ?(extra = false) ?rules ~__POS__ ~arch ?retry
       ?cpu ?storage ?dependencies ~name executable_files =
@@ -203,32 +199,28 @@ module Build = struct
           "etherlink-governance-observer";
         ]
     in
-    let job =
-      job
-        ?rules
-        ?dependencies
-        ~__POS__
-        ~stage:Stages.build
-        ~arch
-        ?retry
-        ?cpu
-        ?storage
-        ~name
-        ~image:Images.CI.build
-        ~before_script:
-          (Helpers.before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        ~variables
-        ~artifacts
-        ["./scripts/ci/build_full_unreleased.sh"]
-      |> enable_cargo_cache
-      |> enable_sccache ~policy:Pull_push
-    in
-    (* Disable coverage for arm64 *)
-    if arch = Amd64 then Coverage.enable_instrumentation job else job
+    job
+      ?rules
+      ?dependencies
+      ~__POS__
+      ~stage:Stages.build
+      ~arch
+      ?retry
+      ?cpu
+      ?storage
+      ~name
+      ~image:Images.CI.build
+      ~before_script:
+        (Helpers.before_script
+           ~take_ownership:true
+           ~source_version:true
+           ~eval_opam:true
+           [])
+      ~variables
+      ~artifacts
+      ["./scripts/ci/build_full_unreleased.sh"]
+    |> enable_cargo_cache
+    |> enable_sccache ~policy:Pull_push
 
   let job_build_arm64_release ?rules () : tezos_job =
     job_build_released_binaries ?rules ~__POS__ ~arch:Arm64 ~storage:Ramfs ()

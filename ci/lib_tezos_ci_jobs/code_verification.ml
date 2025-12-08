@@ -692,7 +692,6 @@ let jobs pipeline_type =
           ~image:Images.CI.test
           ~make_targets:["test-nonproto-unit"]
           ()
-        |> Coverage.enable_instrumentation |> Coverage.enable_output_artifact
       in
       let oc_unit_other_x86_64 =
         (* Runs unit tests for contrib. *)
@@ -703,7 +702,6 @@ let jobs pipeline_type =
           ~cpu:High
           ~make_targets:["test-other-unit"]
           ()
-        |> Coverage.enable_instrumentation |> Coverage.enable_output_artifact
       in
       let oc_unit_proto_x86_64 =
         (* Runs unit tests for protocol. *)
@@ -714,11 +712,8 @@ let jobs pipeline_type =
           ~cpu:Very_high
           ~make_targets:["test-proto-unit"]
           ()
-        |> Coverage.enable_instrumentation |> Coverage.enable_output_artifact
       in
       let oc_unit_non_proto_arm64 =
-        (* No coverage for arm64 jobs -- the code they test is a
-           subset of that tested by x86_64 unit tests. *)
         job_unit_test
           ~__POS__
           ~name:"oc.unit:non-proto-arm64"
@@ -969,13 +964,6 @@ let jobs pipeline_type =
     @ jobs_install_octez
   in
 
-  (* Coverage jobs *)
-  let coverage =
-    match pipeline_type with
-    | Before_merging | Merge_train -> [Coverage.close changeset_octez]
-    | Schedule_extended_test -> []
-  in
-
   (* Manual jobs *)
   let manual =
     (* On scheduled pipelines we build and test the full packages test matrix.
@@ -1101,4 +1089,4 @@ let jobs pipeline_type =
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in
-  start_stage @ sanity @ build @ test @ coverage @ manual
+  start_stage @ sanity @ build @ test @ manual
