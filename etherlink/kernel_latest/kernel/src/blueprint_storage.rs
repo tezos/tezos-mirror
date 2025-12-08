@@ -503,8 +503,8 @@ pub enum BlueprintValidity<Tx> {
     StaleBlueprint,
 }
 
-pub enum DelayedTransactionFetchingResult<Txs> {
-    Ok(Txs),
+pub enum DelayedTransactionFetchingResult<Tx> {
+    Ok(Vec<Tx>),
     BlueprintTooLarge,
     DelayedHashMissing(delayed_inbox::Hash),
 }
@@ -514,7 +514,7 @@ pub fn fetch_hashes_from_delayed_inbox<Host: Runtime>(
     delayed_hashes: Vec<delayed_inbox::Hash>,
     delayed_inbox: &mut DelayedInbox,
     current_blueprint_size: usize,
-) -> anyhow::Result<(DelayedTransactionFetchingResult<Vec<Transaction>>, usize)> {
+) -> anyhow::Result<(DelayedTransactionFetchingResult<Transaction>, usize)> {
     let mut delayed_txs = vec![];
     let mut total_size = current_blueprint_size;
     for tx_hash in delayed_hashes {

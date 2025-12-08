@@ -277,10 +277,7 @@ pub trait ChainConfigTrait: Debug {
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
-    ) -> anyhow::Result<(
-        DelayedTransactionFetchingResult<Vec<Self::Transaction>>,
-        usize,
-    )>;
+    ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transaction>, usize)>;
 
     fn transactions_from_bytes(
         bytes: Vec<Vec<u8>>,
@@ -360,10 +357,8 @@ impl ChainConfigTrait for EvmChainConfig {
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
-    ) -> anyhow::Result<(
-        DelayedTransactionFetchingResult<Vec<Self::Transaction>>,
-        usize,
-    )> {
+    ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transaction>, usize)>
+    {
         crate::blueprint_storage::fetch_hashes_from_delayed_inbox(
             host,
             delayed_hashes,
@@ -484,10 +479,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
         delayed_hashes: Vec<crate::delayed_inbox::Hash>,
         delayed_inbox: &mut DelayedInbox,
         current_blueprint_size: usize,
-    ) -> anyhow::Result<(
-        DelayedTransactionFetchingResult<Vec<Self::Transaction>>,
-        usize,
-    )> {
+    ) -> anyhow::Result<(DelayedTransactionFetchingResult<Self::Transaction>, usize)>
+    {
         // By reusing 'fetch_hashes_from_delayed_inbox', Tezlink don't have to implement
         // the logic to retrieve delayed_inbox items.
         //
