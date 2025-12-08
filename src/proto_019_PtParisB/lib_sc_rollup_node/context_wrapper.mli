@@ -33,9 +33,9 @@ module type S = sig
 
   type tree
 
-  val of_node_context : 'a Context.t -> ('a, repo, tree) Context_sigs.t
+  val of_node_context : 'a Context.index -> ('a, repo) Context_sigs.index
 
-  val to_node_context : ('a, repo, tree) Context_sigs.t -> 'a Context.t
+  val to_node_context : ('a, repo) Context_sigs.index -> 'a Context.index
 
   val of_node_pvmstate : Context.pvmstate -> tree
 

@@ -22,7 +22,9 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-(** This module is largely inspired from {!module:Tezos_protocol_environment.Environement_context} *)
+
+(** This module is largely inspired from
+    {!module:Tezos_protocol_environment.Environement_context} *)
 
 open Context_sigs
 
@@ -37,15 +39,17 @@ type ('repo, 'tree) pvm_context_impl =
    pvm protocol_plugins *)
 
 (** See {!module:Tezos_protocol_environment.Environement_context.t} *)
-type 'a t = private
-  | Context : {
-      index : ('a, 'repo) index;
-      pvm_context_impl : ('repo, 'tree) pvm_context_impl;
-      impl_name : string;
-      tree : 'tree;
-      equality_witness : ('repo, 'tree) equality_witness;
-    }
-      -> 'a t
+type ('a, 'repo, 'tree, 'loaded_tree) container = private {
+  index : ('a, 'repo) index;
+  pvm_context_impl : ('repo, 'tree) pvm_context_impl;
+  impl_name : string;
+  tree : 'loaded_tree;
+  equality_witness : ('repo, 'tree) equality_witness;
+}
+
+type 'a index = private Index : ('a, 'repo, 'tree, unit) container -> 'a index
+
+type 'a t = private Context : ('a, 'repo, 'tree, 'tree) container -> 'a t
 
 (** Read/write context {!t}. *)
 type rw = [`Read | `Write] t
@@ -53,13 +57,18 @@ type rw = [`Read | `Write] t
 (** Read-only context {!t}. *)
 type ro = [`Read] t
 
-val make :
-  index:('a, 'b) index ->
-  tree:'c ->
+(** Read/write {!index}. *)
+type rw_index = [`Read | `Write] index
+
+(** Read-only {!index}. *)
+type ro_index = [`Read] index
+
+val make_index :
+  index:('a, 'b) Context_sigs.index ->
   pvm_context_impl:('b, 'c) pvm_context_impl ->
   equality_witness:('b, 'c) equality_witness ->
   impl_name:string ->
-  'a t
+  'a index
 
 val equiv :
   'a Equality_witness.t * 'b Equality_witness.t ->
@@ -79,25 +88,25 @@ val load :
   cache_size:int ->
   ([< `Read | `Write > `Read] as 'a) Access_mode.t ->
   string ->
-  'a t tzresult Lwt.t
+  'a index tzresult Lwt.t
 
 (** [index context] is the repository of the context [context]. *)
-val index : 'a t -> 'a t
+val index : 'a t -> 'a index
 
 (** [close ctxt] closes the context index [ctxt]. *)
-val close : 'a t -> unit Lwt.t
+val close : 'a index -> unit Lwt.t
 
 (** [readonly index] returns a read-only version of the index. *)
-val readonly : _ t -> [`Read] t
+val readonly : _ index -> [`Read] index
 
 (** [checkout ctxt hash] checkouts the content that corresponds to the commit
     hash [hash] in the repository [ctxt] and returns the corresponding
     context. If there is no commit that corresponds to [hash], it returns
     [None].  *)
-val checkout : 'a t -> hash -> 'a t option Lwt.t
+val checkout : 'a index -> hash -> 'a t option Lwt.t
 
 (** [empty ctxt] is the context with an empty content for the repository [ctxt]. *)
-val empty : 'a t -> 'a t
+val empty : 'a index -> 'a t
 
 (** [commit ?message context] commits content of the context [context] on disk,
     and return the commit hash. *)
@@ -105,29 +114,29 @@ val commit : ?message:string -> [`Read | `Write] t -> hash Lwt.t
 
 (** [is_gc_finished index] returns true if a GC is finished (or idle) and false
     if a GC is running for [index]. *)
-val is_gc_finished : [`Read | `Write] t -> bool
+val is_gc_finished : [`Read | `Write] index -> bool
 
 (** [cancel_gc index] stops the Irmin GC if it is currently running for
     [index]. It returns [true] if a GC was canceled. *)
-val cancel_gc : [`Read | `Write] t -> bool
+val cancel_gc : [`Read | `Write] index -> bool
 
 (** [split ctxt] creates a new suffix file, also called "chunk", into the context's
     file hierarchy. This split function is expected to be called after
     committing a commit that will be a future candidate for a GC target.  *)
-val split : _ t -> unit
+val split : _ index -> unit
 
 (** [gc index ?callback hash] removes all data older than [hash] from disk.
     If passed, [callback] will be executed when garbage collection finishes. *)
 val gc :
-  [`Read | `Write] t -> ?callback:(unit -> unit Lwt.t) -> hash -> unit Lwt.t
+  [`Read | `Write] index -> ?callback:(unit -> unit Lwt.t) -> hash -> unit Lwt.t
 
 (** [wait_gc_completion index] will return a blocking thread if a
     GC run is currently ongoing. *)
-val wait_gc_completion : [`Read | `Write] t -> unit Lwt.t
+val wait_gc_completion : [`Read | `Write] index -> unit Lwt.t
 
 (** [export_snapshot index context_hash ~path] exports the context corresponding
     to [context_hash], if found in [index], into the given folder path. *)
-val export_snapshot : _ t -> hash -> path:string -> unit tzresult Lwt.t
+val export_snapshot : _ index -> hash -> path:string -> unit tzresult Lwt.t
 
 (* Pvm_state that embeds the context_module embedded associated to pvm
    protocol_plugins *)
@@ -153,7 +162,7 @@ module PVMState : sig
   type value = pvmstate
 
   (** [empty ()] is the empty PVM state. *)
-  val empty : 'a t -> value
+  val empty : 'a index -> value
 
   (** [find context] returns the PVM state stored in the [context], if any. *)
   val find : 'a t -> value option Lwt.t

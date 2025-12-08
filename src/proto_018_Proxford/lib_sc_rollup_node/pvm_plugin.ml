@@ -191,7 +191,7 @@ let produce_serialized_output_proof node_ctxt state ~outbox_level ~message_index
   | Some output -> (
       let*! proof =
         PVM.produce_output_proof
-          (of_node_context node_ctxt.context).index
+          (of_node_context node_ctxt.context)
           state
           output
       in

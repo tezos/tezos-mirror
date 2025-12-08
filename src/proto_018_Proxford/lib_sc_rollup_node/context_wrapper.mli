@@ -30,13 +30,13 @@ open Context_sigs
 (* Context *)
 val of_node_context :
   ('repo, 'tree) equality_witness ->
-  [`Read | `Write] Context.t ->
-  ([`Read | `Write], 'repo, 'tree) Context_sigs.t
+  [`Read | `Write] Context.index ->
+  ([`Read | `Write], 'repo) Context_sigs.index
 
 val to_node_context :
   (module Context_sigs.S with type tree = 'tree and type repo = 'repo) ->
-  ('a, 'repo, 'tree) Context_sigs.t ->
-  'a Context.t
+  ('a, 'repo) Context_sigs.index ->
+  'a Context.index
 
 (* PVMState *)
 val of_node_pvmstate :
@@ -48,10 +48,10 @@ val to_node_pvmstate :
 (** Specialized module to handle translation to/from Irmin_context *)
 module Irmin : sig
   val of_node_context :
-    'a Context.t -> ('a, Irmin_context.repo, Irmin_context.tree) Context_sigs.t
+    'a Context.index -> ('a, Irmin_context.repo) Context_sigs.index
 
   val to_node_context :
-    ('a, Irmin_context.repo, Irmin_context.tree) Context_sigs.t -> 'a Context.t
+    ('a, Irmin_context.repo) Context_sigs.index -> 'a Context.index
 
   val of_node_pvmstate : Context.pvmstate -> Irmin_context.tree
 

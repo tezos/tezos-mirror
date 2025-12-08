@@ -102,7 +102,7 @@ type 'a t = {
   unsafe_patches : Pvm_patches.t;
   lockfile : Lwt_unix.file_descr;
   store : 'store store;
-  context : 'context Context.t;
+  context : 'context Context.index;
   lcc : lcc Reference.rw;
   lpc : Commitment.t option Reference.rw;
   private_info : private_info option Reference.rw;
