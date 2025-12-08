@@ -5742,6 +5742,7 @@ module Token : sig
     | `Collected_commitments of Blinded_public_key_hash.t
     | `Frozen_deposits of Receipt.frozen_staker
     | `Unstaked_frozen_deposits of Receipt.unstaked_frozen_staker * Cycle.t
+    | `CLST_deposits
     | `Block_fees
     | `Frozen_bonds of Contract.t * Bond_id.t ]
 
