@@ -187,7 +187,6 @@ let job_unit_tests =
     [". ./scripts/version.sh"; "eval $(opam env)"; "make test-etherlink-unit"]
 
 let job_test_kernel =
-  Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "test_kernel"
     ~__POS__
@@ -195,15 +194,13 @@ let job_test_kernel =
     ~description:"Check and test the etherlink kernel."
     ~image:Images.rust_toolchain
     ~only_if_changed:Files.(rust_toolchain_image @ kernel @ sdks @ mir)
-    ~needs_legacy:
-      [(Job, Tezos_ci_jobs.Code_verification.job_build_kernels pipeline_type)]
+    ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     ["make -f etherlink.mk check"; "make -f etherlink.mk test"]
 
 let job_test_firehose =
-  Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "test_firehose"
     ~__POS__
@@ -211,15 +208,13 @@ let job_test_firehose =
     ~description:"Check and test etherlink firehose."
     ~image:Images.rust_toolchain
     ~only_if_changed:Files.(rust_toolchain_image @ firehose)
-    ~needs_legacy:
-      [(Job, Tezos_ci_jobs.Code_verification.job_build_kernels pipeline_type)]
+    ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     ["make -C etherlink/firehose check"]
 
 let job_test_evm_compatibility =
-  Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "test_evm_compatibility"
     ~__POS__
@@ -227,8 +222,7 @@ let job_test_evm_compatibility =
     ~description:"Check and test EVM compatibility."
     ~image:Images.rust_toolchain
     ~only_if_changed:Files.(rust_toolchain_image @ evm_compatibility)
-    ~needs_legacy:
-      [(Job, Tezos_ci_jobs.Code_verification.job_build_kernels pipeline_type)]
+    ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
@@ -242,7 +236,6 @@ let job_test_evm_compatibility =
     ]
 
 let job_test_revm_compatibility =
-  Cacio.parameterize @@ fun pipeline_type ->
   CI.job
     "test_revm_compatibility"
     ~__POS__
@@ -250,8 +243,7 @@ let job_test_revm_compatibility =
     ~description:"Check and test REVM compatibility."
     ~image:Images.rust_toolchain
     ~only_if_changed:Files.(rust_toolchain_image @ revm_compatibility)
-    ~needs_legacy:
-      [(Job, Tezos_ci_jobs.Code_verification.job_build_kernels pipeline_type)]
+    ~needs:[(Job, Tezos_ci_jobs.Kernels.job_build_kernels)]
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
@@ -324,7 +316,11 @@ let tezt_job ?(retry_tests = 1) =
   CI.tezt_job
     ~tezt_exe:"etherlink/tezt/tests/main.exe"
     ~only_if_changed:(Changeset.encode Tezos_ci_jobs.Changesets.changeset_octez)
-    ~needs:[(Artifacts, job_build_tezt)]
+    ~needs:
+      [
+        (Artifacts, job_build_tezt);
+        (Artifacts, Tezos_ci_jobs.Kernels.job_build_kernels);
+      ]
     ~needs_legacy:
       [
         ( Artifacts,
@@ -332,8 +328,6 @@ let tezt_job ?(retry_tests = 1) =
             Before_merging );
         ( Artifacts,
           Tezos_ci_jobs.Code_verification.job_build_x86_64_exp Before_merging );
-        ( Artifacts,
-          Tezos_ci_jobs.Code_verification.job_build_kernels Before_merging );
       ]
     ~retry_tests
 
@@ -461,10 +455,10 @@ let register () =
       (Auto, job_unit_tests);
       (* We rely on the fact that [Tezos_ci_pipelines.Code_verification.job_build_kernels]
          returns an equivalent job for [Before_merging] and [Merge_train]. *)
-      (Auto, job_test_kernel Before_merging);
-      (Auto, job_test_firehose Before_merging);
-      (Auto, job_test_evm_compatibility Before_merging);
-      (Auto, job_test_revm_compatibility Before_merging);
+      (Auto, job_test_kernel);
+      (Auto, job_test_firehose);
+      (Auto, job_test_evm_compatibility);
+      (Auto, job_test_revm_compatibility);
       (Auto, job_mir_unit);
       (Auto, job_mir_tzt);
       (Auto, job_tezt `merge_request);
@@ -487,17 +481,16 @@ let register () =
           Schedule_extended_test;
         Tezos_ci_jobs.Code_verification.job_build_x86_64_exp
           Schedule_extended_test;
-        Tezos_ci_jobs.Code_verification.job_build_kernels Schedule_extended_test;
       ]
     [
       (Auto, job_build_evm_node_static Amd64 Test);
       (Auto, job_build_evm_node_static Arm64 Test);
       (Auto, job_lint_wasm_runtime);
       (Auto, job_unit_tests);
-      (Auto, job_test_kernel Schedule_extended_test);
-      (Auto, job_test_firehose Schedule_extended_test);
-      (Auto, job_test_evm_compatibility Before_merging);
-      (Auto, job_test_revm_compatibility Before_merging);
+      (Auto, job_test_kernel);
+      (Auto, job_test_firehose);
+      (Auto, job_test_evm_compatibility);
+      (Auto, job_test_revm_compatibility);
       (Auto, job_tezt `scheduled);
       (Auto, job_tezt_slow `scheduled);
       (Auto, job_tezt_extra `scheduled);

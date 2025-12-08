@@ -159,17 +159,6 @@ let depending_on_pipeline_type :
 let build_cache_key =
   "dune-build-cache-" ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id)
 
-let job_build_kernels =
-  depending_on_pipeline_type @@ fun pipeline_type ->
-  job_build_kernels
-    ~rules:
-      (make_rules
-         ~pipeline_type
-         ~changes:changeset_octez_or_kernels_or_mir_or_doc
-         ~dependent:true
-         ())
-    ()
-
 (* The build_x86_64 jobs are split in two to keep the artifact size
    under the 1GB hard limit set by GitLab. *)
 (* [job_build_x86_64_release] builds the released executables. *)
@@ -448,7 +437,6 @@ let jobs pipeline_type =
     job_build_arm64_exp ~rules:build_arm_rules ()
   in
 
-  let job_build_kernels = job_build_kernels pipeline_type in
   (* Octez static binaries *)
   let job_static_x86_64_experimental =
     job_build_static_binaries
@@ -527,7 +515,6 @@ let jobs pipeline_type =
       job_build_x86_64_release;
       job_build_x86_64_extra_dev;
       job_build_x86_64_exp;
-      job_build_kernels;
       build_octez_source;
       job_build_layer1_profiling
         ~rules:(make_rules ~changes:changeset_octez ())

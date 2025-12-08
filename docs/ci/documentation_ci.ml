@@ -121,6 +121,10 @@ let job_manuals =
     ~description:
       "Build the command-line interface manuals (man pages) of Octez \
        executables."
+    ~needs:
+      (match executables_to_use with
+      | `dynamic -> [(Artifacts, Tezos_ci_jobs.Kernels.job_build_kernels)]
+      | `static -> [])
     ~needs_legacy:
       (match executables_to_use with
       | `dynamic ->
@@ -135,9 +139,6 @@ let job_manuals =
             ( Artifacts,
               Tezos_ci_jobs.Code_verification.job_build_x86_64_exp
                 Before_merging );
-            ( Artifacts,
-              Tezos_ci_jobs.Code_verification.job_build_kernels Before_merging
-            );
           ]
       | `static -> [(Artifacts, Tezos_ci_jobs.Master_branch.job_static_x86_64)])
     ~only_if_changed:Files.odoc

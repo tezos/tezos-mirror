@@ -243,31 +243,6 @@ module Build = struct
       ~storage:Ramfs
       "script-inputs/experimental-executables"
 
-  let job_build_kernels ?rules () : tezos_job =
-    job
-      ~__POS__
-      ~name:"oc.build_kernels"
-      ~image:Images.rust_toolchain
-      ~stage:Stages.build
-      ?rules
-      ["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
-      ~artifacts:
-        (artifacts
-           ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
-           ~expire_in:(Duration (Days 1))
-           ~when_:On_success
-           [
-             "evm_kernel.wasm";
-             "smart-rollup-installer";
-             "sequenced_kernel.wasm";
-             "tx_kernel.wasm";
-             "tx_kernel_dal.wasm";
-             "dal_echo_kernel.wasm";
-           ])
-    |> enable_kernels
-    |> enable_sccache ~policy:Pull_push
-    |> enable_cargo_cache
-
   let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
     let profiled_binaries =
       ["octez-node"; "octez-dal-node"; "octez-baker"; "octez-client"]

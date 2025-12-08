@@ -30,10 +30,10 @@ end
 module CI = Cacio.Shared
 
 (* Common configuration for kernel jobs. *)
-let job_kernel =
+let job_kernel ?(sccache = Cacio.sccache ()) =
   CI.job
     ~cargo_cache:true
-    ~sccache:(Cacio.sccache ())
+    ~sccache
     ~variables:[("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
 
 let job_check_riscv_kernels =
@@ -71,6 +71,29 @@ let job_test_kernels =
     ~only_if_changed:Files.(test_kernels @ rust_toolchain)
     ~image:Tezos_ci.Images.rust_toolchain
     ["make -f kernels.mk check"; "make -f kernels.mk test"]
+
+let job_build_kernels =
+  job_kernel
+    "oc.build_kernels"
+    ~__POS__
+    ~stage:Build
+    ~description:"Build the kernels, including the Etherlink kernel."
+    ~image:Tezos_ci.Images.rust_toolchain
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
+         ~expire_in:(Duration (Days 1))
+         ~when_:On_success
+         [
+           "evm_kernel.wasm";
+           "smart-rollup-installer";
+           "sequenced_kernel.wasm";
+           "tx_kernel.wasm";
+           "tx_kernel_dal.wasm";
+           "dal_echo_kernel.wasm";
+         ])
+    ~sccache:(Cacio.sccache ~policy:Pull_push ())
+    ["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
 
 let register () =
   CI.register_before_merging_jobs

@@ -49,6 +49,5 @@ let jobs () =
       job_build_x86_64_release;
       job_build_x86_64_extra_dev;
       job_build_x86_64_exp;
-      job_build_kernels ();
       job_datadog_pipeline_trace;
     ]
