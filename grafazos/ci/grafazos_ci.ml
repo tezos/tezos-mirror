@@ -75,8 +75,9 @@ let job_release_page =
           ]
       | `real ->
           [
-            ("S3_BUCKET", "site-prod.octez.tezos.com/releases");
+            ("S3_BUCKET", "site-prod.octez.tezos.com");
             ("URL", "octez.tezos.com");
+            ("BUCKET_PATH", "/releases");
             ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
           ])
     [
