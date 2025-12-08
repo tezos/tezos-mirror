@@ -79,6 +79,17 @@ let job_build_kernels =
     ~stage:Build
     ~description:"Build the kernels, including the Etherlink kernel."
     ~image:Tezos_ci.Images.rust_toolchain
+    ~only_if_changed:
+      [
+        (* This job is used by other jobs such as [etherlink.test_kernels]
+           and is thus automatically added to pipelines that modify the changeset
+           of those other jobs. But we also want to check that kernels compile
+           if the makefiles are modified, and [kernels.mk] does not trigger those other jobs.
+           So we explicitly add the makefiles to the changeset and we explicitly
+           register [job_build_kernels] in the pipelines. *)
+        "kernels.mk";
+        "etherlink.mk";
+      ]
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
@@ -101,11 +112,13 @@ let register () =
       (Auto, job_check_riscv_kernels);
       (Immediate, job_audit_riscv_deps);
       (Auto, job_test_kernels);
+      (Auto, job_build_kernels);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
       (Auto, job_check_riscv_kernels);
       (Auto, job_audit_riscv_deps);
       (Auto, job_test_kernels);
+      (Auto, job_build_kernels);
     ] ;
   ()

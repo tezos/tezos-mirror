@@ -2473,6 +2473,7 @@ oc.build_kernels:
     - images/rust-toolchain/**/*
     - images/scripts/install_datadog_static.sh
     - irmin/**/*
+    - kernels.mk
     - lwt_domain/**/*
     - michelson_test_scripts/**/*
     - opam/**/*
