@@ -642,9 +642,9 @@ mod test {
 
         // Check the outcome of the transaction
         match execution_result.result {
-            ExecutionResult::Halt { .. } => (),
-            ExecutionResult::Revert { .. } | ExecutionResult::Success { .. } => {
-                panic!("Simple transfer should have halted")
+            ExecutionResult::Revert { .. } => (),
+            ExecutionResult::Halt { .. } | ExecutionResult::Success { .. } => {
+                panic!("Simple transfer should have reverted")
             }
         }
     }

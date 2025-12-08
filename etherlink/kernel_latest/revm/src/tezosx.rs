@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use revm::primitives::{alloy_primitives::Keccak256, Address};
+use revm::primitives::{alloy_primitives::Keccak256, hex::FromHex, Address, Bytes, B256};
 use rlp::{Decodable, Encodable, Rlp};
 use tezos_crypto_rs::public_key_hash::PublicKeyHash;
 use tezos_evm_runtime::runtime::Runtime;
@@ -11,7 +11,12 @@ use tezos_smart_rollup_host::{
     runtime::RuntimeError,
 };
 
-use crate::{helpers::storage::concat, Error};
+use crate::{
+    helpers::storage::concat,
+    precompiles::constants::ALWAYS_REVERT_SOL_CONTRACT,
+    storage::{code::CodeStorage, world_state_handler::StorageAccount},
+    Error,
+};
 
 // Path where is stored the correspondance between an EVM address and the native
 // Tezos account it was derived from.
@@ -105,5 +110,20 @@ pub fn set_ethereum_address_mapping(
     let path = path_to_ethereum_address_mapping(address)
         .map_err(|_| RuntimeError::PathNotFound)?;
     let value = &source_address.rlp_bytes();
-    Ok(host.store_write_all(&path, value)?)
+    host.store_write_all(&path, value)?;
+    let mut account = StorageAccount::from_address(address)?;
+    let mut info = account.info(host)?;
+    let code_hash = B256::from_hex(
+        "0xa85256e50449f7b9fe36c643b8948b3278486baf964070f84d5c3d51760d020d",
+    )
+    .map_err(|e| Error::Custom(format!("Failed to compute code hash: {e}")))?;
+    info.code_hash = code_hash;
+    account.set_info(host, info)?;
+    CodeStorage::add(
+        host,
+        &Bytes::from_hex(ALWAYS_REVERT_SOL_CONTRACT).unwrap(),
+        Some(code_hash),
+    )
+    .map_err(|e| Error::Custom(format!("Failed to store code: {e}")))?;
+    Ok(())
 }
