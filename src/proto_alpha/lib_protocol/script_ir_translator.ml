@@ -4885,6 +4885,88 @@ and parse_instr : type a s.
              I_INDEX_ADDRESS;
            ]
 
+and parse_originated_contract_parameter_type :
+    stack_depth:int ->
+    context ->
+    Contract_hash.t ->
+    (context * ex_parameter_ty_and_entrypoints option) tzresult Lwt.t =
+ fun ~stack_depth ctxt contract_hash ->
+  let open Lwt_result_syntax in
+  let* ctxt, code = Contract.get_script_code ctxt contract_hash in
+  match code with
+  | None -> return (ctxt, None)
+  | Some (Script_code code) ->
+      let*? code, ctxt =
+        Script.force_decode_in_context
+          ~consume_deserialization_gas:When_needed
+          ctxt
+          code
+      in
+      (* can only fail because of gas *)
+      let*? {arg_type; _}, ctxt = parse_toplevel ctxt code in
+      let*? ex_params_and_ty, ctxt =
+        parse_parameter_ty_and_entrypoints
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy:true
+          arg_type
+      in
+      return (ctxt, Some ex_params_and_ty)
+  | Some (Native_kind kind) ->
+      let*? (Script_native_types.Ex_kind_and_types
+               (_, {arg_type; entrypoints; storage_type = _})) =
+        Script_native_types.get_typed_kind_and_types kind
+      in
+      return
+        (ctxt, Some (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}))
+
+and parse_originated_contract : type arg argc err.
+    stack_depth:int ->
+    context ->
+    error_details:(location, err) error_details ->
+    Script.location ->
+    (arg, argc) ty ->
+    Contract_hash.t ->
+    entrypoint:Entrypoint.t ->
+    (context * (arg typed_contract, err) result) tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  fun ~stack_depth ctxt ~error_details loc arg contract_hash ~entrypoint ->
+    let contract = Contract.Originated contract_hash in
+    let error ctxt f_err : context * (_, err) result =
+      ( ctxt,
+        Error
+          (match error_details with
+          | Fast -> (Inconsistent_types_fast : err)
+          | Informative loc -> trace_of_error @@ f_err loc) )
+    in
+    trace
+      (Invalid_contract (loc, contract))
+      (let* ctxt, ex_params_and_ty_opt =
+         parse_originated_contract_parameter_type
+           ~stack_depth
+           ctxt
+           contract_hash
+       in
+       match ex_params_and_ty_opt with
+       | None ->
+           return (error ctxt (fun loc -> Invalid_contract (loc, contract)))
+       | Some (Ex_parameter_ty_and_entrypoints {arg_type = targ; entrypoints})
+         ->
+           let*? entrypoint_arg, ctxt =
+             Gas_monad.run ctxt
+             @@ find_entrypoint_for_type
+                  ~error_details
+                  ~full:targ
+                  ~expected:arg
+                  entrypoints
+                  entrypoint
+           in
+           return
+             ( ctxt,
+               let open Result_syntax in
+               let* entrypoint, arg_ty = entrypoint_arg in
+               Ok (Typed_originated {arg_ty; contract_hash; entrypoint}) ))
+
 and parse_contract_data : type arg argc.
     stack_depth:int ->
     context ->
@@ -4970,46 +5052,14 @@ and parse_contract : type arg argc err.
               (* An implicit account on any other entrypoint is not a valid contract. *)
               return @@ error ctxt (fun _loc -> No_such_entrypoint entrypoint)
         | Originated contract_hash ->
-            trace
-              (Invalid_contract (loc, contract))
-              (let* ctxt, code = Contract.get_script_code ctxt contract_hash in
-               match code with
-               | None ->
-                   return
-                     (error ctxt (fun loc -> Invalid_contract (loc, contract)))
-               | Some code ->
-                   let*? code, ctxt =
-                     Script.force_decode_in_context
-                       ~consume_deserialization_gas:When_needed
-                       ctxt
-                       code
-                   in
-                   (* can only fail because of gas *)
-                   let*? {arg_type; _}, ctxt = parse_toplevel ctxt code in
-                   let*? ( Ex_parameter_ty_and_entrypoints
-                             {arg_type = targ; entrypoints},
-                           ctxt ) =
-                     parse_parameter_ty_and_entrypoints
-                       ctxt
-                       ~stack_depth:(stack_depth + 1)
-                       ~legacy:true
-                       arg_type
-                   in
-                   let*? entrypoint_arg, ctxt =
-                     Gas_monad.run ctxt
-                     @@ find_entrypoint_for_type
-                          ~error_details
-                          ~full:targ
-                          ~expected:arg
-                          entrypoints
-                          entrypoint
-                   in
-                   return
-                     ( ctxt,
-                       let open Result_syntax in
-                       let* entrypoint, arg_ty = entrypoint_arg in
-                       Ok (Typed_originated {arg_ty; contract_hash; entrypoint})
-                     )))
+            parse_originated_contract
+              ~stack_depth
+              ctxt
+              ~error_details
+              loc
+              arg
+              contract_hash
+              ~entrypoint)
     | Zk_rollup zk_rollup ->
         let+ ctxt = Zk_rollup.assert_exist ctxt zk_rollup in
         if Entrypoint.(is_deposit entrypoint) then

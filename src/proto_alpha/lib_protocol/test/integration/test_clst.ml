@@ -22,6 +22,12 @@ let register_test ~title =
     ~file_tags:["clst"]
     ~title:("CLST: " ^ title)
 
+let get_clst_hash ctxt =
+  let open Lwt_result_wrap_syntax in
+  let* alpha_ctxt = Context.get_alpha_ctxt ctxt in
+  let*@ hash = Contract.get_clst_contract_hash alpha_ctxt in
+  return hash
+
 let test_deposit =
   register_test ~title:"Test deposit of a non null amount" @@ fun () ->
   let open Lwt_result_wrap_syntax in
@@ -52,3 +58,91 @@ let test_deposit_zero =
   | Ok _ ->
       Test.fail "Empty deposits on CLST are forbidden and expected to fail"
   | Error trace -> Error_helpers.expect_clst_empty_deposit ~loc:__LOC__ trace
+
+(*
+   Contract taking a contract (or <contract>%<entrypoint>) as parameter, and
+   transfers it any tez it has received with the initial contract call.
+
+{ storage unit;
+  parameter (contract unit);
+  code
+    {
+      UNPAIR ;
+      AMOUNT;
+      UNIT;
+      TRANSFER_TOKENS ;
+      NIL operation ;
+      SWAP ;
+      CONS ;
+      PAIR ;
+    };
+}
+*)
+let proxy_contract =
+  let open Environment.Micheline in
+  let open Script in
+  {
+    code =
+      lazy_expr
+        (strip_locations
+           (Seq
+              ( (),
+                [
+                  Prim ((), K_storage, [Prim ((), T_unit, [], [])], []);
+                  Prim
+                    ( (),
+                      K_parameter,
+                      [Prim ((), T_contract, [Prim ((), T_unit, [], [])], [])],
+                      [] );
+                  Prim
+                    ( (),
+                      K_code,
+                      [
+                        Seq
+                          ( (),
+                            [
+                              Prim ((), I_UNPAIR, [], []);
+                              Prim ((), I_AMOUNT, [], []);
+                              Prim ((), I_UNIT, [], []);
+                              Prim ((), I_TRANSFER_TOKENS, [], []);
+                              Prim
+                                ((), I_NIL, [Prim ((), T_operation, [], [])], []);
+                              Prim ((), I_SWAP, [], []);
+                              Prim ((), I_CONS, [], []);
+                              Prim ((), I_PAIR, [], []);
+                            ] );
+                      ],
+                      [] );
+                ] )));
+    storage = lazy_expr (strip_locations (Prim ((), D_Unit, [], [])));
+  }
+
+let test_deposit_from_originated_contract =
+  register_test ~title:"Test contract depositing is forbidden" @@ fun () ->
+  let open Lwt_result_wrap_syntax in
+  let* b, sender = Context.init1 () in
+  let* origination_op, proxy_hash =
+    Op.contract_origination ~script:proxy_contract (Context.B b) sender
+  in
+  let* b = Block.bake ~operation:origination_op b in
+  let* clst_hash = get_clst_hash (Context.B b) in
+  let* operation =
+    let open Environment.Micheline in
+    let open Script in
+    Op.transaction
+      ~parameters:
+        (lazy_expr
+           (strip_locations
+              (String ((), Contract_hash.to_b58check clst_hash ^ "%deposit"))))
+      (Context.B b)
+      sender
+      proxy_hash
+      Tez.one
+  in
+  let*! b = Block.bake ~operation b in
+  match b with
+  | Ok _ ->
+      Test.fail
+        "Deposits from smart contracts are forbidden and expected to fail"
+  | Error trace ->
+      Error_helpers.expect_clst_non_implicit_depositer ~loc:__LOC__ trace

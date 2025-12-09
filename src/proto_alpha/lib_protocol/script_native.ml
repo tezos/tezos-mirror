@@ -12,13 +12,22 @@ open Script_typed_ir
 module CLST_contract = struct
   open Script_native_types.CLST_types
 
-  type error += Empty_deposit
+  type error += Empty_deposit | Non_implicit_contract of Destination.t
+
+  let is_implicit : Destination.t -> bool = function
+    | Destination.Contract (Contract.Implicit _) -> true
+    | _ -> false
 
   let execute_deposit (ctxt, (step_constants : Script_typed_ir.step_constants))
       (() : deposit) (storage : storage) :
       ((operation Script_list.t, storage) pair * context) tzresult Lwt.t =
     let open Lwt_result_syntax in
     let*? () = error_when Tez.(step_constants.amount = zero) Empty_deposit in
+    let*? () =
+      error_when
+        (not (is_implicit step_constants.sender))
+        (Non_implicit_contract step_constants.sender)
+    in
     let address =
       {destination = step_constants.sender; entrypoint = Entrypoint.default}
     in
@@ -57,4 +66,19 @@ let () =
       Format.fprintf ppf "Deposit of 0ꜩ on CLST are forbidden.")
     Data_encoding.unit
     (function CLST_contract.Empty_deposit -> Some () | _ -> None)
-    (fun () -> CLST_contract.Empty_deposit)
+    (fun () -> CLST_contract.Empty_deposit) ;
+  register_error_kind
+    `Branch
+    ~id:"clst.non_implicit_contract"
+    ~title:"Non implicit contract"
+    ~description:"Only implicit contracts can deposit on CLST."
+    ~pp:(fun ppf address ->
+      Format.fprintf
+        ppf
+        "Only implicit contracts can deposit, %a is not implicit."
+        Destination.pp
+        address)
+    Data_encoding.(obj1 (req "address" Destination.encoding))
+    (function
+      | CLST_contract.Non_implicit_contract address -> Some address | _ -> None)
+    (fun address -> CLST_contract.Non_implicit_contract address)

@@ -357,6 +357,12 @@ val parse_and_unparse_michelson_script_unaccounted :
   Script.michelson_with_storage ->
   (Script.michelson_with_storage * context) tzresult Lwt.t
 
+val parse_originated_contract_parameter_type :
+  stack_depth:int ->
+  context ->
+  Contract_hash.t ->
+  (context * ex_parameter_ty_and_entrypoints option) tzresult Lwt.t
+
 val parse_contract_data :
   context ->
   Script.location ->

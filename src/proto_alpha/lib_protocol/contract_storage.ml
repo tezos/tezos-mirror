@@ -571,8 +571,17 @@ let increment_counter c manager =
     (Manager_counter_repr.succ contract_counter)
 
 let get_script_code c contract_hash =
+  let open Lwt_result_syntax in
   let contract = Contract_repr.Originated contract_hash in
-  Storage.Contract.Code.find c contract
+  let* c, code = Storage.Contract.Code.find c contract in
+  match code with
+  | Some code -> return (c, Some (Contract_kind_repr.Script_code code))
+  | None -> (
+      let* c, native_kind = Storage.Contract.Native.find c contract in
+      match native_kind with
+      | None -> return (c, None)
+      | Some native_kind ->
+          return (c, Some (Contract_kind_repr.Native_kind native_kind)))
 
 let get_script c contract_hash =
   let open Lwt_result_syntax in
@@ -582,13 +591,14 @@ let get_script c contract_hash =
   match (code, storage) with
   | None, None -> return (c, None)
   | Some code, Some storage ->
-      return (c, Some (Contract_repr.Script {Script_repr.code; storage}))
+      return (c, Some (Contract_kind_repr.Script {Script_repr.code; storage}))
   | None, Some storage -> (
       let* c, native_kind = Storage.Contract.Native.find c contract in
       match native_kind with
       | None -> return (c, None)
       | Some native_kind ->
-          return (c, Some (Contract_repr.Native {kind = native_kind; storage})))
+          return
+            (c, Some (Contract_kind_repr.Native {kind = native_kind; storage})))
   (* A contract without storage is an illformed contract. *)
   | Some _, None -> failwith "get_script"
 
