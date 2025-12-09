@@ -8,7 +8,7 @@
 
 type tezlink_sandbox = {
   chain_id : int;
-  funded_addresses : Signature.public_key list;
+  funded_addresses : Signature.V2.public_key list;
 }
 
 type sandbox_config = {
@@ -355,7 +355,7 @@ let main ~cctxt ?(genesis_timestamp = Misc.now ())
                   (fun pk ->
                     let contract =
                       Tezos_types.Contract.of_implicit
-                        (Signature.Public_key.hash pk)
+                        (Signature.V2.Public_key.hash pk)
                     in
                     (* Patch the balance of bootstrap accounts *)
                     let* () =

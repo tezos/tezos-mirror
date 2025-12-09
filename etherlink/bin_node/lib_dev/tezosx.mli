@@ -30,19 +30,19 @@ module Ethereum_runtime : sig
 end
 
 module Tezos_runtime : sig
-  type address = Signature.public_key_hash
+  type address = Signature.V2.public_key_hash
 
   type account_info = {
     balance : Tezos_types.Tez.t;
     nonce : int64;
-    public_key : Signature.public_key option;
+    public_key : Signature.V2.public_key option;
   }
 
   val decode_account_info : bytes -> account_info tzresult
 
   val encode_account_info : account_info -> bytes
 
-  val ethereum_alias : Signature.public_key_hash -> Ethereum_types.address
+  val ethereum_alias : Signature.V2.public_key_hash -> Ethereum_types.address
 end
 
 module Foreign_address : sig

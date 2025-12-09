@@ -42,7 +42,7 @@ let baker_initial_balance = 200000000000L
 
 let baker_initial_deposit = Alpha_context.Tez.of_mutez_exn baker_initial_balance
 
-let faucet_public_key_hash = Signature.Public_key_hash.zero
+let faucet_public_key_hash = Signature.V2.Public_key_hash.zero
 
 let baker_account =
   let public_key_internal =
