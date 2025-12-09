@@ -1616,6 +1616,9 @@ struct
       | Ok () -> Ok true
 
     let share_is_trap delegate share ~traps_fraction =
+      let delegate =
+        Tezos_crypto.Signature.V_latest.Of_V2.public_key_hash delegate
+      in
       match
         Tezos_crypto_dal.Trap.share_is_trap delegate share ~traps_fraction
       with

@@ -44,6 +44,9 @@ let run_baker (cctxt : Tezos_client_base.Client_context.full) ?dal_node_rpc_ctxt
           {vote_file; liquidity_baking_vote = to_protocol liquidity_baking_vote})
       votes
   in
+  let*? sources =
+    List.map_e Signature.Of_V_latest.get_public_key_hash sources
+  in
   let* delegates = Baking_commands.get_delegates cctxt sources in
   Client_daemon.Baker.run
     cctxt

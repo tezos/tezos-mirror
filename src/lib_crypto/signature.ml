@@ -25,16 +25,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type version = Version_0 | Version_1 | Version_2
+type version = Version_0 | Version_1 | Version_2 | Version_3
 
 let version_encoding =
   let open Data_encoding in
   conv_with_guard
-    (function Version_0 -> 0 | Version_1 -> 1 | Version_2 -> 2)
+    (function
+      | Version_0 -> 0 | Version_1 -> 1 | Version_2 -> 2 | Version_3 -> 3)
     (function
       | 0 -> Ok Version_0
       | 1 -> Ok Version_1
       | 2 -> Ok Version_2
+      | 3 -> Ok Version_3
       | _ -> Error "Invalid signature version")
     int8
 
@@ -47,9 +49,13 @@ let version_arg =
       | "0" -> Ok Version_0
       | "1" -> Ok Version_1
       | "2" -> Ok Version_2
+      | "3" -> Ok Version_3
       | _ -> Error "Invalid signature version")
     ~construct:(function
-      | Version_0 -> "0" | Version_1 -> "1" | Version_2 -> "2")
+      | Version_0 -> "0"
+      | Version_1 -> "1"
+      | Version_2 -> "2"
+      | Version_3 -> "3")
     ()
 
 module type CONV = sig
@@ -102,9 +108,9 @@ module type CONV_OPT = sig
 end
 
 module V_latest = struct
-  let version = Version_2
+  let version = Version_3
 
-  include Signature_v2
+  include Signature_v3
 end
 
 module V0 = struct
@@ -315,13 +321,31 @@ module V2 = struct
   module Of_V_latest :
     CONV_OPT with module V_from := V_latest and module V_to := Signature_v2 =
   struct
-    let public_key_hash = Option.some
+    let public_key_hash : V_latest.Public_key_hash.t -> Public_key_hash.t option
+        = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Bls k -> Some (Bls k)
 
-    let public_key = Option.some
+    let public_key : V_latest.Public_key.t -> Public_key.t option = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Bls k -> Some (Bls k)
 
-    let secret_key = Option.some
+    let secret_key : V_latest.Secret_key.t -> Secret_key.t option = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Bls k -> Some (Bls k)
 
-    let signature = Option.some
+    let signature : V_latest.t -> t option = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Unknown k -> Some (Unknown k)
+      | V_latest.Bls k -> Some (Bls k)
 
     let get_public_key pk =
       match public_key pk with
@@ -389,10 +413,93 @@ module V2 = struct
   end
 end
 
-include V_latest
-module Of_V_latest = V2.Of_V_latest
+module V3 = struct
+  include Signature_v3
 
-module Of_V2 : CONV with module V_from := V2 and module V_to := V2 = struct
+  let version = Version_3
+
+  module Of_V_latest :
+    CONV_OPT with module V_from := V_latest and module V_to := Signature_v3 =
+  struct
+    let public_key_hash = Option.some
+
+    let public_key = Option.some
+
+    let secret_key = Option.some
+
+    let signature = Option.some
+
+    let get_public_key pk =
+      match public_key pk with
+      | Some pk -> Ok pk
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key from latest signature version to V3 \
+             impossible."
+
+    let get_public_key_exn pk =
+      match public_key pk with
+      | Some pk -> pk
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V3 \
+             impossible."
+
+    let get_public_key_hash pkh =
+      match public_key_hash pkh with
+      | Some pkh -> Ok pkh
+      | None ->
+          Error_monad.error_with
+            "Conversion of public key hash from latest signature version to V3 \
+             impossible."
+
+    let get_public_key_hash_exn pkh =
+      match public_key_hash pkh with
+      | Some pkh -> pkh
+      | None ->
+          Stdlib.failwith
+            "Conversion of public key hash from latest signature version to V3 \
+             impossible."
+
+    let get_secret_key s =
+      match secret_key s with
+      | Some s -> Ok s
+      | None ->
+          Error_monad.error_with
+            "Conversion of secret key from latest signature version to V3 \
+             impossible."
+
+    let get_secret_key_exn s =
+      match secret_key s with
+      | Some s -> s
+      | None ->
+          Stdlib.failwith
+            "Conversion of secret key from latest signature version to V3 \
+             impossible."
+
+    let get_signature s =
+      match signature s with
+      | Some s -> Ok s
+      | None ->
+          Error_monad.error_with
+            "Conversion of signature from latest signature version to V3 \
+             impossible."
+
+    let get_signature_exn s =
+      match signature s with
+      | Some s -> s
+      | None ->
+          Stdlib.failwith
+            "Conversion of signature from latest signature version to V3 \
+             impossible."
+  end
+end
+
+include V_latest
+module Of_V_latest = V3.Of_V_latest
+
+module Of_V3 : CONV with module V_from := V3 and module V_to := V_latest =
+struct
   let public_key_hash = Fun.id
 
   let public_key = Fun.id

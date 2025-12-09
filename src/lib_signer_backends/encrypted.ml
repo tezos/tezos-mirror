@@ -530,10 +530,18 @@ struct
         match Tezos_crypto.Signature.V2.Of_V_latest.secret_key sk with
         | Some sk ->
             let s = Tezos_crypto.Signature.V2.sign ?watermark sk buf in
-            return s
+            return (Signature.V_latest.Of_V2.signature s)
         | None ->
             Error_monad.failwith
               "Failed to handle secret key in Signature version 2")
+    | Some Version_3 -> (
+        match Tezos_crypto.Signature.V3.Of_V_latest.secret_key sk with
+        | Some sk ->
+            let s = Tezos_crypto.Signature.V3.sign ?watermark sk buf in
+            return s
+        | None ->
+            Error_monad.failwith
+              "Failed to handle secret key in Signature version 3")
     | None -> return (Tezos_crypto.Signature.V_latest.sign ?watermark sk buf)
 
   let deterministic_nonce sk_uri buf =

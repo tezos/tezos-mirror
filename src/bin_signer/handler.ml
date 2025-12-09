@@ -301,7 +301,10 @@ let sign ?signing_version ?magic_bytes ~check_high_watermark ~require_auth
     | Some Version_1 ->
         let* s = Client_keys.V1.sign cctxt sk_uri bytes in
         return (Signature.V_latest.Of_V1.signature s)
-    | Some Version_2 -> Client_keys.V2.sign cctxt sk_uri bytes
+    | Some Version_2 ->
+        let* s = Client_keys.V2.sign cctxt sk_uri bytes in
+        return (Signature.V_latest.Of_V2.signature s)
+    | Some Version_3 -> Client_keys.V3.sign cctxt sk_uri bytes
     | None -> Client_keys.V_latest.sign cctxt sk_uri bytes
   in
   if check_high_watermark then

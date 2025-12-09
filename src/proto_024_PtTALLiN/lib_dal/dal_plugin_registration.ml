@@ -172,6 +172,7 @@ module Plugin = struct
     let* block_hash =
       Protocol_client_context.Alpha_block_services.hash cctxt ~chain ~block ()
     in
+    let*? source = Signature.Of_V_latest.get_public_key_hash source in
     let* counter =
       let* pcounter =
         Plugin.Alpha_services.Contract.counter cpctxt (chain, `Head 0) source
@@ -206,6 +207,7 @@ module Plugin = struct
         Operation.unsigned_encoding
         ({branch = block_hash}, Contents_list (Single operation))
     in
+    let*? src_sk = Signature.Of_V_latest.get_secret_key src_sk in
     let bytes =
       Signature.append ~watermark:Signature.Generic_operation src_sk bytes
     in
@@ -343,12 +345,9 @@ module Plugin = struct
     in
     List.fold_left_es
       (fun acc ({delegate; indexes} : Plugin.RPC.Dal.S.shards_assignment) ->
-        let delegate_pkh =
-          Tezos_crypto.Signature.Of_V2.public_key_hash delegate
-        in
         let* tb_slot =
           match
-            Signature.Public_key_hash.Map.find delegate_pkh pkh_to_tb_slot_map
+            Signature.Public_key_hash.Map.find delegate pkh_to_tb_slot_map
           with
           | Some slot -> return (Slot.to_int slot)
           | None ->
@@ -359,9 +358,10 @@ module Plugin = struct
                    (Resto.Path.to_string
                       Tezos_rpc.Path.(Plugin.RPC.Dal.path / "shards")))
         in
+        let delegate = Tezos_crypto.Signature.Of_V2.public_key_hash delegate in
         return
         @@ Tezos_crypto.Signature.Public_key_hash.Map.add
-             delegate_pkh
+             delegate
              (indexes, tb_slot)
              acc)
       Tezos_crypto.Signature.Public_key_hash.Map.empty

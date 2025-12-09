@@ -322,6 +322,14 @@ module V2 :
      and type watermark := Tezos_crypto.Signature.V2.watermark
      and type signature := Tezos_crypto.Signature.V2.t
 
+module V3 :
+  S
+    with type public_key_hash := Tezos_crypto.Signature.V3.Public_key_hash.t
+     and type public_key := Tezos_crypto.Signature.V3.Public_key.t
+     and type secret_key := Tezos_crypto.Signature.V3.Secret_key.t
+     and type watermark := Tezos_crypto.Signature.V3.watermark
+     and type signature := Tezos_crypto.Signature.V3.t
+
 module V_latest :
   S
     with type public_key_hash :=

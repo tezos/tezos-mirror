@@ -28,7 +28,7 @@
 (** Cryptographic signatures are versioned to expose different versions to
     different protocols, depending on the support.  *)
 
-type version = Version_0 | Version_1 | Version_2
+type version = Version_0 | Version_1 | Version_2 | Version_3
 
 val version_encoding : version Data_encoding.t
 
@@ -90,7 +90,7 @@ end
 module V_latest : sig
   val version : version
 
-  include module type of Signature_v2
+  include module type of Signature_v3
 end
 
 (** [V0] supports Ed25519, Secp256k1, and P256. *)
@@ -115,7 +115,7 @@ module V1 : sig
     CONV_OPT with module V_from := V_latest and module V_to := Signature_v1
 end
 
-(** [V2] supports Ed25519, Secp256k1, P256, and BLS (aug). *)
+(** [V2] supports Ed25519, Secp256k1, P256, and BLS (pop). *)
 module V2 : sig
   val version : version
 
@@ -124,6 +124,17 @@ module V2 : sig
   (** Converting from signatures of {!V_latest} to {!V2}. *)
   module Of_V_latest :
     CONV_OPT with module V_from := V_latest and module V_to := Signature_v2
+end
+
+(** [V3] supports Ed25519, Secp256k1, P256, and BLS (pop). *)
+module V3 : sig
+  val version : version
+
+  include module type of Signature_v3
+
+  (** Converting from signatures of {!V_latest} to {!V3}. *)
+  module Of_V_latest :
+    CONV_OPT with module V_from := V_latest and module V_to := Signature_v3
 end
 
 include module type of V_latest
@@ -143,3 +154,6 @@ module Of_V1 : CONV with module V_from := V1 and module V_to := V_latest
 
 (** Converting from signatures of {!V2} to {!V_latest}. *)
 module Of_V2 : CONV with module V_from := V2 and module V_to := V_latest
+
+(** Converting from signatures of {!V3} to {!V_latest}. *)
+module Of_V3 : CONV with module V_from := V3 and module V_to := V_latest

@@ -50,6 +50,10 @@ module Delegators_contribution_plugin = struct
 
   let delegated_breakdown_at_sampling context ~cycle ~delegate_pkh =
     let open Lwt_result_syntax in
+    let*? delegate_pkh =
+      Signature.Of_V_latest.get_public_key_hash delegate_pkh
+    in
+
     let* output =
       Delegators_contribution.delegated_breakdown_at_sampling
         context
@@ -80,6 +84,9 @@ module Delegators_contribution_plugin = struct
 
   let min_delegated_breakdown context ~delegate_pkh =
     let open Lwt_result_syntax in
+    let*? delegate_pkh =
+      Signature.Of_V_latest.get_public_key_hash delegate_pkh
+    in
     let* {
            total_delegated;
            own_delegated;
