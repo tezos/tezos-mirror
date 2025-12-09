@@ -50,7 +50,7 @@ let proof_of_output node_ctxt output =
       let*! proof =
         produce_output_proof
           (Ctxt_wrapper.of_node_context node_ctxt.context)
-          (Ctxt_wrapper.of_node_pvmstate state)
+          Ctxt_wrapper.(to_imm @@ of_node_pvmstate state)
           output
       in
       match proof with

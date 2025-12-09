@@ -78,10 +78,8 @@ module Tree :
     with type tree = IStore.tree
      and type key = string list
      and type value = bytes
-     and type t = rw = struct
+     and type t := unit = struct
   include IStoreTree
-
-  type t = rw
 
   type tree = IStore.tree
 

@@ -11,11 +11,11 @@
 module Irmin :
   Context.Wrapper.S
     with type repo = Irmin_context.repo
-     and type tree = Irmin_context.tree
+     and type state = Irmin_context.state
      and type mut_state = Irmin_context.mut_state
 
 module Riscv :
   Context.Wrapper.S
     with type repo = Riscv_context.repo
-     and type tree = Riscv_context.tree
-     and type mut_state = Riscv_context.Mutable_state.t
+     and type state = Riscv_context.state
+     and type mut_state = Riscv_context.mut_state

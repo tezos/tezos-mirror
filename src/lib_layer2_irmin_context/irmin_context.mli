@@ -57,7 +57,7 @@ type ro = [`Read] t
 
 module Tree :
   Tezos_context_sigs.Context.TREE
-    with type t = rw
+    with type t := unit
      and type key = string list
      and type value = bytes
      and type tree = tree
