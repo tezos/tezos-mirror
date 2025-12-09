@@ -12,5 +12,8 @@ if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
   exit 1
 fi
 
-aws s3 ls "s3://site-prod.octez.tezos.com/releases/"
-aws s3 ls "s3://site-prod.octez.tezos.com/releases/grafazos/"
+# Set version 23.3 as active using the version manager
+_build/default/ci/bin_release_page/version_manager.exe --path "site-prod.octez.tezos.com/releases" set-active --major 23 --minor 3
+
+aws s3 cp "s3://site-prod.octez.tezos.com/releases/versions.json" "./"
+cat "./versions.json"
