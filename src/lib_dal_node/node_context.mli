@@ -47,6 +47,16 @@ val init :
   unit ->
   t
 
+(** [init_cryptobox config proto_parameters profile] initializes the cryptobox
+    with the given configuration and protocol parameters. For prover profiles,
+    it also initializes the SRS and precomputes shard proofs. Returns the
+    initialized cryptobox and optional precomputation. *)
+val init_cryptobox :
+  Configuration_file.t ->
+  Types.proto_parameters ->
+  Profile_manager.t ->
+  (Cryptobox.t * Cryptobox.shards_proofs_precomputation option) tzresult Lwt.t
+
 (** Returns all the registered plugins *)
 val get_all_plugins : t -> (module Dal_plugin.T) list
 
