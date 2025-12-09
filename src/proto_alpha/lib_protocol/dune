@@ -198,6 +198,7 @@
   Shared_stake
   Delegate_consensus_key
   Delegate_storage
+  Swrr_sampler
   Delegate_sampler
   Delegate_rewards
   Consensus_parameters_storage
@@ -502,6 +503,7 @@
   shared_stake.ml shared_stake.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
+  swrr_sampler.ml swrr_sampler.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
   consensus_parameters_storage.ml consensus_parameters_storage.mli
@@ -808,6 +810,7 @@
   shared_stake.ml shared_stake.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
+  swrr_sampler.ml swrr_sampler.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
   consensus_parameters_storage.ml consensus_parameters_storage.mli
@@ -1098,6 +1101,7 @@
   shared_stake.ml shared_stake.mli
   delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
+  swrr_sampler.ml swrr_sampler.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
   consensus_parameters_storage.ml consensus_parameters_storage.mli
