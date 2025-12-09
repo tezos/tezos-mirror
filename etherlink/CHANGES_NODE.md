@@ -12,6 +12,12 @@
 
 ### Command-line interface changes
 
+- Add a collection of command to inspect the contents of an Etherlink instance
+  durable storage: `shell cat PATH` to print the contents stored under the
+  given `PATH`, `shell ls PATH` to list the subdirectories living under `PATH`,
+  and `shell` to start a REPL allowing users to use `ls` and `cat`
+  interactively. See `man shell` for more information. (!20183)
+
 ### Execution changes
 
 ### Storage changes
