@@ -5,6 +5,7 @@
 use crate::{
     database::EtherlinkVMDB,
     helpers::rlp::{append_option_canonical, append_u16_le, append_u64_le},
+    inspectors::EtherlinkInspector,
     Error,
 };
 
@@ -202,6 +203,16 @@ impl StructLogger {
             store_return_value(host, return_value, &transaction_hash)?;
         };
         Ok(())
+    }
+}
+
+impl<'a, Host: Runtime + 'a> EtherlinkInspector<'a, Host> for StructLogger {
+    fn is_struct_logger(&self) -> bool {
+        true
+    }
+
+    fn get_transaction_hash(&self) -> Option<B256> {
+        self.transaction_hash
     }
 }
 

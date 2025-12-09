@@ -5,8 +5,12 @@
 use revm::{
     context::ContextTr,
     interpreter::{interpreter_types::StackTr, InterpreterTypes},
+    primitives::B256,
     Inspector,
 };
+use tezos_evm_runtime::runtime::Runtime;
+
+use crate::inspectors::EtherlinkInspector;
 
 pub struct NoInspector;
 
@@ -15,4 +19,14 @@ where
     CTX: ContextTr,
     INTR: InterpreterTypes<Stack: StackTr>,
 {
+}
+
+impl<'a, Host: Runtime + 'a> EtherlinkInspector<'a, Host> for NoInspector {
+    fn is_struct_logger(&self) -> bool {
+        false
+    }
+
+    fn get_transaction_hash(&self) -> Option<B256> {
+        None
+    }
 }
