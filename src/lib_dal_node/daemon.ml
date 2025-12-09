@@ -267,7 +267,7 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
             return_unit
         | _ -> return_unit)
       [@profiler.aggregate_s
-        {verbosity = Notice; profiler_module = Profiler} "shards_handler"])
+        {verbosity = Notice; profiler_module = Profiler} "output_shards_handler"])
   in
   let shards_in_handler still_to_receive_indices =
    fun Types.Message_id.{level; slot_index; shard_index; _} from_peer ->
@@ -317,7 +317,8 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
       return_unit
     in
     match[@profiler.aggregate_s
-           {verbosity = Notice; profiler_module = Profiler} "shards_handler"]
+           {verbosity = Notice; profiler_module = Profiler}
+             "input_shards_handler"]
       Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
     with
     | Controller profile
