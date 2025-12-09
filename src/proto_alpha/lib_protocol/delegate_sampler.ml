@@ -223,14 +223,19 @@ module Random = struct
     return (c, pk)
 end
 
-let baking_rights_owner c (level : Level_repr.t) ~round =
+let baking_rights_owner ctxt (level : Level_repr.t) ~round =
   let open Lwt_result_syntax in
   (* This committee is used for rounds *)
-  let committee_size = Constants_storage.consensus_committee_size c in
+  let committee_size = Constants_storage.consensus_committee_size ctxt in
   (* We use [Round.to_slot] to have a limited number of unique rounds
      (it should loop after some time) *)
   let*? slot = Round_repr.to_slot ~committee_size round in
-  let* ctxt, pk = Random.owner c level (Slot_repr.to_int slot) in
+  let* ctxt, pk =
+    let* ctxt, baker_opt = Swrr_sampler.get_baker ctxt level round in
+    match baker_opt with
+    | Some pk -> return (ctxt, pk)
+    | None -> Random.owner ctxt level (Slot_repr.to_int slot)
+  in
   return (ctxt, slot, pk)
 
 let load_sampler_for_cycle ctxt cycle =
