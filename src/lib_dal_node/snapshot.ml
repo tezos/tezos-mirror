@@ -6,53 +6,12 @@
 (*****************************************************************************)
 
 (*
-  This module reimplements parts of the Key_value_store (KVS) file layout
-  for DAL slot and shard files so the snapshot export/import code can open
-  and copy the store files without requiring the full cryptobox setup.
-
-  Cryptobox initialization requires protocol parameters and an active
-  connection to an Octez L1 node to obtain cryptographic parameters. That
-  makes snapshot generation or inspection cumbersome and tightly coupled
-  to a running L1 node.
-
-  By re-creating the minimal KVS file-layouts here (matching how the store
-  writes files on-disk) we can open the store directories and copy their
-  contents without instantiating the cryptobox. This keeps the snapshot
-  mechanism independent from the L1 node and simplifies offline
-  operations (export/import of stores).
-
-  We use the [Key_value_store.Read] module to open the store in readonly
-  mode, ensuring that the export leaves source data untouched, while still
-  allowing another DAL node to run.
+  This module uses the [Key_value_store.Read] module to open the store in
+  readonly mode, ensuring that the export leaves source data untouched, while
+  still allowing another DAL node to run.
 *)
 
 open Filename.Infix
-
-(** Format a slot_id as a string "level_index" *)
-let format_slot_id (slot_id : Types.slot_id) =
-  Format.asprintf "%ld_%d" slot_id.slot_level slot_id.slot_index
-
-(* Note: The hardcoded cryptographic parameters (slot_size, encoded_value_size,
-   number_of_keys_per_file) make the snapshot mechanism not resilient to
-   changes in crypto parameters. However, this is not a problem specific to
-   the snapshot mechanism alone - it's a general limitation of the DAL node
-   itself, which currently doesn't handle crypto parameter changes. Therefore,
-   we tolerate this limitation here. *)
-
-module Slots_file_layout = struct
-  let slot_size = 126_944
-
-  let layout ~root_dir (slot_id, slot_size) =
-    let filename = Format.sprintf "%s_%d" (format_slot_id slot_id) slot_size in
-    let filepath = Filename.concat root_dir filename in
-    Key_value_store.layout
-      ~encoding:(Data_encoding.Fixed.bytes slot_size)
-      ~filepath
-      ~eq:Stdlib.( = )
-      ~index_of:(fun () -> 0)
-      ~number_of_keys_per_file:1
-      ()
-end
 
 (** Read a value from a Single_value_store module in readonly mode.
     Fails if the value is not found. *)
@@ -173,7 +132,8 @@ module Export = struct
 
   (** Export slots for all published slots in the given level range.
       Copies slot files from source to destination directory. *)
-  let export_slots ~src ~dst ~min_published_level ~max_published_level =
+  let export_slots ~cryptobox ~src ~dst ~min_published_level
+      ~max_published_level =
     let open Lwt_result_syntax in
     let*! () = Lwt_utils_unix.create_dir dst in
     let* src_store =
@@ -188,13 +148,9 @@ module Export = struct
       (fun () ->
         iterate_all_slots ~min_published_level ~max_published_level
         @@ fun slot_id ->
-        let file_layout = Slots_file_layout.layout in
-        kvs_copy_value
-          src_store
-          dst_store
-          file_layout
-          (slot_id, Slots_file_layout.slot_size)
-          ())
+        let Cryptobox.{slot_size; _} = Cryptobox.parameters cryptobox in
+        let file_layout = Store.Slots.file_layout in
+        kvs_copy_value src_store dst_store file_layout (slot_id, slot_size) ())
       (fun () ->
         let open Lwt_syntax in
         let* _ = Key_value_store.Read.close src_store in
@@ -321,6 +277,7 @@ module Export = struct
       let src_slot_dir = src_root_dir // Store.Stores_dirs.slot in
       let dst_slot_dir = dst_root_dir // Store.Stores_dirs.slot in
       export_slots
+        ~cryptobox
         ~src:src_slot_dir
         ~dst:dst_slot_dir
         ~min_published_level

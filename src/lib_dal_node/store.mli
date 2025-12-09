@@ -84,6 +84,13 @@ module Slots : sig
 
   type t
 
+  (** [file_layout ~root_dir (slot_id, slot_size)] returns the Key_value_store
+      layout for the given slot_id and slot_size in the root directory. *)
+  val file_layout :
+    root_dir:string ->
+    Types.slot_id * int ->
+    (unit, bytes) Key_value_store.layout
+
   (** [add_slot store ~slot_size slot_content slot_id] adds a mapping from the
       given slot id to the given slot content. *)
   val add_slot :
