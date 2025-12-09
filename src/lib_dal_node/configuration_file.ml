@@ -374,11 +374,10 @@ let encoding : t Data_encoding.t =
                    backup URIs."
                 bool
                 false)
-             (dft
+             (opt
                 "metrics-addr"
                 ~description:"The point for the DAL node metrics server"
-                (Encoding.option P2p_point.Id.encoding)
-                None))
+                P2p_point.Id.encoding))
           (merge_objs
              (obj3
                 (dft

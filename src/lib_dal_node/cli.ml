@@ -92,8 +92,7 @@ let override_conf ?data_dir ?rpc_addr ?expected_pow ?listen_addr ?public_addr
     slots_backup_uris;
     trust_slots_backup_uris;
     profile;
-    (* metrics are disabled unless a metrics_addr option is specified *)
-    metrics_addr;
+    metrics_addr = Option.either metrics_addr configuration.metrics_addr;
     peers = peers @ configuration.peers;
     history_mode = Option.value ~default:configuration.history_mode history_mode;
     service_name = Option.value ~default:configuration.service_name service_name;
