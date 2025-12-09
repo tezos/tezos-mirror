@@ -632,6 +632,11 @@ module Stake : sig
        and type t := Raw_context.t
 end
 
+module Clst : sig
+  module Deposits_balance :
+    Single_data_storage with type t := Raw_context.t and type value = Tez_repr.t
+end
+
 type consensus_pk_in_R = {
   delegate : Signature.Public_key_hash.t;
   consensus_pk : Signature.Public_key.t;
