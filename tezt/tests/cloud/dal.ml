@@ -23,6 +23,7 @@ type configuration = {
   publish_slots_regularly : bool;
   observer_slot_indices : int list;
   observers_multi_slot_indices : int list list;
+  observer_machine_type : string list;
   archivers_slot_indices : int list list;
   observer_pkhs : string list;
   protocol : Protocol.t;
@@ -1334,6 +1335,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     in
     let observer_slot_indices = Cli.observer_slot_indices in
     let observers_multi_slot_indices = Cli.observers_multi_slot_indices in
+    let observer_machine_type = Cli.observer_machine_type in
     let archivers_slot_indices = Cli.archivers_slot_indices in
     let observer_pkhs = Cli.observer_pkhs in
     let protocol = Cli.protocol in
@@ -1405,6 +1407,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         dal_node_producers;
         observer_slot_indices;
         observers_multi_slot_indices;
+        observer_machine_type;
         archivers_slot_indices;
         observer_pkhs;
         protocol;
@@ -1512,31 +1515,44 @@ let register (module Cli : Scenarios_cli.Dal) =
   in
   let vms () =
     let* vms in
-    return
-    @@ List.map
-         (fun agent_kind ->
-           let name = name_of agent_kind in
-           match agent_kind with
-           | Bootstrap -> default_vm_configuration ~name
-           | Baker i -> (
-               try
-                 let machine_type =
-                   List.nth configuration.stake_machine_type i
-                 in
-                 Agent.Configuration.make ?docker_image ~machine_type ~name ()
-               with _ -> default_vm_configuration ~name)
-           | Producer _ ->
-               let machine_type = configuration.producer_machine_type in
-               Agent.Configuration.make ?docker_image ?machine_type ~name ()
-           | Observer _ | Archiver _ | Etherlink_dal_operator
-           | Etherlink_dal_observer _ | Echo_rollup_dal_observer _ ->
-               Agent.Configuration.make ?docker_image ~name ()
-           | Echo_rollup_operator _ -> default_vm_configuration ~name
-           | Etherlink_operator -> default_vm_configuration ~name
-           | Etherlink_producer _ -> default_vm_configuration ~name
-           | Reverse_proxy -> default_vm_configuration ~name
-           | Stresstest _ -> default_vm_configuration ~name)
-         vms
+    (* Builds a table that maps a unique observer name to an identifier. This is
+       useful to identify the observer machine types. *)
+    let observers_map =
+      List.mapi
+        (fun i obs -> (name_of obs, i))
+        (List.filter (function Observer _ -> true | _ -> false) vms)
+    in
+    List.map
+      (fun agent_kind ->
+        let name = name_of agent_kind in
+        match agent_kind with
+        | Bootstrap -> default_vm_configuration ~name
+        | Baker i -> (
+            try
+              let machine_type = List.nth configuration.stake_machine_type i in
+              Agent.Configuration.make ?docker_image ~machine_type ~name ()
+            with _ -> default_vm_configuration ~name)
+        | Producer _ ->
+            let machine_type = configuration.producer_machine_type in
+            Agent.Configuration.make ?docker_image ?machine_type ~name ()
+        | Observer _ -> (
+            try
+              let machine_type =
+                let id = List.assoc name observers_map in
+                List.nth configuration.observer_machine_type id
+              in
+              Agent.Configuration.make ?docker_image ~machine_type ~name ()
+            with _ -> default_vm_configuration ~name)
+        | Archiver _ | Etherlink_dal_operator | Etherlink_dal_observer _
+        | Echo_rollup_dal_observer _ ->
+            Agent.Configuration.make ?docker_image ~name ()
+        | Echo_rollup_operator _ -> default_vm_configuration ~name
+        | Etherlink_operator -> default_vm_configuration ~name
+        | Etherlink_producer _ -> default_vm_configuration ~name
+        | Reverse_proxy -> default_vm_configuration ~name
+        | Stresstest _ -> default_vm_configuration ~name)
+      vms
+    |> return
   in
   let endpoint, resolver_endpoint = Lwt.wait () in
   Cloud.register
