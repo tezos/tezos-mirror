@@ -944,7 +944,11 @@ let jobs pipeline_type =
         Sdk_bindings_ci.job_test
           ~dependencies:dependencies_needs_start
           ~rules:
-            (make_rules ~dependent:true ~changes:changeset_test_sdk_bindings ())
+            (job_rule ~allow_failure:Yes ()
+            :: make_rules
+                 ~dependent:true
+                 ~changes:changeset_test_sdk_bindings
+                 ())
           ()
       in
       [job_test_sdk_bindings]

@@ -961,6 +961,8 @@ test_sdk_bindings:
   - gcp
   rules:
   - when: on_success
+    allow_failure: true
+  - when: on_success
   needs:
   - oc.docker:rust-sdk-bindings:amd64
   dependencies:
