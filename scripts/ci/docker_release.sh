@@ -47,5 +47,8 @@ REQUIRED_EXECUTABLES="$OCTEZ_EXECUTABLES" ./scripts/ci/docker_smoke_test.sh "${D
 # Push minimal, bare and debug images
 ./scripts/ci/docker_push_all.sh
 
-# Sign image signatures
+# Sign images
 ./scripts/ci/docker_sign.sh
+
+# Verify signature
+./scripts/ci/docker_verify_signature.sh

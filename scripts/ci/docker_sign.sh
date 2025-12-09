@@ -1,6 +1,10 @@
 #!/bin/sh
 #
-# Sign the releasing docker images using Cosign
+# Sign the releasing docker image(s) using Cosign.
+# Usage:
+# - '$0 <IMAGE:TAG>' this script will sign the provided image reference
+# and its layers or its sub-images in case of multi-arch images
+# - Without arguments, this script will sign all docker images listed in docker_images.
 #
 # Reads the following environment variables:
 #  - 'GCP_SIGNER_SERVICE_ACCOUNT': signer service account key file encoded
@@ -11,10 +15,22 @@
 
 set -eu
 
-current_dir=$(cd "$(dirname "${0}")" && pwd)
-
-# shellcheck source=./scripts/ci/docker.sh
-. "${current_dir}/docker.sh"
+# Check if argument is valid
+if [ $# -gt 1 ]; then
+  echo "Usage: $0 [<IMAGE:TAG>]"
+  exit 1
+fi
+if [ $# -eq 1 ]; then
+  # Extract IMAGE and TAG from argument when provided
+  IMAGE="${1%:*}"
+  TAG="${1##*:}"
+  # Check the result
+  if [ "$1" = "${IMAGE}" ] || [ -z "${IMAGE}" ] || [ -z "${TAG}" ]; then
+    echo "Format error: When needed, the first optional argument must respect <IMAGE:TAG> format"
+    echo "Usage: $0 [<IMAGE:TAG>]"
+    exit 1
+  fi
+fi
 
 # Auth signer service account
 echo "${GCP_SIGNER_SERVICE_ACCOUNT}" | base64 -d > signer_sa.json
@@ -27,20 +43,40 @@ export GOOGLE_APPLICATION_CREDENTIALS=signer_sa.json
 apk add --update cosign
 cosign version
 
-# Loop over images
-for docker_image in ${docker_images}; do
-
-  # Get image digest
-  IMAGE_DIGEST="${docker_image}@$(docker buildx imagetools inspect "${docker_image}:${DOCKER_IMAGE_TAG}" --format "{{json .Manifest}}" | jq -r '.digest')"
+# Usage: sign_image <IMAGE> <TAG> [recursive]
+sign_image() {
+  # Get image digest (better than tag for precision)
+  IMAGE_DIGEST="$1@$(docker buildx imagetools inspect "$1:$2" --format "{{json .Manifest}}" | jq -r '.digest')"
   echo "Image digest: ${IMAGE_DIGEST}"
 
   # Sign image with cosign
-  cosign sign --key "${GCP_SIGN_KEY}" "${IMAGE_DIGEST}" -y
+  # Check if the image is a multi-arch image
+  # --recursive is needed to sign all included images and not only the manifest list for multi-arch images
+  if [ "$(docker manifest inspect "${IMAGE_DIGEST}" | jq '.manifests | length > 1')" ]; then
+    cosign sign --key "${GCP_SIGN_KEY}" "${IMAGE_DIGEST}" --recursive -y
+  else
+    cosign sign --key "${GCP_SIGN_KEY}" "${IMAGE_DIGEST}" -y
+  fi
 
   # Get the location of image signature as reference
   IMAGE_SIGNATURE_LOCATION=$(cosign triangulate "${IMAGE_DIGEST}")
   echo "Image signature location: ${IMAGE_SIGNATURE_LOCATION}"
-done
+}
+
+# Sign the provided image or sign all images provided in $docker_images
+if [ $# -eq 1 ]; then
+  sign_image "${IMAGE}" "${TAG}"
+else
+  # Get context
+  current_dir=$(cd "$(dirname "${0}")" && pwd)
+  # shellcheck source=./scripts/ci/docker.sh
+  . "${current_dir}/docker.sh"
+
+  # Loop over images in $docker_images and use $DOCKER_IMAGE_TAG as tag
+  for docker_image in ${docker_images}; do
+    sign_image "${docker_image}" "${DOCKER_IMAGE_TAG}"
+  done
+fi
 
 # Remove credentials
 rm signer_sa.json
