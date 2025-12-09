@@ -84,11 +84,12 @@ module Delegate_sampler_state = struct
         return (ctxt, v)
     | Some v -> return (ctxt, v)
 
-  let remove_existing ctxt cycle =
+  let remove ctxt cycle =
     let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
     let*? ctxt = Cache.update ctxt id None in
-    Storage.Delegate_sampler_state.remove_existing ctxt cycle
+    let*! ctxt = Storage.Delegate_sampler_state.remove ctxt cycle in
+    return ctxt
 end
 
 module Delegate_stake_info = struct
@@ -434,7 +435,7 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
   match Cycle_storage.cycle_to_clear_of_sampling_data ~new_cycle with
   | None -> return ctxt
   | Some outdated_cycle ->
-      let* ctxt = Delegate_sampler_state.remove_existing ctxt outdated_cycle in
+      let* ctxt = Delegate_sampler_state.remove ctxt outdated_cycle in
       (* We cannot use [remove_existing] for [Delegate_stake_info] because
          there exists some cycles for which the storage does not exist.
          This happens because this data doesn't exist for cycles before

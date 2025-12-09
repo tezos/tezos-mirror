@@ -78,10 +78,10 @@ let select_bakers_at_cycle_end ctxt ~target_cycle =
   let*! ctxt =
     Storage.Stake.Selected_bakers.add ctxt target_cycle selected_bakers
   in
-  let* ctxt =
-    List.fold_left_es
+  let*! ctxt =
+    List.fold_left_s
       (fun ctxt {pkh; credit; _} ->
-        Storage.Contract.SWRR_credit.update
+        Storage.Contract.SWRR_credit.add
           ctxt
           (Contract_repr.Implicit pkh)
           credit)
