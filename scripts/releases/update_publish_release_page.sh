@@ -13,7 +13,7 @@ if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
 fi
 
 # Set version 23.3 as active using the version manager
-dune exec ci/bin_release_page/version_manager.exe --path "site-prod.octez.tezos.com/releases" set-active --major 23 --minor 3
+dune exec ci/bin_release_page/version_manager.exe -- --path "site-prod.octez.tezos.com/releases" set-active --major 23 --minor 3
 
 aws s3 cp "s3://site-prod.octez.tezos.com/releases/versions.json" "./"
 cat "./versions.json"
