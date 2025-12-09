@@ -75,6 +75,7 @@ type 'token balance =
   | Unstaked_deposits :
       Unstaked_frozen_staker_repr.t * Cycle_repr.t
       -> Tez_repr.t balance
+  | CLST_deposits : Tez_repr.t balance
   | Nonce_revelation_rewards : Tez_repr.t balance
   | Attesting_rewards : Tez_repr.t balance
   | Baking_rewards : Tez_repr.t balance
@@ -112,6 +113,7 @@ let token_of_balance : type token. token balance -> token Token.t = function
   | Block_fees -> Token.Tez
   | Deposits _ -> Token.Tez
   | Unstaked_deposits _ -> Token.Tez
+  | CLST_deposits -> Token.Tez
   | Nonce_revelation_rewards -> Token.Tez
   | Attesting_rewards -> Token.Tez
   | Baking_rewards -> Token.Tez
@@ -192,6 +194,7 @@ let compare_balance : type token1 token2.
         | Staking_delegate_denominator _ -> 22
         | Dal_attesting_rewards -> 23
         | Lost_dal_attesting_rewards _ -> 24
+        | CLST_deposits -> 25
         (* don't forget to add parameterized cases in the first part of the function *)
       in
       Compare.Int.compare (index ba) (index bb)
@@ -489,6 +492,14 @@ let balance_and_update_encoding =
              | Lost_dal_attesting_rewards delegate -> Some ((), (), delegate)
              | _ -> None)
            (fun ((), (), delegate) -> Lost_dal_attesting_rewards delegate);
+         tez_case
+           (Tag 31)
+           ~title:"CLST_deposits"
+           (obj2
+              (req "kind" (constant "freezer"))
+              (req "category" (constant "clst_deposits")))
+           (function CLST_deposits -> Some ((), ()) | _ -> None)
+           (fun ((), ()) -> CLST_deposits);
        ]
 
 type update_origin =
