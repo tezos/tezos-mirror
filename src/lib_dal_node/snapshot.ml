@@ -111,19 +111,21 @@ let iterate_all_slots ~min_published_level ~max_published_level f =
     Returns [Ok ()] if the value was copied or if src value is not found. *)
 let kvs_copy_value src_store dst_store file_layout file key =
   let open Lwt_result_syntax in
-  let*! res = Key_value_store.Read.read_value src_store file_layout file key in
-  match res with
-  | Ok value ->
-      Key_value_store.write_value
-        ~override:false
-        dst_store
-        file_layout
-        file
-        key
-        value
-  | Error _ ->
-      (* Value doesn't exist, skip *)
-      return_unit
+  let* exists =
+    Key_value_store.Read.value_exists src_store file_layout file key
+  in
+  if not exists then return_unit
+  else
+    let* value =
+      Key_value_store.Read.read_value src_store file_layout file key
+    in
+    Key_value_store.write_value
+      ~override:false
+      dst_store
+      file_layout
+      file
+      key
+      value
 
 module Export = struct
   (** Export a filtered subset of the skip_list SQLite database by iterating
