@@ -203,3 +203,46 @@ module Internal_for_tests : sig
       used as a state to be set in the context directly. *)
   val get_a_tree : (module Context_sigs.S) -> string -> pvmstate Lwt.t
 end
+
+module Wrapper : sig
+  (** Context wrappers translate from/to node-context and node-pvmstate PVMs
+      internal representation to those used in the PVM.  Also provides
+      conversion functions from/to mutable and immutable PVM types.  Each
+      different PVM context will imply a dedicated wrapper.*)
+  module type S = sig
+    type repo
+
+    type tree
+
+    (** Type used by the mutable API for PVMs *)
+    type mut_state
+
+    val of_node_context : 'a index -> ('a, repo) Context_sigs.index
+
+    val to_node_context : ('a, repo) Context_sigs.index -> 'a index
+
+    val of_node_pvmstate : pvmstate -> tree
+
+    val to_node_pvmstate : tree -> pvmstate
+
+    val from_imm : tree -> mut_state
+
+    val to_imm : mut_state -> tree
+  end
+
+  (** Specialized module to handle translation to/from a specific context
+      backend implementation *)
+  module Make (C : sig
+    include Context_sigs.S
+
+    type mut_state
+
+    val from_imm : tree -> mut_state
+
+    val to_imm : mut_state -> tree
+  end) :
+    S
+      with type repo = C.repo
+       and type tree = C.tree
+       and type mut_state = C.mut_state
+end
