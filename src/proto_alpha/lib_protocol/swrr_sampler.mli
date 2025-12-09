@@ -76,7 +76,7 @@
     Side effects:
     - Stores selected bakers in [Storage.Stake.Selected_bakers]
     - Updates all delegates' credits in [Storage.Contract.SWRR_credit]
-    - Caches result with [Swrr_selected_distribution] (cache index 3)
+    - Caches result with [Swrr_selected_distribution] (cache index 4)
 
     Called during cycle finalization from [Delegate_sampler.select_distribution_for_cycle].
 
@@ -123,7 +123,7 @@ val reset_credit_for_deactivated_delegates :
 
     What is removed:
     - [Storage.Stake.Selected_bakers] for the cycle (FallbackArray of bakers)
-    - Cache entry at index 3 (in-memory copy)
+    - Cache entry at index 4 (in-memory copy)
 
     When to call:
     - Called from [Delegate_sampler.clear_outdated_sampling_data]
@@ -133,4 +133,5 @@ val reset_credit_for_deactivated_delegates :
     The function uses [remove] not [remove_existing] to handle cases where
     SWRR was disabled during [cycle], making cleanup safe regardless of whether
     data exists. See implementation for details. *)
-val remove_outdated_cycle : Raw_context.t -> Cycle_repr.t -> Raw_context.t Lwt.t
+val remove_outdated_cycle :
+  Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t

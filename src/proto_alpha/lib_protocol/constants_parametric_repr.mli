@@ -264,6 +264,8 @@ type t = {
   (* in cycles *)
   cache_stake_info_cycles : int;
   (* in cycles *)
+  cache_swrr_selected_distribution_cycles : int;
+  (* in cycles *)
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;

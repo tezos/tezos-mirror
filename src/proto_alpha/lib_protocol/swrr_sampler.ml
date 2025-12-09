@@ -16,7 +16,7 @@
     - FallbackArray storage: O(1) indexed access for get_baker (called per block)
     - Z.t credits: arbitrary precision prevents overflow, ensures exact fairness
     - Credit persistence: carries fractional stake weights across cycles
-    - Cache index 3: in-memory array for block production performance
+    - Cache index 4: in-memory array for block production performance
 
     Note that we use {!FallbackArray}s since it's the only allowed implementation of
     arrays in the protocol, whose constant time access property is critical
@@ -34,6 +34,54 @@
       a valid index. *)
 
 type credit_info = {pkh : Signature.public_key_hash; credit : Z.t; stake : Z.t}
+
+module Swrr_selected_distribution = struct
+  module Cache_client = struct
+    type cached_value = Signature.Public_key_hash.t FallbackArray.t
+
+    let namespace = Cache_repr.create_namespace "swrr_selected_distribution"
+
+    let cache_index = 4
+
+    let value_of_identifier ctxt identifier =
+      let cycle = Cycle_repr.of_string_exn identifier in
+      Storage.Stake.Selected_bakers.get ctxt cycle
+  end
+
+  module Cache = (val Cache_repr.register_exn (module Cache_client))
+
+  let identifier_of_cycle cycle = Format.asprintf "%a" Cycle_repr.pp cycle
+
+  (* that's symbolic: 1 cycle = 1 entry *)
+  let size = 1
+
+  let init ctxt cycle delegates =
+    let open Lwt_result_syntax in
+    let id = identifier_of_cycle cycle in
+    let* ctxt = Storage.Stake.Selected_bakers.init ctxt cycle delegates in
+    let*? ctxt = Cache.update ctxt id (Some (delegates, size)) in
+    return ctxt
+
+  let find ctxt cycle =
+    let open Lwt_result_syntax in
+    let id = identifier_of_cycle cycle in
+    let* ctxt, cached_opt = Cache.find ctxt id in
+    match cached_opt with
+    | Some _ as some_cache -> return (ctxt, some_cache)
+    | None ->
+        let* delegates = Storage.Stake.Selected_bakers.find ctxt cycle in
+        let*? ctxt =
+          Cache.update ctxt id (Option.map (fun v -> (v, size)) delegates)
+        in
+        return (ctxt, delegates)
+
+  let remove ctxt cycle =
+    let open Lwt_result_syntax in
+    let id = identifier_of_cycle cycle in
+    let*? ctxt = Cache.update ctxt id None in
+    let*! ctxt = Storage.Stake.Selected_bakers.remove ctxt cycle in
+    return ctxt
+end
 
 (** [select_bakers_at_cycle_end ctxt ~target_cycle] precomputes the ordered
     list of bakers for [target_cycle] using the SWRR weighted round-robin
@@ -151,7 +199,7 @@ let select_bakers_at_cycle_end ctxt ~target_cycle =
   in
   (* Update context: store selected bakers *)
   let* ctxt =
-    Storage.Stake.Selected_bakers.add ctxt target_cycle selected_bakers
+    Swrr_selected_distribution.init ctxt target_cycle selected_bakers
   in
   (* Update credits for all delegates.
 
@@ -185,7 +233,7 @@ let get_baker ctxt level round =
   let cycle = level.Level_repr.cycle in
   let pos = level.Level_repr.cycle_position in
   let*? round_int = Round_repr.to_int round in
-  let* selected_bakers = Storage.Stake.Selected_bakers.find ctxt cycle in
+  let* ctxt, selected_bakers = Swrr_selected_distribution.find ctxt cycle in
   match selected_bakers with
   | None -> return (ctxt, None)
   | Some selected_bakers ->
@@ -222,4 +270,4 @@ let reset_credit_for_deactivated_delegates ctxt deactivated_delegates =
   in
   return ctxt
 
-let remove_outdated_cycle = Storage.Stake.Selected_bakers.remove
+let remove_outdated_cycle = Swrr_selected_distribution.remove

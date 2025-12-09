@@ -326,6 +326,7 @@ type t = {
   cache_stake_distribution_cycles : int;
   cache_sampler_state_cycles : int;
   cache_stake_info_cycles : int;
+  cache_swrr_selected_distribution_cycles : int;
   dal : dal;
   sc_rollup : sc_rollup;
   zk_rollup : zk_rollup;
@@ -635,7 +636,8 @@ let encoding =
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
                   c.cache_sampler_state_cycles,
-                  c.cache_stake_info_cycles ),
+                  c.cache_stake_info_cycles,
+                  c.cache_swrr_selected_distribution_cycles ),
                 ( c.dal,
                   ( (c.sc_rollup, c.zk_rollup),
                     ( c.adaptive_issuance,
@@ -684,7 +686,8 @@ let encoding =
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
                      cache_sampler_state_cycles,
-                     cache_stake_info_cycles ),
+                     cache_stake_info_cycles,
+                     cache_swrr_selected_distribution_cycles ),
                    ( dal,
                      ( (sc_rollup, zk_rollup),
                        ( adaptive_issuance,
@@ -736,6 +739,7 @@ let encoding =
         cache_stake_distribution_cycles;
         cache_sampler_state_cycles;
         cache_stake_info_cycles;
+        cache_swrr_selected_distribution_cycles;
         dal;
         sc_rollup;
         zk_rollup;
@@ -800,11 +804,12 @@ let encoding =
                    (opt "testnet_dictator" Signature.Public_key_hash.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
-                   (obj4
+                   (obj5
                       (req "cache_script_size" int31)
                       (req "cache_stake_distribution_cycles" int8)
                       (req "cache_sampler_state_cycles" int8)
-                      (req "cache_stake_info_cycles" int8))
+                      (req "cache_stake_info_cycles" int8)
+                      (req "cache_swrr_selected_distribution_cycles" int8))
                    (merge_objs
                       (obj1 (req "dal_parametric" dal_encoding))
                       (merge_objs

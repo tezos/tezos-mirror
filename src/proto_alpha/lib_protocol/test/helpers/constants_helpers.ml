@@ -117,6 +117,10 @@ module Set = struct
   let cache_stake_info_cycles cache_stake_info_cycles (c : t) =
     {c with cache_stake_info_cycles}
 
+  let cache_swrr_selected_distribution_cycles
+      cache_swrr_selected_distribution_cycles (c : t) =
+    {c with cache_swrr_selected_distribution_cycles}
+
   let dal dal (c : t) = {c with dal}
 
   module Dal = struct

@@ -981,6 +981,7 @@ module Constants : sig
       cache_stake_distribution_cycles : int;
       cache_sampler_state_cycles : int;
       cache_stake_info_cycles : int;
+      cache_swrr_selected_distribution_cycles : int;
       dal : dal;
       sc_rollup : sc_rollup;
       zk_rollup : zk_rollup;

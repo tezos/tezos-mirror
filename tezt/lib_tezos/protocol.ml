@@ -309,7 +309,9 @@ let parameters_with_custom_consensus_rights_delay ~protocol
     :: parameters
   in
   if number protocol >= 025 then
-    (["cache_stake_info_cycles"], `Int cache_size) :: parameters
+    (["cache_stake_info_cycles"], `Int cache_size)
+    :: (["cache_swrr_selected_distribution_cycles"], `Int cache_size)
+    :: parameters
   else parameters
 
 let previous_protocol = function

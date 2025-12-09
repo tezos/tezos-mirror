@@ -1274,6 +1274,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  cache_stake_distribution_cycles;
                  cache_sampler_state_cycles;
                  cache_stake_info_cycles;
+                 cache_swrr_selected_distribution_cycles;
                  dal = _;
                  sc_rollup = _;
                  zk_rollup = _;
@@ -1330,6 +1331,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             cache_stake_distribution_cycles;
             cache_sampler_state_cycles;
             cache_stake_info_cycles;
+            cache_swrr_selected_distribution_cycles;
             dal;
             sc_rollup;
             zk_rollup;
@@ -1638,6 +1640,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             cache_stake_distribution_cycles;
             cache_sampler_state_cycles;
             cache_stake_info_cycles = cache_stake_distribution_cycles;
+            cache_swrr_selected_distribution_cycles = cache_sampler_state_cycles;
             dal;
             sc_rollup;
             zk_rollup;
