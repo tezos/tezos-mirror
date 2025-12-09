@@ -17,7 +17,7 @@ use revm_etherlink::precompiles::constants::{
 use revm_etherlink::Error;
 use rlp::{Decodable, DecoderError, Encodable};
 use tezos_ethereum::block::BlockFees;
-use tezos_ethereum::rlp_helpers::{self, decode_field, decode_tx_hash, next};
+use tezos_ethereum::rlp_helpers::{decode_field, decode_tx_hash, next};
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
 use tezos_ethereum::tx_common::EthereumTransactionCommon;
 use tezos_ethereum::tx_signature::TxSignature;
@@ -89,36 +89,6 @@ impl Decodable for TransactionContent {
             }
             _ => Err(DecoderError::Custom("Unknown transaction tag.")),
         }
-    }
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum Transactions {
-    EthTxs(Vec<Transaction>),
-}
-
-impl Transactions {
-    pub fn push(&mut self, tx: Transaction) {
-        match self {
-            Self::EthTxs(transactions) => transactions.push(tx),
-        }
-    }
-}
-
-impl Encodable for Transactions {
-    fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        match self {
-            Self::EthTxs(transactions) => {
-                s.append_list(transactions);
-            }
-        }
-    }
-}
-
-impl Decodable for Transactions {
-    fn decode(rlp: &rlp::Rlp) -> Result<Self, DecoderError> {
-        let transactions = rlp_helpers::decode_list(rlp, "transactions")?;
-        Ok(Self::EthTxs(transactions))
     }
 }
 

@@ -13,7 +13,7 @@ use crate::error::TransferError::CumulativeGasUsedOverflow;
 use crate::gas_price::base_fee_per_gas;
 use crate::l2block::L2Block;
 use crate::tick_model;
-use crate::transaction::{Transaction, Transactions, Transactions::EthTxs};
+use crate::transaction::Transaction;
 use alloy_consensus::proofs::ordered_trie_root_with_encoder;
 use alloy_consensus::EMPTY_ROOT_HASH;
 use anyhow::Context;
@@ -323,16 +323,14 @@ impl EthBlockInProgress {
     }
 
     pub fn from_blueprint(
-        blueprint: crate::blueprint::Blueprint<Transactions>,
+        blueprint: crate::blueprint::Blueprint<Transaction>,
         number: U256,
         parent_hash: H256,
         tick_counter: u64,
         base_fee_per_gas: U256,
     ) -> EthBlockInProgress {
         // blueprint is turn into a ring to allow popping from the front
-        let ring = match blueprint.transactions {
-            EthTxs(transactions) => transactions.into(),
-        };
+        let ring = blueprint.transactions.into();
         EthBlockInProgress::new_with_ticks(
             number,
             parent_hash,
