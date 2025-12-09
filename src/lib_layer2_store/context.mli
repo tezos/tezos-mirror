@@ -24,12 +24,10 @@
 (*****************************************************************************)
 
 (** This module is largely inspired from
-    {!module:Tezos_protocol_environment.Environement_context} *)
+    {!module:Tezos_protocol_environment.Environement_context}.
 
-open Context_sigs
-
-(** This module dipatches context calls to contexts/pvm_states
-    corresponding to the used pvm *)
+    This module dipatches context calls to contexts/pvm_states
+    corresponding to the used pvm. *)
 
 (** See {!module:Tezos_protocol_environment.Environement_context.ops} *)
 type ('repo, 'tree) pvm_context_impl =
@@ -38,18 +36,9 @@ type ('repo, 'tree) pvm_context_impl =
 (* Context existential that embeds the context_module associated to
    pvm protocol_plugins *)
 
-(** See {!module:Tezos_protocol_environment.Environement_context.t} *)
-type ('a, 'repo, 'tree, 'loaded_tree) container = private {
-  index : ('a, 'repo) index;
-  pvm_context_impl : ('repo, 'tree) pvm_context_impl;
-  impl_name : string;
-  tree : 'loaded_tree;
-  equality_witness : ('repo, 'tree) equality_witness;
-}
+type 'a index
 
-type 'a index = private Index : ('a, 'repo, 'tree, unit) container -> 'a index
-
-type 'a t = private Context : ('a, 'repo, 'tree, 'tree) container -> 'a t
+type 'a t
 
 (** Read/write context {!t}. *)
 type rw = [`Read | `Write] t
@@ -62,18 +51,6 @@ type rw_index = [`Read | `Write] index
 
 (** Read-only {!index}. *)
 type ro_index = [`Read] index
-
-val make_index :
-  index:('a, 'b) Context_sigs.index ->
-  pvm_context_impl:('b, 'c) pvm_context_impl ->
-  equality_witness:('b, 'c) equality_witness ->
-  impl_name:string ->
-  'a index
-
-val equiv :
-  'a Equality_witness.t * 'b Equality_witness.t ->
-  'c Equality_witness.t * 'd Equality_witness.t ->
-  ('a, 'c) Equality_witness.eq option * ('b, 'd) Equality_witness.eq option
 
 module Hash = Smart_rollup_context_hash
 
@@ -140,21 +117,7 @@ val export_snapshot : _ index -> hash -> path:string -> unit tzresult Lwt.t
 
 (* Pvm_state that embeds the context_module embedded associated to pvm
    protocol_plugins *)
-type pvmstate =
-  | PVMState : {
-      pvm_context_impl : ('repo, 'tree) pvm_context_impl;
-      impl_name : string;
-      pvmstate : 'tree;
-      equality_witness : ('repo, 'tree) equality_witness;
-    }
-      -> pvmstate
-
-val make_pvmstate :
-  pvm_context_impl:('a, 'b) pvm_context_impl ->
-  equality_witness:('a, 'b) equality_witness ->
-  impl_name:string ->
-  pvmstate:'b ->
-  pvmstate
+type pvmstate
 
 (** State of the PVM that this rollup node deals with *)
 module PVMState : sig

@@ -120,7 +120,8 @@ module Context = struct
 
   let make_tree ~tree ~impl = Tree {tree; impl}
 
-  let equiv = Context.equiv
+  let equiv (a, b) (c, d) =
+    (Context_sigs.Equality_witness.eq a c, Context_sigs.Equality_witness.eq b d)
 
   let load : type tree repo.
       (repo, tree) impl ->
