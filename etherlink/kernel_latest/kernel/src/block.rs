@@ -5,9 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::{
-    apply_transaction, ExecutionInfo, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE,
-};
+use crate::apply::{apply_transaction, ExecutionResult, WITHDRAWAL_OUTBOX_QUEUE};
 use crate::blueprint::Blueprint;
 use crate::blueprint_storage::{
     drop_blueprint, read_blueprint, read_current_block_header,
@@ -184,22 +182,14 @@ fn compute<Host: Runtime>(
                 limits,
             )?
         ) {
-            ExecutionResult::Valid(ExecutionInfo {
-                receipt_info,
-                object_info,
-                estimated_ticks_used,
-                execution_gas_used,
-            }) => {
+            ExecutionResult::Valid(execution_info) => {
                 if transaction.is_delayed() {
                     block_in_progress.register_delayed_transaction(transaction.tx_hash);
                 }
 
                 block_in_progress.register_valid_transaction(
                     &transaction,
-                    object_info,
-                    receipt_info,
-                    estimated_ticks_used,
-                    execution_gas_used,
+                    execution_info,
                     host,
                 )?;
                 log!(

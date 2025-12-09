@@ -139,6 +139,10 @@ const TEZOS_ACCOUNTS_PATH: RefPath =
 // This path must contains balance, nonce and optionally a revealed public key.
 const INFO_PATH: RefPath = RefPath::assert_from(b"/info");
 
+pub enum TezosXRuntime {
+    Tezos,
+    Ethereum,
+}
 // Used as a value for the durable storage.
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct TezosAccountInfo {
