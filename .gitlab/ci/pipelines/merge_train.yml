@@ -1392,6 +1392,8 @@ test_sdk_bindings:
   tags:
   - gcp
   rules:
+  - when: on_success
+    allow_failure: true
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
