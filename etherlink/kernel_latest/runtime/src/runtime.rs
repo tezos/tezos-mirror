@@ -115,7 +115,7 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
         self.host.borrow().store_read(path, from_offset, max_bytes)
     }
 
-    #[instrument(skip(self, buffer, from_offset))]
+    #[instrument(skip(self, buffer, from_offset), fields(size))]
     #[inline(always)]
     fn store_read_slice<T: Path>(
         &self,
@@ -123,6 +123,9 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
         from_offset: usize,
         buffer: &mut [u8],
     ) -> Result<usize, RuntimeError> {
+        #[cfg(feature = "tracing")]
+        tracing::Span::current().record("size", buffer.len());
+
         self.host
             .borrow()
             .store_read_slice(path, from_offset, buffer)
@@ -139,7 +142,7 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
         Ok(res)
     }
 
-    #[instrument(skip(self, src))]
+    #[instrument(skip(self, src), fields(size))]
     #[inline(always)]
     fn store_write<T: Path>(
         &mut self,
@@ -147,6 +150,9 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
         src: &[u8],
         at_offset: usize,
     ) -> Result<(), RuntimeError> {
+        #[cfg(feature = "tracing")]
+        tracing::Span::current().record("size", src.len());
+
         self.host.borrow_mut().store_write(path, src, at_offset)
     }
 
@@ -284,6 +290,7 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
 impl<R: SdkRuntime, Host: Borrow<R> + BorrowMut<R>, Internal: InternalRuntime>
     InternalRuntime for KernelHost<R, Host, Internal>
 {
+    #[instrument(skip(self))]
     #[inline(always)]
     fn __internal_store_get_hash<T: Path>(
         &mut self,
