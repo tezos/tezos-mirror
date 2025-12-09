@@ -35,6 +35,10 @@ for docker_image in ${docker_images}; do
   amends=''
   for docker_architecture in ${docker_architectures}; do
     docker pull "${docker_image}:${docker_architecture}_${gitlab_release}"
+
+    # Verify signature before amend
+    ./scripts/ci/docker_verify_signature.sh "${docker_image}:${docker_architecture}_${gitlab_release}"
+
     amends="${amends} --amend ${docker_image}:${docker_architecture}_${gitlab_release}"
   done
 
@@ -42,4 +46,13 @@ for docker_image in ${docker_images}; do
   # by concatenating all the arguments together (space separated), then read and execute it
   eval "docker manifest create ${docker_image}:${target_tag}${amends}"
   docker manifest push "${docker_image}:${target_tag}"
+
+  # Sign image
+  ./scripts/ci/docker_sign.sh "${docker_image}:${target_tag}"
+done
+
+# Signature verification
+for docker_image in ${docker_images}; do
+  echo "### Verifying signature for docker image: ${docker_image}"
+  ./scripts/ci/docker_verify_signature.sh "${docker_image}:${target_tag}"
 done
