@@ -54,23 +54,6 @@ module Slots_file_layout = struct
       ()
 end
 
-module Shards_file_layout = struct
-  let encoded_value_size = 2052
-
-  let number_of_keys_per_file = 4096
-
-  let layout ~root_dir (slot_id : Types.slot_id) =
-    let filepath = Filename.concat root_dir (format_slot_id slot_id) in
-    Key_value_store.layout
-      ~encoded_value_size
-      ~encoding:Cryptobox.share_encoding
-      ~filepath
-      ~eq:Stdlib.( = )
-      ~index_of:Fun.id
-      ~number_of_keys_per_file
-      ()
-end
-
 (** Read a value from a Single_value_store module in readonly mode.
     Fails if the value is not found. *)
 let read_from_store (type value) ~root_dir
@@ -238,7 +221,7 @@ module Export = struct
            but for now we'll scan for existing files. *)
         iterate_all_slots ~min_published_level ~max_published_level
         @@ fun slot_id ->
-        let file_layout = Shards_file_layout.layout in
+        let file_layout = Store.Shards_disk.file_layout in
         let*! count_result =
           Key_value_store.Read.count_values src_store file_layout slot_id
         in
@@ -271,10 +254,27 @@ module Export = struct
         let* _ = Key_value_store.close dst_store in
         return_unit)
 
-  let export ~data_dir:src_data_dir ~min_published_level ~max_published_level
-      dst_data_dir =
+  let export ~data_dir:src_data_dir ~config_file ~min_published_level
+      ~max_published_level dst_data_dir =
     let open Lwt_result_syntax in
+    let* config = Configuration_file.load ~config_file in
+    let cctxt = Rpc_context.make config.Configuration_file.endpoint in
+    let* header, proto_plugins = L1_helpers.wait_for_block_with_plugin cctxt in
+    let*? (module Plugin : Dal_plugin.T), proto_parameters =
+      Proto_plugins.get_plugin_and_parameters_for_level
+        proto_plugins
+        ~level:header.Block_header.shell.level
+    in
+    let profile_ctxt = Profile_manager.empty in
+    (* Initialize crypto as needed by file layouts. *)
+    let* cryptobox, _ =
+      Node_context.init_cryptobox config proto_parameters profile_ctxt
+    in
+    (* Set crypto box share size hook. *)
+    Value_size_hooks.set_share_size
+      (Cryptobox.Internal_for_tests.encoded_share_size cryptobox) ;
     let store_path data_dir =
+      (* We only need data_dir field, so we can just use default as base. *)
       Configuration_file.store_path {Configuration_file.default with data_dir}
     in
     let src_root_dir = store_path src_data_dir in
