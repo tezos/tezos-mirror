@@ -99,6 +99,7 @@ let job_odoc =
     ~description:
       ("Build the documentation of our OCaml libraries (make -C docs " ^ target
      ^ ").")
+    ~cpu:Tezos_ci.Runner.CPU.Very_high
     ~only_if_changed:Files.odoc
     ~force_if_label:["ci--docs"]
     ~artifacts:
