@@ -21,7 +21,11 @@ module type S = sig
   (** Read only {!type:index}. *)
   type ro_index = [`Read] index
 
-  type 'a t = ('a, repo, tree) Context_sigs.t
+  type 'a t = {
+    index : 'a index;
+    tree : tree;
+  }
+    constraint 'a = [< `Read | `Write > `Read]
 
   (** Read/write context {!t}. *)
   type rw = [`Read | `Write] t
@@ -30,7 +34,8 @@ module type S = sig
       committed to disk, i.e. the {!type:commit} hash. *)
   type hash
 
-  val equality_witness : (repo, tree) Context_sigs.equality_witness
+  val equality_witness :
+    repo Context_sigs.Equality_witness.t * tree Context_sigs.Equality_witness.t
 
   (** [load cache_size path] initializes from disk a context from [path].
       [cache_size] allows to change the LRU cache size of Irmin
@@ -181,6 +186,12 @@ module State : sig
       information must be committed using {!val:commit}. *)
   val set : 'a Context.t -> t -> 'a Context.t Lwt.t
 end
+
+module Irmin_context :
+  S
+    with type repo = Irmin_context.repo
+     and type tree = Irmin_context.tree
+     and type 'a index = 'a Irmin_context.index
 
 (* TODO TZX-24: Only make `Wasm_internal` available when node is instantiated
  * with the Wasm PVM *)

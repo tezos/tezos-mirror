@@ -186,7 +186,7 @@ let init_reboot_counter evm_state =
 
 let init ~kernel =
   let open Lwt_result_syntax in
-  let evm_state = Pvm.State.empty (module Irmin_context) () in
+  let evm_state = Pvm.State.empty (module Pvm.Irmin_context) () in
   let* evm_state =
     Pvm.Kernel.start ~tree:evm_state Tezos_scoru_wasm.Wasm_pvm_state.V3 kernel
   in

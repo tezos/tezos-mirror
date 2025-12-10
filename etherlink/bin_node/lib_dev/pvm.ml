@@ -18,7 +18,7 @@ module type S = sig
   (** Read only {!type:index}. *)
   type ro_index = [`Read] index
 
-  type 'a t = ('a, repo, tree) Context_sigs.t
+  type 'a t = {index : 'a index; tree : tree}
 
   (** Read/write context {!t}. *)
   type rw = [`Read | `Write] t
@@ -27,7 +27,8 @@ module type S = sig
       committed to disk, i.e. the {!type:commit} hash. *)
   type hash
 
-  val equality_witness : (repo, tree) Context_sigs.equality_witness
+  val equality_witness :
+    repo Context_sigs.Equality_witness.t * tree Context_sigs.Equality_witness.t
 
   (** [load cache_size path] initializes from disk a context from [path].
       [cache_size] allows to change the LRU cache size of Irmin
@@ -201,6 +202,51 @@ module State = struct
              ~tree:ctxt.tree
              ~impl:(module Impl)
     | _ -> raise (Invalid_argument "Implementation mismatch")
+end
+
+module Irmin_context :
+  S
+    with type repo = Irmin_context.repo
+     and type tree = Irmin_context.tree
+     and type 'a index = 'a Irmin_context.index = struct
+  include Irmin_context
+
+  type 'a t = {index : 'a index; tree : tree}
+
+  type rw = [`Read | `Write] t
+
+  let equality_witness =
+    let repo_eq_w, tree_eq_w, _ = Irmin_context.equality_witness in
+    (repo_eq_w, tree_eq_w)
+
+  let commit ?message {index; tree} =
+    Irmin_context.commit ?message {index; state = ref tree}
+
+  let checkout_exn index hash =
+    let open Lwt_syntax in
+    let+ {index; state} = Irmin_context.checkout_exn index hash in
+    {index; tree = !state}
+
+  let empty index =
+    let {Context_sigs.index; state} = Irmin_context.empty index in
+    {index; tree = !state}
+
+  module PVMState = struct
+    type value = Irmin_context.tree
+
+    let empty () = !(Irmin_context.PVMState.empty ())
+
+    let get {index; tree} =
+      let open Lwt_syntax in
+      let+ state = Irmin_context.PVMState.get {index; state = ref tree} in
+      !state
+
+    let set {index; tree} pvmstate =
+      let open Lwt_syntax in
+      let state = ref tree in
+      let+ () = Irmin_context.PVMState.set {index; state} (ref pvmstate) in
+      {index; tree = !state}
+  end
 end
 
 module Wasm_internal = struct
