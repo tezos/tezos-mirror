@@ -52,7 +52,12 @@ type sccache_config
 (** Make an sccache configuration.
 
     See {!Tezos_ci.Cache.enable_sccache}. *)
-val sccache : ?error_log:string -> ?log:string -> unit -> sccache_config
+val sccache :
+  ?error_log:string ->
+  ?log:string ->
+  ?policy:Gitlab_ci.Types.cache_policy ->
+  unit ->
+  sccache_config
 
 (** Configuration of Dune's cache. *)
 type dune_cache_config

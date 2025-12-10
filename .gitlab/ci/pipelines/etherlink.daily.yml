@@ -229,8 +229,6 @@ oc.build_kernels:
   stage: build
   tags:
   - gcp
-  rules:
-  - when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
   dependencies:
@@ -241,6 +239,7 @@ oc.build_kernels:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
+  interruptible: false
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -256,13 +255,13 @@ oc.build_kernels:
   variables:
     CC: clang
     NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
     CARGO_INCREMENTAL: "0"
     SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
     SCCACHE_GCS_RW_MODE: READ_WRITE
     SCCACHE_GCS_KEY_PREFIX: sccache
     SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
     SCCACHE_IDLE_TIMEOUT: "0"
-    CARGO_NET_OFFLINE: "false"
   artifacts:
     name: build-kernels-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -370,6 +369,169 @@ etherlink.unit_tests:
       junit: test_results/*.xml
     when: always
   retry: 2
+
+etherlink.test_kernel:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f etherlink.mk check
+  - make -f etherlink.mk test
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+
+etherlink.test_firehose:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C etherlink/firehose check
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+
+etherlink.test_evm_compatibility:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
+  - git clone --depth 1 --branch v14.1@etherlink https://github.com/functori/tests
+    ethereum_tests
+  - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_latest/evm_evaluation/resources/
+    -c
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
+
+etherlink.test_revm_compatibility:
+  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:rust-toolchain:amd64
+  - oc.build_kernels
+  dependencies:
+  - oc.docker:rust-toolchain:amd64
+  timeout: 60 minutes
+  cache:
+    key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs revm-evaluation-assessor
+  - git clone --depth 1 https://github.com/functori/evm-fixtures evm_fixtures
+  - ./revm-evaluation-assessor --test-cases ./evm_fixtures/
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CC: clang
+    NATIVE_TARGET: x86_64-unknown-linux-musl
+    CARGO_NET_OFFLINE: "false"
+    CARGO_INCREMENTAL: "0"
+    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
+    SCCACHE_GCS_RW_MODE: READ_ONLY
+    SCCACHE_GCS_KEY_PREFIX: sccache
+    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+    SCCACHE_IDLE_TIMEOUT: "0"
 
 etherlink.mir_unit:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -481,90 +643,6 @@ etherlink.build_tezt:
     - _build/default/etherlink/tezt/tests/main.exe
     when: on_success
 
-etherlink.test_revm_compatibility:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: test
-  tags:
-  - gcp
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  - oc.build_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs revm-evaluation-assessor
-  - git clone --depth 1 https://github.com/functori/evm-fixtures evm_fixtures
-  - ./revm-evaluation-assessor --test-cases ./evm_fixtures/
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-
-etherlink.test_evm_compatibility:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: test
-  tags:
-  - gcp
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  - oc.build_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
-  - git clone --depth 1 --branch v14.1@etherlink https://github.com/functori/tests
-    ethereum_tests
-  - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_latest/evm_evaluation/resources/
-    -c
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-
 etherlink.build_evm_node_static_arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
@@ -666,14 +744,14 @@ etherlink.tezt-flaky:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-exp
-  - oc.build_kernels
   - etherlink.build_tezt
+  - oc.build_kernels
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-exp
-  - oc.build_kernels
   - etherlink.build_tezt
+  - oc.build_kernels
   allow_failure: true
   timeout: 40 minutes
   interruptible: false
@@ -733,14 +811,14 @@ etherlink.tezt-extra:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-exp
-  - oc.build_kernels
   - etherlink.build_tezt
+  - oc.build_kernels
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-exp
-  - oc.build_kernels
   - etherlink.build_tezt
+  - oc.build_kernels
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -799,14 +877,14 @@ etherlink.tezt-slow:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-exp
-  - oc.build_kernels
   - etherlink.build_tezt
+  - oc.build_kernels
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-exp
-  - oc.build_kernels
   - etherlink.build_tezt
+  - oc.build_kernels
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -865,14 +943,14 @@ etherlink.tezt:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-exp
-  - oc.build_kernels
   - etherlink.build_tezt
+  - oc.build_kernels
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-exp
-  - oc.build_kernels
   - etherlink.build_tezt
+  - oc.build_kernels
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -921,82 +999,3 @@ etherlink.tezt:
     when: always
   retry: 2
   parallel: 18
-
-etherlink.test_firehose:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: test
-  tags:
-  - gcp
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  - oc.build_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -C etherlink/firehose check
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
-
-etherlink.test_kernel:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: test
-  tags:
-  - gcp
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  - oc.build_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  timeout: 60 minutes
-  cache:
-    key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -f etherlink.mk check
-  - make -f etherlink.mk test
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    CARGO_INCREMENTAL: "0"
-    SCCACHE_GCS_BUCKET: $GCP_SCCACHE_BUCKET
-    SCCACHE_GCS_RW_MODE: READ_ONLY
-    SCCACHE_GCS_KEY_PREFIX: sccache
-    SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-    SCCACHE_IDLE_TIMEOUT: "0"
