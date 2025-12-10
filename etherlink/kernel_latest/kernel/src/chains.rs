@@ -272,6 +272,8 @@ pub trait ChainConfigTrait: Debug {
 
     type ChainHeader: ChainHeaderTrait + Decodable;
 
+    type ExecutionInfo;
+
     fn get_chain_id(&self) -> U256;
 
     fn get_chain_family(&self) -> ChainFamily;
@@ -337,6 +339,8 @@ impl ChainConfigTrait for EvmChainConfig {
     type TransactionReceipt = tezos_ethereum::transaction::TransactionReceipt;
 
     type ChainHeader = crate::blueprint_storage::EVMBlockHeader;
+
+    type ExecutionInfo = crate::apply::ExecutionInfo;
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id
@@ -482,6 +486,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
     type Transaction = TezlinkOperation;
     type TransactionReceipt = AppliedOperation;
     type ChainHeader = TezBlockHeader;
+    type ExecutionInfo = AppliedOperation;
 
     fn get_chain_id(&self) -> U256 {
         self.chain_id.as_ref().into()
