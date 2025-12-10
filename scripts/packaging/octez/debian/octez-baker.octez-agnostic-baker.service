@@ -21,7 +21,7 @@ EnvironmentFile=-/etc/default/octez-baker
 ExecStartPre=+touch /var/log/tezos/baker.log
 ExecStartPre=+chown tezos:tezos /var/log/tezos/baker.log
 
-ExecStart=/bin/sh -c "/usr/bin/octez-baker --base-dir $HOME/.tezos-client run with local node $DATADIR --liquidity-baking-toggle-vote $LQVOTE $RUNTIME_OPTS $BAKING_KEY"
+ExecStart=/bin/sh -c "/usr/bin/octez-baker --base-dir $HOME/.tezos-client run with local node $DATADIR --liquidity-baking-toggle-vote $LQVOTE $RUNTIME_OPTS $BAKER_KEY"
 
 StandardOutput=append:/var/log/tezos/baker.log
 StandardError=inherit
