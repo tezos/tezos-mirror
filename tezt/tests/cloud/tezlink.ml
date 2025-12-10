@@ -215,6 +215,30 @@ module Faucet_frontend_process = struct
       ]
 end
 
+module Bridge_frontend_process = struct
+  module Parameters = struct
+    type persistent_state = unit
+
+    type session_state = unit
+
+    let base_default_name = "bridge-frontend"
+
+    let default_colors = Evm_node.daemon_default_colors
+  end
+
+  include Daemon.Make (Parameters)
+
+  let run ?runner ~path ~port () =
+    let daemon =
+      create ?runner ~name:Parameters.base_default_name ~path:"sh" ()
+    in
+    run
+      ?runner
+      daemon
+      ()
+      ["-c"; sf "cd %s && npm run dev -- --port %d" path port]
+end
+
 let polling_period = function
   | Evm_node.Nothing -> 500
   | Time_between_blocks t ->
@@ -456,6 +480,39 @@ let init_faucet_backend ~agent ~sequencer_endpoint ~faucet_private_key
   in
   let runner = Agent.runner agent in
   Faucet_backend_process.run ?runner ~path:faucet_backend_dir ()
+
+let init_bridge_frontend ~agent ~network ~l1_endpoint ~bridge_contract
+    ~tzkt_api_url ~rollup ~bridge_proxy =
+  let bridge_frontend_port = proxy_internal_port bridge_proxy in
+  let bridge_dir = "bridge-tezlink" in
+  (* Clone bridge frontend *)
+  let* () =
+    git_clone
+      agent
+      "https://github.com/Arnaud-Bihan/tezlink_deposit.git"
+      bridge_dir
+  in
+  let* () =
+    create_env_file
+      ~agent
+      (sf "%s/.env" bridge_dir)
+      [
+        ("VITE_ENDPOINT", l1_endpoint);
+        ("VITE_CONTRACT", Some bridge_contract);
+        ("VITE_TZKT", tzkt_api_url);
+        ("VITE_ROLLUP", Some rollup);
+        ("VITE_NETWORK", network);
+      ]
+  in
+  let* () =
+    run_cmd agent (sf "cd %s && npm install && npm run build" bridge_dir)
+  in
+  let runner = Agent.runner agent in
+  Bridge_frontend_process.run
+    ?runner
+    ~path:bridge_dir
+    ~port:bridge_frontend_port
+    ()
 
 let init_faucet_frontend ~faucet_api_proxy ~agent ~sequencer_endpoint
     ~faucet_pkh ~tzkt_proxy ~faucet_frontend_proxy =
