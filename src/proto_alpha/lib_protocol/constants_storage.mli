@@ -132,6 +132,10 @@ val dal_number_of_shards : Raw_context.t -> int
 
 val dal_attestation_lag : Raw_context.t -> int
 
+val dal_attestation_lags : Raw_context.t -> int list
+
+val dal_number_of_lags : Raw_context.t -> int
+
 val dal_enable : Raw_context.t -> bool
 
 val zk_rollup_enable : Raw_context.t -> bool

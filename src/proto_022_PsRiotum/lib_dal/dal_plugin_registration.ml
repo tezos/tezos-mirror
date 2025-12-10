@@ -68,6 +68,7 @@ module Plugin = struct
         dynamic_lag_enable = false;
         number_of_slots;
         attestation_lag;
+        attestation_lags = [attestation_lag];
         attestation_threshold;
         traps_fraction;
         cryptobox_parameters;

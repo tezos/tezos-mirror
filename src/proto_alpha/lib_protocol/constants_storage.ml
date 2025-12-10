@@ -236,6 +236,14 @@ let dal_number_of_shards c =
   let constants = Raw_context.constants c in
   constants.dal.cryptobox_parameters.number_of_shards
 
+let dal_attestation_lags c =
+  let constants = Raw_context.constants c in
+  constants.dal.attestation_lags
+
+let dal_number_of_lags c =
+  let constants = Raw_context.constants c in
+  List.length constants.dal.attestation_lags
+
 let dal_enable c =
   let constants = Raw_context.constants c in
   constants.dal.feature_enable

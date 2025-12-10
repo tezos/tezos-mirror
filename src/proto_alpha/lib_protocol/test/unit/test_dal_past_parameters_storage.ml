@@ -72,6 +72,7 @@ let parameters_for_a_level () =
         dynamic_lag_enable = false;
         number_of_slots;
         attestation_lag;
+        attestation_lags = [attestation_lag];
         attestation_threshold;
         cryptobox_parameters;
         minimal_participation_ratio;

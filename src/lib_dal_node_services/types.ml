@@ -371,6 +371,7 @@ type proto_parameters = {
   dynamic_lag_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
+  attestation_lags : int list;
   attestation_threshold : int;
   traps_fraction : Q.t;
   cryptobox_parameters : Cryptobox.Verifier.parameters;
@@ -529,6 +530,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
            dynamic_lag_enable;
            number_of_slots;
            attestation_lag;
+           attestation_lags;
            attestation_threshold;
            traps_fraction;
            cryptobox_parameters;
@@ -544,6 +546,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
           dynamic_lag_enable,
           number_of_slots,
           attestation_lag,
+          attestation_lags,
           attestation_threshold,
           traps_fraction ),
         ( cryptobox_parameters,
@@ -557,6 +560,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
              dynamic_lag_enable,
              number_of_slots,
              attestation_lag,
+             attestation_lags,
              attestation_threshold,
              traps_fraction ),
            ( cryptobox_parameters,
@@ -572,6 +576,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
         dynamic_lag_enable;
         number_of_slots;
         attestation_lag;
+        attestation_lags;
         attestation_threshold;
         traps_fraction;
         cryptobox_parameters;
@@ -582,12 +587,13 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
         minimal_block_delay;
       })
     (merge_objs
-       (obj7
+       (obj8
           (req "feature_enable" bool)
           (req "incentives_enable" bool)
           (req "dynamic_lag_enable" bool)
           (req "number_of_slots" int31)
           (req "attestation_lag" int31)
+          (req "attestation_lags" (list int31))
           (req "attestation_threshold" int31)
           (req "traps_fraction" q_encoding))
        (obj6

@@ -274,6 +274,7 @@ type proto_parameters = {
   dynamic_lag_enable : bool;
   number_of_slots : int;
   attestation_lag : int;
+  attestation_lags : int list;
   attestation_threshold : int;
   traps_fraction : Q.t;
   cryptobox_parameters : Cryptobox.Verifier.parameters;
