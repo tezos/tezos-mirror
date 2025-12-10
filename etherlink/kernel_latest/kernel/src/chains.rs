@@ -203,16 +203,29 @@ impl Decodable for TezlinkContent {
 }
 
 pub trait TransactionTrait {
+    fn is_delayed(&self) -> bool;
+
     fn tx_hash(&self) -> TransactionHash;
 }
 
 impl TransactionTrait for crate::transaction::Transaction {
+    fn is_delayed(&self) -> bool {
+        self.is_delayed()
+    }
+
     fn tx_hash(&self) -> TransactionHash {
         self.tx_hash
     }
 }
 
 impl TransactionTrait for TezlinkOperation {
+    fn is_delayed(&self) -> bool {
+        match self.content {
+            TezlinkContent::Tezos(_) => false,
+            TezlinkContent::Deposit(_) => true,
+        }
+    }
+
     fn tx_hash(&self) -> TransactionHash {
         self.tx_hash
     }
@@ -555,8 +568,9 @@ impl ChainConfigTrait for MichelsonChainConfig {
         // Compute operations that are in the block in progress
         while block_in_progress.has_tx() {
             let operation = block_in_progress.pop_tx().ok_or(error::Error::Reboot)?;
+            let is_delayed = operation.is_delayed();
 
-            match operation.content {
+            let applied_operation = match operation.content {
                 TezlinkContent::Tezos(operation) => {
                     // Compute the hash of the operation
                     let hash = operation.hash()?;
@@ -593,8 +607,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                             }
                         };
 
-                    // Add the applied operation in the block in progress
-                    let applied_operation = AppliedOperation {
+                    AppliedOperation {
                         hash,
                         branch,
                         op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
@@ -603,10 +616,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                                 signature,
                             },
                         ),
-                    };
-                    block_in_progress
-                        .cumulative_receipts
-                        .push(applied_operation);
+                    }
                 }
                 TezlinkContent::Deposit(deposit) => {
                     log!(host, Debug, "Execute Tezlink deposit: {deposit:?}");
@@ -617,7 +627,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
                     let source =
                         PublicKeyHash::nom_read_exact(&TEZLINK_DEPOSITOR[1..]).unwrap();
 
-                    let applied_operation = AppliedOperation {
+                    AppliedOperation {
                         hash: H256::from_slice(&operation.tx_hash).into(),
                         branch: block_in_progress.parent_hash.into(),
                         op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
@@ -645,13 +655,16 @@ impl ChainConfigTrait for MichelsonChainConfig {
                                     .unwrap(),
                             },
                         ),
-                    };
-                    block_in_progress
-                        .cumulative_receipts
-                        .push(applied_operation);
-                    included_delayed_transactions.push(operation.tx_hash);
+                    }
                 }
             };
+            if is_delayed {
+                included_delayed_transactions.push(operation.tx_hash)
+            }
+            // Add the applied operation in the block in progress
+            block_in_progress
+                .cumulative_receipts
+                .push(applied_operation);
         }
 
         // Create a Tezos block from the block in progress
