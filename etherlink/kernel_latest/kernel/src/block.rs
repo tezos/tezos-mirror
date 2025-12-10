@@ -456,7 +456,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
         &outbox_queue,
         block_in_progress,
         sequencer_pool_address,
-        config.maximum_allowed_ticks,
         tracer_input,
         da_fee_per_byte,
         coinbase,
