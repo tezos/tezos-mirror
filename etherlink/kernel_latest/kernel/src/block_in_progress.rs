@@ -5,7 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::apply::{ExecutionInfo, TransactionObjectInfo, TransactionReceiptInfo};
+use crate::apply::{ExecutionInfo, TransactionReceiptInfo};
 use crate::block_storage;
 use crate::chains::{TransactionTrait, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
 use crate::error::Error;
@@ -384,7 +384,7 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
     ) -> Result<(), anyhow::Error> {
         let ExecutionInfo {
             receipt_info,
-            object_info,
+            tx_object,
             estimated_ticks_used,
             runtime,
         } = execution_info;
@@ -416,7 +416,6 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
                 self.logs_bloom.accrue_bloom(&receipt.logs_bloom);
 
                 self.cumulative_receipts.push(receipt);
-                let tx_object = self.make_object(object_info);
                 self.cumulative_tx_objects.push(tx_object);
             }
             RuntimeId::Tezos => (),
@@ -561,22 +560,6 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
             } else {
                 TransactionStatus::Failure
             },
-        }
-    }
-
-    pub fn make_object(&self, object_info: TransactionObjectInfo) -> TransactionObject {
-        TransactionObject {
-            block_number: self.number,
-            from: object_info.from,
-            gas_used: object_info.gas,
-            gas_price: object_info.gas_price,
-            hash: object_info.hash,
-            input: object_info.input,
-            nonce: object_info.nonce,
-            to: object_info.to,
-            index: object_info.index,
-            value: object_info.value,
-            signature: object_info.signature,
         }
     }
 
