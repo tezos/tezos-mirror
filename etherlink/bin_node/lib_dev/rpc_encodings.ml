@@ -1133,6 +1133,24 @@ module Unsubscribe = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Tezosx = struct
+  module Get_tezos_ethereum_address = struct
+    open Ethereum_types
+
+    type input = Signature.public_key_hash
+
+    type output = address
+
+    let input_encoding = Signature.Public_key_hash.encoding
+
+    let output_encoding = address_encoding
+
+    let method_ = "tez_getTezosEthereumAddress"
+
+    type ('input, 'output) method_ += Method : (input, output) method_
+  end
+end
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -1197,6 +1215,8 @@ let evm_supported_methods : (module METHOD) list =
     (module Subscribe);
     (module Unsubscribe);
     (module Trace_block);
+    (* Tezos X rpcs *)
+    (module Tezosx.Get_tezos_ethereum_address);
   ]
 
 let evm_unsupported_methods : string list =

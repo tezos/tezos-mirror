@@ -347,6 +347,12 @@ module Request = struct
         ]
     in
     {method_ = "eth_getLogs"; parameters}
+
+  let tez_getTezosEthereumAddress tezos_address =
+    {
+      method_ = "tez_getTezosEthereumAddress";
+      parameters = `String tezos_address;
+    }
 end
 
 let net_version ?websocket evm_node =
@@ -828,3 +834,15 @@ let coinbase ?websocket evm_node =
 
 let configuration evm_node =
   Curl.get (Evm_node.endpoint evm_node ^ "/configuration") |> Runnable.run
+
+module Tezosx = struct
+  let tez_getTezosEthereumAddress ?websocket tezos_address evm_node =
+    let* response =
+      Evm_node.jsonrpc
+        ?websocket
+        evm_node
+        (Request.tez_getTezosEthereumAddress tezos_address)
+    in
+    let decode_result response = JSON.(response |-> "result" |> as_string) in
+    return @@ decode_or_error decode_result response
+end

@@ -20,7 +20,7 @@ let runtime_tags = List.map Tezosx_runtime.tag
    By default, to write a test, you should use [register_sandbox_test]. Only
    for tests actually requiring to consider L1/L2 communication (typically,
    related to the bridge, or when we need to distinguish between the latest and
-   finalized block) is it useful to use [_register_fullstack_test]. *)
+   finalized block) is it useful to use [register_fullstack_test]. *)
 
 module Setup = struct
   let register_sandbox_test ?uses_client ~title ~tags ~with_runtimes
@@ -160,7 +160,31 @@ let test_deposit =
       ~error_msg:"Expected %R mutez but got %L") ;
   unit
 
+let test_get_tezos_ethereum_address_rpc ~runtime () =
+  Setup.register_sandbox_test
+    ~title:"Test the tez_getTezosEthereumAddress RPC"
+    ~tags:["rpc"]
+    ~with_runtimes:[runtime]
+  @@ fun sandbox ->
+  let tezos_address = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" in
+  let expected = "0xccef676171871a48bbd6e2be75bbcc09d38830c5" in
+  let* rpc_result =
+    Rpc.Tezosx.tez_getTezosEthereumAddress tezos_address sandbox
+  in
+  match rpc_result with
+  | Ok evm_address ->
+      Check.(
+        (evm_address = expected) string ~error_msg:"Expected %R but got %L") ;
+      unit
+  | Error err ->
+      Test.fail
+        "Could not get the EVM address corresponding to the Tezos address %s: \
+         %s"
+        tezos_address
+        err.Rpc.message
+
 let () =
   test_bootstrap_kernel_config () ;
   test_deposit [Alpha] ;
-  test_runtime_feature_flag ~runtime:Tezos ()
+  test_runtime_feature_flag ~runtime:Tezos () ;
+  test_get_tezos_ethereum_address_rpc ~runtime:Tezos ()

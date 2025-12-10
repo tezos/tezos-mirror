@@ -28,6 +28,7 @@
 (* To avoid shadowing the module with the [Gas_price] module defining the
    [eth_gasPrice] RPC. *)
 module G = Gas_price
+module Tezosx_mod = Tezosx
 open Tezos_rpc
 open Rpc_encodings
 open Batch
@@ -976,6 +977,11 @@ let dispatch_request (type f) ~websocket
                 Backend_rpc.Etherlink.balance address block_param
               in
               rpc_ok balance
+            in
+            build_with_input ~f module_ parameters
+        | Tezosx.Get_tezos_ethereum_address.Method ->
+            let f tezos_address =
+              tezos_address |> Tezosx_mod.Tezos_runtime.ethereum_alias |> rpc_ok
             in
             build_with_input ~f module_ parameters
         | Get_storage_at.Method ->

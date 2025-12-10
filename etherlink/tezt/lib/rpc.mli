@@ -389,3 +389,11 @@ val coinbase :
 
 (** Returns the EVM node configuration. *)
 val configuration : Evm_node.t -> JSON.t Lwt.t
+
+module Tezosx : sig
+  val tez_getTezosEthereumAddress :
+    ?websocket:Websocket.t ->
+    string ->
+    Evm_node.t ->
+    (string, error) result Lwt.t
+end
