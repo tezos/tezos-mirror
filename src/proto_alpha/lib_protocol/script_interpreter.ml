@@ -1888,6 +1888,7 @@ type execution_result = {
   ticket_diffs : Z.t Ticket_token_map.t;
   ticket_receipt : Ticket_receipt.t;
   address_registry_diff : Address_registry.diff list;
+  balance_updates : Receipt.balance_updates;
 }
 
 let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
@@ -2027,6 +2028,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
         ticket_diffs;
         ticket_receipt;
         address_registry_diff;
+        balance_updates = [];
       },
       ctxt )
 

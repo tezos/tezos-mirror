@@ -1337,6 +1337,7 @@ module Scripts = struct
                  ticket_diffs = _;
                  ticket_receipt = _;
                  address_registry_diff = _;
+                 balance_updates = _;
                },
                _ ) =
           Script_interpreter.execute
@@ -1409,6 +1410,7 @@ module Scripts = struct
                    ticket_diffs = _;
                    ticket_receipt = _;
                    address_registry_diff = _;
+                   balance_updates = _;
                  },
                  _ctxt ),
                trace ) =
@@ -1503,6 +1505,7 @@ module Scripts = struct
                  ticket_diffs = _;
                  ticket_receipt = _;
                  address_registry_diff = _;
+                 balance_updates = _;
                },
                _ctxt ) =
           Script_interpreter.execute
@@ -1606,6 +1609,7 @@ module Scripts = struct
                  ticket_diffs = _;
                  ticket_receipt = _;
                  address_registry_diff = _;
+                 balance_updates = _;
                },
                _ctxt ) =
           Script_interpreter.execute
