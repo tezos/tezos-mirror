@@ -52,7 +52,15 @@ module Tezos_runtime = struct
 
   let decode_account_info bytes =
     let open Result_syntax in
-    let fail () = tzfail (error_of_fmt "Cannot decode a Tezos account info") in
+    let info_hex = Hex.of_bytes bytes in
+
+    let fail stage () =
+      tzfail
+        (error_of_fmt
+           "Cannot decode a Tezos account info (stage %s) 0x%s"
+           stage
+           (Hex.show info_hex))
+    in
     try
       match Rlp.decode bytes with
       | Ok (Rlp.List [Value balance; Value nonce; public_key]) ->
@@ -67,11 +75,11 @@ module Tezos_runtime = struct
                 return_some
                   (Signature.Public_key.of_b58check_exn
                      (Bytes.unsafe_to_string value))
-            | _ -> fail ()
+            | _ -> fail "public key" ()
           in
           return {balance; nonce; public_key}
-      | _ -> fail ()
-    with _ -> fail ()
+      | _ -> fail "list" ()
+    with _ -> fail "decoding values" ()
 
   let encode_account_info {balance; nonce; public_key} =
     let padded_32_le_int_bytes z =

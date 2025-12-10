@@ -7,6 +7,7 @@ use primitive_types::U256;
 use revm::primitives::Address;
 use revm_etherlink::Error;
 use rlp::{Decodable, Encodable, Rlp};
+use sha3::{Digest, Keccak256};
 use tezos_ethereum::rlp_helpers::{
     append_u256_le, append_u64_le, decode_field_u256_le, decode_field_u64_le,
 };
@@ -32,7 +33,7 @@ const ETHEREUM_ADDRESS_MAPPING_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/eth_accounts/tezosx/native/ethereum");
 
 // Used as a value for the durable storage.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct TezosAccountInfo {
     pub balance: U256,
     pub nonce: u64,
@@ -86,17 +87,29 @@ impl Decodable for TezosAccountInfo {
     }
 }
 
-fn path_to_tezos_account(pub_key_hash: PublicKeyHash) -> Result<OwnedPath, PathError> {
+fn path_to_tezos_account(pub_key_hash: &PublicKeyHash) -> Result<OwnedPath, PathError> {
     let address_path: Vec<u8> = format!("/{pub_key_hash}").into();
     let address_path = OwnedPath::try_from(address_path)?;
     let prefix = concat(&TEZOS_ACCOUNTS_PATH, &address_path)?;
     concat(&prefix, &INFO_PATH)
 }
 
-#[allow(dead_code)]
+pub fn add_balance(
+    host: &mut impl Runtime,
+    pub_key_hash: &PublicKeyHash,
+    amount: U256,
+) -> Result<(), Error> {
+    let mut info = get_tezos_account_info_or_init(host, pub_key_hash)?;
+    info.balance = info
+        .balance
+        .checked_add(amount)
+        .ok_or(Error::Custom("Balance overflow".to_string()))?;
+    set_tezos_account_info(host, pub_key_hash, info)
+}
+
 pub fn get_tezos_account_info(
     host: &impl Runtime,
-    pub_key_hash: PublicKeyHash,
+    pub_key_hash: &PublicKeyHash,
 ) -> Result<Option<TezosAccountInfo>, Error> {
     let path =
         path_to_tezos_account(pub_key_hash).map_err(|_| RuntimeError::PathNotFound)?;
@@ -111,10 +124,24 @@ pub fn get_tezos_account_info(
     }
 }
 
-#[cfg(test)]
+pub fn get_tezos_account_info_or_init(
+    host: &mut impl Runtime,
+    pub_key_hash: &PublicKeyHash,
+) -> Result<TezosAccountInfo, Error> {
+    match get_tezos_account_info(host, pub_key_hash)? {
+        Some(info) => Ok(info),
+        None => {
+            let evm_addr = ethereum_address_from_tezos(pub_key_hash);
+            let foreign_addr = ForeignAddress::Tezos(pub_key_hash.clone());
+            set_ethereum_address_mapping(host, evm_addr, foreign_addr)?;
+            Ok(TezosAccountInfo::default())
+        }
+    }
+}
+
 pub fn set_tezos_account_info(
     host: &mut impl Runtime,
-    pub_key_hash: PublicKeyHash,
+    pub_key_hash: &PublicKeyHash,
     info: TezosAccountInfo,
 ) -> Result<(), Error> {
     let path =
@@ -123,8 +150,12 @@ pub fn set_tezos_account_info(
     Ok(host.store_write(&path, value, 0)?)
 }
 
-const TEZOS_SRC_ADDR_TAG: u8 = 1;
+pub fn ethereum_address_from_tezos(pub_key_hash: &PublicKeyHash) -> Address {
+    let hash: [u8; 32] = Keccak256::digest(pub_key_hash.to_b58check().as_bytes()).into();
+    Address::from_slice(&hash[0..20])
+}
 
+const TEZOS_SRC_ADDR_TAG: u8 = 1;
 #[derive(PartialEq, Debug, Clone, Eq)]
 pub enum ForeignAddress {
     Tezos(PublicKeyHash),
@@ -265,10 +296,10 @@ mod tests {
             pub_key: Some(pub_key.clone()),
         };
 
-        set_tezos_account_info(&mut host, pub_key_hash.clone(), account.clone())
+        set_tezos_account_info(&mut host, &pub_key_hash, account.clone())
             .expect("Writing to the storage should have worked");
 
-        let read_account = get_tezos_account_info(&host, pub_key_hash)
+        let read_account = get_tezos_account_info(&host, &pub_key_hash)
             .expect("Reading the storage should have worked")
             .expect("The path to the account should exist");
         assert_eq!(account, read_account);
