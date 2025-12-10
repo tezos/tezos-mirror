@@ -162,11 +162,7 @@ pub fn compute<Host: Runtime>(
                     block_in_progress.register_delayed_transaction(transaction.tx_hash);
                 }
 
-                block_in_progress.register_valid_transaction(
-                    &transaction,
-                    execution_info,
-                    host,
-                )?;
+                block_in_progress.register_valid_transaction(execution_info, host)?;
             }
             ExecutionResult::Invalid => {
                 on_invalid_transaction(&transaction, block_in_progress)

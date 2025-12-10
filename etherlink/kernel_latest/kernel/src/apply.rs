@@ -656,6 +656,7 @@ pub struct ExecutionInfo {
     pub receipt_info: TransactionReceiptInfo,
     pub tx_object: TransactionObject,
     pub runtime: RuntimeId,
+    pub tx_hash: TransactionHash,
 }
 
 pub enum ExecutionResult<T> {
@@ -748,6 +749,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         receipt_info,
         tx_object,
         runtime,
+        tx_hash: transaction.tx_hash,
     })
 }
 
