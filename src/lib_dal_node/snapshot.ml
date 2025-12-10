@@ -210,10 +210,12 @@ module Export = struct
         let* _ = Key_value_store.close dst_store in
         return_unit)
 
-  let export ~data_dir:src_data_dir ~config_file ~min_published_level
+  let export ~data_dir:src_data_dir ~config_file ~endpoint ~min_published_level
       ~max_published_level dst_data_dir =
     let open Lwt_result_syntax in
     let* config = Configuration_file.load ~config_file in
+    let endpoint = Option.value ~default:config.endpoint endpoint in
+    let config = Configuration_file.{config with endpoint} in
     let cctxt = Rpc_context.make config.Configuration_file.endpoint in
     let* header, proto_plugins = L1_helpers.wait_for_block_with_plugin cctxt in
     let*? (module Plugin : Dal_plugin.T), proto_parameters =

@@ -1049,8 +1049,8 @@ module Snapshot = struct
             ~docs:"OPTIONS"
             [])
 
-    let action min_published_level max_published_level data_dir config_file
-        file_path =
+    let action min_published_level max_published_level data_dir endpoint
+        config_file file_path =
       let data_dir =
         Option.value ~default:Configuration_file.default.data_dir data_dir
       in
@@ -1064,6 +1064,7 @@ module Snapshot = struct
       Snapshot.export
         ~data_dir
         ~config_file
+        ~endpoint
         ~min_published_level:min_level
         ~max_published_level:max_level
         file_path
@@ -1073,7 +1074,7 @@ module Snapshot = struct
         map
           wrap_action
           (const action $ min_published_level $ max_published_level
-         $ Term.data_dir $ Term.config_file $ file_path))
+         $ Term.data_dir $ Term.endpoint $ Term.config_file $ file_path))
 
     let cmd = Cmdliner.Cmd.v info term
   end
