@@ -89,7 +89,7 @@ let lib_etherlink_wasm_runtime =
                  [S "source_tree"; S "../../sdk/rust"];
                  [S "source_tree"; S "src"];
                ];
-               [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
+               [S "action"; [S "no-infer"; [S "system"; S "./build.sh"]]];
              ];
            ])
 
