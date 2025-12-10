@@ -394,6 +394,22 @@ let create_config_file ~agent destination format =
     (Format.formatter_of_out_channel ch)
     format
 
+let create_env_file ~agent destination env =
+  let temp_file = Temp.file "config" in
+  let ch = open_out temp_file in
+  let config_filtered =
+    List.filter_map
+      (function
+        | param, Some value -> Some (Format.sprintf "%s=%s" param value)
+        | _, None -> None)
+      env
+  in
+  let config_str = String.concat "\n" config_filtered in
+  Format.fprintf (Format.formatter_of_out_channel ch) "%s\n" config_str ;
+  let () = close_out ch in
+  let* (_ : string) = Agent.copy agent ~source:temp_file ~destination in
+  unit
+
 let init_faucet_backend ~agent ~sequencer_endpoint ~faucet_private_key
     ~faucet_api_proxy =
   let tezlink_sandbox_endpoint =
@@ -409,30 +425,29 @@ let init_faucet_backend ~agent ~sequencer_endpoint ~faucet_private_key
       "https://github.com/rafoo/tezos-faucet-backend.git"
       faucet_backend_dir
   in
+  let config =
+    [
+      ("API_PORT", sf "%d" faucet_api_port);
+      ("RPC_URL", tezlink_sandbox_endpoint);
+      ("FAUCET_PRIVATE_KEY", faucet_private_key);
+      ("AUTHORIZED_HOST", {|"*"|});
+      ("ENABLE_CAPTCHA", "false");
+      ("DISABLE_CHALLENGES", "true");
+      ("MAX_BALANCE", "6000");
+      ("MIN_TEZ", "1");
+      ("MAX_TEZ", "6000");
+      ("MIN_CHALLENGES", "1");
+      ("MAX_CHALLENGES", "550");
+      ("MAX_CHALLENGES_WITH_CAPTCHA", "66");
+      ("CHALLENGE_SIZE", "2048");
+      ("DIFFICULTY", "4");
+    ]
+  in
   let* () =
-    create_config_file
+    create_env_file
       ~agent
       (sf "%s/.env" faucet_backend_dir)
-      {|
-API_PORT=%d
-RPC_URL=%s
-FAUCET_PRIVATE_KEY=%s
-
-AUTHORIZED_HOST="*"
-ENABLE_CAPTCHA=false
-DISABLE_CHALLENGES=true
-MAX_BALANCE=6000
-MIN_TEZ=1
-MAX_TEZ=6000
-MIN_CHALLENGES=1
-MAX_CHALLENGES=550
-MAX_CHALLENGES_WITH_CAPTCHA=66
-CHALLENGE_SIZE=2048
-DIFFICULTY=4
-|}
-      faucet_api_port
-      tezlink_sandbox_endpoint
-      faucet_private_key
+      (List.map (fun (arg, param) -> (arg, Some param)) config)
   in
   let* () =
     run_cmd
