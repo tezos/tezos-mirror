@@ -84,12 +84,24 @@ let select_bakers_at_cycle_end ctxt ~target_cycle =
       stakes_pkh
   in
 
-  let rec loop i (credit_list : credit_info list)
-      (acc : Signature.public_key_hash list) :
-      credit_info list * Signature.public_key_hash list =
-    if Compare.Int.(i >= nb_slots) then
-      let bakers = List.rev acc in
-      (credit_list, bakers)
+  (* Use a FallbackArray with fallback=Pkh.zero for the selected bakers
+
+     FallbackArray is used instead of list for O(1) indexed access in get_baker,
+     which is called every 6 seconds during block production. Lists would require
+     O(n) traversal via List.nth.
+
+     The fallback value (Signature.Public_key_hash.zero) should never be accessed
+     in normal operation since indices are always mod array_length. If accessed,
+     it indicates a bug in the index calculation or when populating the array
+     in [loop]. *)
+  let init_selected_bakers_array =
+    FallbackArray.make nb_slots Signature.Public_key_hash.zero
+  in
+  (* 0 <= idx < nb_slots *)
+  let rec loop idx (credit_list : credit_info list)
+      (acc : Signature.public_key_hash FallbackArray.t) :
+      credit_info list * Signature.public_key_hash FallbackArray.t =
+    if Compare.Int.(idx >= nb_slots) then (credit_list, acc)
     else
       (* Increase everyone's credit by their stake, and find the max *)
       let best_credit_info_opt, updated_credit_list =
@@ -112,24 +124,33 @@ let select_bakers_at_cycle_end ctxt ~target_cycle =
           (None, [])
           credit_list
       in
-      (* At this point `updated_credit_list` doesn't contain `best_credit_info_opt`, so we can simply update it and add it to the list. *)
+      (* At this point `updated_credit_list` doesn't contain `best_credit_info_opt`,
+         so we can simply update it and add it to the list. *)
       let updated_credit_list, acc =
         match best_credit_info_opt with
-        | None -> (updated_credit_list, acc) (* Should not happen *)
+        | None -> assert false
+        (* Can only happen if credit_list is empty, which is implies stakes_pkh
+           to be empty, which means no baker is active, which is,
+           if not impossible, problematic for many other reasons. *)
         | Some ({credit; pkh; _} as best_credit_info) ->
             (* Subtract total_stake (not just proportional amount) to create "debt".
                This ensures fairness: high-stake delegates are selected more frequently
                but accumulate negative credit proportionally, preventing monopolization.
                Over many iterations, this guarantees selection proportional to stake. *)
-            ( {best_credit_info with credit = Z.sub credit total_stake}
-              :: updated_credit_list,
-              pkh :: acc )
+            let updated_credit_list =
+              {best_credit_info with credit = Z.sub credit total_stake}
+              :: updated_credit_list
+            in
+            FallbackArray.set acc idx pkh ;
+            (updated_credit_list, acc)
       in
-      loop (i + 1) updated_credit_list acc
+      loop (idx + 1) updated_credit_list acc
   in
-  let new_credits, selected_bakers = loop 0 init_credit_list [] in
-  (* update context *)
-  let*! ctxt =
+  let new_credits, selected_bakers =
+    loop 0 init_credit_list init_selected_bakers_array
+  in
+  (* Update context: store selected bakers *)
+  let* ctxt =
     Storage.Stake.Selected_bakers.add ctxt target_cycle selected_bakers
   in
   (* Update credits for all delegates.
@@ -164,20 +185,15 @@ let get_baker ctxt level round =
   let cycle = level.Level_repr.cycle in
   let pos = level.Level_repr.cycle_position in
   let*? round_int = Round_repr.to_int round in
-
   let* selected_bakers = Storage.Stake.Selected_bakers.find ctxt cycle in
   match selected_bakers with
   | None -> return (ctxt, None)
-  | Some selected_bakers -> (
-      let len = List.length selected_bakers in
+  | Some selected_bakers ->
+      let len = FallbackArray.length selected_bakers in
       let idx = (Int32.to_int pos + (3 * round_int)) mod len in
-      match List.nth_opt selected_bakers idx with
-      | None ->
-          assert false
-          (* should not happen if select_bakers_at_cycle_end is correct *)
-      | Some pkh ->
-          let* pk = Delegate_consensus_key.active_pubkey ctxt pkh in
-          return (ctxt, Some pk))
+      let pkh = FallbackArray.get selected_bakers idx in
+      let* pk = Delegate_consensus_key.active_pubkey ctxt pkh in
+      return (ctxt, Some pk)
 
 (** [reset_credit_for_deactivated_delegates ctxt deactivated_delegates] sets
     SWRR credits to zero for delegates that have been deactivated.

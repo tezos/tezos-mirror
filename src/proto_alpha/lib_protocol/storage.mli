@@ -636,7 +636,7 @@ module Stake : sig
   module Selected_bakers :
     Indexed_data_storage
       with type key = Cycle_repr.t
-       and type value = Signature.Public_key_hash.t list
+       and type value = Signature.Public_key_hash.t FallbackArray.t
        and type t := Raw_context.t
 
   (** Sum of the active stakes of all the delegates with

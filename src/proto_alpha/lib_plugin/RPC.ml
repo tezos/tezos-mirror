@@ -4734,7 +4734,9 @@ module S = struct
          cleaned from the context, or if the 'swrr_new_baker_lottery_enable' \
          feature flag is not enabled."
       ~query:cycle_query
-      ~output:Data_encoding.(option (list Signature.Public_key_hash.encoding))
+      ~output:
+        Data_encoding.(
+          option (FallbackArray.encoding Signature.Public_key_hash.encoding))
       RPC_path.(path / "swrr_selected_bakers")
 
   let swrr_credits =
