@@ -60,13 +60,11 @@ let register ?maximum_gas_per_transaction ?set_account_code ?da_fee_per_byte
 let send_transaction_and_fail_upon_sequencer_validation ~raw_tx sequencer
     ~expected_error ~error_msg =
   let wait_for_add = Evm_node.wait_for_tx_queue_add_transaction sequencer in
-  let* hash =
-    let*@ hash = Rpc.send_raw_transaction ~raw_tx sequencer in
-    return hash
-  and* _ = wait_for_add in
   let wait_for_error =
-    Evm_node.wait_for_block_producer_rejected_transaction ~hash sequencer
+    Evm_node.wait_for_block_producer_rejected_transaction sequencer
   in
+  let*@ _ = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let* _ = wait_for_add in
   let*@ _ = produce_block sequencer in
   let* error = wait_for_error in
   Check.(error =~ rex expected_error) ~error_msg ;

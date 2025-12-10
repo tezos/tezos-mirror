@@ -637,6 +637,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?next_wasm_runtime
       ?rpc_server
       ?spawn_rpc
+      ~preconfirmation_stream_enabled:(not enable_multichain)
       (* When adding new experimental feature please make sure it's a
          good idea to activate it for all test or not. *)
       ()

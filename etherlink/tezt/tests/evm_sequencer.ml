@@ -6908,6 +6908,16 @@ let test_blueprint_is_limited_in_size =
        maximum number of chunks"
     ~use_dal:ci_enabled_dal_registration
   @@ fun {sc_rollup_node; client; sequencer; _} _protocol ->
+  (* Preconfirmation set to false because transaction dropping mechanism from IC workflow invalidates it:
+    Remaining transactions are not included in the last block *)
+  let* () = Evm_node.terminate sequencer in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ~preconfirmation_stream_enabled:false
+      ()
+  in
+  let* () = Evm_node.Config_file.update sequencer patch_config in
+  let* () = Evm_node.run sequencer in
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
   let* requests, hashes = batch_n_transactions ~evm_node:sequencer txs in
   (* Each transaction is about 114 bytes, hence 100 * 114 = 11400 bytes, which
@@ -6993,6 +7003,16 @@ let test_blueprint_limit_with_delayed_inbox =
   fun {sc_rollup_node; client; sequencer; sc_rollup_address; l1_contracts; _}
       _protocol
     ->
+  (* Preconfirmation set to false because transaction dropping mechanism from IC workflow invalidates it:
+    Delayed transactions are included by remaining common transaction are not *)
+  let* () = Evm_node.terminate sequencer in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ~preconfirmation_stream_enabled:false
+      ()
+  in
+  let* () = Evm_node.Config_file.update sequencer patch_config in
+  let* () = Evm_node.run sequencer in
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
   (* The first 3 transactions will be sent to the delayed inbox *)
   let delayed_txs, direct_txs = Tezos_base.TzPervasives.TzList.split_n 3 txs in
@@ -13121,31 +13141,21 @@ let test_fa_deposit_and_withdrawals_events =
   capture_logs ~header:"FA Fast Withdrawal" receipt.logs ;
   unit
 
-let test_block_producer_validation =
-  register_all
+let test_block_producer_validation () =
+  register_sandbox_with_observer
+  (* Disable preconfirmations because transaction are rejected before the block production when IC are enabled *)
+    ~patch_config:
+      (Evm_node.patch_config_with_experimental_feature
+         ~preconfirmation_stream_enabled:false
+         ())
     ~__FILE__
     ~tags:["observer"; "tx_queue"; "validation"]
-    ~time_between_blocks:Nothing
-    ~kernels:[Latest] (* node only test *)
-    ~use_dal:Register_without_feature
-    ~websockets:false
-    ~tx_queue:
-      {
-        max_size = 1000;
-        max_lifespan = 100000 (* absurd value so no TX are dropped *);
-        tx_per_addr_limit = 100000 (* absurd value so no TX are limited *);
-      }
     ~title:"Test part of the validation is done when producing blocks."
-    ~use_multichain:Register_without_feature
   (* TODO #7843: Adapt this test to multichain context *)
-  @@ fun {sequencer; observer; _} _protocol ->
-  let* () =
-    let*@ _ = produce_block sequencer in
-    unit
-  and* () = Evm_node.wait_for_blueprint_applied observer 1 in
+  @@ fun {sandbox; observer} ->
   let send_and_wait_sequencer_receive ~raw_tx =
     let wait_sequencer_see_tx =
-      Evm_node.wait_for_tx_queue_add_transaction sequencer
+      Evm_node.wait_for_tx_queue_add_transaction sandbox
     in
     let* hash =
       let*@ hash = Rpc.send_raw_transaction ~raw_tx observer in
@@ -13231,16 +13241,16 @@ let test_block_producer_validation =
     send_and_wait_sequencer_receive ~raw_tx:raw_tx_invalid_nonce
   in
   let* txs =
-    let*@ txs = produce_block sequencer in
+    let*@ txs = produce_block sandbox in
     return txs
   and* reason1 =
     Evm_node.wait_for_block_producer_rejected_transaction
       ~hash:invalid_balance_hash1
-      sequencer
+      sandbox
   and* reason2 =
     Evm_node.wait_for_block_producer_rejected_transaction
       ~hash:invalid_nonce_hash2
-      sequencer
+      sandbox
   in
   Check.(reason1 =~ rex "Not enough funds")
     ~error_msg:"transaction rejected for invalid reason, found %L, expected %R" ;
@@ -14477,7 +14487,7 @@ let () =
   test_deposit_event [Alpha] ;
   test_withdrawal_events [Alpha] ;
   test_fa_deposit_and_withdrawals_events [Alpha] ;
-  test_block_producer_validation [Alpha] ;
+  test_block_producer_validation () ;
   test_durable_storage_consistency [Alpha] ;
   test_fa_deposit_can_be_claimed_and_withdrawn [Alpha] ;
   test_fast_fa_deposit_can_be_claimed_and_withdrawn [Alpha] ;

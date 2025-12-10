@@ -562,6 +562,16 @@ let init_sequencer_sandbox ?maximum_gas_per_transaction ?genesis_timestamp
         (Array.to_list Eth_account.bootstrap_accounts))
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?(sequencer_keys = []) ?with_runtimes () =
+  let patch_config =
+    Option.map
+      (fun input_patch json ->
+        json
+        |> Evm_node.patch_config_with_experimental_feature
+             ~preconfirmation_stream_enabled:true
+             ()
+        |> input_patch)
+      patch_config
+  in
   let wallet_dir = Temp.dir "wallet" in
   let output_config = Temp.file "config.yaml" in
   let preimages_dir = Temp.dir "wasm_2_0_0" in
