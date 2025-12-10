@@ -74,11 +74,12 @@ pub enum BlockInProgressProvenance {
 }
 
 fn on_invalid_transaction<Tx: TransactionTrait, Receipt>(
-    transaction: &Tx,
+    is_delayed: bool,
+    tx_hash: TransactionHash,
     block_in_progress: &mut BlockInProgress<Tx, Receipt>,
 ) {
-    if transaction.is_delayed() {
-        block_in_progress.register_delayed_transaction(transaction.tx_hash());
+    if is_delayed {
+        block_in_progress.register_delayed_transaction(tx_hash);
     }
 }
 
@@ -119,6 +120,8 @@ pub fn compute<Host: Runtime>(
     // iteration over all remaining transaction in the block
     while block_in_progress.has_tx() {
         let transaction = block_in_progress.pop_tx().ok_or(Error::Reboot)?;
+        let tx_hash = transaction.tx_hash();
+        let is_delayed = transaction.is_delayed();
         let data_size: u64 = transaction.data_size();
 
         log!(host, Benchmarking, "Transaction data size: {}", data_size);
@@ -149,7 +152,7 @@ pub fn compute<Host: Runtime>(
                 registry,
                 outbox_queue,
                 block_constants,
-                &transaction,
+                transaction,
                 block_in_progress.index,
                 sequencer_pool_address,
                 tracer_input,
@@ -158,14 +161,14 @@ pub fn compute<Host: Runtime>(
             )?
         ) {
             ExecutionResult::Valid(execution_info) => {
-                if transaction.is_delayed() {
-                    block_in_progress.register_delayed_transaction(transaction.tx_hash);
+                if is_delayed {
+                    block_in_progress.register_delayed_transaction(tx_hash);
                 }
 
                 block_in_progress.register_valid_transaction(execution_info, host)?;
             }
             ExecutionResult::Invalid => {
-                on_invalid_transaction(&transaction, block_in_progress)
+                on_invalid_transaction(is_delayed, tx_hash, block_in_progress)
             }
         };
     }
