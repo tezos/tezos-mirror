@@ -240,7 +240,6 @@ pub fn is_valid_ethereum_transaction_common<Host: Runtime>(
 pub struct TransactionResult {
     pub caller: H160,
     pub execution_outcome: ExecutionOutcome,
-    pub gas_used: U256,
     pub estimated_ticks_used: u64,
     pub runtime: RuntimeId,
 }
@@ -435,12 +434,9 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         }
     };
 
-    let gas_used = execution_outcome.result.gas_used().into();
-
     let transaction_result = TransactionResult {
         caller,
         execution_outcome,
-        gas_used,
         estimated_ticks_used: 0,
         runtime: RuntimeId::Ethereum,
     };
@@ -663,14 +659,11 @@ fn apply_fa_deposit<Host: Runtime>(
         tracer_input,
     )?;
 
-    let gas_used = execution_outcome.result.gas_used().into();
-
     let transaction_result = TransactionResult {
         // A specific address is allocated for queue call
         // System address can only be used as caller for simulations
         caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
         execution_outcome,
-        gas_used,
         estimated_ticks_used: 0,
         runtime: RuntimeId::Ethereum,
     };
@@ -685,7 +678,6 @@ pub struct ExecutionInfo {
     pub receipt_info: TransactionReceiptInfo,
     pub object_info: TransactionObjectInfo,
     pub estimated_ticks_used: u64,
-    pub execution_gas_used: U256,
     pub runtime: RuntimeId,
 }
 
@@ -718,16 +710,17 @@ pub fn handle_transaction_result<Host: Runtime>(
     let TransactionResult {
         caller,
         mut execution_outcome,
-        gas_used,
         estimated_ticks_used: ticks_used,
         runtime,
     } = transaction_result;
 
     let to = transaction.to()?;
 
+    let gas_used = execution_outcome.result.gas_used();
+
     let fee_updates = transaction
         .content
-        .fee_updates(&block_constants.block_fees, gas_used);
+        .fee_updates(&block_constants.block_fees, gas_used.into());
 
     log!(
         host,
@@ -735,12 +728,7 @@ pub fn handle_transaction_result<Host: Runtime>(
         "Transaction executed, outcome: {:?}",
         execution_outcome
     );
-    log!(
-        host,
-        Benchmarking,
-        "gas_used: {:?}",
-        execution_outcome.result.gas_used()
-    );
+    log!(host, Benchmarking, "gas_used: {:?}", gas_used);
     log!(host, Benchmarking, "reason: {:?}", execution_outcome.result);
     for message in execution_outcome.withdrawals.drain(..) {
         match message {
@@ -778,7 +766,6 @@ pub fn handle_transaction_result<Host: Runtime>(
         receipt_info,
         object_info,
         estimated_ticks_used: ticks_used,
-        execution_gas_used: gas_used,
         runtime,
     })
 }
@@ -910,7 +897,6 @@ pub fn apply_transaction<Host: Runtime>(
                             },
                             withdrawals: vec![],
                         },
-                        gas_used: U256::zero(),
                         estimated_ticks_used: 0,
                         runtime: RuntimeId::Tezos,
                     }))

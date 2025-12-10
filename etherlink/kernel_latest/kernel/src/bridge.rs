@@ -412,14 +412,11 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
                 tracer_input,
             )?;
 
-            let gas_used = execution_outcome.result.gas_used().into();
-
             let transaction_result = TransactionResult {
                 // A specific address is allocated for queue call
                 // System address can only be used as caller for simulations
                 caller: alloy_to_h160(&FEED_DEPOSIT_ADDR),
                 execution_outcome,
-                gas_used,
                 estimated_ticks_used: TICKS_FOR_DEPOSIT,
                 runtime: RuntimeId::Ethereum,
             };
@@ -447,12 +444,9 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
                         withdrawals: vec![],
                     };
 
-                    let gas_used = execution_outcome.result.gas_used().into();
-
                     let transaction_result = TransactionResult {
                         caller: H160::zero(),
                         execution_outcome,
-                        gas_used,
                         estimated_ticks_used: TICKS_FOR_DEPOSIT,
                         runtime: RuntimeId::Tezos,
                     };
@@ -469,12 +463,9 @@ pub fn apply_tezosx_xtz_deposit<Host: Runtime>(
                         withdrawals: vec![],
                     };
 
-                    let gas_used = execution_outcome.result.gas_used().into();
-
                     let transaction_result = TransactionResult {
                         caller: H160::zero(),
                         execution_outcome,
-                        gas_used,
                         estimated_ticks_used: TICKS_FOR_DEPOSIT,
                         runtime: RuntimeId::Tezos,
                     };

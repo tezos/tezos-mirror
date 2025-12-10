@@ -386,11 +386,11 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
             receipt_info,
             object_info,
             estimated_ticks_used,
-            execution_gas_used,
             runtime,
         } = execution_info;
+        let execution_gas_used = receipt_info.execution_outcome.result.gas_used();
         // account for gas
-        host.add_execution_gas(receipt_info.execution_outcome.result.gas_used());
+        host.add_execution_gas(execution_gas_used);
 
         self.add_gas(receipt_info.overall_gas_used)?;
 
@@ -400,7 +400,7 @@ impl BlockInProgress<Transaction, TransactionReceipt> {
             estimated_ticks_used,
         ));
         // keep track of execution gas used
-        self.cumulative_execution_gas += execution_gas_used;
+        self.cumulative_execution_gas += execution_gas_used.into();
         match runtime {
             RuntimeId::Ethereum => {
                 // register transaction as done
