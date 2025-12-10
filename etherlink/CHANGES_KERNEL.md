@@ -2,6 +2,16 @@
 
 ## Version NEXT
 
+### Features
+
+### Bug fixes
+
+### Internal
+
+### Tezos X Experimental Features
+
+## Version 6 (Farfadet)
+
 Important information: Rollup nodes configured to use the full history mode will require
 up to twice the disk space they are currently using in the two weeks following
 the activation of this kernel, due to how our storage backend (Irmin) performs
