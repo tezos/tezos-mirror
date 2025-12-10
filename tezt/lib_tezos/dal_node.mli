@@ -258,6 +258,20 @@ val load_last_finalized_processed_level : t -> int option Lwt.t
 val debug_print_store_schemas :
   ?path:string -> ?hooks:Process_hooks.t -> unit -> unit Lwt.t
 
+(** [snapshot_export dal_node ?endpoint ?min_published_level
+    ?max_published_level output_file] exports a snapshot of the DAL node's
+    store to [output_file].
+    If [endpoint] is provided, it overrides the endpoint in the config file.
+    [min_published_level] and [max_published_level] are optional level ranges
+    to export. *)
+val snapshot_export :
+  t ->
+  ?endpoint:Endpoint.t ->
+  ?min_published_level:int32 ->
+  ?max_published_level:int32 ->
+  string ->
+  unit Lwt.t
+
 (** The Proxy module provides functionality to create a proxy server
     that can intercept and mock responses for DAL node requests. *)
 module Proxy : sig
