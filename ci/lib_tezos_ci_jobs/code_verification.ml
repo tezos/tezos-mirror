@@ -198,6 +198,21 @@ let job_build_x86_64_exp =
     "script-inputs/experimental-executables"
   |> enable_dune_cache ~key:Pipeline ~policy:Push
 
+let build_arm_rules ~pipeline_type =
+  make_rules ~pipeline_type ~label:"ci--arm64" ~manual:Yes ()
+
+let job_build_arm64_release =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_arm64_release ~rules:(build_arm_rules ~pipeline_type) ()
+
+let job_build_arm64_extra_dev =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_arm64_extra_dev ~rules:(build_arm_rules ~pipeline_type) ()
+
+let job_build_arm64_exp =
+  depending_on_pipeline_type @@ fun pipeline_type ->
+  job_build_arm64_exp ~rules:(build_arm_rules ~pipeline_type) ()
+
 (* Encodes the conditional [before_merging] pipeline and its unconditional variant
    [schedule_extended_test]. *)
 let jobs pipeline_type =
@@ -423,16 +438,9 @@ let jobs pipeline_type =
   let job_build_x86_64_extra_dev = job_build_x86_64_extra_dev pipeline_type in
   let job_build_x86_64_exp = job_build_x86_64_exp pipeline_type in
 
-  let build_arm_rules = make_rules ~label:"ci--arm64" ~manual:Yes () in
-  let job_build_arm64_release : Tezos_ci.tezos_job =
-    job_build_arm64_release ~rules:build_arm_rules ()
-  in
-  let job_build_arm64_extra_dev : Tezos_ci.tezos_job =
-    job_build_arm64_extra_dev ~rules:build_arm_rules ()
-  in
-  let job_build_arm64_exp : Tezos_ci.tezos_job =
-    job_build_arm64_exp ~rules:build_arm_rules ()
-  in
+  let job_build_arm64_release = job_build_arm64_release pipeline_type in
+  let job_build_arm64_extra_dev = job_build_arm64_extra_dev pipeline_type in
+  let job_build_arm64_exp = job_build_arm64_exp pipeline_type in
 
   (* Octez static binaries *)
   let job_static_x86_64_experimental =
@@ -582,138 +590,7 @@ let jobs pipeline_type =
         Homebrew.child_pipeline_full_auto
     in
 
-    let jobs_unit : tezos_job list =
-      let build_dependencies : Runner.Arch.t -> _ = function
-        | Amd64 ->
-            Dependent
-              [
-                Job job_build_x86_64_release;
-                Job job_build_x86_64_extra_dev;
-                Job job_build_x86_64_exp;
-              ]
-        | Arm64 ->
-            Dependent
-              [
-                Job job_build_arm64_release;
-                Job job_build_arm64_extra_dev;
-                Job job_build_arm64_exp;
-              ]
-      in
-      let rules =
-        (* TODO: Note that all jobs defined here are
-           [dependent] in the sense that they all have
-           [dependencies:]. However, AFAICT, these dependencies are all
-           dummy dependencies for ordering -- not for artifacts. This
-           means that these unit tests can very well run even if their
-           dependencies failed. Moreover, the ordering serves no purpose
-           on scheduled pipelines, so we might even remove them for that
-           [pipeline_type]. *)
-        make_rules ~changes:changeset_octez ~dependent:true ()
-      in
-      let job_unit_test ~__POS__ ?(image = Images.CI.build) ?timeout
-          ?parallel_vector ?(rules = rules) ~arch ?(cpu = Runner.CPU.Normal)
-          ?storage ~name ~make_targets () : tezos_job =
-        let arch_string = Runner.Arch.show_easy_to_distinguish arch in
-        let script = ["make $MAKE_TARGETS"] in
-        let dependencies = build_dependencies arch in
-        let variables =
-          [
-            ("ARCH", arch_string);
-            ("MAKE_TARGETS", String.concat " " make_targets);
-            ("DUNE_ARGS", "-j 12");
-          ]
-        in
-
-        let variables, parallel =
-          (* When parallel_vector is set to non-zero (translating to the
-             [parallel_vector:] clause), set the variable
-             [DISTRIBUTE_TESTS_TO_PARALLELS] to [true], so that
-             [scripts/test_wrapper.sh] partitions the set of @runtest
-             targets to build. *)
-          match parallel_vector with
-          | Some n ->
-              ( variables @ [("DISTRIBUTE_TESTS_TO_PARALLELS", "true")],
-                Some (Vector n) )
-          | None -> (variables, None)
-        in
-        let job =
-          job
-            ?timeout
-            ?parallel
-            ~__POS__
-            ~retry:Gitlab_ci.Types.{max = 2; when_ = []}
-            ~name
-            ~stage:Stages.test
-            ~image
-            ~arch
-            ~cpu
-            ?storage
-            ~dependencies
-            ~rules
-            ~variables
-            ~artifacts:
-              (artifacts
-                 ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
-                 ["test_results"]
-                 ~reports:(reports ~junit:"test_results/*.xml" ())
-                 ~expire_in:(Duration (Days 1))
-                 ~when_:Always)
-            ~before_script:
-              (before_script ~source_version:true ~eval_opam:true [])
-            script
-          |> enable_cargo_cache |> enable_sccache
-        in
-        if arch = Amd64 then enable_dune_cache ~key:Pipeline ~policy:Pull job
-        else job
-      in
-      let oc_unit_non_proto_x86_64 =
-        job_unit_test
-          ~__POS__
-          ~name:"oc.unit:non-proto-x86_64"
-          ~arch:Amd64 (* The [lib_benchmark] unit tests require Python *)
-          ~image:Images.CI.test
-          ~make_targets:["test-nonproto-unit"]
-          ()
-      in
-      let oc_unit_other_x86_64 =
-        (* Runs unit tests for contrib. *)
-        job_unit_test
-          ~__POS__
-          ~name:"oc.unit:other-x86_64"
-          ~arch:Amd64
-          ~cpu:High
-          ~make_targets:["test-other-unit"]
-          ()
-      in
-      let oc_unit_proto_x86_64 =
-        (* Runs unit tests for protocol. *)
-        job_unit_test
-          ~__POS__
-          ~name:"oc.unit:proto-x86_64"
-          ~arch:Amd64
-          ~cpu:Very_high
-          ~make_targets:["test-proto-unit"]
-          ()
-      in
-      let oc_unit_non_proto_arm64 =
-        job_unit_test
-          ~__POS__
-          ~name:"oc.unit:non-proto-arm64"
-          ~storage:Ramfs
-          ~parallel_vector:2
-          ~arch:Arm64 (* The [lib_benchmark] unit tests require Python *)
-          ~image:Images.CI.test
-          ~make_targets:["test-nonproto-unit"; "test-webassembly"]
-          ()
-      in
-      [
-        job_ocaml_check;
-        oc_unit_non_proto_x86_64;
-        oc_unit_other_x86_64;
-        oc_unit_proto_x86_64;
-        oc_unit_non_proto_arm64;
-      ]
-    in
+    let jobs_unit : tezos_job list = [job_ocaml_check] in
     (* The set of installation test jobs *)
     let jobs_install_octez : tezos_job list =
       let compile_octez_rules =
