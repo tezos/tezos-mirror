@@ -917,3 +917,20 @@ val clst_deposit :
   Contract.t ->
   Tez.t ->
   Operation.packed tzresult Lwt.t
+
+(** [clst_withdraw ctxt src amount] returns a withdraw operation of
+    [amount] clst tokens on the CLST contract.
+
+    [amount] is given in mutez, as the current internal exchange rate
+    between clst and mutez set at 1. This rate will be adjusted
+    soon. *)
+val clst_withdraw :
+  ?force_reveal:bool ->
+  ?counter:Manager_counter.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  int64 ->
+  Operation.packed tzresult Lwt.t

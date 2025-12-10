@@ -283,8 +283,8 @@
   Ticket_accounting
   Ticket_transfer
   Clst_storage
-  Script_native
   Script_interpreter_defs
+  Script_native
   Script_interpreter
   Sc_rollup_management_protocol
   Sc_rollup_operations
@@ -589,8 +589,8 @@
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
   clst_storage.ml clst_storage.mli
-  script_native.ml script_native.mli
   script_interpreter_defs.ml
+  script_native.ml script_native.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
@@ -896,8 +896,8 @@
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
   clst_storage.ml clst_storage.mli
-  script_native.ml script_native.mli
   script_interpreter_defs.ml
+  script_native.ml script_native.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
@@ -1187,8 +1187,8 @@
   ticket_accounting.ml ticket_accounting.mli
   ticket_transfer.ml ticket_transfer.mli
   clst_storage.ml clst_storage.mli
-  script_native.ml script_native.mli
   script_interpreter_defs.ml
+  script_native.ml script_native.mli
   script_interpreter.ml script_interpreter.mli
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli

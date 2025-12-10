@@ -231,12 +231,21 @@ let missing_companion_key_for_bls_dal = function
   | Validate_errors.Consensus.Missing_companion_key_for_bls_dal _ -> true
   | _ -> false
 
-let expect_clst_empty_deposit ~loc errs =
+let expect_clst_empty_transfer ~loc errs =
   Assert.expect_error ~loc errs (function
     (* CLST is interacted with as a Michelson contract, as such the trace is
        always part of the interpreter error trace. *)
     | Script_interpreter.Runtime_contract_error _
-      :: Script_native.CLST_contract.Empty_deposit :: _ ->
+      :: Script_native.CLST_contract.Empty_transfer :: _ ->
+        true
+    | _ -> false)
+
+let expect_clst_non_empty_transfer ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter.Runtime_contract_error _
+      :: Script_native.CLST_contract.Non_empty_transfer _ :: _ ->
         true
     | _ -> false)
 
@@ -246,5 +255,14 @@ let expect_clst_non_implicit_depositer ~loc errs =
        always part of the interpreter error trace. *)
     | Script_interpreter.Runtime_contract_error _
       :: Script_native.CLST_contract.Non_implicit_contract _ :: _ ->
+        true
+    | _ -> false)
+
+let expect_clst_balance_too_low ~loc errs =
+  Assert.expect_error ~loc errs (function
+    (* CLST is interacted with as a Michelson contract, as such the trace is
+       always part of the interpreter error trace. *)
+    | Script_interpreter.Runtime_contract_error _
+      :: Script_native.CLST_contract.Balance_too_low _ :: _ ->
         true
     | _ -> false)

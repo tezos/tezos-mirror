@@ -277,8 +277,8 @@
         "Ticket_transfer",
 
         "Clst_storage",
-        "Script_native",
         "Script_interpreter_defs",
+        "Script_native",
         "Script_interpreter",
         "Sc_rollup_management_protocol",
         "Sc_rollup_operations",
