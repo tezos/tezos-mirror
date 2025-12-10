@@ -798,7 +798,7 @@ let add_proxy_service cloud runner name ?(url = Fun.id) proxy =
   add_service cloud ~name ~url:(url endpoint)
 
 let add_services cloud runner ~sequencer_endpoint ~tzkt_proxy_opt
-    ~faucet_proxys_opt ~umami_proxys_opt =
+    ~faucet_proxys_opt ~umami_proxys_opt ~bridge_proxy_opt =
   let add_proxy_service = add_proxy_service cloud runner in
   let* () =
     let name_check = "Check Tezlink RPC endpoint" in
@@ -849,6 +849,11 @@ let add_services cloud runner ~sequencer_endpoint ~tzkt_proxy_opt
     | None -> unit
     | Some {umami_proxy; _} -> add_proxy_service "Umami" umami_proxy
   in
+  let* () =
+    match bridge_proxy_opt with
+    | None -> unit
+    | Some bridge_proxy -> add_proxy_service "Bridge" bridge_proxy
+  in
   unit
 
 type dns_domains = {
@@ -857,6 +862,7 @@ type dns_domains = {
   faucet_domain : string;
   faucet_api_domain : string;
   umami_domain : string;
+  bridge_domain : string;
 }
 
 let nginx_config_of_proxy_opt agent = function
@@ -904,6 +910,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
               faucet_domain = make_domain "faucet";
               faucet_api_domain = make_domain "faucet.api";
               umami_domain = make_domain "umami";
+              bridge_domain = make_domain "bridge";
             })
           Cli.parent_dns_domain
       in
@@ -980,6 +987,26 @@ let register (module Cli : Scenarios_cli.Tezlink) =
             some {tzkt_proxy; umami_proxy}
         | _ -> none
       in
+      let* bridge_proxy_opt =
+        match (Cli.deposit_frontend, Cli.external_sequencer_endpoint) with
+        | false, _ -> none
+        | true, None ->
+            Test.fail
+              "Can't deploy the bridge frontend because \
+               --external-sequencer-endpoint is missing. You can't do deposit \
+               on a sandbox sequencer so the bridge would be useless."
+        | true, Some _ ->
+            let bridge_proxy =
+              make_proxy
+                tezlink_sequencer_agent
+                ~path:None
+                ~dns_domain:
+                  (Option.map (fun doms -> doms.bridge_domain) dns_domains)
+                None
+                activate_ssl
+            in
+            some bridge_proxy
+      in
       let* () =
         add_services
           cloud
@@ -988,6 +1015,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           ~tzkt_proxy_opt
           ~faucet_proxys_opt
           ~umami_proxys_opt
+          ~bridge_proxy_opt
       in
       let () = toplog "Starting Tezlink sequencer" in
       let* () =
