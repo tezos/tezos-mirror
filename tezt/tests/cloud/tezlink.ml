@@ -1077,6 +1077,31 @@ let register (module Cli : Scenarios_cli.Tezlink) =
                 ~faucet_frontend_proxy
             in
             unit
+      and* () =
+        match bridge_proxy_opt with
+        | None -> unit
+        | Some bridge_proxy ->
+            let () = toplog "Starting bridge frontend" in
+            let bridge_contract, rollup =
+              match (Cli.bridge_contract, Cli.rollup_address) with
+              | Some bridge_contract, Some rollup_address ->
+                  (bridge_contract, rollup_address)
+              | _ ->
+                  Test.fail
+                    "Options --bridge-contract and --rollup are required to \
+                     start the bridge frontend."
+            in
+            let _ =
+              init_bridge_frontend
+                ~agent:tezlink_sequencer_agent
+                ~network:Cli.l1_network
+                ~l1_endpoint:Cli.l1_endpoint
+                ~bridge_contract
+                ~tzkt_api_url:Cli.l1_tzkt_api
+                ~rollup
+                ~bridge_proxy
+            in
+            unit
       in
       let* () =
         let* rpc_nginx_config =
