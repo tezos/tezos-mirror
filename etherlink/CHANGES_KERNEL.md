@@ -2,9 +2,13 @@
 
 ## Version NEXT
 
+Its storage version is 45.
+
 ### Features
 
 ### Bug fixes
+
+- Cleanup remaining leftover block indexes from V41 migration. (!20187)
 
 ### Internal
 
