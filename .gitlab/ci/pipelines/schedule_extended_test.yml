@@ -975,7 +975,7 @@ ocaml-check:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - eval $(opam env)
-  - dune cache trim --size=3GB
+  - dune cache trim --size=5GB
   variables:
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
