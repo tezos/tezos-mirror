@@ -55,7 +55,7 @@ type session_state = {
           only once the commits in Irmin and SQlite have been confirmed. *)
   mutable future_block_state : future_block_state option;
       (** This value starts at None to prevent inclusion confirmation
-          handling on an incomplete stream after startup. 
+          handling on an incomplete stream after startup.
           In the case where we find a divergence between the next_blueprint_number
           and the one received by Next_block_info, we lock single transaction executions
           by setting this to None again. *)
@@ -1152,6 +1152,9 @@ module State = struct
                 let+ receipts = store_tez_block_unsafe conn block in
                 (* TODO: support extracting the execution gas *)
                 (Z.zero, receipts)
+          in
+          let*! evm_state =
+            Evm_state.clear_block_storage chain_family block evm_state
           in
           return (evm_state, receipts, execution_gas)
         in
