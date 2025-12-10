@@ -32,7 +32,7 @@ val produce_genesis :
     transactions is empty and [force] is set to [false].*)
 val produce_block :
   force:bool ->
-  timestamp:Time.Protocol.t ->
+  timestamp:Time.Protocol.t option ->
   [`Block_produced of int | `No_block] tzresult Lwt.t
 
 (** [preconfirm_transactions ~transactions] validates each transaction in
@@ -46,6 +46,6 @@ module Internal_for_tests : sig
   val produce_block :
     with_delayed_transactions:bool ->
     force:bool ->
-    timestamp:Time.Protocol.t ->
+    timestamp:Time.Protocol.t option ->
     [`Block_produced of int | `No_block] tzresult Lwt.t
 end

@@ -94,7 +94,7 @@ module Request = struct
         (Time.Protocol.t * Ethereum_types.block_hash)
         -> (unit, tztrace) t
     | Produce_block :
-        (bool * Time.Protocol.t * bool)
+        (bool * Time.Protocol.t option * bool)
         -> ([`Block_produced of int | `No_block], tztrace) t
     | Preconfirm_transactions :
         (string * Tx_queue_types.transaction_object_t) list
@@ -138,7 +138,7 @@ module Request = struct
           (obj4
              (req "request" (constant "produce_block"))
              (req "with_delayed_transactions" bool)
-             (req "timestamp" Time.Protocol.encoding)
+             (opt "timestamp" Time.Protocol.encoding)
              (req "force" bool))
           (function
             | View (Produce_block (with_delayed_transactions, timestamp, force))
@@ -473,16 +473,16 @@ let produce_genesis ~(state : Types.state) ~timestamp ~parent_hash =
     (Blueprints_publisher_types.Request.Blueprint
        {chunks = genesis_chunks; inbox_payload = genesis_payload})
 
-(* Required while the preconfirmation system and previous block production co-exist *)
-let choose_block_timestamp preconfirmation_stream_enabled next_block_timestamp
-    external_timestamp =
-  match (preconfirmation_stream_enabled, next_block_timestamp) with
-  | false, _ -> external_timestamp
-  | true, Some next -> Time.System.to_protocol next
-  | true, None -> Misc.now ()
+let choose_block_timestamp next_block_timestamp external_timestamp =
+  let provided_timestamp =
+    Option.either
+      external_timestamp
+      (Option.map Time.System.to_protocol next_block_timestamp)
+  in
+  match provided_timestamp with Some ts -> ts | None -> Misc.now ()
 
-let produce_block (state : Types.state) ~force ~(timestamp : Time.Protocol.t)
-    ~with_delayed_transactions =
+let produce_block (state : Types.state) ~force
+    ~(timestamp : Time.Protocol.t option) ~with_delayed_transactions =
   let open Lwt_result_syntax in
   match state.tx_container with
   | Ex_tx_container tx_container ->
@@ -498,10 +498,7 @@ let produce_block (state : Types.state) ~force ~(timestamp : Time.Protocol.t)
       *)
       let now = Ptime_clock.now () in
       let timestamp =
-        choose_block_timestamp
-          state.preconfirmation_stream_enabled
-          state.next_block_timestamp
-          timestamp
+        choose_block_timestamp state.next_block_timestamp timestamp
       in
       let*! head_info = Evm_context.head_info () in
       let* () =
@@ -629,6 +626,11 @@ let preconfirm_transactions ~(state : Types.state) ~transactions ~timestamp =
         proto_timestamp
         head_info.next_blueprint_number ;
       let*! () = Events.next_block_timestamp proto_timestamp in
+      let* () =
+        Evm_context.next_block_info
+          proto_timestamp
+          head_info.next_blueprint_number
+      in
       let* remaining_cumulative_size =
         preconfirm_delayed_transactions ~state ~head_info
       in
