@@ -169,6 +169,7 @@ let job_docgen =
     ~description:
       "Build various generated reference material. This includes the RPC, P2P \
        and error reference."
+    ~cpu:Tezos_ci.Runner.CPU.Very_high
     ~only_if_changed:Files.odoc
     ~force_if_label:["ci--docs"]
     ~artifacts:
