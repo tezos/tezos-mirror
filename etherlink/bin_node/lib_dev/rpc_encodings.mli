@@ -416,3 +416,10 @@ type websocket_response = {
 }
 
 type websocket_handler = JSONRPC.request -> websocket_response Lwt.t
+
+module Tezosx : sig
+  module Get_tezos_ethereum_address :
+    METHOD
+      with type input = Signature.public_key_hash
+       and type output = Ethereum_types.address
+end
