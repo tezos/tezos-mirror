@@ -1084,6 +1084,56 @@ let publish_dummy_slot ~source ?error ?fee ~index ~message cryptobox =
   let commitment, proof = Dal.(Commitment.dummy_commitment cryptobox message) in
   Helpers.publish_commitment ~source ?fee ?error ~index ~commitment ~proof
 
+let slot_idx parameters level =
+  level mod parameters.Dal.Parameters.number_of_slots
+
+(** For each level in the range [from_level, to_level]:
+    1. Publishes a dummy slot with content derived from the level and slot index
+    2. Stores the slot in the DAL node
+    3. Bakes a new block to include the published slot on L1
+    4. Waits for the node to reach the baked level
+
+    The [delegates] parameter is used to specify which delegates should
+    participate in baking. *)
+let publish_and_bake ?delegates ~from_level ~to_level parameters cryptobox node
+    client dal_node =
+  let num_bakers = Array.length Account.Bootstrap.keys in
+  let publish source ~index message =
+    let* _op_hash =
+      publish_dummy_slot ~source ~index ~message cryptobox client
+    in
+    unit
+  in
+  let publish_and_store level =
+    let source = Account.Bootstrap.keys.(level mod num_bakers) in
+    let index = slot_idx parameters level in
+    let slot_content =
+      Format.asprintf "content at level %d index %d" level index
+    in
+    let* () = publish source ~index slot_content in
+    let* _commitment, _proof =
+      let slot_size = parameters.Dal.Parameters.cryptobox.slot_size in
+      Helpers.(
+        store_slot dal_node ~slot_index:index
+        @@ make_slot ~slot_size slot_content)
+    in
+    Log.info "Slot with %d index (normally) published at level %d" index level ;
+    unit
+  in
+  Log.info
+    "Publish (inject and bake) a slot header at each level from %d to %d."
+    from_level
+    to_level ;
+  let rec iter level =
+    if level > to_level then return ()
+    else
+      let* () = publish_and_store level in
+      let* () = bake_for ?delegates client in
+      let* _ = Node.wait_for_level node level in
+      iter (level + 1)
+  in
+  iter from_level
+
 (* We check that publishing a slot header with a proof for a different
    slot leads to a proof-checking error. *)
 let publish_dummy_slot_with_wrong_proof_for_same_content ~source ?fee ~index
@@ -2646,49 +2696,9 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
   Check.((parameters.Dal.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
   let client = Client.with_dal_node client ~dal_node in
-  let number_of_slots = parameters.Dal.Parameters.number_of_slots in
-  let slot_size = parameters.cryptobox.slot_size in
-  let slot_idx level = level mod number_of_slots in
-  let num_bakers = Array.length Account.Bootstrap.keys in
   let all_delegates =
     Account.Bootstrap.keys |> Array.to_list
     |> List.map (fun key -> key.Account.alias)
-  in
-  let publish source ~index message =
-    let* _op_hash =
-      publish_dummy_slot ~source ~index ~message cryptobox client
-    in
-    unit
-  in
-  let publish_and_store level =
-    let source = Account.Bootstrap.keys.(level mod num_bakers) in
-    let index = slot_idx level in
-    let slot_content =
-      Format.asprintf "content at level %d index %d" level index
-    in
-    let* () = publish source ~index slot_content in
-    let* _commitment, _proof =
-      Helpers.(
-        store_slot dal_node ~slot_index:index
-        @@ make_slot ~slot_size slot_content)
-    in
-    unit
-  in
-  let publish_and_bake ~init_level ~target_level =
-    Log.info
-      "Publish (inject and bake) a slot header at each level from %d to %d."
-      init_level
-      target_level ;
-    let rec iter level =
-      if level > target_level then return ()
-      else
-        let* () = publish_and_store level in
-        (* bake (and attest) with all available delegates to go faster *)
-        let* () = bake_for client in
-        let* _ = Node.wait_for_level node level in
-        iter (level + 1)
-    in
-    iter init_level
   in
   let run_baker delegates target_level =
     let* baker =
@@ -2727,7 +2737,16 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
       "attestation_lag (%L) should be higher than [max_level - first_level] \
        (which is %R)" ;
   let wait_block_processing = wait_for_layer1_head dal_node max_level in
-  let* () = publish_and_bake ~init_level:first_level ~target_level:max_level in
+  let* () =
+    publish_and_bake
+      ~from_level:first_level
+      ~to_level:max_level
+      parameters
+      cryptobox
+      node
+      client
+      dal_node
+  in
   let* () = wait_block_processing in
   let last_level_of_first_baker =
     intermediary_level + parameters.attestation_lag
@@ -2801,7 +2820,7 @@ let test_attester_with_daemon protocol parameters cryptobox node client dal_node
           dal_node
           ~expected_status
           ~slot_level:level
-          ~slot_index:(slot_idx level)
+          ~slot_index:(slot_idx parameters level)
       in
       check_attestations (level + 1)
   in
@@ -2814,11 +2833,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
   Check.((parameters.Dal.Parameters.attestation_threshold = 100) int)
     ~error_msg:"attestation_threshold value (%L) should be 100" ;
   let client = Client.with_dal_node client ~dal_node in
-  let number_of_slots = parameters.Dal.Parameters.number_of_slots in
-  let slot_size = parameters.cryptobox.slot_size in
   let lag = parameters.attestation_lag in
-  let slot_idx level = level mod number_of_slots in
-  let num_bakers = Array.length Account.Bootstrap.keys in
   let all_delegates =
     Account.Bootstrap.keys |> Array.to_list
     |> List.map (fun key -> key.Account.alias)
@@ -2837,44 +2852,6 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
 
   Log.info "attestation_lag = %d" lag ;
 
-  (* Publish and bake with client *)
-  let publish source ~index message =
-    let* _op_hash =
-      publish_dummy_slot ~source ~index ~message cryptobox client
-    in
-    unit
-  in
-  let publish_and_store level =
-    let source = Account.Bootstrap.keys.(level mod num_bakers) in
-    let index = slot_idx level in
-    let slot_content =
-      Format.asprintf "content at level %d index %d" level index
-    in
-    let* () = publish source ~index slot_content in
-    let* _commitment, _proof =
-      Helpers.(
-        store_slot dal_node ~slot_index:index
-        @@ make_slot ~slot_size slot_content)
-    in
-    Log.info "Slot with %d index (normally) published at level %d" index level ;
-    unit
-  in
-  let publish_and_bake ~from_level ~to_level delegates =
-    Log.info
-      "Publish (inject and bake) a slot header at each level from %d to %d."
-      from_level
-      to_level ;
-    let rec iter level =
-      if level > to_level then return ()
-      else
-        let* () = publish_and_store level in
-        let* () = bake_for ~delegates:(`For delegates) client in
-        let* _ = Node.wait_for_level node level in
-        iter (level + 1)
-    in
-    iter from_level
-  in
-
   let wait_level = last_level + 1 in
   let wait_block_processing_on_l1 = wait_for_layer1_head dal_node wait_level in
 
@@ -2886,18 +2863,27 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
     publish_and_bake
       ~from_level:first_level
       ~to_level:(intermediary_level + lag)
-      all_delegates
+      ~delegates:(`For all_delegates)
+      parameters
+      cryptobox
+      node
+      client
+      dal_node
   in
   let* () =
     publish_and_bake
       ~from_level:(intermediary_level + lag + 1)
       ~to_level:last_level
-      not_all_delegates
+      ~delegates:(`For not_all_delegates)
+      parameters
+      cryptobox
+      node
+      client
+      dal_node
   in
   let* () = bake_for client in
   let* _lvl = wait_block_processing_on_l1 in
   let* () = wait_block_processing_on_dal in
-
   Log.info "Check the attestation status of the published slots." ;
   let rec check_attestations level =
     if level > last_checked_level then return ()
@@ -2912,7 +2898,7 @@ let test_attester_with_bake_for _protocol parameters cryptobox node client
           dal_node
           ~expected_status
           ~slot_level:level
-          ~slot_index:(slot_idx level)
+          ~slot_index:(slot_idx parameters level)
       in
       check_attestations (level + 1)
   in
