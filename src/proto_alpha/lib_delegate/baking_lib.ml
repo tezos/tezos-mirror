@@ -32,7 +32,7 @@ module Events = Baking_events.Lib
 let sleep_until_block_timestamp prepared_block =
   let open Lwt_syntax in
   match
-    Baking_scheduling.sleep_until
+    Baking_automaton.sleep_until
       prepared_block.signed_block_header.shell.timestamp
   with
   | Some waiter ->
@@ -94,7 +94,7 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
       (fun dal_node_rpc_ctxt ->
         let*! delegates =
           List.map_s
-            (Baking_scheduling.try_resolve_consensus_keys cctxt)
+            (Baking_automaton.try_resolve_consensus_keys cctxt)
             delegates
         in
         let delegate_ids =
@@ -219,7 +219,7 @@ let bake_at_next_level_event state =
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let*! baking_time =
-    Baking_scheduling.compute_next_potential_baking_time_at_next_level state
+    Baking_automaton.compute_next_potential_baking_time_at_next_level state
   in
   match baking_time with
   | None -> cctxt#error "No baking slot found for the delegates"
@@ -235,7 +235,7 @@ let bake_at_next_level_event state =
       let*! () =
         Option.value
           ~default:Lwt.return_unit
-          (Baking_scheduling.sleep_until timestamp)
+          (Baking_automaton.sleep_until timestamp)
       in
       return
         (Baking_state.Timeout
@@ -264,7 +264,7 @@ let bake_at_next_level state =
    or attest the block if necessary *)
 let first_automaton_event state =
   match state.level_state.elected_block with
-  | None -> Lwt.return (Baking_scheduling.compute_bootstrap_event state)
+  | None -> Lwt.return (Baking_automaton.compute_bootstrap_event state)
   | Some _elected_block ->
       (* If there is an elected block we can directly bake at next
          level after waiting its date *)
@@ -332,7 +332,7 @@ let propose_at_next_level ~minimal_timestamp state =
   if minimal_timestamp then
     let* minimal_round, delegate =
       match
-        Baking_scheduling.first_potential_round_at_next_level
+        Baking_automaton.first_potential_round_at_next_level
           state
           ~earliest_round:Round.zero
       with
@@ -472,7 +472,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
             in
             propose_at_next_level ~minimal_timestamp state
         | None -> (
-            let*? event = Baking_scheduling.compute_bootstrap_event state in
+            let*? event = Baking_automaton.compute_bootstrap_event state in
             let*! state, _action = State_transitions.step state event in
             let latest_proposal = state.level_state.latest_proposal in
             let open State_transitions in
@@ -583,7 +583,7 @@ let repropose (cctxt : Protocol_client_context.full) ?(force = false)
   let* state = create_state cctxt ~config ~current_proposal delegates in
   (* Make sure the operation worker is populated to avoid empty blocks
      being proposed. *)
-  let*? event = Baking_scheduling.compute_bootstrap_event state in
+  let*? event = Baking_automaton.compute_bootstrap_event state in
   let*! state, _action = State_transitions.step state event in
   let latest_proposal = state.level_state.latest_proposal in
   let* state =
@@ -604,7 +604,7 @@ let repropose (cctxt : Protocol_client_context.full) ?(force = false)
     | None, true -> (
         let next_round = Round.succ latest_proposal.block.round in
         match
-          Baking_scheduling.first_potential_round_at_current_level
+          Baking_automaton.first_potential_round_at_current_level
             ~earliest_round:next_round
             state
         with
@@ -671,7 +671,7 @@ let bake_using_automaton ~count config state heads_stream =
     state.global_state.forge_worker_hooks.get_forge_event_stream ()
   in
   let loop_state =
-    Baking_scheduling.create_loop_state
+    Baking_automaton.create_loop_state
       ~heads_stream
       ~forge_event_stream
       state.global_state.operation_worker
@@ -683,7 +683,7 @@ let bake_using_automaton ~count config state heads_stream =
     | _ -> false
   in
   let* event_opt =
-    Baking_scheduling.automaton_loop
+    Baking_automaton.automaton_loop
       ~stop_on_event:stop_on_next_level_block
       ~config
       ~on_error:(fun err -> Lwt.return (Error err))
@@ -760,7 +760,7 @@ let rec baking_minimal_timestamp ~count state
   in
   let* minimal_round, delegate =
     match
-      Baking_scheduling.first_potential_round_at_next_level
+      Baking_automaton.first_potential_round_at_next_level
         state
         ~earliest_round:Round.zero
     with
