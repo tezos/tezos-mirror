@@ -25,7 +25,9 @@ module CLST_contract = struct
 
   let execute_deposit (ctxt, (step_constants : Script_typed_ir.step_constants))
       (() : deposit) (storage : storage) :
-      ((operation Script_list.t, storage) pair * context) tzresult Lwt.t =
+      ((operation Script_list.t * storage * Receipt.balance_updates) * context)
+      tzresult
+      Lwt.t =
     let open Lwt_result_syntax in
     let*? () = error_when Tez.(step_constants.amount = zero) Empty_transfer in
     let*? () =
@@ -53,17 +55,20 @@ module CLST_contract = struct
     in
     let new_ledger, total_supply = new_storage in
     let total_supply = Script_int.add_n total_supply added_amount in
-    let* ctxt, _balance_updates =
+    let* ctxt, balance_updates =
       Clst_contract_storage.deposit_to_clst_deposits
         ctxt
         ~clst_contract_hash:step_constants.self
         step_constants.amount
     in
-    return ((Script_list.empty, (new_ledger, total_supply)), ctxt)
+    return
+      ((Script_list.empty, (new_ledger, total_supply), balance_updates), ctxt)
 
   let execute_withdraw (ctxt, (step_constants : Script_typed_ir.step_constants))
       (amount : withdraw) (storage : storage) :
-      ((operation Script_list.t, storage) pair * context) tzresult Lwt.t =
+      ((operation Script_list.t * storage * Receipt.balance_updates) * context)
+      tzresult
+      Lwt.t =
     let open Lwt_result_syntax in
     let*? () =
       error_when
@@ -109,7 +114,7 @@ module CLST_contract = struct
       Tez.of_mutez_exn
         (Option.value ~default:0L (Script_int.to_int64 removed_amount))
     in
-    let* ctxt, _balance_updates =
+    let* ctxt, balance_updates =
       Clst_contract_storage.withdraw_from_clst_deposits
         ctxt
         ~clst_contract_hash:step_constants.self
@@ -130,7 +135,9 @@ module CLST_contract = struct
     let ctxt = Local_gas_counter.update_context gas_counter outdated_ctxt in
     let new_ledger, total_supply = new_storage in
     let total_supply = Script_int.(abs (sub total_supply removed_amount)) in
-    return ((Script_list.of_list [op], (new_ledger, total_supply)), ctxt)
+    return
+      ( (Script_list.of_list [op], (new_ledger, total_supply), balance_updates),
+        ctxt )
 
   let execute (ctxt, (step_constants : step_constants)) (value : arg)
       (storage : storage) =
@@ -207,7 +214,9 @@ let get_views : type arg storage.
 
 let execute (type arg storage) (ctxt, step_constants)
     (kind : (arg, storage) kind) (arg : arg) (storage : storage) :
-    ((operation Script_list.t, storage) pair * context, error trace) result
+    ( (operation Script_list.t * storage * Receipt.balance_updates) * context,
+      error trace )
+    result
     Lwt.t =
   match kind with
   | CLST_kind -> CLST_contract.execute (ctxt, step_constants) arg storage

@@ -1945,12 +1945,15 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
   let*? to_update, ctxt =
     Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
   in
-  let* (ops, new_storage), ctxt =
+  let* (ops, new_storage, balance_updates), ctxt =
     match implementation with
     | Lambda {code; _} ->
-        trace
-          (Runtime_contract_error step_constants.self)
-          (interp logger (ctxt, step_constants) code (arg, old_storage))
+        let* (op, new_storage), ctxt =
+          trace
+            (Runtime_contract_error step_constants.self)
+            (interp logger (ctxt, step_constants) code (arg, old_storage))
+        in
+        return ((op, new_storage, []), ctxt)
     | Native {kind} ->
         trace
           (Runtime_contract_error step_constants.self)
@@ -2028,7 +2031,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
         ticket_diffs;
         ticket_receipt;
         address_registry_diff;
-        balance_updates = [];
+        balance_updates;
       },
       ctxt )
 
