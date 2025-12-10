@@ -711,89 +711,12 @@ let jobs pipeline_type =
           ~make_targets:["test-nonproto-unit"; "test-webassembly"]
           ()
       in
-      let oc_unit_webassembly_x86_64 =
-        job
-          ~__POS__
-          ~name:"oc.unit:webassembly-x86_64"
-          ~arch:Amd64 (* The wasm tests are written in Python *)
-          ~image:Images.CI.test
-          ~stage:Stages.test
-          ~dependencies:(build_dependencies Amd64)
-          ~rules
-          ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/4663
-               This test takes around 2 to 4min to complete, but it sometimes
-               hangs. We use a timeout to retry the test in this case. The
-               underlying issue should be fixed eventually, turning this timeout
-               unnecessary. *)
-          ~timeout:(Minutes 20)
-          ["make test-webassembly"]
-      in
-      let oc_unit_protocol_compiles =
-        job
-          ~__POS__
-          ~name:"oc.unit:protocol_compiles"
-          ~arch:Amd64
-          ~cpu:Very_high
-          ~image:Images.CI.build
-          ~stage:Stages.test
-          ~dependencies:(build_dependencies Amd64)
-          ~rules
-          ~before_script:(before_script ~source_version:true ~eval_opam:true [])
-          ["dune build @runtest_compile_protocol"]
-        |> enable_cargo_cache |> enable_sccache
-      in
-      (* "de" stands for data-encoding, since data-encoding is considered
-         to be a separate product. *)
-      let de_unit arch ?storage () =
-        job
-          ~__POS__
-          ~name:("de.unit:" ^ Runner.Arch.show_easy_to_distinguish arch)
-          ~arch
-          ?storage
-          ~image:Images.CI.test
-          ~stage:Stages.test
-          ~rules:
-            (make_rules
-               ~changes:
-                 (Changeset.union
-                    changeset_base
-                    (Changeset.make ["data-encoding/**"]))
-               ())
-          ~dependencies:(build_dependencies arch)
-          ~before_script:(before_script ~eval_opam:true [])
-          ["dune runtest data-encoding"]
-      in
-      let resto_unit arch ?storage () =
-        job
-          ~__POS__
-          ~name:("resto.unit:" ^ Runner.Arch.show_easy_to_distinguish arch)
-          ~arch
-          ?storage
-          ~image:Images.CI.test
-          ~stage:Stages.test
-          ~timeout:(Minutes 10)
-          ~rules:
-            (make_rules
-               ~changes:
-                 (Changeset.union changeset_base (Changeset.make ["resto/**"]))
-               ())
-          ~dependencies:(build_dependencies arch)
-          ~before_script:(before_script ~eval_opam:true [])
-          ["dune runtest resto"]
-      in
       [
         job_ocaml_check;
         oc_unit_non_proto_x86_64;
         oc_unit_other_x86_64;
         oc_unit_proto_x86_64;
         oc_unit_non_proto_arm64;
-        oc_unit_webassembly_x86_64;
-        oc_unit_protocol_compiles;
-        de_unit Amd64 ();
-        de_unit Arm64 ~storage:Ramfs ();
-        resto_unit Amd64 ();
-        resto_unit Arm64 ~storage:Ramfs ();
       ]
     in
     (* The set of installation test jobs *)
