@@ -53,3 +53,21 @@ val set_balance_from_storage :
 (** [get_total_supply context] returns the total supply of CLST tokens
     in the CLST contract. *)
 val get_total_supply : context -> (CLST_types.nat * context) tzresult Lwt.t
+
+(** [deposit_to_clst_deposits context ~clst_contract_hash amount] deposits
+    [amount] tez from [clst_contract_hash] balance to the CLST deposits
+    container *)
+val deposit_to_clst_deposits :
+  context ->
+  clst_contract_hash:Contract_hash.t ->
+  Tez.t ->
+  (context * Receipt.balance_updates) tzresult Lwt.t
+
+(** [withdraw_from_clst_deposits context ~clst_contract_hash amount] withdraws
+    [amount] tez from the CLST deposits container to [clst_contract_hash]
+    balance. *)
+val withdraw_from_clst_deposits :
+  context ->
+  clst_contract_hash:Contract_hash.t ->
+  Tez.t ->
+  (context * Receipt.balance_updates) tzresult Lwt.t

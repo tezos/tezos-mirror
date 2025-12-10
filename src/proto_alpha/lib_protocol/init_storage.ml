@@ -158,6 +158,7 @@ let initialize_accumulator_native_contract ctxt =
       ~script:(Script_native_repr.CLST_contract.with_initial_storage, None)
   in
   let* ctxt = Storage.Contract.Native_contracts.CLST.init ctxt contract_hash in
+  let* ctxt = Storage.Clst.Deposits_balance.init ctxt Tez_repr.zero in
   return (Raw_context.unset_origination_nonce ctxt)
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract

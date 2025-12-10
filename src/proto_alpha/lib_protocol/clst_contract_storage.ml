@@ -76,3 +76,11 @@ let get_total_supply ctxt =
     | None -> Script_int.zero_n
   in
   return (total_supply, ctxt)
+
+let deposit_to_clst_deposits ctxt ~clst_contract_hash amount =
+  let clst_contract = Contract.Originated clst_contract_hash in
+  Token.transfer ctxt (`Contract clst_contract) `CLST_deposits amount
+
+let withdraw_from_clst_deposits ctxt ~clst_contract_hash amount =
+  let clst_contract = Contract.Originated clst_contract_hash in
+  Token.transfer ctxt `CLST_deposits (`Contract clst_contract) amount

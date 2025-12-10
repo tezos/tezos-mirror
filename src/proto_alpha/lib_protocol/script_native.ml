@@ -53,6 +53,12 @@ module CLST_contract = struct
     in
     let new_ledger, total_supply = new_storage in
     let total_supply = Script_int.add_n total_supply added_amount in
+    let* ctxt, _balance_updates =
+      Clst_contract_storage.deposit_to_clst_deposits
+        ctxt
+        ~clst_contract_hash:step_constants.self
+        step_constants.amount
+    in
     return ((Script_list.empty, (new_ledger, total_supply)), ctxt)
 
   let execute_withdraw (ctxt, (step_constants : Script_typed_ir.step_constants))
@@ -102,6 +108,12 @@ module CLST_contract = struct
     let amount_tez =
       Tez.of_mutez_exn
         (Option.value ~default:0L (Script_int.to_int64 removed_amount))
+    in
+    let* ctxt, _balance_updates =
+      Clst_contract_storage.withdraw_from_clst_deposits
+        ctxt
+        ~clst_contract_hash:step_constants.self
+        amount_tez
     in
     let gas_counter, outdated_ctxt =
       Local_gas_counter.local_gas_counter_and_outdated_context ctxt
