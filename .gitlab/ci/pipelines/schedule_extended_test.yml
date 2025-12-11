@@ -140,28 +140,6 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-sanity_ci:
-  image: ${ci_image_name_protected}/build:amd64--master
-  stage: sanity
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - make --silent -C manifest check
-  - make --silent -C ci check
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 docker:hadolint:
   image: hadolint/hadolint:2.12.0-alpine
   stage: sanity
@@ -1191,6 +1169,28 @@ oc.build_kernels:
     - tx_kernel_dal.wasm
     - dal_echo_kernel.wasm
     when: on_success
+
+sanity_ci:
+  image: ${ci_image_name_protected}/build:amd64--master
+  stage: sanity
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  - make --silent -C manifest check
+  - make --silent -C ci check
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}

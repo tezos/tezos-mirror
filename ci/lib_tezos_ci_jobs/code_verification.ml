@@ -239,23 +239,6 @@ let jobs pipeline_type =
   let sanity =
     let stage = Stages.sanity in
     let dependencies = Dependent [] in
-    let job_sanity_ci : tezos_job =
-      (* Quick, CI-related sanity checks.
-
-         Verifies that manifest and CIAO are up to date. *)
-      job
-        ~__POS__
-        ~name:"sanity_ci"
-        ~image:Images.CI.build_master
-        ~stage
-        ~dependencies
-        ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
-        [
-          "make --silent -C manifest check";
-          (* Check that .gitlab-ci.yml is up to date. *)
-          "make --silent -C ci check";
-        ]
-    in
     (* Necromantic nix-related rites. *)
     let job_nix : tezos_job =
       job
@@ -420,7 +403,6 @@ let jobs pipeline_type =
       | Schedule_extended_test -> []
     in
     [
-      job_sanity_ci;
       job_docker_hadolint;
       job_oc_ocaml_fmt;
       job_semgrep;
