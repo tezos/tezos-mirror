@@ -34,6 +34,25 @@ type genesis_info = Metadata.genesis_info = {
   commitment_hash : Commitment.Hash.t;
 }
 
+type context_status = Valid | Dirty
+
+(** The current head context state, shared between the daemon (which evaluates
+    blocks) and state readers (such as RPC handlers). [status] is set to [Dirty]
+    at the start of block evaluation and to [Valid] once evaluation is complete.
+
+    Invariant:
+    [status = Valid] => [ctxt] is the context resulting from the full evaluation
+    of [block].
+
+    In particular, when [status = Dirty], [ctxt] is being evaluated for [block]
+    and may be in an intermediate state. *)
+type context_state = {
+  ctxt : Context.rw;  (** The mutable context with read-write PVM state. *)
+  status : context_status;
+      (** Whether this context is fully committed or still being evaluated. *)
+  block : Layer1.header;  (** The block this context corresponds to. *)
+}
+
 (** Abstract type for store to force access through this module. *)
 type 'a store constraint 'a = [< `Read | `Write > `Read]
 

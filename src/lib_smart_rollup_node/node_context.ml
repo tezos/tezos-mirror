@@ -32,6 +32,14 @@ type genesis_info = Metadata.genesis_info = {
   commitment_hash : Commitment.Hash.t;
 }
 
+type context_status = Valid | Dirty
+
+type context_state = {
+  ctxt : Context.rw;
+  status : context_status;
+  block : Layer1.header;
+}
+
 type 'a store = 'a Store.t constraint 'a = [< `Read | `Write > `Read]
 
 module Node_store = struct

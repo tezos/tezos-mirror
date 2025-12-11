@@ -30,6 +30,7 @@ type state = {
   rpc_server : Rpc_server.t;
   configuration : Configuration.t;
   node_ctxt : Node_context.rw;
+  current_ctxt : Node_context.context_state option Reference.rw;
 }
 
 let is_before_origination (node_ctxt : _ Node_context.t)
@@ -37,14 +38,32 @@ let is_before_origination (node_ctxt : _ Node_context.t)
   let origination_level = node_ctxt.genesis_info.level in
   header.level < origination_level
 
-let previous_context (node_ctxt : _ Node_context.t)
-    ~(predecessor : Layer1.header) =
+let context_of_block' (node_ctxt : _ Node_context.t) (block : Layer1.header) =
   let open Lwt_result_syntax in
-  if is_before_origination node_ctxt predecessor then
+  if is_before_origination node_ctxt block then
     (* This is before we have interpreted the boot sector, so we start
        with an empty context in genesis *)
     return (Context.empty node_ctxt.context)
-  else Node_context.checkout_context node_ctxt predecessor.Layer1.hash
+  else Node_context.checkout_context node_ctxt block.hash
+
+let context_of_block ~set_current {node_ctxt; current_ctxt; _}
+    (block : Layer1.header) =
+  let open Lwt_result_syntax in
+  match Reference.get current_ctxt with
+  | Some {ctxt; status = Valid; block = {hash = current_hash; _}}
+    when Block_hash.equal block.hash current_hash ->
+      return ctxt
+  | _ ->
+      let+ ctxt = context_of_block' node_ctxt block in
+      if set_current then
+        Reference.set current_ctxt @@ Some {ctxt; status = Valid; block} ;
+      ctxt
+
+let start_block_evaluation state block ctxt =
+  Reference.set state.current_ctxt @@ Some {ctxt; status = Dirty; block}
+
+let finish_block_evaluation state block ctxt =
+  Reference.set state.current_ctxt @@ Some {ctxt; status = Valid; block}
 
 let start_workers (plugin : (module Protocol_plugin_sig.S))
     (node_ctxt : _ Node_context.t) =
@@ -138,7 +157,8 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       ]) ;
   let* () = Node_context.save_protocol_info node_ctxt head ~predecessor in
   let* () = handle_protocol_migration ~catching_up state head in
-  let* ctxt = previous_context node_ctxt ~predecessor in
+  let* ctxt = context_of_block ~set_current:true state predecessor in
+  start_block_evaluation state head ctxt ;
   let module Plugin = (val state.plugin) in
   let start_timestamp = Time.System.now () in
   let* inbox_hash, inbox, inbox_witness, messages =
@@ -169,6 +189,7 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       (inbox, messages)
   in
   let*! context_hash = Context.commit ctxt in
+  finish_block_evaluation state head ctxt ;
   let* commitment_hash =
     Publisher.process_head
       state.plugin
@@ -275,7 +296,7 @@ and update_l2_chain ({node_ctxt; _} as state) ~catching_up
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7731
            This just overwrites the outbox messages with the correct ones for
            the level but we need to properly handle reorgs in the storage. *)
-        let* ctxt = Node_context.checkout_context node_ctxt head.hash in
+        let* ctxt = context_of_block ~set_current:true state head in
         let* () =
           register_outbox_messages state.plugin node_ctxt ctxt head.level
         in
@@ -783,7 +804,7 @@ module Internal_for_tests = struct
       (node_ctxt : _ Node_context.t) ~is_first_block ~predecessor head messages
       =
     let open Lwt_result_syntax in
-    let* ctxt = previous_context node_ctxt ~predecessor in
+    let* ctxt = context_of_block' node_ctxt predecessor in
     let* () = Node_context.save_level node_ctxt (Layer1.head_of_header head) in
     let* inbox_hash, inbox, inbox_witness, messages =
       Plugin.Inbox.Internal_for_tests.process_messages
@@ -961,6 +982,7 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
       current_protocol
       configuration
   in
+  let current_ctxt = Reference.new_ None in
   let dir = Rpc_directory.directory node_ctxt in
   let* rpc_server =
     Rpc_server.start
@@ -970,7 +992,7 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
       ~cors:configuration.cors
       dir
   in
-  let state = {node_ctxt; rpc_server; configuration; plugin} in
+  let state = {node_ctxt; rpc_server; configuration; plugin; current_ctxt} in
   let* () = check_operator_balance state in
   let* () = Node_context.save_protocols_from_l1 node_ctxt in
   let (_ : Lwt_exit.clean_up_callback_id) =
