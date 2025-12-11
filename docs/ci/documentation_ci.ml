@@ -131,8 +131,6 @@ let job_manuals =
         ( Artifacts,
           Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
             Before_merging );
-        ( Artifacts,
-          Tezos_ci_jobs.Code_verification.job_build_x86_64_exp Before_merging );
       ]
     ~only_if_changed:Files.odoc
     ~force_if_label:["ci--docs"]
@@ -264,8 +262,6 @@ let register () =
           Schedule_extended_test;
         Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
           Schedule_extended_test;
-        Tezos_ci_jobs.Code_verification.job_build_x86_64_exp
-          Schedule_extended_test;
       ]
     [
       (Auto, job_rst_check);
@@ -285,8 +281,6 @@ let register () =
         Tezos_ci_jobs.Code_verification.job_build_x86_64_release
           Schedule_extended_test;
         Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
-          Schedule_extended_test;
-        Tezos_ci_jobs.Code_verification.job_build_x86_64_exp
           Schedule_extended_test;
       ]
     [(Auto, job_publish)] ;

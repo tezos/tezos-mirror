@@ -3142,13 +3142,11 @@ documentation.manuals:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-exp
   - oc.build_kernels
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
-  - oc.build_amd64-exp
   - oc.build_kernels
   timeout: 60 minutes
   interruptible: true
