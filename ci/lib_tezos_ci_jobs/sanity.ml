@@ -133,6 +133,25 @@ let job_oc_misc_checks =
          | `no_license_check -> []);
        ])
 
+(* Note: this job's script includes a copy-paste of the script of [grafazos.build]. *)
+let job_check_jsonnet =
+  CI.job
+    "check_jsonnet"
+    ~__POS__
+    ~image:Tezos_ci.Images.jsonnet_master
+    ~description:"Check jsonnet format and lint."
+    ~stage:Test
+    ~only_if_changed:["**/*.jsonnet"]
+    [
+      "cd grafazos/";
+      (* For security, we explicitly install v11.1.0
+           which corresponds to commit [1ce5aec]. *)
+      "jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec";
+      "cd ../";
+      "scripts/lint.sh --check-jsonnet-format";
+      "scripts/lint.sh --check-jsonnet-lint";
+    ]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -141,6 +160,7 @@ let register () =
       (Immediate, job_oc_ocaml_fmt);
       (Immediate, job_semgrep);
       (Immediate, job_oc_misc_checks `full);
+      (Immediate, job_check_jsonnet);
     ] ;
   CI.register_schedule_extended_test_jobs
     [
@@ -149,5 +169,6 @@ let register () =
       (Immediate, job_oc_ocaml_fmt);
       (Immediate, job_semgrep);
       (Immediate, job_oc_misc_checks `no_license_check);
+      (Immediate, job_check_jsonnet);
     ] ;
   ()

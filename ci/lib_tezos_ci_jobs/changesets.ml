@@ -174,9 +174,6 @@ let changeset_lint_files =
 (** Set of Rust files for formatting ([cargo fmt --check]). *)
 let changeset_rust_fmt_files = Changeset.(changeset_base @ make ["**/*.rs"])
 
-(** Set of Jsonnet files for formatting ([jsonnetfmt --test]). *)
-let changeset_jsonnet_fmt_files = Changeset.(make ["**/*.jsonnet"])
-
 let changeset_test_sdk_rust =
   Changeset.(
     changeset_base

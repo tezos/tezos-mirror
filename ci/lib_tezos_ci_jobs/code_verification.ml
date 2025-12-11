@@ -262,30 +262,6 @@ let jobs pipeline_type =
         ["nix run .#ci-check-version-sh-lock"]
         ~cache:[cache ~key:"nix-store" ["/nix/store"]]
     in
-    let job_check_jsonnet =
-      (* Note: this job's script includes a copy-paste of the script of [grafazos.build]. *)
-      job
-        ~__POS__
-        ~name:"check_jsonnet"
-        ~image:Images.jsonnet_master
-        ~stage
-        ~dependencies
-        ~rules:
-          (make_rules ~dependent:true ~changes:changeset_jsonnet_fmt_files ())
-        ~before_script:
-          [
-            "cd grafazos/";
-            (* For security, we explicitly install v11.1.0
-               which corresponds to commit [1ce5aec]. *)
-            "jb install \
-             github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec";
-            "cd ../";
-          ]
-        [
-          "scripts/lint.sh --check-jsonnet-format";
-          "scripts/lint.sh --check-jsonnet-lint";
-        ]
-    in
     let job_check_rust_fmt : tezos_job =
       job
         ~__POS__
@@ -325,7 +301,7 @@ let jobs pipeline_type =
           ]
       | Schedule_extended_test -> []
     in
-    [job_check_jsonnet; job_check_rust_fmt] @ mr_only_jobs
+    job_check_rust_fmt :: mr_only_jobs
   in
   let dependencies_needs_start = dependencies_needs_start pipeline_type in
   let job_build_x86_64_release = job_build_x86_64_release pipeline_type in
