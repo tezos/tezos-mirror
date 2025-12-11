@@ -124,3 +124,5 @@ let reset_credit_for_deactivated_delegates ctxt deactivated_delegates =
       deactivated_delegates
   in
   return ctxt
+
+let remove_outdated_cycle = Storage.Stake.Selected_bakers.remove

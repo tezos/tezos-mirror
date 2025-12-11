@@ -441,7 +441,9 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
          This happens because this data doesn't exist for cycles before
          the storage has been introduced. *)
       let* ctxt = Delegate_stake_info.remove ctxt outdated_cycle in
-      Seed_storage.remove_for_cycle ctxt outdated_cycle
+      let* ctxt = Seed_storage.remove_for_cycle ctxt outdated_cycle in
+      let*! ctxt = Swrr_sampler.remove_outdated_cycle ctxt outdated_cycle in
+      return ctxt
 
 let attesting_power ~all_bakers_attest_enabled ctxt level =
   let open Lwt_result_syntax in
