@@ -162,6 +162,37 @@ let job_check_rust_fmt =
     ~only_if_changed:["**/*.rs"]
     ["scripts/check-format-rust.sh"]
 
+(* Note: checking commit titles only makes sense in merge request pipelines.
+   In scheduled pipelines, it is too late to change commit titles. *)
+let job_commit_titles =
+  Cacio.parameterize @@ fun mode ->
+  CI.job
+    "commit_titles"
+    ~__POS__
+    ~description:"Check that commit titles match the developer guidelines."
+    ~image:Tezos_ci.Images.CI.prebuild_master
+    ~stage:Test
+    ~allow_failure:
+      (match mode with
+      | `strict -> No
+      | `lenient ->
+          (* ./scripts/ci/check_commit_messages.sh exits with code 65
+             when a git history contains invalid commits titles
+             in situations where that is allowed. *)
+          With_exit_codes [65])
+    [
+      (* "|| exit $?" might seem like a noop but is in fact necessary
+         to please his majesty GitLab.
+         For more info, see:
+         - https://gitlab.com/tezos/tezos/-/merge_requests/9923#note_1538894754;
+         - https://gitlab.com/tezos/tezos/-/merge_requests/12141; and
+         - https://gitlab.com/groups/gitlab-org/-/epics/6074
+         TODO: replace this with [FF_USE_NEW_BASH_EVAL_STRATEGY=true], see
+         {{:https://docs.gitlab.com/runner/configuration/feature-flags.html}GitLab
+         Runner feature flags}. *)
+      "./scripts/ci/check_commit_messages.sh || exit $?";
+    ]
+
 let register () =
   CI.register_merge_request_jobs
     [
@@ -173,6 +204,8 @@ let register () =
       (Immediate, job_check_jsonnet);
       (Immediate, job_check_rust_fmt);
     ] ;
+  CI.register_before_merging_jobs [(Immediate, job_commit_titles `lenient)] ;
+  CI.register_merge_train_jobs [(Immediate, job_commit_titles `strict)] ;
   CI.register_schedule_extended_test_jobs
     [
       (Immediate, job_sanity_ci);
