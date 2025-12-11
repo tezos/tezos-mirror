@@ -43,6 +43,7 @@ etherlink.republish-docker-image:arm64:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - ./scripts/ci/docker_initialize.sh
   - VERSION=$(etherlink/scripts/get_latest_release_version.sh)
   - BUILT_IMAGE=$(etherlink/scripts/build_docker_release.sh arm64 $VERSION)
   - export CI_COMMIT_TAG="octez-evm-node-v$VERSION"
@@ -50,6 +51,10 @@ etherlink.republish-docker-image:arm64:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
 
 etherlink.republish-docker-image:x86_64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -68,6 +73,7 @@ etherlink.republish-docker-image:x86_64:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - ./scripts/ci/docker_initialize.sh
   - VERSION=$(etherlink/scripts/get_latest_release_version.sh)
   - BUILT_IMAGE=$(etherlink/scripts/build_docker_release.sh x86_64 $VERSION)
   - export CI_COMMIT_TAG="octez-evm-node-v$VERSION"
@@ -75,3 +81,7 @@ etherlink.republish-docker-image:x86_64:
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    DOCKER_BUILD_TARGET: without-evm-artifacts
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
