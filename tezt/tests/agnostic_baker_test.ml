@@ -216,7 +216,9 @@ let reconnect_after_migration ~migrate_from ~migrate_to =
         "reconnect";
         Protocol.tag migrate_from;
         Protocol.tag migrate_to;
-        "flaky";
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/8171
+           Reconnection during a protocol migration kills the baker. *)
+        Tag.ci_disabled;
       ]
     ~uses:[Constant.octez_agnostic_baker]
   @@ fun () ->
