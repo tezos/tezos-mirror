@@ -56,7 +56,7 @@ etherlink.republish-docker-image:arm64:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
+    CI_DOCKER_HUB: "true"
 
 etherlink.republish-docker-image:x86_64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -88,4 +88,4 @@ etherlink.republish-docker-image:x86_64:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
+    CI_DOCKER_HUB: "true"

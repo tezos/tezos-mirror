@@ -442,7 +442,6 @@ let job_docker_promote_to_latest =
 
 let job_republish_docker_image =
   Cacio.parameterize @@ fun arch ->
-  Cacio.parameterize @@ fun test ->
   CI.job
     ("republish-docker-image:" ^ Runner.Arch.(show_easy_to_distinguish arch))
     ~__POS__
@@ -452,11 +451,7 @@ let job_republish_docker_image =
     ~arch
     ~stage:Build
     ~image:Tezos_ci.Images_external.docker
-    ~variables:
-      [
-        ("DOCKER_VERSION", "24.0.7");
-        ("CI_DOCKER_HUB", match test with `test -> "false" | `real -> "true");
-      ]
+    ~variables:[("DOCKER_VERSION", "24.0.7"); ("CI_DOCKER_HUB", "true")]
     ~services:[{name = "docker:${DOCKER_VERSION}-dind"}]
     [
       "./scripts/ci/docker_initialize.sh";
@@ -529,7 +524,7 @@ let register () =
     ~description:
       "Pipeline to rebuild and republish the latest released Docker images."
     [
-      (Manual, job_republish_docker_image Amd64 `test);
-      (Manual, job_republish_docker_image Arm64 `test);
+      (Manual, job_republish_docker_image Amd64);
+      (Manual, job_republish_docker_image Arm64);
     ] ;
   ()
