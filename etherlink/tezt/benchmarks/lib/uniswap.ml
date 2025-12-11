@@ -11,6 +11,8 @@ open Benchmark_utils
 open Floodgate_lib
 
 type env = {
+  container :
+    L2_types.evm_chain_family Evm_node_lib_dev.Services_backend_sig.tx_container;
   sequencer : Evm_node.t;
   rpc_node : Evm_node.t;
   infos : Network_info.t;
@@ -60,10 +62,11 @@ let deposit_wxtz_gas_limit {accounts; infos; rpc_node; wxtz_addr; _} =
   Log.debug "Deposit gas limit: %a@." Z.pp_print gas_limit ;
   return gas_limit
 
-let deposit_wxtz ~gas_limit {infos; rpc_node; wxtz_addr; _} ?nonce value account
-    =
+let deposit_wxtz ~gas_limit {container; infos; rpc_node; wxtz_addr; _} ?nonce
+    value account =
   let* _ =
     call
+      ~container
       infos
       rpc_node
       wxtz_addr
@@ -155,8 +158,8 @@ let check_wxtz_deposits env =
   Log.report "Deposited tokens to WXTZ contract" ;
   unit
 
-let add_xtz_liquidity {sequencer; rpc_node; infos; router_addr; _} ~sender
-    ~token_addr ~xtz ~token =
+let add_xtz_liquidity {container; sequencer; rpc_node; infos; router_addr; _}
+    ~sender ~token_addr ~xtz ~token =
   let name = "addLiquidityETH" in
   let params_ty =
     [`address; `uint 256; `uint 256; `uint 256; `address; `uint 256]
@@ -176,6 +179,7 @@ let add_xtz_liquidity {sequencer; rpc_node; infos; router_addr; _} ~sender
   wait_for_application sequencer @@ fun () ->
   let* _ =
     call
+      ~container
       infos
       rpc_node
       router_addr
@@ -196,8 +200,8 @@ let add_xtz_liquidities env ~sender =
       add_xtz_liquidity env ~sender ~token_addr ~xtz:1000 ~token)
     env.gld_tokens
 
-let add_liquidity {sequencer; rpc_node; infos; router_addr; _} ~sender ~gld
-    ~gld2 =
+let add_liquidity {container; sequencer; rpc_node; infos; router_addr; _}
+    ~sender ~gld ~gld2 =
   let name = "addLiquidity" in
   let params_ty =
     [
@@ -228,6 +232,7 @@ let add_liquidity {sequencer; rpc_node; infos; router_addr; _} ~sender ~gld
   wait_for_application sequencer @@ fun () ->
   let* _ =
     call
+      ~container
       infos
       rpc_node
       router_addr
@@ -258,14 +263,15 @@ let add_token_liquidities env ~sender =
           add_liquidity env ~sender ~gld:(p1, 100_000) ~gld2:(p2, 200_000))
         (pairs env)
 
-let approve_router {sequencer; rpc_node; infos; router_addr; _} ~sender
-    ~token_addr =
+let approve_router {container; sequencer; rpc_node; infos; router_addr; _}
+    ~sender ~token_addr =
   let name = "approve" in
   let params_ty = [`address; `uint 256] in
   let params = [`address (address router_addr); `int max_uint256] in
   wait_for_application sequencer @@ fun () ->
   let* _ =
     call
+      ~container
       infos
       rpc_node
       token_addr
@@ -308,6 +314,7 @@ let swap_xtz ~nb_hops env iteration sender_index =
   in
   let* _ =
     call
+      ~container:env.container
       env.infos
       env.rpc_node
       env.router_addr
@@ -331,15 +338,24 @@ let step ({sequencer; accounts; nb_hops; _} as env) iteration =
   in
   wait_for_application sequencer step_f
 
-let create_pair ?nonce {sequencer; rpc_node; infos; factory_addr; _} ~sender
-    ((n, gld_addr), (n2, gld2_addr)) =
+let create_pair ?nonce {container; sequencer; rpc_node; infos; factory_addr; _}
+    ~sender ((n, gld_addr), (n2, gld2_addr)) =
   Log.info " - Create pair %s/%s" n n2 ;
   let name = "createPair" in
   let params_ty = [`address; `address] in
   let params = [`address (address gld_addr); `address (address gld2_addr)] in
   wait_for_application sequencer @@ fun () ->
   let* _ =
-    call infos rpc_node factory_addr sender ?nonce ~name params_ty params
+    call
+      ~container
+      infos
+      rpc_node
+      factory_addr
+      sender
+      ?nonce
+      ~name
+      params_ty
+      params
   in
   unit
 
@@ -376,19 +392,34 @@ let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
   let*? infos =
     Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:1000.
   in
-  let*? () =
-    Tx_queue.start
-      ~relay_endpoint:endpoint
-      ~max_transaction_batch_length:(Some 300)
-      ~inclusion_timeout:parameters.timeout
-      ()
+  let start_container, container =
+    Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
   in
+  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
+         (module Tx_container)) =
+    container
+  in
+  let max_size = 999_999 in
+  let tx_per_addr_limit = Int64.of_int 999_999 in
+  let max_transaction_batch_length = Some 300 in
+  let max_lifespan_s = 2 in
+  let config : Evm_node_config.Configuration.tx_queue =
+    {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
+  in
+  let*? () =
+    start_container ~config ~keep_alive:true ~timeout:parameters.timeout ()
+  in
+  let* () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let follower =
     Floodgate.start_blueprint_follower
       ~relay_endpoint:endpoint
       ~rpc_endpoint:endpoint
   in
-  let tx_queue = Tx_queue.beacon ~tick_interval:0.25 in
+  let tx_queue =
+    Tx_container.tx_queue_beacon
+      ~evm_node_endpoint:(Rpc endpoint)
+      ~tick_interval:0.25
+  in
   Log.report "Deploying WXTZ" ;
   let* wxtz_addr = deploy_contract ~rpc_node infos ~sequencer sender `ERC20 in
   Log.info "  WXTZ: %s" wxtz_addr ;
@@ -422,6 +453,7 @@ let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
 
   let env =
     {
+      container;
       sequencer;
       rpc_node;
       infos;
@@ -453,7 +485,7 @@ let setup ~accounts ~nb_tokens ~nb_hops ~sequencer ~rpc_node =
   let shutdown () =
     Lwt.cancel follower ;
     Lwt.cancel tx_queue ;
-    let* () = Tx_queue.shutdown () in
+    let*? () = Tx_container.shutdown () in
     let* () = Evm_node.terminate sequencer in
     unit
   in

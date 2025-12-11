@@ -13,6 +13,8 @@ open Floodgate_lib
 open Evm_node_lib_dev_encoding
 
 type env = {
+  container :
+    L2_types.evm_chain_family Evm_node_lib_dev.Services_backend_sig.tx_container;
   sequencer : Evm_node.t;
   rpc_node : Evm_node.t;
   infos : Network_info.t;
@@ -21,9 +23,11 @@ type env = {
   nb_contracts : int;
 }
 
-let deposit_one {infos; gas_limit; rpc_node; _} ?nonce value account contract =
+let deposit_one {container; infos; gas_limit; rpc_node; _} ?nonce value account
+    contract =
   let* _ =
     call
+      ~container
       infos
       rpc_node
       contract
@@ -132,14 +136,15 @@ let transfer_gas_limit {accounts; infos; rpc_node; _} contract =
   in
   return gas_limit
 
-let account_step infos rpc_node ?gas_limit contract ~nonce (sender : Account.t)
-    value (dest : Account.t) =
+let account_step {container; infos; rpc_node; gas_limit; _} contract ~nonce
+    (sender : Account.t) value (dest : Account.t) =
   let* _ =
     call
+      ~container
       infos
       rpc_node
       contract
-      ?gas_limit
+      ~gas_limit
       sender
       ~nonce
       ~name:"transfer"
@@ -148,8 +153,8 @@ let account_step infos rpc_node ?gas_limit contract ~nonce (sender : Account.t)
   in
   unit
 
-let sender_step {infos; rpc_node; gas_limit; accounts; _} erc20s iteration
-    sender_index =
+let sender_step env erc20s iteration sender_index =
+  let accounts = env.accounts in
   let sender = accounts.(sender_index mod Array.length accounts) in
   let dest_index =
     (sender_index + (7 * (iteration + 1))) mod Array.length accounts
@@ -160,9 +165,7 @@ let sender_step {infos; rpc_node; gas_limit; accounts; _} erc20s iteration
     (fun i contract ->
       let nonce = Z.add nonce (Z.of_int i) in
       account_step
-        infos
-        rpc_node
-        ~gas_limit
+        env
         contract
         ~nonce
         sender
@@ -204,8 +207,12 @@ let test_erc20_capacity () =
   let*? infos =
     Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:100.
   in
+  let start_container, container =
+    Evm_node_lib_dev.Tx_queue.tx_container ~chain_family:EVM
+  in
   let env =
     {
+      container;
       infos;
       sequencer;
       rpc_node = sequencer;
@@ -214,19 +221,33 @@ let test_erc20_capacity () =
       nb_contracts;
     }
   in
-  let*? () =
-    Tx_queue.start
-      ~relay_endpoint:endpoint
-      ~max_transaction_batch_length:(Some 300)
-      ~inclusion_timeout:parameters.timeout
-      ()
+
+  let (Evm_node_lib_dev.Services_backend_sig.Evm_tx_container
+         (module Tx_container)) =
+    container
   in
+
+  let max_size = 999_999 in
+  let tx_per_addr_limit = Int64.of_int 999_999 in
+  let max_transaction_batch_length = Some 300 in
+  let max_lifespan_s = 2 in
+  let config : Evm_node_config.Configuration.tx_queue =
+    {max_size; max_transaction_batch_length; max_lifespan_s; tx_per_addr_limit}
+  in
+  let*? () =
+    start_container ~config ~keep_alive:true ~timeout:parameters.timeout ()
+  in
+  let* () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let follower =
     Floodgate.start_blueprint_follower
       ~relay_endpoint:endpoint
       ~rpc_endpoint:endpoint
   in
-  let tx_queue = Tx_queue.beacon ~tick_interval:0.1 in
+  let tx_queue =
+    Tx_container.tx_queue_beacon
+      ~evm_node_endpoint:(Rpc endpoint)
+      ~tick_interval:0.1
+  in
   Log.report "Deploying %d ERC20 contracts" nb_contracts ;
   let* erc20s =
     deploy_contracts
@@ -253,7 +274,7 @@ let test_erc20_capacity () =
   in
   Lwt.cancel follower ;
   Lwt.cancel tx_queue ;
-  let* () = Tx_queue.shutdown () in
+  let*? () = Tx_container.shutdown () in
   let* () = Evm_node.terminate sequencer in
   stop_profile ()
 
