@@ -248,7 +248,7 @@ let job_publish =
     ~image:Tezos_ci.Images.CI.test
     ~stage:Publish
     ~description:"Publish the documentation to octez.com/docs."
-    ~needs:[(Artifacts, job_build_all `full `static)]
+    ~needs:[(Artifacts, job_build_all `full `dynamic)]
     ~cargo_cache:true
     ~sccache:(Cacio.sccache ())
     [
@@ -285,6 +285,14 @@ let register () =
     ~description:
       "Generate and push the documentation to octez.com/docs without being \
        interrupted."
-    ~legacy_jobs:[Tezos_ci_jobs.Master_branch.job_static_x86_64]
+    ~legacy_jobs:
+      [
+        Tezos_ci_jobs.Code_verification.job_build_x86_64_release
+          Schedule_extended_test;
+        Tezos_ci_jobs.Code_verification.job_build_x86_64_extra_dev
+          Schedule_extended_test;
+        Tezos_ci_jobs.Code_verification.job_build_x86_64_exp
+          Schedule_extended_test;
+      ]
     [(Auto, job_publish)] ;
   ()
